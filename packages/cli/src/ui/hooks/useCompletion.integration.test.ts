@@ -55,6 +55,12 @@ describe('useCompletion git-aware filtering integration', () => {
       action: vi.fn(),
     },
     {
+      name: 'stats',
+      altName: 'usage',
+      description: 'check session stats. Usage: /stats [model|tools]',
+      action: vi.fn(),
+    },
+    {
       name: 'clear',
       description: 'Clear the screen',
       action: vi.fn(),
@@ -511,10 +517,39 @@ describe('useCompletion git-aware filtering integration', () => {
     expect(result.current.showSuggestions).toBe(true);
   });
 
-  it('should suggest commands based on altName', async () => {
+  it('should not suggest commands when altName is fully typed', async () => {
+    {
+      const { result } = renderHook(() =>
+        useCompletion(
+          '/?',
+          '/test/cwd',
+          true,
+          mockSlashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions).toHaveLength(0);
+    }
+    {
+      const { result } = renderHook(() =>
+        useCompletion(
+          '/usage',
+          '/test/cwd',
+          true,
+          mockSlashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions).toHaveLength(0);
+    }
+  });
+
+  it('should suggest commands based on partial altName matches', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/?',
+        '/usag', // part of usage
         '/test/cwd',
         true,
         mockSlashCommands,
@@ -523,9 +558,10 @@ describe('useCompletion git-aware filtering integration', () => {
     );
 
     expect(result.current.suggestions).toEqual([
-      { label: 'help', value: 'help', description: 'Show help' },
+      { label: 'stats', value: 'stats', description: 'check session stats. Usage: /stats [model|tools]' },
     ]);
   });
+
 
   it('should suggest sub-command names for a parent command', async () => {
     const { result } = renderHook(() =>
