@@ -16,7 +16,7 @@ import {
   DEFAULT_ENCODING,
   getSpecificMimeType,
 } from '../utils/fileUtils.js';
-import { PartListUnion } from '@google/genai';
+import { PartListUnion, Schema, Type } from '@google/genai';
 import { Config } from '../config/config.js';
 import {
   recordFileOperationMetric,
@@ -135,43 +135,53 @@ export class ReadManyFilesTool extends BaseTool<
     readonly targetDir: string,
     private config: Config,
   ) {
-    const parameterSchema: Record<string, unknown> = {
-      type: 'object',
+    const parameterSchema: Schema = {
+      type: Type.OBJECT,
       properties: {
         paths: {
-          type: 'array',
-          items: { type: 'string' },
+          type: Type.ARRAY,
+          items: {
+            type: Type.STRING,
+            minLength: '1',
+          },
+          minItems: '1',
           description:
             "Required. An array of glob patterns or paths relative to the tool's target directory. Examples: ['src/**/*.ts'], ['README.md', 'docs/']",
         },
         include: {
-          type: 'array',
-          items: { type: 'string' },
+          type: Type.ARRAY,
+          items: {
+            type: Type.STRING,
+            minLength: '1',
+          },
           description:
             'Optional. Additional glob patterns to include. These are merged with `paths`. Example: ["*.test.ts"] to specifically add test files if they were broadly excluded.',
           default: [],
         },
         exclude: {
-          type: 'array',
-          items: { type: 'string' },
+          type: Type.ARRAY,
+          items: {
+            type: Type.STRING,
+            minLength: '1',
+          },
           description:
             'Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: ["**/*.log", "temp/"]',
           default: [],
         },
         recursive: {
-          type: 'boolean',
+          type: Type.BOOLEAN,
           description:
             'Optional. Whether to search recursively (primarily controlled by `**` in glob patterns). Defaults to true.',
           default: true,
         },
         useDefaultExcludes: {
-          type: 'boolean',
+          type: Type.BOOLEAN,
           description:
             'Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.',
           default: true,
         },
         respect_git_ignore: {
-          type: 'boolean',
+          type: Type.BOOLEAN,
           description:
             'Optional. Whether to respect .gitignore patterns when discovering files. Only available in git repositories. Defaults to true.',
           default: true,
@@ -202,47 +212,9 @@ Use this tool when the user's query implies needing the content of several files
   }
 
   validateParams(params: ReadManyFilesParams): string | null {
-    if (
-      !params.paths ||
-      !Array.isArray(params.paths) ||
-      params.paths.length === 0
-    ) {
-      return 'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.';
-    }
-    if (
-      this.schema.parameters &&
-      !SchemaValidator.validate(
-        this.schema.parameters as Record<string, unknown>,
-        params,
-      )
-    ) {
-      if (
-        !params.paths ||
-        !Array.isArray(params.paths) ||
-        params.paths.length === 0
-      ) {
-        return 'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.';
-      }
-      return 'Parameters failed schema validation. Ensure "paths" is a non-empty array and other parameters match their expected types.';
-    }
-    for (const p of params.paths) {
-      if (typeof p !== 'string' || p.trim() === '') {
-        return 'Each item in "paths" must be a non-empty string/glob pattern.';
-      }
-    }
-    if (
-      params.include &&
-      (!Array.isArray(params.include) ||
-        !params.include.every((item) => typeof item === 'string'))
-    ) {
-      return 'If provided, "include" must be an array of strings/glob patterns.';
-    }
-    if (
-      params.exclude &&
-      (!Array.isArray(params.exclude) ||
-        !params.exclude.every((item) => typeof item === 'string'))
-    ) {
-      return 'If provided, "exclude" must be an array of strings/glob patterns.';
+    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    if (errors) {
+      return errors;
     }
     return null;
   }
@@ -418,7 +390,7 @@ Use this tool when the user's query implies needing the content of several files
         if (typeof fileReadResult.llmContent === 'string') {
           const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
             '{filePath}',
-            relativePathForDisplay,
+            filePath,
           );
           contentParts.push(`${separator}\n\n${fileReadResult.llmContent}\n\n`);
         } else {

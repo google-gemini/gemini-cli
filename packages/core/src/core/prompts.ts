@@ -22,12 +22,12 @@ export function getCoreSystemPrompt(userMemory?: string): string {
   // if GEMINI_SYSTEM_MD is set (and not 0|false), override system prompt from file
   // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD
   let systemMdEnabled = false;
-  let systemMdPath = path.join(GEMINI_CONFIG_DIR, 'system.md');
+  let systemMdPath = path.resolve(path.join(GEMINI_CONFIG_DIR, 'system.md'));
   const systemMdVar = process.env.GEMINI_SYSTEM_MD?.toLowerCase();
   if (systemMdVar && !['0', 'false'].includes(systemMdVar)) {
     systemMdEnabled = true; // enable system prompt override
     if (!['1', 'true'].includes(systemMdVar)) {
-      systemMdPath = systemMdVar; // use custom path from GEMINI_SYSTEM_MD
+      systemMdPath = path.resolve(systemMdVar); // use custom path from GEMINI_SYSTEM_MD
     }
     // require file to exist when override is enabled
     if (!fs.existsSync(systemMdPath)) {
@@ -49,6 +49,7 @@ You are an interactive CLI agent specializing in software engineering tasks. You
 - **Proactiveness:** Fulfill the user's request thoroughly, including reasonable, directly implied follow-up actions.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
+- **Path Construction:** Before using any file system tool (e.g., ${ReadFileTool.Name}' or '${WriteFileTool.Name}'), you must construct the full absolute path for the file_path argument. Always combine the absolute path of the project's root directory with the file's path relative to the root. For example, if the project root is /path/to/project/ and the file is foo/bar/baz.txt, the final path you must use is /path/to/project/foo/bar/baz.txt. If the user provides a relative path, you must resolve it against the root directory to create an absolute path.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
 # Primary Workflows
@@ -166,7 +167,7 @@ model: true
 
 <example>
 user: list files here.
-model: [tool_call: ${LSTool.Name} for path '.']
+model: [tool_call: ${LSTool.Name} for path '/path/to/project']
 </example>
 
 <example>
@@ -211,7 +212,7 @@ ${(function () {
 
 <example>
 user: Delete the temp directory.
-model: I can run \`rm -rf ./temp\`. This will permanently delete the directory and all its contents.
+model: I can run \`rm -rf /path/to/project/temp\`. This will permanently delete the directory and all its contents.
 </example>
 
 <example>
@@ -260,7 +261,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
     if (['1', 'true'].includes(writeSystemMdVar)) {
       fs.writeFileSync(systemMdPath, basePrompt); // write to default path, can be modified via GEMINI_SYSTEM_MD
     } else {
-      fs.writeFileSync(writeSystemMdVar, basePrompt); // write to custom path from GEMINI_WRITE_SYSTEM_MD
+      fs.writeFileSync(path.resolve(writeSystemMdVar), basePrompt); // write to custom path from GEMINI_WRITE_SYSTEM_MD
     }
   }
 
@@ -270,4 +271,69 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
       : '';
 
   return `${basePrompt}${memorySuffix}`;
+}
+
+/**
+ * Provides the system prompt for the history compression process.
+ * This prompt instructs the model to act as a specialized state manager,
+ * think in a scratchpad, and produce a structured XML summary.
+ */
+export function getCompressionPrompt(): string {
+  return `
+You are the component that summarizes internal chat history into a given structure.
+
+When the conversation history grows too large, you will be invoked to distill the entire history into a concise, structured XML snapshot. This snapshot is CRITICAL, as it will become the agent's *only* memory of the past. The agent will resume its work based solely on this snapshot. All crucial details, plans, errors, and user directives MUST be preserved.
+
+First, you will think through the entire history in a private <scratchpad>. Review the user's overall goal, the agent's actions, tool outputs, file modifications, and any unresolved questions. Identify every piece of information that is essential for future actions.
+
+After your reasoning is complete, generate the final <state_snapshot> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.
+
+The structure MUST be as follows:
+
+<state_snapshot>
+    <overall_goal>
+        <!-- A single, concise sentence describing the user's high-level objective. -->
+        <!-- Example: "Refactor the authentication service to use a new JWT library." -->
+    </overall_goal>
+
+    <key_knowledge>
+        <!-- Crucial facts, conventions, and constraints the agent must remember based on the conversation history and interaction with the user. Use bullet points. -->
+        <!-- Example:
+         - Build Command: \`npm run build\`
+         - Testing: Tests are run with \`npm test\`. Test files must end in \`.test.ts\`.
+         - API Endpoint: The primary API endpoint is \`https://api.example.com/v2\`.
+         
+        -->
+    </key_knowledge>
+
+    <file_system_state>
+        <!-- List files that have been created, read, modified, or deleted. Note their status and critical learnings. -->
+        <!-- Example:
+         - CWD: \`/home/user/project/src\`
+         - READ: \`package.json\` - Confirmed 'axios' is a dependency.
+         - MODIFIED: \`services/auth.ts\` - Replaced 'jsonwebtoken' with 'jose'.
+         - CREATED: \`tests/new-feature.test.ts\` - Initial test structure for the new feature.
+        -->
+    </file_system_state>
+
+    <recent_actions>
+        <!-- A summary of the last few significant agent actions and their outcomes. Focus on facts. -->
+        <!-- Example:
+         - Ran \`grep 'old_function'\` which returned 3 results in 2 files.
+         - Ran \`npm run test\`, which failed due to a snapshot mismatch in \`UserProfile.test.ts\`.
+         - Ran \`ls -F static/\` and discovered image assets are stored as \`.webp\`.
+        -->
+    </recent_actions>
+
+    <current_plan>
+        <!-- The agent's step-by-step plan. Mark completed steps. -->
+        <!-- Example:
+         1. [DONE] Identify all files using the deprecated 'UserAPI'.
+         2. [IN PROGRESS] Refactor \`src/components/UserProfile.tsx\` to use the new 'ProfileAPI'.
+         3. [TODO] Refactor the remaining files.
+         4. [TODO] Update tests to reflect the API change.
+        -->
+    </current_plan>
+</state_snapshot>
+`.trim();
 }

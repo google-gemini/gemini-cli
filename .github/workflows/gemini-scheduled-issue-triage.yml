@@ -1,0 +1,100 @@
+name: Gemini Scheduled Issue Triage
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Runs every hour
+  workflow_dispatch: {}
+
+jobs:
+  triage-issues:
+    timeout-minutes: 10
+    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+    steps:
+      - name: Generate GitHub App Token
+        id: generate_token
+        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Find untriaged issues
+        id: find_issues
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+        run: |
+          echo "🔍 Finding issues without labels..."
+          NO_LABEL_ISSUES=$(gh issue list --repo ${{ github.repository }} --search "is:open is:issue no:label" --json number,title,body)
+
+          echo "🏷️ Finding issues that need triage..."
+          NEED_TRIAGE_ISSUES=$(gh issue list --repo ${{ github.repository }} --search "is:open is:issue label:\"status/need-triage\"" --json number,title,body)
+
+          echo "🔄 Merging and deduplicating issues..."
+          ISSUES=$(echo "$NO_LABEL_ISSUES" "$NEED_TRIAGE_ISSUES" | jq -c -s 'add | unique_by(.number)')
+
+          echo "📝 Setting output for GitHub Actions..."
+          echo "issues_to_triage=$ISSUES" >> "$GITHUB_OUTPUT"
+
+          echo "✅ Found $(echo "$ISSUES" | jq 'length') issues to triage! 🎯"
+
+      - name: Run Gemini Issue Triage
+        if: steps.find_issues.outputs.issues_to_triage != '[]'
+        uses: google-gemini/gemini-cli-action@df3f890f003d28c60a2a09d2c29e0126e4d1e2ff
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+          ISSUES_TO_TRIAGE: ${{ steps.find_issues.outputs.issues_to_triage }}
+          REPOSITORY: ${{ github.repository }}
+        with:
+          version: 0.1.8-rc.0
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OTLP_GCP_WIF_PROVIDER: ${{ secrets.OTLP_GCP_WIF_PROVIDER }}
+          OTLP_GOOGLE_CLOUD_PROJECT: ${{ secrets.OTLP_GOOGLE_CLOUD_PROJECT }}
+          settings_json: |
+            {
+              "coreTools": [
+                "run_shell_command(echo)",
+                "run_shell_command(gh label list)",
+                "run_shell_command(gh issue edit)",
+                "run_shell_command(gh issue list)"
+              ],
+              "telemetry": {
+                "enabled": true,
+                "target": "gcp"
+              },
+              "sandbox": false
+            }
+          prompt: |
+            You are an issue triage assistant. Analyze issues and apply appropriate labels ONE AT A TIME.
+
+            Repository: ${{ github.repository }}
+
+            Steps:
+            1. Run: `gh label list --repo ${{ github.repository }} --limit 100` to see available labels
+            2. Check environment variable for issues to triage: $ISSUES_TO_TRIAGE (JSON array of issues)
+            3. Parse the JSON array from step 2 and for EACH INDIVIDUAL issue, apply appropriate labels using separate commands:
+               - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --add-label "label1"`
+               - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --add-label "label2"`
+               - Continue for each label separately
+
+            IMPORTANT: Label each issue individually, one command per issue, one label at a time if needed.
+
+            Guidelines:
+            - Only use existing repository labels from step 1
+            - Do not add comments to issues
+            - Triage each issue independently based on title and body content
+            - Focus on applying: kind/* (bug/enhancement/documentation), area/* (core/cli/testing/windows), and priority/* labels
+            - If an issue has insufficient information, consider applying "status/need-information"
+            - After applying appropriate labels to an issue, remove the "status/need-triage" label if present: `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "status/need-triage"`
+            - Execute one `gh issue edit` command per issue, wait for success before proceeding to the next
+
+            Example triage logic:
+            - Issues with "bug", "error", "broken" → kind/bug
+            - Issues with "feature", "enhancement", "improve" → kind/enhancement
+            - Issues about Windows/performance → area/windows, area/performance
+            - Critical bugs → priority/p0, other bugs → priority/p1, enhancements → priority/p2
+
+            Process each issue sequentially and confirm each labeling operation before moving to the next issue.

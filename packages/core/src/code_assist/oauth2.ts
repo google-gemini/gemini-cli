@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OAuth2Client, Credentials } from 'google-auth-library';
+import {
+  OAuth2Client,
+  Credentials,
+  Compute,
+  CodeChallengeMethod,
+} from 'google-auth-library';
 import * as http from 'http';
 import url from 'url';
 import crypto from 'crypto';
@@ -13,6 +18,15 @@ import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import * as os from 'os';
+import { Config } from '../config/config.js';
+import { getErrorMessage } from '../utils/errors.js';
+import {
+  cacheGoogleAccount,
+  getCachedGoogleAccount,
+  clearCachedGoogleAccount,
+} from '../utils/user_account.js';
+import { AuthType } from '../core/contentGenerator.js';
+import readline from 'node:readline';
 
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
@@ -52,37 +66,142 @@ export interface OauthWebLogin {
   loginCompletePromise: Promise<void>;
 }
 
-export async function getOauthClient(): Promise<OAuth2Client> {
+export async function getOauthClient(
+  authType: AuthType,
+  config: Config,
+): Promise<OAuth2Client> {
   const client = new OAuth2Client({
     clientId: OAUTH_CLIENT_ID,
     clientSecret: OAUTH_CLIENT_SECRET,
   });
 
+  client.on('tokens', async (tokens: Credentials) => {
+    await cacheCredentials(tokens);
+  });
+
+  // If there are cached creds on disk, they always take precedence
   if (await loadCachedCredentials(client)) {
     // Found valid cached credentials.
+    // Check if we need to retrieve Google Account ID or Email
+    if (!getCachedGoogleAccount()) {
+      try {
+        await fetchAndCacheUserInfo(client);
+      } catch {
+        // Non-fatal, continue with existing auth.
+      }
+    }
+    console.log('Loaded cached credentials.');
     return client;
   }
 
-  const webLogin = await authWithWeb(client);
+  // In Google Cloud Shell, we can use Application Default Credentials (ADC)
+  // provided via its metadata server to authenticate non-interactively using
+  // the identity of the user logged into Cloud Shell.
+  if (authType === AuthType.CLOUD_SHELL) {
+    try {
+      console.log("Attempting to authenticate via Cloud Shell VM's ADC.");
+      const computeClient = new Compute({
+        // We can leave this empty, since the metadata server will provide
+        // the service account email.
+      });
+      await computeClient.getAccessToken();
+      console.log('Authentication successful.');
 
-  console.log(
-    `\n\nCode Assist login required.\n` +
-      `Attempting to open authentication page in your browser.\n` +
-      `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
-  );
-  await open(webLogin.authUrl);
-  console.log('Waiting for authentication...');
+      // Do not cache creds in this case; note that Compute client will handle its own refresh
+      return computeClient;
+    } catch (e) {
+      throw new Error(
+        `Could not authenticate using Cloud Shell credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ${getErrorMessage(
+          e,
+        )}`,
+      );
+    }
+  }
 
-  await webLogin.loginCompletePromise;
+  if (config.getNoBrowser()) {
+    let success = false;
+    const maxRetries = 2;
+    for (let i = 0; !success && i < maxRetries; i++) {
+      success = await authWithUserCode(client);
+      if (!success) {
+        console.error(
+          '\nFailed to authenticate with user code.',
+          i === maxRetries - 1 ? '' : 'Retrying...\n',
+        );
+      }
+    }
+    if (!success) {
+      process.exit(1);
+    }
+  } else {
+    const webLogin = await authWithWeb(client);
+
+    // This does basically nothing, as it isn't show to the user.
+    console.log(
+      `\n\nCode Assist login required.\n` +
+        `Attempting to open authentication page in your browser.\n` +
+        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
+    );
+    await open(webLogin.authUrl);
+    console.log('Waiting for authentication...');
+
+    await webLogin.loginCompletePromise;
+  }
 
   return client;
+}
+
+async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
+  const redirectUri = 'https://sdk.cloud.google.com/authcode_cloudcode.html';
+  const codeVerifier = await client.generateCodeVerifierAsync();
+  const state = crypto.randomBytes(32).toString('hex');
+  const authUrl: string = client.generateAuthUrl({
+    redirect_uri: redirectUri,
+    access_type: 'offline',
+    scope: OAUTH_SCOPE,
+    code_challenge_method: CodeChallengeMethod.S256,
+    code_challenge: codeVerifier.codeChallenge,
+    state,
+  });
+  console.log('Please visit the following URL to authorize the application:');
+  console.log('');
+  console.log(authUrl);
+  console.log('');
+
+  const code = await new Promise<string>((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question('Enter the authorization code: ', (code) => {
+      rl.close();
+      resolve(code.trim());
+    });
+  });
+
+  if (!code) {
+    console.error('Authorization code is required.');
+    return false;
+  }
+
+  try {
+    const { tokens } = await client.getToken({
+      code,
+      codeVerifier: codeVerifier.codeVerifier,
+      redirect_uri: redirectUri,
+    });
+    client.setCredentials(tokens);
+  } catch (_error) {
+    return false;
+  }
+  return true;
 }
 
 async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   const port = await getAvailablePort();
   const redirectUri = `http://localhost:${port}/oauth2callback`;
   const state = crypto.randomBytes(32).toString('hex');
-  const authUrl: string = client.generateAuthUrl({
+  const authUrl = client.generateAuthUrl({
     redirect_uri: redirectUri,
     access_type: 'offline',
     scope: OAUTH_SCOPE,
@@ -114,7 +233,16 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
             redirect_uri: redirectUri,
           });
           client.setCredentials(tokens);
-          await cacheCredentials(client.credentials);
+          // Retrieve and cache Google Account ID during authentication
+          try {
+            await fetchAndCacheUserInfo(client);
+          } catch (error) {
+            console.error(
+              'Failed to retrieve Google Account ID during authentication:',
+              error,
+            );
+            // Don't fail the auth flow if Google Account ID retrieval fails
+          }
 
           res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_SUCCESS_URL });
           res.end();
@@ -195,8 +323,44 @@ function getCachedCredentialPath(): string {
 
 export async function clearCachedCredentialFile() {
   try {
-    await fs.rm(getCachedCredentialPath());
+    await fs.rm(getCachedCredentialPath(), { force: true });
+    // Clear the Google Account ID cache when credentials are cleared
+    await clearCachedGoogleAccount();
   } catch (_) {
     /* empty */
+  }
+}
+
+async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
+  try {
+    const { token } = await client.getAccessToken();
+    if (!token) {
+      return;
+    }
+
+    const response = await fetch(
+      'https://www.googleapis.com/oauth2/v2/userinfo',
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      console.error(
+        'Failed to fetch user info:',
+        response.status,
+        response.statusText,
+      );
+      return;
+    }
+
+    const userInfo = await response.json();
+    if (userInfo.email) {
+      await cacheGoogleAccount(userInfo.email);
+    }
+  } catch (error) {
+    console.error('Error retrieving user info:', error);
   }
 }

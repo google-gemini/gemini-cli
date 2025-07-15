@@ -14,6 +14,7 @@ import {
   EVENT_CLI_CONFIG,
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
+  EVENT_FLASH_FALLBACK,
   SERVICE_NAME,
 } from './constants.js';
 import {
@@ -23,6 +24,7 @@ import {
   StartSessionEvent,
   ToolCallEvent,
   UserPromptEvent,
+  FlashFallbackEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -31,7 +33,9 @@ import {
   recordToolCallMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
+import { uiTelemetryService, UiEvent } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
 const shouldLogUserPrompts = (config: Config): boolean =>
   config.getTelemetryLogPromptsEnabled();
@@ -98,6 +102,12 @@ export function logUserPrompt(config: Config, event: UserPromptEvent): void {
 }
 
 export function logToolCall(config: Config, event: ToolCallEvent): void {
+  const uiEvent = {
+    ...event,
+    'event.name': EVENT_TOOL_CALL,
+    'event.timestamp': new Date().toISOString(),
+  } as UiEvent;
+  uiTelemetryService.addEvent(uiEvent);
   ClearcutLogger.getInstance(config)?.logToolCallEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
@@ -106,7 +116,7 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     ...event,
     'event.name': EVENT_TOOL_CALL,
     'event.timestamp': new Date().toISOString(),
-    function_args: JSON.stringify(event.function_args, null, 2),
+    function_args: safeJsonStringify(event.function_args, 2),
   };
   if (event.error) {
     attributes['error.message'] = event.error;
@@ -149,7 +159,35 @@ export function logApiRequest(config: Config, event: ApiRequestEvent): void {
   logger.emit(logRecord);
 }
 
+export function logFlashFallback(
+  config: Config,
+  event: FlashFallbackEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logFlashFallbackEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_FLASH_FALLBACK,
+    'event.timestamp': new Date().toISOString(),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Switching to flash as Fallback.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
 export function logApiError(config: Config, event: ApiErrorEvent): void {
+  const uiEvent = {
+    ...event,
+    'event.name': EVENT_API_ERROR,
+    'event.timestamp': new Date().toISOString(),
+  } as UiEvent;
+  uiTelemetryService.addEvent(uiEvent);
   ClearcutLogger.getInstance(config)?.logApiErrorEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
@@ -186,6 +224,12 @@ export function logApiError(config: Config, event: ApiErrorEvent): void {
 }
 
 export function logApiResponse(config: Config, event: ApiResponseEvent): void {
+  const uiEvent = {
+    ...event,
+    'event.name': EVENT_API_RESPONSE,
+    'event.timestamp': new Date().toISOString(),
+  } as UiEvent;
+  uiTelemetryService.addEvent(uiEvent);
   ClearcutLogger.getInstance(config)?.logApiResponseEvent(event);
   if (!isTelemetrySdkInitialized()) return;
   const attributes: LogAttributes = {
