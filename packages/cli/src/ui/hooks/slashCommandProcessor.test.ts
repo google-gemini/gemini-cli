@@ -54,7 +54,16 @@ vi.mock('../../utils/version.js', () => ({
 }));
 
 import { act, renderHook } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  Mock,
+} from 'vitest';
 import open from 'open';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
 import { MessageType, SlashCommandProcessorResult } from '../types.js';
@@ -206,76 +215,6 @@ describe('useSlashCommandProcessor', () => {
 
   const getProcessor = (showToolDescriptions: boolean = false) =>
     getProcessorHook(showToolDescriptions).result.current;
-
-  describe('/stats command', () => {
-    it('should show detailed session statistics', async () => {
-      // Arrange
-      mockUseSessionStats.mockReturnValue({
-        stats: {
-          sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
-        },
-      });
-
-      const { handleSlashCommand } = getProcessor();
-      const mockDate = new Date('2025-01-01T01:02:03.000Z'); // 1h 2m 3s duration
-      vi.setSystemTime(mockDate);
-
-      // Act
-      await act(async () => {
-        handleSlashCommand('/stats');
-      });
-
-      // Assert
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2, // Called after the user message
-        expect.objectContaining({
-          type: MessageType.STATS,
-          duration: '1h 2m 3s',
-        }),
-        expect.any(Number),
-      );
-
-      vi.useRealTimers();
-    });
-
-    it('should show model-specific statistics when using /stats model', async () => {
-      // Arrange
-      const { handleSlashCommand } = getProcessor();
-
-      // Act
-      await act(async () => {
-        handleSlashCommand('/stats model');
-      });
-
-      // Assert
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2, // Called after the user message
-        expect.objectContaining({
-          type: MessageType.MODEL_STATS,
-        }),
-        expect.any(Number),
-      );
-    });
-
-    it('should show tool-specific statistics when using /stats tools', async () => {
-      // Arrange
-      const { handleSlashCommand } = getProcessor();
-
-      // Act
-      await act(async () => {
-        handleSlashCommand('/stats tools');
-      });
-
-      // Assert
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2, // Called after the user message
-        expect.objectContaining({
-          type: MessageType.TOOL_STATS,
-        }),
-        expect.any(Number),
-      );
-    });
-  });
 
   describe('Other commands', () => {
     it('/editor should open editor dialog and return handled', async () => {
