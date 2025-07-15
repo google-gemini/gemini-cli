@@ -7,7 +7,7 @@
 import { createHash } from 'crypto';
 import { GeminiEventType, ServerGeminiStreamEvent } from '../core/turn.js';
 import { logLoopDetected } from '../telemetry/loggers.js';
-import { LoopType } from '../telemetry/types.js';
+import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
 import { Config } from '../config/config.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
@@ -68,11 +68,10 @@ export class LoopDetectionService {
       this.toolCallRepetitionCount = 1;
     }
     if (this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD) {
-      logLoopDetected(this.config, {
-        'event.name': 'loop_detected',
-        'event.timestamp': new Date().toISOString(),
-        loop_type: LoopType.TOOL_CALL,
-      });
+      logLoopDetected(
+        this.config,
+        new LoopDetectedEvent(LoopType.CONSECUTIVE_IDENTICAL_TOOL_CALLS),
+      );
       return true;
     }
     return false;
@@ -110,11 +109,10 @@ export class LoopDetectionService {
       }
 
       if (this.sentenceRepetitionCount >= CONTENT_LOOP_THRESHOLD) {
-        logLoopDetected(this.config, {
-          'event.name': 'loop_detected',
-          'event.timestamp': new Date().toISOString(),
-          loop_type: LoopType.CONTENT,
-        });
+        logLoopDetected(
+          this.config,
+          new LoopDetectedEvent(LoopType.CHANTING_IDENTICAL_SENTENCES),
+        );
         return true;
       }
     }

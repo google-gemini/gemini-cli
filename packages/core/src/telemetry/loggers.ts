@@ -300,8 +300,6 @@ export function logLoopDetected(
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     ...event,
-    'event.name': 'loop_detected',
-    'event.timestamp': new Date().toISOString(),
   };
 
   const logger = logs.getLogger(SERVICE_NAME);

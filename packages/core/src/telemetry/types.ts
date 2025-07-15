@@ -247,8 +247,8 @@ export class FlashFallbackEvent {
 }
 
 export enum LoopType {
-  TOOL_CALL = 'tool_call',
-  CONTENT = 'content',
+  CONSECUTIVE_IDENTICAL_TOOL_CALLS = 'consecutive_identical_tool_calls',
+  CHANTING_IDENTICAL_SENTENCES = 'chanting_identical_sentences',
 }
 
 export class LoopDetectedEvent {
