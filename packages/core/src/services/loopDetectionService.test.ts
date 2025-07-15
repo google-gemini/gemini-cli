@@ -120,6 +120,70 @@ describe('LoopDetectionService', () => {
       expect(service.addAndCheck(eventWithPunct)).toBe(false);
     });
 
+    it('should not treat function calls or method calls as sentence endings', () => {
+      // These should not trigger sentence detection, so repeating them many times should never cause a loop
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 2; i++) {
+        expect(service.addAndCheck(createContentEvent('console.log()'))).toBe(
+          false,
+        );
+      }
+
+      service.reset();
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 2; i++) {
+        expect(service.addAndCheck(createContentEvent('obj.method()'))).toBe(
+          false,
+        );
+      }
+
+      service.reset();
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 2; i++) {
+        expect(
+          service.addAndCheck(createContentEvent('arr.filter().map()')),
+        ).toBe(false);
+      }
+
+      service.reset();
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 2; i++) {
+        expect(
+          service.addAndCheck(
+            createContentEvent('if (condition) { return true; }'),
+          ),
+        ).toBe(false);
+      }
+    });
+
+    it('should correctly identify actual sentence endings and trigger loop detection', () => {
+      // These should trigger sentence detection, so repeating them should eventually cause a loop
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        expect(
+          service.addAndCheck(createContentEvent('This is a sentence.')),
+        ).toBe(false);
+      }
+      expect(
+        service.addAndCheck(createContentEvent('This is a sentence.')),
+      ).toBe(true);
+
+      service.reset();
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        expect(
+          service.addAndCheck(createContentEvent('Is this a question? ')),
+        ).toBe(false);
+      }
+      expect(
+        service.addAndCheck(createContentEvent('Is this a question? ')),
+      ).toBe(true);
+
+      service.reset();
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        expect(
+          service.addAndCheck(createContentEvent('What excitement!\n')),
+        ).toBe(false);
+      }
+      expect(
+        service.addAndCheck(createContentEvent('What excitement!\n')),
+      ).toBe(true);
+    });
+
     it('should handle content with mixed punctuation', () => {
       service.addAndCheck(createContentEvent('Question?'));
       service.addAndCheck(createContentEvent('Exclamation!'));

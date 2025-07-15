@@ -9,7 +9,7 @@ import { GeminiEventType, ServerGeminiStreamEvent } from '../core/turn.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
-const SENTENCE_ENDING_PUNCTUATION = /[.!?]/;
+const SENTENCE_ENDING_PUNCTUATION_REGEX = /[.!?]+(?=\s|$)/;
 
 /**
  * Service for detecting and preventing infinite loops in AI responses.
@@ -39,6 +39,8 @@ export class LoopDetectionService {
   addAndCheck(event: ServerGeminiStreamEvent): boolean {
     switch (event.type) {
       case GeminiEventType.ToolCallRequest:
+        // content chanting only happens in one single stream, reset if there
+        // is a tool call in between
         this.resetSentenceCount();
         return this.checkToolCallLoop(event.value);
       case GeminiEventType.Content:
@@ -63,11 +65,12 @@ export class LoopDetectionService {
   private checkContentLoop(content: string): boolean {
     this.partialContent += content;
 
-    if (!SENTENCE_ENDING_PUNCTUATION.test(this.partialContent)) {
+    if (!SENTENCE_ENDING_PUNCTUATION_REGEX.test(this.partialContent)) {
       return false;
     }
 
-    const completeSentences = this.partialContent.match(/[^.!?]+[.!?]/g) || [];
+    const completeSentences =
+      this.partialContent.match(/[^.!?]+[.!?]+(?=\s|$)/g) || [];
     if (completeSentences.length === 0) {
       return false;
     }
