@@ -24,6 +24,7 @@ import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
+import { isWithinRoot } from '../utils/fileUtils.js';
 
 /**
  * Parameters for the Edit tool
@@ -72,12 +73,7 @@ export class EditTool
   implements ModifiableTool<EditToolParams>
 {
   static readonly Name = 'replace';
-  private readonly rootDirectory: string;
 
-  /**
-   * Creates a new instance of the EditLogic
-   * @param rootDirectory Root directory to ground this tool in.
-   */
   constructor(private readonly config: Config) {
     super(
       EditTool.Name,
@@ -121,24 +117,6 @@ Expectation for required parameters:
         type: Type.OBJECT,
       },
     );
-    this.rootDirectory = path.resolve(this.config.getTargetDir());
-  }
-
-  /**
-   * Checks if a path is within the root directory.
-   * @param pathToCheck The absolute path to check.
-   * @returns True if the path is within the root directory, false otherwise.
-   */
-  private isWithinRoot(pathToCheck: string): boolean {
-    const normalizedPath = path.normalize(pathToCheck);
-    const normalizedRoot = this.rootDirectory;
-    const rootWithSep = normalizedRoot.endsWith(path.sep)
-      ? normalizedRoot
-      : normalizedRoot + path.sep;
-    return (
-      normalizedPath === normalizedRoot ||
-      normalizedPath.startsWith(rootWithSep)
-    );
   }
 
   /**
@@ -156,8 +134,8 @@ Expectation for required parameters:
       return `File path must be absolute: ${params.file_path}`;
     }
 
-    if (!this.isWithinRoot(params.file_path)) {
-      return `File path must be within the root directory (${this.rootDirectory}): ${params.file_path}`;
+    if (!isWithinRoot(params.file_path, this.config.getTargetDir())) {
+      return `File path must be within the root directory (${this.config.getTargetDir()}): ${params.file_path}`;
     }
 
     return null;
@@ -325,7 +303,7 @@ Expectation for required parameters:
     );
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
-      title: `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`,
+      title: `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.config.getTargetDir()))}`,
       fileName,
       fileDiff,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
@@ -341,7 +319,10 @@ Expectation for required parameters:
     if (!params.file_path || !params.old_string || !params.new_string) {
       return `Model did not provide valid parameters for edit tool`;
     }
-    const relativePath = makeRelative(params.file_path, this.rootDirectory);
+    const relativePath = makeRelative(
+      params.file_path,
+      this.config.getTargetDir(),
+    );
     if (params.old_string === '') {
       return `Create ${shortenPath(relativePath)}`;
     }
@@ -400,7 +381,7 @@ Expectation for required parameters:
 
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {
-        displayResult = `Created ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`;
+        displayResult = `Created ${shortenPath(makeRelative(params.file_path, this.config.getTargetDir()))}`;
       } else {
         // Generate diff for display, even though core logic doesn't technically need it
         // The CLI wrapper will use this part of the ToolResult
