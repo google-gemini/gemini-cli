@@ -44,28 +44,28 @@ function commandExists(cmd: string): boolean {
   }
 }
 
-const editorCommands: Record<EditorType, { win32: string; default: string }> = {
-  vscode: { win32: 'code.cmd', default: 'code' },
-  vscodium: { win32: 'codium.cmd', default: 'codium' },
-  windsurf: { win32: 'windsurf', default: 'windsurf' },
-  cursor: { win32: 'cursor', default: 'cursor' },
-  vim: { win32: 'vim', default: 'vim' },
-  neovim: { win32: 'nvim', default: 'nvim' },
-  zed: { win32: 'zed', default: 'zed' },
+/**
+ * Editor command configurations for different platforms.
+ * Each editor can have multiple possible command names, listed in order of preference.
+ */
+const editorCommands: Record<
+  EditorType,
+  { win32: string[]; default: string[] }
+> = {
+  vscode: { win32: ['code.cmd'], default: ['code'] },
+  vscodium: { win32: ['codium.cmd'], default: ['codium'] },
+  windsurf: { win32: ['windsurf'], default: ['windsurf'] },
+  cursor: { win32: ['cursor'], default: ['cursor'] },
+  vim: { win32: ['vim'], default: ['vim'] },
+  neovim: { win32: ['nvim'], default: ['nvim'] },
+  zed: { win32: ['zed'], default: ['zeditor', 'zed'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
   const commandConfig = editorCommands[editor];
-  const command =
+  const commands =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
-
-  const primaryExists = commandExists(command);
-
-  if (editor === 'zed' && !primaryExists) {
-    return commandExists('zeditor');
-  }
-
-  return primaryExists;
+  return commands.some((cmd) => commandExists(cmd));
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
@@ -99,21 +99,20 @@ export function getDiffCommand(
     return null;
   }
   const commandConfig = editorCommands[editor];
-  const command =
+  const commands =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
+  const command =
+    commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
+    commands[commands.length - 1];
+
   switch (editor) {
     case 'vscode':
     case 'vscodium':
     case 'windsurf':
     case 'cursor':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
-    case 'zed': {
-      const zedCommand = commandExists(command) ? command : 'zeditor';
-      return {
-        command: zedCommand,
-        args: ['--wait', '--diff', oldPath, newPath],
-      };
-    }
+    case 'zed':
+      return { command, args: ['--wait', '--diff', oldPath, newPath] };
     case 'vim':
     case 'neovim':
       return {
