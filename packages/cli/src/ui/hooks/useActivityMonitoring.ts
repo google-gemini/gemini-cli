@@ -6,12 +6,13 @@
 
 import { useCallback } from 'react';
 import {
-  recordUserActivity,
   Config,
   getActivityMonitor,
   startGlobalActivityMonitoring,
   stopGlobalActivityMonitoring,
+  ActivityType,
 } from '@google/gemini-cli-core';
+import { recordUserActivity as recordUserActivitySimple } from '@google/gemini-cli-core/src/telemetry/activity-detector.js';
 
 /**
  * Options for the activity monitoring hook
@@ -65,9 +66,12 @@ export function useActivityMonitoring(
 
   // Record activity callback
   const recordActivity = useCallback(
-    (_type: string, _context?: string, _metadata?: Record<string, unknown>) => {
+    (type: string, context?: string, metadata?: Record<string, unknown>) => {
       if (enabled) {
-        recordUserActivity();
+        const monitor = getActivityMonitor();
+        if (monitor) {
+          monitor.recordActivity(type as ActivityType, context, metadata);
+        }
       }
     },
     [enabled],
@@ -78,7 +82,7 @@ export function useActivityMonitoring(
     // Activity monitoring is always active when enabled
     if (enabled) {
       startGlobalActivityMonitoring(config);
-      recordUserActivity(); // Record initial activity
+      recordUserActivitySimple(); // Record initial activity
     }
   }, [enabled, config]);
 
@@ -120,25 +124,25 @@ export function useActivityMonitoring(
 export function useActivityRecorder(_config: Config, enabled: boolean = true) {
   return {
     recordUserInput: useCallback(() => {
-      if (enabled) recordUserActivity();
+      if (enabled) recordUserActivitySimple();
     }, [enabled]),
     recordUserInputEnd: useCallback(() => {
-      if (enabled) recordUserActivity();
+      if (enabled) recordUserActivitySimple();
     }, [enabled]),
     recordMessageAdded: useCallback(() => {
-      if (enabled) recordUserActivity();
+      if (enabled) recordUserActivitySimple();
     }, [enabled]),
     recordToolCall: useCallback(() => {
-      if (enabled) recordUserActivity();
+      if (enabled) recordUserActivitySimple();
     }, [enabled]),
     recordStreamStart: useCallback(() => {
-      if (enabled) recordUserActivity();
+      if (enabled) recordUserActivitySimple();
     }, [enabled]),
     recordStreamEnd: useCallback(() => {
-      if (enabled) recordUserActivity();
+      if (enabled) recordUserActivitySimple();
     }, [enabled]),
     recordHistoryUpdate: useCallback(() => {
-      if (enabled) recordUserActivity();
+      if (enabled) recordUserActivitySimple();
     }, [enabled]),
   };
 }
