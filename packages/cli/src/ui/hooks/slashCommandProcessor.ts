@@ -248,36 +248,6 @@ export const useSlashCommandProcessor = (
         action: (_mainCommand, _subCommand, _args) => openEditorDialog(),
       },
       {
-        name: 'stats',
-        altName: 'usage',
-        description: 'check session stats. Usage: /stats [model|tools]',
-        action: (_mainCommand, subCommand, _args) => {
-          if (subCommand === 'model') {
-            addMessage({
-              type: MessageType.MODEL_STATS,
-              timestamp: new Date(),
-            });
-            return;
-          } else if (subCommand === 'tools') {
-            addMessage({
-              type: MessageType.TOOL_STATS,
-              timestamp: new Date(),
-            });
-            return;
-          }
-
-          const now = new Date();
-          const { sessionStartTime } = session.stats;
-          const wallDuration = now.getTime() - sessionStartTime.getTime();
-
-          addMessage({
-            type: MessageType.STATS,
-            duration: formatDuration(wallDuration),
-            timestamp: new Date(),
-          });
-        },
-      },
-      {
         name: 'mcp',
         description: 'list configured MCP servers and tools',
         action: async (_mainCommand, _subCommand, _args) => {
@@ -466,34 +436,6 @@ export const useSlashCommandProcessor = (
             message += '\n';
           }
 
-          // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
-          message += '\u001b[0m';
-
-          addMessage({
-            type: MessageType.INFO,
-            content: message,
-            timestamp: new Date(),
-          });
-        },
-      },
-      {
-        name: 'extensions',
-        description: 'list active extensions',
-        action: async () => {
-          const activeExtensions = config?.getActiveExtensions();
-          if (!activeExtensions || activeExtensions.length === 0) {
-            addMessage({
-              type: MessageType.INFO,
-              content: 'No active extensions.',
-              timestamp: new Date(),
-            });
-            return;
-          }
-
-          let message = 'Active extensions:\n\n';
-          for (const ext of activeExtensions) {
-            message += `  - \u001b[36m${ext.name} (v${ext.version})\u001b[0m\n`;
-          }
           // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
           message += '\u001b[0m';
 

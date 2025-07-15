@@ -11,9 +11,11 @@ import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
+import { statsCommand } from '../ui/commands/statsCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
+import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 
 const loadBuiltInCommands = async (
   config: Config | null,
@@ -22,11 +24,13 @@ const loadBuiltInCommands = async (
     aboutCommand,
     authCommand,
     clearCommand,
-    helpCommand,
+    extensionsCommand,
+  helpCommand,
     ideCommand(config),
     memoryCommand,
     privacyCommand,
-    themeCommand,
+    statsCommand,
+  themeCommand,
   ];
 
   return allCommands.filter(
