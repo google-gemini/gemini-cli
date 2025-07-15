@@ -196,7 +196,7 @@ The enhanced memory monitoring system supports configuration through the activit
     "maxEventBuffer": 100,
     "triggerActivities": [
       "user_input_start",
-      "message_added", 
+      "message_added",
       "tool_call_scheduled",
       "stream_start"
     ]
