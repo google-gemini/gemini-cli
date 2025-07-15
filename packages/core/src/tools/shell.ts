@@ -489,14 +489,22 @@ Process Group PGID: Process group started or \`(none)\``,
       }
     }
 
-    const summary = await summarizeToolOutput(
-      llmContent,
-      this.config.getGeminiClient(),
-      abortSignal,
-    );
+    const summarizeConfig = this.config.getSummarizeToolOutputConfig();
+    if (summarizeConfig && summarizeConfig[this.name]) {
+      const summary = await summarizeToolOutput(
+        llmContent,
+        this.config.getGeminiClient(),
+        abortSignal,
+        summarizeConfig[this.name].tokenBudget,
+      );
+      return {
+        llmContent: summary,
+        returnDisplay: returnDisplayMessage,
+      };
+    }
 
     return {
-      llmContent: summary,
+      llmContent,
       returnDisplay: returnDisplayMessage,
     };
   }
