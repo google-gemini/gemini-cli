@@ -2,7 +2,7 @@
   "name": "@google/gemini-cli",
   "version": "0.1.12",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20"
   },
   "type": "module",
   "workspaces": [
@@ -80,6 +80,6 @@
     "react-devtools-core": "^4.28.5",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
-    "yargs": "^17.7.2"
+    "yargs": "^18.0.0"
   }
 }
