@@ -1021,7 +1021,6 @@ export const useSlashCommandProcessor = (
     toggleCorgiMode,
     savedChatTags,
     config,
-    settings,
     showToolDescriptions,
     session,
     gitService,
