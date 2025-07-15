@@ -144,6 +144,7 @@ export interface ConfigParameters {
   listExtensions?: boolean;
   activeExtensions?: ActiveExtension[];
   noBrowser?: boolean;
+  ideMode?: boolean;
 }
 
 export class Config {
@@ -183,6 +184,7 @@ export class Config {
   private readonly model: string;
   private readonly extensionContextFilePaths: string[];
   private readonly noBrowser: boolean;
+  private readonly ideMode: boolean;
   private modelSwitchedDuringSession: boolean = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
@@ -234,6 +236,7 @@ export class Config {
     this.listExtensions = params.listExtensions ?? false;
     this._activeExtensions = params.activeExtensions ?? [];
     this.noBrowser = params.noBrowser ?? false;
+    this.ideMode = params.ideMode ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -256,11 +259,7 @@ export class Config {
     // Initialize centralized FileDiscoveryService
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
-      try {
-        await this.getGitService();
-      } catch {
-        // For now swallow the error, later log it.
-      }
+      await this.getGitService();
     }
     this.toolRegistry = await this.createToolRegistry();
   }
@@ -498,6 +497,10 @@ export class Config {
     return this.noBrowser;
   }
 
+  getIdeMode(): boolean {
+    return this.ideMode;
+  }
+
   async getGitService(): Promise<GitService> {
     if (!this.gitService) {
       this.gitService = new GitService(this.targetDir);
@@ -522,7 +525,6 @@ export class Config {
 
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this);
-    const targetDir = this.getTargetDir();
 
     // helper to create & register core tools that are enabled
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -557,14 +559,14 @@ export class Config {
       }
     };
 
-    registerCoreTool(LSTool, targetDir, this);
-    registerCoreTool(ReadFileTool, targetDir, this);
-    registerCoreTool(GrepTool, targetDir);
-    registerCoreTool(GlobTool, targetDir, this);
+    registerCoreTool(LSTool, this);
+    registerCoreTool(ReadFileTool, this);
+    registerCoreTool(GrepTool, this);
+    registerCoreTool(GlobTool, this);
     registerCoreTool(EditTool, this);
     registerCoreTool(WriteFileTool, this);
     registerCoreTool(WebFetchTool, this);
-    registerCoreTool(ReadManyFilesTool, targetDir, this);
+    registerCoreTool(ReadManyFilesTool, this);
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);

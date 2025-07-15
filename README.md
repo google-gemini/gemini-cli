@@ -30,6 +30,11 @@ With the Gemini CLI you can:
 
    ```bash
    npm install -g @google/gemini-cli
+   ```
+
+   Then, run the CLI from anywhere:
+
+   ```bash
    gemini
    ```
 
@@ -95,6 +100,7 @@ gemini
 - If you encounter any issues, review the **[Troubleshooting guide](./docs/troubleshooting.md)**.
 - For more comprehensive documentation, see the [full documentation](./docs/index.md).
 - Take a look at some [popular tasks](#popular-tasks) for more inspiration.
+- Check out our **[Official Roadmap](./ROADMAP.md)**
 
 ### Troubleshooting
 
