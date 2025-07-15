@@ -37,6 +37,9 @@ vi.mock('../ui/commands/privacyCommand.js', () => ({
 vi.mock('../ui/commands/aboutCommand.js', () => ({
   aboutCommand: { name: 'about', description: 'Mock About' },
 }));
+vi.mock('../ui/commands/ideCommand.js', () => ({
+  ideCommand: () => ({ name: 'ide', description: 'Mock IDE' }),
+}));
 
 describe('CommandService', () => {
   describe('when using default production loader', () => {

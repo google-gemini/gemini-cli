@@ -153,6 +153,7 @@ describe('useSlashCommandProcessor', () => {
       getCheckpointingEnabled: vi.fn(() => true),
       getBugCommand: vi.fn(() => undefined),
       getSessionId: vi.fn(() => 'test-session-id'),
+      getIdeMode: vi.fn(() => false),
     } as unknown as Config;
     mockCorgiMode = vi.fn();
     mockUseSessionStats.mockReturnValue({
