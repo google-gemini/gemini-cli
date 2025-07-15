@@ -53,6 +53,7 @@ export enum GeminiEventType {
   MaxSessionTurns = 'max_session_turns',
   UsageMetadata = 'usage_metadata',
   Finished = 'finished',
+  LoopDetected = 'loop_detected',
 }
 
 export interface StructuredError {
@@ -147,6 +148,10 @@ export type ServerGeminiUsageMetadataEvent = {
   value: GenerateContentResponseUsageMetadata & { apiTimeMs?: number };
 };
 
+export type ServerGeminiLoopDetectedEvent = {
+  type: GeminiEventType.LoopDetected;
+};
+
 // The original union type, now composed of the individual types
 export type ServerGeminiStreamEvent =
   | ServerGeminiContentEvent
@@ -159,7 +164,8 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiThoughtEvent
   | ServerGeminiMaxSessionTurnsEvent
   | ServerGeminiUsageMetadataEvent
-  | ServerGeminiFinishedEvent;
+  | ServerGeminiFinishedEvent
+  | ServerGeminiLoopDetectedEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
