@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { fileURLToPath } from 'url';
 import { Config } from '@google/gemini-cli-core';
 import { SlashCommand } from './types.js';
 import * as child_process from 'child_process';
 import * as process from 'process';
 import { glob } from 'glob';
 import * as path from 'path';
-import * as fs from 'fs';
 
 const VSCODE_COMMAND = process.platform === 'win32' ? 'code.cmd' : 'code';
 
@@ -56,8 +56,39 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
             return;
           }
 
-          // TODO: fix path finding
-          const vsixPath = "packages/vscode-ide-companion/gemini-cli-vscode-ide-companion-0.0.1.vsix"
+          const bundleDir = path.dirname(fileURLToPath(import.meta.url));
+          // The VSIX file is copied to the bundle directory as part of the build.
+          let vsixFiles = glob.sync(path.join(bundleDir, '*.vsix'));
+
+          if (vsixFiles.length === 0) {
+            // If the VSIX file is not in the bundle, it might be a dev
+            // environment running with `npm start`. Look for it in the original
+            // package location, relative to the bundle dir.
+            const devPath = path.join(
+              bundleDir,
+              '..',
+              '..',
+              '..',
+              '..',
+              '..',
+              'vscode-ide-companion',
+              '*.vsix',
+            );
+            console.log(devPath)
+            vsixFiles = glob.sync(devPath);
+          }
+
+          if (vsixFiles.length === 0) {
+            context.ui.addItem(
+              {
+                type: 'error',
+                text: 'Could not find the VSCode extension file (.vsix).',
+              },
+              Date.now(),
+            );
+            return;
+          }
+          const vsixPath = vsixFiles[0];
           if (!vsixPath) {
             context.ui.addItem(
               {
