@@ -17,8 +17,13 @@ import { WriteFileTool } from '../tools/write-file.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
+import { Config } from '../config/config.js';
+import { ideContext } from '../services/ideContext.js';
 
-export function getCoreSystemPrompt(userMemory?: string): string {
+export function getCoreSystemPrompt(
+  config: Config,
+  userMemory?: string,
+): string {
   // if GEMINI_SYSTEM_MD is set (and not 0|false), override system prompt from file
   // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD
   let systemMdEnabled = false;
@@ -150,6 +155,33 @@ ${(function () {
 - If a commit fails, never attempt to work around the issues without being asked to do so.
 - Never push changes to a remote repository without being asked explicitly by the user.
 `;
+  }
+  return '';
+})()}
+
+${(function () {
+  if (config.getIdeMode()) {
+    const activeFile = ideContext.getActiveFileContext();
+    if (activeFile?.filePath) {
+      let prompt = `
+# IDE Mode
+You are running in IDE mode. The user has the following file open:
+- Path: ${activeFile.filePath}`;
+      if (activeFile.cursor) {
+        prompt += `
+- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`;
+      }
+      if (activeFile.selection) {
+        prompt += `
+- Selection:
+\`\`\`
+${activeFile.selection}
+\`\`\``;
+      }
+      prompt += `
+Focus on providing contextually relevant assistance for this file.`;
+      return prompt;
+    }
   }
   return '';
 })()}
