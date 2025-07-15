@@ -147,7 +147,9 @@ export const useSlashCommandProcessor = (
         historyItemContent = {
           type: 'info',
           parts: message.parts,
-          text: message.parts.join(""),
+          text: message.parts
+            .map((part) => (part.type === 'text' ? part.text : part.value))
+            .join(''),
         };
       } else {
         historyItemContent = {

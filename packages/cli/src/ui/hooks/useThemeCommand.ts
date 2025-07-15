@@ -7,8 +7,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { themeManager } from '../themes/theme-manager.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
-import { type HistoryItem, MessageType } from '../types.js';
+import { type HistoryItem, HistoryItemInfo, MessageType } from '../types.js';
 import process from 'node:process';
+import { textInfoPart } from '../utils/infoParts.js';
 
 interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
@@ -43,7 +44,12 @@ export const useThemeCommand = (
           {
             type: MessageType.INFO,
             text: 'Theme configuration unavailable due to NO_COLOR env variable.',
-          },
+            parts: [
+              textInfoPart(
+                'Theme configuration unavailable due to NO_COLOR env variable.',
+              ),
+            ],
+          } satisfies HistoryItemInfo as HistoryItemInfo,
           Date.now(),
         );
       }
@@ -65,7 +71,12 @@ export const useThemeCommand = (
         {
           type: MessageType.INFO,
           text: 'Theme configuration unavailable due to NO_COLOR env variable.',
-        },
+          parts: [
+            textInfoPart(
+              'Theme configuration unavailable due to NO_COLOR env variable.',
+            ),
+          ],
+        } satisfies HistoryItemInfo as HistoryItemInfo,
         Date.now(),
       );
       return;
