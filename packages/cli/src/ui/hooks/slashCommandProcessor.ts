@@ -1115,13 +1115,13 @@ export const useSlashCommandProcessor = (
                 };
               case 'message':
                 addItem(
-                  {
-                    type:
-                      result.messageType === 'error'
-                        ? MessageType.ERROR
-                        : MessageType.INFO,
-                    text: result.content,
-                  },
+                  result.messageType === 'info'
+                    ? historyItemInfo(textInfoPart(result.content))
+                    : {
+                        type: MessageType.ERROR,
+
+                        text: result.content,
+                      },
                   Date.now(),
                 );
                 return { type: 'handled' };
@@ -1192,13 +1192,9 @@ export const useSlashCommandProcessor = (
           }
           if (actionResult?.type === 'message') {
             addItem(
-              {
-                type:
-                  actionResult.messageType === 'error'
-                    ? MessageType.ERROR
-                    : MessageType.INFO,
-                text: actionResult.content,
-              },
+              actionResult.messageType === 'info'
+                ? historyItemInfo(textInfoPart(actionResult.content))
+                : { type: MessageType.ERROR, text: actionResult.content },
               Date.now(),
             );
           }

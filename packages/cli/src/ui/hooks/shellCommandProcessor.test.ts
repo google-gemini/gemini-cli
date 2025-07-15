@@ -10,6 +10,7 @@ import { useShellCommandProcessor } from './shellCommandProcessor';
 import { Config, GeminiClient } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import EventEmitter from 'events';
+import { historyItemInfo, textInfoPart } from '../utils/historyItemInfo.js';
 
 // Mock dependencies
 vi.mock('child_process');
@@ -103,11 +104,9 @@ describe('useShellCommandProcessor', () => {
     });
 
     expect(addItemToHistoryMock).toHaveBeenCalledTimes(2);
-    expect(addItemToHistoryMock.mock.calls[1][0]).toEqual({
-      type: 'info',
-      text: 'file1.txt\nfile2.txt',
-      parts: [{ type: 'text', text: 'file1.txt\nfile2.txt' }],
-    });
+    expect(addItemToHistoryMock.mock.calls[1][0]).toEqual(
+      historyItemInfo(textInfoPart('file1.txt\nfile2.txt')),
+    );
     expect(geminiClientMock.addHistory).toHaveBeenCalledTimes(1);
   });
 
@@ -140,16 +139,11 @@ describe('useShellCommandProcessor', () => {
     });
 
     expect(addItemToHistoryMock).toHaveBeenCalledTimes(2);
-    expect(addItemToHistoryMock.mock.calls[1][0]).toEqual({
-      type: 'info',
-      text: '[Command produced binary output, which is not shown.]',
-      parts: [
-        {
-          type: 'text',
-          text: '[Command produced binary output, which is not shown.]',
-        },
-      ],
-    });
+    expect(addItemToHistoryMock.mock.calls[1][0]).toEqual(
+      historyItemInfo(
+        textInfoPart('[Command produced binary output, which is not shown.]'),
+      ),
+    );
   });
 
   it('should handle command failure', async () => {

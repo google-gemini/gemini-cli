@@ -6,12 +6,13 @@
 
 import { useState, useCallback } from 'react';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
-import { type HistoryItem, MessageType } from '../types.js';
+import { type HistoryItem } from '../types.js';
 import {
   allowEditorTypeInSandbox,
   checkHasEditorType,
   EditorType,
 } from '@google/gemini-cli-core';
+import { historyItemInfo, textInfoPart } from '../utils/historyItemInfo.js';
 
 interface UseEditorSettingsReturn {
   isEditorDialogOpen: boolean;
@@ -47,10 +48,11 @@ export const useEditorSettings = (
       try {
         loadedSettings.setValue(scope, 'preferredEditor', editorType);
         addItem(
-          {
-            type: MessageType.INFO,
-            text: `Editor preference ${editorType ? `set to "${editorType}"` : 'cleared'} in ${scope} settings.`,
-          },
+          historyItemInfo(
+            textInfoPart(
+              `Editor preference ${editorType ? `set to "${editorType}"` : 'cleared'} in ${scope} settings.`,
+            ),
+          ),
           Date.now(),
         );
         setEditorError(null);

@@ -21,12 +21,12 @@ import { Part, PartListUnion } from '@google/genai';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import {
   HistoryItem,
-  MessageType,
   SlashCommandProcessorResult,
   StreamingState,
 } from '../types.js';
 import { Dispatch, SetStateAction } from 'react';
 import { LoadedSettings } from '../../config/settings.js';
+import { historyItemInfo, textInfoPart } from '../utils/historyItemInfo.js';
 
 // --- MOCKS ---
 const mockSendMessageStream = vi
@@ -902,10 +902,7 @@ describe('useGeminiStream', () => {
       // Verify cancellation message is added
       await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
-          {
-            type: MessageType.INFO,
-            text: 'Request cancelled.',
-          },
+          historyItemInfo(textInfoPart('Request cancelled.')),
           expect.any(Number),
         );
       });

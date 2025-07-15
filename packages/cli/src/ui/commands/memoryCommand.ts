@@ -7,6 +7,7 @@
 import { getErrorMessage } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
 import { SlashCommand, SlashCommandActionReturn } from './types.js';
+import { historyItemInfo, textInfoPart } from '../utils/historyItemInfo.js';
 
 export const memoryCommand: SlashCommand = {
   name: 'memory',
@@ -25,10 +26,7 @@ export const memoryCommand: SlashCommand = {
             : 'Memory is currently empty.';
 
         context.ui.addItem(
-          {
-            type: MessageType.INFO,
-            text: messageContent,
-          },
+          historyItemInfo(textInfoPart(messageContent)),
           Date.now(),
         );
       },
@@ -46,10 +44,9 @@ export const memoryCommand: SlashCommand = {
         }
 
         context.ui.addItem(
-          {
-            type: MessageType.INFO,
-            text: `Attempting to save to memory: "${args.trim()}"`,
-          },
+          historyItemInfo(
+            textInfoPart(`Attempting to save to memory: "${args.trim()}"`),
+          ),
           Date.now(),
         );
 
@@ -65,10 +62,9 @@ export const memoryCommand: SlashCommand = {
       description: 'Refresh the memory from the source.',
       action: async (context) => {
         context.ui.addItem(
-          {
-            type: MessageType.INFO,
-            text: 'Refreshing memory from source files...',
-          },
+          historyItemInfo(
+            textInfoPart('Refreshing memory from source files...'),
+          ),
           Date.now(),
         );
 
@@ -83,10 +79,7 @@ export const memoryCommand: SlashCommand = {
                 : 'Memory refreshed successfully. No memory content found.';
 
             context.ui.addItem(
-              {
-                type: MessageType.INFO,
-                text: successMessage,
-              },
+              historyItemInfo(textInfoPart(successMessage)),
               Date.now(),
             );
           }

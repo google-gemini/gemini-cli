@@ -191,13 +191,7 @@ export const useGeminiStream = (
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, Date.now());
       }
-      addItem(
-        {
-          type: MessageType.INFO,
-          text: 'Request cancelled.',
-        },
-        Date.now(),
-      );
+      addItem(historyItemInfo(textInfoPart('Request cancelled.')), Date.now());
       setPendingHistoryItem(null);
       setIsResponding(false);
     }
@@ -392,7 +386,7 @@ export const useGeminiStream = (
         setPendingHistoryItem(null);
       }
       addItem(
-        { type: MessageType.INFO, text: 'User cancelled the request.' },
+        historyItemInfo(textInfoPart('User cancelled the request.')),
         userMessageTimestamp,
       );
       setIsResponding(false);

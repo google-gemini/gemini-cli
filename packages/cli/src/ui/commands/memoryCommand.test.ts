@@ -10,6 +10,7 @@ import { type CommandContext, SlashCommand } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 import { getErrorMessage } from '@google/gemini-cli-core';
+import { historyItemInfo, textInfoPart } from '../utils/historyItemInfo.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
@@ -66,10 +67,7 @@ describe('memoryCommand', () => {
       await showCommand.action(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: 'Memory is currently empty.',
-        },
+        historyItemInfo(textInfoPart('Memory is currently empty.')),
         expect.any(Number),
       );
     });
@@ -85,10 +83,11 @@ describe('memoryCommand', () => {
       await showCommand.action(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: `Current memory content from 1 file(s):\n\n---\n${memoryContent}\n---`,
-        },
+        historyItemInfo(
+          textInfoPart(
+            `Current memory content from 1 file(s):\n\n---\n${memoryContent}\n---`,
+          ),
+        ),
         expect.any(Number),
       );
     });
@@ -122,10 +121,9 @@ describe('memoryCommand', () => {
       const result = addCommand.action(mockContext, `  ${fact}  `);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: `Attempting to save to memory: "${fact}"`,
-        },
+        historyItemInfo(
+          textInfoPart(`Attempting to save to memory: "${fact}"`),
+        ),
         expect.any(Number),
       );
 
@@ -166,20 +164,18 @@ describe('memoryCommand', () => {
       await refreshCommand.action(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: 'Refreshing memory from source files...',
-        },
+        historyItemInfo(textInfoPart('Refreshing memory from source files...')),
         expect.any(Number),
       );
 
       expect(mockRefreshMemory).toHaveBeenCalledOnce();
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: 'Memory refreshed successfully. Loaded 18 characters from 2 file(s).',
-        },
+        historyItemInfo(
+          textInfoPart(
+            'Memory refreshed successfully. Loaded 18 characters from 2 file(s).',
+          ),
+        ),
         expect.any(Number),
       );
     });
@@ -195,10 +191,11 @@ describe('memoryCommand', () => {
       expect(mockRefreshMemory).toHaveBeenCalledOnce();
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: 'Memory refreshed successfully. No memory content found.',
-        },
+        historyItemInfo(
+          textInfoPart(
+            'Memory refreshed successfully. No memory content found.',
+          ),
+        ),
         expect.any(Number),
       );
     });
@@ -236,10 +233,7 @@ describe('memoryCommand', () => {
       ).resolves.toBeUndefined();
 
       expect(nullConfigContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: 'Refreshing memory from source files...',
-        },
+        historyItemInfo(textInfoPart('Refreshing memory from source files...')),
         expect.any(Number),
       );
 

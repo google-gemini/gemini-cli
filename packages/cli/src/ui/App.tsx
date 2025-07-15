@@ -80,6 +80,7 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { historyItemInfo, textInfoPart } from './utils/historyItemInfo.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -227,10 +228,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const performMemoryRefresh = useCallback(async () => {
     addItem(
-      {
-        type: MessageType.INFO,
-        text: 'Refreshing hierarchical memory (GEMINI.md or other context files)...',
-      },
+      historyItemInfo(
+        textInfoPart(
+          'Refreshing hierarchical memory (GEMINI.md or other context files)...',
+        ),
+      ),
       Date.now(),
     );
     try {
@@ -245,10 +247,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       setGeminiMdFileCount(fileCount);
 
       addItem(
-        {
-          type: MessageType.INFO,
-          text: `Memory refreshed successfully. ${memoryContent.length > 0 ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).` : 'No memory content found.'}`,
-        },
+        historyItemInfo(
+          textInfoPart(
+            `Memory refreshed successfully. ${memoryContent.length > 0 ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).` : 'No memory content found.'}`,
+          ),
+        ),
         Date.now(),
       );
       if (config.getDebugMode()) {
@@ -340,13 +343,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       }
 
       // Add message to UI history
-      addItem(
-        {
-          type: MessageType.INFO,
-          text: message,
-        },
-        Date.now(),
-      );
+      addItem(historyItemInfo(textInfoPart(message)), Date.now());
 
       // Set the flag to prevent tool continuation
       setModelSwitchedFromQuotaError(true);

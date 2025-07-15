@@ -17,12 +17,13 @@ import { act } from 'react';
 import { renderHook } from '@testing-library/react';
 import { useEditorSettings } from './useEditorSettings.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
-import { MessageType, type HistoryItem } from '../types.js';
+import { type HistoryItem } from '../types.js';
 import {
   type EditorType,
   checkHasEditorType,
   allowEditorTypeInSandbox,
 } from '@google/gemini-cli-core';
+import { historyItemInfo, textInfoPart } from '../utils/historyItemInfo.js';
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
@@ -113,10 +114,9 @@ describe('useEditorSettings', () => {
     );
 
     expect(mockAddItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.INFO,
-        text: 'Editor preference set to "vscode" in User settings.',
-      },
+      historyItemInfo(
+        textInfoPart('Editor preference set to "vscode" in User settings.'),
+      ),
       expect.any(Number),
     );
 
@@ -143,10 +143,9 @@ describe('useEditorSettings', () => {
     );
 
     expect(mockAddItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.INFO,
-        text: 'Editor preference cleared in Workspace settings.',
-      },
+      historyItemInfo(
+        textInfoPart('Editor preference cleared in Workspace settings.'),
+      ),
       expect.any(Number),
     );
 
@@ -174,10 +173,11 @@ describe('useEditorSettings', () => {
       );
 
       expect(mockAddItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: `Editor preference set to "${editorType}" in User settings.`,
-        },
+        historyItemInfo(
+          textInfoPart(
+            `Editor preference set to "${editorType}" in User settings.`,
+          ),
+        ),
         expect.any(Number),
       );
     });
@@ -203,10 +203,11 @@ describe('useEditorSettings', () => {
       );
 
       expect(mockAddItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: `Editor preference set to "vscode" in ${scope} settings.`,
-        },
+        historyItemInfo(
+          textInfoPart(
+            `Editor preference set to "vscode" in ${scope} settings.`,
+          ),
+        ),
         expect.any(Number),
       );
     });

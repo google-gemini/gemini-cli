@@ -7,9 +7,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { themeManager } from '../themes/theme-manager.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
-import { type HistoryItem, HistoryItemInfo, MessageType } from '../types.js';
+import { type HistoryItem } from '../types.js';
 import process from 'node:process';
-import { textInfoPart } from '../utils/historyItemInfo.js';
+import { historyItemInfo, textInfoPart } from '../utils/historyItemInfo.js';
 
 interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
@@ -41,15 +41,11 @@ export const useThemeCommand = (
     if (effectiveTheme === undefined) {
       if (process.env.NO_COLOR) {
         addItem(
-          {
-            type: MessageType.INFO,
-            text: 'Theme configuration unavailable due to NO_COLOR env variable.',
-            parts: [
-              textInfoPart(
-                'Theme configuration unavailable due to NO_COLOR env variable.',
-              ),
-            ],
-          } satisfies HistoryItemInfo as HistoryItemInfo,
+          historyItemInfo(
+            textInfoPart(
+              'Theme configuration unavailable due to NO_COLOR env variable.',
+            ),
+          ),
           Date.now(),
         );
       }
@@ -68,15 +64,11 @@ export const useThemeCommand = (
   const openThemeDialog = useCallback(() => {
     if (process.env.NO_COLOR) {
       addItem(
-        {
-          type: MessageType.INFO,
-          text: 'Theme configuration unavailable due to NO_COLOR env variable.',
-          parts: [
-            textInfoPart(
-              'Theme configuration unavailable due to NO_COLOR env variable.',
-            ),
-          ],
-        } satisfies HistoryItemInfo as HistoryItemInfo,
+        historyItemInfo(
+          textInfoPart(
+            'Theme configuration unavailable due to NO_COLOR env variable.',
+          ),
+        ),
         Date.now(),
       );
       return;
