@@ -32,6 +32,7 @@ import path from 'path';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
+import { parseAndFormatApiError } from '../utils/errorParsing.js';
 import { LoadedSettings } from '../../config/settings.js';
 import {
   type CommandContext,
@@ -152,6 +153,41 @@ export const useSlashCommandProcessor = (
     },
     [addItem],
   );
+
+  const refreshMcpAction = useCallback(async () => {
+    if (!config) {
+      addMessage({
+        type: MessageType.ERROR,
+        content: 'Configuration not available.',
+        timestamp: new Date(),
+      });
+      return;
+    }
+    addMessage({
+      type: MessageType.INFO,
+      content: 'Refreshing MCP servers...',
+      timestamp: new Date(),
+    });
+    try {
+      await config.refreshMcpServers();
+      addMessage({
+        type: MessageType.INFO,
+        content: 'MCP servers refreshed successfully.',
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      const errorMessage = parseAndFormatApiError(
+        error,
+        settings.merged.selectedAuthType,
+      );
+      addMessage({
+        type: MessageType.ERROR,
+        content: `Error refreshing MCP servers: ${errorMessage}`,
+        timestamp: new Date(),
+      });
+      console.error('Error refreshing MCP servers:', error);
+    }
+  }, [config, addMessage, settings.merged.selectedAuthType]);
 
   const commandContext = useMemo(
     (): CommandContext => ({
@@ -279,9 +315,14 @@ export const useSlashCommandProcessor = (
       },
       {
         name: 'mcp',
-        description: 'list configured MCP servers and tools',
+        description:
+          'list configured MCP servers and tools. Usage: /mcp [desc|nodesc|schema|refresh]',
         action: async (_mainCommand, _subCommand, _args) => {
-          // Check if the _subCommand includes a specific flag to control description visibility
+          if (_subCommand === 'refresh') {
+            await refreshMcpAction();
+            return;
+          }
+          // Check if the subCommand includes a specific flag to control description visibility
           let useShowDescriptions = showToolDescriptions;
           if (_subCommand === 'desc' || _subCommand === 'descriptions') {
             useShowDescriptions = true;
@@ -1002,6 +1043,7 @@ export const useSlashCommandProcessor = (
     setPendingCompressionItem,
     clearItems,
     refreshStatic,
+    refreshMcpAction,
   ]);
 
   const handleSlashCommand = useCallback(
