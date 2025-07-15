@@ -259,11 +259,7 @@ export class Config {
     // Initialize centralized FileDiscoveryService
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
-      try {
-        await this.getGitService();
-      } catch {
-        // For now swallow the error, later log it.
-      }
+      await this.getGitService();
     }
     this.toolRegistry = await this.createToolRegistry();
   }
