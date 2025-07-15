@@ -11,7 +11,7 @@ describe('HighWaterMarkTracker', () => {
   let tracker: HighWaterMarkTracker;
 
   beforeEach(() => {
-    tracker = new HighWaterMarkTracker(5, 3); // 5% threshold, 3-sample smoothing
+    tracker = new HighWaterMarkTracker(5); // 5% threshold
   });
 
   describe('constructor', () => {
@@ -21,7 +21,7 @@ describe('HighWaterMarkTracker', () => {
     });
 
     it('should initialize with custom values', () => {
-      const customTracker = new HighWaterMarkTracker(10, 5);
+      const customTracker = new HighWaterMarkTracker(10);
       expect(customTracker).toBeInstanceOf(HighWaterMarkTracker);
     });
   });
@@ -167,27 +167,6 @@ describe('HighWaterMarkTracker', () => {
       expect(tracker.getHighWaterMark('heap_used')).toBe(0);
       expect(tracker.getHighWaterMark('rss')).toBe(0);
       expect(tracker.getAllHighWaterMarks()).toEqual({});
-    });
-  });
-
-  describe('getGrowthPercentage', () => {
-    it('should return 0 for unknown metric types', () => {
-      const growth = tracker.getGrowthPercentage('unknown_metric', 1000000);
-      expect(growth).toBe(0);
-    });
-
-    it('should calculate growth percentage correctly', () => {
-      tracker.shouldRecordMetric('heap_used', 1000000);
-
-      const growth = tracker.getGrowthPercentage('heap_used', 1200000);
-      expect(growth).toBeCloseTo(20, 1); // 20% growth
-    });
-
-    it('should handle negative growth', () => {
-      tracker.shouldRecordMetric('heap_used', 1000000);
-
-      const growth = tracker.getGrowthPercentage('heap_used', 800000);
-      expect(growth).toBeCloseTo(-20, 1); // 20% decrease
     });
   });
 

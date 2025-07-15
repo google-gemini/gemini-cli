@@ -12,7 +12,6 @@ import {
   stopGlobalActivityMonitoring,
   ActivityType,
 } from '@google/gemini-cli-core';
-import { recordUserActivity as recordUserActivitySimple } from '@google/gemini-cli-core/src/telemetry/activity-detector.js';
 
 /**
  * Options for the activity monitoring hook
@@ -82,7 +81,13 @@ export function useActivityMonitoring(
     // Activity monitoring is always active when enabled
     if (enabled) {
       startGlobalActivityMonitoring(config);
-      recordUserActivitySimple(); // Record initial activity
+      const monitor = getActivityMonitor();
+      if (monitor) {
+        monitor.recordActivity(
+          ActivityType.MANUAL_TRIGGER,
+          'monitoring_started',
+        );
+      }
     }
   }, [enabled, config]);
 
@@ -122,27 +127,22 @@ export function useActivityMonitoring(
  * Provides convenient functions for recording specific activity types
  */
 export function useActivityRecorder(_config: Config, enabled: boolean = true) {
+  const recordSimpleActivity = useCallback(() => {
+    if (enabled) {
+      const monitor = getActivityMonitor();
+      if (monitor) {
+        monitor.recordActivity(ActivityType.USER_INPUT_START);
+      }
+    }
+  }, [enabled]);
+
   return {
-    recordUserInput: useCallback(() => {
-      if (enabled) recordUserActivitySimple();
-    }, [enabled]),
-    recordUserInputEnd: useCallback(() => {
-      if (enabled) recordUserActivitySimple();
-    }, [enabled]),
-    recordMessageAdded: useCallback(() => {
-      if (enabled) recordUserActivitySimple();
-    }, [enabled]),
-    recordToolCall: useCallback(() => {
-      if (enabled) recordUserActivitySimple();
-    }, [enabled]),
-    recordStreamStart: useCallback(() => {
-      if (enabled) recordUserActivitySimple();
-    }, [enabled]),
-    recordStreamEnd: useCallback(() => {
-      if (enabled) recordUserActivitySimple();
-    }, [enabled]),
-    recordHistoryUpdate: useCallback(() => {
-      if (enabled) recordUserActivitySimple();
-    }, [enabled]),
+    recordUserInput: recordSimpleActivity,
+    recordUserInputEnd: recordSimpleActivity,
+    recordMessageAdded: recordSimpleActivity,
+    recordToolCall: recordSimpleActivity,
+    recordStreamStart: recordSimpleActivity,
+    recordStreamEnd: recordSimpleActivity,
+    recordHistoryUpdate: recordSimpleActivity,
   };
 }
