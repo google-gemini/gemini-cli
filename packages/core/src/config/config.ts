@@ -48,6 +48,7 @@ import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js'
 
 import { ListCRITool } from '../tools/ListCRI.js';
 import { GetCRITool } from '../tools/GetCRI.js';
+import { CreateCRITool } from '../tools/CreateCRI.js';
 
 
 
@@ -575,6 +576,7 @@ export class Config {
     registerCoreTool(WebSearchTool, this);
     registerCoreTool(ListCRITool, this);
     registerCoreTool(GetCRITool, this);
+    registerCoreTool(CreateCRITool, this);
 
     await registry.discoverTools();
     return registry;
