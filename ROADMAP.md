@@ -54,7 +54,7 @@ Gemini CLI is an open-source project, and we welcome contributions from the comm
 
 - **Roadmap:** Please review and find areas in our [roadmap](https://github.com/google-gemini/gemini-cli/issues/4191) that you would like to contribute to. Contributions based on this will be easiest to integrate with.
 - **Report Bugs:** If you find an issue, please create a bug(https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml) with as much detail as possible. If you believe it is a critical breaking issue preventing direct CLI usage, please tag it as `priorty/p0`. 
-- **Suggest Features:** Have a great idea? We'd love to hear it! Open a feature request on the [issues page](https://github.com/google-gemini/gemini-cli/issues).
+- **Suggest Features:** Have a great idea? We'd love to hear it! Open a [feature request](https://github.com/google-gemini/gemini-cli/issues/new?template=feature_request.yml).
 - **Contribute Code:** Check out our [CONTRIBUTING.md](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md) file for guidelines on how to submit pull requests. We have a list of "good first issues" for new contributors.
 - **Write Documentation:** Help us improve our documentation, tutorials, and examples.
 We are excited about the future of Gemini CLI and look forward to building it with you!
