@@ -23,10 +23,12 @@ Our development is guided by the following principles:
 
 Our roadmap is managed directly through [GitHub Issues](https://github.com/google-gemini/gemini-cli/issues). This approach allows for transparency and gives you a direct way to learn more or get involved with any specific initiative. All our roadmap items will be tagged as Type:`Feature` and Label:`maintainer` for features we are actively working on, or ``maintainer/roadmap`` for a more detailed list of tasks. 
 
-Issues are tagged with labels that provide key information at a glance:
-- **Target Quarter:** target/Q3-2025 indicates the anticipated delivery timeline.
-- **Feature Area:** area/model or area/tooling categorizes the work.
-To see what we're working on, you can filter our issues by these labels.
+Issues are organized to provide key information at a glance:
+- **Target Quarter:** `Milestone` denotes the anticipated delivery timeline.
+- **Feature Area:** Labels such as `area/model` or `area/tooling` categorizes the work.
+- **Issue Type:** _Workstream_ => _Epics_ => _Features_ => _Tasks|Bugs_ 
+
+To see what we're working on, you can filter our issues by dimensions.
 
 ## Focus Areas
 
