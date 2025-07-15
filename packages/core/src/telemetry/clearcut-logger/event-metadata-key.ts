@@ -137,6 +137,19 @@ export enum EventMetadataKey {
 
   // Logs the end of a session.
   GEMINI_CLI_END_SESSION_ID = 34,
+
+  // ==========================================================================
+  // Shared Keys
+  // ===========================================================================
+
+  // Logs the Prompt Id
+  GEMINI_CLI_PROMPT_ID = 35,
+
+  // Logs the Auth type for the prompt, api responses and errors.
+  GEMINI_CLI_AUTH_TYPE = 36,
+
+  // Logs the total number of Google accounts ever used.
+  GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT = 37,
 }
 
 export function getEventMetadataKey(
