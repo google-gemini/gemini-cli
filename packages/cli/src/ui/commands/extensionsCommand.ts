@@ -25,7 +25,10 @@ export const extensionsCommand: SlashCommand = {
 
     let message = 'Active extensions:\n\n';
     for (const ext of activeExtensions) {
-      message += `  - \u001b[36m${ext.name} (v${ext.version})\u001b[0m\n`;
+      const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*.{0,2}(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+      const name = stripAnsi(ext.name);
+      const version = stripAnsi(ext.version);
+      message += `  - \u001b[36m${name} (v${version})\u001b[0m\n`;
     }
     // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
     message += '\u001b[0m';
