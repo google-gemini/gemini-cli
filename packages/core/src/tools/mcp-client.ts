@@ -20,6 +20,7 @@ import { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { FunctionDeclaration, Type, mcpToTool } from '@google/genai';
 import { sanitizeParameters, ToolRegistry } from './tool-registry.js';
+import pkg from '../../package.json' with { type: 'json' };
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -301,8 +302,8 @@ export async function connectToMcpServer(
   debugMode: boolean,
 ): Promise<Client> {
   const mcpClient = new Client({
-    name: 'gemini-cli-mcp-client',
-    version: '0.0.1',
+    name: 'gemini-cli',
+    version: pkg.version,
   });
 
   // patch Client.callTool to use request timeout as genai McpCallTool.callTool does not do it
