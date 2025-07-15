@@ -114,6 +114,7 @@ describe('WriteFileTool', () => {
     // Default mock implementations that return valid structures
     mockEnsureCorrectEdit.mockImplementation(
       async (
+        filePath: string,
         _currentContent: string,
         params: EditToolParams,
         _client: GeminiClient,
@@ -248,6 +249,7 @@ describe('WriteFileTool', () => {
       );
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
+        filePath,
         originalContent,
         {
           old_string: originalContent,
@@ -388,6 +390,7 @@ describe('WriteFileTool', () => {
       )) as ToolEditConfirmationDetails;
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
+        filePath,
         originalContent,
         {
           old_string: originalContent,
@@ -523,6 +526,7 @@ describe('WriteFileTool', () => {
       const result = await tool.execute(params, abortSignal);
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
+        filePath,
         initialContent,
         {
           old_string: initialContent,

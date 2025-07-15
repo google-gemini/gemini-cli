@@ -357,7 +357,10 @@ describe('retryWithBackoff', () => {
       // Should fail with original error when fallback is rejected
       expect(result).toBeInstanceOf(Error);
       expect(result.message).toBe('Rate limit exceeded');
-      expect(fallbackCallback).toHaveBeenCalledWith('oauth-personal');
+      expect(fallbackCallback).toHaveBeenCalledWith(
+        'oauth-personal',
+        expect.any(Error),
+      );
     });
 
     it('should handle mixed error types (only count consecutive 429s)', async () => {

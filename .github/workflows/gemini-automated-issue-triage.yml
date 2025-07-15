@@ -7,6 +7,7 @@ on:
 jobs:
   triage-issue:
     timeout-minutes: 5
+    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
     permissions:
       issues: write
       contents: read
@@ -18,32 +19,19 @@ jobs:
     steps:
       - name: Generate GitHub App Token
         id: generate_token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.PRIVATE_KEY }}
 
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ steps.generate_token.outputs.token }}
-
-      - name: Install dependencies
-        run: npm install
-
       - name: Run Gemini Issue Triage
-        uses: google-gemini/gemini-cli-action@1efc0bac9e0b2da6c6cab95df513324d8dfc2a79
+        uses: google-gemini/gemini-cli-action@df3f890f003d28c60a2a09d2c29e0126e4d1e2ff
         env:
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          REPOSITORY: ${{ github.repository }}
         with:
-          version: main
+          version: 0.1.8-rc.0
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OTLP_GCP_WIF_PROVIDER: ${{ secrets.OTLP_GCP_WIF_PROVIDER }}
-          OTLP_GCP_SERVICE_ACCOUNT: ${{ secrets.OTLP_GCP_SERVICE_ACCOUNT }}
           OTLP_GOOGLE_CLOUD_PROJECT: ${{ secrets.OTLP_GOOGLE_CLOUD_PROJECT }}
           settings_json: |
             {
@@ -52,30 +40,24 @@ jobs:
                 "run_shell_command(gh issue edit)",
                 "run_shell_command(gh issue list)"
               ],
+              "telemetry": {
+                "enabled": true,
+                "target": "gcp"
+              },
+              "sandbox": false
             }
           prompt: |
-            You are an issue triage assistant for GitHub issues.
-            Your task is to analyze the issue and apply appropriate labels from the repository's list of available labels.
+            You are an issue triage assistant. Analyze the current GitHub issue and apply the most appropriate existing labels.
 
-            **IMPORTANT: Your only action should be to apply labels. Do not post any comments or modify any code.**
+            Steps:
+            1. Run: `gh label list --repo ${{ github.repository }} --limit 100` to get all available labels.
+            2. Review the issue title and body provided in the environment variables.
+            3. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, and priority/*.
+            4. Apply the selected labels to this issue using: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`
+            5. If the issue has a "status/need-triage" label, remove it after applying the appropriate labels: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --remove-label "status/need-triage"`
 
-            **Triage Workflow:**
-
-            1. **Fetch Available Labels:**
-               Execute: `gh label list`
-
-            2. **Get Issue Information:**
-               The issue details are available in environment variables:
-               - Repository: $REPOSITORY
-               - Issue Number: $ISSUE_NUMBER
-               - Issue Title: $ISSUE_TITLE
-               - Issue Body: $ISSUE_BODY
-
-            3. **Analyze and Apply Labels:**
-               Based on the issue title and body, determine appropriate labels and apply them using:
-               `gh issue edit $ISSUE_NUMBER --add-label "label1,label2"`
-
-            **Guidelines:**
-            - Only use labels that exist in the repository
-            - Do not add comments to the issue
-            - Common label patterns: kind/bug, kind/enhancement, kind/documentation, area/*, priority/*
+            Guidelines:
+            - Only use labels that already exist in the repository.
+            - Do not add comments or modify the issue content.
+            - Triage only the current issue.
+            - Assign all applicable kind/*, area/*, and priority/* labels based on the issue content.

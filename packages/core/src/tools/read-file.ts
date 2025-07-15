@@ -8,6 +8,7 @@ import path from 'path';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { BaseTool, ToolResult } from './tools.js';
+import { Type } from '@google/genai';
 import {
   isWithinRoot,
   processSingleFileContent,
@@ -45,10 +46,7 @@ export interface ReadFileToolParams {
 export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
   static readonly Name: string = 'read_file';
 
-  constructor(
-    private rootDirectory: string,
-    private config: Config,
-  ) {
+  constructor(private config: Config) {
     super(
       ReadFileTool.Name,
       'ReadFile',
@@ -58,43 +56,37 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
           absolute_path: {
             description:
               "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
-            type: 'string',
-            pattern: '^/',
+            type: Type.STRING,
           },
           offset: {
             description:
               "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
-            type: 'number',
+            type: Type.NUMBER,
           },
           limit: {
             description:
               "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
-            type: 'number',
+            type: Type.NUMBER,
           },
         },
         required: ['absolute_path'],
-        type: 'object',
+        type: Type.OBJECT,
       },
     );
-    this.rootDirectory = path.resolve(rootDirectory);
   }
 
   validateToolParams(params: ReadFileToolParams): string | null {
-    if (
-      this.schema.parameters &&
-      !SchemaValidator.validate(
-        this.schema.parameters as Record<string, unknown>,
-        params,
-      )
-    ) {
-      return 'Parameters failed schema validation.';
+    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    if (errors) {
+      return errors;
     }
+
     const filePath = params.absolute_path;
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute, but was relative: ${filePath}. You must provide an absolute path.`;
     }
-    if (!isWithinRoot(filePath, this.rootDirectory)) {
-      return `File path must be within the root directory (${this.rootDirectory}): ${filePath}`;
+    if (!isWithinRoot(filePath, this.config.getTargetDir())) {
+      return `File path must be within the root directory (${this.config.getTargetDir()}): ${filePath}`;
     }
     if (params.offset !== undefined && params.offset < 0) {
       return 'Offset must be a non-negative number';
@@ -105,11 +97,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
 
     const fileService = this.config.getFileService();
     if (fileService.shouldGeminiIgnoreFile(params.absolute_path)) {
-      const relativePath = makeRelative(
-        params.absolute_path,
-        this.rootDirectory,
-      );
-      return `File path '${shortenPath(relativePath)}' is ignored by .geminiignore pattern(s).`;
+      return `File path '${filePath}' is ignored by .geminiignore pattern(s).`;
     }
 
     return null;
@@ -123,7 +111,10 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     ) {
       return `Path unavailable`;
     }
-    const relativePath = makeRelative(params.absolute_path, this.rootDirectory);
+    const relativePath = makeRelative(
+      params.absolute_path,
+      this.config.getTargetDir(),
+    );
     return shortenPath(relativePath);
   }
 
@@ -141,7 +132,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
 
     const result = await processSingleFileContent(
       params.absolute_path,
-      this.rootDirectory,
+      this.config.getTargetDir(),
       params.offset,
       params.limit,
     );
