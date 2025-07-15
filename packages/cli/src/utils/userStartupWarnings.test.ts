@@ -8,7 +8,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getUserStartupWarnings } from './userStartupWarnings.js';
 import * as os from 'os';
 import fs from 'fs/promises';
-import semver from 'semver';
 
 vi.mock('os', () => ({
   default: { homedir: vi.fn() },
@@ -17,13 +16,6 @@ vi.mock('os', () => ({
 
 vi.mock('fs/promises', () => ({
   default: { realpath: vi.fn() },
-}));
-
-vi.mock('semver', () => ({
-  default: {
-    major: vi.fn(),
-  },
-  major: vi.fn(),
 }));
 
 describe('getUserStartupWarnings', () => {
@@ -71,44 +63,6 @@ describe('getUserStartupWarnings', () => {
       expect(warnings).toContainEqual(
         expect.stringContaining('Could not verify'),
       );
-    });
-  });
-
-  function setNodeVersionMajor(majorVersion: number) {
-    vi.mocked(semver.major).mockReturnValue(majorVersion);
-  }
-
-  describe('node version check', () => {
-    afterEach(() => {
-      setNodeVersionMajor(20);
-    });
-
-    it('should return a warning if Node.js version is less than minMajor', async () => {
-      setNodeVersionMajor(18);
-      const warnings = await getUserStartupWarnings('');
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]).toContain('Node.js');
-      expect(warnings[0]).toContain('requires Node.js 20 or higher');
-    });
-
-    it('should not return a warning if Node.js version is equal to minMajor', async () => {
-      setNodeVersionMajor(20);
-      const warnings = await getUserStartupWarnings('');
-      expect(warnings).toEqual([]);
-    });
-
-    it('should not return a warning if Node.js version is greater than minMajor', async () => {
-      setNodeVersionMajor(22);
-      const warnings = await getUserStartupWarnings('');
-      expect(warnings).toEqual([]);
-    });
-
-    it('should use default minMajor=20 if not provided', async () => {
-      setNodeVersionMajor(18);
-      const warnings = await getUserStartupWarnings('');
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]).toContain('Node.js');
-      expect(warnings[0]).toContain('requires Node.js 20 or higher');
     });
   });
 
