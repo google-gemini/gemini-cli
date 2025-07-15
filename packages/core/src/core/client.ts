@@ -40,6 +40,7 @@ import {
 } from './contentGenerator.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { LoopDetectionService } from '../services/loopDetectionService.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -100,12 +101,16 @@ export class GeminiClient {
    */
   private readonly COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
+  private readonly loopDetector: LoopDetectionService;
+  private lastPromptId?: string;
+
   constructor(private config: Config) {
     if (config.getProxy()) {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
     }
 
     this.embeddingModel = config.getEmbeddingModel();
+    this.loopDetector = new LoopDetectionService(config);
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
@@ -272,6 +277,10 @@ export class GeminiClient {
     turns: number = this.MAX_TURNS,
     originalModel?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    if (this.lastPromptId !== prompt_id) {
+      this.loopDetector.reset();
+      this.lastPromptId = prompt_id;
+    }
     this.sessionTurnCount++;
     if (
       this.config.getMaxSessionTurns() > 0 &&
@@ -297,6 +306,10 @@ export class GeminiClient {
     const turn = new Turn(this.getChat(), prompt_id);
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
+      if (this.loopDetector.addAndCheck(event)) {
+        yield { type: GeminiEventType.LoopDetected };
+        return turn;
+      }
       yield event;
     }
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {

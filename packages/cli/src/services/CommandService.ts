@@ -11,12 +11,16 @@ import { clearCommand } from '../ui/commands/clearCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
+import { privacyCommand } from '../ui/commands/privacyCommand.js';
+import { aboutCommand } from '../ui/commands/aboutCommand.js';
 
 const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
+  aboutCommand,
   authCommand,
   clearCommand,
   helpCommand,
   memoryCommand,
+  privacyCommand,
   statsCommand,
   themeCommand,
 ];
