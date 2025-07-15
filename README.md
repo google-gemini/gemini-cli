@@ -21,7 +21,7 @@ With the Gemini CLI you can:
 
 You have two options to install Gemini CLI.
 
-### With Node 
+### With Node
 
 1. **Prerequisites:** Ensure you have [Node.js version 20](https://nodejs.org/en/download) or higher installed.
 2. **Run the CLI:** Execute the following command in your terminal:
@@ -42,16 +42,17 @@ You have two options to install Gemini CLI.
    gemini
    ```
 
-### With Brew
+### With Homebrew
 
-1. **Prerequisites:** Ensure you have [Brew](https://brew.sh/) installed.
+1. **Prerequisites:** Ensure you have [Homebrew](https://brew.sh/) installed.
 2. **Install the CLI** Execute the following command in your terminal:
 
    ```bash
    brew install gemini-cli
    ```
 
-   and **run it** with:
+   Then, run the CLI from anywhere:
+
    ```bash
    gemini
    ```
