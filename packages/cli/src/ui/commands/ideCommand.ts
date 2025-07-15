@@ -129,20 +129,9 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
             );
             return;
           }
-          const vsixPath = vsixFiles[0];
-          if (!vsixPath) {
-            context.ui.addItem(
-              {
-                type: 'error',
-                text: 'Could not find the required VS Code companion extension.',
-              },
-              Date.now(),
-            );
-            return;
-          }
 
+          const vsixPath = vsixFiles[0];
           const command = `${VSCODE_COMMAND} --install-extension ${vsixPath} --force`;
-          console.log(command);
           context.ui.addItem(
             {
               type: 'info',

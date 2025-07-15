@@ -45,7 +45,7 @@ vi.mock('../ui/commands/aboutCommand.js', () => ({
   aboutCommand: { name: 'about', description: 'Mock About' },
 }));
 vi.mock('../ui/commands/ideCommand.js', () => ({
-  aboutCommand: { name: 'ide', description: 'Mock IDE' },
+  ideCommand: { name: 'ide', description: 'Mock IDE' },
 }));
 vi.mock('../ui/commands/extensionsCommand.js', () => ({
   extensionsCommand: { name: 'extensions', description: 'Mock Extensions' },
