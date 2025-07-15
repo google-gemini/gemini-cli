@@ -36,14 +36,14 @@ export class MemoryMonitor {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
   private lastSnapshot: MemorySnapshot | null = null;
-  private monitoringInterval: number = 10000; // 10 seconds default (reduced from 5)
+  private monitoringInterval: number = 10000;
   private highWaterMarkTracker: HighWaterMarkTracker;
   private rateLimiter: RateLimiter;
   private useEnhancedMonitoring: boolean = true;
 
   constructor() {
     // No config stored to avoid multi-session attribution issues
-    this.highWaterMarkTracker = new HighWaterMarkTracker(5, 3); // 5% threshold, 3-sample smoothing
+    this.highWaterMarkTracker = new HighWaterMarkTracker(5); // 5% threshold
     this.rateLimiter = new RateLimiter(60000); // 1 minute minimum between recordings
   }
 
