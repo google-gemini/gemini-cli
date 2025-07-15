@@ -221,7 +221,7 @@ export function useCompletion(
         // enter should submit immediately.
         if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
           const perfectMatch = potentialSuggestions.find(
-            (s) => s.name === partial,
+            (s) => s.name === partial || s.altName === partial,
           );
           if (perfectMatch && !perfectMatch.subCommands) {
             potentialSuggestions = [];
