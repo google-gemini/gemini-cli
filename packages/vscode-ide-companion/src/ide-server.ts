@@ -113,16 +113,22 @@ export async function startIDEServer(context: vscode.ExtensionContext) {
 
   app.get('/mcp', handleSessionRequest);
 
-  // TODO(#3918): Generate dynamically and write to env variable
-  const PORT = 3000;
-  app.listen(PORT, (error?: Error) => {
+  // Dynamically import 'get-port' as it is an ESM-only package.
+  const { default: getPort } = await import('get-port');
+  const port = await getPort();
+  context.environmentVariableCollection.replace(
+    'GEMINI_CLI_IDE_SERVER_PORT',
+    port.toString(),
+  );
+
+  app.listen(port, (error?: Error) => {
     if (error) {
       console.error('Failed to start server:', error);
       vscode.window.showErrorMessage(
-        `Companion server failed to start on port ${PORT}: ${error.message}`,
+        `Companion server failed to start on port ${port}: ${error.message}`,
       );
     }
-    console.log(`MCP Streamable HTTP Server listening on port ${PORT}`);
+    console.log(`MCP Streamable HTTP Server listening on port ${port}`);
   });
 }
 
