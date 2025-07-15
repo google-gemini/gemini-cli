@@ -34,13 +34,9 @@ function isVSCodeInstalled(): boolean {
       { stdio: 'ignore' },
     );
     return true;
-  } catch (_e) {
+  } catch {
     return false;
   }
-}
-
-interface ExecError extends Error {
-  stderr: Buffer;
 }
 
 export const ideCommand = (config: Config | null): SlashCommand | null => {
@@ -50,14 +46,12 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
 
   return {
     name: 'ide',
-    description: 'Commands for interacting with the IDE.',
+    description: 'manage IDE integration',
     subCommands: [
       {
         name: 'status',
-        description: 'Show status of IDE integration',
-        action: (context: CommandContext): SlashCommandActionReturn => {
-          const { config } = context.services;
-
+        description: 'check status of IDE integration',
+        action: (_context: CommandContext): SlashCommandActionReturn => {
           const status = getMCPServerStatus(IDE_SERVER_NAME);
           const discoveryState = getMCPDiscoveryState();
           switch (status) {
@@ -65,13 +59,13 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
               return {
                 type: 'message',
                 messageType: 'info',
-                content: `🟢 IDE integration enabled.`,
+                content: `🟢 Connected`,
               };
             case MCPServerStatus.CONNECTING:
               return {
                 type: 'message',
                 messageType: 'info',
-                content: `🔄 Initializing IDE integration...`,
+                content: `🔄 Initializing...`,
               };
             case MCPServerStatus.DISCONNECTED:
             default:
@@ -79,13 +73,13 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
                 return {
                   type: 'message',
                   messageType: 'info',
-                  content: `🔄 Initializing IDE integration...`,
+                  content: `🔄 Initializing...`,
                 };
               } else {
                 return {
                   type: 'message',
                   messageType: 'error',
-                  content: `🔴 Could not initialize IDE integration.`,
+                  content: `🔴 Disconnected`,
                 };
               }
           }
@@ -93,13 +87,13 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
       },
       {
         name: 'install',
-        description: 'Install IDE extension.',
+        description: 'install required VS Code companion extension',
         action: async (context) => {
           if (!isVSCodeInstalled()) {
             context.ui.addItem(
               {
                 type: 'error',
-                text: `VSCode command-line tool "${VSCODE_COMMAND}" not found in your PATH. Please make sure it is installed and configured correctly.`,
+                text: `VS Code command-line tool "${VSCODE_COMMAND}" not found in your PATH.`,
               },
               Date.now(),
             );
@@ -131,7 +125,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
             context.ui.addItem(
               {
                 type: 'error',
-                text: 'Could not find the VSCode extension file (.vsix).',
+                text: 'Could not find the required VS Code companion extension.',
               },
               Date.now(),
             );
@@ -142,7 +136,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
             context.ui.addItem(
               {
                 type: 'error',
-                text: 'Could not find the VSCode extension file (.vsix).',
+                text: 'Could not find the required VS Code companion extension.',
               },
               Date.now(),
             );
@@ -150,10 +144,11 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
           }
 
           const command = `${VSCODE_COMMAND} --install-extension ${vsixPath} --force`;
+          console.log(command);
           context.ui.addItem(
             {
               type: 'info',
-              text: `Installing VSCode extension from ${vsixPath}...`,
+              text: `Installing VS Code companion extension...`,
             },
             Date.now(),
           );
@@ -162,16 +157,15 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
             context.ui.addItem(
               {
                 type: 'info',
-                text: 'VSCode extension installed successfully.',
+                text: 'VS Code companion extension installed successfully. Restart gemini-cli in a fresh terminal window.',
               },
               Date.now(),
             );
-          } catch (error) {
-            const execError = error as ExecError;
+          } catch (_error) {
             context.ui.addItem(
               {
                 type: 'error',
-                text: `Failed to install VSCode extension. Command failed: ${command}\nError: ${execError.stderr.toString()}`,
+                text: `Failed to install VS Code companion extension.`,
               },
               Date.now(),
             );
