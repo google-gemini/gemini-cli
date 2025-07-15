@@ -507,6 +507,59 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
+    it('should open the auth dialog when a new command returns an auth dialog action', async () => {
+      const mockAction = vi.fn().mockResolvedValue({
+        type: 'dialog',
+        dialog: 'auth',
+      });
+      const newAuthCommand: SlashCommand = { name: 'auth', action: mockAction };
+
+      const mockLoader = async () => [newAuthCommand];
+      const commandServiceInstance = new ActualCommandService(mockLoader);
+      vi.mocked(CommandService).mockImplementation(
+        () => commandServiceInstance,
+      );
+
+      const { result } = getProcessorHook();
+      await vi.waitFor(() => {
+        expect(
+          result.current.slashCommands.some((c) => c.name === 'auth'),
+        ).toBe(true);
+      });
+
+      const commandResult = await result.current.handleSlashCommand('/auth');
+
+      expect(mockAction).toHaveBeenCalledTimes(1);
+      expect(mockOpenAuthDialog).toHaveBeenCalledWith();
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+
+    it('should open the theme dialog when a new command returns a theme dialog action', async () => {
+      const mockAction = vi.fn().mockResolvedValue({
+        type: 'dialog',
+        dialog: 'theme',
+      });
+      const newCommand: SlashCommand = { name: 'test', action: mockAction };
+      const mockLoader = async () => [newCommand];
+      const commandServiceInstance = new ActualCommandService(mockLoader);
+      vi.mocked(CommandService).mockImplementation(
+        () => commandServiceInstance,
+      );
+
+      const { result } = getProcessorHook();
+      await vi.waitFor(() => {
+        expect(
+          result.current.slashCommands.some((c) => c.name === 'test'),
+        ).toBe(true);
+      });
+
+      const commandResult = await result.current.handleSlashCommand('/test');
+
+      expect(mockAction).toHaveBeenCalledTimes(1);
+      expect(mockOpenThemeDialog).toHaveBeenCalledWith();
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+
     it('should show help for a parent command with no action', async () => {
       const parentCommand: SlashCommand = {
         name: 'parent',
