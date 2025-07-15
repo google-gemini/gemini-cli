@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.9",
+  "version": "0.1.12",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,11 +14,14 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.9"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.12"
   },
   "scripts": {
     "start": "node scripts/start.js",
     "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
+    "auth:npm": "npx google-artifactregistry-auth",
+    "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
+    "auth": "npm run auth:npm && npm run auth:docker",
     "generate": "node scripts/generate-git-commit-info.js",
     "build": "node scripts/build.js",
     "build:all": "npm run build && npm run build:sandbox",
@@ -55,7 +58,7 @@
   ],
   "devDependencies": {
     "@types/micromatch": "^4.0.9",
-    "@types/mime-types": "^2.1.4",
+    "@types/mime-types": "^3.0.1",
     "@types/minimatch": "^5.1.2",
     "@types/shell-quote": "^1.7.5",
     "@vitest/coverage-v8": "^3.1.1",

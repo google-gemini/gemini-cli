@@ -17,6 +17,7 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
   TelemetryTarget,
+  MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -34,12 +35,13 @@ const logger = {
   error: (...args: any[]) => console.error('[ERROR]', ...args),
 };
 
-interface CliArgs {
+export interface CliArgs {
   model: string | undefined;
   sandbox: boolean | string | undefined;
   sandboxImage: string | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
+  promptInteractive: string | undefined;
   allFiles: boolean | undefined;
   all_files: boolean | undefined;
   showMemoryUsage: boolean | undefined;
@@ -50,13 +52,14 @@ interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
-  allowedMcpServerNames: string | undefined;
+  allowedMcpServerNames: string[] | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
+  ideMode: boolean | undefined;
 }
 
-async function parseArguments(): Promise<CliArgs> {
-  const argv = await yargs(hideBin(process.argv))
+export async function parseArguments(): Promise<CliArgs> {
+  const yargsInstance = yargs(hideBin(process.argv))
     .scriptName('gemini')
     .usage(
       '$0 [options]',
@@ -72,6 +75,12 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 'p',
       type: 'string',
       description: 'Prompt. Appended to input on stdin (if any).',
+    })
+    .option('prompt-interactive', {
+      alias: 'i',
+      type: 'string',
+      description:
+        'Execute the provided prompt and continue in interactive mode',
     })
     .option('sandbox', {
       alias: 's',
@@ -152,7 +161,8 @@ async function parseArguments(): Promise<CliArgs> {
       default: false,
     })
     .option('allowed-mcp-server-names', {
-      type: 'string',
+      type: 'array',
+      string: true,
       description: 'Allowed MCP server names',
     })
     .option('extensions', {
@@ -167,13 +177,27 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'List all available extensions and exit.',
     })
+    .option('ide-mode', {
+      type: 'boolean',
+      description: 'Run in IDE mode?',
+    })
+
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
-    .strict().argv;
+    .strict()
+    .check((argv) => {
+      if (argv.prompt && argv.promptInteractive) {
+        throw new Error(
+          'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
+        );
+      }
+      return true;
+    });
 
-  return argv;
+  yargsInstance.wrap(yargsInstance.terminalWidth());
+  return yargsInstance.argv;
 }
 
 // This function is now a thin wrapper around the server's implementation.
@@ -204,13 +228,18 @@ export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
   sessionId: string,
+  argv: CliArgs,
 ): Promise<Config> {
-  const argv = await parseArguments();
   const debugMode =
     argv.debug ||
     [process.env.DEBUG, process.env.DEBUG_MODE].some(
       (v) => v === 'true' || v === '1',
     );
+
+  const ideMode =
+    (argv.ideMode ?? settings.ideMode ?? false) &&
+    process.env.TERM_PROGRAM === 'vscode' &&
+    !process.env.SANDBOX;
 
   const activeExtensions = filterActiveExtensions(
     extensions,
@@ -245,9 +274,7 @@ export async function loadCliConfig(
   const excludeTools = mergeExcludeTools(settings, activeExtensions);
 
   if (argv.allowedMcpServerNames) {
-    const allowedNames = new Set(
-      argv.allowedMcpServerNames.split(',').filter(Boolean),
-    );
+    const allowedNames = new Set(argv.allowedMcpServerNames.filter(Boolean));
     if (allowedNames.size > 0) {
       mcpServers = Object.fromEntries(
         Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
@@ -255,6 +282,24 @@ export async function loadCliConfig(
     } else {
       mcpServers = {};
     }
+  }
+
+  if (ideMode) {
+    mcpServers['_ide_server'] = new MCPServerConfig(
+      undefined, // command
+      undefined, // args
+      undefined, // env
+      undefined, // cwd
+      undefined, // url
+      'http://localhost:3000/mcp', // httpUrl
+      undefined, // headers
+      undefined, // tcp
+      undefined, // timeout
+      false, // trust
+      'IDE connection', // description
+      undefined, // includeTools
+      undefined, // excludeTools
+    );
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
@@ -265,7 +310,7 @@ export async function loadCliConfig(
     sandbox: sandboxConfig,
     targetDir: process.cwd(),
     debugMode,
-    question: argv.prompt || '',
+    question: argv.promptInteractive || argv.prompt || '',
     fullContext: argv.allFiles || argv.all_files || false,
     coreTools: settings.coreTools || undefined,
     excludeTools,
@@ -310,11 +355,14 @@ export async function loadCliConfig(
     bugCommand: settings.bugCommand,
     model: argv.model!,
     extensionContextFilePaths,
+    maxSessionTurns: settings.maxSessionTurns ?? -1,
     listExtensions: argv.listExtensions || false,
     activeExtensions: activeExtensions.map((e) => ({
       name: e.config.name,
       version: e.config.version,
     })),
+    noBrowser: !!process.env.NO_BROWSER,
+    ideMode,
   });
 }
 

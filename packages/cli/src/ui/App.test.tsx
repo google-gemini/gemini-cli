@@ -14,9 +14,12 @@ import {
   ToolRegistry,
   AccessibilitySettings,
   SandboxConfig,
+  GeminiClient,
 } from '@google/gemini-cli-core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
+import { useGeminiStream } from './hooks/useGeminiStream.js';
+import { StreamingState } from './types.js';
 import { Tips } from './components/Tips.js';
 
 // Define a more complete mock server config based on actual Config
@@ -67,6 +70,8 @@ interface MockServerConfig {
   getAccessibility: Mock<() => AccessibilitySettings>;
   getProjectRoot: Mock<() => string | undefined>;
   getAllGeminiMdFilenames: Mock<() => string[]>;
+  getGeminiClient: Mock<() => GeminiClient | undefined>;
+  getUserTier: Mock<() => Promise<string | undefined>>;
 }
 
 // Mock @google/gemini-cli-core and its Config class
@@ -123,12 +128,13 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getVertexAI: vi.fn(() => opts.vertexai),
         getShowMemoryUsage: vi.fn(() => opts.showMemoryUsage ?? false),
         getAccessibility: vi.fn(() => opts.accessibility ?? {}),
-        getProjectRoot: vi.fn(() => opts.projectRoot),
+        getProjectRoot: vi.fn(() => opts.targetDir),
         getGeminiClient: vi.fn(() => ({})),
         getCheckpointingEnabled: vi.fn(() => opts.checkpointing ?? true),
         getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
         setFlashFallbackHandler: vi.fn(),
         getSessionId: vi.fn(() => 'test-session-id'),
+        getUserTier: vi.fn().mockResolvedValue(undefined),
       };
     });
   return {
@@ -155,6 +161,8 @@ vi.mock('./hooks/useAuthCommand', () => ({
     openAuthDialog: vi.fn(),
     handleAuthSelect: vi.fn(),
     handleAuthHighlight: vi.fn(),
+    isAuthenticating: false,
+    cancelAuthentication: vi.fn(),
   })),
 }));
 
@@ -179,25 +187,41 @@ vi.mock('./components/Tips.js', () => ({
   Tips: vi.fn(() => null),
 }));
 
+vi.mock('./components/Header.js', () => ({
+  Header: vi.fn(() => null),
+}));
+
 describe('App UI', () => {
   let mockConfig: MockServerConfig;
   let mockSettings: LoadedSettings;
+  let mockVersion: string;
   let currentUnmount: (() => void) | undefined;
 
   const createMockSettings = (
-    settings: Partial<Settings> = {},
+    settings: {
+      system?: Partial<Settings>;
+      user?: Partial<Settings>;
+      workspace?: Partial<Settings>;
+    } = {},
   ): LoadedSettings => {
+    const systemSettingsFile: SettingsFile = {
+      path: '/system/settings.json',
+      settings: settings.system || {},
+    };
     const userSettingsFile: SettingsFile = {
       path: '/user/settings.json',
-      settings: {},
+      settings: settings.user || {},
     };
     const workspaceSettingsFile: SettingsFile = {
       path: '/workspace/.gemini/settings.json',
-      settings: {
-        ...settings,
-      },
+      settings: settings.workspace || {},
     };
-    return new LoadedSettings(userSettingsFile, workspaceSettingsFile, []);
+    return new LoadedSettings(
+      systemSettingsFile,
+      userSettingsFile,
+      workspaceSettingsFile,
+      [],
+    );
   };
 
   beforeEach(() => {
@@ -214,6 +238,7 @@ describe('App UI', () => {
       cwd: '/tmp',
       model: 'model',
     }) as unknown as MockServerConfig;
+    mockVersion = '0.0.0-test';
 
     // Ensure the getShowMemoryUsage mock function is specifically set up if not covered by constructor mock
     if (!mockConfig.getShowMemoryUsage) {
@@ -222,7 +247,7 @@ describe('App UI', () => {
     mockConfig.getShowMemoryUsage.mockReturnValue(false); // Default for most tests
 
     // Ensure a theme is set so the theme dialog does not appear.
-    mockSettings = createMockSettings({ theme: 'Default' });
+    mockSettings = createMockSettings({ workspace: { theme: 'Default' } });
   });
 
   afterEach(() => {
@@ -243,6 +268,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -259,6 +285,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -268,8 +295,7 @@ describe('App UI', () => {
 
   it('should display custom contextFileName in footer when set and count is 1', async () => {
     mockSettings = createMockSettings({
-      contextFileName: 'AGENTS.md',
-      theme: 'Default',
+      workspace: { contextFileName: 'AGENTS.md', theme: 'Default' },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(1);
     mockConfig.getDebugMode.mockReturnValue(false);
@@ -279,6 +305,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -288,8 +315,10 @@ describe('App UI', () => {
 
   it('should display a generic message when multiple context files with different names are provided', async () => {
     mockSettings = createMockSettings({
-      contextFileName: ['AGENTS.md', 'CONTEXT.md'],
-      theme: 'Default',
+      workspace: {
+        contextFileName: ['AGENTS.md', 'CONTEXT.md'],
+        theme: 'Default',
+      },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(2);
     mockConfig.getDebugMode.mockReturnValue(false);
@@ -299,6 +328,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -308,8 +338,7 @@ describe('App UI', () => {
 
   it('should display custom contextFileName with plural when set and count is > 1', async () => {
     mockSettings = createMockSettings({
-      contextFileName: 'MY_NOTES.TXT',
-      theme: 'Default',
+      workspace: { contextFileName: 'MY_NOTES.TXT', theme: 'Default' },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(3);
     mockConfig.getDebugMode.mockReturnValue(false);
@@ -319,6 +348,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -328,8 +358,7 @@ describe('App UI', () => {
 
   it('should not display context file message if count is 0, even if contextFileName is set', async () => {
     mockSettings = createMockSettings({
-      contextFileName: 'ANY_FILE.MD',
-      theme: 'Default',
+      workspace: { contextFileName: 'ANY_FILE.MD', theme: 'Default' },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(0);
     mockConfig.getDebugMode.mockReturnValue(false);
@@ -339,6 +368,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -358,6 +388,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -378,6 +409,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -390,6 +422,7 @@ describe('App UI', () => {
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
@@ -399,18 +432,72 @@ describe('App UI', () => {
 
   it('should not display Tips component when hideTips is true', async () => {
     mockSettings = createMockSettings({
-      hideTips: true,
+      workspace: {
+        hideTips: true,
+      },
     });
 
     const { unmount } = render(
       <App
         config={mockConfig as unknown as ServerConfig}
         settings={mockSettings}
+        version={mockVersion}
       />,
     );
     currentUnmount = unmount;
     await Promise.resolve();
     expect(vi.mocked(Tips)).not.toHaveBeenCalled();
+  });
+
+  it('should display Header component by default', async () => {
+    const { Header } = await import('./components/Header.js');
+    const { unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    expect(vi.mocked(Header)).toHaveBeenCalled();
+  });
+
+  it('should not display Header component when hideBanner is true', async () => {
+    const { Header } = await import('./components/Header.js');
+    mockSettings = createMockSettings({
+      user: { hideBanner: true },
+    });
+
+    const { unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    expect(vi.mocked(Header)).not.toHaveBeenCalled();
+  });
+
+  it('should show tips if system says show, but workspace and user settings say hide', async () => {
+    mockSettings = createMockSettings({
+      system: { hideTips: false },
+      user: { hideTips: true },
+      workspace: { hideTips: true },
+    });
+
+    const { unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    expect(vi.mocked(Tips)).toHaveBeenCalled();
   });
 
   describe('when no theme is set', () => {
@@ -435,6 +522,7 @@ describe('App UI', () => {
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
+          version={mockVersion}
         />,
       );
       currentUnmount = unmount;
@@ -449,6 +537,7 @@ describe('App UI', () => {
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
+          version={mockVersion}
         />,
       );
       currentUnmount = unmount;
@@ -457,6 +546,50 @@ describe('App UI', () => {
         'Theme configuration unavailable due to NO_COLOR env variable.',
       );
       expect(lastFrame()).not.toContain('Select Theme');
+    });
+  });
+
+  describe('with initial prompt from --prompt-interactive', () => {
+    it('should submit the initial prompt automatically', async () => {
+      const mockSubmitQuery = vi.fn();
+
+      mockConfig.getQuestion = vi.fn(() => 'hello from prompt-interactive');
+
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Idle,
+        submitQuery: mockSubmitQuery,
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+      });
+
+      mockConfig.getGeminiClient.mockReturnValue({
+        isInitialized: vi.fn(() => true),
+      } as unknown as GeminiClient);
+
+      const { unmount, rerender } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Force a re-render to trigger useEffect
+      rerender(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockSubmitQuery).toHaveBeenCalledWith(
+        'hello from prompt-interactive',
+      );
     });
   });
 });
