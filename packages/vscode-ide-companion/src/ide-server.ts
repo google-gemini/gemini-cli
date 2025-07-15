@@ -14,21 +14,30 @@ import {
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 
+function sendActiveFileChangedNotification(
+  transport: StreamableHTTPServerTransport,
+) {
+  const editor = vscode.window.activeTextEditor;
+  const filePath = editor ? editor.document.uri.fsPath : '';
+  const notification: JSONRPCNotification = {
+    jsonrpc: '2.0',
+    method: 'ide/activeFileChanged',
+    params: { filePath },
+  };
+  transport.send(notification);
+}
+
 export async function startIDEServer(context: vscode.ExtensionContext) {
   const app = express();
   app.use(express.json());
 
   const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+  const sessionsWithInitialNotification = new Set<string>();
 
   const disposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
     const filePath = editor ? editor.document.uri.fsPath : null;
-    const notification: JSONRPCNotification = {
-      jsonrpc: '2.0',
-      method: 'ide/activeFileChanged',
-      params: { filePath },
-    };
     for (const transport of Object.values(transports)) {
-      transport.send(notification);
+      sendActiveFileChangedNotification(transport);
     }
   });
   context.subscriptions.push(disposable);
@@ -44,19 +53,12 @@ export async function startIDEServer(context: vscode.ExtensionContext) {
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (newSessionId) => {
           transports[newSessionId] = transport;
-          const editor = vscode.window.activeTextEditor;
-          const filePath = editor ? editor.document.uri.fsPath : null;
-          const notification: JSONRPCNotification = {
-            jsonrpc: '2.0',
-            method: 'ide/activeFileChanged',
-            params: { filePath },
-          };
-          transport.send(notification);
         },
       });
 
       transport.onclose = () => {
         if (transport.sessionId) {
+          sessionsWithInitialNotification.delete(transport.sessionId);
           delete transports[transport.sessionId];
         }
       };
@@ -101,6 +103,11 @@ export async function startIDEServer(context: vscode.ExtensionContext) {
     }
 
     const transport = transports[sessionId];
+    if (!sessionsWithInitialNotification.has(sessionId)) {
+      sendActiveFileChangedNotification(transport);
+      sessionsWithInitialNotification.add(sessionId);
+    }
+
     try {
       await transport.handleRequest(req, res);
     } catch (error) {
@@ -150,9 +157,7 @@ const createMcpServer = () => {
     async () => {
       try {
         const activeEditor = vscode.window.activeTextEditor;
-        const filePath = activeEditor
-          ? activeEditor.document.uri.fsPath
-          : undefined;
+        const filePath = activeEditor ? activeEditor.document.uri.fsPath : '';
         if (filePath) {
           return {
             content: [{ type: 'text', text: `Active file: ${filePath}` }],
