@@ -92,6 +92,37 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
 }
 import { runAcpPeer } from './acp/acpPeer.js';
 
+/**
+ * Utility function to track startup performance with less verbose syntax
+ */
+async function trackStartupPerformance<T>(
+  operation: () => Promise<T>,
+  phase: string,
+  config?: Config,
+  attributes?: Record<string, string | number | boolean>,
+): Promise<T> {
+  if (!isPerformanceMonitoringActive()) {
+    return operation();
+  }
+
+  const start = performance.now();
+  const result = await operation();
+  const duration = performance.now() - start;
+
+  if (config) {
+    recordStartupPerformance(config, phase, duration, attributes);
+  }
+
+  // Add Chrome DevTools integration for debug builds
+  if (process.env.NODE_ENV === 'development') {
+    performance.mark(`${phase}-start`);
+    performance.mark(`${phase}-end`);
+    performance.measure(phase, `${phase}-start`, `${phase}-end`);
+  }
+
+  return result;
+}
+
 export async function main() {
   const startupStart = performance.now();
   const workspaceRoot = process.cwd();
@@ -121,7 +152,7 @@ export async function main() {
   }
 
   const argv = await parseArguments();
-  
+
   // Extensions loading phase
   const extensionsStart = performance.now();
   const extensions = loadExtensions(workspaceRoot);
@@ -241,17 +272,14 @@ export async function main() {
           process.exit(1);
         }
       }
-      const sandboxStart = performance.now();
-      await start_sandbox(sandboxConfig, memoryArgs);
-      const sandboxEnd = performance.now();
-      const sandboxDuration = sandboxEnd - sandboxStart;
-
-      // Record sandbox performance if monitoring is active
-      if (isPerformanceMonitoringActive()) {
-        recordStartupPerformance(config, 'sandbox_setup', sandboxDuration, {
+      await trackStartupPerformance(
+        () => start_sandbox(sandboxConfig, memoryArgs),
+        'sandbox_setup',
+        config,
+        {
           sandbox_command: sandboxConfig.command,
-        });
-      }
+        },
+      );
 
       process.exit(0);
     } else {
@@ -319,7 +347,7 @@ export async function main() {
       has_question: (input?.length ?? 0) > 0,
     });
   }
-  
+
   const shouldBeInteractive =
     !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0);
 
