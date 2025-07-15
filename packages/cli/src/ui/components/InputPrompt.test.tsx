@@ -13,11 +13,13 @@ import { vi } from 'vitest';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
+import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
+vi.mock('../utils/clipboardUtils.js');
 
 type MockedUseShellHistory = ReturnType<typeof useShellHistory>;
 type MockedUseCompletion = ReturnType<typeof useCompletion>;
@@ -76,6 +78,7 @@ describe('InputPrompt', () => {
         mockBuffer.viewportVisualLines = [newText];
         mockBuffer.allVisualLines = [newText];
       }),
+      replaceRangeByOffset: vi.fn(),
       viewportVisualLines: [''],
       allVisualLines: [''],
       visualCursor: [0, 0],
@@ -87,7 +90,7 @@ describe('InputPrompt', () => {
       killLineLeft: vi.fn(),
       openInExternalEditor: vi.fn(),
       newline: vi.fn(),
-      replaceRangeByOffset: vi.fn(),
+      backspace: vi.fn(),
     } as unknown as TextBuffer;
 
     mockShellHistory = {
@@ -216,6 +219,126 @@ describe('InputPrompt', () => {
     expect(mockInputHistory.navigateDown).toHaveBeenCalled();
     expect(props.onSubmit).toHaveBeenCalledWith('some text');
     unmount();
+  });
+
+  describe('clipboard image paste', () => {
+    beforeEach(() => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(null);
+      vi.mocked(clipboardUtils.cleanupOldClipboardImages).mockResolvedValue(
+        undefined,
+      );
+    });
+
+    it('should handle Ctrl+V when clipboard has an image', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(
+        '/test/.gemini-clipboard/clipboard-123.png',
+      );
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      // Send Ctrl+V
+      stdin.write('\x16'); // Ctrl+V
+      await wait();
+
+      expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
+      expect(clipboardUtils.saveClipboardImage).toHaveBeenCalledWith(
+        props.config.getTargetDir(),
+      );
+      expect(clipboardUtils.cleanupOldClipboardImages).toHaveBeenCalledWith(
+        props.config.getTargetDir(),
+      );
+      expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should not insert anything when clipboard has no image', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x16'); // Ctrl+V
+      await wait();
+
+      expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
+      expect(clipboardUtils.saveClipboardImage).not.toHaveBeenCalled();
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should handle image save failure gracefully', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(null);
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x16'); // Ctrl+V
+      await wait();
+
+      expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should insert image path at cursor position with proper spacing', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(
+        '/test/.gemini-clipboard/clipboard-456.png',
+      );
+
+      // Set initial text and cursor position
+      mockBuffer.text = 'Hello world';
+      mockBuffer.cursor = [0, 5]; // Cursor after "Hello"
+      mockBuffer.lines = ['Hello world'];
+      mockBuffer.replaceRangeByOffset = vi.fn();
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x16'); // Ctrl+V
+      await wait();
+
+      // Should insert at cursor position with spaces
+      expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
+
+      // Get the actual call to see what path was used
+      const actualCall = vi.mocked(mockBuffer.replaceRangeByOffset).mock
+        .calls[0];
+      expect(actualCall[0]).toBe(5); // start offset
+      expect(actualCall[1]).toBe(5); // end offset
+      expect(actualCall[2]).toMatch(
+        /@.*\.gemini-clipboard\/clipboard-456\.png/,
+      ); // flexible path match
+      unmount();
+    });
+
+    it('should handle errors during clipboard operations', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      vi.mocked(clipboardUtils.clipboardHasImage).mockRejectedValue(
+        new Error('Clipboard error'),
+      );
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x16'); // Ctrl+V
+      await wait();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error handling clipboard image:',
+        expect.any(Error),
+      );
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+
+      consoleErrorSpy.mockRestore();
+      unmount();
+    });
   });
 
   it('should complete a partial parent command and add a space', async () => {
@@ -355,8 +478,6 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  // ADD this test for defensive coverage
-
   it('should not submit on Enter when the buffer is empty or only contains whitespace', async () => {
     props.buffer.setText('   '); // Set buffer to whitespace
 
@@ -405,6 +526,21 @@ describe('InputPrompt', () => {
 
     expect(props.buffer.replaceRangeByOffset).toHaveBeenCalled();
     expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should add a newline on enter when the line ends with a backslash', async () => {
+    props.buffer.setText('first line\\');
+
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\r');
+    await wait();
+
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(props.buffer.backspace).toHaveBeenCalled();
+    expect(props.buffer.newline).toHaveBeenCalled();
     unmount();
   });
 });

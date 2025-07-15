@@ -18,7 +18,7 @@
 // limitations under the License.
 
 import { execSync } from 'child_process';
-import { chmodSync, readFileSync, rmSync } from 'fs';
+import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -134,6 +134,14 @@ function buildImage(imageName, dockerfile) {
     { stdio: buildStdout, shell: '/bin/bash' },
   );
   console.log(`built ${finalImageName}`);
+  if (existsSync('/workspace/final_image_uri.txt')) {
+    // The publish step only supports one image. If we build multiple, only the last one
+    // will be published. Throw an error to make this failure explicit.
+    throw new Error(
+      'CI artifact file /workspace/final_image_uri.txt already exists. Refusing to overwrite.',
+    );
+  }
+  writeFileSync('/workspace/final_image_uri.txt', finalImageName);
 }
 
 if (baseImage && baseDockerfile) {

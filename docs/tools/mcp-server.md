@@ -87,7 +87,7 @@ Each server configuration supports the following properties:
 #### Optional
 
 - **`args`** (string[]): Command-line arguments for Stdio transport
-- **`headers`** (object): Custom HTTP headers when using `httpUrl`
+- **`headers`** (object): Custom HTTP headers when using `url` or `httpUrl`
 - **`env`** (object): Environment variables for the server process. Values can reference environment variables using `$VAR_NAME` or `${VAR_NAME}` syntax
 - **`cwd`** (string): Working directory for Stdio transport
 - **`timeout`** (number): Request timeout in milliseconds (default: 600,000ms = 10 minutes)
@@ -416,7 +416,7 @@ The MCP integration tracks several states:
 
 ### Debugging Tips
 
-1. **Enable debug mode:** Run the CLI with `--debug_mode` for verbose output
+1. **Enable debug mode:** Run the CLI with `--debug` for verbose output
 2. **Check stderr:** MCP server stderr is captured and logged (INFO messages filtered)
 3. **Test isolation:** Test your MCP server independently before integrating
 4. **Incremental setup:** Start with simple tools before adding complex functionality

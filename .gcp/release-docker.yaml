@@ -24,13 +24,15 @@ steps:
     args:
       - -c
       - |
+        SHELL_TAG_NAME="$TAG_NAME"
         FINAL_TAG="$SHORT_SHA" # Default to SHA
-        if [[ "$TAG_NAME" == *"-nightly"* ]]; then
+        if [[ "$$SHELL_TAG_NAME" == *"-nightly"* ]]; then
           echo "Nightly release detected."
-          FINAL_TAG="${TAG_NAME#v}"
-        elif [[ "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          FINAL_TAG="$${SHELL_TAG_NAME#v}"
+        # Also escape the variable in the regex match
+        elif [[ "$$SHELL_TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
           echo "Official release detected."
-          FINAL_TAG="${TAG_NAME#v}"
+          FINAL_TAG="$${SHELL_TAG_NAME#v}"
         else
           echo "Development/RC release detected. Using commit SHA as tag."
         fi
@@ -46,7 +48,7 @@ steps:
       - |
         export GEMINI_SANDBOX_IMAGE_TAG=$$(cat /workspace/image_tag.txt)
         echo "Using Docker image tag for build: $$GEMINI_SANDBOX_IMAGE_TAG"
-        npm run build:sandbox:fast
+        npm run build:sandbox
     env:
       - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
 
@@ -58,13 +60,10 @@ steps:
       - -c
       - |
         set -e
-        IMAGE_TAG=$(cat /workspace/image_tag.txt)
-        BASE_IMAGE_URI=$(npm run -s config get sandboxImageUri)
-        IMAGE_URI_NO_TAG=${BASE_IMAGE_URI%:*}
-        FINAL_IMAGE_URI="${IMAGE_URI_NO_TAG}:${IMAGE_TAG}"
+        FINAL_IMAGE_URI=$$(cat /workspace/final_image_uri.txt)
 
-        echo "Pushing sandbox image: ${FINAL_IMAGE_URI}"
-        $_CONTAINER_TOOL push "${FINAL_IMAGE_URI}"
+        echo "Pushing sandbox image: $${FINAL_IMAGE_URI}"
+        $_CONTAINER_TOOL push "$${FINAL_IMAGE_URI}"
     env:
       - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
 

@@ -16,10 +16,10 @@ jobs:
         sandbox: [sandbox:none, sandbox:docker]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20.x
           cache: 'npm'
@@ -32,11 +32,11 @@ jobs:
 
       - name: Set up Docker
         if: matrix.sandbox == 'sandbox:docker'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
       - name: Set up Podman
         if: matrix.sandbox == 'sandbox:podman'
-        uses: redhat-actions/podman-login@v1
+        uses: redhat-actions/podman-login@4934294ad0449894bcd1e9f191899d7292469603 # v1
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}

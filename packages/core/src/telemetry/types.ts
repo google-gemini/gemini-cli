@@ -95,12 +95,21 @@ export class UserPromptEvent {
   'event.name': 'user_prompt';
   'event.timestamp': string; // ISO 8601
   prompt_length: number;
+  prompt_id: string;
+  auth_type?: string;
   prompt?: string;
 
-  constructor(prompt_length: number, prompt?: string) {
+  constructor(
+    prompt_length: number,
+    prompt_Id: string,
+    auth_type?: string,
+    prompt?: string,
+  ) {
     this['event.name'] = 'user_prompt';
     this['event.timestamp'] = new Date().toISOString();
     this.prompt_length = prompt_length;
+    this.prompt_id = prompt_Id;
+    this.auth_type = auth_type;
     this.prompt = prompt;
   }
 }
@@ -115,6 +124,7 @@ export class ToolCallEvent {
   decision?: ToolCallDecision;
   error?: string;
   error_type?: string;
+  prompt_id: string;
 
   constructor(call: CompletedToolCall) {
     this['event.name'] = 'tool_call';
@@ -128,6 +138,7 @@ export class ToolCallEvent {
       : undefined;
     this.error = call.response.error?.message;
     this.error_type = call.response.error?.name;
+    this.prompt_id = call.request.prompt_id;
   }
 }
 
@@ -135,12 +146,14 @@ export class ApiRequestEvent {
   'event.name': 'api_request';
   'event.timestamp': string; // ISO 8601
   model: string;
+  prompt_id: string;
   request_text?: string;
 
-  constructor(model: string, request_text?: string) {
+  constructor(model: string, prompt_id: string, request_text?: string) {
     this['event.name'] = 'api_request';
     this['event.timestamp'] = new Date().toISOString();
     this.model = model;
+    this.prompt_id = prompt_id;
     this.request_text = request_text;
   }
 }
@@ -153,11 +166,15 @@ export class ApiErrorEvent {
   error_type?: string;
   status_code?: number | string;
   duration_ms: number;
+  prompt_id: string;
+  auth_type?: string;
 
   constructor(
     model: string,
     error: string,
     duration_ms: number,
+    prompt_id: string,
+    auth_type?: string,
     error_type?: string,
     status_code?: number | string,
   ) {
@@ -168,6 +185,8 @@ export class ApiErrorEvent {
     this.error_type = error_type;
     this.status_code = status_code;
     this.duration_ms = duration_ms;
+    this.prompt_id = prompt_id;
+    this.auth_type = auth_type;
   }
 }
 
@@ -185,10 +204,14 @@ export class ApiResponseEvent {
   tool_token_count: number;
   total_token_count: number;
   response_text?: string;
+  prompt_id: string;
+  auth_type?: string;
 
   constructor(
     model: string,
     duration_ms: number,
+    prompt_id: string,
+    auth_type?: string,
     usage_data?: GenerateContentResponseUsageMetadata,
     response_text?: string,
     error?: string,
@@ -206,6 +229,20 @@ export class ApiResponseEvent {
     this.total_token_count = usage_data?.totalTokenCount ?? 0;
     this.response_text = response_text;
     this.error = error;
+    this.prompt_id = prompt_id;
+    this.auth_type = auth_type;
+  }
+}
+
+export class FlashFallbackEvent {
+  'event.name': 'flash_fallback';
+  'event.timestamp': string; // ISO 8601
+  auth_type: string;
+
+  constructor(auth_type: string) {
+    this['event.name'] = 'flash_fallback';
+    this['event.timestamp'] = new Date().toISOString();
+    this.auth_type = auth_type;
   }
 }
 
@@ -216,4 +253,5 @@ export type TelemetryEvent =
   | ToolCallEvent
   | ApiRequestEvent
   | ApiErrorEvent
-  | ApiResponseEvent;
+  | ApiResponseEvent
+  | FlashFallbackEvent;

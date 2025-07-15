@@ -646,7 +646,7 @@ export class CoreToolScheduler {
 
         scheduledCall.tool
           .execute(scheduledCall.request.args, signal, liveOutputCallback)
-          .then((toolResult: ToolResult) => {
+          .then(async (toolResult: ToolResult) => {
             if (signal.aborted) {
               this.setStatusInternal(
                 callId,
@@ -661,13 +661,13 @@ export class CoreToolScheduler {
               callId,
               toolResult.llmContent,
             );
-
             const successResponse: ToolCallResponseInfo = {
               callId,
               responseParts: response,
               resultDisplay: toolResult.returnDisplay,
               error: undefined,
             };
+
             this.setStatusInternal(callId, 'success', successResponse);
           })
           .catch((executionError: Error) => {
