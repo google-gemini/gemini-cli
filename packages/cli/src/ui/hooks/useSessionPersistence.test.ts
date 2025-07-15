@@ -156,6 +156,32 @@ describe('useSessionPersistence - Integration Test', () => {
     consoleErrorSpy.mockRestore();
   });
 
+  it('should not call loadHistory if session file contains valid JSON but not an array', async () => {
+    const geminiDir = path.join(tempDir, '.gemini');
+    fs.mkdirSync(geminiDir, { recursive: true });
+    const sessionPath = path.join(geminiDir, 'session.json');
+    fs.writeFileSync(sessionPath, '{"key": "value"}'); // Valid JSON, but not an array
+
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    renderHook(() =>
+      useSessionPersistence({
+        sessionPersistence: true,
+        history: mockHistory,
+        loadHistory: mockLoadHistory,
+      }),
+    );
+
+    // Give async operations a chance to run
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(mockLoadHistory).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).not.toHaveBeenCalled(); // No error should be logged for this case
+    consoleErrorSpy.mockRestore();
+  });
+
   it('should not throw or call loadHistory if session file does not exist', async () => {
     const consoleErrorSpy = vi
       .spyOn(console, 'error')

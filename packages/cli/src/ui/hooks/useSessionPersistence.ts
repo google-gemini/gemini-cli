@@ -28,7 +28,10 @@ export const useSessionPersistence = ({
         const sessionPath = path.join(process.cwd(), '.gemini', 'session.json');
         try {
           const sessionData = await fsp.readFile(sessionPath, 'utf-8');
-          loadHistory(JSON.parse(sessionData));
+          const parsedHistory = JSON.parse(sessionData);
+          if (Array.isArray(parsedHistory)) {
+            loadHistory(parsedHistory);
+          }
         } catch (error) {
           // Silently ignore if file doesn't exist.
           if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
