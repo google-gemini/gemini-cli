@@ -53,6 +53,7 @@ import { DeleteCRITool } from '../tools/DeleteCRI.js';
 import { UpdateCRITool } from '../tools/UpdateCRI.js';
 import { ListRepositoryGroupsTool } from '../tools/ListGroups.js';
 import { GetRepositoryGroupTool } from '../tools/GetGroups.js';
+import { CreateRepositoryGroupTool } from '../tools/CreateGroups.js';
 
 
 
@@ -585,6 +586,7 @@ export class Config {
     registerCoreTool(UpdateCRITool, this);
     registerCoreTool(ListRepositoryGroupsTool, this);
     registerCoreTool(GetRepositoryGroupTool, this);
+    registerCoreTool(CreateRepositoryGroupTool, this);
 
     await registry.discoverTools();
     return registry;
