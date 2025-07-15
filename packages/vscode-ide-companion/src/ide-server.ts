@@ -36,7 +36,7 @@ export async function startIDEServer(context: vscode.ExtensionContext) {
   const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
   const sessionsWithInitialNotification = new Set<string>();
 
-  const disposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
+  const disposable = vscode.window.onDidChangeActiveTextEditor((_editor) => {
     for (const transport of Object.values(transports)) {
       sendActiveFileChangedNotification(transport);
     }
