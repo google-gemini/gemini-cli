@@ -37,7 +37,6 @@ export async function startIDEServer(context: vscode.ExtensionContext) {
   const sessionsWithInitialNotification = new Set<string>();
 
   const disposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
-    const filePath = editor ? editor.document.uri.fsPath : null;
     for (const transport of Object.values(transports)) {
       sendActiveFileChangedNotification(transport);
     }
