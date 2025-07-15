@@ -70,7 +70,7 @@ describe('CommandService', () => {
         const tree = commandService.getCommands();
 
         // Post-condition assertions
-        expect(tree.length).toBe(8);
+        expect(tree.length).toBe(9);
 
         const commandNames = tree.map((cmd) => cmd.name);
         expect(commandNames).toContain('auth');
@@ -87,14 +87,14 @@ describe('CommandService', () => {
       it('should overwrite any existing commands when called again', async () => {
         // Load once
         await commandService.loadCommands();
-        expect(commandService.getCommands().length).toBe(8);
+        expect(commandService.getCommands().length).toBe(9);
 
         // Load again
         await commandService.loadCommands();
         const tree = commandService.getCommands();
 
         // Should not append, but overwrite
-        expect(tree.length).toBe(8);
+        expect(tree.length).toBe(9);
       });
     });
 
@@ -106,7 +106,7 @@ describe('CommandService', () => {
         await commandService.loadCommands();
 
         const loadedTree = commandService.getCommands();
-        expect(loadedTree.length).toBe(8);
+        expect(loadedTree.length).toBe(9);
         expect(loadedTree).toEqual([
           aboutCommand,
           authCommand,
