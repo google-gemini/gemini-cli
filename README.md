@@ -17,6 +17,23 @@ With the Gemini CLI you can:
 - Ground your queries with the [Google Search](https://ai.google.dev/gemini-api/docs/grounding)
   tool, built in to Gemini.
 
+## Table of Contents
+
+- [Quickstart](#quickstart)
+  - [Using a Gemini API Key](#use-a-gemini-api-key)
+  - [Using a Vertex AI API Key](#use-a-vertex-ai-api-key)
+- [Examples](#examples)
+- [Popular Tasks](#popular-tasks)
+  - [Explore a New Codebase](#explore-a-new-codebase)
+  - [Work with Existing Code](#work-with-your-existing-code)
+  - [Automate Your Workflows](#automate-your-workflows)
+  - [Interact with Your System](#interact-with-your-system)
+- [Uninstall](#uninstall)
+- [Troubleshooting](#troubleshooting)
+- [Next Steps](#next-steps)
+- [Terms of Service and Privacy Notice](#terms-of-service-and-privacy-notice)
+
+
 ## Quickstart
 
 1. **Prerequisites:** Ensure you have [Node.js version 20](https://nodejs.org/en/download) or higher installed.
@@ -38,8 +55,8 @@ With the Gemini CLI you can:
    gemini
    ```
 
-3. **Pick a color theme**
-4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
+3. **Pick a color theme.**
+4. **Authenticate:** when prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
 
 You are now ready to use the Gemini CLI!
 
@@ -61,16 +78,16 @@ The Gemini API provides a free tier with [100 requests per day](https://ai.googl
 The Vertex AI API provides a [free tier](https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview) using express mode for Gemini 2.5 Pro, control over which model you use, and access to higher rate limits with a billing account:
 
 1. Generate a key from [Google Cloud](https://cloud.google.com/vertex-ai/generative-ai/docs/start/api-keys).
-2. Set it as an environment variable in your terminal. Replace `YOUR_API_KEY` with your generated key and set GOOGLE_GENAI_USE_VERTEXAI to true
+2. Set it as an environment variable in your terminal. Replace `YOUR_API_KEY` with your generated key and set GOOGLE_GENAI_USE_VERTEXAI to true.
 
    ```bash
    export GOOGLE_API_KEY="YOUR_API_KEY"
    export GOOGLE_GENAI_USE_VERTEXAI=true
    ```
 
-3. (Optionally) Add a billing account on your project to get access to [higher usage limits](https://cloud.google.com/vertex-ai/generative-ai/docs/quotas)
+3. (Optionally) Add a billing account on your project to get access to [higher usage limits](https://cloud.google.com/vertex-ai/generative-ai/docs/quotas).
 
-For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
+For other authentication methods, including Google Workspace accounts, see the [Authentication](./docs/cli/authentication.md) guide.
 
 ## Examples
 
@@ -96,15 +113,15 @@ gemini
 ### Next steps
 
 - Learn how to [contribute to or build from the source](./CONTRIBUTING.md).
-- Explore the available **[CLI Commands](./docs/cli/commands.md)**.
-- If you encounter any issues, review the **[troubleshooting guide](./docs/troubleshooting.md)**.
+- Explore the available [CLI Commands](./docs/cli/commands.md).
+- If you encounter any issues, review the [Troubleshooting Guide](./docs/troubleshooting.md).
 - For more comprehensive documentation, see the [full documentation](./docs/index.md).
 - Take a look at some [popular tasks](#popular-tasks) for more inspiration.
-- Check out our **[Official Roadmap](./ROADMAP.md)**
+- Check out our [Official Roadmap](./ROADMAP.md).
 
 ### Troubleshooting
 
-Head over to the [troubleshooting guide](docs/troubleshooting.md) if you're
+Head over to the [Troubleshooting Guide](docs/troubleshooting.md) if you're
 having issues.
 
 ## Popular tasks
@@ -153,7 +170,7 @@ Use MCP servers to integrate your local system tools with your enterprise collab
 > Organize my PDF invoices by month of expenditure.
 ```
 
-### Uninstall
+## Uninstall
 
 Head over to the [Uninstall](docs/Uninstall.md) guide for uninstallation instructions.
 
