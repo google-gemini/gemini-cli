@@ -23,12 +23,10 @@ export const extensionsCommand: SlashCommand = {
       return;
     }
 
-    let message = 'Active extensions:\n\n';
-    for (const ext of activeExtensions) {
-      message += `  - \u001b[36m${ext.name} (v${ext.version})\u001b[0m\n`;
-    }
-    // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
-    message += '\u001b[0m';
+const extensionLines = activeExtensions.map(
+  (ext) => `  - \u001b[36m${ext.name} (v${ext.version})\u001b[0m`
+);
+const message = `Active extensions:\n\n${extensionLines.join('\n')}\n`;
 
     context.ui.addItem(
       {
