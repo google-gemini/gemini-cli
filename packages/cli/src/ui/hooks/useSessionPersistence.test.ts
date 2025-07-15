@@ -61,6 +61,13 @@ describe('useSessionPersistence - Integration Test', () => {
   });
 
   it('should save session history on exit when persistence is enabled', () => {
+    // Add items to history before rendering the hook
+    mockHistory.push(
+      { id: 1, type: MessageType.USER, text: 'User message 1' },
+      { id: 2, type: MessageType.GEMINI, text: 'Gemini response 1' },
+      { id: 3, type: MessageType.INFO, text: 'Info message' }, // Should be filtered
+    );
+
     const { unmount } = renderHook(() =>
       useSessionPersistence({
         sessionPersistence: true,
@@ -74,13 +81,6 @@ describe('useSessionPersistence - Integration Test', () => {
       (call) => call[0] === 'exit',
     )?.[1];
     expect(exitHandler).toBeDefined();
-
-    // Add items to history
-    mockHistory.push(
-      { id: 1, type: MessageType.USER, text: 'User message 1' },
-      { id: 2, type: MessageType.GEMINI, text: 'Gemini response 1' },
-      { id: 3, type: MessageType.INFO, text: 'Info message' }, // Should be filtered
-    );
 
     // Manually trigger the exit handler to save the session
     exitHandler();
