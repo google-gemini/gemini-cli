@@ -390,6 +390,20 @@ export const useSlashCommandProcessor = (
               message += ` (${serverTools.length} tools cached)`;
             }
 
+            // Add working directory if available
+            // Show working directory (cwd) if available on the server config
+            let workingDir: string | undefined = undefined;
+            if (server && typeof server === 'object' && server !== null) {
+              // Prefer cwd property from MCPServerConfig
+              const cwd = (server as { cwd?: string }).cwd;
+              if (typeof cwd === 'string' && cwd.trim().length > 0) {
+                workingDir = cwd;
+              }
+            }
+            if (workingDir) {
+              message += `\n  Working Directory: ${workingDir}`;
+            }
+
             // Add server description with proper handling of multi-line descriptions
             if ((useShowDescriptions || useShowSchema) && server?.description) {
               const greenColor = '\u001b[32m';
