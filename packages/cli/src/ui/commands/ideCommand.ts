@@ -103,7 +103,6 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
           const bundleDir = path.dirname(fileURLToPath(import.meta.url));
           // The VSIX file is copied to the bundle directory as part of the build.
           let vsixFiles = glob.sync(path.join(bundleDir, '*.vsix'));
-
           if (vsixFiles.length === 0) {
             // If the VSIX file is not in the bundle, it might be a dev
             // environment running with `npm start`. Look for it in the original
@@ -120,7 +119,6 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
             );
             vsixFiles = glob.sync(devPath);
           }
-
           if (vsixFiles.length === 0) {
             context.ui.addItem(
               {

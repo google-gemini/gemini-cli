@@ -25,12 +25,12 @@ const loadBuiltInCommands = async (
     authCommand,
     clearCommand,
     extensionsCommand,
-  helpCommand,
+    helpCommand,
     ideCommand(config),
     memoryCommand,
     privacyCommand,
     statsCommand,
-  themeCommand,
+    themeCommand,
   ];
 
   return allCommands.filter(
