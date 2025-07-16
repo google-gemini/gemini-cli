@@ -56,6 +56,7 @@ export enum MCPDiscoveryState {
  * Map to track the status of each MCP server within the core package
  */
 const mcpServerStatusesInternal: Map<string, MCPServerStatus> = new Map();
+const activeTransports: Map<string, Transport> = new Map();
 
 /**
  * Track the overall MCP discovery state
@@ -129,6 +130,19 @@ export function getMCPDiscoveryState(): MCPDiscoveryState {
   return mcpDiscoveryState;
 }
 
+export async function closeMcpServer(
+  serverName: string,
+  toolRegistry: ToolRegistry,
+): Promise<void> {
+  const transport = activeTransports.get(serverName);
+  if (transport) {
+    await transport.close();
+    activeTransports.delete(serverName);
+    toolRegistry.unregisterToolsByServer(serverName);
+    updateMCPServerStatus(serverName, MCPServerStatus.DISCONNECTED);
+  }
+}
+
 /**
  * Discovers tools from all configured MCP servers and registers them with the tool registry.
  * It orchestrates the connection and discovery process for each server defined in the
@@ -145,19 +159,26 @@ export async function discoverMcpTools(
   toolRegistry: ToolRegistry,
   debugMode: boolean,
 ): Promise<void> {
+  for (const serverName of activeTransports.keys()) {
+    if (!mcpServers[serverName] || mcpServers[serverName].enabled === false) {
+      await closeMcpServer(serverName, toolRegistry);
+    }
+  }
+
   mcpDiscoveryState = MCPDiscoveryState.IN_PROGRESS;
   try {
     mcpServers = populateMcpServerCommand(mcpServers, mcpServerCommand);
 
-    const discoveryPromises = Object.entries(mcpServers).map(
-      ([mcpServerName, mcpServerConfig]) =>
+    const discoveryPromises = Object.entries(mcpServers)
+      .filter(([, mcpServerConfig]) => mcpServerConfig.enabled !== false)
+      .map(([mcpServerName, mcpServerConfig]) =>
         connectAndDiscover(
           mcpServerName,
           mcpServerConfig,
           toolRegistry,
           debugMode,
         ),
-    );
+      );
     await Promise.all(discoveryPromises);
   } finally {
     mcpDiscoveryState = MCPDiscoveryState.COMPLETED;
@@ -381,10 +402,12 @@ export function createTransport(
         headers: mcpServerConfig.headers,
       };
     }
-    return new StreamableHTTPClientTransport(
+    const transport = new StreamableHTTPClientTransport(
       new URL(mcpServerConfig.httpUrl),
       transportOptions,
     );
+    activeTransports.set(mcpServerName, transport);
+    return transport;
   }
 
   if (mcpServerConfig.url) {
@@ -394,10 +417,12 @@ export function createTransport(
         headers: mcpServerConfig.headers,
       };
     }
-    return new SSEClientTransport(
+    const transport = new SSEClientTransport(
       new URL(mcpServerConfig.url),
       transportOptions,
     );
+    activeTransports.set(mcpServerName, transport);
+    return transport;
   }
 
   if (mcpServerConfig.command) {
@@ -417,6 +442,7 @@ export function createTransport(
         console.debug(`[DEBUG] [MCP STDERR (${mcpServerName})]: `, stderrStr);
       });
     }
+    activeTransports.set(mcpServerName, transport);
     return transport;
   }
 

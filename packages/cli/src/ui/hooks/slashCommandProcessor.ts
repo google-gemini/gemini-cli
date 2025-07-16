@@ -32,7 +32,11 @@ import path from 'path';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
-import { LoadedSettings } from '../../config/settings.js';
+import {
+  LoadedSettings,
+  Settings,
+  SettingScope,
+} from '../../config/settings.js';
 import {
   type CommandContext,
   type SlashCommandActionReturn,
@@ -77,6 +81,7 @@ export const useSlashCommandProcessor = (
   showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
+  reloadSettings: () => void,
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<SlashCommand[]>([]);
@@ -92,6 +97,11 @@ export const useSlashCommandProcessor = (
     // The logger's initialize is async, but we can create the instance
     // synchronously. Commands that use it will await its initialization.
     return l;
+  }, [config]);
+
+  const [mcpServers, setMcpServers] = useState(config?.getMcpServers() || {});
+  useEffect(() => {
+    setMcpServers(config?.getMcpServers() || {});
   }, [config]);
 
   const [pendingCompressionItemRef, setPendingCompressionItem] =
@@ -271,6 +281,41 @@ export const useSlashCommandProcessor = (
             useShowSchema = true;
           }
 
+          if (_subCommand === 'toggle' && _args) {
+            const serverName = _args;
+            const userSettings: Settings = { ...settings.user.settings };
+            const mcpSettings = userSettings.mcpServers || {};
+
+            if (!mcpSettings[serverName]) {
+              addMessage({
+                type: MessageType.ERROR,
+                content: `MCP server "${serverName}" not found.`,
+                timestamp: new Date(),
+              });
+              return;
+            }
+
+            // Create a new object for the server config to avoid direct mutation
+            mcpSettings[serverName] = {
+              ...mcpSettings[serverName],
+              enabled: mcpSettings[serverName].enabled === false,
+            };
+
+            userSettings.mcpServers = mcpSettings;
+
+            settings.setValue(SettingScope.User, 'mcpServers', mcpSettings);
+            setMcpServers(mcpSettings);
+
+            addMessage({
+              type: MessageType.INFO,
+              content: `Toggled MCP server "${serverName}". Refreshing config...`,
+              timestamp: new Date(),
+            });
+            // Reload the config to apply changes
+            reloadSettings();
+            return;
+          }
+
           const toolRegistry = await config?.getToolRegistry();
           if (!toolRegistry) {
             addMessage({
@@ -281,7 +326,6 @@ export const useSlashCommandProcessor = (
             return;
           }
 
-          const mcpServers = config?.getMcpServers() || {};
           const serverNames = Object.keys(mcpServers);
 
           if (serverNames.length === 0) {
@@ -347,9 +391,10 @@ export const useSlashCommandProcessor = (
 
             // Get server description if available
             const server = mcpServers[serverName];
+            const isEnabled = server.enabled !== false;
 
             // Format server header with bold formatting and status
-            message += `${statusIndicator} \u001b[1m${serverName}\u001b[0m - ${statusText}`;
+            message += `${statusIndicator} \u001b[1m${serverName}\u001b[0m${isEnabled ? '' : ' (disabled)'} - ${statusText}`;
 
             // Add tool count with conditional messaging
             if (status === MCPServerStatus.CONNECTED) {
@@ -549,14 +594,7 @@ export const useSlashCommandProcessor = (
           const cliVersion = await getCliVersion();
           const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
 
-          const info = `
-*   **CLI Version:** ${cliVersion}
-*   **Git Commit:** ${GIT_COMMIT_INFO}
-*   **Operating System:** ${osVersion}
-*   **Sandbox Environment:** ${sandboxEnv}
-*   **Model Version:** ${modelVersion}
-*   **Memory Usage:** ${memoryUsage}
-`;
+          const info = `\n*   **CLI Version:** ${cliVersion}\n*   **Git Commit:** ${GIT_COMMIT_INFO}\n*   **Operating System:** ${osVersion}\n*   **Sandbox Environment:** ${sandboxEnv}\n*   **Model Version:** ${modelVersion}\n*   **Memory Usage:** ${memoryUsage}\n`;
 
           let bugReportUrl =
             'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}';
@@ -944,6 +982,9 @@ export const useSlashCommandProcessor = (
     setPendingCompressionItem,
     clearItems,
     refreshStatic,
+    settings,
+    mcpServers,
+    reloadSettings,
   ]);
 
   const handleSlashCommand = useCallback(

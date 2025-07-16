@@ -76,7 +76,7 @@ import {
   GeminiClient,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
-import { LoadedSettings } from '../../config/settings.js';
+import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { CommandService } from '../../services/CommandService.js';
@@ -162,6 +162,7 @@ describe('useSlashCommandProcessor', () => {
       getCheckpointingEnabled: vi.fn(() => true),
       getBugCommand: vi.fn(() => undefined),
       getSessionId: vi.fn(() => 'test-session-id'),
+      getMcpServers: vi.fn(() => ({})),
     } as unknown as Config;
     mockCorgiMode = vi.fn();
     mockUseSessionStats.mockReturnValue({
@@ -190,8 +191,17 @@ describe('useSlashCommandProcessor', () => {
       merged: {
         contextFileName: 'GEMINI.md',
       },
+      user: {
+        settings: {
+          mcpServers: {
+            server1: { command: 'cmd1', enabled: true },
+            server2: { command: 'cmd2', enabled: false },
+          },
+        },
+      },
+      setValue: vi.fn(),
     } as unknown as LoadedSettings;
-    return renderHook(() =>
+    const hook = renderHook(() =>
       useSlashCommandProcessor(
         mockConfig,
         settings,
@@ -209,12 +219,16 @@ describe('useSlashCommandProcessor', () => {
         showToolDescriptions,
         mockSetQuittingMessages,
         vi.fn(), // mockOpenPrivacyNotice
+        vi.fn(), // mockReloadSettings
       ),
     );
+    return { hook, settings };
   };
 
-  const getProcessor = (showToolDescriptions: boolean = false) =>
-    getProcessorHook(showToolDescriptions).result.current;
+  const getProcessor = (showToolDescriptions: boolean = false) => {
+    const { hook, settings } = getProcessorHook(showToolDescriptions);
+    return { ...hook.result.current, settings, result: hook.result };
+  };
 
   describe('Other commands', () => {
     it('/editor should open editor dialog and return handled', async () => {
@@ -255,7 +269,9 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const { result } = getProcessorHook();
+      const {
+        hook: { result },
+      } = getProcessorHook();
 
       await vi.waitFor(() => {
         // We check that the `slashCommands` array, which is the public API
@@ -287,7 +303,9 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const { result } = getProcessorHook();
+      const {
+        hook: { result },
+      } = getProcessorHook();
       await vi.waitFor(() => {
         expect(
           result.current.slashCommands.some((c) => c.name === 'test'),
@@ -317,7 +335,9 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const { result } = getProcessorHook();
+      const {
+        hook: { result },
+      } = getProcessorHook();
       await vi.waitFor(() => {
         expect(
           result.current.slashCommands.some((c) => c.name === 'test'),
@@ -349,7 +369,9 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const { result } = getProcessorHook();
+      const {
+        hook: { result },
+      } = getProcessorHook();
       await vi.waitFor(() => {
         expect(
           result.current.slashCommands.some((c) => c.name === 'test'),
@@ -376,7 +398,9 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const { result } = getProcessorHook();
+      const {
+        hook: { result },
+      } = getProcessorHook();
       await vi.waitFor(() => {
         expect(
           result.current.slashCommands.some((c) => c.name === 'auth'),
@@ -402,7 +426,9 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const { result } = getProcessorHook();
+      const {
+        hook: { result },
+      } = getProcessorHook();
       await vi.waitFor(() => {
         expect(
           result.current.slashCommands.some((c) => c.name === 'test'),
@@ -430,7 +456,9 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const { result } = getProcessorHook();
+      const {
+        hook: { result },
+      } = getProcessorHook();
 
       await vi.waitFor(() => {
         expect(
@@ -1123,6 +1151,55 @@ describe('useSlashCommandProcessor', () => {
 
       expect(commandResult).toEqual({ type: 'handled' });
     });
+
+    describe('/mcp toggle', () => {
+      it('should toggle an enabled server to disabled', async () => {
+        const { handleSlashCommand, settings } = getProcessor();
+        await act(async () => {
+          await handleSlashCommand('/mcp toggle server1');
+        });
+
+        expect(settings.setValue).toHaveBeenCalledWith(
+          SettingScope.User,
+          'mcpServers',
+          {
+            server1: { command: 'cmd1', enabled: false },
+            server2: { command: 'cmd2', enabled: false },
+          },
+        );
+      });
+
+      it('should toggle a disabled server to enabled', async () => {
+        const { handleSlashCommand, settings } = getProcessor();
+        await act(async () => {
+          await handleSlashCommand('/mcp toggle server2');
+        });
+
+        expect(settings.setValue).toHaveBeenCalledWith(
+          SettingScope.User,
+          'mcpServers',
+          {
+            server1: { command: 'cmd1', enabled: true },
+            server2: { command: 'cmd2', enabled: true },
+          },
+        );
+      });
+
+      it('should show an error for a non-existent server', async () => {
+        const { handleSlashCommand } = getProcessor();
+        await act(async () => {
+          await handleSlashCommand('/mcp toggle non-existent-server');
+        });
+
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.ERROR,
+            text: 'MCP server "non-existent-server" not found.',
+          }),
+          expect.any(Number),
+        );
+      });
+    });
   });
 
   describe('/mcp schema', () => {
@@ -1207,7 +1284,7 @@ describe('useSlashCommandProcessor', () => {
 
   describe('/compress command', () => {
     it('should call tryCompressChat(true)', async () => {
-      const hook = getProcessorHook();
+      const { hook } = getProcessorHook();
       mockTryCompressChat.mockResolvedValue({
         originalTokenCount: 100,
         newTokenCount: 50,

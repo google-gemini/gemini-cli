@@ -39,7 +39,7 @@ import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
-import { LoadedSettings } from '../config/settings.js';
+import { loadSettings, LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup } from '../utils/cleanup.js';
@@ -57,6 +57,7 @@ import {
   EditorType,
   FlashFallbackEvent,
   logFlashFallback,
+  discoverMcpTools,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -66,7 +67,7 @@ import {
   useSessionStats,
 } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
-import { useBracketedPaste } from './hooks/useBracketedPaste.js';
+
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
@@ -97,7 +98,18 @@ export const AppWrapper = (props: AppProps) => (
 );
 
 const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
-  useBracketedPaste();
+  const [currentSettings, setCurrentSettings] = useState(settings);
+
+  const reloadSettings = useCallback(async () => {
+    const newSettings = loadSettings(process.cwd());
+    setCurrentSettings(newSettings);
+    discoverMcpTools(
+      newSettings.merged.mcpServers || {},
+      newSettings.merged.mcpServerCommand,
+      await config.getToolRegistry(),
+      config.getDebugMode() || false,
+    );
+  }, [config]);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
   const nightly = version.includes('nightly');
@@ -371,7 +383,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     commandContext,
   } = useSlashCommandProcessor(
     config,
-    settings,
+    currentSettings,
     history,
     addItem,
     clearItems,
@@ -386,6 +398,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     showToolDescriptions,
     setQuittingMessages,
     openPrivacyNotice,
+    reloadSettings,
   );
   const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
 
