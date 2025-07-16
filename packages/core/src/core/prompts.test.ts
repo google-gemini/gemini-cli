@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { getCoreSystemPrompt } from './prompts.js';
 import { isGitRepository } from '../utils/gitUtils.js';
-import { Config } from '../config/config.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -27,25 +26,11 @@ vi.mock('../tools/write-file', () => ({
 vi.mock('../utils/gitUtils', () => ({
   isGitRepository: vi.fn(),
 }));
-vi.mock('../config/config.js');
 
 describe('Core System Prompt (prompts.ts)', () => {
-  let mockConfig: Config;
-
-  beforeEach(() => {
-    const MockedConfig = vi.mocked(Config, true);
-    MockedConfig.mockImplementation(() => {
-      const mock = {
-        getIdeMode: vi.fn().mockReturnValue(false),
-      };
-      return mock as unknown as Config;
-    });
-    mockConfig = new Config({} as never);
-  });
-
   it('should return the base prompt when no userMemory is provided', () => {
     vi.stubEnv('SANDBOX', undefined);
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = getCoreSystemPrompt();
     expect(prompt).not.toContain('---\n\n'); // Separator should not be present
     expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
     expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
@@ -53,7 +38,7 @@ describe('Core System Prompt (prompts.ts)', () => {
 
   it('should return the base prompt when userMemory is empty string', () => {
     vi.stubEnv('SANDBOX', undefined);
-    const prompt = getCoreSystemPrompt(mockConfig, '');
+    const prompt = getCoreSystemPrompt('');
     expect(prompt).not.toContain('---\n\n');
     expect(prompt).toContain('You are an interactive CLI agent');
     expect(prompt).toMatchSnapshot();
@@ -61,7 +46,7 @@ describe('Core System Prompt (prompts.ts)', () => {
 
   it('should return the base prompt when userMemory is whitespace only', () => {
     vi.stubEnv('SANDBOX', undefined);
-    const prompt = getCoreSystemPrompt(mockConfig, '   \n  \t ');
+    const prompt = getCoreSystemPrompt('   \n  \t ');
     expect(prompt).not.toContain('---\n\n');
     expect(prompt).toContain('You are an interactive CLI agent');
     expect(prompt).toMatchSnapshot();
@@ -71,7 +56,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.stubEnv('SANDBOX', undefined);
     const memory = 'This is custom user memory.\nBe extra polite.';
     const expectedSuffix = `\n\n---\n\n${memory}`;
-    const prompt = getCoreSystemPrompt(mockConfig, memory);
+    const prompt = getCoreSystemPrompt(memory);
 
     expect(prompt.endsWith(expectedSuffix)).toBe(true);
     expect(prompt).toContain('You are an interactive CLI agent'); // Ensure base prompt follows
@@ -80,7 +65,7 @@ describe('Core System Prompt (prompts.ts)', () => {
 
   it('should include sandbox-specific instructions when SANDBOX env var is set', () => {
     vi.stubEnv('SANDBOX', 'true'); // Generic sandbox value
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = getCoreSystemPrompt();
     expect(prompt).toContain('# Sandbox');
     expect(prompt).not.toContain('# MacOS Seatbelt');
     expect(prompt).not.toContain('# Outside of Sandbox');
@@ -89,7 +74,7 @@ describe('Core System Prompt (prompts.ts)', () => {
 
   it('should include seatbelt-specific instructions when SANDBOX env var is "sandbox-exec"', () => {
     vi.stubEnv('SANDBOX', 'sandbox-exec');
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = getCoreSystemPrompt();
     expect(prompt).toContain('# MacOS Seatbelt');
     expect(prompt).not.toContain('# Sandbox');
     expect(prompt).not.toContain('# Outside of Sandbox');
@@ -98,7 +83,7 @@ describe('Core System Prompt (prompts.ts)', () => {
 
   it('should include non-sandbox instructions when SANDBOX env var is not set', () => {
     vi.stubEnv('SANDBOX', undefined); // Ensure it's not set
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = getCoreSystemPrompt();
     expect(prompt).toContain('# Outside of Sandbox');
     expect(prompt).not.toContain('# Sandbox');
     expect(prompt).not.toContain('# MacOS Seatbelt');
@@ -108,7 +93,7 @@ describe('Core System Prompt (prompts.ts)', () => {
   it('should include git instructions when in a git repo', () => {
     vi.stubEnv('SANDBOX', undefined);
     vi.mocked(isGitRepository).mockReturnValue(true);
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = getCoreSystemPrompt();
     expect(prompt).toContain('# Git Repository');
     expect(prompt).toMatchSnapshot();
   });
@@ -116,7 +101,7 @@ describe('Core System Prompt (prompts.ts)', () => {
   it('should not include git instructions when not in a git repo', () => {
     vi.stubEnv('SANDBOX', undefined);
     vi.mocked(isGitRepository).mockReturnValue(false);
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = getCoreSystemPrompt();
     expect(prompt).not.toContain('# Git Repository');
     expect(prompt).toMatchSnapshot();
   });
