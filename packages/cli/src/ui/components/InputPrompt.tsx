@@ -407,6 +407,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleSubmitAndClear,
       shellHistory,
       handleClipboardImage,
+      resetCompletionState,
     ],
   );
 
