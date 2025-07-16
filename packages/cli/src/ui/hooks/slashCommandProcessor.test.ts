@@ -1281,3 +1281,4 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
   });
+});

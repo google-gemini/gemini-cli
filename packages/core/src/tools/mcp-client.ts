@@ -166,7 +166,6 @@ export async function discoverMcpTools(
       }
     }
   }
-  }
 
   mcpDiscoveryState = MCPDiscoveryState.IN_PROGRESS;
   try {
