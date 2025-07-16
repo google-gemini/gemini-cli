@@ -149,7 +149,8 @@ describe('useSessionPersistence - Integration Test', () => {
 
       const loadedItems = mockLoadHistory.mock.calls[0][0];
       loadedItems.forEach((item: HistoryItem) => {
-        if (item.id !== 100) { // Only check loaded items for negative IDs
+        if (item.id !== 100) {
+          // Only check loaded items for negative IDs
           expect(item.id).toBeLessThan(0);
         }
       });
@@ -264,9 +265,7 @@ describe('useSessionPersistence - Integration Test', () => {
     fs.chmodSync(geminiDir, 0o444); // Set read-only permissions
 
     // Add items to history before rendering the hook
-    mockHistory.push(
-      { id: 1, type: MessageType.USER, text: 'User message' },
-    );
+    mockHistory.push({ id: 1, type: MessageType.USER, text: 'User message' });
 
     const { unmount } = renderHook(() =>
       useSessionPersistence({
