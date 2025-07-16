@@ -24,6 +24,7 @@ import { glob } from 'glob';
 import * as path from 'path';
 
 const VSCODE_COMMAND = process.platform === 'win32' ? 'code.cmd' : 'code';
+const VSCODE_COMPANION_EXTENSION_FOLDER = 'vscode-ide-companion';
 
 function isVSCodeInstalled(): boolean {
   try {
@@ -114,7 +115,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
               '..',
               '..',
               '..',
-              'vscode-ide-companion',
+              VSCODE_COMPANION_EXTENSION_FOLDER,
               '*.vsix',
             );
             vsixFiles = glob.sync(devPath);
@@ -123,7 +124,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
             context.ui.addItem(
               {
                 type: 'error',
-                text: 'Could not find the required VS Code companion extension.',
+                text: 'Could not find the required VS Code companion extension. Please file a bug via /bug.',
               },
               Date.now(),
             );

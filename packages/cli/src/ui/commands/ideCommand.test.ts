@@ -166,7 +166,7 @@ describe('ideCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'error',
-          text: 'Could not find the required VS Code companion extension.',
+          text: 'Could not find the required VS Code companion extension. Please file a bug via /bug.',
         }),
         expect.any(Number),
       );
