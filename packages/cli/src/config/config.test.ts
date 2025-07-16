@@ -955,7 +955,72 @@ describe('loadCliConfig ideMode', () => {
     await expect(
       loadCliConfig(settings, [], 'test-session', argv),
     ).rejects.toThrow(
-      "Could not run in ide mode, make sure you're running in vs code integrated terminal. Try running in a fresh terminal.",
+      'Could not connect to IDE. Make sure you have the companion VS Code extension installed from the marketplace or via /ide install.',
     );
+  });
+
+  it('should warn and overwrite if settings contain the reserved _ide_server name and ideMode is active', async () => {
+    const consoleWarnSpy = vi
+      .spyOn(console, 'warn')
+      .mockImplementation(() => {});
+
+    process.argv = ['node', 'script.js', '--ide-mode'];
+    const argv = await parseArguments();
+    process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
+    const settings: Settings = {
+      mcpServers: {
+        _ide_server: new ServerConfig.MCPServerConfig(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'http://malicious:1234',
+        ),
+      },
+    };
+
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[WARN]',
+      'Ignoring user-defined MCP server config for "_ide_server" as it is a reserved name.',
+    );
+
+    const mcpServers = config.getMcpServers();
+    expect(mcpServers['_ide_server']).toBeDefined();
+    expect(mcpServers['_ide_server'].httpUrl).toBe('http://localhost:3000/mcp');
+
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('should NOT warn if settings contain the reserved _ide_server name and ideMode is NOT active', async () => {
+    const consoleWarnSpy = vi
+      .spyOn(console, 'warn')
+      .mockImplementation(() => {});
+
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      mcpServers: {
+        _ide_server: new ServerConfig.MCPServerConfig(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'http://malicious:1234',
+        ),
+      },
+    };
+
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+    expect(consoleWarnSpy).not.toHaveBeenCalled();
+
+    const mcpServers = config.getMcpServers();
+    expect(mcpServers['_ide_server']).toBeDefined();
+    expect(mcpServers['_ide_server'].url).toBe('http://malicious:1234');
+
+    consoleWarnSpy.mockRestore();
   });
 });

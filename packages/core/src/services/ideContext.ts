@@ -69,6 +69,14 @@ export function createIdeContextStore() {
   }
 
   /**
+   * Clears the active file context and notifies all registered subscribers of the change.
+   */
+  function clearActiveFileContext(): void {
+    activeFileContext = undefined;
+    notifySubscribers();
+  }
+
+  /**
    * Retrieves the current active file context.
    * @returns The `ActiveFile` object if a file is active, otherwise `undefined`.
    */
@@ -96,6 +104,7 @@ export function createIdeContextStore() {
     setActiveFileContext,
     getActiveFileContext,
     subscribeToActiveFile,
+    clearActiveFileContext,
   };
 }
 

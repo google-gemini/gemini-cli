@@ -306,10 +306,15 @@ export async function loadCliConfig(
   }
 
   if (ideMode) {
+    if (mcpServers[IDE_SERVER_NAME]) {
+      logger.warn(
+        `Ignoring user-defined MCP server config for "${IDE_SERVER_NAME}" as it is a reserved name.`,
+      );
+    }
     const companionPort = process.env.GEMINI_CLI_IDE_SERVER_PORT;
     if (!companionPort) {
       throw new Error(
-        "Could not run in ide mode, make sure you're running in vs code integrated terminal. Try running in a fresh terminal.",
+        'Could not connect to IDE. Make sure you have the companion VS Code extension installed from the marketplace or via /ide install.',
       );
     }
     const httpUrl = `http://localhost:${companionPort}/mcp`;

@@ -122,4 +122,19 @@ describe('ideContext - Active File', () => {
     const activeFile = ideContext.getActiveFileContext();
     expect(activeFile).toEqual(testFile);
   });
+
+  it('should clear the active file context', () => {
+    const testFile = {
+      filePath: '/path/to/test/file.ts',
+      cursor: { line: 5, character: 10 },
+    };
+
+    ideContext.setActiveFileContext(testFile);
+
+    expect(ideContext.getActiveFileContext()).toEqual(testFile);
+
+    ideContext.clearActiveFileContext();
+
+    expect(ideContext.getActiveFileContext()).toBeUndefined();
+  });
 });
