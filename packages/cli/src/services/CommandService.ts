@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Config } from '@google/gemini-cli-core';
 import { SlashCommand } from '../ui/commands/types.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
@@ -19,29 +20,42 @@ import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
+import { ideCommand } from '../ui/commands/ideCommand.js';
 
-const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
-  aboutCommand,
-  authCommand,
-  chatCommand,
-  clearCommand,
-  compressCommand,
-  docsCommand,
-  extensionsCommand,
-  helpCommand,
-  mcpCommand,
-  memoryCommand,
-  privacyCommand,
-  statsCommand,
-  themeCommand,
-  toolsCommand,
-];
+const loadBuiltInCommands = async (
+  config: Config | null,
+): Promise<SlashCommand[]> => {
+  const allCommands = [
+    aboutCommand,
+    authCommand,
+    chatCommand,
+    clearCommand,
+    compressCommand,
+    docsCommand,
+    extensionsCommand,
+    helpCommand,
+    ideCommand(config),
+    mcpCommand,
+    memoryCommand,
+    privacyCommand,
+    statsCommand,
+    themeCommand,
+    toolsCommand,
+  ];
+
+  return allCommands.filter(
+    (command): command is SlashCommand => command !== null,
+  );
+};
 
 export class CommandService {
   private commands: SlashCommand[] = [];
 
   constructor(
-    private commandLoader: () => Promise<SlashCommand[]> = loadBuiltInCommands,
+    private config: Config | null,
+    private commandLoader: (
+      config: Config | null,
+    ) => Promise<SlashCommand[]> = loadBuiltInCommands,
   ) {
     // The constructor can be used for dependency injection in the future.
   }
@@ -49,7 +63,7 @@ export class CommandService {
   async loadCommands(): Promise<void> {
     // For now, we only load the built-in commands.
     // File-based and remote commands will be added later.
-    this.commands = await this.commandLoader();
+    this.commands = await this.commandLoader(this.config);
   }
 
   getCommands(): SlashCommand[] {
