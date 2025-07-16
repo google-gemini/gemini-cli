@@ -6,8 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GitService } from './gitService.js';
-import * as path from 'path';
-import type * as FsPromisesModule from 'fs/promises';
+import * as path from 'node:path';
+import type * as FsPromisesModule from 'node:fs/promises';
 import type { ChildProcess } from 'node:child_process';
 
 const hoistedMockExec = vi.hoisted(() => vi.fn());

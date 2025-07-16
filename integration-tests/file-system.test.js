@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { strict as assert } from 'assert';
+import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { TestRig } from './test-helper.js';
 

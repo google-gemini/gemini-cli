@@ -10,8 +10,8 @@ import { handleAtCommand } from './atCommandProcessor.js';
 import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
 import { ToolCallStatus } from '../types.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import * as fsPromises from 'fs/promises';
-import type { Stats } from 'fs';
+import * as fsPromises from 'node:fs/promises';
+import type { Stats } from 'node:fs';
 
 const mockGetToolRegistry = vi.fn();
 const mockGetTargetDir = vi.fn();

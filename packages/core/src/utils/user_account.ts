@@ -6,7 +6,7 @@
 
 import path from 'node:path';
 import { promises as fsp, existsSync, readFileSync } from 'node:fs';
-import * as os from 'os';
+import * as os from 'node:os';
 import { GEMINI_DIR, GOOGLE_ACCOUNTS_FILENAME } from './paths.js';
 
 interface UserAccounts {

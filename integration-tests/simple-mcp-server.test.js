@@ -7,10 +7,10 @@
 import { test, describe, before, after } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { TestRig } from './test-helper.js';
-import { spawn } from 'child_process';
-import { join } from 'path';
-import { fileURLToPath } from 'url';
-import { writeFileSync, unlinkSync } from 'fs';
+import { spawn } from 'node:child_process';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { writeFileSync, unlinkSync } from 'node:fs';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const serverScriptPath = join(__dirname, './temp-server.js');

@@ -5,7 +5,7 @@
  */
 
 import { test } from 'node:test';
-import { strict as assert } from 'assert';
+import { strict as assert } from 'node:assert';
 import { TestRig } from './test-helper.js';
 
 test('should be able to search the web', async (t) => {

@@ -12,9 +12,9 @@ import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
 } from './memoryTool.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as os from 'os';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
 
 // Mock dependencies
 vi.mock('fs/promises');

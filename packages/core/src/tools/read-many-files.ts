@@ -7,7 +7,7 @@
 import { BaseTool, ToolResult } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
-import * as path from 'path';
+import * as path from 'node:path';
 import { glob } from 'glob';
 import { getCurrentGeminiMdFilename } from './memoryTool.js';
 import {
