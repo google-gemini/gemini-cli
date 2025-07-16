@@ -30,7 +30,7 @@ vi.mock('node:process', () => ({
   cwd: vi.fn(() => '/mock/cwd'),
   get env() {
     return process.env;
-  }, // Use a getter here too
+  },
   platform: 'test-platform',
   version: 'test-node-version',
   memoryUsage: vi.fn(() => ({
@@ -122,6 +122,7 @@ describe('useSlashCommandProcessor', () => {
   let mockGeminiClient: GeminiClient;
   let mockConfig: Config;
   let mockCorgiMode: ReturnType<typeof vi.fn>;
+  let mockSettings: LoadedSettings;
   const mockUseSessionStats = useSessionStats as Mock;
 
   beforeEach(() => {
@@ -165,6 +166,20 @@ describe('useSlashCommandProcessor', () => {
       getMcpServers: vi.fn(() => ({})),
     } as unknown as Config;
     mockCorgiMode = vi.fn();
+    mockSettings = {
+      merged: {
+        contextFileName: 'GEMINI.md',
+      },
+      user: {
+        settings: {
+          mcpServers: {
+            server1: { command: 'cmd1', enabled: true },
+            server2: { command: 'cmd2', enabled: false },
+          },
+        },
+      },
+      setValue: vi.fn(),
+    } as unknown as LoadedSettings;
     mockUseSessionStats.mockReturnValue({
       stats: {
         sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
@@ -186,25 +201,11 @@ describe('useSlashCommandProcessor', () => {
     process.env = { ...globalThis.process.env };
   });
 
-  const getProcessorHook = (showToolDescriptions: boolean = false) => {
-    const settings = {
-      merged: {
-        contextFileName: 'GEMINI.md',
-      },
-      user: {
-        settings: {
-          mcpServers: {
-            server1: { command: 'cmd1', enabled: true },
-            server2: { command: 'cmd2', enabled: false },
-          },
-        },
-      },
-      setValue: vi.fn(),
-    } as unknown as LoadedSettings;
-    const hook = renderHook(() =>
+  const getProcessorHook = (showToolDescriptions: boolean = false) =>
+    renderHook(() =>
       useSlashCommandProcessor(
         mockConfig,
-        settings,
+        mockSettings,
         [],
         mockAddItem,
         mockClearItems,
@@ -222,12 +223,10 @@ describe('useSlashCommandProcessor', () => {
         vi.fn(), // mockReloadSettings
       ),
     );
-    return { hook, settings };
-  };
 
   const getProcessor = (showToolDescriptions: boolean = false) => {
-    const { hook, settings } = getProcessorHook(showToolDescriptions);
-    return { ...hook.result.current, settings, result: hook.result };
+    const { result } = getProcessorHook(showToolDescriptions);
+    return { ...result.current, result };
   };
 
   describe('Other commands', () => {
@@ -269,9 +268,7 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const {
-        hook: { result },
-      } = getProcessorHook();
+      const { result } = getProcessorHook();
 
       await vi.waitFor(() => {
         // We check that the `slashCommands` array, which is the public API
@@ -303,9 +300,7 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const {
-        hook: { result },
-      } = getProcessorHook();
+      const { result } = getProcessorHook();
       await vi.waitFor(() => {
         expect(
           result.current.slashCommands.some((c) => c.name === 'test'),
@@ -335,9 +330,7 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const {
-        hook: { result },
-      } = getProcessorHook();
+      const { result } = getProcessorHook();
       await vi.waitFor(() => {
         expect(
           result.current.slashCommands.some((c) => c.name === 'test'),
@@ -369,9 +362,7 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const {
-        hook: { result },
-      } = getProcessorHook();
+      const { result } = getProcessorHook();
       await vi.waitFor(() => {
         expect(
           result.current.slashCommands.some((c) => c.name === 'test'),
@@ -398,9 +389,7 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const {
-        hook: { result },
-      } = getProcessorHook();
+      const { result } = getProcessorHook();
       await vi.waitFor(() => {
         expect(
           result.current.slashCommands.some((c) => c.name === 'auth'),
@@ -426,9 +415,7 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const {
-        hook: { result },
-      } = getProcessorHook();
+      const { result } = getProcessorHook();
       await vi.waitFor(() => {
         expect(
           result.current.slashCommands.some((c) => c.name === 'test'),
@@ -456,9 +443,7 @@ describe('useSlashCommandProcessor', () => {
         () => commandServiceInstance,
       );
 
-      const {
-        hook: { result },
-      } = getProcessorHook();
+      const { result } = getProcessorHook();
 
       await vi.waitFor(() => {
         expect(
@@ -1154,12 +1139,12 @@ describe('useSlashCommandProcessor', () => {
 
     describe('/mcp toggle', () => {
       it('should toggle an enabled server to disabled', async () => {
-        const { handleSlashCommand, settings } = getProcessor();
+        const { handleSlashCommand } = getProcessor();
         await act(async () => {
           await handleSlashCommand('/mcp toggle server1');
         });
 
-        expect(settings.setValue).toHaveBeenCalledWith(
+        expect(mockSettings.setValue).toHaveBeenCalledWith(
           SettingScope.User,
           'mcpServers',
           {
@@ -1170,12 +1155,12 @@ describe('useSlashCommandProcessor', () => {
       });
 
       it('should toggle a disabled server to enabled', async () => {
-        const { handleSlashCommand, settings } = getProcessor();
+        const { handleSlashCommand } = getProcessor();
         await act(async () => {
           await handleSlashCommand('/mcp toggle server2');
         });
 
-        expect(settings.setValue).toHaveBeenCalledWith(
+        expect(mockSettings.setValue).toHaveBeenCalledWith(
           SettingScope.User,
           'mcpServers',
           {
