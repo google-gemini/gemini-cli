@@ -17,17 +17,22 @@ import { WriteFileTool } from '../tools/write-file.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
+import { Config } from '../config/config.js';
+import { ideContext } from '../services/ideContext.js';
 
-export function getCoreSystemPrompt(userMemory?: string): string {
+export function getCoreSystemPrompt(
+  config: Config,
+  userMemory?: string,
+): string {
   // if GEMINI_SYSTEM_MD is set (and not 0|false), override system prompt from file
   // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD
   let systemMdEnabled = false;
-  let systemMdPath = path.join(GEMINI_CONFIG_DIR, 'system.md');
+  let systemMdPath = path.resolve(path.join(GEMINI_CONFIG_DIR, 'system.md'));
   const systemMdVar = process.env.GEMINI_SYSTEM_MD?.toLowerCase();
   if (systemMdVar && !['0', 'false'].includes(systemMdVar)) {
     systemMdEnabled = true; // enable system prompt override
     if (!['1', 'true'].includes(systemMdVar)) {
-      systemMdPath = systemMdVar; // use custom path from GEMINI_SYSTEM_MD
+      systemMdPath = path.resolve(systemMdVar); // use custom path from GEMINI_SYSTEM_MD
     }
     // require file to exist when override is enabled
     if (!fs.existsSync(systemMdPath)) {
@@ -49,6 +54,7 @@ You are an interactive CLI agent specializing in software engineering tasks. You
 - **Proactiveness:** Fulfill the user's request thoroughly, including reasonable, directly implied follow-up actions.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
+- **Path Construction:** Before using any file system tool (e.g., ${ReadFileTool.Name}' or '${WriteFileTool.Name}'), you must construct the full absolute path for the file_path argument. Always combine the absolute path of the project's root directory with the file's path relative to the root. For example, if the project root is /path/to/project/ and the file is foo/bar/baz.txt, the final path you must use is /path/to/project/foo/bar/baz.txt. If the user provides a relative path, you must resolve it against the root directory to create an absolute path.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
 # Primary Workflows
@@ -152,7 +158,25 @@ ${(function () {
   }
   return '';
 })()}
-
+${(function () {
+  if (config.getIdeMode()) {
+    const activeFile = ideContext.getActiveFileContext();
+    if (activeFile?.filePath) {
+      let prompt = `
+# IDE Mode
+You are running in IDE mode. The user has the following file open:
+- Path: ${activeFile.filePath}`;
+      if (activeFile.cursor) {
+        prompt += `
+- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`;
+      }
+      prompt += `
+Focus on providing contextually relevant assistance for this file.`;
+      return prompt;
+    }
+  }
+  return '';
+})()}
 # Examples (Illustrating Tone and Workflow)
 <example>
 user: 1 + 2
@@ -166,7 +190,7 @@ model: true
 
 <example>
 user: list files here.
-model: [tool_call: ${LSTool.Name} for path '.']
+model: [tool_call: ${LSTool.Name} for path '/path/to/project']
 </example>
 
 <example>
@@ -211,7 +235,7 @@ ${(function () {
 
 <example>
 user: Delete the temp directory.
-model: I can run \`rm -rf ./temp\`. This will permanently delete the directory and all its contents.
+model: I can run \`rm -rf /path/to/project/temp\`. This will permanently delete the directory and all its contents.
 </example>
 
 <example>
@@ -260,7 +284,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
     if (['1', 'true'].includes(writeSystemMdVar)) {
       fs.writeFileSync(systemMdPath, basePrompt); // write to default path, can be modified via GEMINI_SYSTEM_MD
     } else {
-      fs.writeFileSync(writeSystemMdVar, basePrompt); // write to custom path from GEMINI_WRITE_SYSTEM_MD
+      fs.writeFileSync(path.resolve(writeSystemMdVar), basePrompt); // write to custom path from GEMINI_WRITE_SYSTEM_MD
     }
   }
 
@@ -285,11 +309,11 @@ When the conversation history grows too large, you will be invoked to distill th
 
 First, you will think through the entire history in a private <scratchpad>. Review the user's overall goal, the agent's actions, tool outputs, file modifications, and any unresolved questions. Identify every piece of information that is essential for future actions.
 
-After your reasoning is complete, generate the final <compressed_chat_history> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.
+After your reasoning is complete, generate the final <state_snapshot> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.
 
 The structure MUST be as follows:
 
-<compressed_chat_history>
+<state_snapshot>
     <overall_goal>
         <!-- A single, concise sentence describing the user's high-level objective. -->
         <!-- Example: "Refactor the authentication service to use a new JWT library." -->
@@ -333,6 +357,6 @@ The structure MUST be as follows:
          4. [TODO] Update tests to reflect the API change.
         -->
     </current_plan>
-</compressed_chat_history>
+</state_snapshot>
 `.trim();
 }
