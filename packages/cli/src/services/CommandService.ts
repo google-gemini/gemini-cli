@@ -16,8 +16,9 @@ import { chatCommand } from '../ui/commands/chatCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
-import { compressCommand } from '../ui/commands/compressCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
+import { toolsCommand } from '../ui/commands/toolsCommand.js';
+import { compressCommand } from '../ui/commands/compressCommand.js';
 
 const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
   aboutCommand,
@@ -33,6 +34,7 @@ const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
   privacyCommand,
   statsCommand,
   themeCommand,
+  toolsCommand,
 ];
 
 export class CommandService {

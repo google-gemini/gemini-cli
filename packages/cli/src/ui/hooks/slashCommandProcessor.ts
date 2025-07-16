@@ -66,7 +66,6 @@ export const useSlashCommandProcessor = (
   openAuthDialog: () => void,
   openEditorDialog: () => void,
   toggleCorgiMode: () => void,
-  showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
 ) => {
@@ -204,80 +203,6 @@ export const useSlashCommandProcessor = (
         name: 'editor',
         description: 'set external editor preference',
         action: (_mainCommand, _subCommand, _args) => openEditorDialog(),
-      },
-      {
-        name: 'tools',
-        description: 'list available Gemini CLI tools',
-        action: async (_mainCommand, _subCommand, _args) => {
-          // Check if the _subCommand includes a specific flag to control description visibility
-          let useShowDescriptions = showToolDescriptions;
-          if (_subCommand === 'desc' || _subCommand === 'descriptions') {
-            useShowDescriptions = true;
-          } else if (
-            _subCommand === 'nodesc' ||
-            _subCommand === 'nodescriptions'
-          ) {
-            useShowDescriptions = false;
-          } else if (_args === 'desc' || _args === 'descriptions') {
-            useShowDescriptions = true;
-          } else if (_args === 'nodesc' || _args === 'nodescriptions') {
-            useShowDescriptions = false;
-          }
-
-          const toolRegistry = await config?.getToolRegistry();
-          const tools = toolRegistry?.getAllTools();
-          if (!tools) {
-            addMessage({
-              type: MessageType.ERROR,
-              content: 'Could not retrieve tools.',
-              timestamp: new Date(),
-            });
-            return;
-          }
-
-          // Filter out MCP tools by checking if they have a serverName property
-          const geminiTools = tools.filter((tool) => !('serverName' in tool));
-
-          let message = 'Available Gemini CLI tools:\n\n';
-
-          if (geminiTools.length > 0) {
-            geminiTools.forEach((tool) => {
-              if (useShowDescriptions && tool.description) {
-                // Format tool name in cyan using simple ANSI cyan color
-                message += `  - \u001b[36m${tool.displayName} (${tool.name})\u001b[0m:\n`;
-
-                // Apply green color to the description text
-                const greenColor = '\u001b[32m';
-                const resetColor = '\u001b[0m';
-
-                // Handle multi-line descriptions by properly indenting and preserving formatting
-                const descLines = tool.description.trim().split('\n');
-
-                // If there are multiple lines, add proper indentation for each line
-                if (descLines) {
-                  for (const descLine of descLines) {
-                    message += `      ${greenColor}${descLine}${resetColor}\n`;
-                  }
-                }
-              } else {
-                // Use cyan color for the tool name even when not showing descriptions
-                message += `  - \u001b[36m${tool.displayName}\u001b[0m\n`;
-              }
-            });
-          } else {
-            message += '  No tools available\n';
-          }
-          message += '\n';
-
-          // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
-          message += '\u001b[0m';
-
-          addMessage({
-            type: MessageType.INFO,
-            content: message,
-            timestamp: new Date(),
-          });
-        },
       },
       {
         name: 'corgi',
@@ -503,7 +428,6 @@ export const useSlashCommandProcessor = (
     openEditorDialog,
     toggleCorgiMode,
     config,
-    showToolDescriptions,
     session,
     gitService,
     loadHistory,
