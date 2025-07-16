@@ -24,7 +24,7 @@ const loadBuiltInCommands = async (
   config: Config | null,
 ): Promise<SlashCommand[]> => {
   const allCommands = [
-  aboutCommand,
+    aboutCommand,
     authCommand,
     chatCommand,
     clearCommand,
