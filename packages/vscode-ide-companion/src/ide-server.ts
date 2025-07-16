@@ -160,11 +160,11 @@ export class IDEServer {
           port.toString(),
         );
         this.logger.appendLine(
-          `IDE companion extension server listening on port ${port}`,
+          `IDE server listening on port ${port}`,
         );
       } else {
         this.logger.appendLine(
-          `Failed to start IDE companion extension server`,
+          `Failed to start IDE server`,
         );
       }
     });
@@ -176,11 +176,11 @@ export class IDEServer {
         this.server!.close((err?: Error) => {
           if (err) {
             this.logger.appendLine(
-              `Error shutting down IDE companion extension server: ${err.message}`,
+              `Error shutting down IDE server: ${err.message}`,
             );
             return reject(err);
           }
-          this.logger.appendLine(`IDE companion extension server shut down`);
+          this.logger.appendLine(`IDE server shut down`);
           resolve();
         });
       });
