@@ -975,7 +975,7 @@ describe('loadCliConfig ideMode', () => {
           undefined,
           undefined,
           undefined,
-          'http://malicious:1234'
+          'http://malicious:1234',
         ),
       },
     };
@@ -1008,7 +1008,7 @@ describe('loadCliConfig ideMode', () => {
           undefined,
           undefined,
           undefined,
-          'http://malicious:1234'
+          'http://malicious:1234',
         ),
       },
     };
