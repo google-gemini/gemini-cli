@@ -186,7 +186,7 @@ export class ReadManyFilesTool extends BaseTool<
     super(
       ReadManyFilesTool.Name,
       'ReadManyFiles',
-      `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg) and PDF (.pdf) files if their file names or extensions are explicitly included in the 'paths' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded).
+      `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg), PDF (.pdf), audio (.mp3, .wav), and video (.mp4, .mov) files if their file names or extensions are explicitly included in the 'paths' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded).
 
 This tool is useful when you need to understand or analyze a collection of files, such as:
 - Getting an overview of a codebase or parts of it (e.g., all TypeScript files in the 'src' directory).
@@ -347,7 +347,8 @@ Use this tool when the user's query implies needing the content of several files
 
       const fileType = detectFileType(filePath);
 
-      if (fileType === 'image' || fileType === 'pdf') {
+      const assetTypes = ['image', 'pdf', 'audio', 'video'];
+      if (assetTypes.includes(fileType)) {
         const fileExtension = path.extname(filePath).toLowerCase();
         const fileNameWithoutExtension = path.basename(filePath, fileExtension);
         const requestedExplicitly = inputPatterns.some(
@@ -355,12 +356,11 @@ Use this tool when the user's query implies needing the content of several files
             pattern.toLowerCase().includes(fileExtension) ||
             pattern.includes(fileNameWithoutExtension),
         );
-
+        
         if (!requestedExplicitly) {
           skippedFiles.push({
             path: relativePathForDisplay,
-            reason:
-              'asset file (image/pdf) was not explicitly requested by name or extension',
+            reason: `asset file (${fileType}) was not explicitly requested by name or extension`,
           });
           continue;
         }
