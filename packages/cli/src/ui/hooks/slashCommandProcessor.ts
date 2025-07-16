@@ -268,8 +268,7 @@ export const useSlashCommandProcessor = (
             useShowSchema = true;
           }
 
-          if (_subCommand === 'toggle' && _args) {
-            const serverName = _args;
+          const setMcpEnabled = (serverName: string, enabled: boolean) => {
             const userSettings: Settings = { ...settings.user.settings };
             const mcpSettings = userSettings.mcpServers || {};
 
@@ -284,7 +283,7 @@ export const useSlashCommandProcessor = (
 
             mcpSettings[serverName] = {
               ...mcpSettings[serverName],
-              enabled: !mcpSettings[serverName].enabled,
+              enabled,
             };
 
             userSettings.mcpServers = mcpSettings;
@@ -293,11 +292,17 @@ export const useSlashCommandProcessor = (
 
             addMessage({
               type: MessageType.INFO,
-              content: `Toggled MCP server "${serverName}". Refreshing config...`,
+              content: `${
+                enabled ? 'Enabled' : 'Disabled'
+              } MCP server "${serverName}". Refreshing config...`,
               timestamp: new Date(),
             });
             // Reload the config to apply changes
             reloadSettings();
+          };
+
+          if ((_subCommand === 'on' || _subCommand === 'off') && _args) {
+            setMcpEnabled(_args, _subCommand === 'on');
             return;
           }
 

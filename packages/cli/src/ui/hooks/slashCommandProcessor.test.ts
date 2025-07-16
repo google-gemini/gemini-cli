@@ -1137,27 +1137,11 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
-    describe('/mcp toggle', () => {
-      it('should toggle an enabled server to disabled', async () => {
+    describe('/mcp on/off', () => {
+      it('should enable a server with /mcp on', async () => {
         const { handleSlashCommand } = getProcessor();
         await act(async () => {
-          await handleSlashCommand('/mcp toggle server1');
-        });
-
-        expect(mockSettings.setValue).toHaveBeenCalledWith(
-          SettingScope.User,
-          'mcpServers',
-          {
-            server1: { command: 'cmd1', enabled: false },
-            server2: { command: 'cmd2', enabled: false },
-          },
-        );
-      });
-
-      it('should toggle a disabled server to enabled', async () => {
-        const { handleSlashCommand } = getProcessor();
-        await act(async () => {
-          await handleSlashCommand('/mcp toggle server2');
+          await handleSlashCommand('/mcp on server2');
         });
 
         expect(mockSettings.setValue).toHaveBeenCalledWith(
@@ -1168,12 +1152,44 @@ describe('useSlashCommandProcessor', () => {
             server2: { command: 'cmd2', enabled: true },
           },
         );
+
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: 'Enabled MCP server "server2". Refreshing config...',
+          }),
+          expect.any(Number),
+        );
+      });
+
+      it('should disable a server with /mcp off', async () => {
+        const { handleSlashCommand } = getProcessor();
+        await act(async () => {
+          await handleSlashCommand('/mcp off server1');
+        });
+
+        expect(mockSettings.setValue).toHaveBeenCalledWith(
+          SettingScope.User,
+          'mcpServers',
+          {
+            server1: { command: 'cmd1', enabled: false },
+            server2: { command: 'cmd2', enabled: false },
+          },
+        );
+
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: 'Disabled MCP server "server1". Refreshing config...',
+          }),
+          expect.any(Number),
+        );
       });
 
       it('should show an error for a non-existent server', async () => {
         const { handleSlashCommand } = getProcessor();
         await act(async () => {
-          await handleSlashCommand('/mcp toggle non-existent-server');
+          await handleSlashCommand('/mcp on non-existent-server');
         });
 
         expect(mockAddItem).toHaveBeenCalledWith(
