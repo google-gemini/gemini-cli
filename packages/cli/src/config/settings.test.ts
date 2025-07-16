@@ -223,6 +223,7 @@ describe('Settings Loading and Merging', () => {
       const systemSettingsContent = {
         theme: 'system-theme',
         sandbox: false,
+        allowMCPServers: ['server1', 'server2'],
         telemetry: { enabled: false },
       };
       const userSettingsContent = {
@@ -234,6 +235,7 @@ describe('Settings Loading and Merging', () => {
         sandbox: false,
         coreTools: ['tool1'],
         contextFileName: 'WORKSPACE_CONTEXT.md',
+        allowMCPServers: ['server1', 'server2', 'server3'],
       };
 
       (fs.readFileSync as Mock).mockImplementation(
@@ -259,6 +261,7 @@ describe('Settings Loading and Merging', () => {
         telemetry: { enabled: false },
         coreTools: ['tool1'],
         contextFileName: 'WORKSPACE_CONTEXT.md',
+        allowMCPServers: ['server1', 'server2'],
       });
     });
 
