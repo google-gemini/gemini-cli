@@ -240,4 +240,43 @@ describe('useSessionPersistence - Integration Test', () => {
     expect(consoleErrorSpy).not.toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
   });
+
+  it('should log error if saving fails due to file system permissions', () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    // Create a read-only directory to simulate permission error
+    const geminiDir = path.join(tempDir, '.gemini');
+    fs.mkdirSync(geminiDir, { recursive: true });
+    fs.chmodSync(geminiDir, 0o444); // Set read-only permissions
+
+    // Add items to history before rendering the hook
+    mockHistory.push(
+      { id: 1, type: MessageType.USER, text: 'User message' },
+    );
+
+    const { unmount } = renderHook(() =>
+      useSessionPersistence({
+        sessionPersistence: true,
+        history: mockHistory,
+        loadHistory: mockLoadHistory,
+      }),
+    );
+
+    const exitHandler = mockProcessOn.mock.calls.find(
+      (call) => call[0] === 'exit',
+    )?.[1];
+    expect(exitHandler).toBeDefined();
+
+    exitHandler();
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Error saving session history:',
+      expect.any(Error),
+    );
+
+    consoleErrorSpy.mockRestore();
+    unmount();
+  });
 });

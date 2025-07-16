@@ -79,7 +79,8 @@ export const useSessionPersistence = ({
     }
 
     const saveSession = () => {
-      if (sessionPersistence) {
+      // The surrounding useEffect ensures this only runs when persistence is enabled.
+      try {
         const geminiDir = path.join(process.cwd(), '.gemini');
         if (!fs.existsSync(geminiDir)) {
           fs.mkdirSync(geminiDir, { recursive: true });
@@ -95,14 +96,12 @@ export const useSessionPersistence = ({
           )
           .map((item) => ({ type: item.type, text: item.text }));
 
-        try {
-          fs.writeFileSync(
-            sessionPath,
-            JSON.stringify(serializableHistory, null, 2),
-          );
-        } catch (error) {
-          console.error('Error saving session history:', error);
-        }
+        fs.writeFileSync(
+          sessionPath,
+          JSON.stringify(serializableHistory, null, 2),
+        );
+      } catch (error) {
+        console.error('Error saving session history:', error);
       }
     };
 
