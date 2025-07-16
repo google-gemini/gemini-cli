@@ -57,7 +57,7 @@ export const useSessionPersistence = ({
                 id: -(index + 1),
               }));
             if (historyWithIds.length > 0) {
-              loadHistory(historyWithIds);
+              loadHistory([...historyWithIds, ...historyRef.current]);
             }
           }
         } catch (error) {
