@@ -6,12 +6,12 @@
 
 // Fix for Node.js environment - ImageData is not available
 if (typeof globalThis.ImageData === 'undefined') {
-  class MockImageData {
-    data: any;
+    class MockImageData {
+    data: Uint8ClampedArray;
     width: number;
     height: number;
-    
-    constructor(data: any, width: number, height: number) {
+
+    constructor(data: Uint8ClampedArray, width: number, height: number) {
       this.data = data;
       this.width = width;
       this.height = height;
@@ -377,6 +377,163 @@ async function validateNonInterActiveAuth(
   return nonInteractiveConfig;
 }
 
+// Configuration interfaces for better organization
+interface MCPServerConfig {
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  cwd?: string;
+  url?: string;
+  httpUrl?: string;
+  headers?: Record<string, string>;
+  tcp?: string;
+  timeout?: number;
+  trust?: boolean;
+  description?: string;
+}
+
+interface ToolConfig {
+  coreTools?: string[];
+  excludeTools?: string[];
+  discoveryCommand?: string;
+  callCommand?: string;
+  mcpServerCommand?: string;
+}
+
+interface ModelConfig {
+  model?: string;
+  debugMode?: boolean;
+  fullContext?: boolean;
+  showMemoryUsage?: boolean;
+  proxy?: string;
+}
+
+interface FileConfig {
+  contextFileName?: string | string[];
+  respectGitIgnore?: boolean;
+  enableRecursiveFileSearch?: boolean;
+}
+
+interface ChatOptions {
+  // Simple options for common cases
+  mode?: 'default' | 'autoEdit' | 'yolo';
+  debug?: boolean;
+  
+  // Grouped configuration
+  model?: ModelConfig;
+  tools?: ToolConfig;
+  files?: FileConfig;
+  mcpServers?: Record<string, MCPServerConfig>;
+  
+  // Advanced options
+  history?: Array<{ role: 'user' | 'model'; parts: Array<{ text?: string; [key: string]: unknown }> }>;
+  checkpointing?: boolean;
+  
+  // Preset configurations
+  preset?: 'minimal' | 'development' | 'production' | 'research';
+}
+
+// Preset configurations
+const CHAT_PRESETS: Record<string, Partial<ChatOptions>> = {
+  minimal: {
+    mode: 'default',
+    debug: false,
+    model: { debugMode: false, fullContext: false },
+    tools: { coreTools: ['read_file', 'write_file', 'shell'] }
+  },
+  development: {
+    mode: 'autoEdit',
+    debug: true,
+    model: { debugMode: true, fullContext: true, showMemoryUsage: true },
+    files: { respectGitIgnore: true, enableRecursiveFileSearch: true }
+  },
+  production: {
+    mode: 'default',
+    debug: false,
+    model: { debugMode: false, fullContext: false },
+    files: { respectGitIgnore: true }
+  },
+  research: {
+    mode: 'yolo',
+    debug: true,
+    model: { debugMode: true, fullContext: true, showMemoryUsage: true },
+    files: { enableRecursiveFileSearch: true }
+  }
+};
+
+// Helper function to merge configurations
+function mergeConfig(baseConfig: ChatOptions, overrides: ChatOptions): ChatOptions {
+  const merged = { ...baseConfig };
+  
+  // Simple properties
+  if (overrides.mode) merged.mode = overrides.mode;
+  if (overrides.debug !== undefined) merged.debug = overrides.debug;
+  if (overrides.checkpointing !== undefined) merged.checkpointing = overrides.checkpointing;
+  if (overrides.history) merged.history = overrides.history;
+  if (overrides.mcpServers) merged.mcpServers = overrides.mcpServers;
+  
+  // Grouped properties
+  if (overrides.model) merged.model = { ...merged.model, ...overrides.model };
+  if (overrides.tools) merged.tools = { ...merged.tools, ...overrides.tools };
+  if (overrides.files) merged.files = { ...merged.files, ...overrides.files };
+  
+  return merged;
+}
+
+// Convert new format to legacy format
+function convertToLegacyConfig(options: ChatOptions): Record<string, any> {
+  const legacy: Record<string, any> = {};
+  
+  // Map simple options
+  if (options.mode) {
+    legacy.approvalMode = options.mode;
+  }
+  if (options.debug !== undefined) {
+    legacy.debugMode = options.debug;
+  }
+  if (options.checkpointing !== undefined) {
+    legacy.checkpointing = options.checkpointing;
+  }
+  if (options.history) {
+    legacy.history = options.history;
+  }
+  if (options.mcpServers) {
+    legacy.mcpServers = options.mcpServers;
+  }
+  
+  // Map model config
+  if (options.model) {
+    if (options.model.model) legacy.model = options.model.model;
+    if (options.model.debugMode !== undefined) legacy.debugMode = options.model.debugMode;
+    if (options.model.fullContext !== undefined) legacy.fullContext = options.model.fullContext;
+    if (options.model.showMemoryUsage !== undefined) legacy.showMemoryUsage = options.model.showMemoryUsage;
+    if (options.model.proxy) legacy.proxy = options.model.proxy;
+  }
+  
+  // Map tools config
+  if (options.tools) {
+    if (options.tools.coreTools) legacy.coreTools = options.tools.coreTools;
+    if (options.tools.excludeTools) legacy.excludeTools = options.tools.excludeTools;
+    if (options.tools.discoveryCommand) legacy.toolDiscoveryCommand = options.tools.discoveryCommand;
+    if (options.tools.callCommand) legacy.toolCallCommand = options.tools.callCommand;
+    if (options.tools.mcpServerCommand) legacy.mcpServerCommand = options.tools.mcpServerCommand;
+  }
+  
+  // Map files config
+  if (options.files) {
+    if (options.files.contextFileName) legacy.contextFileName = options.files.contextFileName;
+    legacy.fileFiltering = {};
+    if (options.files.respectGitIgnore !== undefined) {
+      legacy.fileFiltering.respectGitIgnore = options.files.respectGitIgnore;
+    }
+    if (options.files.enableRecursiveFileSearch !== undefined) {
+      legacy.fileFiltering.enableRecursiveFileSearch = options.files.enableRecursiveFileSearch;
+    }
+  }
+  
+  return legacy;
+}
+
 async function registerAsHyphaService(options: {
   serverUrl: string;
   workspace: string;
@@ -395,17 +552,30 @@ async function registerAsHyphaService(options: {
 
   try {
     // Ensure Gemini is properly configured and authenticated
-    if (!options.config.getContentGeneratorConfig()) {
+    console.log('=== SERVICE REGISTRATION AUTH SETUP ===');
+    const contentGenConfig = options.config.getContentGeneratorConfig();
+    console.log('ContentGeneratorConfig exists:', !!contentGenConfig);
+    console.log('GEMINI_API_KEY exists:', !!process.env.GEMINI_API_KEY);
+    
+    if (!contentGenConfig) {
       // set default fallback to gemini api key
       if (process.env.GEMINI_API_KEY) {
+        console.log('Setting up auth with GEMINI_API_KEY...');
         const settings = loadSettings(process.cwd());
         settings.setValue(SettingScope.User, 'selectedAuthType', AuthType.USE_GEMINI);
         await options.config.refreshAuth(AuthType.USE_GEMINI);
+        console.log('Auth setup completed in service registration');
       } else {
         console.error('No Gemini API key found. Please set GEMINI_API_KEY environment variable.');
         process.exit(1);
       }
+    } else {
+      console.log('ContentGeneratorConfig already exists, skipping auth setup');
     }
+    
+    // Verify the client is working
+    const testClient = options.config.getGeminiClient();
+    console.log('Test client after service registration auth:', testClient ? 'exists' : 'undefined');
 
     // Connect to Hypha server
     const server = await hyphaWebsocketClient.connectToServer({
@@ -416,21 +586,158 @@ async function registerAsHyphaService(options: {
 
     console.log(`Connected to workspace: ${server.config.workspace}`);
 
-    // Create chat function
-    const chat = async function* (query: string) {
-      console.log(`Processing query: ${query}`);
-      
-      try {
-        yield {
-          type: 'status',
-          content: 'Initializing Gemini client...',
-          timestamp: new Date().toISOString()
-        };
+         // Create chat function with elegant configuration
+     const chat = async function* (query: string, chatOptions: ChatOptions = {}) {
+       console.log(`Processing query: ${query}`);
+       
+       let geminiClient: any; // Will be assigned the GeminiClient instance
+       let legacyConfig: Record<string, any> = {}; // Declare at function scope for catch block access
+       
+       try {
+         yield {
+           type: 'status',
+           content: 'Initializing Gemini client...',
+           timestamp: new Date().toISOString()
+         };
 
-        // Get the Gemini client
-        const geminiClient = options.config.getGeminiClient();
-        const toolRegistry = await options.config.getToolRegistry();
+         console.log('=== CHAT FUNCTION START ===');
+         console.log('chatOptions provided:', Object.keys(chatOptions).length > 0);
+         console.log('chatOptions:', chatOptions);
+
+         // Apply preset if specified
+         let finalConfig = chatOptions;
+         if (chatOptions.preset) {
+           const presetConfig = CHAT_PRESETS[chatOptions.preset];
+           if (presetConfig) {
+             finalConfig = mergeConfig(presetConfig, chatOptions);
+             console.log('Applied preset:', chatOptions.preset);
+           }
+         }
+
+         // Convert to legacy format for backward compatibility
+         legacyConfig = convertToLegacyConfig(finalConfig);
+         console.log('Legacy config:', legacyConfig);
+
+        // Create a modified config if chatConfig is provided
+        let activeConfig = options.config;
+        if (legacyConfig) {
+          // Import ApprovalMode and MCPServerConfig
+          const { ApprovalMode, MCPServerConfig } = await import('@google/gemini-cli-core');
+          
+          // Convert string approval mode to enum
+          let approvalMode = ApprovalMode.DEFAULT;
+          if (legacyConfig.approvalMode === 'autoEdit') {
+            approvalMode = ApprovalMode.AUTO_EDIT;
+          } else if (legacyConfig.approvalMode === 'yolo') {
+            approvalMode = ApprovalMode.YOLO;
+          }
+
+                     // Convert MCP server configs
+           const mcpServers: Record<string, InstanceType<typeof MCPServerConfig>> = {};
+           if (legacyConfig.mcpServers) {
+             for (const [key, config] of Object.entries(legacyConfig.mcpServers)) {
+               const mcpConfig = config as MCPServerConfig;
+               mcpServers[key] = new MCPServerConfig(
+                 mcpConfig.command,
+                 mcpConfig.args,
+                 mcpConfig.env,
+                 mcpConfig.cwd,
+                 mcpConfig.url,
+                 mcpConfig.httpUrl,
+                 mcpConfig.headers,
+                 mcpConfig.tcp,
+                 mcpConfig.timeout,
+                 mcpConfig.trust,
+                 mcpConfig.description
+               );
+             }
+           }
+
+          // Create new Config with merged parameters
+          const { Config } = await import('@google/gemini-cli-core');
+          const originalConfigParams = {
+            sessionId: options.config.getSessionId(),
+            embeddingModel: options.config.getEmbeddingModel(),
+            targetDir: options.config.getTargetDir(),
+            debugMode: legacyConfig.debugMode ?? options.config.getDebugMode(),
+            question: options.config.getQuestion(),
+            fullContext: legacyConfig.fullContext ?? options.config.getFullContext(),
+            coreTools: legacyConfig.coreTools ?? options.config.getCoreTools(),
+            excludeTools: legacyConfig.excludeTools ?? options.config.getExcludeTools(),
+            toolDiscoveryCommand: legacyConfig.toolDiscoveryCommand ?? options.config.getToolDiscoveryCommand(),
+            toolCallCommand: legacyConfig.toolCallCommand ?? options.config.getToolCallCommand(),
+            mcpServerCommand: legacyConfig.mcpServerCommand ?? options.config.getMcpServerCommand(),
+            mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : options.config.getMcpServers(),
+            userMemory: options.config.getUserMemory(),
+            geminiMdFileCount: options.config.getGeminiMdFileCount(),
+            approvalMode,
+            showMemoryUsage: legacyConfig.showMemoryUsage ?? options.config.getShowMemoryUsage(),
+            contextFileName: legacyConfig.contextFileName,
+            accessibility: options.config.getAccessibility(),
+            telemetry: {
+              enabled: options.config.getTelemetryEnabled(),
+              target: options.config.getTelemetryTarget(),
+              otlpEndpoint: options.config.getTelemetryOtlpEndpoint(),
+              logPrompts: options.config.getTelemetryLogPromptsEnabled(),
+            },
+            usageStatisticsEnabled: options.config.getUsageStatisticsEnabled(),
+            fileFiltering: legacyConfig.fileFiltering ?? {
+              respectGitIgnore: options.config.getFileFilteringRespectGitIgnore(),
+              enableRecursiveFileSearch: options.config.getEnableRecursiveFileSearch(),
+            },
+            checkpointing: legacyConfig.checkpointing ?? options.config.getCheckpointingEnabled(),
+            proxy: legacyConfig.proxy ?? options.config.getProxy(),
+            cwd: options.config.getWorkingDir(),
+            model: legacyConfig.model ?? options.config.getModel(),
+            extensionContextFilePaths: options.config.getExtensionContextFilePaths(),
+          };
+
+          activeConfig = new Config(originalConfigParams);
+          
+          // Initialize the new config to set up GeminiClient and ToolRegistry
+          console.log('Initializing new config...');
+          const { AuthType } = await import('@google/gemini-cli-core');
+          const authType = options.config.getContentGeneratorConfig()?.authType || AuthType.USE_GEMINI;
+          console.log('Auth type:', authType);
+          await activeConfig.refreshAuth(authType);
+          console.log('refreshAuth completed for new config');
+        } else {
+          // Even when using original config, ensure it's properly initialized
+          console.log('Using original config, checking if initialized...');
+          const originalClient = options.config.getGeminiClient();
+          console.log('Original config geminiClient:', originalClient ? 'exists' : 'undefined');
+          
+          if (!originalClient) {
+            console.log('Initializing original config...');
+            const { AuthType } = await import('@google/gemini-cli-core');
+            const authType = options.config.getContentGeneratorConfig()?.authType || AuthType.USE_GEMINI;
+            console.log('Auth type:', authType);
+            await activeConfig.refreshAuth(authType);
+            console.log('refreshAuth completed for original config');
+          } else {
+            console.log('Original config already has geminiClient, skipping auth');
+          }
+        }
+
+        // Get the Gemini client from the active config
+        console.log('Getting GeminiClient from activeConfig...');
+        geminiClient = activeConfig.getGeminiClient();
+        console.log('GeminiClient:', geminiClient ? 'initialized' : 'undefined');
+        
+        if (!geminiClient) {
+          console.log('GeminiClient is undefined! Attempting manual auth...');
+          const { AuthType } = await import('@google/gemini-cli-core');
+          await activeConfig.refreshAuth(AuthType.USE_GEMINI);
+          geminiClient = activeConfig.getGeminiClient();
+          console.log('After manual auth, GeminiClient:', geminiClient ? 'initialized' : 'still undefined');
+        }
+        const toolRegistry = await activeConfig.getToolRegistry();
         const geminiChat = await geminiClient.getChat();
+
+        // Set history if provided
+        if (legacyConfig?.history) {
+          await geminiClient.setHistory(legacyConfig.history);
+        }
 
         yield {
           type: 'status',
@@ -442,110 +749,246 @@ async function registerAsHyphaService(options: {
         let fullResponse = '';
 
         while (true) {
-          const functionCalls: any[] = [];
+          const functionCalls: Array<{ id?: string; name: string; args?: Record<string, unknown> }> = [];
 
-          const responseStream = await geminiChat.sendMessageStream({
-            message: currentMessages[0]?.parts || [],
-            config: {
-              tools: [
-                { functionDeclarations: toolRegistry.getFunctionDeclarations() },
-              ],
-            },
-          });
+          try {
+            const responseStream = await geminiChat.sendMessageStream({
+              message: currentMessages[0]?.parts || [],
+              config: {
+                tools: [
+                  { functionDeclarations: toolRegistry.getFunctionDeclarations() },
+                ],
+              },
+            });
 
-          // Process streaming response
-          for await (const resp of responseStream) {
-            const textPart = getResponseText(resp);
-            if (textPart) {
-              fullResponse += textPart;
-              yield {
-                type: 'text',
-                content: textPart,
-                timestamp: new Date().toISOString()
-              };
+            // Process streaming response with timeout and better error handling
+            try {
+              const streamIterator = responseStream[Symbol.asyncIterator]();
+              let iterationCount = 0;
+              const maxIterations = 1000; // Prevent infinite loops
+              
+              while (iterationCount < maxIterations) {
+                try {
+                  // Add timeout to prevent hanging
+                  const timeoutPromise = new Promise<{ done: true; value: undefined }>((_, reject) => {
+                    setTimeout(() => reject(new Error('Stream iteration timeout')), 30000);
+                  });
+                  
+                  const iterationPromise = streamIterator.next();
+                  const result = await Promise.race([iterationPromise, timeoutPromise]);
+                  
+                  if (result.done) {
+                    console.log('Stream iteration completed normally');
+                    break;
+                  }
+                  
+                  const resp = result.value;
+                  if (!resp) {
+                    console.log('Received empty response, continuing...');
+                    iterationCount++;
+                    continue;
+                  }
+                  
+                  try {
+                    const textPart = getResponseText(resp);
+                    if (textPart) {
+                      fullResponse += textPart;
+                      yield {
+                        type: 'text',
+                        content: textPart,
+                        timestamp: new Date().toISOString()
+                      };
+                    }
+                    
+                    if (resp.functionCalls) {
+                      functionCalls.push(...resp.functionCalls);
+                    }
+                  } catch (respError) {
+                    console.error('Error processing individual response chunk:', respError);
+                    yield {
+                      type: 'error',
+                      content: `Response processing error: ${(respError as Error).message}`,
+                      history: await geminiClient.getHistory().catch(() => legacyConfig?.history || []),
+                      timestamp: new Date().toISOString()
+                    };
+                    break; // Exit iteration on processing error
+                  }
+                  
+                  iterationCount++;
+                } catch (iterError) {
+                  console.error('Error in single iteration:', iterError);
+                  const errorMessage = (iterError as Error).message || String(iterError);
+                  
+                  // Check if this is a termination error
+                  if (errorMessage.includes('terminated') || errorMessage.includes('closed')) {
+                    console.log('Stream was terminated, ending iteration gracefully');
+                    break;
+                  }
+                  
+                  // For other errors, yield error and continue
+                  yield {
+                    type: 'error',
+                    content: `Stream iteration error: ${errorMessage}`,
+                    history: await geminiClient.getHistory().catch(() => legacyConfig?.history || []),
+                    timestamp: new Date().toISOString()
+                  };
+                  break;
+                }
+              }
+              
+              if (iterationCount >= maxIterations) {
+                console.warn('Stream iteration reached maximum iterations, stopping');
+                yield {
+                  type: 'status',
+                  content: 'Stream processing reached maximum iterations',
+                  timestamp: new Date().toISOString()
+                };
+              }
+              
+            } catch (streamIterationError) {
+              console.error('Error iterating over response stream:', streamIterationError);
+              const errorMessage = (streamIterationError as Error).message || String(streamIterationError);
+              
+              // Handle specific termination errors more gracefully
+              if (errorMessage.includes('terminated') || errorMessage.includes('closed')) {
+                console.log('Stream was terminated, continuing with available data');
+                yield {
+                  type: 'status',
+                  content: 'Stream connection was terminated, continuing with available data',
+                  timestamp: new Date().toISOString()
+                };
+              } else {
+                yield {
+                  type: 'error',
+                  content: `Stream iteration error: ${errorMessage}`,
+                  history: await geminiClient.getHistory().catch(() => legacyConfig?.history || []),
+                  timestamp: new Date().toISOString()
+                };
+                break; // Exit the main loop on unrecoverable stream errors
+              }
             }
-            
-            if (resp.functionCalls) {
-              functionCalls.push(...resp.functionCalls);
-            }
+          } catch (streamError) {
+            console.error('Error in sendMessageStream:', streamError);
+            yield {
+              type: 'error',
+              content: `Stream error: ${(streamError as Error).message}`,
+              history: await geminiClient.getHistory().catch(() => legacyConfig?.history || []),
+              timestamp: new Date().toISOString()
+            };
+            break; // Exit the main loop on stream creation errors
           }
 
           // Handle function calls if any
           if (functionCalls.length > 0) {
-            yield {
-              type: 'status',
-              content: `Executing ${functionCalls.length} tool call(s)...`,
-              timestamp: new Date().toISOString()
-            };
-
-            const toolResponseParts: any[] = [];
-
-            for (const fc of functionCalls) {
-              const callId = fc.id ?? `${fc.name}-${Date.now()}`;
-              const requestInfo = {
-                callId,
-                name: fc.name,
-                args: fc.args ?? {},
-                isClientInitiated: false,
+            try {
+              console.log(`Starting execution of ${functionCalls.length} tool call(s)`);
+              yield {
+                type: 'status',
+                content: `Executing ${functionCalls.length} tool call(s)...`,
+                timestamp: new Date().toISOString()
               };
 
-              try {
-                const { executeToolCall } = await import('@google/gemini-cli-core');
-                const toolResponse = await executeToolCall(
-                  options.config,
-                  requestInfo,
-                  toolRegistry,
-                  new AbortController().signal
-                );
+              const toolResponseParts: any[] = [];
 
-                if (toolResponse.error) {
-                  yield {
-                    type: 'error',
-                    content: `Tool execution error: ${toolResponse.error.message}`,
-                    timestamp: new Date().toISOString()
+              for (const fc of functionCalls) {
+                try {
+                  console.log(`Executing tool: ${fc.name} with args:`, fc.args);
+                  
+                  const callId = fc.id ?? `${fc.name}-${Date.now()}`;
+                  const requestInfo = {
+                    callId,
+                    name: fc.name,
+                    args: fc.args ?? {},
+                    isClientInitiated: false,
                   };
-                }
 
-                if (toolResponse.responseParts) {
-                  const parts = Array.isArray(toolResponse.responseParts)
-                    ? toolResponse.responseParts
-                    : [toolResponse.responseParts];
-                  for (const part of parts) {
-                    if (typeof part === 'string') {
-                      toolResponseParts.push({ text: part });
-                    } else if (part) {
-                      toolResponseParts.push(part);
+                  const { executeToolCall } = await import('@google/gemini-cli-core');
+                  const toolResponse = await executeToolCall(
+                    activeConfig,
+                    requestInfo,
+                    toolRegistry,
+                    new AbortController().signal
+                  );
+
+                  console.log(`Tool ${fc.name} completed. Error: ${toolResponse.error?.message || 'none'}, Has response: ${!!toolResponse.responseParts}`);
+
+                  if (toolResponse.error) {
+                    console.error(`Tool execution error for ${fc.name}:`, toolResponse.error);
+                    yield {
+                      type: 'error',
+                      content: `Tool execution error: ${toolResponse.error.message}`,
+                      history: await geminiClient.getHistory().catch(() => legacyConfig?.history || []),
+                      timestamp: new Date().toISOString()
+                    };
+                    // Continue with other tools rather than returning
+                  }
+
+                  if (toolResponse.responseParts) {
+                    const parts = Array.isArray(toolResponse.responseParts)
+                      ? toolResponse.responseParts
+                      : [toolResponse.responseParts];
+                    for (const part of parts) {
+                      if (typeof part === 'string') {
+                        toolResponseParts.push({ text: part });
+                      } else if (part) {
+                        toolResponseParts.push(part);
+                      }
                     }
                   }
+                } catch (toolError) {
+                  console.error(`Critical error executing tool ${fc.name}:`, toolError);
+                  yield {
+                    type: 'error',
+                    content: `Tool execution failed: ${(toolError as Error).message}`,
+                    history: await geminiClient.getHistory().catch(() => legacyConfig?.history || []),
+                    timestamp: new Date().toISOString()
+                  };
+                  // Continue with other tools rather than returning
                 }
-              } catch (error) {
-                yield {
-                  type: 'error',
-                  content: `Tool execution failed: ${(error as Error).message}`,
-                  timestamp: new Date().toISOString()
-                };
               }
-            }
 
-            currentMessages = [{ role: 'user', parts: toolResponseParts }];
+              console.log(`All tools completed. Response parts count: ${toolResponseParts.length}`);
+              currentMessages = [{ role: 'user', parts: toolResponseParts }];
+            } catch (toolGroupError) {
+              console.error('Critical error in tool execution group:', toolGroupError);
+              yield {
+                type: 'error',
+                content: `Tool group execution failed: ${(toolGroupError as Error).message}`,
+                history: await geminiClient.getHistory().catch(() => legacyConfig?.history || []),
+                timestamp: new Date().toISOString()
+              };
+              return;
+            }
           } else {
             // No more function calls, we're done
+            console.log('No more function calls, conversation complete');
             break;
           }
         }
 
-        // Yield final response
+        // Yield final response with history
+        const finalHistory = await geminiClient.getHistory();
         yield {
           type: 'final',
           content: fullResponse || 'Query processed successfully',
+          history: finalHistory,
           timestamp: new Date().toISOString()
         };
 
       } catch (error) {
         console.error('Error processing query:', error);
+        // Try to get history even on error
+        let errorHistory;
+        try {
+          errorHistory = await geminiClient.getHistory();
+        } catch {
+          // If we can't get history, that's okay
+          errorHistory = legacyConfig?.history || [];
+        }
         yield {
           type: 'error',
           content: (error as Error).message,
+          history: errorHistory,
           timestamp: new Date().toISOString()
         };
       }

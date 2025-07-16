@@ -1,0 +1,4 @@
+gemini --connect https://hypha.aicell.io \
+       --workspace "ws-user-github|478667" \
+       --token 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FtdW4uYWkvIiwic3ViIjoic3BhcmtseS1waHJhc2UtNzA2ODE3ODYiLCJhdWQiOiJodHRwczovL2FtdW4tYWkuZXUuYXV0aDAuY29tL2FwaS92Mi8iLCJpYXQiOjE3NTE1MTgwNDYsImV4cCI6MTc4NzUxODA0Niwic2NvcGUiOiJ3czp3cy11c2VyLWdpdGh1Ynw0Nzg2Njcjcncgd2lkOndzLXVzZXItZ2l0aHVifDQ3ODY2NyIsImd0eSI6ImNsaWVudC1jcmVkZW50aWFscyIsImh0dHBzOi8vYW11bi5haS9yb2xlcyI6WyJhZG1pbiJdLCJodHRwczovL2FtdW4uYWkvZW1haWwiOiJvZXdheTAwN0BnbWFpbC5jb20ifQ.rwAm1tkBGuNOuvV2OJ-6VtUVuTgMCqUNnxdJkI-q4Tw' \
+       --service-id gemini-agent

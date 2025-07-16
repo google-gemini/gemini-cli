@@ -52,8 +52,8 @@ Register the Gemini CLI as a service on the Hypha server:
 
 ```bash
 gemini --connect https://hypha.aicell.io \
-       --workspace ws-user-github|478667 \
-       --token YOUR_TOKEN \
+       --workspace "ws-user-github|478667" \
+       --token 'YOUR_TOKEN' \
        --service-id gemini-agent
 ```
 
