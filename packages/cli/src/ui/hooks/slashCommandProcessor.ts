@@ -252,14 +252,15 @@ export const useSlashCommandProcessor = (
               return;
             }
 
-            mcpSettings[serverName] = {
-              ...mcpSettings[serverName],
-              enabled,
+            const newMcpSettings = {
+              ...mcpSettings,
+              [serverName]: {
+                ...mcpSettings[serverName],
+                enabled,
+              },
             };
 
-            userSettings.mcpServers = mcpSettings;
-
-            settings.setValue(SettingScope.User, 'mcpServers', mcpSettings);
+            settings.setValue(SettingScope.User, 'mcpServers', newMcpSettings);
 
             addMessage({
               type: MessageType.INFO,
