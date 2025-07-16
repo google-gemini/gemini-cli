@@ -10,6 +10,7 @@ import { type SlashCommand } from '../ui/commands/types.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
+import { docsCommand } from '../ui/commands/docsCommand.js';
 import { chatCommand } from '../ui/commands/chatCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
@@ -18,6 +19,7 @@ import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
+import { mcpCommand } from '../ui/commands/mcpCommand.js';
 
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
@@ -28,6 +30,9 @@ vi.mock('../ui/commands/helpCommand.js', () => ({
 }));
 vi.mock('../ui/commands/clearCommand.js', () => ({
   clearCommand: { name: 'clear', description: 'Mock Clear' },
+}));
+vi.mock('../ui/commands/docsCommand.js', () => ({
+  docsCommand: { name: 'docs', description: 'Mock Docs' },
 }));
 vi.mock('../ui/commands/authCommand.js', () => ({
   authCommand: { name: 'auth', description: 'Mock Auth' },
@@ -50,9 +55,12 @@ vi.mock('../ui/commands/compressCommand.js', () => ({
 vi.mock('../ui/commands/extensionsCommand.js', () => ({
   extensionsCommand: { name: 'extensions', description: 'Mock Extensions' },
 }));
+vi.mock('../ui/commands/mcpCommand.js', () => ({
+  mcpCommand: { name: 'mcp', description: 'Mock MCP' },
+}));
 
 describe('CommandService', () => {
-  const subCommandLen = 11;
+  const subCommandLen = 13;
 
   describe('when using default production loader', () => {
     let commandService: CommandService;
@@ -84,6 +92,7 @@ describe('CommandService', () => {
         expect(commandNames).toContain('memory');
         expect(commandNames).toContain('help');
         expect(commandNames).toContain('clear');
+        expect(commandNames).toContain('docs');
         expect(commandNames).toContain('chat');
         expect(commandNames).toContain('theme');
         expect(commandNames).toContain('stats');
@@ -91,6 +100,7 @@ describe('CommandService', () => {
         expect(commandNames).toContain('about');
         expect(commandNames).toContain('compress');
         expect(commandNames).toContain('extensions');
+        expect(commandNames).toContain('mcp');
       });
 
       it('should overwrite any existing commands when called again', async () => {
@@ -122,8 +132,10 @@ describe('CommandService', () => {
           chatCommand,
           clearCommand,
           compressCommand,
+          docsCommand,
           extensionsCommand,
           helpCommand,
+          mcpCommand,
           memoryCommand,
           privacyCommand,
           statsCommand,

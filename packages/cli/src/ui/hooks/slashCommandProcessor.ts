@@ -10,15 +10,7 @@ import open from 'open';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useStateAndRef } from './useStateAndRef.js';
-import {
-  Config,
-  GitService,
-  Logger,
-  MCPDiscoveryState,
-  MCPServerStatus,
-  getMCPDiscoveryState,
-  getMCPServerStatus,
-} from '@google/gemini-cli-core';
+import { Config, GitService, Logger } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
   Message,
@@ -218,27 +210,6 @@ export const useSlashCommandProcessor = (
   const legacyCommands: LegacySlashCommand[] = useMemo(() => {
     const commands: LegacySlashCommand[] = [
       // `/help` and `/clear` have been migrated and REMOVED from this list.
-      {
-        name: 'docs',
-        description: 'open full Gemini CLI documentation in your browser',
-        action: async (_mainCommand, _subCommand, _args) => {
-          const docsUrl = 'https://goo.gle/gemini-cli-docs';
-          if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-            addMessage({
-              type: MessageType.INFO,
-              content: `Please open the following URL in your browser to view the documentation:\n${docsUrl}`,
-              timestamp: new Date(),
-            });
-          } else {
-            addMessage({
-              type: MessageType.INFO,
-              content: `Opening documentation in your browser: ${docsUrl}`,
-              timestamp: new Date(),
-            });
-            await open(docsUrl);
-          }
-        },
-      },
       {
         name: 'editor',
         description: 'set external editor preference',
