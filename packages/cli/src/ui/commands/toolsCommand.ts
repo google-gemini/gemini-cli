@@ -39,23 +39,19 @@ export const toolsCommand: SlashCommand = {
 
     if (geminiTools.length > 0) {
       geminiTools.forEach((tool) => {
-        const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*.{0,2}(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
         if (useShowDescriptions && tool.description) {
-          // Format tool name in cyan
-          message += `  - \u001b[36m${stripAnsi(tool.displayName)} (${stripAnsi(tool.name)})\u001b[0m:\n`;
+          message += `  - \u001b[36m${tool.displayName} (${tool.name})\u001b[0m:\n`;
 
-          // Apply green color to the description text
           const greenColor = '\u001b[32m';
           const resetColor = '\u001b[0m';
 
           // Handle multi-line descriptions
           const descLines = tool.description.trim().split('\n');
           for (const descLine of descLines) {
-            message += `      ${greenColor}${stripAnsi(descLine)}${resetColor}\n`;
+            message += `      ${greenColor}${descLine}${resetColor}\n`;
           }
         } else {
-          // Use cyan color for the tool name
-          message += `  - \u001b[36m${stripAnsi(tool.displayName)}\u001b[0m\n`;
+          message += `  - \u001b[36m${tool.displayName}\u001b[0m\n`;
         }
       });
     } else {
@@ -63,7 +59,6 @@ export const toolsCommand: SlashCommand = {
     }
     message += '\n';
 
-    // Reset any ANSI formatting
     message += '\u001b[0m';
 
     context.ui.addItem({ type: MessageType.INFO, text: message }, Date.now());

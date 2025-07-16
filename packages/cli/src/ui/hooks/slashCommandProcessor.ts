@@ -66,7 +66,6 @@ export const useSlashCommandProcessor = (
   openAuthDialog: () => void,
   openEditorDialog: () => void,
   toggleCorgiMode: () => void,
-  showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
 ) => {
@@ -450,7 +449,6 @@ export const useSlashCommandProcessor = (
     openEditorDialog,
     toggleCorgiMode,
     config,
-    showToolDescriptions,
     session,
     gitService,
     loadHistory,
