@@ -55,6 +55,12 @@ describe('useCompletion git-aware filtering integration', () => {
       action: vi.fn(),
     },
     {
+      name: 'stats',
+      altName: 'usage',
+      description: 'check session stats. Usage: /stats [model|tools]',
+      action: vi.fn(),
+    },
+    {
       name: 'clear',
       description: 'Clear the screen',
       action: vi.fn(),
@@ -511,10 +517,27 @@ describe('useCompletion git-aware filtering integration', () => {
     expect(result.current.showSuggestions).toBe(true);
   });
 
-  it('should suggest commands based on altName', async () => {
+  it.each([['/?'], ['/usage']])(
+    'should not suggest commands when altName is fully typed',
+    async (altName) => {
+      const { result } = renderHook(() =>
+        useCompletion(
+          altName,
+          '/test/cwd',
+          true,
+          mockSlashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions).toHaveLength(0);
+    },
+  );
+
+  it('should suggest commands based on partial altName matches', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/?',
+        '/usag', // part of the word "usage"
         '/test/cwd',
         true,
         mockSlashCommands,
@@ -523,7 +546,11 @@ describe('useCompletion git-aware filtering integration', () => {
     );
 
     expect(result.current.suggestions).toEqual([
-      { label: 'help', value: 'help', description: 'Show help' },
+      {
+        label: 'stats',
+        value: 'stats',
+        description: 'check session stats. Usage: /stats [model|tools]',
+      },
     ]);
   });
 
@@ -734,7 +761,7 @@ describe('useCompletion git-aware filtering integration', () => {
 
     expect(result.current.suggestions.length).toBe(mockSlashCommands.length);
     expect(result.current.suggestions.map((s) => s.label)).toEqual(
-      expect.arrayContaining(['help', 'clear', 'memory', 'chat']),
+      expect.arrayContaining(['help', 'clear', 'memory', 'chat', 'stats']),
     );
   });
 
