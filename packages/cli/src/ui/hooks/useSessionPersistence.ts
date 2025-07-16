@@ -33,12 +33,17 @@ export const useSessionPersistence = ({
     historyRef.current = history;
   }, [history]);
   useEffect(() => {
+    let isMounted = true;
+
     const loadSession = async () => {
       if (sessionPersistence) {
         const sessionPath = path.join(process.cwd(), '.gemini', 'session.json');
         try {
           const sessionData = await fsp.readFile(sessionPath, 'utf-8');
           const parsedHistory = JSON.parse(sessionData);
+
+          if (!isMounted) return;
+
           if (Array.isArray(parsedHistory)) {
             const historyWithIds: HistoryItem[] = parsedHistory
               .filter(
@@ -61,6 +66,8 @@ export const useSessionPersistence = ({
             }
           }
         } catch (error) {
+          if (!isMounted) return;
+
           // Silently ignore if file doesn't exist.
           if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
             return;
@@ -71,6 +78,10 @@ export const useSessionPersistence = ({
     };
 
     void loadSession();
+
+    return () => {
+      isMounted = false;
+    };
   }, [sessionPersistence, loadHistory]);
 
   useEffect(() => {
