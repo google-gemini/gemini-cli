@@ -10,6 +10,7 @@ import { type SlashCommand } from '../ui/commands/types.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
+import { docsCommand } from '../ui/commands/docsCommand.js';
 import { chatCommand } from '../ui/commands/chatCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
@@ -30,6 +31,9 @@ vi.mock('../ui/commands/helpCommand.js', () => ({
 }));
 vi.mock('../ui/commands/clearCommand.js', () => ({
   clearCommand: { name: 'clear', description: 'Mock Clear' },
+}));
+vi.mock('../ui/commands/docsCommand.js', () => ({
+  docsCommand: { name: 'docs', description: 'Mock Docs' },
 }));
 vi.mock('../ui/commands/authCommand.js', () => ({
   authCommand: { name: 'auth', description: 'Mock Auth' },
@@ -92,6 +96,7 @@ describe('CommandService', () => {
         expect(commandNames).toContain('memory');
         expect(commandNames).toContain('help');
         expect(commandNames).toContain('clear');
+        expect(commandNames).toContain('docs');
         expect(commandNames).toContain('chat');
         expect(commandNames).toContain('theme');
         expect(commandNames).toContain('stats');
@@ -132,6 +137,7 @@ describe('CommandService', () => {
           chatCommand,
           clearCommand,
           compressCommand,
+          docsCommand,
           extensionsCommand,
           helpCommand,
           mcpCommand,
