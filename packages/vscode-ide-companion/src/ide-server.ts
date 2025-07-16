@@ -114,15 +114,16 @@ export class IDEServer {
 
       try {
         await transport.handleRequest(req, res);
-        if (!sessionsWithInitialNotification.has(sessionId)) {
-          sendActiveFileChangedNotification(transport);
-          sessionsWithInitialNotification.add(sessionId);
-        }
       } catch (error) {
         console.error('Error handling MCP GET request:', error);
         if (!res.headersSent) {
           res.status(400).send('Bad Request');
         }
+      }
+
+      if (!sessionsWithInitialNotification.has(sessionId)) {
+        sendActiveFileChangedNotification(transport);
+        sessionsWithInitialNotification.add(sessionId);
       }
     };
 
