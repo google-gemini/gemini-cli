@@ -48,7 +48,6 @@ vi.mock('../ui/commands/extensionsCommand.js', () => ({
 }));
 
 describe('CommandService', () => {
-  
   const subCommandLen = 10;
 
   describe('when using default production loader', () => {
