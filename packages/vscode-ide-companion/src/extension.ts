@@ -5,10 +5,17 @@
  */
 
 import * as vscode from 'vscode';
-import { startIDEServer } from './ide-server';
+import { IDEServer } from './ide-server';
+
+let ideServer: IDEServer;
 
 export async function activate(context: vscode.ExtensionContext) {
-  startIDEServer(context);
+  ideServer = new IDEServer();
+  ideServer.start(context);
 }
 
-export function deactivate() {}
+export function deactivate() {
+  if (ideServer) {
+    ideServer.stop();
+  }
+}
