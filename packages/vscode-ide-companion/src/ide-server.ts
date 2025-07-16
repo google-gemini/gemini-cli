@@ -159,13 +159,9 @@ export class IDEServer {
           IDE_SERVER_PORT_ENV_VAR,
           port.toString(),
         );
-        this.logger.appendLine(
-          `IDE server listening on port ${port}`,
-        );
+        this.logger.appendLine(`IDE server listening on port ${port}`);
       } else {
-        this.logger.appendLine(
-          `Failed to start IDE server`,
-        );
+        this.logger.appendLine(`Failed to start IDE server`);
       }
     });
   }
