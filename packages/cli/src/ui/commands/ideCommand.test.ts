@@ -31,10 +31,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-interface ExecError extends Error {
-  stderr: Buffer;
-}
-
 describe('ideCommand', () => {
   let mockContext: CommandContext;
   let mockConfig: Config;
@@ -237,7 +233,9 @@ describe('ideCommand', () => {
         .mockReturnValueOnce('') // VSCode is installed check
         .mockImplementation(() => {
           // Installation command
-          const error = new Error('Command failed') as ExecError;
+          const error: Error & { stderr?: Buffer } = new Error(
+            'Command failed',
+          );
           error.stderr = Buffer.from(errorMessage);
           throw error;
         });
