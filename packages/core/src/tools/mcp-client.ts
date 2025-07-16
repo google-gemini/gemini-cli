@@ -293,7 +293,7 @@ export async function discoverTools(
         ),
       );
     }
-    if (discoveredTools.length === 0 && mcpServerName !== IDE_SERVER_NAME) {
+    if (discoveredTools.length === 0) {
       throw Error('No enabled tools found');
     }
     return discoveredTools;
