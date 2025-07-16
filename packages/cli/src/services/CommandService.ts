@@ -8,6 +8,7 @@ import { SlashCommand } from '../ui/commands/types.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
+import { docsCommand } from '../ui/commands/docsCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
@@ -24,6 +25,7 @@ const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
   chatCommand,
   clearCommand,
   compressCommand,
+  docsCommand,
   extensionsCommand,
   helpCommand,
   mcpCommand,
