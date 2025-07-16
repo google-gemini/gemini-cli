@@ -215,6 +215,9 @@ export async function connectAndDiscover(
       mcpClient.onerror = (error) => {
         console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
         updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+        if (mcpServerName === IDE_SERVER_NAME) {
+          ideContext.clearActiveFileContext();
+        }
       };
 
       if (mcpServerName === IDE_SERVER_NAME) {
