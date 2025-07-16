@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GroundingMetadata } from '@google/genai';
-import { BaseTool, ToolResult } from './tools.js';
+import type { GroundingMetadata } from '@google/genai';
+import type { ToolResult } from './tools.js';
+import { BaseTool } from './tools.js';
 import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 
 import { getErrorMessage } from '../utils/errors.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 
 interface GroundingChunkWeb {

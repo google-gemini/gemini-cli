@@ -5,28 +5,26 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useGeminiStream, mergePartListUnions } from './useGeminiStream.js';
 import { useInput } from 'ink';
-import {
-  useReactToolScheduler,
+import type {
   TrackedToolCall,
   TrackedCompletedToolCall,
   TrackedExecutingToolCall,
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
-import { Config, EditorType, AuthType } from '@google/gemini-cli-core';
-import { Part, PartListUnion } from '@google/genai';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import {
-  HistoryItem,
-  MessageType,
-  SlashCommandProcessorResult,
-  StreamingState,
-} from '../types.js';
-import { Dispatch, SetStateAction } from 'react';
-import { LoadedSettings } from '../../config/settings.js';
+import { useReactToolScheduler } from './useReactToolScheduler.js';
+import type { Config, EditorType } from '@google/gemini-cli-core';
+import { AuthType } from '@google/gemini-cli-core';
+import type { Part, PartListUnion } from '@google/genai';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
+import type { HistoryItem, SlashCommandProcessorResult } from '../types.js';
+import { MessageType, StreamingState } from '../types.js';
+import type { Dispatch, SetStateAction } from 'react';
+import type { LoadedSettings } from '../../config/settings.js';
 
 // --- MOCKS ---
 const mockSendMessageStream = vi

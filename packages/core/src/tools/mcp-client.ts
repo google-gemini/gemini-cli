@@ -5,21 +5,19 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import {
-  SSEClientTransport,
-  SSEClientTransportOptions,
-} from '@modelcontextprotocol/sdk/client/sse.js';
-import {
-  StreamableHTTPClientTransport,
-  StreamableHTTPClientTransportOptions,
-} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import type { StreamableHTTPClientTransportOptions } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { parse } from 'shell-quote';
-import { MCPServerConfig } from '../config/config.js';
+import type { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { FunctionDeclaration, Type, mcpToTool } from '@google/genai';
-import { sanitizeParameters, ToolRegistry } from './tool-registry.js';
+import type { FunctionDeclaration } from '@google/genai';
+import { Type, mcpToTool } from '@google/genai';
+import type { ToolRegistry } from './tool-registry.js';
+import { sanitizeParameters } from './tool-registry.js';
 import {
   ActiveFileNotificationSchema,
   IDE_SERVER_NAME,

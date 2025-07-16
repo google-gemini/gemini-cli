@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ToolResult } from '../tools/tools.js';
-import {
+import type { ToolResult } from '../tools/tools.js';
+import type {
   Content,
   GenerateContentConfig,
   GenerateContentResponse,
 } from '@google/genai';
-import { GeminiClient } from '../core/client.js';
+import type { GeminiClient } from '../core/client.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
-import { PartListUnion } from '@google/genai';
+import type { PartListUnion } from '@google/genai';
 
 /**
  * A function that summarizes the result of a tool execution.

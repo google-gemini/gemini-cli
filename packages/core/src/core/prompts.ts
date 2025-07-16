@@ -17,7 +17,7 @@ import { WriteFileTool } from '../tools/write-file.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { ideContext } from '../services/ideContext.js';
 
 export function getCoreSystemPrompt(

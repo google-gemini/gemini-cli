@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Schema } from '@google/genai';
+import type { Schema } from '@google/genai';
 import * as ajv from 'ajv';
 
 const ajValidator = new ajv.Ajv();

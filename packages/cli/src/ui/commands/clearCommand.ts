@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SlashCommand } from './types.js';
+import type { SlashCommand } from './types.js';
 
 export const clearCommand: SlashCommand = {
   name: 'clear',

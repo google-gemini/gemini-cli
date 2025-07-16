@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BaseTool, ToolResult } from './tools.js';
+import type { ToolResult } from './tools.js';
+import { BaseTool } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as path from 'path';
@@ -16,8 +17,9 @@ import {
   DEFAULT_ENCODING,
   getSpecificMimeType,
 } from '../utils/fileUtils.js';
-import { PartListUnion, Schema, Type } from '@google/genai';
-import { Config } from '../config/config.js';
+import type { PartListUnion, Schema } from '@google/genai';
+import { Type } from '@google/genai';
+import type { Config } from '../config/config.js';
 import {
   recordFileOperationMetric,
   FileOperation,

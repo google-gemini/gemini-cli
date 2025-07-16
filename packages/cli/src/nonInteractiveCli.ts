@@ -4,15 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   Config,
   ToolCallRequestInfo,
-  executeToolCall,
   ToolRegistry,
+} from '@google/gemini-cli-core';
+import {
+  executeToolCall,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
 } from '@google/gemini-cli-core';
-import {
+import type {
   Content,
   Part,
   FunctionCall,

@@ -15,12 +15,12 @@ import {
   getStructuredResponse,
   getStructuredResponseFromParts,
 } from './generateContentResponseUtilities.js';
-import {
+import type {
   GenerateContentResponse,
   Part,
-  FinishReason,
   SafetyRating,
 } from '@google/genai';
+import { FinishReason } from '@google/genai';
 
 const mockTextPart = (text: string): Part => ({ text });
 const mockFunctionCallPart = (

@@ -7,14 +7,15 @@
 import * as vscode from 'vscode';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import express, { Request, Response } from 'express';
+import type { Request, Response } from 'express';
+import express from 'express';
 import { randomUUID } from 'node:crypto';
 import {
   isInitializeRequest,
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { Server } from 'node:http';
+import type { Server } from 'node:http';
 
 function sendActiveFileChangedNotification(
   transport: StreamableHTTPServerTransport,

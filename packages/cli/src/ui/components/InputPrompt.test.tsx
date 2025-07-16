@@ -5,10 +5,11 @@
  */
 
 import { render } from 'ink-testing-library';
-import { InputPrompt, InputPromptProps } from './InputPrompt.js';
+import type { InputPromptProps } from './InputPrompt.js';
+import { InputPrompt } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
-import { Config } from '@google/gemini-cli-core';
-import { CommandContext, SlashCommand } from '../commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { vi } from 'vitest';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';

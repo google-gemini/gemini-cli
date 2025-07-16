@@ -15,8 +15,9 @@ import {
   DiscoveredMCPTool,
 } from '@google/gemini-cli-core';
 import open from 'open';
-import { MessageActionReturn } from './types.js';
-import { Type, CallableTool } from '@google/genai';
+import type { MessageActionReturn } from './types.js';
+import type { CallableTool } from '@google/genai';
+import { Type } from '@google/genai';
 
 // Mock external dependencies
 vi.mock('open', () => ({

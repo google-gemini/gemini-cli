@@ -7,7 +7,8 @@
 import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
-import { HistoryItem, MessageType } from '../types.js';
+import type { HistoryItem } from '../types.js';
+import { MessageType } from '../types.js';
 import { SessionStatsProvider } from '../contexts/SessionContext.js';
 
 // Mock child components

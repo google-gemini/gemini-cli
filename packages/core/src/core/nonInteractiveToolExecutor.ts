@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  logToolCall,
+import type {
   ToolCallRequestInfo,
   ToolCallResponseInfo,
   ToolRegistry,
   ToolResult,
 } from '../index.js';
-import { Config } from '../config/config.js';
+import { logToolCall } from '../index.js';
+import type { Config } from '../config/config.js';
 import { convertToFunctionResponse } from './coreToolScheduler.js';
 
 /**

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   Config,
   ToolCallRequestInfo,
   ExecutingToolCall,
@@ -13,7 +13,6 @@ import {
   WaitingToolCall,
   CompletedToolCall,
   CancelledToolCall,
-  CoreToolScheduler,
   OutputUpdateHandler,
   AllToolCallsCompleteHandler,
   ToolCallsUpdateHandler,
@@ -22,13 +21,14 @@ import {
   Status as CoreStatus,
   EditorType,
 } from '@google/gemini-cli-core';
+import { CoreToolScheduler } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo } from 'react';
-import {
+import type {
   HistoryItemToolGroup,
   IndividualToolCallDisplay,
-  ToolCallStatus,
   HistoryItemWithoutId,
 } from '../types.js';
+import { ToolCallStatus } from '../types.js';
 
 export type ScheduleFn = (
   request: ToolCallRequestInfo | ToolCallRequestInfo[],

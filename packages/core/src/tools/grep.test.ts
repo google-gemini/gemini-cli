@@ -5,11 +5,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { GrepTool, GrepToolParams } from './grep.js';
+import type { GrepToolParams } from './grep.js';
+import { GrepTool } from './grep.js';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 
 // Mock the child_process module to control grep/git grep behavior
 vi.mock('child_process', () => ({

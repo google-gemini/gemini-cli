@@ -24,14 +24,17 @@ vi.mock('../utils/editor.js', () => ({
   openDiff: mockOpenDiff,
 }));
 
-import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
-import { EditTool, EditToolParams } from './edit.js';
-import { FileDiff } from './tools.js';
+import type { Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { EditToolParams } from './edit.js';
+import { EditTool } from './edit.js';
+import type { FileDiff } from './tools.js';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { ApprovalMode, Config } from '../config/config.js';
-import { Content, Part, SchemaUnion } from '@google/genai';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
+import type { Content, Part, SchemaUnion } from '@google/genai';
 
 describe('EditTool', () => {
   let tool: EditTool;

@@ -6,8 +6,8 @@
 
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
+  type DOMElement,
   Box,
-  DOMElement,
   measureElement,
   Static,
   Text,
@@ -39,7 +39,7 @@ import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
-import { LoadedSettings } from '../config/settings.js';
+import type { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup } from '../utils/cleanup.js';
@@ -49,12 +49,12 @@ import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
 import {
+  type EditorType,
   getErrorMessage,
   type Config,
   getAllGeminiMdFilenames,
   ApprovalMode,
   isEditorAvailable,
-  EditorType,
   FlashFallbackEvent,
   logFlashFallback,
   AuthType,

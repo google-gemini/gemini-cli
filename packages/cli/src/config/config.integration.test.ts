@@ -8,11 +8,11 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { tmpdir } from 'os';
-import {
-  Config,
+import type {
   ConfigParameters,
   ContentGeneratorConfig,
 } from '@google/gemini-cli-core';
+import { Config } from '@google/gemini-cli-core';
 
 const TEST_CONTENT_GENERATOR_CONFIG: ContentGeneratorConfig = {
   apiKey: 'test-key',

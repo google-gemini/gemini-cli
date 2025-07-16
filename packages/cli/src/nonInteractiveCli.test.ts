@@ -7,8 +7,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { Config, GeminiClient, ToolRegistry } from '@google/gemini-cli-core';
-import { GenerateContentResponse, Part, FunctionCall } from '@google/genai';
+import type { Config } from '@google/gemini-cli-core';
+import { GeminiClient, ToolRegistry } from '@google/gemini-cli-core';
+import type {
+  GenerateContentResponse,
+  Part,
+  FunctionCall,
+} from '@google/genai';
 
 // Mock dependencies
 vi.mock('@google/gemini-cli-core', async () => {

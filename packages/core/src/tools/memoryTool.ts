@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BaseTool, ToolResult } from './tools.js';
-import { FunctionDeclaration, Type } from '@google/genai';
+import type { ToolResult } from './tools.js';
+import { BaseTool } from './tools.js';
+import type { FunctionDeclaration } from '@google/genai';
+import { Type } from '@google/genai';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { homedir } from 'os';

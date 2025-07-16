@@ -8,23 +8,24 @@ import { useCallback, useMemo, useEffect, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
 import open from 'open';
 import process from 'node:process';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useStateAndRef } from './useStateAndRef.js';
-import { Config, GitService, Logger } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
+import { GitService, Logger } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
-import {
+import type {
   Message,
-  MessageType,
   HistoryItemWithoutId,
   HistoryItem,
   SlashCommandProcessorResult,
 } from '../types.js';
+import { MessageType } from '../types.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
-import { LoadedSettings } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import {
   type CommandContext,
   type SlashCommandActionReturn,

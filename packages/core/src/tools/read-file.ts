@@ -7,14 +7,15 @@
 import path from 'path';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import { BaseTool, ToolResult } from './tools.js';
+import type { ToolResult } from './tools.js';
+import { BaseTool } from './tools.js';
 import { Type } from '@google/genai';
 import {
   isWithinRoot,
   processSingleFileContent,
   getSpecificMimeType,
 } from '../utils/fileUtils.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import {
   recordFileOperationMetric,
   FileOperation,

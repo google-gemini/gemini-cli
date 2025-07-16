@@ -8,14 +8,13 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { Config } from '../config/config.js';
-import {
-  BaseTool,
+import type { Config } from '../config/config.js';
+import type {
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
-  ToolConfirmationOutcome,
 } from './tools.js';
+import { BaseTool, ToolConfirmationOutcome } from './tools.js';
 import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';

@@ -6,52 +6,54 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useInput } from 'ink';
-import {
+import type {
   Config,
   GeminiClient,
-  GeminiEventType as ServerGeminiEventType,
   ServerGeminiStreamEvent as GeminiEvent,
   ServerGeminiContentEvent as ContentEvent,
   ServerGeminiErrorEvent as ErrorEvent,
   ServerGeminiChatCompressedEvent,
+  ToolCallRequestInfo,
+  EditorType,
+  ThoughtSummary,
+} from '@google/gemini-cli-core';
+import {
+  GeminiEventType as ServerGeminiEventType,
   getErrorMessage,
   isNodeError,
   MessageSenderType,
-  ToolCallRequestInfo,
   logUserPrompt,
   GitService,
-  EditorType,
-  ThoughtSummary,
   UnauthorizedError,
   UserPromptEvent,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion } from '@google/genai';
-import {
-  StreamingState,
+import type {
   HistoryItem,
   HistoryItemWithoutId,
   HistoryItemToolGroup,
-  MessageType,
   SlashCommandProcessorResult,
-  ToolCallStatus,
 } from '../types.js';
+import { StreamingState, MessageType, ToolCallStatus } from '../types.js';
 import { isAtCommand } from '../utils/commandUtils.js';
 import { parseAndFormatApiError } from '../utils/errorParsing.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { useStateAndRef } from './useStateAndRef.js';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
 import { promises as fs } from 'fs';
 import path from 'path';
-import {
-  useReactToolScheduler,
-  mapToDisplay as mapTrackedToolCallsToDisplay,
+import type {
   TrackedToolCall,
   TrackedCompletedToolCall,
   TrackedCancelledToolCall,
+} from './useReactToolScheduler.js';
+import {
+  useReactToolScheduler,
+  mapToDisplay as mapTrackedToolCallsToDisplay,
 } from './useReactToolScheduler.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 

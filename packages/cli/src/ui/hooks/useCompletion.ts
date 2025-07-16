@@ -8,19 +8,16 @@ import { useState, useEffect, useCallback } from 'react';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { glob } from 'glob';
+import type { Config, FileDiscoveryService } from '@google/gemini-cli-core';
 import {
   isNodeError,
   escapePath,
   unescapePath,
   getErrorMessage,
-  Config,
-  FileDiscoveryService,
 } from '@google/gemini-cli-core';
-import {
-  MAX_SUGGESTIONS_TO_SHOW,
-  Suggestion,
-} from '../components/SuggestionsDisplay.js';
-import { CommandContext, SlashCommand } from '../commands/types.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
+import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
 
 export interface UseCompletionReturn {
   suggestions: Suggestion[];

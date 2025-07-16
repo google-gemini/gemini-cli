@@ -8,13 +8,15 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { homedir, platform } from 'os';
 import * as dotenv from 'dotenv';
-import {
+import type {
   MCPServerConfig,
-  GEMINI_CONFIG_DIR as GEMINI_DIR,
-  getErrorMessage,
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
+} from '@google/gemini-cli-core';
+import {
+  GEMINI_CONFIG_DIR as GEMINI_DIR,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';

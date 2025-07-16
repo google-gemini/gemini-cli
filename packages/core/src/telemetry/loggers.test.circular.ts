@@ -11,10 +11,13 @@
 import { describe, it, expect } from 'vitest';
 import { logToolCall } from './loggers.js';
 import { ToolCallEvent } from './types.js';
-import { Config } from '../config/config.js';
-import { CompletedToolCall } from '../core/coreToolScheduler.js';
-import { ToolCallRequestInfo, ToolCallResponseInfo } from '../core/turn.js';
-import { Tool } from '../tools/tools.js';
+import type { Config } from '../config/config.js';
+import type { CompletedToolCall } from '../core/coreToolScheduler.js';
+import type {
+  ToolCallRequestInfo,
+  ToolCallResponseInfo,
+} from '../core/turn.js';
+import type { Tool } from '../tools/tools.js';
 
 describe('Circular Reference Handling', () => {
   it('should handle circular references in tool function arguments', () => {

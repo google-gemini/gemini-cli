@@ -5,11 +5,12 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fsPromises from 'fs/promises';
 import * as fs from 'fs';
-import { Dirent as FSDirent } from 'fs';
-import * as nodePath from 'path';
+import type { Dirent as FSDirent } from 'fs';
+import type * as nodePath from 'path';
 import { getFolderStructure } from './getFolderStructure.js';
 import * as gitUtils from './gitUtils.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';

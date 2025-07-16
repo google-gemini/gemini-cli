@@ -6,13 +6,13 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { LoopDetectionService } from './loopDetectionService.js';
-import {
-  GeminiEventType,
+import type {
   ServerGeminiContentEvent,
   ServerGeminiToolCallRequestEvent,
 } from '../core/turn.js';
-import { ServerGeminiStreamEvent } from '../core/turn.js';
-import { Config } from '../config/config.js';
+import { GeminiEventType } from '../core/turn.js';
+import type { ServerGeminiStreamEvent } from '../core/turn.js';
+import type { Config } from '../config/config.js';
 import * as loggers from '../telemetry/loggers.js';
 
 vi.mock('../telemetry/loggers.js', () => ({

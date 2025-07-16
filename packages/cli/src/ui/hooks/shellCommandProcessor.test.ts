@@ -7,7 +7,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { vi } from 'vitest';
 import { useShellCommandProcessor } from './shellCommandProcessor';
-import { Config, GeminiClient } from '@google/gemini-cli-core';
+import type { Config, GeminiClient } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import EventEmitter from 'events';
 
