@@ -11,6 +11,7 @@ import { type SlashCommand } from '../ui/commands/types.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
+import { docsCommand } from '../ui/commands/docsCommand.js';
 import { chatCommand } from '../ui/commands/chatCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
@@ -18,8 +19,9 @@ import { statsCommand } from '../ui/commands/statsCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
-import { compressCommand } from '../ui/commands/compressCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
+import { toolsCommand } from '../ui/commands/toolsCommand.js';
+import { compressCommand } from '../ui/commands/compressCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 
 // Mock the command modules to isolate the service from the command implementations.
@@ -31,6 +33,9 @@ vi.mock('../ui/commands/helpCommand.js', () => ({
 }));
 vi.mock('../ui/commands/clearCommand.js', () => ({
   clearCommand: { name: 'clear', description: 'Mock Clear' },
+}));
+vi.mock('../ui/commands/docsCommand.js', () => ({
+  docsCommand: { name: 'docs', description: 'Mock Docs' },
 }));
 vi.mock('../ui/commands/authCommand.js', () => ({
   authCommand: { name: 'auth', description: 'Mock Auth' },
@@ -47,21 +52,24 @@ vi.mock('../ui/commands/statsCommand.js', () => ({
 vi.mock('../ui/commands/aboutCommand.js', () => ({
   aboutCommand: { name: 'about', description: 'Mock About' },
 }));
-vi.mock('../ui/commands/compressCommand.js', () => ({
-  compressCommand: { name: 'compress', description: 'Mock Compress' },
-}));
 vi.mock('../ui/commands/ideCommand.js', () => ({
   ideCommand: vi.fn(),
 }));
 vi.mock('../ui/commands/extensionsCommand.js', () => ({
   extensionsCommand: { name: 'extensions', description: 'Mock Extensions' },
 }));
+vi.mock('../ui/commands/toolsCommand.js', () => ({
+  toolsCommand: { name: 'tools', description: 'Mock Tools' },
+}));
+vi.mock('../ui/commands/compressCommand.js', () => ({
+  compressCommand: { name: 'compress', description: 'Mock Compress' },
+}));
 vi.mock('../ui/commands/mcpCommand.js', () => ({
   mcpCommand: { name: 'mcp', description: 'Mock MCP' },
 }));
 
 describe('CommandService', () => {
-  const subCommandLen = 12;
+  const subCommandLen = 14;
   let mockConfig: vi.Mocked<Config>;
 
   beforeEach(() => {
@@ -101,13 +109,15 @@ describe('CommandService', () => {
         expect(commandNames).toContain('memory');
         expect(commandNames).toContain('help');
         expect(commandNames).toContain('clear');
+        expect(commandNames).toContain('docs');
         expect(commandNames).toContain('chat');
         expect(commandNames).toContain('theme');
         expect(commandNames).toContain('stats');
         expect(commandNames).toContain('privacy');
         expect(commandNames).toContain('about');
-        expect(commandNames).toContain('compress');
         expect(commandNames).toContain('extensions');
+        expect(commandNames).toContain('tools');
+        expect(commandNames).toContain('compress');
         expect(commandNames).toContain('mcp');
         expect(commandNames).not.toContain('ide');
       });
@@ -155,6 +165,7 @@ describe('CommandService', () => {
           chatCommand,
           clearCommand,
           compressCommand,
+          docsCommand,
           extensionsCommand,
           helpCommand,
           mcpCommand,
@@ -162,6 +173,7 @@ describe('CommandService', () => {
           privacyCommand,
           statsCommand,
           themeCommand,
+          toolsCommand,
         ]);
       });
     });
