@@ -112,6 +112,11 @@ describe('useSessionPersistence - Integration Test', () => {
     ];
     fs.writeFileSync(sessionPath, JSON.stringify(savedHistory));
 
+    const initialHistory = [
+      { id: 100, type: MessageType.USER, text: 'Initial message' },
+    ];
+    mockHistory.push(...initialHistory);
+
     renderHook(() =>
       useSessionPersistence({
         sessionPersistence: true,
@@ -134,12 +139,19 @@ describe('useSessionPersistence - Integration Test', () => {
             text: 'Loaded gemini response',
             id: expect.any(Number),
           }),
+          expect.objectContaining({
+            type: MessageType.USER,
+            text: 'Initial message',
+            id: 100,
+          }),
         ]),
       );
 
       const loadedItems = mockLoadHistory.mock.calls[0][0];
       loadedItems.forEach((item: HistoryItem) => {
-        expect(item.id).toBeLessThan(0);
+        if (item.id !== 100) { // Only check loaded items for negative IDs
+          expect(item.id).toBeLessThan(0);
+        }
       });
     });
   });
