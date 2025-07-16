@@ -326,6 +326,14 @@ export class ToolRegistry {
     return serverTools.sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  unregisterToolsByServer(serverName: string): void {
+    for (const tool of this.tools.values()) {
+      if ((tool as DiscoveredMCPTool)?.serverName === serverName) {
+        this.tools.delete(tool.name);
+      }
+    }
+  }
+
   /**
    * Get the definition of a specific tool.
    */

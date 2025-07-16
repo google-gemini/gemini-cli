@@ -24,7 +24,11 @@ import path from 'path';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
-import { LoadedSettings } from '../../config/settings.js';
+import {
+  LoadedSettings,
+  Settings,
+  SettingScope,
+} from '../../config/settings.js';
 import {
   type CommandContext,
   type SlashCommandActionReturn,
@@ -69,6 +73,7 @@ export const useSlashCommandProcessor = (
   showToolDescriptions: boolean = false,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
+  reloadSettings: () => void,
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<SlashCommand[]>([]);
@@ -84,6 +89,11 @@ export const useSlashCommandProcessor = (
     // The logger's initialize is async, but we can create the instance
     // synchronously. Commands that use it will await its initialization.
     return l;
+  }, [config]);
+
+  const [mcpServers, setMcpServers] = useState(config?.getMcpServers() || {});
+  useEffect(() => {
+    setMcpServers(config?.getMcpServers() || {});
   }, [config]);
 
   const [pendingCompressionItemRef, setPendingCompressionItem] =
@@ -204,6 +214,243 @@ export const useSlashCommandProcessor = (
         name: 'editor',
         description: 'set external editor preference',
         action: (_mainCommand, _subCommand, _args) => openEditorDialog(),
+      },
+      {
+        name: 'mcp',
+        description: 'list configured MCP servers and tools',
+        action: async (_mainCommand, _subCommand, _args) => {
+          // Check if the _subCommand includes a specific flag to control description visibility
+          let useShowDescriptions = showToolDescriptions;
+          if (_subCommand === 'desc' || _subCommand === 'descriptions') {
+            useShowDescriptions = true;
+          } else if (
+            _subCommand === 'nodesc' ||
+            _subCommand === 'nodescriptions'
+          ) {
+            useShowDescriptions = false;
+          } else if (_args === 'desc' || _args === 'descriptions') {
+            useShowDescriptions = true;
+          } else if (_args === 'nodesc' || _args === 'nodescriptions') {
+            useShowDescriptions = false;
+          }
+          // Check if the _subCommand includes a specific flag to show detailed tool schema
+          let useShowSchema = false;
+          if (_subCommand === 'schema' || _args === 'schema') {
+            useShowSchema = true;
+          }
+
+          const setMcpEnabled = (serverName: string, enabled: boolean) => {
+            const userSettings: Settings = { ...settings.user.settings };
+            const mcpSettings = userSettings.mcpServers || {};
+
+            if (!mcpSettings[serverName]) {
+              addMessage({
+                type: MessageType.ERROR,
+                content: `MCP server "${serverName}" not found.`,
+                timestamp: new Date(),
+              });
+              return;
+            }
+
+            mcpSettings[serverName] = {
+              ...mcpSettings[serverName],
+              enabled,
+            };
+
+            userSettings.mcpServers = mcpSettings;
+
+            settings.setValue(SettingScope.User, 'mcpServers', mcpSettings);
+
+            addMessage({
+              type: MessageType.INFO,
+              content: `${
+                enabled ? 'Enabled' : 'Disabled'
+              } MCP server "${serverName}". Refreshing config...`,
+              timestamp: new Date(),
+            });
+            // Reload the config to apply changes
+            reloadSettings();
+          };
+
+          if ((_subCommand === 'on' || _subCommand === 'off') && _args) {
+            setMcpEnabled(_args, _subCommand === 'on');
+            return;
+          }
+
+          const toolRegistry = await config?.getToolRegistry();
+          if (!toolRegistry) {
+            addMessage({
+              type: MessageType.ERROR,
+              content: 'Could not retrieve tool registry.',
+              timestamp: new Date(),
+            });
+            return;
+          }
+
+          const serverNames = Object.keys(mcpServers);
+
+          if (serverNames.length === 0) {
+            const docsUrl = 'https://goo.gle/gemini-cli-docs-mcp';
+            if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
+              addMessage({
+                type: MessageType.INFO,
+                content: `No MCP servers configured. Please open the following URL in your browser to view documentation:\n${docsUrl}`,
+                timestamp: new Date(),
+              });
+            } else {
+              addMessage({
+                type: MessageType.INFO,
+                content: `No MCP servers configured. Opening documentation in your browser: ${docsUrl}`,
+                timestamp: new Date(),
+              });
+              await open(docsUrl);
+            }
+            return;
+          }
+
+          // Check if any servers are still connecting
+          const connectingServers = serverNames.filter(
+            (name) => getMCPServerStatus(name) === MCPServerStatus.CONNECTING,
+          );
+          const discoveryState = getMCPDiscoveryState();
+
+          let message = '';
+
+          // Add overall discovery status message if needed
+          if (
+            discoveryState === MCPDiscoveryState.IN_PROGRESS ||
+            connectingServers.length > 0
+          ) {
+            message += `\u001b[33m⏳ MCP servers are starting up (${connectingServers.length} initializing)...\u001b[0m\n`;
+            message += `\u001b[90mNote: First startup may take longer. Tool availability will update automatically.\u001b[0m\n\n`;
+          }
+
+          message += 'Configured MCP servers:\n\n';
+
+          for (const serverName of serverNames) {
+            const serverTools = toolRegistry.getToolsByServer(serverName);
+            const status = getMCPServerStatus(serverName);
+
+            // Add status indicator with descriptive text
+            let statusIndicator = '';
+            let statusText = '';
+            switch (status) {
+              case MCPServerStatus.CONNECTED:
+                statusIndicator = '🟢';
+                statusText = 'Ready';
+                break;
+              case MCPServerStatus.CONNECTING:
+                statusIndicator = '🔄';
+                statusText = 'Starting... (first startup may take longer)';
+                break;
+              case MCPServerStatus.DISCONNECTED:
+              default:
+                statusIndicator = '🔴';
+                statusText = 'Disconnected';
+                break;
+            }
+
+            // Get server description if available
+            const server = mcpServers[serverName];
+            const isEnabled = server.enabled !== false;
+
+            // Format server header with bold formatting and status
+            message += `${statusIndicator} \u001b[1m${serverName}\u001b[0m${isEnabled ? '' : ' (disabled)'} - ${statusText}`;
+
+            // Add tool count with conditional messaging
+            if (status === MCPServerStatus.CONNECTED) {
+              message += ` (${serverTools.length} tools)`;
+            } else if (status === MCPServerStatus.CONNECTING) {
+              message += ` (tools will appear when ready)`;
+            } else {
+              message += ` (${serverTools.length} tools cached)`;
+            }
+
+            // Add server description with proper handling of multi-line descriptions
+            if ((useShowDescriptions || useShowSchema) && server?.description) {
+              const greenColor = '\u001b[32m';
+              const resetColor = '\u001b[0m';
+
+              const descLines = server.description.trim().split('\n');
+              if (descLines) {
+                message += ':\n';
+                for (const descLine of descLines) {
+                  message += `    ${greenColor}${descLine}${resetColor}\n`;
+                }
+              } else {
+                message += '\n';
+              }
+            } else {
+              message += '\n';
+            }
+
+            // Reset formatting after server entry
+            message += '\u001b[0m';
+
+            if (serverTools.length > 0) {
+              serverTools.forEach((tool) => {
+                if (
+                  (useShowDescriptions || useShowSchema) &&
+                  tool.description
+                ) {
+                  // Format tool name in cyan using simple ANSI cyan color
+                  message += `  - \u001b[36m${tool.name}\u001b[0m`;
+
+                  // Apply green color to the description text
+                  const greenColor = '\u001b[32m';
+                  const resetColor = '\u001b[0m';
+
+                  // Handle multi-line descriptions by properly indenting and preserving formatting
+                  const descLines = tool.description.trim().split('\n');
+                  if (descLines) {
+                    message += ':\n';
+                    for (const descLine of descLines) {
+                      message += `      ${greenColor}${descLine}${resetColor}\n`;
+                    }
+                  } else {
+                    message += '\n';
+                  }
+                  // Reset is handled inline with each line now
+                } else {
+                  // Use cyan color for the tool name even when not showing descriptions
+                  message += `  - \u001b[36m${tool.name}\u001b[0m\n`;
+                }
+                if (useShowSchema) {
+                  // Prefix the parameters in cyan
+                  message += `    \u001b[36mParameters:\u001b[0m\n`;
+                  // Apply green color to the parameter text
+                  const greenColor = '\u001b[32m';
+                  const resetColor = '\u001b[0m';
+
+                  const paramsLines = JSON.stringify(
+                    tool.schema.parameters,
+                    null,
+                    2,
+                  )
+                    .trim()
+                    .split('\n');
+                  if (paramsLines) {
+                    for (const paramsLine of paramsLines) {
+                      message += `      ${greenColor}${paramsLine}${resetColor}\n`;
+                    }
+                  }
+                }
+              });
+            } else {
+              message += '  No tools available\n';
+            }
+            message += '\n';
+          }
+
+          // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
+          message += '\u001b[0m';
+
+          addMessage({
+            type: MessageType.INFO,
+            content: message,
+            timestamp: new Date(),
+          });
+        },
       },
       {
         name: 'tools',
@@ -508,6 +755,9 @@ export const useSlashCommandProcessor = (
     gitService,
     loadHistory,
     setQuittingMessages,
+    settings,
+    mcpServers,
+    reloadSettings,
   ]);
 
   const handleSlashCommand = useCallback(

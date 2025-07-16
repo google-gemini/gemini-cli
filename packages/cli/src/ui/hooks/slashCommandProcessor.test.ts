@@ -30,7 +30,7 @@ vi.mock('node:process', () => ({
   cwd: vi.fn(() => '/mock/cwd'),
   get env() {
     return process.env;
-  }, // Use a getter here too
+  },
   platform: 'test-platform',
   version: 'test-node-version',
   memoryUsage: vi.fn(() => ({
@@ -69,7 +69,7 @@ import { useSlashCommandProcessor } from './slashCommandProcessor.js';
 import { MessageType, SlashCommandProcessorResult } from '../types.js';
 import { Config, GeminiClient } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
-import { LoadedSettings } from '../../config/settings.js';
+import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { CommandService } from '../../services/CommandService.js';
@@ -113,6 +113,7 @@ describe('useSlashCommandProcessor', () => {
   let mockGeminiClient: GeminiClient;
   let mockConfig: Config;
   let mockCorgiMode: ReturnType<typeof vi.fn>;
+  let mockSettings: LoadedSettings;
   const mockUseSessionStats = useSessionStats as Mock;
 
   beforeEach(() => {
@@ -153,8 +154,23 @@ describe('useSlashCommandProcessor', () => {
       getCheckpointingEnabled: vi.fn(() => true),
       getBugCommand: vi.fn(() => undefined),
       getSessionId: vi.fn(() => 'test-session-id'),
+      getMcpServers: vi.fn(() => ({})),
     } as unknown as Config;
     mockCorgiMode = vi.fn();
+    mockSettings = {
+      merged: {
+        contextFileName: 'GEMINI.md',
+      },
+      user: {
+        settings: {
+          mcpServers: {
+            server1: { command: 'cmd1', enabled: true },
+            server2: { command: 'cmd2', enabled: false },
+          },
+        },
+      },
+      setValue: vi.fn(),
+    } as unknown as LoadedSettings;
     mockUseSessionStats.mockReturnValue({
       stats: {
         sessionStartTime: new Date('2025-01-01T00:00:00.000Z'),
@@ -176,16 +192,11 @@ describe('useSlashCommandProcessor', () => {
     process.env = { ...globalThis.process.env };
   });
 
-  const getProcessorHook = (showToolDescriptions: boolean = false) => {
-    const settings = {
-      merged: {
-        contextFileName: 'GEMINI.md',
-      },
-    } as unknown as LoadedSettings;
-    return renderHook(() =>
+  const getProcessorHook = (showToolDescriptions: boolean = false) =>
+    renderHook(() =>
       useSlashCommandProcessor(
         mockConfig,
-        settings,
+        mockSettings,
         [],
         mockAddItem,
         mockClearItems,
@@ -200,12 +211,14 @@ describe('useSlashCommandProcessor', () => {
         showToolDescriptions,
         mockSetQuittingMessages,
         vi.fn(), // mockOpenPrivacyNotice
+        vi.fn(), // mockReloadSettings
       ),
     );
-  };
 
-  const getProcessor = (showToolDescriptions: boolean = false) =>
-    getProcessorHook(showToolDescriptions).result.current;
+  const getProcessor = (showToolDescriptions: boolean = false) => {
+    const { result } = getProcessorHook(showToolDescriptions);
+    return { ...result.current, result };
+  };
 
   describe('Other commands', () => {
     it('/editor should open editor dialog and return handled', async () => {
@@ -748,6 +761,515 @@ describe('useSlashCommandProcessor', () => {
       expect(message).toContain('Description for Tool1');
       expect(message).toContain('Tool2');
       expect(message).toContain('Description for Tool2');
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+  });
+
+  describe('/mcp command', () => {
+    it('should show an error if tool registry is not available', async () => {
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue(undefined),
+      } as unknown as Config;
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandProcessorResult | false = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/mcp');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Could not retrieve tool registry.',
+        }),
+        expect.any(Number),
+      );
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+
+    it('should display a message with a URL when no MCP servers are configured in a sandbox', async () => {
+      process.env.SANDBOX = 'sandbox';
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue({
+          getToolsByServer: vi.fn().mockReturnValue([]),
+        }),
+        getMcpServers: vi.fn().mockReturnValue({}),
+      } as unknown as Config;
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandProcessorResult | false = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/mcp');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `No MCP servers configured. Please open the following URL in your browser to view documentation:\nhttps://goo.gle/gemini-cli-docs-mcp`,
+        }),
+        expect.any(Number),
+      );
+      expect(commandResult).toEqual({ type: 'handled' });
+      delete process.env.SANDBOX;
+    });
+
+    it('should display a message and open a URL when no MCP servers are configured outside a sandbox', async () => {
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue({
+          getToolsByServer: vi.fn().mockReturnValue([]),
+        }),
+        getMcpServers: vi.fn().mockReturnValue({}),
+      } as unknown as Config;
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandProcessorResult | false = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/mcp');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'No MCP servers configured. Opening documentation in your browser: https://goo.gle/gemini-cli-docs-mcp',
+        }),
+        expect.any(Number),
+      );
+      expect(open).toHaveBeenCalledWith('https://goo.gle/gemini-cli-docs-mcp');
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+
+    it('should display configured MCP servers with status indicators and their tools', async () => {
+      // Mock MCP servers configuration
+      const mockMcpServers = {
+        server1: { command: 'cmd1' },
+        server2: { command: 'cmd2' },
+        server3: { command: 'cmd3' },
+      };
+
+      // Setup getMCPServerStatus mock implementation - use all CONNECTED to avoid startup message in this test
+      vi.mocked(getMCPServerStatus).mockImplementation((serverName) => {
+        if (serverName === 'server1') return MCPServerStatus.CONNECTED;
+        if (serverName === 'server2') return MCPServerStatus.CONNECTED;
+        return MCPServerStatus.DISCONNECTED; // Default for server3 and others
+      });
+
+      // Setup getMCPDiscoveryState mock to return completed so no startup message is shown
+      vi.mocked(getMCPDiscoveryState).mockReturnValue(
+        MCPDiscoveryState.COMPLETED,
+      );
+
+      // Mock tools from each server
+      const mockServer1Tools = [
+        { name: 'server1_tool1' },
+        { name: 'server1_tool2' },
+      ];
+
+      const mockServer2Tools = [{ name: 'server2_tool1' }];
+
+      const mockServer3Tools = [{ name: 'server3_tool1' }];
+
+      const mockGetToolsByServer = vi.fn().mockImplementation((serverName) => {
+        if (serverName === 'server1') return mockServer1Tools;
+        if (serverName === 'server2') return mockServer2Tools;
+        if (serverName === 'server3') return mockServer3Tools;
+        return [];
+      });
+
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue({
+          getToolsByServer: mockGetToolsByServer,
+        }),
+        getMcpServers: vi.fn().mockReturnValue(mockMcpServers),
+      } as unknown as Config;
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandProcessorResult | false = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/mcp');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Configured MCP servers:'),
+        }),
+        expect.any(Number),
+      );
+
+      // Check that the message contains details about servers and their tools
+      const message = mockAddItem.mock.calls[1][0].text;
+      // Server 1 - Connected
+      expect(message).toContain(
+        '🟢 \u001b[1mserver1\u001b[0m - Ready (2 tools)',
+      );
+      expect(message).toContain('\u001b[36mserver1_tool1\u001b[0m');
+      expect(message).toContain('\u001b[36mserver1_tool2\u001b[0m');
+
+      // Server 2 - Connected
+      expect(message).toContain(
+        '🟢 \u001b[1mserver2\u001b[0m - Ready (1 tools)',
+      );
+      expect(message).toContain('\u001b[36mserver2_tool1\u001b[0m');
+
+      // Server 3 - Disconnected
+      expect(message).toContain(
+        '🔴 \u001b[1mserver3\u001b[0m - Disconnected (1 tools cached)',
+      );
+      expect(message).toContain('\u001b[36mserver3_tool1\u001b[0m');
+
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+
+    it('should display tool descriptions when showToolDescriptions is true', async () => {
+      // Mock MCP servers configuration with server description
+      const mockMcpServers = {
+        server1: {
+          command: 'cmd1',
+          description: 'This is a server description',
+        },
+      };
+
+      // Setup getMCPServerStatus mock implementation
+      vi.mocked(getMCPServerStatus).mockImplementation((serverName) => {
+        if (serverName === 'server1') return MCPServerStatus.CONNECTED;
+        return MCPServerStatus.DISCONNECTED;
+      });
+
+      // Setup getMCPDiscoveryState mock to return completed
+      vi.mocked(getMCPDiscoveryState).mockReturnValue(
+        MCPDiscoveryState.COMPLETED,
+      );
+
+      // Mock tools from server with descriptions
+      const mockServerTools = [
+        { name: 'tool1', description: 'This is tool 1 description' },
+        { name: 'tool2', description: 'This is tool 2 description' },
+      ];
+
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue({
+          getToolsByServer: vi.fn().mockReturnValue(mockServerTools),
+        }),
+        getMcpServers: vi.fn().mockReturnValue(mockMcpServers),
+      } as unknown as Config;
+
+      const { handleSlashCommand } = getProcessor(true);
+      let commandResult: SlashCommandProcessorResult | false = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/mcp');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Configured MCP servers:'),
+        }),
+        expect.any(Number),
+      );
+
+      const message = mockAddItem.mock.calls[1][0].text;
+
+      // Check that server description is included (with ANSI color codes)
+      expect(message).toContain('\u001b[1mserver1\u001b[0m - Ready (2 tools)');
+      expect(message).toContain(
+        '\u001b[32mThis is a server description\u001b[0m',
+      );
+
+      // Check that tool descriptions are included (with ANSI color codes)
+      expect(message).toContain('\u001b[36mtool1\u001b[0m');
+      expect(message).toContain(
+        '\u001b[32mThis is tool 1 description\u001b[0m',
+      );
+      expect(message).toContain('\u001b[36mtool2\u001b[0m');
+      expect(message).toContain(
+        '\u001b[32mThis is tool 2 description\u001b[0m',
+      );
+
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+
+    it('should indicate when a server has no tools', async () => {
+      // Mock MCP servers configuration
+      const mockMcpServers = {
+        server1: { command: 'cmd1' },
+        server2: { command: 'cmd2' },
+      };
+
+      // Setup getMCPServerStatus mock implementation
+      vi.mocked(getMCPServerStatus).mockImplementation((serverName) => {
+        if (serverName === 'server1') return MCPServerStatus.CONNECTED;
+        if (serverName === 'server2') return MCPServerStatus.DISCONNECTED;
+        return MCPServerStatus.DISCONNECTED;
+      });
+
+      // Setup getMCPDiscoveryState mock to return completed
+      vi.mocked(getMCPDiscoveryState).mockReturnValue(
+        MCPDiscoveryState.COMPLETED,
+      );
+
+      // Mock tools from each server - server2 has no tools
+      const mockServer1Tools = [{ name: 'server1_tool1' }];
+
+      const mockServer2Tools: Array<{ name: string }> = [];
+
+      const mockGetToolsByServer = vi.fn().mockImplementation((serverName) => {
+        if (serverName === 'server1') return mockServer1Tools;
+        if (serverName === 'server2') return mockServer2Tools;
+        return [];
+      });
+
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue({
+          getToolsByServer: mockGetToolsByServer,
+        }),
+        getMcpServers: vi.fn().mockReturnValue(mockMcpServers),
+      } as unknown as Config;
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandProcessorResult | false = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/mcp');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Configured MCP servers:'),
+        }),
+        expect.any(Number),
+      );
+
+      // Check that the message contains details about both servers and their tools
+      const message = mockAddItem.mock.calls[1][0].text;
+      expect(message).toContain(
+        '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tools)',
+      );
+      expect(message).toContain('\u001b[36mserver1_tool1\u001b[0m');
+      expect(message).toContain(
+        '🔴 \u001b[1mserver2\u001b[0m - Disconnected (0 tools cached)',
+      );
+      expect(message).toContain('No tools available');
+
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+
+    it('should show startup indicator when servers are connecting', async () => {
+      // Mock MCP servers configuration
+      const mockMcpServers = {
+        server1: { command: 'cmd1' },
+        server2: { command: 'cmd2' },
+      };
+
+      // Setup getMCPServerStatus mock implementation with one server connecting
+      vi.mocked(getMCPServerStatus).mockImplementation((serverName) => {
+        if (serverName === 'server1') return MCPServerStatus.CONNECTED;
+        if (serverName === 'server2') return MCPServerStatus.CONNECTING;
+        return MCPServerStatus.DISCONNECTED;
+      });
+
+      // Setup getMCPDiscoveryState mock to return in progress
+      vi.mocked(getMCPDiscoveryState).mockReturnValue(
+        MCPDiscoveryState.IN_PROGRESS,
+      );
+
+      // Mock tools from each server
+      const mockServer1Tools = [{ name: 'server1_tool1' }];
+      const mockServer2Tools = [{ name: 'server2_tool1' }];
+
+      const mockGetToolsByServer = vi.fn().mockImplementation((serverName) => {
+        if (serverName === 'server1') return mockServer1Tools;
+        if (serverName === 'server2') return mockServer2Tools;
+        return [];
+      });
+
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue({
+          getToolsByServer: mockGetToolsByServer,
+        }),
+        getMcpServers: vi.fn().mockReturnValue(mockMcpServers),
+      } as unknown as Config;
+
+      const { handleSlashCommand } = getProcessor();
+      let commandResult: SlashCommandProcessorResult | false = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/mcp');
+      });
+
+      const message = mockAddItem.mock.calls[1][0].text;
+
+      // Check that startup indicator is shown
+      expect(message).toContain(
+        '⏳ MCP servers are starting up (1 initializing)...',
+      );
+      expect(message).toContain(
+        'Note: First startup may take longer. Tool availability will update automatically.',
+      );
+
+      // Check server statuses
+      expect(message).toContain(
+        '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tools)',
+      );
+      expect(message).toContain(
+        '🔄 \u001b[1mserver2\u001b[0m - Starting... (first startup may take longer) (tools will appear when ready)',
+      );
+
+      expect(commandResult).toEqual({ type: 'handled' });
+    });
+
+    describe('/mcp on/off', () => {
+      it('should enable a server with /mcp on', async () => {
+        const { handleSlashCommand } = getProcessor();
+        await act(async () => {
+          await handleSlashCommand('/mcp on server2');
+        });
+
+        expect(mockSettings.setValue).toHaveBeenCalledWith(
+          SettingScope.User,
+          'mcpServers',
+          {
+            server1: { command: 'cmd1', enabled: true },
+            server2: { command: 'cmd2', enabled: true },
+          },
+        );
+
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: 'Enabled MCP server "server2". Refreshing config...',
+          }),
+          expect.any(Number),
+        );
+      });
+
+      it('should disable a server with /mcp off', async () => {
+        const { handleSlashCommand } = getProcessor();
+        await act(async () => {
+          await handleSlashCommand('/mcp off server1');
+        });
+
+        expect(mockSettings.setValue).toHaveBeenCalledWith(
+          SettingScope.User,
+          'mcpServers',
+          {
+            server1: { command: 'cmd1', enabled: false },
+            server2: { command: 'cmd2', enabled: false },
+          },
+        );
+
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: 'Disabled MCP server "server1". Refreshing config...',
+          }),
+          expect.any(Number),
+        );
+      });
+
+      it('should show an error for a non-existent server', async () => {
+        const { handleSlashCommand } = getProcessor();
+        await act(async () => {
+          await handleSlashCommand('/mcp on non-existent-server');
+        });
+
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.ERROR,
+            text: 'MCP server "non-existent-server" not found.',
+          }),
+          expect.any(Number),
+        );
+      });
+    });
+  });
+
+  describe('/mcp schema', () => {
+    it('should display tool schemas and descriptions', async () => {
+      // Mock MCP servers configuration with server description
+      const mockMcpServers = {
+        server1: {
+          command: 'cmd1',
+          description: 'This is a server description',
+        },
+      };
+
+      // Setup getMCPServerStatus mock implementation
+      vi.mocked(getMCPServerStatus).mockImplementation((serverName) => {
+        if (serverName === 'server1') return MCPServerStatus.CONNECTED;
+        return MCPServerStatus.DISCONNECTED;
+      });
+
+      // Setup getMCPDiscoveryState mock to return completed
+      vi.mocked(getMCPDiscoveryState).mockReturnValue(
+        MCPDiscoveryState.COMPLETED,
+      );
+
+      // Mock tools from server with descriptions
+      const mockServerTools = [
+        {
+          name: 'tool1',
+          description: 'This is tool 1 description',
+          schema: {
+            parameters: [{ name: 'param1', type: 'string' }],
+          },
+        },
+        {
+          name: 'tool2',
+          description: 'This is tool 2 description',
+          schema: {
+            parameters: [{ name: 'param2', type: 'number' }],
+          },
+        },
+      ];
+
+      mockConfig = {
+        ...mockConfig,
+        getToolRegistry: vi.fn().mockResolvedValue({
+          getToolsByServer: vi.fn().mockReturnValue(mockServerTools),
+        }),
+        getMcpServers: vi.fn().mockReturnValue(mockMcpServers),
+      } as unknown as Config;
+
+      const { handleSlashCommand } = getProcessor(true);
+      let commandResult: SlashCommandProcessorResult | false = false;
+      await act(async () => {
+        commandResult = await handleSlashCommand('/mcp schema');
+      });
+
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Configured MCP servers:'),
+        }),
+        expect.any(Number),
+      );
+
+      const message = mockAddItem.mock.calls[1][0].text;
+
+      // Check that server description is included
+      expect(message).toContain('Ready (2 tools)');
+      expect(message).toContain('This is a server description');
+
+      // Check that tool schemas are included
+      expect(message).toContain('tool 1 description');
+      expect(message).toContain('param1');
+      expect(message).toContain('string');
+      expect(message).toContain('tool 2 description');
+      expect(message).toContain('param2');
+      expect(message).toContain('number');
+
       expect(commandResult).toEqual({ type: 'handled' });
     });
   });
