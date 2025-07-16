@@ -26,11 +26,11 @@ const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
   compressCommand,
   extensionsCommand,
   helpCommand,
+  mcpCommand,
   memoryCommand,
   privacyCommand,
   statsCommand,
   themeCommand,
-  mcpCommand,
 ];
 
 export class CommandService {

@@ -56,7 +56,7 @@ vi.mock('../ui/commands/mcpCommand.js', () => ({
 }));
 
 describe('CommandService', () => {
-  const subCommandLen = 11;
+  const subCommandLen = 12;
 
   describe('when using default production loader', () => {
     let commandService: CommandService;
