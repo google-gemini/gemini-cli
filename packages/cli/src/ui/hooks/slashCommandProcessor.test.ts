@@ -1204,38 +1204,4 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
   });
-
-  describe('/compress command', () => {
-    it('should call tryCompressChat(true)', async () => {
-      const hook = getProcessorHook();
-      mockTryCompressChat.mockResolvedValue({
-        originalTokenCount: 100,
-        newTokenCount: 50,
-      });
-
-      await act(async () => {
-        hook.result.current.handleSlashCommand('/compress');
-      });
-      await act(async () => {
-        hook.rerender();
-      });
-      expect(hook.result.current.pendingHistoryItems).toEqual([]);
-      expect(mockGeminiClient.tryCompressChat).toHaveBeenCalledWith(
-        'Prompt Id not set',
-        true,
-      );
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          type: MessageType.COMPRESSION,
-          compression: {
-            isPending: false,
-            originalTokenCount: 100,
-            newTokenCount: 50,
-          },
-        }),
-        expect.any(Number),
-      );
-    });
-  });
 });
