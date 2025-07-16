@@ -356,6 +356,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       if (key.ctrl && key.name === 'e') {
         buffer.move('end');
+        buffer.moveToOffset(cpLen(buffer.text));
+        return;
+      }
+      // Ctrl+C (Clear input)
+      if (key.ctrl && key.name === 'c') {
+        if (buffer.text.length > 0) {
+          buffer.setText('');
+          resetCompletionState();
+          return;
+        }
         return;
       }
 
@@ -397,6 +407,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleSubmitAndClear,
       shellHistory,
       handleClipboardImage,
+      resetCompletionState,
     ],
   );
 

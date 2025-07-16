@@ -47,6 +47,10 @@ export interface CheckpointingSettings {
   enabled?: boolean;
 }
 
+export interface SummarizeToolOutputSettings {
+  tokenBudget?: number;
+}
+
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
 }
@@ -62,6 +66,8 @@ export interface Settings {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
+  allowMCPServers?: string[];
+  excludeMCPServers?: string[];
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
@@ -86,6 +92,9 @@ export interface Settings {
 
   // Setting for setting maximum number of user/model/tool turns in a session.
   maxSessionTurns?: number;
+
+  // A map of tool names to their summarization settings.
+  summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
 
   // Add other settings here.
   ideMode?: boolean;
