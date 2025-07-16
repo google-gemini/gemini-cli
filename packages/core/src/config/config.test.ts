@@ -151,14 +151,12 @@ describe('Server Config (config.ts)', () => {
         apiKey: 'test-key',
       };
 
-      (createContentGeneratorConfig as Mock).mockResolvedValue(
-        mockContentConfig,
-      );
+      (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
 
       await config.refreshAuth(authType);
 
       expect(createContentGeneratorConfig).toHaveBeenCalledWith(
-        MODEL, // Should be called with the original model 'gemini-pro'
+        config,
         authType,
       );
       // Verify that contentGeneratorConfig is updated with the new model
