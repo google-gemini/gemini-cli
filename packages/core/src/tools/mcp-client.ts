@@ -159,10 +159,13 @@ export async function discoverMcpTools(
   toolRegistry: ToolRegistry,
   debugMode: boolean,
 ): Promise<void> {
-  for (const serverName of activeTransports.keys()) {
-    if (!mcpServers[serverName] || mcpServers[serverName].enabled === false) {
-      await closeMcpServer(serverName, toolRegistry);
+  if (mcpServers) {
+    for (const serverName of activeTransports.keys()) {
+      if (!mcpServers[serverName] || mcpServers[serverName].enabled === false) {
+        await closeMcpServer(serverName, toolRegistry);
+      }
     }
+  }
   }
 
   mcpDiscoveryState = MCPDiscoveryState.IN_PROGRESS;
