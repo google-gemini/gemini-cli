@@ -16,11 +16,16 @@ import {
 
 import { Server as HTTPServer } from 'node:http';
 
+const MCP_SESSION_ID_HEADER = 'mcp-session-id';
+const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
+
 function sendActiveFileChangedNotification(
   transport: StreamableHTTPServerTransport,
+  logger: vscode.OutputChannel,
 ) {
   const editor = vscode.window.activeTextEditor;
   const filePath = editor ? editor.document.uri.fsPath : '';
+  logger.appendLine(`Sending active file changed notification: ${filePath}`);
   const notification: JSONRPCNotification = {
     jsonrpc: '2.0',
     method: 'ide/activeFileChanged',
@@ -32,6 +37,11 @@ function sendActiveFileChangedNotification(
 export class IDEServer {
   private server: HTTPServer | undefined;
   private context: vscode.ExtensionContext | undefined;
+  private logger: vscode.OutputChannel;
+
+  constructor(logger: vscode.OutputChannel) {
+    this.logger = logger;
+  }
 
   async start(context: vscode.ExtensionContext) {
     this.context = context;
@@ -44,7 +54,7 @@ export class IDEServer {
 
     const disposable = vscode.window.onDidChangeActiveTextEditor((_editor) => {
       for (const transport of Object.values(transports)) {
-        sendActiveFileChangedNotification(transport);
+        sendActiveFileChangedNotification(transport, this.logger);
       }
     });
     context.subscriptions.push(disposable);
@@ -52,7 +62,9 @@ export class IDEServer {
     const mcpServer = createMcpServer();
 
     app.post('/mcp', async (req: Request, res: Response) => {
-      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
+        | string
+        | undefined;
       let transport: StreamableHTTPServerTransport;
 
       if (sessionId && transports[sessionId]) {
@@ -61,12 +73,14 @@ export class IDEServer {
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (newSessionId) => {
+            this.logger.appendLine(`New session initialized: ${newSessionId}`);
             transports[newSessionId] = transport;
           },
         });
 
         transport.onclose = () => {
           if (transport.sessionId) {
+            this.logger.appendLine(`Session closed: ${transport.sessionId}`);
             sessionsWithInitialNotification.delete(transport.sessionId);
             delete transports[transport.sessionId];
           }
@@ -89,7 +103,9 @@ export class IDEServer {
       try {
         await transport.handleRequest(req, res, req.body);
       } catch (error) {
-        console.error('Error handling MCP request:', error);
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.appendLine(`Error handling MCP request: ${errorMessage}`);
         if (!res.headersSent) {
           res.status(500).json({
             jsonrpc: '2.0' as const,
@@ -104,7 +120,9 @@ export class IDEServer {
     });
 
     const handleSessionRequest = async (req: Request, res: Response) => {
-      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
+        | string
+        | undefined;
       if (!sessionId || !transports[sessionId]) {
         res.status(400).send('Invalid or missing session ID');
         return;
@@ -115,14 +133,18 @@ export class IDEServer {
       try {
         await transport.handleRequest(req, res);
       } catch (error) {
-        console.error('Error handling MCP GET request:', error);
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.appendLine(
+          `Error handling session request: ${errorMessage}`,
+        );
         if (!res.headersSent) {
           res.status(400).send('Bad Request');
         }
       }
 
       if (!sessionsWithInitialNotification.has(sessionId)) {
-        sendActiveFileChangedNotification(transport);
+        sendActiveFileChangedNotification(transport, this.logger);
         sessionsWithInitialNotification.add(sessionId);
       }
     };
@@ -134,24 +156,37 @@ export class IDEServer {
       if (address && typeof address !== 'string') {
         const port = address.port;
         context.environmentVariableCollection.replace(
-          'GEMINI_CLI_IDE_SERVER_PORT',
+          IDE_SERVER_PORT_ENV_VAR,
           port.toString(),
         );
-        console.log(`MCP Streamable HTTP Server listening on port ${port}`);
+        this.logger.appendLine(
+          `IDE companion extension server listening on port ${port}`,
+        );
       } else {
-        const port = 0;
-        console.error('Failed to start server:', 'Unknown error');
-        vscode.window.showErrorMessage(
-          `Companion server failed to start on port ${port}: Unknown error`,
+        this.logger.appendLine(
+          `Failed to start IDE companion extension server`,
         );
       }
     });
   }
 
-  stop() {
+  async stop(): Promise<void> {
     if (this.server) {
-      this.server.close();
+      await new Promise<void>((resolve, reject) => {
+        this.server!.close((err?: Error) => {
+          if (err) {
+            this.logger.appendLine(
+              `Error shutting down IDE companion extension server: ${err.message}`,
+            );
+            return reject(err);
+          }
+          this.logger.appendLine(`IDE companion extension server shut down`);
+          resolve();
+        });
+      });
+      this.server = undefined;
     }
+
     if (this.context) {
       this.context.environmentVariableCollection.clear();
     }
