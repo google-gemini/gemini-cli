@@ -45,6 +45,22 @@ describe('mcp-client', () => {
       expect(tools.length).toBe(1);
       expect(mockedMcpToTool).toHaveBeenCalledOnce();
     });
+
+    it('should throw an error if server returns invalid function declarations', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () => ({
+          // Invalid functionDeclarations
+          functionDeclarations: { not: 'an array' },
+        }),
+      } as unknown as GenAiLib.CallableTool);
+
+      await expect(
+        discoverTools('test-server', {}, mockedClient),
+      ).rejects.toThrow(
+        'Error discovering tools: Error: Server did not return valid function declarations.',
+      );
+    });
   });
 
   describe('appendMcpServerCommand', () => {

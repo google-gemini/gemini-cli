@@ -269,26 +269,32 @@ export async function discoverTools(
 
     const discoveredTools: DiscoveredMCPTool[] = [];
     for (const funcDecl of tool.functionDeclarations) {
-      if (!isEnabled(funcDecl, mcpServerName, mcpServerConfig)) {
-        continue;
+      try {
+        if (!isEnabled(funcDecl, mcpServerName, mcpServerConfig)) {
+          continue;
+        }
+
+        const toolNameForModel = generateValidName(funcDecl, mcpServerName);
+
+        sanitizeParameters(funcDecl.parameters);
+
+        discoveredTools.push(
+          new DiscoveredMCPTool(
+            mcpCallableTool,
+            mcpServerName,
+            toolNameForModel,
+            funcDecl.description ?? '',
+            funcDecl.parameters ?? { type: Type.OBJECT, properties: {} },
+            funcDecl.name!,
+            mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+            mcpServerConfig.trust,
+          ),
+        );
+      } catch (error) {
+        console.error(
+          `Error processing tool '${funcDecl?.name || 'unknown'}' from MCP server '${mcpServerName}': ${(error as Error).message}`,
+        );
       }
-
-      const toolNameForModel = generateValidName(funcDecl, mcpServerName);
-
-      sanitizeParameters(funcDecl.parameters);
-
-      discoveredTools.push(
-        new DiscoveredMCPTool(
-          mcpCallableTool,
-          mcpServerName,
-          toolNameForModel,
-          funcDecl.description ?? '',
-          funcDecl.parameters ?? { type: Type.OBJECT, properties: {} },
-          funcDecl.name!,
-          mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-          mcpServerConfig.trust,
-        ),
-      );
     }
     if (discoveredTools.length === 0) {
       throw Error('No enabled tools found');
