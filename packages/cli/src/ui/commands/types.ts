@@ -10,6 +10,7 @@ import { Config, GitService, Logger } from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
 import { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { SessionStatsState } from '../contexts/SessionContext.js';
+import { HistoryItemWithoutId } from '../types.js';
 
 // Grouped dependencies for clarity and easier mocking
 export interface CommandContext {
@@ -36,6 +37,16 @@ export interface CommandContext {
      * Sets the transient debug message displayed in the application footer in debug mode.
      */
     setDebugMessage: (message: string) => void;
+    /** The currently pending history item, if any. */
+    pendingItem: HistoryItemWithoutId | null;
+    /**
+     * Sets a pending item in the history, which is useful for indicating
+     * that a long-running operation is in progress.
+     *
+     * @param item The history item to display as pending, or `null` to clear.
+     * @throws If a pending item is already set.
+     */
+    setPendingItem: (item: HistoryItemWithoutId | null) => void;
   };
   // Session-specific data
   session: {
