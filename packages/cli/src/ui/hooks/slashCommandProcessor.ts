@@ -581,7 +581,14 @@ export const useSlashCommandProcessor = (
           const cliVersion = await getCliVersion();
           const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
 
-          const info = `\n*   **CLI Version:** ${cliVersion}\n*   **Git Commit:** ${GIT_COMMIT_INFO}\n*   **Operating System:** ${osVersion}\n*   **Sandbox Environment:** ${sandboxEnv}\n*   **Model Version:** ${modelVersion}\n*   **Memory Usage:** ${memoryUsage}\n`;
+          const info = `
+*   **CLI Version:** ${cliVersion}
+*   **Git Commit:** ${GIT_COMMIT_INFO}
+*   **Operating System:** ${osVersion}
+*   **Sandbox Environment:** ${sandboxEnv}
+*   **Model Version:** ${modelVersion}
+*   **Memory Usage:** ${memoryUsage}
+`;
 
           let bugReportUrl =
             'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}';
