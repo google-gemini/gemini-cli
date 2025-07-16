@@ -23,11 +23,6 @@ export interface CommandContext {
   };
   // UI state and history management
   ui: {
-    // TODO - As more commands are add some additions may be needed or reworked using this new context.
-    // Ex.
-    // history: HistoryItem[];
-    // pendingHistoryItems: HistoryItemWithoutId[];
-
     /** Adds a new item to the history display. */
     addItem: UseHistoryManagerReturn['addItem'];
     /** Clears all history items and the console screen. */
@@ -43,7 +38,6 @@ export interface CommandContext {
      * that a long-running operation is in progress.
      *
      * @param item The history item to display as pending, or `null` to clear.
-     * @throws If a pending item is already set.
      */
     setPendingItem: (item: HistoryItemWithoutId | null) => void;
   };

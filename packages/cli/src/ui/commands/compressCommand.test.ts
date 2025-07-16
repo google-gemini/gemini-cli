@@ -70,7 +70,10 @@ describe('compressCommand', () => {
       }),
     );
 
-    expect(mockTryCompressChat).toHaveBeenCalledWith('Prompt Id not set', true);
+    expect(mockTryCompressChat).toHaveBeenCalledWith(
+      expect.stringMatching(/^compress-\d+$/),
+      true,
+    );
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
