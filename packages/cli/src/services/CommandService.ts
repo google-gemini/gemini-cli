@@ -9,11 +9,14 @@ import { SlashCommand } from '../ui/commands/types.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
+import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
+import { chatCommand } from '../ui/commands/chatCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
+import { compressCommand } from '../ui/commands/compressCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 
@@ -21,12 +24,15 @@ const loadBuiltInCommands = async (
   config: Config | null,
 ): Promise<SlashCommand[]> => {
   const allCommands = [
-    aboutCommand,
+  aboutCommand,
     authCommand,
+    chatCommand,
     clearCommand,
+    compressCommand,
     extensionsCommand,
     helpCommand,
     ideCommand(config),
+    mcpCommand,
     memoryCommand,
     privacyCommand,
     statsCommand,
