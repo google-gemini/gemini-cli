@@ -725,6 +725,66 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(baseSettings, [], 'test-session', argv);
     expect(config.getMcpServers()).toEqual({});
   });
+
+  it('should read allowMCPServers from settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      ...baseSettings,
+      allowMCPServers: ['server1', 'server2'],
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getMcpServers()).toEqual({
+      server1: { url: 'http://localhost:8080' },
+      server2: { url: 'http://localhost:8081' },
+    });
+  });
+
+  it('should read excludeMCPServers from settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      ...baseSettings,
+      excludeMCPServers: ['server1', 'server2'],
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getMcpServers()).toEqual({
+      server3: { url: 'http://localhost:8082' },
+    });
+  });
+
+  it('should override allowMCPServers with excludeMCPServers if overlapping ', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      ...baseSettings,
+      excludeMCPServers: ['server1'],
+      allowMCPServers: ['server1', 'server2'],
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getMcpServers()).toEqual({
+      server2: { url: 'http://localhost:8081' },
+    });
+  });
+
+  it('should prioritize mcp server flag if set ', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed-mcp-server-names',
+      'server1',
+    ];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      ...baseSettings,
+      excludeMCPServers: ['server1'],
+      allowMCPServers: ['server2'],
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getMcpServers()).toEqual({
+      server1: { url: 'http://localhost:8080' },
+    });
+  });
 });
 
 describe('loadCliConfig extensions', () => {
@@ -780,6 +840,7 @@ describe('loadCliConfig ideMode', () => {
     // Explicitly delete TERM_PROGRAM and SANDBOX before each test
     delete process.env.TERM_PROGRAM;
     delete process.env.SANDBOX;
+    delete process.env.GEMINI_CLI_IDE_SERVER_PORT;
   });
 
   afterEach(() => {
@@ -816,6 +877,7 @@ describe('loadCliConfig ideMode', () => {
     process.argv = ['node', 'script.js', '--ide-mode'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(true);
@@ -825,6 +887,7 @@ describe('loadCliConfig ideMode', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
     const settings: Settings = { ideMode: true };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(true);
@@ -834,6 +897,7 @@ describe('loadCliConfig ideMode', () => {
     process.argv = ['node', 'script.js', '--ide-mode'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
     const settings: Settings = { ideMode: false };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(true);
@@ -868,10 +932,11 @@ describe('loadCliConfig ideMode', () => {
     expect(config.getIdeMode()).toBe(false);
   });
 
-  it('should add __ide_server when ideMode is true', async () => {
+  it('should add _ide_server when ideMode is true', async () => {
     process.argv = ['node', 'script.js', '--ide-mode'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(true);
@@ -880,5 +945,17 @@ describe('loadCliConfig ideMode', () => {
     expect(mcpServers['_ide_server'].httpUrl).toBe('http://localhost:3000/mcp');
     expect(mcpServers['_ide_server'].description).toBe('IDE connection');
     expect(mcpServers['_ide_server'].trust).toBe(false);
+  });
+
+  it('should throw an error if ideMode is true and no port is set', async () => {
+    process.argv = ['node', 'script.js', '--ide-mode'];
+    const argv = await parseArguments();
+    process.env.TERM_PROGRAM = 'vscode';
+    const settings: Settings = {};
+    await expect(
+      loadCliConfig(settings, [], 'test-session', argv),
+    ).rejects.toThrow(
+      "Could not run in ide mode, make sure you're running in vs code integrated terminal. Try running in a fresh terminal.",
+    );
   });
 });
