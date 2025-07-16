@@ -182,7 +182,7 @@ export const useSlashCommandProcessor = (
     ],
   );
 
-  const commandService = useMemo(() => new CommandService(), []);
+  const commandService = useMemo(() => new CommandService(config), [config]);
 
   useEffect(() => {
     const load = async () => {

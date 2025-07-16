@@ -6,6 +6,7 @@
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { CommandService } from './CommandService.js';
+import { type Config } from '@google/gemini-cli-core';
 import { type SlashCommand } from '../ui/commands/types.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
@@ -17,6 +18,7 @@ import { themeCommand } from '../ui/commands/themeCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
+import { ideCommand } from '../ui/commands/ideCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
@@ -50,6 +52,9 @@ vi.mock('../ui/commands/statsCommand.js', () => ({
 vi.mock('../ui/commands/aboutCommand.js', () => ({
   aboutCommand: { name: 'about', description: 'Mock About' },
 }));
+vi.mock('../ui/commands/ideCommand.js', () => ({
+  ideCommand: vi.fn(),
+}));
 vi.mock('../ui/commands/extensionsCommand.js', () => ({
   extensionsCommand: { name: 'extensions', description: 'Mock Extensions' },
 }));
@@ -65,12 +70,20 @@ vi.mock('../ui/commands/mcpCommand.js', () => ({
 
 describe('CommandService', () => {
   const subCommandLen = 14;
+  let mockConfig: vi.Mocked<Config>;
+
+  beforeEach(() => {
+    mockConfig = {
+      getIdeMode: vi.fn(),
+    } as unknown as vi.Mocked<Config>;
+    vi.mocked(ideCommand).mockReturnValue(null);
+  });
 
   describe('when using default production loader', () => {
     let commandService: CommandService;
 
     beforeEach(() => {
-      commandService = new CommandService();
+      commandService = new CommandService(mockConfig);
     });
 
     it('should initialize with an empty command tree', () => {
@@ -106,6 +119,21 @@ describe('CommandService', () => {
         expect(commandNames).toContain('tools');
         expect(commandNames).toContain('compress');
         expect(commandNames).toContain('mcp');
+        expect(commandNames).not.toContain('ide');
+      });
+
+      it('should include ide command when ideMode is on', async () => {
+        mockConfig.getIdeMode.mockReturnValue(true);
+        vi.mocked(ideCommand).mockReturnValue({
+          name: 'ide',
+          description: 'Mock IDE',
+        });
+        await commandService.loadCommands();
+        const tree = commandService.getCommands();
+
+        expect(tree.length).toBe(subCommandLen + 1);
+        const commandNames = tree.map((cmd) => cmd.name);
+        expect(commandNames).toContain('ide');
       });
 
       it('should overwrite any existing commands when called again', async () => {
@@ -163,7 +191,7 @@ describe('CommandService', () => {
       const mockLoader = vi.fn().mockResolvedValue(mockCommands);
 
       // Act: Instantiate the service WITH the injected loader function.
-      const commandService = new CommandService(mockLoader);
+      const commandService = new CommandService(mockConfig, mockLoader);
       await commandService.loadCommands();
       const tree = commandService.getCommands();
 
