@@ -23,14 +23,14 @@ With the Gemini CLI you can:
   - [Using a Gemini API Key](#use-a-gemini-api-key)
   - [Using a Vertex AI API Key](#use-a-vertex-ai-api-key)
 - [Examples](#examples)
+  - [Next Steps](#next-steps)
+  - [Troubleshooting](#troubleshooting)
 - [Popular Tasks](#popular-tasks)
   - [Explore a New Codebase](#explore-a-new-codebase)
   - [Work with Existing Code](#work-with-your-existing-code)
   - [Automate Your Workflows](#automate-your-workflows)
   - [Interact with Your System](#interact-with-your-system)
 - [Uninstall](#uninstall)
-- [Troubleshooting](#troubleshooting)
-- [Next Steps](#next-steps)
 - [Terms of Service and Privacy Notice](#terms-of-service-and-privacy-notice)
 
 
