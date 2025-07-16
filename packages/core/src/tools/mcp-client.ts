@@ -214,6 +214,9 @@ export async function connectAndDiscover(
       mcpClient.onerror = (error) => {
         console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
         updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+        if (mcpServerName === IDE_SERVER_NAME) {
+          ideContext.clearActiveFileContext();
+        }
       };
 
       if (mcpServerName === IDE_SERVER_NAME) {
@@ -290,7 +293,7 @@ export async function discoverTools(
         ),
       );
     }
-    if (discoveredTools.length === 0) {
+    if (discoveredTools.length === 0 && mcpServerName !== IDE_SERVER_NAME) {
       throw Error('No enabled tools found');
     }
     return discoveredTools;
