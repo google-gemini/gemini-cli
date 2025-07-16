@@ -66,7 +66,7 @@ import {
 } from 'vitest';
 import open from 'open';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
-import { MessageType, SlashCommandProcessorResult } from '../types.js';
+import { SlashCommandProcessorResult } from '../types.js';
 import { Config, GeminiClient } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { LoadedSettings } from '../../config/settings.js';
@@ -176,7 +176,7 @@ describe('useSlashCommandProcessor', () => {
     process.env = { ...globalThis.process.env };
   });
 
-  const getProcessorHook = (showToolDescriptions: boolean = false) => {
+  const getProcessorHook = () => {
     const settings = {
       merged: {
         contextFileName: 'GEMINI.md',
@@ -197,15 +197,13 @@ describe('useSlashCommandProcessor', () => {
         mockOpenAuthDialog,
         mockOpenEditorDialog,
         mockCorgiMode,
-        showToolDescriptions,
         mockSetQuittingMessages,
         vi.fn(), // mockOpenPrivacyNotice
       ),
     );
   };
 
-  const getProcessor = (showToolDescriptions: boolean = false) =>
-    getProcessorHook(showToolDescriptions).result.current;
+  const getProcessor = () => getProcessorHook().result.current;
 
   describe('Other commands', () => {
     it('/editor should open editor dialog and return handled', async () => {
@@ -594,161 +592,5 @@ describe('useSlashCommandProcessor', () => {
         expect(mockProcessExit).toHaveBeenCalledWith(0);
       },
     );
-  });
-
-  describe('Unknown command', () => {
-    it('should show an error and return handled for a general unknown command', async () => {
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandProcessorResult | false = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/unknowncommand');
-      });
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          type: MessageType.ERROR,
-          text: 'Unknown command: /unknowncommand',
-        }),
-        expect.any(Number),
-      );
-      expect(commandResult).toEqual({ type: 'handled' });
-    });
-  });
-
-  describe('/tools command', () => {
-    it('should show an error if tool registry is not available', async () => {
-      mockConfig = {
-        ...mockConfig,
-        getToolRegistry: vi.fn().mockResolvedValue(undefined),
-      } as unknown as Config;
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandProcessorResult | false = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/tools');
-      });
-
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          type: MessageType.ERROR,
-          text: 'Could not retrieve tools.',
-        }),
-        expect.any(Number),
-      );
-      expect(commandResult).toEqual({ type: 'handled' });
-    });
-
-    it('should show an error if getAllTools returns undefined', async () => {
-      mockConfig = {
-        ...mockConfig,
-        getToolRegistry: vi.fn().mockResolvedValue({
-          getAllTools: vi.fn().mockReturnValue(undefined),
-        }),
-      } as unknown as Config;
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandProcessorResult | false = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/tools');
-      });
-
-      expect(mockAddItem).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          type: MessageType.ERROR,
-          text: 'Could not retrieve tools.',
-        }),
-        expect.any(Number),
-      );
-      expect(commandResult).toEqual({ type: 'handled' });
-    });
-
-    it('should display only Gemini CLI tools (filtering out MCP tools)', async () => {
-      // Create mock tools - some with serverName property (MCP tools) and some without (Gemini CLI tools)
-      const mockTools = [
-        { name: 'tool1', displayName: 'Tool1' },
-        { name: 'tool2', displayName: 'Tool2' },
-        { name: 'mcp_tool1', serverName: 'mcp-server1' },
-        { name: 'mcp_tool2', serverName: 'mcp-server1' },
-      ];
-
-      mockConfig = {
-        ...mockConfig,
-        getToolRegistry: vi.fn().mockResolvedValue({
-          getAllTools: vi.fn().mockReturnValue(mockTools),
-        }),
-      } as unknown as Config;
-
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandProcessorResult | false = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/tools');
-      });
-
-      // Should only show tool1 and tool2, not the MCP tools
-      const message = mockAddItem.mock.calls[1][0].text;
-      expect(message).toContain('Tool1');
-      expect(message).toContain('Tool2');
-      expect(commandResult).toEqual({ type: 'handled' });
-    });
-
-    it('should display a message when no Gemini CLI tools are available', async () => {
-      // Only MCP tools available
-      const mockTools = [
-        { name: 'mcp_tool1', serverName: 'mcp-server1' },
-        { name: 'mcp_tool2', serverName: 'mcp-server1' },
-      ];
-
-      mockConfig = {
-        ...mockConfig,
-        getToolRegistry: vi.fn().mockResolvedValue({
-          getAllTools: vi.fn().mockReturnValue(mockTools),
-        }),
-      } as unknown as Config;
-
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandProcessorResult | false = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/tools');
-      });
-
-      const message = mockAddItem.mock.calls[1][0].text;
-      expect(message).toContain('No tools available');
-      expect(commandResult).toEqual({ type: 'handled' });
-    });
-
-    it('should display tool descriptions when /tools desc is used', async () => {
-      const mockTools = [
-        {
-          name: 'tool1',
-          displayName: 'Tool1',
-          description: 'Description for Tool1',
-        },
-        {
-          name: 'tool2',
-          displayName: 'Tool2',
-          description: 'Description for Tool2',
-        },
-      ];
-
-      mockConfig = {
-        ...mockConfig,
-        getToolRegistry: vi.fn().mockResolvedValue({
-          getAllTools: vi.fn().mockReturnValue(mockTools),
-        }),
-      } as unknown as Config;
-
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandProcessorResult | false = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/tools desc');
-      });
-
-      const message = mockAddItem.mock.calls[1][0].text;
-      expect(message).toContain('Tool1');
-      expect(message).toContain('Description for Tool1');
-      expect(message).toContain('Tool2');
-      expect(message).toContain('Description for Tool2');
-      expect(commandResult).toEqual({ type: 'handled' });
-    });
   });
 });
