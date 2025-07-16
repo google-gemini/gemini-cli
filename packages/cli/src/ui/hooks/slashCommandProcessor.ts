@@ -169,6 +169,8 @@ export const useSlashCommandProcessor = (
           refreshStatic();
         },
         setDebugMessage: onDebugMessage,
+        pendingItem: pendingCompressionItemRef.current,
+        setPendingItem: setPendingCompressionItem,
       },
       session: {
         stats: session.stats,
@@ -184,6 +186,8 @@ export const useSlashCommandProcessor = (
       refreshStatic,
       session.stats,
       onDebugMessage,
+      pendingCompressionItemRef,
+      setPendingCompressionItem,
     ],
   );
 
@@ -599,60 +603,6 @@ export const useSlashCommandProcessor = (
           }, 100);
         },
       },
-      {
-        name: 'compress',
-        altName: 'summarize',
-        description: 'Compresses the context by replacing it with a summary.',
-        action: async (_mainCommand, _subCommand, _args) => {
-          if (pendingCompressionItemRef.current !== null) {
-            addMessage({
-              type: MessageType.ERROR,
-              content:
-                'Already compressing, wait for previous request to complete',
-              timestamp: new Date(),
-            });
-            return;
-          }
-          setPendingCompressionItem({
-            type: MessageType.COMPRESSION,
-            compression: {
-              isPending: true,
-              originalTokenCount: null,
-              newTokenCount: null,
-            },
-          });
-          try {
-            const compressed = await config!
-              .getGeminiClient()!
-              // TODO: Set Prompt id for CompressChat from SlashCommandProcessor.
-              .tryCompressChat('Prompt Id not set', true);
-            if (compressed) {
-              addMessage({
-                type: MessageType.COMPRESSION,
-                compression: {
-                  isPending: false,
-                  originalTokenCount: compressed.originalTokenCount,
-                  newTokenCount: compressed.newTokenCount,
-                },
-                timestamp: new Date(),
-              });
-            } else {
-              addMessage({
-                type: MessageType.ERROR,
-                content: 'Failed to compress chat history.',
-                timestamp: new Date(),
-              });
-            }
-          } catch (e) {
-            addMessage({
-              type: MessageType.ERROR,
-              content: `Failed to compress chat history: ${e instanceof Error ? e.message : String(e)}`,
-              timestamp: new Date(),
-            });
-          }
-          setPendingCompressionItem(null);
-        },
-      },
     ];
 
     if (config?.getCheckpointingEnabled()) {
@@ -786,8 +736,6 @@ export const useSlashCommandProcessor = (
     gitService,
     loadHistory,
     setQuittingMessages,
-    pendingCompressionItemRef,
-    setPendingCompressionItem,
   ]);
 
   const handleSlashCommand = useCallback(
