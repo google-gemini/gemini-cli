@@ -15,12 +15,18 @@ export async function activate(context: vscode.ExtensionContext) {
   logger.show();
   logger.appendLine('Starting Gemini CLI IDE Companion server...');
   ideServer = new IDEServer(logger);
-  ideServer.start(context);
+  try {
+    await ideServer.start(context);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.appendLine(`Failed to start IDE server: ${message}`);
+  }
 }
 
 export function deactivate() {
   if (ideServer) {
-    logger.dispose();
-    return ideServer.stop();
+    return ideServer.stop().finally(() => {
+      logger.dispose();
+    });
   }
 }

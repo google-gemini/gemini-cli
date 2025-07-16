@@ -160,8 +160,6 @@ export class IDEServer {
           port.toString(),
         );
         this.logger.appendLine(`IDE server listening on port ${port}`);
-      } else {
-        this.logger.appendLine(`Failed to start IDE server`);
       }
     });
   }
