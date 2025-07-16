@@ -13,8 +13,10 @@ import { clearCommand } from '../ui/commands/clearCommand.js';
 import { chatCommand } from '../ui/commands/chatCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
+import { statsCommand } from '../ui/commands/statsCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
+import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
@@ -35,11 +37,20 @@ vi.mock('../ui/commands/themeCommand.js', () => ({
 vi.mock('../ui/commands/privacyCommand.js', () => ({
   privacyCommand: { name: 'privacy', description: 'Mock Privacy' },
 }));
+vi.mock('../ui/commands/statsCommand.js', () => ({
+  statsCommand: { name: 'stats', description: 'Mock Stats' },
+}));
 vi.mock('../ui/commands/aboutCommand.js', () => ({
   aboutCommand: { name: 'about', description: 'Mock About' },
 }));
+vi.mock('../ui/commands/extensionsCommand.js', () => ({
+  extensionsCommand: { name: 'extensions', description: 'Mock Extensions' },
+}));
 
 describe('CommandService', () => {
+  
+  const subCommandLen = 10;
+
   describe('when using default production loader', () => {
     let commandService: CommandService;
 
@@ -63,7 +74,7 @@ describe('CommandService', () => {
         const tree = commandService.getCommands();
 
         // Post-condition assertions
-        expect(tree.length).toBe(8);
+        expect(tree.length).toBe(subCommandLen);
 
         const commandNames = tree.map((cmd) => cmd.name);
         expect(commandNames).toContain('auth');
@@ -72,21 +83,23 @@ describe('CommandService', () => {
         expect(commandNames).toContain('clear');
         expect(commandNames).toContain('chat');
         expect(commandNames).toContain('theme');
+        expect(commandNames).toContain('stats');
         expect(commandNames).toContain('privacy');
         expect(commandNames).toContain('about');
+        expect(commandNames).toContain('extensions');
       });
 
       it('should overwrite any existing commands when called again', async () => {
         // Load once
         await commandService.loadCommands();
-        expect(commandService.getCommands().length).toBe(8);
+        expect(commandService.getCommands().length).toBe(subCommandLen);
 
         // Load again
         await commandService.loadCommands();
         const tree = commandService.getCommands();
 
         // Should not append, but overwrite
-        expect(tree.length).toBe(8);
+        expect(tree.length).toBe(subCommandLen);
       });
     });
 
@@ -98,15 +111,17 @@ describe('CommandService', () => {
         await commandService.loadCommands();
 
         const loadedTree = commandService.getCommands();
-        expect(loadedTree.length).toBe(8);
+        expect(loadedTree.length).toBe(subCommandLen);
         expect(loadedTree).toEqual([
           aboutCommand,
           authCommand,
           chatCommand,
           clearCommand,
+          extensionsCommand,
           helpCommand,
           memoryCommand,
           privacyCommand,
+          statsCommand,
           themeCommand,
         ]);
       });
