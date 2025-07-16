@@ -8,28 +8,84 @@ import * as vscode from 'vscode';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
+import {
+  isInitializeRequest,
+  type JSONRPCNotification,
+} from '@modelcontextprotocol/sdk/types.js';
 
-export async function startIDEServer(_context: vscode.ExtensionContext) {
+import { Server } from 'node:http';
+
+function sendActiveFileChangedNotification(
+  transport: StreamableHTTPServerTransport,
+) {
+  const editor = vscode.window.activeTextEditor;
+  const filePath = editor ? editor.document.uri.fsPath : '';
+  const notification: JSONRPCNotification = {
+    jsonrpc: '2.0',
+    method: 'ide/activeFileChanged',
+    params: { filePath },
+  };
+  transport.send(notification);
+}
+
+export async function startIDEServer(context: vscode.ExtensionContext) {
   const app = express();
   app.use(express.json());
 
-  const mcpServer = createMcpServer();
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-    enableJsonResponse: true,
-  });
+  const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+  const sessionsWithInitialNotification = new Set<string>();
 
-  mcpServer.connect(transport);
+  const disposable = vscode.window.onDidChangeActiveTextEditor((_editor) => {
+    for (const transport of Object.values(transports)) {
+      sendActiveFileChangedNotification(transport);
+    }
+  });
+  context.subscriptions.push(disposable);
 
   app.post('/mcp', async (req: Request, res: Response) => {
-    console.log('Received MCP request:', req.body);
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+    let transport: StreamableHTTPServerTransport;
+
+    if (sessionId && transports[sessionId]) {
+      transport = transports[sessionId];
+    } else if (!sessionId && isInitializeRequest(req.body)) {
+      transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (newSessionId) => {
+          transports[newSessionId] = transport;
+        },
+      });
+
+      transport.onclose = () => {
+        if (transport.sessionId) {
+          sessionsWithInitialNotification.delete(transport.sessionId);
+          delete transports[transport.sessionId];
+        }
+      };
+
+      const server = createMcpServer();
+      server.connect(transport);
+    } else {
+      res.status(400).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32000,
+          message:
+            'Bad Request: No valid session ID provided for non-initialize request.',
+        },
+        id: null,
+      });
+      return;
+    }
+
     try {
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
       console.error('Error handling MCP request:', error);
       if (!res.headersSent) {
         res.status(500).json({
-          jsonrpc: '2.0',
+          jsonrpc: '2.0' as const,
           error: {
             code: -32603,
             message: 'Internal server error',
@@ -40,30 +96,59 @@ export async function startIDEServer(_context: vscode.ExtensionContext) {
     }
   });
 
-  // Handle GET requests for SSE streams
-  app.get('/mcp', async (req: Request, res: Response) => {
-    res.status(405).set('Allow', 'POST').send('Method Not Allowed');
-  });
+  const handleSessionRequest = async (req: Request, res: Response) => {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+    if (!sessionId || !transports[sessionId]) {
+      res.status(400).send('Invalid or missing session ID');
+      return;
+    }
 
-  // Start the server
-  // TODO(#3918): Generate dynamically and write to env variable
-  const PORT = 3000;
-  app.listen(PORT, (error) => {
-    if (error) {
-      console.error('Failed to start server:', error);
+    const transport = transports[sessionId];
+
+    try {
+      await transport.handleRequest(req, res);
+    } catch (error) {
+      console.error('Error handling MCP GET request:', error);
+      if (!res.headersSent) {
+        res.status(400).send('Bad Request');
+      }
+    }
+
+    if (!sessionsWithInitialNotification.has(sessionId)) {
+      sendActiveFileChangedNotification(transport);
+      sessionsWithInitialNotification.add(sessionId);
+    }
+  };
+
+  app.get('/mcp', handleSessionRequest);
+
+  const server = app.listen(0, () => {
+    const address = (server as Server).address();
+    if (address && typeof address !== 'string') {
+      const port = address.port;
+      context.environmentVariableCollection.replace(
+        'GEMINI_CLI_IDE_SERVER_PORT',
+        port.toString(),
+      );
+      console.log(`MCP Streamable HTTP Server listening on port ${port}`);
+    } else {
+      const port = 0;
+      console.error('Failed to start server:', 'Unknown error');
       vscode.window.showErrorMessage(
-        `Companion server failed to start on port ${PORT}: ${error.message}`,
+        `Companion server failed to start on port ${port}: Unknown error`,
       );
     }
-    console.log(`MCP Streamable HTTP Server listening on port ${PORT}`);
   });
 }
 
 const createMcpServer = () => {
-  const server = new McpServer({
-    name: 'vscode-ide-server',
-    version: '1.0.0',
-  });
+  const server = new McpServer(
+    {
+      name: 'gemini-cli-companion-mcp-server',
+      version: '1.0.0',
+    },
+    { capabilities: { logging: {} } },
+  );
   server.registerTool(
     'getActiveFile',
     {
@@ -74,9 +159,7 @@ const createMcpServer = () => {
     async () => {
       try {
         const activeEditor = vscode.window.activeTextEditor;
-        const filePath = activeEditor
-          ? activeEditor.document.uri.fsPath
-          : undefined;
+        const filePath = activeEditor ? activeEditor.document.uri.fsPath : '';
         if (filePath) {
           return {
             content: [{ type: 'text', text: `Active file: ${filePath}` }],

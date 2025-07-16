@@ -74,12 +74,7 @@ function getResponseText(response: GenerateContentResponse): string | null {
   return null;
 }
 
-const toolOutputSummarizerModel = DEFAULT_GEMINI_FLASH_MODEL;
-const toolOutputSummarizerConfig: GenerateContentConfig = {
-  maxOutputTokens: 2000,
-};
-
-const SUMMARIZE_TOOL_OUTPUT_PROMPT = `Summarize the following tool output to be a maximum of {maxLength} characters. The summary should be concise and capture the main points of the tool output.
+const SUMMARIZE_TOOL_OUTPUT_PROMPT = `Summarize the following tool output to be a maximum of {maxOutputTokens} tokens. The summary should be concise and capture the main points of the tool output.
 
 The summarization should be done based on the content that is provided. Here are the basic rules to follow:
 1. If the text is a directory listing or any output that is structural, use the history of the conversation to understand the context. Using this context try to understand what information we need from the tool output and return that as a response.
@@ -104,24 +99,28 @@ export async function summarizeToolOutput(
   textToSummarize: string,
   geminiClient: GeminiClient,
   abortSignal: AbortSignal,
-  maxLength: number = 2000,
+  maxOutputTokens: number = 2000,
 ): Promise<string> {
-  if (!textToSummarize || textToSummarize.length < maxLength) {
+  // There is going to be a slight difference here since we are comparing length of string with maxOutputTokens.
+  // This is meant to be a ballpark estimation of if we need to summarize the tool output.
+  if (!textToSummarize || textToSummarize.length < maxOutputTokens) {
     return textToSummarize;
   }
   const prompt = SUMMARIZE_TOOL_OUTPUT_PROMPT.replace(
-    '{maxLength}',
-    String(maxLength),
+    '{maxOutputTokens}',
+    String(maxOutputTokens),
   ).replace('{textToSummarize}', textToSummarize);
 
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
-
+  const toolOutputSummarizerConfig: GenerateContentConfig = {
+    maxOutputTokens,
+  };
   try {
     const parsedResponse = (await geminiClient.generateContent(
       contents,
       toolOutputSummarizerConfig,
       abortSignal,
-      toolOutputSummarizerModel,
+      DEFAULT_GEMINI_FLASH_MODEL,
     )) as unknown as GenerateContentResponse;
     return getResponseText(parsedResponse) || textToSummarize;
   } catch (error) {
