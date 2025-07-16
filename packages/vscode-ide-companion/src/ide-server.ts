@@ -149,5 +149,44 @@ const createMcpServer = () => {
     },
     { capabilities: { logging: {} } },
   );
+  server.registerTool(
+    'getActiveFile',
+    {
+      description:
+        '(IDE Tool) Get the path of the file currently active in VS Code.',
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const activeEditor = vscode.window.activeTextEditor;
+        const filePath = activeEditor ? activeEditor.document.uri.fsPath : '';
+        if (filePath) {
+          return {
+            content: [{ type: 'text', text: `Active file: ${filePath}` }],
+          };
+        } else {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'No file is currently active in the editor.',
+              },
+            ],
+          };
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to get active file: ${
+                (error as Error).message || 'Unknown error'
+              }`,
+            },
+          ],
+        };
+      }
+    },
+  );
   return server;
 };
