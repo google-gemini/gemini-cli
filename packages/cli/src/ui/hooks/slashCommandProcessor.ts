@@ -198,23 +198,6 @@ export const useSlashCommandProcessor = (
     load();
   }, [commandService]);
 
-  const savedChatTags = useCallback(async () => {
-    const geminiDir = config?.getProjectTempDir();
-    if (!geminiDir) {
-      return [];
-    }
-    try {
-      const files = await fs.readdir(geminiDir);
-      return files
-        .filter(
-          (file) => file.startsWith('checkpoint-') && file.endsWith('.json'),
-        )
-        .map((file) => file.replace('checkpoint-', '').replace('.json', ''));
-    } catch (_err) {
-      return [];
-    }
-  }, [config]);
-
   // Define legacy commands
   // This list contains all commands that have NOT YET been migrated to the
   // new system. As commands are migrated, they are removed from this list.
@@ -588,142 +571,7 @@ export const useSlashCommandProcessor = (
           })();
         },
       },
-      {
-        name: 'chat',
-        description:
-          'Manage conversation history. Usage: /chat <list|save|resume> <tag>',
-        action: async (_mainCommand, subCommand, args) => {
-          const tag = (args || '').trim();
-          const logger = new Logger(config?.getSessionId() || '');
-          await logger.initialize();
-          const chat = await config?.getGeminiClient()?.getChat();
-          if (!chat) {
-            addMessage({
-              type: MessageType.ERROR,
-              content: 'No chat client available for conversation status.',
-              timestamp: new Date(),
-            });
-            return;
-          }
-          if (!subCommand) {
-            addMessage({
-              type: MessageType.ERROR,
-              content: 'Missing command\nUsage: /chat <list|save|resume> <tag>',
-              timestamp: new Date(),
-            });
-            return;
-          }
-          switch (subCommand) {
-            case 'save': {
-              if (!tag) {
-                addMessage({
-                  type: MessageType.ERROR,
-                  content: 'Missing tag. Usage: /chat save <tag>',
-                  timestamp: new Date(),
-                });
-                return;
-              }
-              const history = chat.getHistory();
-              if (history.length > 0) {
-                await logger.saveCheckpoint(chat?.getHistory() || [], tag);
-                addMessage({
-                  type: MessageType.INFO,
-                  content: `Conversation checkpoint saved with tag: ${tag}.`,
-                  timestamp: new Date(),
-                });
-              } else {
-                addMessage({
-                  type: MessageType.INFO,
-                  content: 'No conversation found to save.',
-                  timestamp: new Date(),
-                });
-              }
-              return;
-            }
-            case 'resume':
-            case 'restore':
-            case 'load': {
-              if (!tag) {
-                addMessage({
-                  type: MessageType.ERROR,
-                  content: 'Missing tag. Usage: /chat resume <tag>',
-                  timestamp: new Date(),
-                });
-                return;
-              }
-              const conversation = await logger.loadCheckpoint(tag);
-              if (conversation.length === 0) {
-                addMessage({
-                  type: MessageType.INFO,
-                  content: `No saved checkpoint found with tag: ${tag}.`,
-                  timestamp: new Date(),
-                });
-                return;
-              }
 
-              clearItems();
-              chat.clearHistory();
-              const rolemap: { [key: string]: MessageType } = {
-                user: MessageType.USER,
-                model: MessageType.GEMINI,
-              };
-              let hasSystemPrompt = false;
-              let i = 0;
-              for (const item of conversation) {
-                i += 1;
-
-                // Add each item to history regardless of whether we display
-                // it.
-                chat.addHistory(item);
-
-                const text =
-                  item.parts
-                    ?.filter((m) => !!m.text)
-                    .map((m) => m.text)
-                    .join('') || '';
-                if (!text) {
-                  // Parsing Part[] back to various non-text output not yet implemented.
-                  continue;
-                }
-                if (i === 1 && text.match(/context for our chat/)) {
-                  hasSystemPrompt = true;
-                }
-                if (i > 2 || !hasSystemPrompt) {
-                  addItem(
-                    {
-                      type:
-                        (item.role && rolemap[item.role]) || MessageType.GEMINI,
-                      text,
-                    } as HistoryItemWithoutId,
-                    i,
-                  );
-                }
-              }
-              console.clear();
-              refreshStatic();
-              return;
-            }
-            case 'list':
-              addMessage({
-                type: MessageType.INFO,
-                content:
-                  'list of saved conversations: ' +
-                  (await savedChatTags()).join(', '),
-                timestamp: new Date(),
-              });
-              return;
-            default:
-              addMessage({
-                type: MessageType.ERROR,
-                content: `Unknown /chat command: ${subCommand}. Available: list, save, resume`,
-                timestamp: new Date(),
-              });
-              return;
-          }
-        },
-        completion: async () =>
-          (await savedChatTags()).map((tag) => 'resume ' + tag),
-      },
       {
         name: 'quit',
         altName: 'exit',
@@ -932,18 +780,14 @@ export const useSlashCommandProcessor = (
     addMessage,
     openEditorDialog,
     toggleCorgiMode,
-    savedChatTags,
     config,
     showToolDescriptions,
     session,
     gitService,
     loadHistory,
-    addItem,
     setQuittingMessages,
     pendingCompressionItemRef,
     setPendingCompressionItem,
-    clearItems,
-    refreshStatic,
   ]);
 
   const handleSlashCommand = useCallback(
@@ -1041,6 +885,16 @@ export const useSlashCommandProcessor = (
                     );
                   }
                 }
+              case 'load_history': {
+                await config
+                  ?.getGeminiClient()
+                  ?.setHistory(result.clientHistory);
+                commandContext.ui.clear();
+                result.history.forEach((item, index) => {
+                  commandContext.ui.addItem(item, index);
+                });
+                return { type: 'handled' };
+              }
               default: {
                 const unhandled: never = result;
                 throw new Error(`Unhandled slash command result: ${unhandled}`);
@@ -1109,6 +963,7 @@ export const useSlashCommandProcessor = (
       return { type: 'handled' };
     },
     [
+      config,
       addItem,
       setShowHelp,
       openAuthDialog,
