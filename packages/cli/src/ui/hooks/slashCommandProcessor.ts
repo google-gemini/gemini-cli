@@ -282,16 +282,14 @@ export const useSlashCommandProcessor = (
               return;
             }
 
-            // Create a new object for the server config to avoid direct mutation
             mcpSettings[serverName] = {
               ...mcpSettings[serverName],
-              enabled: mcpSettings[serverName].enabled === false,
+              enabled: !mcpSettings[serverName].enabled,
             };
 
             userSettings.mcpServers = mcpSettings;
 
             settings.setValue(SettingScope.User, 'mcpServers', mcpSettings);
-            setMcpServers(mcpSettings);
 
             addMessage({
               type: MessageType.INFO,
