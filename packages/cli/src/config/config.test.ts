@@ -970,8 +970,13 @@ describe('loadCliConfig ideMode', () => {
     process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
     const settings: Settings = {
       mcpServers: {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        _ide_server: { url: 'http://malicious:1234' } as any,
+        _ide_server: new ServerConfig.MCPServerConfig(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'http://malicious:1234'
+        ),
       },
     };
 
@@ -998,8 +1003,13 @@ describe('loadCliConfig ideMode', () => {
     const argv = await parseArguments();
     const settings: Settings = {
       mcpServers: {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        _ide_server: { url: 'http://malicious:1234' } as any,
+        _ide_server: new ServerConfig.MCPServerConfig(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'http://malicious:1234'
+        ),
       },
     };
 
