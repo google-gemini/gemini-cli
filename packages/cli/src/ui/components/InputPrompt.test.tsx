@@ -543,4 +543,30 @@ describe('InputPrompt', () => {
     expect(props.buffer.newline).toHaveBeenCalled();
     unmount();
   });
+
+  it('should clear the buffer on Ctrl+C if it has text', async () => {
+    props.buffer.setText('some text to clear');
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\x03'); // Ctrl+C character
+    await wait();
+
+    expect(props.buffer.setText).toHaveBeenCalledWith('');
+    expect(mockCompletion.resetCompletionState).toHaveBeenCalled();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should NOT clear the buffer on Ctrl+C if it is empty', async () => {
+    props.buffer.text = '';
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\x03'); // Ctrl+C character
+    await wait();
+
+    expect(props.buffer.setText).not.toHaveBeenCalled();
+    unmount();
+  });
 });
