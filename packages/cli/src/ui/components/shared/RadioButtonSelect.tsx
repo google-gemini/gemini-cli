@@ -127,7 +127,7 @@ export function RadioButtonSelect<T>({
 
         // A single '0' is not a valid selection since items are 1-indexed.
         if (newNumberInput === '0') {
-          numberInputTimer.current = setTimeout(() => setNumberInput(''), 250);
+          numberInputTimer.current = setTimeout(() => setNumberInput(''), 350);
           return;
         }
 
@@ -146,7 +146,7 @@ export function RadioButtonSelect<T>({
             numberInputTimer.current = setTimeout(() => {
               onSelect(targetItem.value);
               setNumberInput('');
-            }, 250); // Debounce time for multi-digit input.
+            }, 350); // Debounce time for multi-digit input.
           }
         } else {
           // The typed number is out of bounds, clear the buffer
@@ -171,10 +171,17 @@ export function RadioButtonSelect<T>({
         const isSelected = activeIndex === itemIndex;
 
         let textColor = Colors.Foreground;
+        let numberColor = Colors.Foreground;
         if (isSelected) {
           textColor = Colors.AccentGreen;
+          numberColor = Colors.AccentGreen;
         } else if (item.disabled) {
           textColor = Colors.Gray;
+          numberColor = Colors.Gray;
+        }
+
+        if (!showNumbers) {
+          numberColor = Colors.Gray;
         }
 
         const numberColumnWidth = String(items.length).length;
@@ -194,7 +201,7 @@ export function RadioButtonSelect<T>({
               flexShrink={0}
               minWidth={itemNumberText.length}
             >
-              <Text color={textColor}>{showNumbers ? itemNumberText : ''}</Text>
+              <Text color={numberColor}>{itemNumberText}</Text>
             </Box>
             {item.themeNameDisplay && item.themeTypeDisplay ? (
               <Text color={textColor} wrap="truncate">
