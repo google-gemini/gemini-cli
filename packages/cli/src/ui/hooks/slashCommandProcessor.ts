@@ -6,7 +6,6 @@
 
 import { useCallback, useMemo, useEffect, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
-import open from 'open';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useStateAndRef } from './useStateAndRef.js';
@@ -21,9 +20,7 @@ import {
 } from '../types.js';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
-import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
-import { getCliVersion } from '../../utils/version.js';
+import { formatDuration } from '../utils/formatters.js';
 import { LoadedSettings } from '../../config/settings.js';
 import {
   type CommandContext,
@@ -205,69 +202,6 @@ export const useSlashCommandProcessor = (
           toggleCorgiMode();
         },
       },
-      {
-        name: 'bug',
-        description: 'submit a bug report',
-        action: async (_mainCommand, _subCommand, args) => {
-          let bugDescription = _subCommand || '';
-          if (args) {
-            bugDescription += ` ${args}`;
-          }
-          bugDescription = bugDescription.trim();
-
-          const osVersion = `${process.platform} ${process.version}`;
-          let sandboxEnv = 'no sandbox';
-          if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-            sandboxEnv = process.env.SANDBOX.replace(/^gemini-(?:code-)?/, '');
-          } else if (process.env.SANDBOX === 'sandbox-exec') {
-            sandboxEnv = `sandbox-exec (${
-              process.env.SEATBELT_PROFILE || 'unknown'
-            })`;
-          }
-          const modelVersion = config?.getModel() || 'Unknown';
-          const cliVersion = await getCliVersion();
-          const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
-
-          const info = `
-*   **CLI Version:** ${cliVersion}
-*   **Git Commit:** ${GIT_COMMIT_INFO}
-*   **Operating System:** ${osVersion}
-*   **Sandbox Environment:** ${sandboxEnv}
-*   **Model Version:** ${modelVersion}
-*   **Memory Usage:** ${memoryUsage}
-`;
-
-          let bugReportUrl =
-            'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}';
-          const bugCommand = config?.getBugCommand();
-          if (bugCommand?.urlTemplate) {
-            bugReportUrl = bugCommand.urlTemplate;
-          }
-          bugReportUrl = bugReportUrl
-            .replace('{title}', encodeURIComponent(bugDescription))
-            .replace('{info}', encodeURIComponent(info));
-
-          addMessage({
-            type: MessageType.INFO,
-            content: `To submit your bug report, please open the following URL in your browser:\n${bugReportUrl}`,
-            timestamp: new Date(),
-          });
-          (async () => {
-            try {
-              await open(bugReportUrl);
-            } catch (error) {
-              const errorMessage =
-                error instanceof Error ? error.message : String(error);
-              addMessage({
-                type: MessageType.ERROR,
-                content: `Could not open URL in browser: ${errorMessage}`,
-                timestamp: new Date(),
-              });
-            }
-          })();
-        },
-      },
-
       {
         name: 'quit',
         altName: 'exit',
