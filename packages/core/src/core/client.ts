@@ -309,10 +309,11 @@ export class GeminiClient {
       const activeFile = ideContext.getActiveFileContext();
       if (activeFile?.filePath) {
         let context = `
-Here is information about the user's current IDE context. Use this if relevant to the user's query:
+This is the file that the user was most recently looking at:
 - Path: ${activeFile.filePath}`;
         if (activeFile.cursor) {
           context += `
+This is the cursor position in the file:
 - Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`;
         }
         request = [
