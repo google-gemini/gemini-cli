@@ -433,9 +433,9 @@ export const useGeminiStream = (
         {
           type: 'info',
           text:
-        `IMPORTANT: This conversation approached the input token limit for ${config.getModel()}. ` +
-        `A compressed context will be sent for future messages (compressed from: ` +
-        `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
+            `IMPORTANT: This conversation approached the input token limit for ${config.getModel()}. ` +
+            `A compressed context will be sent for future messages (compressed from: ` +
+            `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
             `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
         },
         Date.now(),

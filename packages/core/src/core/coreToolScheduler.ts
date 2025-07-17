@@ -28,7 +28,6 @@ import {
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
 import * as Diff from 'diff';
-import { writeFileSync } from 'fs';
 
 export type ValidatingToolCall = {
   status: 'validating';

@@ -6,7 +6,6 @@
 
 import { useCallback, useMemo, useEffect, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
-import open from 'open';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useStateAndRef } from './useStateAndRef.js';
@@ -21,9 +20,6 @@ import {
 } from '../types.js';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
-import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
-import { getCliVersion } from '../../utils/version.js';
 import { LoadedSettings } from '../../config/settings.js';
 import {
   type CommandContext,
@@ -182,7 +178,7 @@ export const useSlashCommandProcessor = (
     ],
   );
 
-  const commandService = useMemo(() => new CommandService(), []);
+  const commandService = useMemo(() => new CommandService(config), [config]);
 
   useEffect(() => {
     const load = async () => {
@@ -200,103 +196,9 @@ export const useSlashCommandProcessor = (
     const commands: LegacySlashCommand[] = [
       // `/help` and `/clear` have been migrated and REMOVED from this list.
       {
-        name: 'editor',
-        description: 'set external editor preference',
-        action: (_mainCommand, _subCommand, _args) => openEditorDialog(),
-      },
-      {
         name: 'corgi',
         action: (_mainCommand, _subCommand, _args) => {
           toggleCorgiMode();
-        },
-      },
-      {
-        name: 'bug',
-        description: 'submit a bug report',
-        action: async (_mainCommand, _subCommand, args) => {
-          let bugDescription = _subCommand || '';
-          if (args) {
-            bugDescription += ` ${args}`;
-          }
-          bugDescription = bugDescription.trim();
-
-          const osVersion = `${process.platform} ${process.version}`;
-          let sandboxEnv = 'no sandbox';
-          if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-            sandboxEnv = process.env.SANDBOX.replace(/^gemini-(?:code-)?/, '');
-          } else if (process.env.SANDBOX === 'sandbox-exec') {
-            sandboxEnv = `sandbox-exec (${
-              process.env.SEATBELT_PROFILE || 'unknown'
-            })`;
-          }
-          const modelVersion = config?.getModel() || 'Unknown';
-          const cliVersion = await getCliVersion();
-          const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
-
-          const info = `
-*   **CLI Version:** ${cliVersion}
-*   **Git Commit:** ${GIT_COMMIT_INFO}
-*   **Operating System:** ${osVersion}
-*   **Sandbox Environment:** ${sandboxEnv}
-*   **Model Version:** ${modelVersion}
-*   **Memory Usage:** ${memoryUsage}
-`;
-
-          let bugReportUrl =
-            'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}';
-          const bugCommand = config?.getBugCommand();
-          if (bugCommand?.urlTemplate) {
-            bugReportUrl = bugCommand.urlTemplate;
-          }
-          bugReportUrl = bugReportUrl
-            .replace('{title}', encodeURIComponent(bugDescription))
-            .replace('{info}', encodeURIComponent(info));
-
-          addMessage({
-            type: MessageType.INFO,
-            content: `To submit your bug report, please open the following URL in your browser:\n${bugReportUrl}`,
-            timestamp: new Date(),
-          });
-          (async () => {
-            try {
-              await open(bugReportUrl);
-            } catch (error) {
-              const errorMessage =
-                error instanceof Error ? error.message : String(error);
-              addMessage({
-                type: MessageType.ERROR,
-                content: `Could not open URL in browser: ${errorMessage}`,
-                timestamp: new Date(),
-              });
-            }
-          })();
-        },
-      },
-      {
-        name: 'quit',
-        altName: 'exit',
-        description: 'exit the cli',
-        action: async (mainCommand, _subCommand, _args) => {
-          const now = new Date();
-          const { sessionStartTime } = session.stats;
-          const wallDuration = now.getTime() - sessionStartTime.getTime();
-
-          setQuittingMessages([
-            {
-              type: 'user',
-              text: `/${mainCommand}`,
-              id: now.getTime() - 1,
-            },
-            {
-              type: 'quit',
-              duration: formatDuration(wallDuration),
-              id: now.getTime(),
-            },
-          ]);
-
-          setTimeout(() => {
-            process.exit(0);
-          }, 100);
         },
       },
     ];
@@ -422,16 +324,7 @@ export const useSlashCommandProcessor = (
       });
     }
     return commands;
-  }, [
-    addMessage,
-    openEditorDialog,
-    toggleCorgiMode,
-    config,
-    session,
-    gitService,
-    loadHistory,
-    setQuittingMessages,
-  ]);
+  }, [addMessage, toggleCorgiMode, config, gitService, loadHistory]);
 
   const handleSlashCommand = useCallback(
     async (
@@ -518,6 +411,9 @@ export const useSlashCommandProcessor = (
                   case 'theme':
                     openThemeDialog();
                     return { type: 'handled' };
+                  case 'editor':
+                    openEditorDialog();
+                    return { type: 'handled' };
                   case 'privacy':
                     openPrivacyNotice();
                     return { type: 'handled' };
@@ -538,6 +434,12 @@ export const useSlashCommandProcessor = (
                 });
                 return { type: 'handled' };
               }
+              case 'quit':
+                setQuittingMessages(result.messages);
+                setTimeout(() => {
+                  process.exit(0);
+                }, 100);
+                return { type: 'handled' };
               default: {
                 const unhandled: never = result;
                 throw new Error(`Unhandled slash command result: ${unhandled}`);
@@ -616,6 +518,8 @@ export const useSlashCommandProcessor = (
       addMessage,
       openThemeDialog,
       openPrivacyNotice,
+      openEditorDialog,
+      setQuittingMessages,
     ],
   );
 

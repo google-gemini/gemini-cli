@@ -135,6 +135,14 @@ export class UiTelemetryService extends EventEmitter {
     return this.#lastPromptTokenCount;
   }
 
+  resetLastPromptTokenCount(): void {
+    this.#lastPromptTokenCount = 0;
+    this.emit('update', {
+      metrics: this.#metrics,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+    });
+  }
+
   private getOrCreateModelMetrics(modelName: string): ModelMetrics {
     if (!this.#metrics.models[modelName]) {
       this.#metrics.models[modelName] = createInitialModelMetrics();
