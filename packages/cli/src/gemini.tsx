@@ -228,9 +228,7 @@ export async function main() {
     process.exit(1);
   }
 
-  const promptMetadata = new PromptMetadata(
-    Math.random().toString(16).slice(2),
-  );
+  const promptMetadata = new PromptMetadata(config.getSessionId());
   logUserPrompt(config, {
     'event.name': 'user_prompt',
     'event.timestamp': new Date().toISOString(),

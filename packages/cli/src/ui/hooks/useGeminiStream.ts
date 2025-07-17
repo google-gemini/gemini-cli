@@ -558,7 +558,7 @@ export const useGeminiStream = (
 
       if (!promptMetadata) {
         promptMetadata = new PromptMetadata(
-          config.getSessionId() + '########' + getPromptCount(),
+          config.getSessionId() + '#' + getPromptCount(),
         );
       }
 
