@@ -15,6 +15,8 @@ import { Settings } from './settings.js';
 interface SandboxCliArgs {
   sandbox?: boolean | string;
   sandboxImage?: string;
+  runningGpu?: boolean;
+  gpuDevice?: string;
 }
 
 const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
@@ -94,14 +96,20 @@ export async function loadSandboxConfig(
   settings: Settings,
   argv: SandboxCliArgs,
 ): Promise<SandboxConfig | undefined> {
-  const sandboxOption = argv.sandbox ?? settings.sandbox;
+  // Automatically enable sandbox if GPU is requested
+  const sandboxOption =
+    argv.sandbox ??
+    settings.sandbox ??
+    !!process.env.GEMINI_SANDBOX_RUNNING_GPU;
   const command = getSandboxCommand(sandboxOption);
 
   const packageJson = await getPackageJson();
-  const image =
-    argv.sandboxImage ??
-    process.env.GEMINI_SANDBOX_IMAGE ??
-    packageJson?.config?.sandboxImageUri;
+  const image = argv.sandboxImage ??
+      process.env.GEMINI_SANDBOX_IMAGE ??
+      packageJson?.config?.sandboxImageUri;
 
-  return command && image ? { command, image } : undefined;
+  const runningGpu = argv.runningGpu ?? process.env.GEMINI_SANDBOX_RUNNING_GPU === 'true';
+  const gpuDevice = argv.gpuDevice ?? process.env.GEMINI_SANDBOX_GPU_DEVICE;
+
+  return command && image ? { command, image, runningGpu, gpuDevice } : undefined;
 }

@@ -616,6 +616,14 @@ export async function start_sandbox(
     args.push('--authfile', emptyAuthFilePath);
   }
 
+  if (config.runningGpu) {
+    // if running with GPU, add NVIDIA runtime and set up environment variables
+    args.push('--gpus', 'all');
+    if (config.command === 'docker') {
+      args.push('--runtime=nvidia');
+    }
+  }
+
   // Determine if the current user's UID/GID should be passed to the sandbox.
   // See shouldUseCurrentUserInSandbox for more details.
   let userFlag = '';
