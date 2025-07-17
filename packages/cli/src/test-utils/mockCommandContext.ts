@@ -76,15 +76,13 @@ export const createMockCommandContext = (
         const targetValue = output[key];
 
         if (
-          sourceValue &&
-          typeof sourceValue === 'object' &&
-          !Array.isArray(sourceValue) &&
-          targetValue &&
-          typeof targetValue === 'object' &&
-          !Array.isArray(targetValue)
+          // We only want to recursivlty merge plain objects
+          Object.prototype.toString.call(sourceValue) === '[object Object]' &&
+          Object.prototype.toString.call(targetValue) === '[object Object]'
         ) {
           output[key] = merge(targetValue, sourceValue);
         } else {
+          // If not, we do a direct assignment. This preserves Date objects and others.
           output[key] = sourceValue;
         }
       }
