@@ -6,6 +6,8 @@
 
 import { Buffer } from 'buffer';
 import * as https from 'https';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+
 import {
   StartSessionEvent,
   EndSessionEvent,
@@ -132,12 +134,18 @@ export class ClearcutLogger {
         headers: { 'Content-Length': Buffer.byteLength(body) },
       };
       const bufs: Buffer[] = [];
-      const req = https.request(options, (res) => {
-        res.on('data', (buf) => bufs.push(buf));
-        res.on('end', () => {
-          resolve(Buffer.concat(bufs));
-        });
-      });
+      const req = https.request(
+        {
+          ...options,
+          agent: this.getProxyAgent(),
+        },
+        (res) => {
+          res.on('data', (buf) => bufs.push(buf));
+          res.on('end', () => {
+            resolve(Buffer.concat(bufs));
+          });
+        },
+      );
       req.on('error', (e) => {
         if (this.config?.getDebugMode()) {
           console.log('Clearcut POST request error: ', e);
@@ -497,6 +505,18 @@ export class ClearcutLogger {
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
+  }
+
+  getProxyAgent() {
+    const proxyUrl = this.config?.getProxy();
+    if (!proxyUrl) return undefined;
+    // undici which is widely used in the repo can only support http & https proxy protocol,
+    // https://github.com/nodejs/undici/issues/2224
+    if (proxyUrl.startsWith('http')) {
+      return new HttpsProxyAgent(proxyUrl);
+    } else {
+      throw new Error('Unsupported proxy type');
+    }
   }
 
   shutdown() {
