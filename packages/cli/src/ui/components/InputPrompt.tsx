@@ -58,6 +58,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const [reverseSearchActive, setReverseSearchActive] = useState(false);
+  const [reverseSearchQuery, setReverseSearchQuery] = useState('');
+  const [originalBufferText, setOriginalBufferText] = useState('');
   const completion = useCompletion(
     buffer.text,
     config.getTargetDir(),
@@ -248,6 +251,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.name === 'escape') {
+        if (reverseSearchActive) {
+          setReverseSearchActive(false);
+          setReverseSearchQuery('');
+          buffer.setText(originalBufferText);
+          shellHistory.resetMatching();
+        }
+
         if (shellModeActive) {
           setShellModeActive(false);
           return;
@@ -314,7 +324,75 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             return;
           }
         } else {
-          // Shell History Navigation
+          // Shell History Navigation with reverse search
+          if (key.name === 'r' && key.ctrl && !reverseSearchActive) {
+            setReverseSearchActive(true);
+
+            setOriginalBufferText(buffer.text);
+            buffer.setText('');
+            setReverseSearchQuery('');
+            return;
+          }
+
+          if (reverseSearchActive) {
+            if (key.name === 'g' && key.ctrl) {
+              setReverseSearchActive(false);
+              shellHistory.resetMatching();
+              setReverseSearchQuery('');
+              buffer.setText(originalBufferText);
+              return;
+            }
+
+            if (key.name === 'up' || (key.name === 'r' && key.ctrl)) {
+              const nextMatch = shellHistory.getPreviousMatchingCommand();
+              if (nextMatch !== null) {
+                buffer.setText(nextMatch);
+              }
+              return;
+            }
+
+            if (key.name === 'down' || (key.name === 's' && key.ctrl)) {
+              const prevMatch = shellHistory.getNextMatchingCommand();
+              buffer.setText(prevMatch || '');
+              return;
+            }
+
+            if (key.name === 'backspace') {
+              const nextQuery = reverseSearchQuery.slice(0, -1);
+              setReverseSearchQuery(nextQuery);
+              const match = shellHistory.getMatchingCommand(nextQuery);
+              buffer.setText(match !== null ? match : nextQuery);
+              return;
+            }
+
+            if (key.name === 'return') {
+              const command = buffer.text;
+
+              setReverseSearchActive(false);
+              setReverseSearchQuery('');
+              shellHistory.resetMatching();
+              setOriginalBufferText('');
+              handleSubmitAndClear(command);
+
+              return;
+            }
+
+            if (
+              key.sequence &&
+              key.sequence.length > 0 &&
+              !key.ctrl &&
+              !key.meta
+            ) {
+              const nextQuery = reverseSearchQuery + key.sequence;
+              setReverseSearchQuery(nextQuery);
+              const match = shellHistory.getMatchingCommand(nextQuery);
+              buffer.setText(match || '');
+              return;
+            }
+            return;
+          }
+
+          // Normal shell history navigation
           if (key.name === 'up') {
             const prevCommand = shellHistory.getPreviousCommand();
             if (prevCommand !== null) buffer.setText(prevCommand);
@@ -406,6 +484,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleAutocomplete,
       handleSubmitAndClear,
       shellHistory,
+      reverseSearchActive,
+      reverseSearchQuery,
+      setReverseSearchActive,
+      setReverseSearchQuery,
+      originalBufferText,
+      setOriginalBufferText,
       handleClipboardImage,
       resetCompletionState,
     ],
@@ -428,7 +512,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         <Text
           color={shellModeActive ? Colors.AccentYellow : Colors.AccentPurple}
         >
-          {shellModeActive ? '! ' : '> '}
+          {shellModeActive ? (
+            reverseSearchActive ? (
+              <Text color={Colors.AccentCyan}>(r): </Text>
+            ) : (
+              '! '
+            )
+          ) : (
+            '> '
+          )}
         </Text>
         <Box flexGrow={1} flexDirection="column">
           {buffer.text.length === 0 && placeholder ? (
@@ -449,7 +541,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 display = display + ' '.repeat(inputWidth - currentVisualWidth);
               }
 
-              if (visualIdxInRenderedSet === cursorVisualRow) {
+              if (
+                visualIdxInRenderedSet === cursorVisualRow &&
+                !reverseSearchActive
+              ) {
                 const relativeVisualColForHighlight = cursorVisualColAbsolute;
 
                 if (relativeVisualColForHighlight >= 0) {
@@ -491,6 +586,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             userInput={buffer.text}
           />
         </Box>
+      )}
+      {reverseSearchActive && shellModeActive && (
+        <Text color={Colors.AccentYellow}>:{reverseSearchQuery}</Text>
       )}
     </>
   );
