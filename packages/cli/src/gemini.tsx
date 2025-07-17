@@ -37,6 +37,7 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
+  PromptMetadata,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -227,12 +228,15 @@ export async function main() {
     process.exit(1);
   }
 
-  const prompt_id = Math.random().toString(16).slice(2);
+  const promptMetadata = new PromptMetadata(
+    Math.random().toString(16).slice(2),
+  );
   logUserPrompt(config, {
     'event.name': 'user_prompt',
     'event.timestamp': new Date().toISOString(),
     prompt: input,
-    prompt_id,
+    // TODO rename prompt_id to promptId.
+    prompt_id: promptMetadata.getPromptId(),
     auth_type: config.getContentGeneratorConfig()?.authType,
     prompt_length: input.length,
   });
@@ -245,7 +249,7 @@ export async function main() {
     argv,
   );
 
-  await runNonInteractive(nonInteractiveConfig, input, prompt_id);
+  await runNonInteractive(nonInteractiveConfig, input, promptMetadata);
   process.exit(0);
 }
 

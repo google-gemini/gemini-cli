@@ -24,6 +24,7 @@ import {
   ThoughtSummary,
   UnauthorizedError,
   UserPromptEvent,
+  PromptMetadata,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion } from '@google/genai';
@@ -207,7 +208,7 @@ export const useGeminiStream = (
       query: PartListUnion,
       userMessageTimestamp: number,
       abortSignal: AbortSignal,
-      prompt_id: string,
+      promptMetadata: PromptMetadata,
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
@@ -227,7 +228,7 @@ export const useGeminiStream = (
           config,
           new UserPromptEvent(
             trimmedQuery.length,
-            prompt_id,
+            promptMetadata.getPromptId(),
             config.getContentGeneratorConfig()?.authType,
             trimmedQuery,
           ),
@@ -246,7 +247,8 @@ export const useGeminiStream = (
               name: toolName,
               args: toolArgs,
               isClientInitiated: true,
-              prompt_id,
+              // TODO rename prompt_id to promptId.
+              prompt_id: promptMetadata.getPromptId(),
             };
             scheduleToolCalls([toolCallRequest], abortSignal);
           }
@@ -532,7 +534,7 @@ export const useGeminiStream = (
     async (
       query: PartListUnion,
       options?: { isContinuation: boolean },
-      prompt_id?: string,
+      promptMetadata?: PromptMetadata,
     ) => {
       if (
         (streamingState === StreamingState.Responding ||
@@ -554,15 +556,17 @@ export const useGeminiStream = (
       const abortSignal = abortControllerRef.current.signal;
       turnCancelledRef.current = false;
 
-      if (!prompt_id) {
-        prompt_id = config.getSessionId() + '########' + getPromptCount();
+      if (!promptMetadata) {
+        promptMetadata = new PromptMetadata(
+          config.getSessionId() + '########' + getPromptCount(),
+        );
       }
 
       const { queryToSend, shouldProceed } = await prepareQueryForGemini(
         query,
         userMessageTimestamp,
         abortSignal,
-        prompt_id!,
+        promptMetadata!,
       );
 
       if (!shouldProceed || queryToSend === null) {
@@ -580,7 +584,8 @@ export const useGeminiStream = (
         const stream = geminiClient.sendMessageStream(
           queryToSend,
           abortSignal,
-          prompt_id!,
+          // TODO: To be refactored in a seperate PR.
+          promptMetadata!.getPromptId(),
         );
         const processingStatus = await processGeminiStreamEvents(
           stream,
@@ -744,6 +749,7 @@ export const useGeminiStream = (
         (toolCall) => toolCall.request.callId,
       );
 
+      // TODO: To be refactored in a seperate PR.
       const prompt_ids = geminiTools.map(
         (toolCall) => toolCall.request.prompt_id,
       );
@@ -760,7 +766,7 @@ export const useGeminiStream = (
         {
           isContinuation: true,
         },
-        prompt_ids[0],
+        new PromptMetadata(prompt_ids[0]),
       );
     },
     [

@@ -337,3 +337,11 @@ The structure MUST be as follows:
 </state_snapshot>
 `.trim();
 }
+
+export class PromptMetadata {
+  constructor(private readonly promptId: string) {}
+
+  getPromptId(): string {
+    return this.promptId;
+  }
+}

@@ -7,7 +7,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { Config, GeminiClient, ToolRegistry } from '@google/gemini-cli-core';
+import {
+  Config,
+  GeminiClient,
+  ToolRegistry,
+  PromptMetadata,
+} from '@google/gemini-cli-core';
 import { GenerateContentResponse, Part, FunctionCall } from '@google/genai';
 
 // Mock dependencies
@@ -82,7 +87,11 @@ describe('runNonInteractive', () => {
     })();
     mockChat.sendMessageStream.mockResolvedValue(inputStream);
 
-    await runNonInteractive(mockConfig, 'Test input', 'prompt-id-1');
+    await runNonInteractive(
+      mockConfig,
+      'Test input',
+      new PromptMetadata('prompt-id-1'),
+    );
 
     expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
       {
@@ -135,7 +144,11 @@ describe('runNonInteractive', () => {
       .mockResolvedValueOnce(stream1)
       .mockResolvedValueOnce(stream2);
 
-    await runNonInteractive(mockConfig, 'Use a tool', 'prompt-id-2');
+    await runNonInteractive(
+      mockConfig,
+      'Use a tool',
+      new PromptMetadata('prompt-id-2'),
+    );
 
     expect(mockChat.sendMessageStream).toHaveBeenCalledTimes(2);
     expect(mockCoreExecuteToolCall).toHaveBeenCalledWith(
@@ -195,7 +208,11 @@ describe('runNonInteractive', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
-    await runNonInteractive(mockConfig, 'Trigger tool error', 'prompt-id-3');
+    await runNonInteractive(
+      mockConfig,
+      'Trigger tool error',
+      new PromptMetadata('prompt-id-3'),
+    );
 
     expect(mockCoreExecuteToolCall).toHaveBeenCalled();
     expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -219,7 +236,11 @@ describe('runNonInteractive', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
-    await runNonInteractive(mockConfig, 'Initial fail', 'prompt-id-4');
+    await runNonInteractive(
+      mockConfig,
+      'Initial fail',
+      new PromptMetadata('prompt-id-4'),
+    );
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       '[API Error: API connection failed]',
@@ -274,7 +295,7 @@ describe('runNonInteractive', () => {
     await runNonInteractive(
       mockConfig,
       'Trigger tool not found',
-      'prompt-id-5',
+      new PromptMetadata('prompt-id-5'),
     );
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
