@@ -947,16 +947,20 @@ describe('loadCliConfig ideMode', () => {
     expect(mcpServers['_ide_server'].trust).toBe(false);
   });
 
-  it('should throw an error if ideMode is true and no port is set', async () => {
+  it('should warn if ideMode is true and no port is set', async () => {
+    const consoleWarnSpy = vi
+      .spyOn(console, 'warn')
+      .mockImplementation(() => {});
     process.argv = ['node', 'script.js', '--ide-mode'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
     const settings: Settings = {};
-    await expect(
-      loadCliConfig(settings, [], 'test-session', argv),
-    ).rejects.toThrow(
+    await loadCliConfig(settings, [], 'test-session', argv);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[WARN]',
       'Could not connect to IDE. Make sure you have the companion VS Code extension installed from the marketplace or via /ide install.',
     );
+    consoleWarnSpy.mockRestore();
   });
 
   it('should warn and overwrite if settings contain the reserved _ide_server name and ideMode is active', async () => {
