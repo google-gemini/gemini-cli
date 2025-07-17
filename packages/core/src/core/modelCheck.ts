@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { setGlobalDispatcher, ProxyAgent } from 'undici';
 import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -20,6 +21,7 @@ import {
 export async function getEffectiveModel(
   apiKey: string,
   currentConfiguredModel: string,
+  proxy?: string,
 ): Promise<string> {
   if (currentConfiguredModel !== DEFAULT_GEMINI_MODEL) {
     // Only check if the user is trying to use the specific pro model we want to fallback from.
@@ -43,6 +45,9 @@ export async function getEffectiveModel(
   const timeoutId = setTimeout(() => controller.abort(), 2000); // 500ms timeout for the request
 
   try {
+    if (proxy) {
+      setGlobalDispatcher(new ProxyAgent(proxy));
+    }
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
