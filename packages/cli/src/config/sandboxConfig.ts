@@ -104,12 +104,16 @@ export async function loadSandboxConfig(
   const command = getSandboxCommand(sandboxOption);
 
   const packageJson = await getPackageJson();
-  const image = argv.sandboxImage ??
-      process.env.GEMINI_SANDBOX_IMAGE ??
-      packageJson?.config?.sandboxImageUri;
+  const image =
+    argv.sandboxImage ??
+    process.env.GEMINI_SANDBOX_IMAGE ??
+    packageJson?.config?.sandboxImageUri;
 
-  const runningGpu = argv.runningGpu ?? process.env.GEMINI_SANDBOX_RUNNING_GPU === 'true';
+  const runningGpu =
+    argv.runningGpu ?? process.env.GEMINI_SANDBOX_RUNNING_GPU === 'true';
   const gpuDevice = argv.gpuDevice ?? process.env.GEMINI_SANDBOX_GPU_DEVICE;
 
-  return command && image ? { command, image, runningGpu, gpuDevice } : undefined;
+  return command && image
+    ? { command, image, runningGpu, gpuDevice }
+    : undefined;
 }
