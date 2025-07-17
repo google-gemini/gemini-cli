@@ -9,9 +9,11 @@ import * as path from 'path';
 import * as Diff from 'diff';
 import {
   BaseTool,
+  Icon,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolEditConfirmationDetails,
+  ToolLocation,
   ToolResult,
   ToolResultDisplay,
 } from './tools.js';
@@ -89,6 +91,7 @@ Expectation for required parameters:
 4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
 **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
 **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
+      Icon.Pencil,
       {
         properties: {
           file_path: {
@@ -139,6 +142,15 @@ Expectation for required parameters:
     }
 
     return null;
+  }
+
+  /**
+   * Determines any file locations affected by the tool execution
+   * @param params Parameters for the tool execution
+   * @returns A list of such paths
+   */
+  toolLocations(params: EditToolParams): ToolLocation[] {
+    return [{ path: params.file_path }];
   }
 
   private _applyReplacement(
@@ -306,6 +318,8 @@ Expectation for required parameters:
       title: `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.config.getTargetDir()))}`,
       fileName,
       fileDiff,
+      originalContent: editData.currentContent,
+      newContent: editData.newContent,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
@@ -394,7 +408,12 @@ Expectation for required parameters:
           'Proposed',
           DEFAULT_DIFF_OPTIONS,
         );
-        displayResult = { fileDiff, fileName };
+        displayResult = {
+          fileDiff,
+          fileName,
+          originalContent: editData.currentContent,
+          newContent: editData.newContent,
+        };
       }
 
       const llmSuccessMessageParts = [

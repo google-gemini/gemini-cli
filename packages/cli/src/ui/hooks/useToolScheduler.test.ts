@@ -23,7 +23,8 @@ import {
   ToolCallResponseInfo,
   ToolCall, // Import from core
   Status as ToolCallStatusType,
-  ApprovalMode, // Import from core
+  ApprovalMode,
+  Icon,
 } from '@google/gemini-cli-core';
 import {
   HistoryItemWithoutId,
@@ -56,6 +57,8 @@ const mockTool: Tool = {
   name: 'mockTool',
   displayName: 'Mock Tool',
   description: 'A mock tool for testing',
+  icon: Icon.Hammer,
+  toolLocations: vi.fn(),
   isOutputMarkdown: false,
   canUpdateOutput: false,
   schema: {},
@@ -85,6 +88,8 @@ const mockToolRequiresConfirmation: Tool = {
       onConfirm: mockOnUserConfirmForToolConfirmation,
       fileName: 'mockToolRequiresConfirmation.ts',
       fileDiff: 'Mock tool requires confirmation',
+      originalContent: 'Original content',
+      newContent: 'New content',
     }),
   ),
 };
@@ -807,6 +812,8 @@ describe('mapToDisplay', () => {
     isOutputMarkdown: false,
     canUpdateOutput: false,
     schema: {},
+    icon: Icon.Hammer,
+    toolLocations: vi.fn(),
     validateToolParams: vi.fn(),
     execute: vi.fn(),
     shouldConfirmExecute: vi.fn(),
@@ -885,6 +892,8 @@ describe('mapToDisplay', () => {
           toolDisplayName: 'Test Tool Display',
           fileName: 'test.ts',
           fileDiff: 'Test diff',
+          originalContent: 'Original content',
+          newContent: 'New content',
         } as ToolCallConfirmationDetails,
       },
       expectedStatus: ToolCallStatus.Confirming,

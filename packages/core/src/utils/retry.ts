@@ -216,7 +216,7 @@ export async function retryWithBackoff<T>(
  * @param error The error object.
  * @returns The HTTP status code, or undefined if not found.
  */
-function getErrorStatus(error: unknown): number | undefined {
+export function getErrorStatus(error: unknown): number | undefined {
   if (typeof error === 'object' && error !== null) {
     if ('status' in error && typeof error.status === 'number') {
       return error.status;
