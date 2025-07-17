@@ -81,6 +81,7 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { useChatRecordingService } from './hooks/useChatRecording.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -107,7 +108,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     checkForUpdates().then(setUpdateMessage);
   }, []);
 
-  const { history, addItem, clearItems, loadHistory } = useHistory();
+  // Initialize the AutoSavingService to automatically log conversation history.
+  const chatRecordingService = useChatRecordingService(config);
+
+  const { history, addItem, clearItems, loadHistory } = useHistory({
+    chatRecordingService,
+  });
   const {
     consoleMessages,
     handleNewMessage,
@@ -528,6 +534,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     performMemoryRefresh,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
+    chatRecordingService,
   );
   pendingHistoryItems.push(...pendingGeminiHistoryItems);
   const { elapsedTime, currentLoadingPhrase } =

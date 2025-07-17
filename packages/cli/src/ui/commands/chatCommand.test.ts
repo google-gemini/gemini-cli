@@ -20,59 +20,37 @@ import {
   SlashCommand,
 } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { Content } from '@google/genai';
-import { GeminiClient } from '@google/gemini-cli-core';
+import { MessageType } from '../types.js';
 
 import * as fsPromises from 'fs/promises';
 import { chatCommand } from './chatCommand.js';
-import { Stats } from 'fs';
-import { HistoryItemWithoutId } from '../types.js';
 
 vi.mock('fs/promises', () => ({
   stat: vi.fn(),
   readdir: vi.fn().mockResolvedValue(['file1.txt', 'file2.txt'] as string[]),
+  readFile: vi.fn(),
 }));
 
 describe('chatCommand', () => {
   const mockFs = fsPromises as Mocked<typeof fsPromises>;
 
   let mockContext: CommandContext;
-  let mockGetChat: ReturnType<typeof vi.fn>;
-  let mockSaveCheckpoint: ReturnType<typeof vi.fn>;
-  let mockLoadCheckpoint: ReturnType<typeof vi.fn>;
-  let mockGetHistory: ReturnType<typeof vi.fn>;
 
-  const getSubCommand = (name: 'list' | 'save' | 'resume'): SlashCommand => {
+  const getSubCommand = (name: 'list' | 'resume' | 'search'): SlashCommand => {
     const subCommand = chatCommand.subCommands?.find(
       (cmd) => cmd.name === name,
     );
     if (!subCommand) {
-      throw new Error(`/memory ${name} command not found.`);
+      throw new Error(`/chat ${name} command not found.`);
     }
     return subCommand;
   };
 
   beforeEach(() => {
-    mockGetHistory = vi.fn().mockReturnValue([]);
-    mockGetChat = vi.fn().mockResolvedValue({
-      getHistory: mockGetHistory,
-    });
-    mockSaveCheckpoint = vi.fn().mockResolvedValue(undefined);
-    mockLoadCheckpoint = vi.fn().mockResolvedValue([]);
-
     mockContext = createMockCommandContext({
       services: {
         config: {
           getProjectTempDir: () => '/tmp/gemini',
-          getGeminiClient: () =>
-            ({
-              getChat: mockGetChat,
-            }) as unknown as GeminiClient,
-        },
-        logger: {
-          saveCheckpoint: mockSaveCheckpoint,
-          loadCheckpoint: mockLoadCheckpoint,
-          initialize: vi.fn().mockResolvedValue(undefined),
         },
       },
     });
@@ -84,7 +62,9 @@ describe('chatCommand', () => {
 
   it('should have the correct main command definition', () => {
     expect(chatCommand.name).toBe('chat');
-    expect(chatCommand.description).toBe('Manage conversation history.');
+    expect(chatCommand.description).toBe(
+      'Browse auto-saved conversations. Usage: /chat <list|resume|search>',
+    );
     expect(chatCommand.subCommands).toHaveLength(3);
   });
 
@@ -95,7 +75,7 @@ describe('chatCommand', () => {
       listCommand = getSubCommand('list');
     });
 
-    it('should inform when no checkpoints are found', async () => {
+    it('should inform when no conversations are found', async () => {
       mockFs.readdir.mockImplementation(
         (async (_: string): Promise<string[]> =>
           [] as string[]) as unknown as typeof fsPromises.readdir,
@@ -104,24 +84,36 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: 'No saved conversation checkpoints found.',
+        content: 'No auto-saved conversations found.',
       });
     });
 
-    it('should list found checkpoints', async () => {
-      const fakeFiles = ['checkpoint-test1.json', 'checkpoint-test2.json'];
-      const date = new Date();
+    it('should list found conversations', async () => {
+      const fakeFiles = ['session1.json', 'session2.json'];
+      const mockConversationData = {
+        startTime: '2025-01-01T00:00:00Z',
+        lastUpdated: '2025-01-01T01:00:00Z',
+        messages: [
+          { type: 'user', content: 'Hello', timestamp: '2025-01-01T00:00:00Z' },
+          {
+            type: 'model',
+            content: 'Hi there',
+            timestamp: '2025-01-01T00:01:00Z',
+          },
+        ],
+      };
 
       mockFs.readdir.mockImplementation(
         (async (_: string): Promise<string[]> =>
           fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
       );
-      mockFs.stat.mockImplementation((async (path: string): Promise<Stats> => {
-        if (path.endsWith('test1.json')) {
-          return { mtime: date } as Stats;
-        }
-        return { mtime: new Date(date.getTime() + 1000) } as Stats;
-      }) as unknown as typeof fsPromises.stat);
+
+      mockFs.readFile.mockImplementation(
+        (async (_: string): Promise<string> =>
+          JSON.stringify(
+            mockConversationData,
+          )) as unknown as typeof fsPromises.readFile,
+      );
 
       const result = (await listCommand?.action?.(
         mockContext,
@@ -130,148 +122,196 @@ describe('chatCommand', () => {
 
       const content = result?.content ?? '';
       expect(result?.type).toBe('message');
-      expect(content).toContain('List of saved conversations:');
-      const index1 = content.indexOf('- \u001b[36mtest1\u001b[0m');
-      const index2 = content.indexOf('- \u001b[36mtest2\u001b[0m');
-      expect(index1).toBeGreaterThanOrEqual(0);
-      expect(index2).toBeGreaterThan(index1);
-    });
-  });
-  describe('save subcommand', () => {
-    let saveCommand: SlashCommand;
-    const tag = 'my-tag';
-    beforeEach(() => {
-      saveCommand = getSubCommand('save');
-    });
-
-    it('should return an error if tag is missing', async () => {
-      const result = await saveCommand?.action?.(mockContext, '  ');
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'error',
-        content: 'Missing tag. Usage: /chat save <tag>',
-      });
-    });
-
-    it('should inform if conversation history is empty', async () => {
-      mockGetHistory.mockReturnValue([]);
-      const result = await saveCommand?.action?.(mockContext, tag);
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content: 'No conversation found to save.',
-      });
-    });
-
-    it('should save the conversation', async () => {
-      const history: HistoryItemWithoutId[] = [
-        {
-          type: 'user',
-          text: 'hello',
-        },
-      ];
-      mockGetHistory.mockReturnValue(history);
-      const result = await saveCommand?.action?.(mockContext, tag);
-
-      expect(mockSaveCheckpoint).toHaveBeenCalledWith(history, tag);
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content: `Conversation checkpoint saved with tag: ${tag}.`,
-      });
+      expect(content).toContain('Auto-saved conversations:');
+      expect(content).toContain('session1 (2 messages');
+      expect(content).toContain('session2 (2 messages');
     });
   });
 
   describe('resume subcommand', () => {
-    const goodTag = 'good-tag';
-    const badTag = 'bad-tag';
-
     let resumeCommand: SlashCommand;
+
     beforeEach(() => {
       resumeCommand = getSubCommand('resume');
     });
 
-    it('should return an error if tag is missing', async () => {
+    it('should return an error if session ID is missing', async () => {
       const result = await resumeCommand?.action?.(mockContext, '');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing session ID. Usage: /chat resume <session-id>',
+      });
+    });
+
+    it('should inform if conversation is not found', async () => {
+      mockFs.readFile.mockRejectedValue(new Error('File not found'));
+
+      const result = await resumeCommand?.action?.(mockContext, 'nonexistent');
 
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat resume <tag>',
-      });
-    });
-
-    it('should inform if checkpoint is not found', async () => {
-      mockLoadCheckpoint.mockResolvedValue([]);
-
-      const result = await resumeCommand?.action?.(mockContext, badTag);
-
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content: `No saved checkpoint found with tag: ${badTag}.`,
+        content: 'Error resuming conversation: File not found',
       });
     });
 
     it('should resume a conversation', async () => {
-      const conversation: Content[] = [
-        { role: 'user', parts: [{ text: 'hello gemini' }] },
-        { role: 'model', parts: [{ text: 'hello world' }] },
-      ];
-      mockLoadCheckpoint.mockResolvedValue(conversation);
+      const mockConversationData = {
+        startTime: '2025-01-01T00:00:00Z',
+        lastUpdated: '2025-01-01T01:00:00Z',
+        messages: [
+          {
+            type: 'user',
+            content: 'Hello Gemini',
+            timestamp: '2025-01-01T00:00:00Z',
+          },
+          {
+            type: 'model',
+            content: 'Hello world',
+            timestamp: '2025-01-01T00:01:00Z',
+          },
+        ],
+      };
 
-      const result = await resumeCommand?.action?.(mockContext, goodTag);
+      mockFs.readFile.mockImplementation(
+        (async (_: string): Promise<string> =>
+          JSON.stringify(
+            mockConversationData,
+          )) as unknown as typeof fsPromises.readFile,
+      );
+
+      const result = await resumeCommand?.action?.(mockContext, 'test-session');
 
       expect(result).toEqual({
         type: 'load_history',
         history: [
-          { type: 'user', text: 'hello gemini' },
-          { type: 'gemini', text: 'hello world' },
-        ] as HistoryItemWithoutId[],
-        clientHistory: conversation,
+          { type: MessageType.USER, text: 'Hello Gemini' },
+          { type: MessageType.GEMINI, text: 'Hello world' },
+        ],
+        clientHistory: [
+          { role: 'user', parts: [{ text: 'Hello Gemini' }] },
+          { role: 'model', parts: [{ text: 'Hello world' }] },
+        ],
       });
     });
 
     describe('completion', () => {
       it('should provide completion suggestions', async () => {
-        const fakeFiles = ['checkpoint-alpha.json', 'checkpoint-beta.json'];
-        mockFs.readdir.mockImplementation(
-          (async (_: string): Promise<string[]> =>
-            fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+        const fakeFiles = [
+          'session-2025-07-17T16-33-deb82d22.json',
+          'session-2025-07-17T16-35-abc123ef.json',
+        ];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockFs.readdir.mockResolvedValue(fakeFiles as any);
+
+        const result = await resumeCommand?.completion?.(
+          mockContext,
+          'session-2025-07-17T16-33',
         );
 
-        mockFs.stat.mockImplementation(
-          (async (_: string): Promise<Stats> =>
-            ({
-              mtime: new Date(),
-            }) as Stats) as unknown as typeof fsPromises.stat,
-        );
-
-        const result = await resumeCommand?.completion?.(mockContext, 'a');
-
-        expect(result).toEqual(['alpha']);
+        expect(mockFs.readdir).toHaveBeenCalledWith('\\tmp\\gemini\\chats');
+        expect(result).toEqual(['session-2025-07-17T16-33-deb82d22']);
       });
 
-      it('should suggest filenames sorted by modified time (newest first)', async () => {
-        const fakeFiles = ['checkpoint-test1.json', 'checkpoint-test2.json'];
-        const date = new Date();
+      it('should handle empty directory', async () => {
         mockFs.readdir.mockImplementation(
           (async (_: string): Promise<string[]> =>
-            fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+            [] as string[]) as unknown as typeof fsPromises.readdir,
         );
-        mockFs.stat.mockImplementation((async (
-          path: string,
-        ): Promise<Stats> => {
-          if (path.endsWith('test1.json')) {
-            return { mtime: date } as Stats;
-          }
-          return { mtime: new Date(date.getTime() + 1000) } as Stats;
-        }) as unknown as typeof fsPromises.stat);
 
         const result = await resumeCommand?.completion?.(mockContext, '');
-        // Sort items by last modified time (newest first)
-        expect(result).toEqual(['test2', 'test1']);
+
+        expect(result).toEqual([]);
       });
+    });
+  });
+
+  describe('search subcommand', () => {
+    let searchCommand: SlashCommand;
+
+    beforeEach(() => {
+      searchCommand = getSubCommand('search');
+    });
+
+    it('should return an error if search query is missing', async () => {
+      const result = await searchCommand?.action?.(mockContext, '');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing search query. Usage: /chat search <text>',
+      });
+    });
+
+    it('should inform when no matches are found', async () => {
+      const fakeFiles = ['session1.json'];
+      const mockConversationData = {
+        startTime: '2025-01-01T00:00:00Z',
+        lastUpdated: '2025-01-01T01:00:00Z',
+        messages: [
+          { type: 'user', content: 'Hello', timestamp: '2025-01-01T00:00:00Z' },
+        ],
+      };
+
+      mockFs.readdir.mockImplementation(
+        (async (_: string): Promise<string[]> =>
+          fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+      );
+
+      mockFs.readFile.mockImplementation(
+        (async (_: string): Promise<string> =>
+          JSON.stringify(
+            mockConversationData,
+          )) as unknown as typeof fsPromises.readFile,
+      );
+
+      const result = await searchCommand?.action?.(mockContext, 'goodbye');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'No conversations found containing "goodbye".',
+      });
+    });
+
+    it('should find and display matching conversations', async () => {
+      const fakeFiles = ['session1.json', 'session2.json'];
+      const mockConversationData = {
+        startTime: '2025-01-01T00:00:00Z',
+        lastUpdated: '2025-01-01T01:00:00Z',
+        messages: [
+          {
+            type: 'user',
+            content: 'Hello world',
+            timestamp: '2025-01-01T00:00:00Z',
+          },
+          {
+            type: 'model',
+            content: 'Hi there',
+            timestamp: '2025-01-01T00:01:00Z',
+          },
+        ],
+      };
+
+      mockFs.readdir.mockImplementation(
+        (async (_: string): Promise<string[]> =>
+          fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+      );
+
+      mockFs.readFile.mockImplementation(
+        (async (_: string): Promise<string> =>
+          JSON.stringify(
+            mockConversationData,
+          )) as unknown as typeof fsPromises.readFile,
+      );
+
+      const result = await searchCommand?.action?.(mockContext, 'hello');
+
+      const content = (result as MessageActionReturn)?.content ?? '';
+      expect(result?.type).toBe('message');
+      expect(content).toContain('Found "hello" in:');
+      expect(content).toContain('session1: 1 matches');
+      expect(content).toContain('session2: 1 matches');
     });
   });
 });

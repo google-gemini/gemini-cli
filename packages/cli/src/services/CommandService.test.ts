@@ -11,7 +11,7 @@ import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
 import { docsCommand } from '../ui/commands/docsCommand.js';
-import { chatCommand } from '../ui/commands/chatCommand.js';
+import { forkCommand } from '../ui/commands/forkCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
@@ -21,6 +21,7 @@ import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
+import { chatCommand } from '../ui/commands/chatCommand.js';
 
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
@@ -62,9 +63,12 @@ vi.mock('../ui/commands/compressCommand.js', () => ({
 vi.mock('../ui/commands/mcpCommand.js', () => ({
   mcpCommand: { name: 'mcp', description: 'Mock MCP' },
 }));
+vi.mock('../ui/commands/forkCommand.js', () => ({
+  forkCommand: { name: 'fork', description: 'Mock Fork' },
+}));
 
 describe('CommandService', () => {
-  const subCommandLen = 14;
+  const subCommandLen = 15;
 
   describe('when using default production loader', () => {
     let commandService: CommandService;
@@ -97,7 +101,7 @@ describe('CommandService', () => {
         expect(commandNames).toContain('help');
         expect(commandNames).toContain('clear');
         expect(commandNames).toContain('docs');
-        expect(commandNames).toContain('chat');
+        expect(commandNames).toContain('fork');
         expect(commandNames).toContain('theme');
         expect(commandNames).toContain('stats');
         expect(commandNames).toContain('privacy');
@@ -106,6 +110,7 @@ describe('CommandService', () => {
         expect(commandNames).toContain('tools');
         expect(commandNames).toContain('compress');
         expect(commandNames).toContain('mcp');
+        expect(commandNames).toContain('chat');
       });
 
       it('should overwrite any existing commands when called again', async () => {
@@ -139,6 +144,7 @@ describe('CommandService', () => {
           compressCommand,
           docsCommand,
           extensionsCommand,
+          forkCommand,
           helpCommand,
           mcpCommand,
           memoryCommand,

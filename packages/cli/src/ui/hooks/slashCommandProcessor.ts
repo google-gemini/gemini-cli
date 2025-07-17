@@ -272,7 +272,6 @@ export const useSlashCommandProcessor = (
           })();
         },
       },
-
       {
         name: 'quit',
         altName: 'exit',

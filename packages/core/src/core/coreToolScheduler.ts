@@ -18,6 +18,7 @@ import {
   logToolCall,
   ToolCallEvent,
   ToolConfirmationPayload,
+  ChatRecordingService,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
@@ -27,6 +28,7 @@ import {
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
 import * as Diff from 'diff';
+import { writeFileSync } from 'fs';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -221,6 +223,7 @@ interface CoreToolSchedulerOptions {
   approvalMode?: ApprovalMode;
   getPreferredEditor: () => EditorType | undefined;
   config: Config;
+  chatRecordingService?: ChatRecordingService;
 }
 
 export class CoreToolScheduler {
@@ -232,6 +235,7 @@ export class CoreToolScheduler {
   private approvalMode: ApprovalMode;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
+  private chatRecordingService?: ChatRecordingService;
 
   constructor(options: CoreToolSchedulerOptions) {
     this.config = options.config;
@@ -241,6 +245,7 @@ export class CoreToolScheduler {
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.approvalMode = options.approvalMode ?? ApprovalMode.DEFAULT;
     this.getPreferredEditor = options.getPreferredEditor;
+    this.chatRecordingService = options.chatRecordingService;
   }
 
   private setStatusInternal(
@@ -687,12 +692,25 @@ export class CoreToolScheduler {
   }
 
   private checkAndNotifyCompletion(): void {
-    const allCallsAreTerminal = this.toolCalls.every(
-      (call) =>
-        call.status === 'success' ||
-        call.status === 'error' ||
-        call.status === 'cancelled',
-    );
+    const isToolCallTerminal = (call: ToolCall) =>
+      call.status === 'success' ||
+      call.status === 'error' ||
+      call.status === 'cancelled';
+    const allCallsAreTerminal = this.toolCalls.every(isToolCallTerminal);
+
+    // Add all the tool calls in their current state: pending, executing success, or any other.
+    if (this.chatRecordingService) {
+      this.chatRecordingService.recordToolCalls(
+        this.toolCalls.map((c) => ({
+          id: c.request.callId,
+          name: c.request.name,
+          args: c.request.args,
+          result: isToolCallTerminal(c) ? c.response?.responseParts : null,
+          status: c.status,
+          timestamp: new Date().toISOString(),
+        })),
+      );
+    }
 
     if (this.toolCalls.length > 0 && allCallsAreTerminal) {
       const completedCalls = [...this.toolCalls] as CompletedToolCall[];

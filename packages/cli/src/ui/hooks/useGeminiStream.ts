@@ -25,6 +25,7 @@ import {
   UnauthorizedError,
   UserPromptEvent,
   DEFAULT_GEMINI_FLASH_MODEL,
+  ChatRecordingService,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion } from '@google/genai';
 import {
@@ -93,6 +94,7 @@ export const useGeminiStream = (
   performMemoryRefresh: () => Promise<void>,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
+  chatRecordingService: ChatRecordingService,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -133,6 +135,7 @@ export const useGeminiStream = (
       config,
       setPendingHistoryItem,
       getPreferredEditor,
+      chatRecordingService,
     );
 
   const pendingToolCallGroupDisplay = useMemo(
@@ -242,7 +245,9 @@ export const useGeminiStream = (
           if (slashCommandResult.type === 'schedule_tool') {
             const { toolName, toolArgs } = slashCommandResult;
             const toolCallRequest: ToolCallRequestInfo = {
-              callId: `${toolName}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+              callId: `${toolName}-${Date.now()}-${Math.random()
+                .toString(16)
+                .slice(2)}`,
               name: toolName,
               args: toolArgs,
               isClientInitiated: true,
@@ -428,9 +433,9 @@ export const useGeminiStream = (
         {
           type: 'info',
           text:
-            `IMPORTANT: This conversation approached the input token limit for ${config.getModel()}. ` +
-            `A compressed context will be sent for future messages (compressed from: ` +
-            `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
+        `IMPORTANT: This conversation approached the input token limit for ${config.getModel()}. ` +
+        `A compressed context will be sent for future messages (compressed from: ` +
+        `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
             `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
         },
         Date.now(),
@@ -474,6 +479,7 @@ export const useGeminiStream = (
         switch (event.type) {
           case ServerGeminiEventType.Thought:
             setThought(event.value);
+            chatRecordingService.recordThought(event.value);
             break;
           case ServerGeminiEventType.Content:
             geminiMessageBuffer = handleContentEvent(
@@ -525,6 +531,7 @@ export const useGeminiStream = (
       scheduleToolCalls,
       handleChatCompressionEvent,
       handleMaxSessionTurnsEvent,
+      chatRecordingService,
     ],
   );
 
@@ -804,7 +811,9 @@ export const useGeminiStream = (
         } catch (error) {
           if (!isNodeError(error) || error.code !== 'EEXIST') {
             onDebugMessage(
-              `Failed to create checkpoint directory: ${getErrorMessage(error)}`,
+              `Failed to create checkpoint directory: ${getErrorMessage(
+                error,
+              )}`,
             );
             return;
           }

@@ -17,6 +17,7 @@ import {
   ToolCallEvent,
   ToolCallDecision,
 } from './types.js';
+import { ChatRecordingService } from '../services/chatRecordingService.js';
 
 export type UiEvent =
   | (ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE })
@@ -102,6 +103,7 @@ const createInitialMetrics = (): SessionMetrics => ({
 export class UiTelemetryService extends EventEmitter {
   #metrics: SessionMetrics = createInitialMetrics();
   #lastPromptTokenCount = 0;
+  #chatRecordingService: ChatRecordingService | null = null;
 
   addEvent(event: UiEvent) {
     switch (event['event.name']) {
@@ -154,6 +156,17 @@ export class UiTelemetryService extends EventEmitter {
     modelMetrics.tokens.tool += event.tool_token_count;
 
     this.#lastPromptTokenCount = event.input_token_count;
+
+    if (this.#chatRecordingService) {
+      this.#chatRecordingService.recordMessageTokens({
+        input: event.input_token_count,
+        output: event.output_token_count,
+        cached: event.cached_content_token_count,
+        thoughts: event.thoughts_token_count,
+        tool: event.tool_token_count,
+        total: event.total_token_count,
+      });
+    }
   }
 
   private processApiError(event: ApiErrorEvent) {
@@ -201,6 +214,10 @@ export class UiTelemetryService extends EventEmitter {
       tools.totalDecisions[event.decision]++;
       toolStats.decisions[event.decision]++;
     }
+  }
+
+  setChatRecordingService(chatRecordingService: ChatRecordingService) {
+    this.#chatRecordingService = chatRecordingService;
   }
 }
 
