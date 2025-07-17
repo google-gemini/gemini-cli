@@ -57,6 +57,7 @@ export interface CliArgs {
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   ideMode: boolean | undefined;
+  proxy: string | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -182,7 +183,11 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'Run in IDE mode?',
     })
-
+    .option('proxy', {
+      type: 'string',
+      description:
+        'Proxy for gemini client, like schema://user:password@host:port',
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -312,27 +317,28 @@ export async function loadCliConfig(
       );
     }
     const companionPort = process.env.GEMINI_CLI_IDE_SERVER_PORT;
-    if (!companionPort) {
-      throw new Error(
+    if (companionPort) {
+      const httpUrl = `http://localhost:${companionPort}/mcp`;
+      mcpServers[IDE_SERVER_NAME] = new MCPServerConfig(
+        undefined, // command
+        undefined, // args
+        undefined, // env
+        undefined, // cwd
+        undefined, // url
+        httpUrl, // httpUrl
+        undefined, // headers
+        undefined, // tcp
+        undefined, // timeout
+        false, // trust
+        'IDE connection', // description
+        undefined, // includeTools
+        undefined, // excludeTools
+      );
+    } else {
+      logger.warn(
         'Could not connect to IDE. Make sure you have the companion VS Code extension installed from the marketplace or via /ide install.',
       );
     }
-    const httpUrl = `http://localhost:${companionPort}/mcp`;
-    mcpServers[IDE_SERVER_NAME] = new MCPServerConfig(
-      undefined, // command
-      undefined, // args
-      undefined, // env
-      undefined, // cwd
-      undefined, // url
-      httpUrl, // httpUrl
-      undefined, // headers
-      undefined, // tcp
-      undefined, // timeout
-      false, // trust
-      'IDE connection', // description
-      undefined, // includeTools
-      undefined, // excludeTools
-    );
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
@@ -379,6 +385,7 @@ export async function loadCliConfig(
     },
     checkpointing: argv.checkpointing || settings.checkpointing?.enabled,
     proxy:
+      argv.proxy ||
       process.env.HTTPS_PROXY ||
       process.env.https_proxy ||
       process.env.HTTP_PROXY ||
