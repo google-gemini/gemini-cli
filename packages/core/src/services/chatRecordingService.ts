@@ -199,14 +199,9 @@ export class ChatRecordingService {
         // If the last message already has token info, it's because this new token info is for a
         // new message that hasn't been recorded yet.
         if (lastMsg && lastMsg.type === 'gemini' && !lastMsg.tokens) {
-          console.log(
-            'Adding tokens to existing gemini message; prev tokens =',
-            lastMsg.tokens,
-          );
           lastMsg.tokens = tokens;
           this.queuedTokens = null;
         } else {
-          console.log('Queuing tokens for next gemini message');
           this.queuedTokens = tokens;
         }
       });
@@ -267,8 +262,13 @@ export class ChatRecordingService {
             this.queuedTokens = null;
           }
           conversation.messages.push(newMsg);
-        } else if (lastMsg.toolCalls) {
-          // Update existing tool call entries.
+        } else {
+          // The last message is an existing Gemini message that we need to update.
+
+          // Update any existing tool call entries.
+          if (!lastMsg.toolCalls) {
+            lastMsg.toolCalls = [];
+          }
           lastMsg.toolCalls = lastMsg.toolCalls.map((toolCall) => {
             // If there are multiple tool calls with the same ID, this will take the first one.
             const incomingToolCall = toolCalls.find(
