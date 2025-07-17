@@ -313,7 +313,7 @@ export async function loadCliConfig(
     }
     const companionPort = process.env.GEMINI_CLI_IDE_SERVER_PORT;
     if (!companionPort) {
-      throw new Error(
+      logger.warn(
         'Could not connect to IDE. Make sure you have the companion VS Code extension installed from the marketplace or via /ide install.',
       );
     }
