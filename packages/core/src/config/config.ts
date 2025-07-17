@@ -103,6 +103,8 @@ export class MCPServerConfig {
 export interface SandboxConfig {
   command: 'docker' | 'podman' | 'sandbox-exec';
   image: string;
+  runningGpu?: boolean;
+  gpuDevice?: string;
 }
 
 export type FlashFallbackHandler = (
