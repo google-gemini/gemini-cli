@@ -15,6 +15,7 @@ import {
   ApiResponseEvent,
   ApiErrorEvent,
   FlashFallbackEvent,
+  LoopDetectedEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
@@ -23,6 +24,7 @@ import {
   getCachedGoogleAccount,
   getLifetimeGoogleAccounts,
 } from '../../utils/user_account.js';
+import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -32,6 +34,7 @@ const api_response_event_name = 'api_response';
 const api_error_event_name = 'api_error';
 const end_session_event_name = 'end_session';
 const flash_fallback_event_name = 'flash_fallback';
+const loop_detected_event_name = 'loop_detected';
 
 export interface LogResponse {
   nextRequestWaitMs?: number;
@@ -65,7 +68,7 @@ export class ClearcutLogger {
     this.events.push([
       {
         event_time_ms: Date.now(),
-        source_extension_json: JSON.stringify(event),
+        source_extension_json: safeJsonStringify(event),
       },
     ]);
   }
@@ -121,7 +124,7 @@ export class ClearcutLogger {
           log_event: eventsToSend,
         },
       ];
-      const body = JSON.stringify(request);
+      const body = safeJsonStringify(request);
       const options = {
         hostname: 'play.googleapis.com',
         path: '/log',
@@ -445,6 +448,18 @@ export class ClearcutLogger {
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
+  }
+
+  logLoopDetectedEvent(event: LoopDetectedEvent): void {
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_LOOP_DETECTED_TYPE,
+        value: JSON.stringify(event.loop_type),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(loop_detected_event_name, data));
+    this.flushIfNeeded();
   }
 
   logEndSessionEvent(event: EndSessionEvent): void {

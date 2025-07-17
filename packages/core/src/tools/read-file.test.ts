@@ -42,8 +42,9 @@ describe('ReadFileTool', () => {
     const fileService = new FileDiscoveryService(tempRootDir);
     const mockConfigInstance = {
       getFileService: () => fileService,
+      getTargetDir: () => tempRootDir,
     } as unknown as Config;
-    tool = new ReadFileTool(tempRootDir, mockConfigInstance);
+    tool = new ReadFileTool(mockConfigInstance);
     mockProcessSingleFileContent.mockReset();
   });
 

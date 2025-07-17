@@ -59,9 +59,10 @@ describe('ReadManyFilesTool', () => {
     const mockConfig = {
       getFileService: () => fileService,
       getFileFilteringRespectGitIgnore: () => true,
+      getTargetDir: () => tempRootDir,
     } as Partial<Config> as Config;
 
-    tool = new ReadManyFilesTool(tempRootDir, mockConfig);
+    tool = new ReadManyFilesTool(mockConfig);
 
     mockReadFileFn = mockControl.mockReadFile;
     mockReadFileFn.mockReset();

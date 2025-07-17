@@ -38,3 +38,4 @@ packages/*/coverage/
 # Generated files
 packages/cli/src/generated/
 .integration-tests/
+packages/vscode-ide-companion/*.vsix

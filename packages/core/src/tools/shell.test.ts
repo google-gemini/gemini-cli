@@ -410,6 +410,9 @@ describe('ShellTool Bug Reproduction', () => {
       getDebugMode: () => false,
       getGeminiClient: () => ({}) as GeminiClient,
       getTargetDir: () => '.',
+      getSummarizeToolOutputConfig: () => ({
+        [shellTool.name]: {},
+      }),
     } as unknown as Config;
     shellTool = new ShellTool(config);
   });
@@ -428,5 +431,87 @@ describe('ShellTool Bug Reproduction', () => {
     expect(result.returnDisplay).toBe('hello\n');
     expect(result.llmContent).toBe('summarized output');
     expect(summarizeSpy).toHaveBeenCalled();
+  });
+
+  it('should not call summarizer if disabled in config', async () => {
+    config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getDebugMode: () => false,
+      getGeminiClient: () => ({}) as GeminiClient,
+      getTargetDir: () => '.',
+      getSummarizeToolOutputConfig: () => ({}),
+    } as unknown as Config;
+    shellTool = new ShellTool(config);
+
+    const summarizeSpy = vi
+      .spyOn(summarizer, 'summarizeToolOutput')
+      .mockResolvedValue('summarized output');
+
+    const abortSignal = new AbortController().signal;
+    const result = await shellTool.execute(
+      { command: 'echo "hello"' },
+      abortSignal,
+    );
+
+    expect(result.returnDisplay).toBe('hello\n');
+    expect(result.llmContent).not.toBe('summarized output');
+    expect(summarizeSpy).not.toHaveBeenCalled();
+  });
+
+  it('should pass token budget to summarizer', async () => {
+    config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getDebugMode: () => false,
+      getGeminiClient: () => ({}) as GeminiClient,
+      getTargetDir: () => '.',
+      getSummarizeToolOutputConfig: () => ({
+        [shellTool.name]: { tokenBudget: 1000 },
+      }),
+    } as unknown as Config;
+    shellTool = new ShellTool(config);
+
+    const summarizeSpy = vi
+      .spyOn(summarizer, 'summarizeToolOutput')
+      .mockResolvedValue('summarized output');
+
+    const abortSignal = new AbortController().signal;
+    await shellTool.execute({ command: 'echo "hello"' }, abortSignal);
+
+    expect(summarizeSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      expect.any(Object),
+      1000,
+    );
+  });
+
+  it('should use default token budget if not specified', async () => {
+    config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getDebugMode: () => false,
+      getGeminiClient: () => ({}) as GeminiClient,
+      getTargetDir: () => '.',
+      getSummarizeToolOutputConfig: () => ({
+        [shellTool.name]: {},
+      }),
+    } as unknown as Config;
+    shellTool = new ShellTool(config);
+
+    const summarizeSpy = vi
+      .spyOn(summarizer, 'summarizeToolOutput')
+      .mockResolvedValue('summarized output');
+
+    const abortSignal = new AbortController().signal;
+    await shellTool.execute({ command: 'echo "hello"' }, abortSignal);
+
+    expect(summarizeSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      expect.any(Object),
+      undefined,
+    );
   });
 });

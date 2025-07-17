@@ -150,6 +150,13 @@ export enum EventMetadataKey {
 
   // Logs the total number of Google accounts ever used.
   GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT = 37,
+
+  // ==========================================================================
+  // Loop Detected Event Keys
+  // ===========================================================================
+
+  // Logs the type of loop detected.
+  GEMINI_CLI_LOOP_DETECTED_TYPE = 38,
 }
 
 export function getEventMetadataKey(

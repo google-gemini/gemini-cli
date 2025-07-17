@@ -65,7 +65,8 @@ describe('DiscoveredMCPTool', () => {
       expect(tool.name).toBe(toolNameForModel);
       expect(tool.schema.name).toBe(toolNameForModel);
       expect(tool.schema.description).toBe(baseDescription);
-      expect(tool.schema.parameters).toEqual(inputSchema);
+      expect(tool.schema.parameters).toBeUndefined();
+      expect(tool.schema.parametersJsonSchema).toEqual(inputSchema);
       expect(tool.serverToolName).toBe(serverToolName);
       expect(tool.timeout).toBeUndefined();
     });
@@ -81,6 +82,8 @@ describe('DiscoveredMCPTool', () => {
         serverToolName,
       );
       expect(tool.schema.description).toBe(baseDescription);
+      expect(tool.schema.parameters).toBeUndefined();
+      expect(tool.schema.parametersJsonSchema).toEqual(inputSchema);
     });
 
     it('should accept and store a custom timeout', () => {

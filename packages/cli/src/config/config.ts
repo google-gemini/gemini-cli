@@ -17,6 +17,8 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   FileDiscoveryService,
   TelemetryTarget,
+  MCPServerConfig,
+  IDE_SERVER_NAME,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -54,6 +56,7 @@ export interface CliArgs {
   allowedMcpServerNames: string[] | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
+  ideMode: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -175,6 +178,10 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'List all available extensions and exit.',
     })
+    .option('ide-mode', {
+      type: 'boolean',
+      description: 'Run in IDE mode?',
+    })
 
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
@@ -230,6 +237,11 @@ export async function loadCliConfig(
       (v) => v === 'true' || v === '1',
     );
 
+  const ideMode =
+    (argv.ideMode ?? settings.ideMode ?? false) &&
+    process.env.TERM_PROGRAM === 'vscode' &&
+    !process.env.SANDBOX;
+
   const activeExtensions = filterActiveExtensions(
     extensions,
     argv.extensions || [],
@@ -262,6 +274,26 @@ export async function loadCliConfig(
   let mcpServers = mergeMcpServers(settings, activeExtensions);
   const excludeTools = mergeExcludeTools(settings, activeExtensions);
 
+  if (!argv.allowedMcpServerNames) {
+    if (settings.allowMCPServers) {
+      const allowedNames = new Set(settings.allowMCPServers.filter(Boolean));
+      if (allowedNames.size > 0) {
+        mcpServers = Object.fromEntries(
+          Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
+        );
+      }
+    }
+
+    if (settings.excludeMCPServers) {
+      const excludedNames = new Set(settings.excludeMCPServers.filter(Boolean));
+      if (excludedNames.size > 0) {
+        mcpServers = Object.fromEntries(
+          Object.entries(mcpServers).filter(([key]) => !excludedNames.has(key)),
+        );
+      }
+    }
+  }
+
   if (argv.allowedMcpServerNames) {
     const allowedNames = new Set(argv.allowedMcpServerNames.filter(Boolean));
     if (allowedNames.size > 0) {
@@ -271,6 +303,36 @@ export async function loadCliConfig(
     } else {
       mcpServers = {};
     }
+  }
+
+  if (ideMode) {
+    if (mcpServers[IDE_SERVER_NAME]) {
+      logger.warn(
+        `Ignoring user-defined MCP server config for "${IDE_SERVER_NAME}" as it is a reserved name.`,
+      );
+    }
+    const companionPort = process.env.GEMINI_CLI_IDE_SERVER_PORT;
+    if (!companionPort) {
+      throw new Error(
+        'Could not connect to IDE. Make sure you have the companion VS Code extension installed from the marketplace or via /ide install.',
+      );
+    }
+    const httpUrl = `http://localhost:${companionPort}/mcp`;
+    mcpServers[IDE_SERVER_NAME] = new MCPServerConfig(
+      undefined, // command
+      undefined, // args
+      undefined, // env
+      undefined, // cwd
+      undefined, // url
+      httpUrl, // httpUrl
+      undefined, // headers
+      undefined, // tcp
+      undefined, // timeout
+      false, // trust
+      'IDE connection', // description
+      undefined, // includeTools
+      undefined, // excludeTools
+    );
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
@@ -333,6 +395,8 @@ export async function loadCliConfig(
       version: e.config.version,
     })),
     noBrowser: !!process.env.NO_BROWSER,
+    summarizeToolOutput: settings.summarizeToolOutput,
+    ideMode,
   });
 }
 
