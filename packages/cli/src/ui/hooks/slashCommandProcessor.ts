@@ -19,29 +19,8 @@ import {
   SlashCommandProcessorResult,
 } from '../types.js';
 import { LoadedSettings } from '../../config/settings.js';
-import {
-  type CommandContext,
-  type SlashCommandActionReturn,
-  type SlashCommand,
-} from '../commands/types.js';
+import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
-
-// This interface is for the old, inline command definitions.
-// It will be removed once all commands are migrated to the new system.
-export interface LegacySlashCommand {
-  name: string;
-  altName?: string;
-  description?: string;
-  completion?: () => Promise<string[]>;
-  action: (
-    mainCommand: string,
-    subCommand?: string,
-    args?: string,
-  ) =>
-    | void
-    | SlashCommandActionReturn
-    | Promise<void | SlashCommandActionReturn>;
-}
 
 /**
  * Hook to define and process slash commands (e.g., /help, /clear).
@@ -49,7 +28,6 @@ export interface LegacySlashCommand {
 export const useSlashCommandProcessor = (
   config: Config | null,
   settings: LoadedSettings,
-  history: HistoryItem[],
   addItem: UseHistoryManagerReturn['addItem'],
   clearItems: UseHistoryManagerReturn['clearItems'],
   loadHistory: UseHistoryManagerReturn['loadHistory'],
@@ -157,6 +135,7 @@ export const useSlashCommandProcessor = (
         setDebugMessage: onDebugMessage,
         pendingItem: pendingCompressionItemRef.current,
         setPendingItem: setPendingCompressionItem,
+        toggleCorgiMode,
       },
       session: {
         stats: session.stats,
@@ -175,6 +154,7 @@ export const useSlashCommandProcessor = (
       onDebugMessage,
       pendingCompressionItemRef,
       setPendingCompressionItem,
+      toggleCorgiMode,
     ],
   );
 
@@ -188,23 +168,6 @@ export const useSlashCommandProcessor = (
 
     load();
   }, [commandService]);
-
-  // Define legacy commands
-  // This list contains all commands that have NOT YET been migrated to the
-  // new system. As commands are migrated, they are removed from this list.
-  const legacyCommands: LegacySlashCommand[] = useMemo(() => {
-    const commands: LegacySlashCommand[] = [
-      // `/help` and `/clear` have been migrated and REMOVED from this list.
-      {
-        name: 'corgi',
-        action: (_mainCommand, _subCommand, _args) => {
-          toggleCorgiMode();
-        },
-      },
-    ];
-
-    return commands;
-  }, [toggleCorgiMode]);
 
   const handleSlashCommand = useCallback(
     async (
@@ -229,8 +192,6 @@ export const useSlashCommandProcessor = (
 
       const parts = trimmed.substring(1).trim().split(/\s+/);
       const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
-
-      // --- Start of New Tree Traversal Logic ---
 
       let currentCommands = commands;
       let commandToExecute: SlashCommand | undefined;
@@ -341,45 +302,6 @@ export const useSlashCommandProcessor = (
         }
       }
 
-      // --- End of New Tree Traversal Logic ---
-
-      // --- Legacy Fallback Logic (for commands not yet migrated) ---
-
-      const mainCommand = parts[0];
-      const subCommand = parts[1];
-      const legacyArgs = parts.slice(2).join(' ');
-
-      for (const cmd of legacyCommands) {
-        if (mainCommand === cmd.name || mainCommand === cmd.altName) {
-          const actionResult = await cmd.action(
-            mainCommand,
-            subCommand,
-            legacyArgs,
-          );
-
-          if (actionResult?.type === 'tool') {
-            return {
-              type: 'schedule_tool',
-              toolName: actionResult.toolName,
-              toolArgs: actionResult.toolArgs,
-            };
-          }
-          if (actionResult?.type === 'message') {
-            addItem(
-              {
-                type:
-                  actionResult.messageType === 'error'
-                    ? MessageType.ERROR
-                    : MessageType.INFO,
-                text: actionResult.content,
-              },
-              Date.now(),
-            );
-          }
-          return { type: 'handled' };
-        }
-      }
-
       addMessage({
         type: MessageType.ERROR,
         content: `Unknown command: ${trimmed}`,
@@ -393,7 +315,6 @@ export const useSlashCommandProcessor = (
       setShowHelp,
       openAuthDialog,
       commands,
-      legacyCommands,
       commandContext,
       addMessage,
       openThemeDialog,
@@ -403,38 +324,9 @@ export const useSlashCommandProcessor = (
     ],
   );
 
-  const allCommands = useMemo(() => {
-    // Adapt legacy commands to the new SlashCommand interface
-    const adaptedLegacyCommands: SlashCommand[] = legacyCommands.map(
-      (legacyCmd) => ({
-        name: legacyCmd.name,
-        altName: legacyCmd.altName,
-        description: legacyCmd.description,
-        action: async (_context: CommandContext, args: string) => {
-          const parts = args.split(/\s+/);
-          const subCommand = parts[0] || undefined;
-          const restOfArgs = parts.slice(1).join(' ') || undefined;
-
-          return legacyCmd.action(legacyCmd.name, subCommand, restOfArgs);
-        },
-        completion: legacyCmd.completion
-          ? async (_context: CommandContext, _partialArg: string) =>
-              legacyCmd.completion!()
-          : undefined,
-      }),
-    );
-
-    const newCommandNames = new Set(commands.map((c) => c.name));
-    const filteredAdaptedLegacy = adaptedLegacyCommands.filter(
-      (c) => !newCommandNames.has(c.name),
-    );
-
-    return [...commands, ...filteredAdaptedLegacy];
-  }, [commands, legacyCommands]);
-
   return {
     handleSlashCommand,
-    slashCommands: allCommands,
+    slashCommands: commands,
     pendingHistoryItems,
     commandContext,
   };
