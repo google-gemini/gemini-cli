@@ -33,7 +33,6 @@
     "ajv": "^8.17.1",
     "diff": "^7.0.0",
     "dotenv": "^17.1.0",
-    "gaxios": "^7.1.1",
     "glob": "^10.4.5",
     "google-auth-library": "^9.11.0",
     "html-to-text": "^9.0.5",
