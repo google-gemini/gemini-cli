@@ -312,27 +312,28 @@ export async function loadCliConfig(
       );
     }
     const companionPort = process.env.GEMINI_CLI_IDE_SERVER_PORT;
-    if (!companionPort) {
-      throw new Error(
+    if (companionPort) {
+      const httpUrl = `http://localhost:${companionPort}/mcp`;
+      mcpServers[IDE_SERVER_NAME] = new MCPServerConfig(
+        undefined, // command
+        undefined, // args
+        undefined, // env
+        undefined, // cwd
+        undefined, // url
+        httpUrl, // httpUrl
+        undefined, // headers
+        undefined, // tcp
+        undefined, // timeout
+        false, // trust
+        'IDE connection', // description
+        undefined, // includeTools
+        undefined, // excludeTools
+      );
+    } else {
+      logger.warn(
         'Could not connect to IDE. Make sure you have the companion VS Code extension installed from the marketplace or via /ide install.',
       );
     }
-    const httpUrl = `http://localhost:${companionPort}/mcp`;
-    mcpServers[IDE_SERVER_NAME] = new MCPServerConfig(
-      undefined, // command
-      undefined, // args
-      undefined, // env
-      undefined, // cwd
-      undefined, // url
-      httpUrl, // httpUrl
-      undefined, // headers
-      undefined, // tcp
-      undefined, // timeout
-      false, // trust
-      'IDE connection', // description
-      undefined, // includeTools
-      undefined, // excludeTools
-    );
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
