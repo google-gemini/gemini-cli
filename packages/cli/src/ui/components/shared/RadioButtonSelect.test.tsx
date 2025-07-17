@@ -91,6 +91,21 @@ describe('<RadioButtonSelect />', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
+  it('renders a list with >10 items and matches snapshot', () => {
+    const manyItems = Array.from({ length: 12 }, (_, i) => ({
+      label: `Item ${i + 1}`,
+      value: `item-${i + 1}`,
+    }));
+    const { lastFrame } = render(
+      <RadioButtonSelect
+        items={manyItems}
+        onSelect={() => {}}
+        isFocused={true}
+      />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   it('renders nothing when no items are provided', () => {
     const { lastFrame } = render(
       <RadioButtonSelect items={[]} onSelect={() => {}} isFocused={true} />,
