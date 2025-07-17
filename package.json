@@ -17,7 +17,7 @@
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.12"
   },
   "scripts": {
-    "start": "node scripts/start.js",
+    "start": "vite-node -w ./packages/cli/index.ts",
     "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
     "auth:npm": "npx google-artifactregistry-auth",
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
@@ -61,6 +61,7 @@
     "@types/mime-types": "^3.0.1",
     "@types/minimatch": "^5.1.2",
     "@types/shell-quote": "^1.7.5",
+    "@vitejs/plugin-react": "^4.6.0",
     "@vitest/coverage-v8": "^3.1.1",
     "concurrently": "^9.2.0",
     "cross-env": "^7.0.3",
