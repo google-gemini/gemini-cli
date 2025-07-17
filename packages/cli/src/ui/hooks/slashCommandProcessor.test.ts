@@ -206,18 +206,6 @@ describe('useSlashCommandProcessor', () => {
 
   const getProcessor = () => getProcessorHook().result.current;
 
-  describe('Other commands', () => {
-    it('/editor should open editor dialog and return handled', async () => {
-      const { handleSlashCommand } = getProcessor();
-      let commandResult: SlashCommandProcessorResult | false = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand('/editor');
-      });
-      expect(mockOpenEditorDialog).toHaveBeenCalled();
-      expect(commandResult).toEqual({ type: 'handled' });
-    });
-  });
-
   describe('New command registry', () => {
     let ActualCommandService: typeof CommandService;
 
