@@ -23,13 +23,13 @@ export const CompressionMessage: React.FC<CompressionDisplayProps> = ({
 }) => {
   const { isPending, originalTokenCount, newTokenCount } = compression;
 
+  const originalTokens = originalTokenCount ?? 0;
+  const newTokens = newTokenCount ?? 0;
+
   const getCompressionText = () => {
     if (isPending) {
       return 'Compressing chat history';
     }
-
-    const originalTokens = originalTokenCount ?? 0;
-    const newTokens = newTokenCount ?? 0;
 
     if (newTokens >= originalTokens) {
       return 'Skipping compression for small history as the process would have increased its size.';
@@ -39,6 +39,11 @@ export const CompressionMessage: React.FC<CompressionDisplayProps> = ({
   };
 
   const text = getCompressionText();
+  const color = isPending
+    ? Colors.AccentPurple
+    : newTokens >= originalTokens
+      ? Colors.AccentYellow
+      : Colors.AccentGreen;
 
   return (
     <Box flexDirection="row">
@@ -50,9 +55,7 @@ export const CompressionMessage: React.FC<CompressionDisplayProps> = ({
         )}
       </Box>
       <Box>
-        <Text color={isPending ? Colors.AccentPurple : Colors.AccentGreen}>
-          {text}
-        </Text>
+        <Text color={color}>{text}</Text>
       </Box>
     </Box>
   );
