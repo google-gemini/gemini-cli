@@ -353,7 +353,11 @@ describe('runNonInteractive', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
-    await runNonInteractive(mockConfig, 'Trigger loop');
+    await runNonInteractive(
+      mockConfig,
+      'Trigger loop',
+      new PromptMetadata('prompt-id-6'),
+    );
 
     expect(mockChat.sendMessageStream).toHaveBeenCalledTimes(1);
     expect(consoleErrorSpy).toHaveBeenCalledWith(
