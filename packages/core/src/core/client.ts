@@ -41,6 +41,7 @@ import {
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
+import { ideContext } from '../services/ideContext.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -303,6 +304,25 @@ export class GeminiClient {
     if (compressed) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
+
+    if (this.config.getIdeMode()) {
+      const activeFile = ideContext.getActiveFileContext();
+      if (activeFile?.filePath) {
+        let context = `
+This is the file that the user was most recently looking at:
+- Path: ${activeFile.filePath}`;
+        if (activeFile.cursor) {
+          context += `
+This is the cursor position in the file:
+- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`;
+        }
+        request = [
+          { text: context },
+          ...(Array.isArray(request) ? request : [request]),
+        ];
+      }
+    }
+
     const turn = new Turn(this.getChat(), prompt_id);
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
