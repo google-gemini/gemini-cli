@@ -43,7 +43,7 @@ const loadBuiltInCommands = async (
     statsCommand,
     themeCommand,
     toolsCommand,
-];
+  ];
 
   return allCommands.filter(
     (command): command is SlashCommand => command !== null,

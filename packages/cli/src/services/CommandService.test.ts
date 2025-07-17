@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, type Mocked } from 'vitest';
 import { CommandService } from './CommandService.js';
 import { type Config } from '@google/gemini-cli-core';
 import { type SlashCommand } from '../ui/commands/types.js';
@@ -73,13 +73,13 @@ vi.mock('../ui/commands/editorCommand.js', () => ({
 }));
 
 describe('CommandService', () => {
-  const subCommandLen = 14;
-  let mockConfig: vi.Mocked<Config>;
+  const subCommandLen = 15;
+  let mockConfig: Mocked<Config>;
 
   beforeEach(() => {
     mockConfig = {
       getIdeMode: vi.fn(),
-    } as unknown as vi.Mocked<Config>;
+    } as unknown as Mocked<Config>;
     vi.mocked(ideCommand).mockReturnValue(null);
   });
 

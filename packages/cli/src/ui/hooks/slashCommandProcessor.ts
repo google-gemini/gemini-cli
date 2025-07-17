@@ -420,7 +420,6 @@ export const useSlashCommandProcessor = (
     return commands;
   }, [
     addMessage,
-    openEditorDialog,
     toggleCorgiMode,
     config,
     session,
