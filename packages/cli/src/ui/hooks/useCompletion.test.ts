@@ -65,6 +65,12 @@ describe('useCompletion', () => {
         action: vi.fn(),
       },
       {
+        name: 'stats',
+        altName: 'usage',
+        description: 'check session stats. Usage: /stats [model|tools]',
+        action: vi.fn(),
+      },
+      {
         name: 'clear',
         description: 'Clear the screen',
         action: vi.fn(),
@@ -299,7 +305,7 @@ describe('useCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions.length).toBe(4);
+      expect(result.current.suggestions.length).toBe(5);
       expect(result.current.activeSuggestionIndex).toBe(0);
 
       act(() => {
@@ -325,7 +331,7 @@ describe('useCompletion', () => {
       act(() => {
         result.current.navigateUp();
       });
-      expect(result.current.activeSuggestionIndex).toBe(3);
+      expect(result.current.activeSuggestionIndex).toBe(4);
     });
 
     it('should handle navigation with large suggestion lists and scrolling', () => {
@@ -372,9 +378,9 @@ describe('useCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toHaveLength(4);
+      expect(result.current.suggestions).toHaveLength(5);
       expect(result.current.suggestions.map((s) => s.label)).toEqual(
-        expect.arrayContaining(['help', 'clear', 'memory', 'chat']),
+        expect.arrayContaining(['help', 'clear', 'memory', 'chat', 'stats']),
       );
       expect(result.current.showSuggestions).toBe(true);
       expect(result.current.activeSuggestionIndex).toBe(0);
@@ -397,10 +403,28 @@ describe('useCompletion', () => {
       expect(result.current.suggestions[0].description).toBe('Show help');
     });
 
-    it('should suggest commands by altName', () => {
+    it.each([['/?'], ['/usage']])(
+      'should not suggest commands when altName is fully typed',
+      (altName) => {
+        const { result } = renderHook(() =>
+          useCompletion(
+            altName,
+            testCwd,
+            true,
+            mockSlashCommands,
+            mockCommandContext,
+            mockConfig,
+          ),
+        );
+
+        expect(result.current.suggestions).toHaveLength(0);
+      },
+    );
+
+    it('should suggest commands based on partial altName matches', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/?',
+          '/usag', // part of the word "usage"
           testCwd,
           true,
           mockSlashCommands,
@@ -410,7 +434,7 @@ describe('useCompletion', () => {
       );
 
       expect(result.current.suggestions).toHaveLength(1);
-      expect(result.current.suggestions[0].label).toBe('help');
+      expect(result.current.suggestions[0].label).toBe('stats');
     });
 
     it('should not show suggestions for exact leaf command match', () => {

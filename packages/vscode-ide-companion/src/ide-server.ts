@@ -13,117 +13,177 @@ import {
   isInitializeRequest,
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
+import { Server as HTTPServer } from 'node:http';
 
-export async function startIDEServer(context: vscode.ExtensionContext) {
-  const app = express();
-  app.use(express.json());
+const MCP_SESSION_ID_HEADER = 'mcp-session-id';
+const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 
-  const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+function sendActiveFileChangedNotification(
+  transport: StreamableHTTPServerTransport,
+  logger: vscode.OutputChannel,
+) {
+  const editor = vscode.window.activeTextEditor;
+  const filePath = editor ? editor.document.uri.fsPath : '';
+  logger.appendLine(`Sending active file changed notification: ${filePath}`);
+  const notification: JSONRPCNotification = {
+    jsonrpc: '2.0',
+    method: 'ide/activeFileChanged',
+    params: { filePath },
+  };
+  transport.send(notification);
+}
 
-  const disposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
-    const filePath = editor ? editor.document.uri.fsPath : null;
-    const notification: JSONRPCNotification = {
-      jsonrpc: '2.0',
-      method: 'ide/activeFileChanged',
-      params: { filePath },
-    };
-    for (const transport of Object.values(transports)) {
-      transport.send(notification);
-    }
-  });
-  context.subscriptions.push(disposable);
+export class IDEServer {
+  private server: HTTPServer | undefined;
+  private context: vscode.ExtensionContext | undefined;
+  private logger: vscode.OutputChannel;
 
-  app.post('/mcp', async (req: Request, res: Response) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined;
-    let transport: StreamableHTTPServerTransport;
+  constructor(logger: vscode.OutputChannel) {
+    this.logger = logger;
+  }
 
-    if (sessionId && transports[sessionId]) {
-      transport = transports[sessionId];
-    } else if (!sessionId && isInitializeRequest(req.body)) {
-      transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (newSessionId) => {
-          transports[newSessionId] = transport;
-          const editor = vscode.window.activeTextEditor;
-          const filePath = editor ? editor.document.uri.fsPath : null;
-          const notification: JSONRPCNotification = {
-            jsonrpc: '2.0',
-            method: 'ide/activeFileChanged',
-            params: { filePath },
-          };
-          transport.send(notification);
-        },
-      });
+  async start(context: vscode.ExtensionContext) {
+    this.context = context;
+    const transports: { [sessionId: string]: StreamableHTTPServerTransport } =
+      {};
+    const sessionsWithInitialNotification = new Set<string>();
 
-      transport.onclose = () => {
-        if (transport.sessionId) {
-          delete transports[transport.sessionId];
-        }
-      };
+    const app = express();
+    app.use(express.json());
+    const mcpServer = createMcpServer();
 
-      const server = createMcpServer();
-      server.connect(transport);
-    } else {
-      res.status(400).json({
-        jsonrpc: '2.0',
-        error: {
-          code: -32000,
-          message:
-            'Bad Request: No valid session ID provided for non-initialize request.',
-        },
-        id: null,
-      });
-      return;
-    }
+    const disposable = vscode.window.onDidChangeActiveTextEditor((_editor) => {
+      for (const transport of Object.values(transports)) {
+        sendActiveFileChangedNotification(transport, this.logger);
+      }
+    });
+    context.subscriptions.push(disposable);
 
-    try {
-      await transport.handleRequest(req, res, req.body);
-    } catch (error) {
-      console.error('Error handling MCP request:', error);
-      if (!res.headersSent) {
-        res.status(500).json({
-          jsonrpc: '2.0' as const,
+    app.post('/mcp', async (req: Request, res: Response) => {
+      const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
+        | string
+        | undefined;
+      let transport: StreamableHTTPServerTransport;
+
+      if (sessionId && transports[sessionId]) {
+        transport = transports[sessionId];
+      } else if (!sessionId && isInitializeRequest(req.body)) {
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (newSessionId) => {
+            this.logger.appendLine(`New session initialized: ${newSessionId}`);
+            transports[newSessionId] = transport;
+          },
+        });
+        transport.onclose = () => {
+          if (transport.sessionId) {
+            this.logger.appendLine(`Session closed: ${transport.sessionId}`);
+            sessionsWithInitialNotification.delete(transport.sessionId);
+            delete transports[transport.sessionId];
+          }
+        };
+        mcpServer.connect(transport);
+      } else {
+        this.logger.appendLine(
+          'Bad Request: No valid session ID provided for non-initialize request.',
+        );
+        res.status(400).json({
+          jsonrpc: '2.0',
           error: {
-            code: -32603,
-            message: 'Internal server error',
+            code: -32000,
+            message:
+              'Bad Request: No valid session ID provided for non-initialize request.',
           },
           id: null,
         });
+        return;
       }
-    }
-  });
 
-  const handleSessionRequest = async (req: Request, res: Response) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined;
-    if (!sessionId || !transports[sessionId]) {
-      res.status(400).send('Invalid or missing session ID');
-      return;
-    }
-
-    const transport = transports[sessionId];
-    try {
-      await transport.handleRequest(req, res);
-    } catch (error) {
-      console.error('Error handling MCP GET request:', error);
-      if (!res.headersSent) {
-        res.status(400).send('Bad Request');
+      try {
+        await transport.handleRequest(req, res, req.body);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.appendLine(`Error handling MCP request: ${errorMessage}`);
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: '2.0' as const,
+            error: {
+              code: -32603,
+              message: 'Internal server error',
+            },
+            id: null,
+          });
+        }
       }
-    }
-  };
+    });
 
-  app.get('/mcp', handleSessionRequest);
+    const handleSessionRequest = async (req: Request, res: Response) => {
+      const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
+        | string
+        | undefined;
+      if (!sessionId || !transports[sessionId]) {
+        this.logger.appendLine('Invalid or missing session ID');
+        res.status(400).send('Invalid or missing session ID');
+        return;
+      }
 
-  // TODO(#3918): Generate dynamically and write to env variable
-  const PORT = 3000;
-  app.listen(PORT, (error?: Error) => {
-    if (error) {
-      console.error('Failed to start server:', error);
-      vscode.window.showErrorMessage(
-        `Companion server failed to start on port ${PORT}: ${error.message}`,
-      );
+      const transport = transports[sessionId];
+      try {
+        await transport.handleRequest(req, res);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.appendLine(
+          `Error handling session request: ${errorMessage}`,
+        );
+        if (!res.headersSent) {
+          res.status(400).send('Bad Request');
+        }
+      }
+
+      if (!sessionsWithInitialNotification.has(sessionId)) {
+        sendActiveFileChangedNotification(transport, this.logger);
+        sessionsWithInitialNotification.add(sessionId);
+      }
+    };
+
+    app.get('/mcp', handleSessionRequest);
+
+    this.server = app.listen(0, () => {
+      const address = (this.server as HTTPServer).address();
+      if (address && typeof address !== 'string') {
+        const port = address.port;
+        context.environmentVariableCollection.replace(
+          IDE_SERVER_PORT_ENV_VAR,
+          port.toString(),
+        );
+        this.logger.appendLine(`IDE server listening on port ${port}`);
+      }
+    });
+  }
+
+  async stop(): Promise<void> {
+    if (this.server) {
+      await new Promise<void>((resolve, reject) => {
+        this.server!.close((err?: Error) => {
+          if (err) {
+            this.logger.appendLine(
+              `Error shutting down IDE server: ${err.message}`,
+            );
+            return reject(err);
+          }
+          this.logger.appendLine(`IDE server shut down`);
+          resolve();
+        });
+      });
+      this.server = undefined;
     }
-    console.log(`MCP Streamable HTTP Server listening on port ${PORT}`);
-  });
+
+    if (this.context) {
+      this.context.environmentVariableCollection.clear();
+    }
+  }
 }
 
 const createMcpServer = () => {
@@ -142,33 +202,18 @@ const createMcpServer = () => {
       inputSchema: {},
     },
     async () => {
-      try {
-        const activeEditor = vscode.window.activeTextEditor;
-        const filePath = activeEditor
-          ? activeEditor.document.uri.fsPath
-          : undefined;
-        if (filePath) {
-          return {
-            content: [{ type: 'text', text: `Active file: ${filePath}` }],
-          };
-        } else {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'No file is currently active in the editor.',
-              },
-            ],
-          };
-        }
-      } catch (error) {
+      const activeEditor = vscode.window.activeTextEditor;
+      const filePath = activeEditor ? activeEditor.document.uri.fsPath : '';
+      if (filePath) {
+        return {
+          content: [{ type: 'text', text: `Active file: ${filePath}` }],
+        };
+      } else {
         return {
           content: [
             {
               type: 'text',
-              text: `Failed to get active file: ${
-                (error as Error).message || 'Unknown error'
-              }`,
+              text: 'No file is currently active in the editor.',
             },
           ],
         };
