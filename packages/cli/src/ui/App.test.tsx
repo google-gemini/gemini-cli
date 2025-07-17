@@ -135,6 +135,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         setFlashFallbackHandler: vi.fn(),
         getSessionId: vi.fn(() => 'test-session-id'),
         getUserTier: vi.fn().mockResolvedValue(undefined),
+        getIdeMode: vi.fn(() => false),
       };
     });
   return {
@@ -185,6 +186,10 @@ vi.mock('../config/config.js', async (importOriginal) => {
 
 vi.mock('./components/Tips.js', () => ({
   Tips: vi.fn(() => null),
+}));
+
+vi.mock('./components/Header.js', () => ({
+  Header: vi.fn(() => null),
 }));
 
 describe('App UI', () => {
@@ -443,6 +448,38 @@ describe('App UI', () => {
     currentUnmount = unmount;
     await Promise.resolve();
     expect(vi.mocked(Tips)).not.toHaveBeenCalled();
+  });
+
+  it('should display Header component by default', async () => {
+    const { Header } = await import('./components/Header.js');
+    const { unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    expect(vi.mocked(Header)).toHaveBeenCalled();
+  });
+
+  it('should not display Header component when hideBanner is true', async () => {
+    const { Header } = await import('./components/Header.js');
+    mockSettings = createMockSettings({
+      user: { hideBanner: true },
+    });
+
+    const { unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    expect(vi.mocked(Header)).not.toHaveBeenCalled();
   });
 
   it('should show tips if system says show, but workspace and user settings say hide', async () => {
