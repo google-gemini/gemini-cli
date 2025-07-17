@@ -71,8 +71,7 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  // TODO: Add 'theme' | 'auth' | 'editor' | 'privacy' as migration happens.
-  dialog: 'help' | 'auth' | 'theme' | 'privacy';
+  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy';
 }
 
 /**
