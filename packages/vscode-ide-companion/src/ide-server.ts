@@ -13,7 +13,6 @@ import {
   isInitializeRequest,
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
-
 import { Server as HTTPServer } from 'node:http';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
@@ -45,12 +44,13 @@ export class IDEServer {
 
   async start(context: vscode.ExtensionContext) {
     this.context = context;
-    const app = express();
-    app.use(express.json());
-
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } =
       {};
     const sessionsWithInitialNotification = new Set<string>();
+
+    const app = express();
+    app.use(express.json());
+    const mcpServer = createMcpServer();
 
     const disposable = vscode.window.onDidChangeActiveTextEditor((_editor) => {
       for (const transport of Object.values(transports)) {
@@ -58,8 +58,6 @@ export class IDEServer {
       }
     });
     context.subscriptions.push(disposable);
-
-    const mcpServer = createMcpServer();
 
     app.post('/mcp', async (req: Request, res: Response) => {
       const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
@@ -77,7 +75,6 @@ export class IDEServer {
             transports[newSessionId] = transport;
           },
         });
-
         transport.onclose = () => {
           if (transport.sessionId) {
             this.logger.appendLine(`Session closed: ${transport.sessionId}`);
@@ -85,9 +82,11 @@ export class IDEServer {
             delete transports[transport.sessionId];
           }
         };
-
         mcpServer.connect(transport);
       } else {
+        this.logger.appendLine(
+          'Bad Request: No valid session ID provided for non-initialize request.',
+        );
         res.status(400).json({
           jsonrpc: '2.0',
           error: {
@@ -124,12 +123,12 @@ export class IDEServer {
         | string
         | undefined;
       if (!sessionId || !transports[sessionId]) {
+        this.logger.appendLine('Invalid or missing session ID');
         res.status(400).send('Invalid or missing session ID');
         return;
       }
 
       const transport = transports[sessionId];
-
       try {
         await transport.handleRequest(req, res);
       } catch (error) {
