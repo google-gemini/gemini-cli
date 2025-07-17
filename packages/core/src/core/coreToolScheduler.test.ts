@@ -19,6 +19,7 @@ import {
   ToolConfirmationPayload,
   ToolResult,
   Config,
+  Icon,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 
@@ -29,7 +30,7 @@ class MockTool extends BaseTool<Record<string, unknown>, ToolResult> {
   executeFn = vi.fn();
 
   constructor(name = 'mockTool') {
-    super(name, name, 'A mock tool', {});
+    super(name, name, 'A mock tool', Icon.Hammer, {});
   }
 
   async shouldConfirmExecute(
@@ -91,6 +92,8 @@ class MockModifiableTool
         title: 'Confirm Mock Tool',
         fileName: 'test.txt',
         fileDiff: 'diff',
+        originalContent: 'originalContent',
+        newContent: 'newContent',
         onConfirm: async () => {},
       };
     }
@@ -139,6 +142,7 @@ describe('CoreToolScheduler', () => {
       name: 'mockTool',
       args: {},
       isClientInitiated: false,
+      prompt_id: 'prompt-id-1',
     };
 
     abortController.abort();
@@ -206,6 +210,7 @@ describe('CoreToolScheduler with payload', () => {
       name: 'mockModifiableTool',
       args: {},
       isClientInitiated: false,
+      prompt_id: 'prompt-id-2',
     };
 
     await scheduler.schedule([request], abortController.signal);

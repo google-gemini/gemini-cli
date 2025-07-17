@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
@@ -57,21 +57,28 @@ export function ThemeDialog({
   const scopeItems = [
     { label: 'User Settings', value: SettingScope.User },
     { label: 'Workspace Settings', value: SettingScope.Workspace },
+    { label: 'System Settings', value: SettingScope.System },
   ];
 
-  const handleThemeSelect = (themeName: string) => {
-    onSelect(themeName, selectedScope);
-  };
+  const handleThemeSelect = useCallback(
+    (themeName: string) => {
+      onSelect(themeName, selectedScope);
+    },
+    [onSelect, selectedScope],
+  );
 
-  const handleScopeHighlight = (scope: SettingScope) => {
+  const handleScopeHighlight = useCallback((scope: SettingScope) => {
     setSelectedScope(scope);
     setSelectInputKey(Date.now());
-  };
+  }, []);
 
-  const handleScopeSelect = (scope: SettingScope) => {
-    handleScopeHighlight(scope);
-    setFocusedSection('theme'); // Reset focus to theme section
-  };
+  const handleScopeSelect = useCallback(
+    (scope: SettingScope) => {
+      handleScopeHighlight(scope);
+      setFocusedSection('theme'); // Reset focus to theme section
+    },
+    [handleScopeHighlight],
+  );
 
   const [focusedSection, setFocusedSection] = useState<'theme' | 'scope'>(
     'theme',
@@ -86,16 +93,21 @@ export function ThemeDialog({
     }
   });
 
+  const otherScopes = Object.values(SettingScope).filter(
+    (scope) => scope !== selectedScope,
+  );
+
+  const modifiedInOtherScopes = otherScopes.filter(
+    (scope) => settings.forScope(scope).settings.theme !== undefined,
+  );
+
   let otherScopeModifiedMessage = '';
-  const otherScope =
-    selectedScope === SettingScope.User
-      ? SettingScope.Workspace
-      : SettingScope.User;
-  if (settings.forScope(otherScope).settings.theme !== undefined) {
+  if (modifiedInOtherScopes.length > 0) {
+    const modifiedScopesStr = modifiedInOtherScopes.join(', ');
     otherScopeModifiedMessage =
       settings.forScope(selectedScope).settings.theme !== undefined
-        ? `(Also modified in ${otherScope})`
-        : `(Modified in ${otherScope})`;
+        ? `(Also modified in ${modifiedScopesStr})`
+        : `(Modified in ${modifiedScopesStr})`;
   }
 
   // Constants for calculating preview pane layout.
@@ -190,6 +202,9 @@ export function ThemeDialog({
             onSelect={handleThemeSelect}
             onHighlight={onHighlight}
             isFocused={currenFocusedSection === 'theme'}
+            maxItemsToShow={8}
+            showScrollArrows={true}
+            showNumbers={currenFocusedSection === 'theme'}
           />
 
           {/* Scope Selection */}
@@ -204,6 +219,7 @@ export function ThemeDialog({
                 onSelect={handleScopeSelect}
                 onHighlight={handleScopeHighlight}
                 isFocused={currenFocusedSection === 'scope'}
+                showNumbers={currenFocusedSection === 'scope'}
               />
             </Box>
           )}

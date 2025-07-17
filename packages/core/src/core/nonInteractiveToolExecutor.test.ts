@@ -13,6 +13,7 @@ import {
   Tool,
   ToolCallConfirmationDetails,
   Config,
+  Icon,
 } from '../index.js';
 import { Part, Type } from '@google/genai';
 
@@ -32,6 +33,7 @@ describe('executeToolCall', () => {
       name: 'testTool',
       displayName: 'Test Tool',
       description: 'A tool for testing',
+      icon: Icon.Hammer,
       schema: {
         name: 'testTool',
         description: 'A tool for testing',
@@ -51,6 +53,7 @@ describe('executeToolCall', () => {
       isOutputMarkdown: false,
       canUpdateOutput: false,
       getDescription: vi.fn(),
+      toolLocations: vi.fn(() => []),
     };
 
     mockToolRegistry = {
@@ -67,6 +70,7 @@ describe('executeToolCall', () => {
       name: 'testTool',
       args: { param1: 'value1' },
       isClientInitiated: false,
+      prompt_id: 'prompt-id-1',
     };
     const toolResult: ToolResult = {
       llmContent: 'Tool executed successfully',
@@ -105,6 +109,7 @@ describe('executeToolCall', () => {
       name: 'nonExistentTool',
       args: {},
       isClientInitiated: false,
+      prompt_id: 'prompt-id-2',
     };
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(undefined);
 
@@ -140,6 +145,7 @@ describe('executeToolCall', () => {
       name: 'testTool',
       args: { param1: 'value1' },
       isClientInitiated: false,
+      prompt_id: 'prompt-id-3',
     };
     const executionError = new Error('Tool execution failed');
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
@@ -172,6 +178,7 @@ describe('executeToolCall', () => {
       name: 'testTool',
       args: { param1: 'value1' },
       isClientInitiated: false,
+      prompt_id: 'prompt-id-4',
     };
     const cancellationError = new Error('Operation cancelled');
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
@@ -215,6 +222,7 @@ describe('executeToolCall', () => {
       name: 'testTool',
       args: {},
       isClientInitiated: false,
+      prompt_id: 'prompt-id-5',
     };
     const imageDataPart: Part = {
       inlineData: { mimeType: 'image/png', data: 'base64data' },
