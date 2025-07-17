@@ -69,6 +69,7 @@ import {
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
+import { useVim } from './hooks/vim.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
 import {
@@ -390,6 +391,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     openAuthDialog,
     openEditorDialog,
     toggleCorgiMode,
+    () => toggleVimModeRef.current?.(), // Wrapper function that calls the ref
     setQuittingMessages,
     openPrivacyNotice,
   );
@@ -535,6 +537,20 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     },
     [submitQuery],
   );
+
+  // Create a ref for vim toggle function to avoid circular dependency
+  const toggleVimModeRef = useRef<(() => void) | null>(null);
+
+  // Initialize vim mode
+  const {
+    mode: vimMode,
+    vimModeEnabled,
+    toggleVimMode,
+    handleInput: vimHandleInput,
+  } = useVim(buffer, config, settings, handleFinalSubmit);
+
+  // Store the toggle function in the ref
+  toggleVimModeRef.current = toggleVimMode;
 
   const logger = useLogger();
   const [userMessages, setUserMessages] = useState<string[]>([]);
@@ -928,6 +944,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   commandContext={commandContext}
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
+                  vimModeEnabled={vimModeEnabled}
+                  vimHandleInput={vimHandleInput}
                 />
               )}
             </>
@@ -979,6 +997,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             }
             promptTokenCount={sessionStats.lastPromptTokenCount}
             nightly={nightly}
+            vimMode={vimModeEnabled ? vimMode : undefined}
           />
         </Box>
       </Box>

@@ -26,6 +26,7 @@ import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
+import { vimCommand } from '../ui/commands/vimCommand.js';
 
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
@@ -79,9 +80,12 @@ vi.mock('../ui/commands/bugCommand.js', () => ({
 vi.mock('../ui/commands/quitCommand.js', () => ({
   quitCommand: { name: 'quit', description: 'Mock Quit' },
 }));
+vi.mock('../ui/commands/vimCommand.js', () => ({
+  vimCommand: { name: 'vim', description: 'Mock Vim' },
+}));
 
 describe('CommandService', () => {
-  const subCommandLen = 17;
+  const subCommandLen = 18;
   let mockConfig: Mocked<Config>;
 
   beforeEach(() => {
@@ -132,6 +136,7 @@ describe('CommandService', () => {
         expect(commandNames).toContain('tools');
         expect(commandNames).toContain('compress');
         expect(commandNames).toContain('mcp');
+        expect(commandNames).toContain('vim');
         expect(commandNames).not.toContain('ide');
       });
 
@@ -149,6 +154,7 @@ describe('CommandService', () => {
         expect(commandNames).toContain('ide');
         expect(commandNames).toContain('editor');
         expect(commandNames).toContain('quit');
+        expect(commandNames).toContain('vim');
       });
 
       it('should overwrite any existing commands when called again', async () => {
@@ -192,6 +198,7 @@ describe('CommandService', () => {
           statsCommand,
           themeCommand,
           toolsCommand,
+          vimCommand,
         ]);
       });
     });

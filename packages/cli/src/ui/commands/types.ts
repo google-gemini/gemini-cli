@@ -41,6 +41,8 @@ export interface CommandContext {
      * @param item The history item to display as pending, or `null` to clear.
      */
     setPendingItem: (item: HistoryItemWithoutId | null) => void;
+    /** Toggles vim mode on/off. */
+    toggleVimMode: () => void;
   };
   // Session-specific data
   session: {

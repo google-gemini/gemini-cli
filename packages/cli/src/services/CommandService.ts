@@ -24,6 +24,7 @@ import { compressCommand } from '../ui/commands/compressCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
+import { vimCommand } from '../ui/commands/vimCommand.js';
 
 const loadBuiltInCommands = async (
   config: Config | null,
@@ -47,6 +48,7 @@ const loadBuiltInCommands = async (
     statsCommand,
     themeCommand,
     toolsCommand,
+    vimCommand,
   ];
 
   return allCommands.filter(

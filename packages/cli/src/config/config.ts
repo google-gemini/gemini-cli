@@ -401,6 +401,7 @@ export async function loadCliConfig(
       name: e.config.name,
       version: e.config.version,
     })),
+    vimMode: settings.vimMode,
     noBrowser: !!process.env.NO_BROWSER,
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,

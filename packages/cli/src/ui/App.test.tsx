@@ -71,6 +71,7 @@ interface MockServerConfig {
   getProjectRoot: Mock<() => string | undefined>;
   getAllGeminiMdFilenames: Mock<() => string[]>;
   getGeminiClient: Mock<() => GeminiClient | undefined>;
+  getVimMode: Mock<() => boolean>;
   getUserTier: Mock<() => Promise<string | undefined>>;
 }
 
@@ -132,6 +133,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getGeminiClient: vi.fn(() => ({})),
         getCheckpointingEnabled: vi.fn(() => opts.checkpointing ?? true),
         getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
+        getVimMode: vi.fn(() => false),
         setFlashFallbackHandler: vi.fn(),
         getSessionId: vi.fn(() => 'test-session-id'),
         getUserTier: vi.fn().mockResolvedValue(undefined),

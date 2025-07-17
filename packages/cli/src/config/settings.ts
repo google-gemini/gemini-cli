@@ -93,6 +93,9 @@ export interface Settings {
   // A map of tool names to their summarization settings.
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
 
+  // UI setting. Enables vim mode.
+  vimMode?: boolean;
+
   // Add other settings here.
   ideMode?: boolean;
 }
