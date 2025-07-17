@@ -11,6 +11,7 @@ import { type SlashCommand } from '../ui/commands/types.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
+import { corgiCommand } from '../ui/commands/corgiCommand.js';
 import { docsCommand } from '../ui/commands/docsCommand.js';
 import { chatCommand } from '../ui/commands/chatCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
@@ -37,6 +38,9 @@ vi.mock('../ui/commands/helpCommand.js', () => ({
 }));
 vi.mock('../ui/commands/clearCommand.js', () => ({
   clearCommand: { name: 'clear', description: 'Mock Clear' },
+}));
+vi.mock('../ui/commands/corgiCommand.js', () => ({
+  corgiCommand: { name: 'corgi', description: 'Mock Corgi' },
 }));
 vi.mock('../ui/commands/docsCommand.js', () => ({
   docsCommand: { name: 'docs', description: 'Mock Docs' },
@@ -85,7 +89,7 @@ vi.mock('../ui/commands/restoreCommand.js', () => ({
 }));
 
 describe('CommandService', () => {
-  const subCommandLen = 17;
+  const subCommandLen = 18;
   let mockConfig: Mocked<Config>;
 
   beforeEach(() => {
@@ -128,6 +132,8 @@ describe('CommandService', () => {
         expect(commandNames).toContain('memory');
         expect(commandNames).toContain('help');
         expect(commandNames).toContain('clear');
+        expect(commandNames).toContain('compress');
+        expect(commandNames).toContain('corgi');
         expect(commandNames).toContain('docs');
         expect(commandNames).toContain('chat');
         expect(commandNames).toContain('theme');
@@ -136,7 +142,6 @@ describe('CommandService', () => {
         expect(commandNames).toContain('about');
         expect(commandNames).toContain('extensions');
         expect(commandNames).toContain('tools');
-        expect(commandNames).toContain('compress');
         expect(commandNames).toContain('mcp');
         expect(commandNames).not.toContain('ide');
       });
@@ -201,6 +206,7 @@ describe('CommandService', () => {
           chatCommand,
           clearCommand,
           compressCommand,
+          corgiCommand,
           docsCommand,
           editorCommand,
           extensionsCommand,
