@@ -39,19 +39,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     super(
       ShellTool.Name,
       'Shell',
-      `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
-
-The following information is returned:
-
-Command: Executed command.
-Directory: Directory (relative to project root) where command was executed, or \`(root)\`.
-Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-Error: Error or \`(none)\` if no error was reported for the subprocess.
-Exit Code: Exit code or \`(none)\` if terminated by signal.
-Signal: Signal number or \`(none)\` if no signal was received.
-Background PIDs: List of background processes started or \`(none)\`.
-Process Group PGID: Process group started or \`(none)\``,
+      'This tool executes a given shell command as `bash -c <command>`. Command can start background processes using `&`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as `kill -- -PGID` or signaled as `kill -s SIGNAL -- -PGID`.\n\nThe following information is returned:\n\nCommand: Executed command.\nDirectory: Directory (relative to project root) where command was executed, or `(root)`.\nStdout: Output on stdout stream. Can be `(empty)` or partial on error and for any unwaited background processes.\nStderr: Output on stderr stream. Can be `(empty)` or partial on error and for any unwaited background processes.\nError: Error or `(none)` if no error was reported for the subprocess.\nExit Code: Exit code or `(none)` if terminated by signal.\nSignal: Signal number or `(none)` if no signal was received.\nBackground PIDs: List of background processes started or `(none)`.\nProcess Group PGID: Process group started or `(none)`',
       {
         type: Type.OBJECT,
         properties: {
@@ -101,12 +89,29 @@ Process Group PGID: Process group started or \`(none)\``,
    * @example getCommandRoot("git status && npm test") returns "git"
    */
   getCommandRoot(command: string): string | undefined {
-    return command
-      .trim() // remove leading and trailing whitespace
-      .replace(/[{}()]/g, '') // remove all grouping operators
-      .split(/[\s;&|]+/)[0] // split on any whitespace or separator or chaining operators and take first part
-      ?.split(/[/\\]/) // split on any path separators (or return undefined if previous line was undefined)
-      .pop(); // take last part and return command root (or undefined if previous line was empty)
+    const trimmedCommand = command.trim();
+    if (!trimmedCommand) {
+      return undefined;
+    }
+
+    const parts = trimmedCommand.split(/\s+/);
+    const firstPart = parts[0];
+
+    if (!firstPart) {
+      return undefined;
+    }
+
+    // Handle paths, like /bin/ls
+    const pathParts = firstPart.split(/[\\/]/);
+    return pathParts.pop();
+  }
+
+  getCommandSubCommand(command: string): string | undefined {
+    const parts = command.trim().split(/[\s;&|]+/);
+    if (parts.length > 1) {
+      return parts[1];
+    }
+    return undefined;
   }
 
   /**
@@ -258,6 +263,7 @@ Process Group PGID: Process group started or \`(none)\``,
       return false; // skip confirmation, execute call will fail immediately
     }
     const rootCommand = this.getCommandRoot(params.command)!; // must be non-empty string post-validation
+    const subCommand = this.getCommandSubCommand(params.command);
     if (this.whitelist.has(rootCommand)) {
       return false; // already approved and whitelisted
     }
@@ -266,6 +272,7 @@ Process Group PGID: Process group started or \`(none)\``,
       title: 'Confirm Shell Command',
       command: params.command,
       rootCommand,
+      subCommand,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.whitelist.add(rootCommand);

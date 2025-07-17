@@ -139,7 +139,7 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: `Yes, allow always "${executionProps.rootCommand} ..."`,
+        label: `Yes, always allow "${executionProps.rootCommand}${executionProps.subCommand ? ` ${executionProps.subCommand}` : ''} ..."`,
         value: ToolConfirmationOutcome.ProceedAlways,
       },
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },

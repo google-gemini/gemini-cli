@@ -225,6 +225,7 @@ export interface ToolExecuteConfirmationDetails {
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   command: string;
   rootCommand: string;
+  subCommand?: string;
 }
 
 export interface ToolMcpConfirmationDetails {
