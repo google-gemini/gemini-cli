@@ -54,16 +54,7 @@ vi.mock('../../utils/version.js', () => ({
 }));
 
 import { act, renderHook } from '@testing-library/react';
-import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  beforeAll,
-  Mock,
-} from 'vitest';
+import { vi, describe, it, expect, beforeEach, beforeAll, Mock } from 'vitest';
 import open from 'open';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
 import { SlashCommandProcessorResult } from '../types.js';
@@ -202,8 +193,6 @@ describe('useSlashCommandProcessor', () => {
       ),
     );
   };
-
-  const getProcessor = () => getProcessorHook().result.current;
 
   describe('New command registry', () => {
     let ActualCommandService: typeof CommandService;

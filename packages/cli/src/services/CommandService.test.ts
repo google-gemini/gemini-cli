@@ -81,7 +81,7 @@ vi.mock('../ui/commands/quitCommand.js', () => ({
 }));
 
 describe('CommandService', () => {
-  const subCommandLen = 16;
+  const subCommandLen = 17;
   let mockConfig: Mocked<Config>;
 
   beforeEach(() => {
@@ -188,8 +188,8 @@ describe('CommandService', () => {
           mcpCommand,
           memoryCommand,
           privacyCommand,
-          statsCommand,
           quitCommand,
+          statsCommand,
           themeCommand,
           toolsCommand,
         ]);

@@ -20,7 +20,6 @@ import {
 } from '../types.js';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { formatDuration } from '../utils/formatters.js';
 import { LoadedSettings } from '../../config/settings.js';
 import {
   type CommandContext,
@@ -325,14 +324,7 @@ export const useSlashCommandProcessor = (
       });
     }
     return commands;
-  }, [
-    addMessage,
-    toggleCorgiMode,
-    config,
-    session,
-    gitService,
-    loadHistory,
-  ]);
+  }, [addMessage, toggleCorgiMode, config, gitService, loadHistory]);
 
   const handleSlashCommand = useCallback(
     async (

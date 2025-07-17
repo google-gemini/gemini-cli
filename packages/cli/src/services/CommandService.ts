@@ -43,8 +43,8 @@ const loadBuiltInCommands = async (
     mcpCommand,
     memoryCommand,
     privacyCommand,
-    statsCommand,
     quitCommand,
+    statsCommand,
     themeCommand,
     toolsCommand,
   ];
