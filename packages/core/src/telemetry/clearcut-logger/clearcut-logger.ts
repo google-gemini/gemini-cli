@@ -276,7 +276,6 @@ export class ClearcutLogger {
         value: surface,
       },
     ];
-console.log('################################# data ##################', data);
 
     // Flush start event immediately
     this.enqueueLogEvent(this.createLogEvent(start_session_event_name, data));
@@ -304,7 +303,6 @@ console.log('################################# data ##################', data);
         value: JSON.stringify(event.auth_type),
       },
     ];
-console.log('################################# data ##################', data);
 
     this.enqueueLogEvent(this.createLogEvent(new_prompt_event_name, data));
     this.flushIfNeeded();
