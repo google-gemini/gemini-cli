@@ -88,17 +88,12 @@ export function ThemeDialog({
     [onSelect, selectedScope],
   );
 
-
-  
   const handleThemeHighlight = (themeName: string) => {
     setHighlightedThemeName(themeName);
     onHighlight(themeName);
   };
 
-  
-
   const handleScopeHighlight = useCallback((scope: SettingScope) => {
-
     setSelectedScope(scope);
     setSelectInputKey(Date.now());
   }, []);

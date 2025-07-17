@@ -69,7 +69,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
           );
           process.exit(0);
         }
-
       }
       setIsAuthDialogOpen(false);
       setAuthError(null);
