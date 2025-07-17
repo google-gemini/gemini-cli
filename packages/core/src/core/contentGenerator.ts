@@ -49,7 +49,7 @@ export type ContentGeneratorConfig = {
   model: string;
   apiKey?: string;
   vertexai?: boolean;
-  authType?: AuthType | undefined;
+  authType?: AuthType;
 };
 
 export function createContentGeneratorConfig(
