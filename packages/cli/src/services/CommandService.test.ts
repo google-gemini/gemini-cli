@@ -26,6 +26,7 @@ import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
+import { restoreCommand } from '../ui/commands/restoreCommand.js';
 
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
@@ -79,6 +80,9 @@ vi.mock('../ui/commands/bugCommand.js', () => ({
 vi.mock('../ui/commands/quitCommand.js', () => ({
   quitCommand: { name: 'quit', description: 'Mock Quit' },
 }));
+vi.mock('../ui/commands/restoreCommand.js', () => ({
+  restoreCommand: vi.fn(),
+}));
 
 describe('CommandService', () => {
   const subCommandLen = 17;
@@ -87,8 +91,10 @@ describe('CommandService', () => {
   beforeEach(() => {
     mockConfig = {
       getIdeMode: vi.fn(),
+      getCheckpointingEnabled: vi.fn(),
     } as unknown as Mocked<Config>;
     vi.mocked(ideCommand).mockReturnValue(null);
+    vi.mocked(restoreCommand).mockReturnValue(null);
   });
 
   describe('when using default production loader', () => {
@@ -149,6 +155,20 @@ describe('CommandService', () => {
         expect(commandNames).toContain('ide');
         expect(commandNames).toContain('editor');
         expect(commandNames).toContain('quit');
+      });
+
+      it('should include restore command when checkpointing is on', async () => {
+        mockConfig.getCheckpointingEnabled.mockReturnValue(true);
+        vi.mocked(restoreCommand).mockReturnValue({
+          name: 'restore',
+          description: 'Mock Restore',
+        });
+        await commandService.loadCommands();
+        const tree = commandService.getCommands();
+
+        expect(tree.length).toBe(subCommandLen + 1);
+        const commandNames = tree.map((cmd) => cmd.name);
+        expect(commandNames).toContain('restore');
       });
 
       it('should overwrite any existing commands when called again', async () => {

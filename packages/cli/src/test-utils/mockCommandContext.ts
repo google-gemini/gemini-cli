@@ -46,6 +46,7 @@ export const createMockCommandContext = (
       setDebugMessage: vi.fn(),
       pendingItem: null,
       setPendingItem: vi.fn(),
+      loadHistory: vi.fn(),
     },
     session: {
       stats: {
