@@ -97,6 +97,27 @@ describe('LoopDetectionService', () => {
         expect(service.addAndCheck(event3)).toBe(false);
       }
     });
+
+    it('should not reset tool call counter for other event types', () => {
+      const toolCallEvent = createToolCallRequestEvent('testTool', {
+        param: 'value',
+      });
+      const otherEvent = {
+        type: 'thought',
+      } as unknown as ServerGeminiStreamEvent;
+
+      // Send events just below the threshold
+      for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD - 1; i++) {
+        expect(service.addAndCheck(toolCallEvent)).toBe(false);
+      }
+
+      // Send a different event type
+      expect(service.addAndCheck(otherEvent)).toBe(false);
+
+      // Send the tool call event again, which should now trigger the loop
+      expect(service.addAndCheck(toolCallEvent)).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Content Loop Detection', () => {
