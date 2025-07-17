@@ -9,6 +9,7 @@ import { HistoryItemWithoutId } from '../types.js';
 import { Config, GitService, Logger } from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
 import { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+import type { HistoryItem } from '../types.js';
 import { SessionStatsState } from '../contexts/SessionContext.js';
 
 // Grouped dependencies for clarity and easier mocking
@@ -56,6 +57,12 @@ export interface ToolActionReturn {
   toolArgs: Record<string, unknown>;
 }
 
+/** The return type for a command action that results in the app quitting. */
+export interface QuitActionReturn {
+  type: 'quit';
+  messages: HistoryItem[];
+}
+
 /**
  * The return type for a command action that results in a simple message
  * being displayed to the user.
@@ -71,8 +78,7 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  // TODO: Add 'theme' | 'auth' | 'editor' | 'privacy' as migration happens.
-  dialog: 'help' | 'auth' | 'theme' | 'privacy';
+  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy';
 }
 
 /**
@@ -88,6 +94,7 @@ export interface LoadHistoryActionReturn {
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
+  | QuitActionReturn
   | OpenDialogActionReturn
   | LoadHistoryActionReturn;
 // The standardized contract for any command in the system.
