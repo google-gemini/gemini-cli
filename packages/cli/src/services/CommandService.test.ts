@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, type Mocked } from 'vitest';
 import { CommandService } from './CommandService.js';
 import { type Config } from '@google/gemini-cli-core';
 import { type SlashCommand } from '../ui/commands/types.js';
@@ -23,6 +23,7 @@ import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
+import { editorCommand } from '../ui/commands/editorCommand.js';
 
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
@@ -67,15 +68,18 @@ vi.mock('../ui/commands/compressCommand.js', () => ({
 vi.mock('../ui/commands/mcpCommand.js', () => ({
   mcpCommand: { name: 'mcp', description: 'Mock MCP' },
 }));
+vi.mock('../ui/commands/editorCommand.js', () => ({
+  editorCommand: { name: 'editor', description: 'Mock Editor' },
+}));
 
 describe('CommandService', () => {
-  const subCommandLen = 14;
-  let mockConfig: vi.Mocked<Config>;
+  const subCommandLen = 15;
+  let mockConfig: Mocked<Config>;
 
   beforeEach(() => {
     mockConfig = {
       getIdeMode: vi.fn(),
-    } as unknown as vi.Mocked<Config>;
+    } as unknown as Mocked<Config>;
     vi.mocked(ideCommand).mockReturnValue(null);
   });
 
@@ -134,6 +138,7 @@ describe('CommandService', () => {
         expect(tree.length).toBe(subCommandLen + 1);
         const commandNames = tree.map((cmd) => cmd.name);
         expect(commandNames).toContain('ide');
+        expect(commandNames).toContain('editor');
       });
 
       it('should overwrite any existing commands when called again', async () => {
@@ -166,6 +171,7 @@ describe('CommandService', () => {
           clearCommand,
           compressCommand,
           docsCommand,
+          editorCommand,
           extensionsCommand,
           helpCommand,
           mcpCommand,
