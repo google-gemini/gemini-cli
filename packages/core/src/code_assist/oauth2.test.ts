@@ -34,6 +34,7 @@ vi.mock('node:readline');
 
 const mockConfig = {
   getNoBrowser: () => false,
+  getProxy: () => 'http://test.proxy.com:8080',
 } as unknown as Config;
 
 // Mock fetch globally
@@ -175,6 +176,7 @@ describe('oauth2', () => {
   it('should perform login with user code', async () => {
     const mockConfigWithNoBrowser = {
       getNoBrowser: () => true,
+      getProxy: () => 'http://test.proxy.com:8080',
     } as unknown as Config;
 
     const mockCodeVerifier = {

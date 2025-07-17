@@ -68,6 +68,7 @@ describe('createContentGeneratorConfig', () => {
     getModel: vi.fn().mockReturnValue('gemini-pro'),
     setModel: vi.fn(),
     flashFallbackHandler: vi.fn(),
+    getProxy: vi.fn(),
   } as unknown as Config;
 
   beforeEach(() => {
