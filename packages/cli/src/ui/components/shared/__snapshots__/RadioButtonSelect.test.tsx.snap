@@ -20,9 +20,9 @@ exports[`<RadioButtonSelect /> > renders a list with >10 items and matches snaps
 `;
 
 exports[`<RadioButtonSelect /> > renders with numbers hidden and matches snapshot 1`] = `
-"●    Option 1
-     Option 2
-     Option 3"
+"● 1. Option 1
+  2. Option 2
+  3. Option 3"
 `;
 
 exports[`<RadioButtonSelect /> > renders with scroll arrows and matches snapshot 1`] = `
