@@ -99,12 +99,14 @@ export const useSessionPersistence = ({
         const sessionPath = path.join(geminiDir, 'session.json');
 
         // Create a serializable version of the history
+        const MAX_PERSISTED_HISTORY = 200; // A reasonable default, could be made configurable.
         const serializableHistory = historyRef.current
           .filter(
             (item) =>
               item.type === MessageType.USER ||
               item.type === MessageType.GEMINI,
           )
+          .slice(-MAX_PERSISTED_HISTORY)
           .map((item) => ({ type: item.type, text: item.text }));
 
         fs.writeFileSync(
