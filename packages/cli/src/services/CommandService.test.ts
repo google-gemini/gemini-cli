@@ -24,6 +24,7 @@ import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
+import { bugCommand } from '../ui/commands/bugCommand.js';
 
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
@@ -71,9 +72,12 @@ vi.mock('../ui/commands/mcpCommand.js', () => ({
 vi.mock('../ui/commands/editorCommand.js', () => ({
   editorCommand: { name: 'editor', description: 'Mock Editor' },
 }));
+vi.mock('../ui/commands/bugCommand.js', () => ({
+  bugCommand: { name: 'bug', description: 'Mock Bug' },
+}));
 
 describe('CommandService', () => {
-  const subCommandLen = 15;
+  const subCommandLen = 16;
   let mockConfig: Mocked<Config>;
 
   beforeEach(() => {
@@ -110,6 +114,7 @@ describe('CommandService', () => {
 
         const commandNames = tree.map((cmd) => cmd.name);
         expect(commandNames).toContain('auth');
+        expect(commandNames).toContain('bug');
         expect(commandNames).toContain('memory');
         expect(commandNames).toContain('help');
         expect(commandNames).toContain('clear');
@@ -167,6 +172,7 @@ describe('CommandService', () => {
         expect(loadedTree).toEqual([
           aboutCommand,
           authCommand,
+          bugCommand,
           chatCommand,
           clearCommand,
           compressCommand,

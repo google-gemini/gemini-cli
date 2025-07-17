@@ -71,7 +71,6 @@ import { Config, GeminiClient } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { LoadedSettings } from '../../config/settings.js';
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
-import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { CommandService } from '../../services/CommandService.js';
 import { SlashCommand } from '../commands/types.js';
 
@@ -450,114 +449,6 @@ describe('useSlashCommandProcessor', () => {
         }),
         expect.any(Number),
       );
-    });
-  });
-
-  describe('/bug command', () => {
-    const originalEnv = process.env;
-    beforeEach(() => {
-      vi.resetModules();
-      mockGetCliVersionFn.mockResolvedValue('0.1.0');
-      process.env = { ...originalEnv };
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-      process.env = originalEnv;
-    });
-
-    const getExpectedUrl = (
-      description?: string,
-      sandboxEnvVar?: string,
-      seatbeltProfileVar?: string,
-      cliVersion?: string,
-    ) => {
-      const osVersion = 'test-platform test-node-version';
-      let sandboxEnvStr = 'no sandbox';
-      if (sandboxEnvVar && sandboxEnvVar !== 'sandbox-exec') {
-        sandboxEnvStr = sandboxEnvVar.replace(/^gemini-(?:code-)?/, '');
-      } else if (sandboxEnvVar === 'sandbox-exec') {
-        sandboxEnvStr = `sandbox-exec (${seatbeltProfileVar || 'unknown'})`;
-      }
-      const modelVersion = 'test-model';
-      // Use the mocked memoryUsage value
-      const memoryUsage = '11.8 MB';
-
-      const info = `
-*   **CLI Version:** ${cliVersion}
-*   **Git Commit:** ${GIT_COMMIT_INFO}
-*   **Operating System:** ${osVersion}
-*   **Sandbox Environment:** ${sandboxEnvStr}
-*   **Model Version:** ${modelVersion}
-*   **Memory Usage:** ${memoryUsage}
-`;
-      let url =
-        'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml';
-      if (description) {
-        url += `&title=${encodeURIComponent(description)}`;
-      }
-      url += `&info=${encodeURIComponent(info)}`;
-      return url;
-    };
-
-    it('should call open with the correct GitHub issue URL and return true', async () => {
-      mockGetCliVersionFn.mockResolvedValue('test-version');
-      process.env.SANDBOX = 'gemini-sandbox';
-      process.env.SEATBELT_PROFILE = 'test_profile';
-      const { handleSlashCommand } = getProcessor();
-      const bugDescription = 'This is a test bug';
-      const expectedUrl = getExpectedUrl(
-        bugDescription,
-        process.env.SANDBOX,
-        process.env.SEATBELT_PROFILE,
-        'test-version',
-      );
-      let commandResult: SlashCommandProcessorResult | false = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand(`/bug ${bugDescription}`);
-      });
-
-      expect(mockAddItem).toHaveBeenCalledTimes(2);
-      expect(open).toHaveBeenCalledWith(expectedUrl);
-      expect(commandResult).toEqual({ type: 'handled' });
-    });
-
-    it('should use the custom bug command URL from config if available', async () => {
-      process.env.CLI_VERSION = '0.1.0';
-      process.env.SANDBOX = 'sandbox-exec';
-      process.env.SEATBELT_PROFILE = 'permissive-open';
-      const bugCommand = {
-        urlTemplate:
-          'https://custom-bug-tracker.com/new?title={title}&info={info}',
-      };
-      mockConfig = {
-        ...mockConfig,
-        getBugCommand: vi.fn(() => bugCommand),
-      } as unknown as Config;
-      process.env.CLI_VERSION = '0.1.0';
-
-      const { handleSlashCommand } = getProcessor();
-      const bugDescription = 'This is a custom bug';
-      const info = `
-*   **CLI Version:** 0.1.0
-*   **Git Commit:** ${GIT_COMMIT_INFO}
-*   **Operating System:** test-platform test-node-version
-*   **Sandbox Environment:** sandbox-exec (permissive-open)
-*   **Model Version:** test-model
-*   **Memory Usage:** 11.8 MB
-`;
-      const expectedUrl = bugCommand.urlTemplate
-        .replace('{title}', encodeURIComponent(bugDescription))
-        .replace('{info}', encodeURIComponent(info));
-
-      let commandResult: SlashCommandProcessorResult | false = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand(`/bug ${bugDescription}`);
-      });
-
-      expect(mockAddItem).toHaveBeenCalledTimes(2);
-      expect(open).toHaveBeenCalledWith(expectedUrl);
-      expect(commandResult).toEqual({ type: 'handled' });
     });
   });
 
