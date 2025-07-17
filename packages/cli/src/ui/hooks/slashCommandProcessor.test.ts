@@ -14,7 +14,7 @@ vi.mock('node:process', () => ({
     cwd: vi.fn(() => '/mock/cwd'),
     get env() {
       return process.env;
-    }, // Use a getter to ensure current process.env is used
+    },
     platform: 'test-platform',
     version: 'test-node-version',
     memoryUsage: vi.fn(() => ({
@@ -25,12 +25,11 @@ vi.mock('node:process', () => ({
       arrayBuffers: 123456,
     })),
   },
-  // Provide top-level exports as well for compatibility
   exit: mockProcessExit,
   cwd: vi.fn(() => '/mock/cwd'),
   get env() {
     return process.env;
-  }, // Use a getter here too
+  },
   platform: 'test-platform',
   version: 'test-node-version',
   memoryUsage: vi.fn(() => ({
@@ -106,19 +105,7 @@ describe('useSlashCommandProcessor', () => {
   const mockUseSessionStats = useSessionStats as Mock;
 
   beforeEach(() => {
-    // Reset all mocks to clear any previous state or calls.
     vi.clearAllMocks();
-
-    // Default mock setup for CommandService for all the OLD tests.
-    // This makes them pass again by simulating the original behavior where
-    // the service is constructed but doesn't do much yet.
-    vi.mocked(CommandService).mockImplementation(
-      () =>
-        ({
-          loadCommands: vi.fn().mockResolvedValue(undefined),
-          getCommands: vi.fn().mockReturnValue([]), // Return an empty array by default
-        }) as unknown as CommandService,
-    );
 
     mockAddItem = vi.fn();
     mockClearItems = vi.fn();
@@ -177,7 +164,6 @@ describe('useSlashCommandProcessor', () => {
       useSlashCommandProcessor(
         mockConfig,
         settings,
-        [],
         mockAddItem,
         mockClearItems,
         mockLoadHistory,
@@ -194,7 +180,7 @@ describe('useSlashCommandProcessor', () => {
     );
   };
 
-  describe('New command registry', () => {
+  describe('Command Processing', () => {
     let ActualCommandService: typeof CommandService;
 
     beforeAll(async () => {
@@ -208,7 +194,7 @@ describe('useSlashCommandProcessor', () => {
       vi.clearAllMocks();
     });
 
-    it('should execute a command from the new registry', async () => {
+    it('should execute a registered command', async () => {
       const mockAction = vi.fn();
       const newCommand: SlashCommand = { name: 'test', action: mockAction };
       const mockLoader = async () => [newCommand];
@@ -243,7 +229,7 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
-    it('should return "schedule_tool" when a new command returns a tool action', async () => {
+    it('should return "schedule_tool" for a command returning a tool action', async () => {
       const mockAction = vi.fn().mockResolvedValue({
         type: 'tool',
         toolName: 'my_tool',
@@ -276,7 +262,7 @@ describe('useSlashCommandProcessor', () => {
       });
     });
 
-    it('should return "handled" when a new command returns a message action', async () => {
+    it('should return "handled" for a command returning a message action', async () => {
       const mockAction = vi.fn().mockResolvedValue({
         type: 'message',
         messageType: 'info',
@@ -312,7 +298,7 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
-    it('should return "handled" when a new command returns a dialog action', async () => {
+    it('should return "handled" for a command returning a dialog action', async () => {
       const mockAction = vi.fn().mockResolvedValue({
         type: 'dialog',
         dialog: 'help',
@@ -341,7 +327,7 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
-    it('should open the auth dialog when a new command returns an auth dialog action', async () => {
+    it('should open the auth dialog for a command returning an auth dialog action', async () => {
       const mockAction = vi.fn().mockResolvedValue({
         type: 'dialog',
         dialog: 'auth',
@@ -371,7 +357,7 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
-    it('should open the theme dialog when a new command returns a theme dialog action', async () => {
+    it('should open the theme dialog for a command returning a theme dialog action', async () => {
       const mockAction = vi.fn().mockResolvedValue({
         type: 'dialog',
         dialog: 'theme',
