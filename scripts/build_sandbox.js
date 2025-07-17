@@ -141,15 +141,15 @@ function buildImage(imageName, dockerfile) {
       'CI artifact file /workspace/final_image_uri.txt already exists. Refusing to overwrite.',
     );
   }
-  writeFileSync('/workspace/final_image_uri.txt', finalImageName);
-}
-
-if (baseImage && baseDockerfile) {
-  buildImage(baseImage, baseDockerfile);
+  process.env.CI ? null : writeFileSync('/workspace/final_image_uri.txt', finalImageName);
 }
 
 if (customDockerfile && customImage) {
   buildImage(customImage, customDockerfile);
+}
+
+if (baseImage && baseDockerfile) {
+  buildImage(baseImage, baseDockerfile);
 }
 
 execSync(`${sandboxCommand} image prune -f`, { stdio: 'ignore' });
