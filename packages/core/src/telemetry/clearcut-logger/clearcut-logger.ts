@@ -205,7 +205,7 @@ export class ClearcutLogger {
   }
 
   logStartSessionEvent(event: StartSessionEvent): void {
-    const surface = process.env.SURFACE || undefined;
+    const surface = process.env.SURFACE || 'SURFACE_NOT_SET';
     const data = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
@@ -213,7 +213,7 @@ export class ClearcutLogger {
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId(),
+        value: this.config?.getSessionId() ?? '',
       },
       {
         gemini_cli_key:
@@ -276,6 +276,8 @@ export class ClearcutLogger {
         value: surface,
       },
     ];
+console.log('################################# data ##################', data);
+
     // Flush start event immediately
     this.enqueueLogEvent(this.createLogEvent(start_session_event_name, data));
     this.flushToClearcut().catch((error) => {
@@ -291,7 +293,7 @@ export class ClearcutLogger {
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId(),
+        value: this.config?.getSessionId() ?? '',
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
@@ -302,6 +304,7 @@ export class ClearcutLogger {
         value: JSON.stringify(event.auth_type),
       },
     ];
+console.log('################################# data ##################', data);
 
     this.enqueueLogEvent(this.createLogEvent(new_prompt_event_name, data));
     this.flushIfNeeded();
@@ -457,7 +460,7 @@ export class ClearcutLogger {
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId(),
+        value: this.config?.getSessionId() ?? '',
       },
     ];
 
@@ -471,7 +474,7 @@ export class ClearcutLogger {
     const data = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId(),
+        value: this.config?.getSessionId() ?? '',
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_LOOP_DETECTED_TYPE,
