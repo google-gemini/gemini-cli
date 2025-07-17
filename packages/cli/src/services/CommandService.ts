@@ -13,6 +13,7 @@ import { docsCommand } from '../ui/commands/docsCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
+import { editorCommand } from '../ui/commands/editorCommand.js';
 import { chatCommand } from '../ui/commands/chatCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
@@ -32,6 +33,7 @@ const loadBuiltInCommands = async (
     clearCommand,
     compressCommand,
     docsCommand,
+    editorCommand,
     extensionsCommand,
     helpCommand,
     ideCommand(config),
