@@ -36,16 +36,15 @@ export function ThemeDialog({
     SettingScope.User,
   );
 
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
   // Generate theme items
-  const themeItems = themeManager.getAvailableThemes().map((theme) => {
-    const typeString = theme.type.charAt(0).toUpperCase() + theme.type.slice(1);
-    return {
-      label: theme.name,
-      value: theme.name,
-      themeNameDisplay: theme.name,
-      themeTypeDisplay: typeString,
-    };
-  });
+  const themeItems = themeManager.getAvailableThemes().map((theme) => ({
+    label: theme.name,
+    value: theme.name,
+    themeNameDisplay: theme.name,
+    themeTypeDisplay: capitalize(theme.type),
+  }));
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
 
   // Determine which radio button should be initially selected in the theme list
@@ -183,9 +182,8 @@ export function ThemeDialog({
   // The code block is slightly longer than the diff, so give it more space.
   const codeBlockHeight = Math.ceil(availableHeightForPanes * 0.6);
   const diffHeight = Math.floor(availableHeightForPanes * 0.4);
-
-  let themeType = themeManager.getActiveTheme().type;
-  themeType = themeType.charAt(0).toUpperCase() + themeType.slice(1);
+  console.log(themeItems);
+  const themeType = capitalize(themeManager.getActiveTheme().type);
   return (
     <Box
       borderStyle="round"
