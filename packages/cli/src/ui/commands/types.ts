@@ -41,6 +41,12 @@ export interface CommandContext {
      * @param item The history item to display as pending, or `null` to clear.
      */
     setPendingItem: (item: HistoryItemWithoutId | null) => void;
+    /**
+     * Loads a new set of history items, replacing the current history.
+     *
+     * @param history The array of history items to load.
+     */
+    loadHistory: UseHistoryManagerReturn['loadHistory'];
   };
   // Session-specific data
   session: {
