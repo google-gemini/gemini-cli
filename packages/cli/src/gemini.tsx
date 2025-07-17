@@ -84,6 +84,7 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   await new Promise((resolve) => child.on('close', resolve));
   process.exit(0);
 }
+import { runAcpPeer } from './acp/acpPeer.js';
 
 export async function main() {
   const workspaceRoot = process.cwd();
@@ -187,6 +188,10 @@ export async function main() {
   ) {
     // Do oauth before app renders to make copying the link possible.
     await getOauthClient(settings.merged.selectedAuthType, config);
+  }
+
+  if (config.getExperimentalAcp()) {
+    return runAcpPeer(config, settings);
   }
 
   let input = config.getQuestion();
