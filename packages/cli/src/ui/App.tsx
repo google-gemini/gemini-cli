@@ -43,7 +43,6 @@ import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup } from '../utils/cleanup.js';
-import { ExtensionsSummary } from './components/ExtensionsSummary.js';
 import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
@@ -723,7 +722,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   nightly={nightly}
                 />
               )}
-              <ExtensionsSummary config={config} />
               {!settings.merged.hideTips && <Tips config={config} />}
             </Box>,
             ...history.map((h) => (
