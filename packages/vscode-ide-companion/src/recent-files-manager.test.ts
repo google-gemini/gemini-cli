@@ -157,6 +157,22 @@ describe('RecentFilesManager', () => {
     expect(manager.recentFiles[0].filePath).toBe('/test/file2.txt');
   });
 
+  it('prunes files older than the max age', () => {
+    const manager = new RecentFilesManager(context, 10, 1); // 1 minute max age
+    const uri1 = vscode.Uri.file('/test/file1.txt');
+    const uri2 = vscode.Uri.file('/test/file2.txt');
+
+    // Add a file that is not expired
+    manager.add(uri1);
+
+    // Add a file that is expired
+    const oldTimestamp = Date.now() - 2 * 60 * 1000; // 2 minutes ago
+    manager['files'].push({ uri: uri2, timestamp: oldTimestamp });
+
+    expect(manager.recentFiles).toHaveLength(1);
+    expect(manager.recentFiles[0].filePath).toBe('/test/file1.txt');
+  });
+
   describe('with MAX_RECENT_FILES from environment variable', () => {
     const originalEnv = process.env;
 
@@ -190,6 +206,58 @@ describe('RecentFilesManager', () => {
         manager.add(vscode.Uri.file(`/test/file${i}.txt`));
       }
       expect(manager.recentFiles).toHaveLength(10);
+    });
+  });
+
+  describe('with MAX_FILE_AGE_MINUTES from environment variable', () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      vi.resetModules();
+      process.env = { ...originalEnv };
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    it('uses the value from the environment variable', async () => {
+      process.env['IDE_MODE_MAX_FILE_AGE_MINUTES'] = '1';
+      const { RecentFilesManager } = await import('./recent-files-manager.js');
+      const manager = new RecentFilesManager(context);
+      const uri1 = vscode.Uri.file('/test/file1.txt');
+      const uri2 = vscode.Uri.file('/test/file2.txt');
+
+      // Add a file that is not expired
+      manager.add(uri1);
+
+      // Add a file that is expired
+      const oldTimestamp = Date.now() - 2 * 60 * 1000; // 2 minutes ago
+      manager['files'].push({ uri: uri2, timestamp: oldTimestamp });
+
+      expect(manager.recentFiles).toHaveLength(1);
+      expect(manager.recentFiles[0].filePath).toBe('/test/file1.txt');
+    });
+
+    it('uses the default value if the environment variable is invalid', async () => {
+      process.env['IDE_MODE_MAX_FILE_AGE_MINUTES'] = 'not-a-number';
+      const { RecentFilesManager, getMaxFileAge } = await import(
+        './recent-files-manager.js'
+      );
+      expect(getMaxFileAge()).toBe(20160);
+      const manager = new RecentFilesManager(context);
+      const uri1 = vscode.Uri.file('/test/file1.txt');
+      const uri2 = vscode.Uri.file('/test/file2.txt');
+
+      // Add a file that is not expired
+      manager.add(uri1);
+
+      // Add a file that is expired
+      const oldTimestamp = Date.now() - (20160 + 1) * 60 * 1000;
+      manager['files'].push({ uri: uri2, timestamp: oldTimestamp });
+
+      expect(manager.recentFiles).toHaveLength(1);
+      expect(manager.recentFiles[0].filePath).toBe('/test/file1.txt');
     });
   });
 });
