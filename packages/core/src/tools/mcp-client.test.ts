@@ -9,7 +9,6 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import {
   populateMcpServerCommand,
   createTransport,
-  generateValidName,
   isEnabled,
   discoverTools,
 } from './mcp-client.js';
@@ -171,92 +170,6 @@ describe('mcp-client', () => {
         env: { FOO: 'bar' },
         stderr: 'pipe',
       });
-    });
-  });
-  describe('generateValidName', () => {
-    it('should return a valid name for a simple function', () => {
-      const funcDecl = { name: 'myFunction' };
-      const serverName = 'myServer';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('myServer__myFunction');
-    });
-
-    it('should prepend the server name', () => {
-      const funcDecl = { name: 'anotherFunction' };
-      const serverName = 'production-server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('production-server__anotherFunction');
-    });
-
-    it('should replace invalid characters with underscores', () => {
-      const funcDecl = { name: 'invalid-name with spaces' };
-      const serverName = 'test_server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('test_server__invalid-name_with_spaces');
-    });
-
-    it('should truncate long names', () => {
-      const funcDecl = {
-        name: 'a_very_long_function_name_that_will_definitely_exceed_the_limit',
-      };
-      const serverName = 'a_long_server_name';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result.length).toBe(63);
-      expect(result).toBe(
-        'a_long_server_name__a_very_l___will_definitely_exceed_the_limit',
-      );
-    });
-
-    it('should handle names with only invalid characters', () => {
-      const funcDecl = { name: '!@#$%^&*()' };
-      const serverName = 'special-chars';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('special-chars____________');
-    });
-
-    it('should handle names that are already valid', () => {
-      const funcDecl = { name: 'already_valid' };
-      const serverName = 'validator';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('validator__already_valid');
-    });
-
-    it('should handle names with leading/trailing invalid characters', () => {
-      const funcDecl = { name: '-_invalid-_' };
-      const serverName = 'trim-test';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('trim-test__-_invalid-_');
-    });
-
-    it('should handle names that are exactly 63 characters long', () => {
-      const longName = 'a'.repeat(45);
-      const funcDecl = { name: longName };
-      const serverName = 'server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe(`server__${longName}`);
-      expect(result.length).toBe(53);
-    });
-
-    it('should handle names that are exactly 64 characters long', () => {
-      const longName = 'a'.repeat(55);
-      const funcDecl = { name: longName };
-      const serverName = 'server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result.length).toBe(63);
-      expect(result).toBe(
-        'server__aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      );
-    });
-
-    it('should handle names that are longer than 64 characters', () => {
-      const longName = 'a'.repeat(100);
-      const funcDecl = { name: longName };
-      const serverName = 'long-server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result.length).toBe(63);
-      expect(result).toBe(
-        'long-server__aaaaaaaaaaaaaaa___aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      );
     });
   });
   describe('isEnabled', () => {
