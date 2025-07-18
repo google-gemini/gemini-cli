@@ -14,7 +14,7 @@
 export function shouldAttemptBrowserLaunch(): boolean {
   // A list of browser names that indicate we should not attempt to open a
   // web browser for the user.
-  const browserBlocklist = ['www-browser', 'lynx', 'links', 'w3m'];
+  const browserBlocklist = ['www-browser'];
   const browserEnv = process.env.BROWSER;
   if (browserEnv && browserBlocklist.includes(browserEnv)) {
     return false;
