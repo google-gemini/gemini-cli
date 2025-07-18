@@ -277,16 +277,13 @@ export async function discoverTools(
         continue;
       }
 
-      const toolNameForModel = generateValidName(funcDecl, mcpServerName);
-
       discoveredTools.push(
         new DiscoveredMCPTool(
           mcpCallableTool,
           mcpServerName,
-          toolNameForModel,
+          funcDecl.name!,
           funcDecl.description ?? '',
           funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
-          funcDecl.name!,
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
           mcpServerConfig.trust,
         ),
@@ -425,26 +422,6 @@ export function createTransport(
   throw new Error(
     `Invalid configuration: missing httpUrl (for Streamable HTTP), url (for SSE), and command (for stdio).`,
   );
-}
-
-/** Visible for testing */
-export function generateValidName(
-  funcDecl: FunctionDeclaration,
-  mcpServerName: string,
-) {
-  // Replace invalid characters (based on 400 error message from Gemini API) with underscores
-  let validToolname = funcDecl.name!.replace(/[^a-zA-Z0-9_.-]/g, '_');
-
-  // Prepend MCP server name to avoid conflicts with other tools
-  validToolname = mcpServerName + '__' + validToolname;
-
-  // If longer than 63 characters, replace middle with '___'
-  // (Gemini API says max length 64, but actual limit seems to be 63)
-  if (validToolname.length > 63) {
-    validToolname =
-      validToolname.slice(0, 28) + '___' + validToolname.slice(-32);
-  }
-  return validToolname;
 }
 
 /** Visible for testing */
