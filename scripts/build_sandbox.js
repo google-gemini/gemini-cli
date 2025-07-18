@@ -133,7 +133,8 @@ function buildImage(imageName, dockerfile) {
   const finalImageName = `${imageName.split(':')[0]}:${imageTag}`;
 
   execSync(
-    `${buildCommand} ${process.env.BUILD_SANDBOX_FLAGS || ''
+    `${buildCommand} ${
+      process.env.BUILD_SANDBOX_FLAGS || ''
     } --build-arg CLI_VERSION_ARG=${npmPackageVersion} -f "${dockerfile}" -t "${finalImageName}" .`,
     { stdio: buildStdout, shell: '/bin/bash' },
   );
