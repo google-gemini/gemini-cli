@@ -17,7 +17,7 @@ describe('extensionsCommand', () => {
     mockContext = createMockCommandContext({
       services: {
         config: {
-          getActiveExtensions: () => [],
+          getExtensions: () => [],
         },
       },
     });
@@ -36,13 +36,14 @@ describe('extensionsCommand', () => {
 
   it('should list active extensions when they are found', async () => {
     const mockExtensions = [
-      { name: 'ext-one', version: '1.0.0' },
-      { name: 'ext-two', version: '2.1.0' },
+      { name: 'ext-one', version: '1.0.0', isActive: true },
+      { name: 'ext-two', version: '2.1.0', isActive: true },
+      { name: 'ext-three', version: '3.0.0', isActive: false },
     ];
     mockContext = createMockCommandContext({
       services: {
         config: {
-          getActiveExtensions: () => mockExtensions,
+          getExtensions: () => mockExtensions,
         },
       },
     });
