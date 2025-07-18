@@ -162,7 +162,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         // - Otherwise, the base is everything EXCEPT the last partial part.
         const basePath =
           hasTrailingSpace || isParentPath ? parts : parts.slice(0, -1);
-        const newValue = `/${[...basePath, suggestion].join(' ')} `;
+        const newValue = `/${[...basePath, suggestion].join(' ')}`;
 
         buffer.setText(newValue);
       } else {
@@ -263,6 +263,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (key.ctrl && key.name === 'l') {
         onClearScreen();
+        return;
+      }
+
+      // If the command is a perfect match, pressing enter should execute it.
+      if (completion.isPerfectMatch && key.name === 'return') {
+        handleSubmitAndClear(buffer.text);
         return;
       }
 
