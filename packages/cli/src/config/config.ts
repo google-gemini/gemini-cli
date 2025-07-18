@@ -22,7 +22,7 @@ import {
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
-import { Extension, filterActiveExtensions } from './extension.js';
+import { Extension, annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 
@@ -252,9 +252,13 @@ export async function loadCliConfig(
     process.env.TERM_PROGRAM === 'vscode' &&
     !process.env.SANDBOX;
 
-  const activeExtensions = filterActiveExtensions(
+  const allExtensions = annotateActiveExtensions(
     extensions,
     argv.extensions || [],
+  );
+
+  const activeExtensions = extensions.filter(
+    (_, i) => allExtensions[i].isActive,
   );
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
@@ -283,6 +287,7 @@ export async function loadCliConfig(
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
   const excludeTools = mergeExcludeTools(settings, activeExtensions);
+  const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
 
   if (!argv.allowedMcpServerNames) {
     if (settings.allowMCPServers) {
@@ -308,9 +313,24 @@ export async function loadCliConfig(
     const allowedNames = new Set(argv.allowedMcpServerNames.filter(Boolean));
     if (allowedNames.size > 0) {
       mcpServers = Object.fromEntries(
-        Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
+        Object.entries(mcpServers).filter(([key, server]) => {
+          const isAllowed = allowedNames.has(key);
+          if (!isAllowed) {
+            blockedMcpServers.push({
+              name: key,
+              extensionName: server.extensionName || '',
+            });
+          }
+          return isAllowed;
+        }),
       );
     } else {
+      blockedMcpServers.push(
+        ...Object.entries(mcpServers).map(([key, server]) => ({
+          name: key,
+          extensionName: server.extensionName || '',
+        })),
+      );
       mcpServers = {};
     }
   }
@@ -403,10 +423,8 @@ export async function loadCliConfig(
     maxSessionTurns: settings.maxSessionTurns ?? -1,
     experimentalAcp: argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,
-    activeExtensions: activeExtensions.map((e) => ({
-      name: e.config.name,
-      version: e.config.version,
-    })),
+    extensions: allExtensions,
+    blockedMcpServers,
     noBrowser: !!process.env.NO_BROWSER,
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
@@ -424,7 +442,10 @@ function mergeMcpServers(settings: Settings, extensions: Extension[]) {
           );
           return;
         }
-        mcpServers[key] = server;
+        mcpServers[key] = {
+          ...server,
+          extensionName: extension.config.name,
+        };
       },
     );
   }
