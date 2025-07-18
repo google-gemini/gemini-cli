@@ -45,6 +45,10 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import {
+  BackgroundAgentManager,
+  loadBackgroundAgentManager,
+} from '../background/backgroundManager.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -71,9 +75,10 @@ export interface TelemetrySettings {
   logPrompts?: boolean;
 }
 
-export interface ActiveExtension {
+export interface GeminiCLIExtension {
   name: string;
   version: string;
+  isActive: boolean;
 }
 
 export class MCPServerConfig {
@@ -97,6 +102,7 @@ export class MCPServerConfig {
     readonly description?: string,
     readonly includeTools?: string[],
     readonly excludeTools?: string[],
+    readonly extensionName?: string,
   ) {}
 }
 
@@ -125,6 +131,7 @@ export interface ConfigParameters {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
+  backgroundAgents?: Record<string, MCPServerConfig>;
   userMemory?: string;
   geminiMdFileCount?: number;
   approvalMode?: ApprovalMode;
@@ -147,7 +154,8 @@ export interface ConfigParameters {
   maxSessionTurns?: number;
   experimentalAcp?: boolean;
   listExtensions?: boolean;
-  activeExtensions?: ActiveExtension[];
+  extensions?: GeminiCLIExtension[];
+  blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideMode?: boolean;
@@ -155,6 +163,7 @@ export interface ConfigParameters {
 
 export class Config {
   private toolRegistry!: ToolRegistry;
+  private backgroundAgentManager?: BackgroundAgentManager;
   private readonly sessionId: string;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private readonly embeddingModel: string;
@@ -169,6 +178,7 @@ export class Config {
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
   private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
+  private readonly backgroundAgents?: Record<string, MCPServerConfig>;
   private userMemory: string;
   private geminiMdFileCount: number;
   private approvalMode: ApprovalMode;
@@ -194,7 +204,11 @@ export class Config {
   private modelSwitchedDuringSession: boolean = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
-  private readonly _activeExtensions: ActiveExtension[];
+  private readonly _extensions: GeminiCLIExtension[];
+  private readonly _blockedMcpServers: Array<{
+    name: string;
+    extensionName: string;
+  }>;
   flashFallbackHandler?: FlashFallbackHandler;
   private quotaErrorOccurred: boolean = false;
   private readonly summarizeToolOutput:
@@ -217,6 +231,7 @@ export class Config {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
+    this.backgroundAgents = params.backgroundAgents;
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
@@ -245,7 +260,8 @@ export class Config {
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalAcp = params.experimentalAcp ?? false;
     this.listExtensions = params.listExtensions ?? false;
-    this._activeExtensions = params.activeExtensions ?? [];
+    this._extensions = params.extensions ?? [];
+    this._blockedMcpServers = params.blockedMcpServers ?? [];
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.ideMode = params.ideMode ?? false;
@@ -273,6 +289,10 @@ export class Config {
     if (this.getCheckpointingEnabled()) {
       await this.getGitService();
     }
+    this.backgroundAgentManager = await loadBackgroundAgentManager(
+      this.backgroundAgents,
+      this.debugMode,
+    );
     this.toolRegistry = await this.createToolRegistry();
   }
 
@@ -398,6 +418,10 @@ export class Config {
     return this.mcpServers;
   }
 
+  getBackgroundAgentManager(): BackgroundAgentManager | undefined {
+    return this.backgroundAgentManager;
+  }
+
   getUserMemory(): string {
     return this.userMemory;
   }
@@ -505,8 +529,12 @@ export class Config {
     return this.listExtensions;
   }
 
-  getActiveExtensions(): ActiveExtension[] {
-    return this._activeExtensions;
+  getExtensions(): GeminiCLIExtension[] {
+    return this._extensions;
+  }
+
+  getBlockedMcpServers(): Array<{ name: string; extensionName: string }> {
+    return this._blockedMcpServers;
   }
 
   getNoBrowser(): boolean {
