@@ -34,8 +34,9 @@ export function loadExtensions(workspaceDir: string): Extension[] {
   const uniqueExtensions = new Map<string, Extension>();
   for (const extension of allExtensions) {
     if (!uniqueExtensions.has(extension.config.name)) {
-      console.log(
-        `Loading extension: ${extension.config.name} (version: ${extension.config.version})`,
+      // stderr is used to avoid breaking JSON output on stdout
+      process.stderr.write(
+        `Loading extension: ${extension.config.name} (version: ${extension.config.version})\n`,
       );
       uniqueExtensions.set(extension.config.name, extension);
     }
