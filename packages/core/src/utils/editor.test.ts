@@ -62,6 +62,7 @@ describe('editor utils', () => {
       { editor: 'vim', command: 'vim', win32Command: 'vim' },
       { editor: 'neovim', command: 'nvim', win32Command: 'nvim' },
       { editor: 'zed', command: 'zed', win32Command: 'zed' },
+      { editor: 'trae', command: 'trae', win32Command: 'trae' },
     ];
 
     for (const { editor, command, win32Command } of testCases) {
@@ -118,6 +119,7 @@ describe('editor utils', () => {
       { editor: 'windsurf', command: 'windsurf', win32Command: 'windsurf' },
       { editor: 'cursor', command: 'cursor', win32Command: 'cursor' },
       { editor: 'zed', command: 'zed', win32Command: 'zed' },
+      { editor: 'trae', command: 'trae', win32Command: 'trae' },
     ];
 
     for (const { editor, command, win32Command } of guiEditors) {
@@ -190,6 +192,7 @@ describe('editor utils', () => {
       'windsurf',
       'cursor',
       'zed',
+      'trae',
     ];
     for (const editor of spawnEditors) {
       it(`should call spawn for ${editor}`, async () => {
@@ -319,6 +322,7 @@ describe('editor utils', () => {
       'windsurf',
       'cursor',
       'zed',
+      'trae',
     ];
     for (const editor of guiEditors) {
       it(`should not allow ${editor} in sandbox mode`, () => {
