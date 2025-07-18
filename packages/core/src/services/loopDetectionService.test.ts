@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { LoopDetectionService } from './loopDetectionService.js';
 import {
   GeminiEventType,
@@ -12,15 +12,26 @@ import {
   ServerGeminiToolCallRequestEvent,
 } from '../core/turn.js';
 import { ServerGeminiStreamEvent } from '../core/turn.js';
+import { Config } from '../config/config.js';
+import * as loggers from '../telemetry/loggers.js';
+
+vi.mock('../telemetry/loggers.js', () => ({
+  logLoopDetected: vi.fn(),
+}));
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
 
 describe('LoopDetectionService', () => {
   let service: LoopDetectionService;
+  let mockConfig: Config;
 
   beforeEach(() => {
-    service = new LoopDetectionService();
+    mockConfig = {
+      getTelemetryEnabled: () => true,
+    } as unknown as Config;
+    service = new LoopDetectionService(mockConfig);
+    vi.clearAllMocks();
   });
 
   const createToolCallRequestEvent = (
@@ -48,6 +59,7 @@ describe('LoopDetectionService', () => {
       for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD - 1; i++) {
         expect(service.addAndCheck(event)).toBe(false);
       }
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
 
     it(`should detect a loop on the TOOL_CALL_LOOP_THRESHOLD-th identical call`, () => {
@@ -56,6 +68,7 @@ describe('LoopDetectionService', () => {
         service.addAndCheck(event);
       }
       expect(service.addAndCheck(event)).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
     });
 
     it('should detect a loop on subsequent identical calls', () => {
@@ -64,6 +77,7 @@ describe('LoopDetectionService', () => {
         service.addAndCheck(event);
       }
       expect(service.addAndCheck(event)).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(2);
     });
 
     it('should not detect a loop for different tool calls', () => {
@@ -83,6 +97,27 @@ describe('LoopDetectionService', () => {
         expect(service.addAndCheck(event3)).toBe(false);
       }
     });
+
+    it('should not reset tool call counter for other event types', () => {
+      const toolCallEvent = createToolCallRequestEvent('testTool', {
+        param: 'value',
+      });
+      const otherEvent = {
+        type: 'thought',
+      } as unknown as ServerGeminiStreamEvent;
+
+      // Send events just below the threshold
+      for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD - 1; i++) {
+        expect(service.addAndCheck(toolCallEvent)).toBe(false);
+      }
+
+      // Send a different event type
+      expect(service.addAndCheck(otherEvent)).toBe(false);
+
+      // Send the tool call event again, which should now trigger the loop
+      expect(service.addAndCheck(toolCallEvent)).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Content Loop Detection', () => {
@@ -91,6 +126,7 @@ describe('LoopDetectionService', () => {
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
         expect(service.addAndCheck(event)).toBe(false);
       }
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
 
     it(`should detect a loop on the CONTENT_LOOP_THRESHOLD-th identical content string`, () => {
@@ -99,6 +135,7 @@ describe('LoopDetectionService', () => {
         service.addAndCheck(event);
       }
       expect(service.addAndCheck(event)).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
     });
 
     it('should not detect a loop for different content strings', () => {
@@ -108,6 +145,7 @@ describe('LoopDetectionService', () => {
         expect(service.addAndCheck(event1)).toBe(false);
         expect(service.addAndCheck(event2)).toBe(false);
       }
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
   });
 
