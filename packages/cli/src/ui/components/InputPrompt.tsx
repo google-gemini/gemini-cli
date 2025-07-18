@@ -73,23 +73,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
     // Search backwards from cursor position using code points
     const codePoints = toCodePoints(text);
-    
+
     for (let i = offset - 1; i >= 0; i--) {
       const char = codePoints[i];
-      
+
       if (char === ' ' || char === '\n') {
         // Check if this space is escaped by looking at the character before it
         let isEscaped = false;
         let backslashCount = 0;
-        
+
         // Count consecutive backslashes before the space
         for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
           backslashCount++;
         }
-        
+
         // If there's an odd number of backslashes, the space is escaped
         isEscaped = backslashCount % 2 === 1;
-        
+
         if (!isEscaped) {
           // Found unescaped space before @ or /, return false
           return false;

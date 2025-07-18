@@ -761,7 +761,7 @@ describe('InputPrompt', () => {
       mockBuffer.text = '@src/file👍.txt';
       mockBuffer.lines = ['@src/file👍.txt'];
       mockBuffer.cursor = [0, 14]; // After the emoji character
-      
+
       mockedUseCompletion.mockReturnValue({
         ...mockCompletion,
         showSuggestions: true,
@@ -788,7 +788,7 @@ describe('InputPrompt', () => {
       mockBuffer.text = '@src/file👍.txt hello';
       mockBuffer.lines = ['@src/file👍.txt hello'];
       mockBuffer.cursor = [0, 20]; // After the space
-      
+
       mockedUseCompletion.mockReturnValue({
         ...mockCompletion,
         showSuggestions: false,
@@ -815,7 +815,7 @@ describe('InputPrompt', () => {
       mockBuffer.text = '@src/my\\ file.txt';
       mockBuffer.lines = ['@src/my\\ file.txt'];
       mockBuffer.cursor = [0, 16]; // After the escaped space and filename
-      
+
       mockedUseCompletion.mockReturnValue({
         ...mockCompletion,
         showSuggestions: true,
@@ -842,7 +842,7 @@ describe('InputPrompt', () => {
       mockBuffer.text = '@path/my\\ file.txt hello';
       mockBuffer.lines = ['@path/my\\ file.txt hello'];
       mockBuffer.cursor = [0, 24]; // After "hello"
-      
+
       mockedUseCompletion.mockReturnValue({
         ...mockCompletion,
         showSuggestions: false,
@@ -869,11 +869,13 @@ describe('InputPrompt', () => {
       mockBuffer.text = '@docs/my\\ long\\ file\\ name.md';
       mockBuffer.lines = ['@docs/my\\ long\\ file\\ name.md'];
       mockBuffer.cursor = [0, 29]; // At the end
-      
+
       mockedUseCompletion.mockReturnValue({
         ...mockCompletion,
         showSuggestions: true,
-        suggestions: [{ label: 'my long file name.md', value: 'my long file name.md' }],
+        suggestions: [
+          { label: 'my long file name.md', value: 'my long file name.md' },
+        ],
       });
 
       const { unmount } = render(<InputPrompt {...props} />);
@@ -896,7 +898,7 @@ describe('InputPrompt', () => {
       mockBuffer.text = '/memory\\ test';
       mockBuffer.lines = ['/memory\\ test'];
       mockBuffer.cursor = [0, 13]; // At the end
-      
+
       mockedUseCompletion.mockReturnValue({
         ...mockCompletion,
         showSuggestions: true,
@@ -923,11 +925,13 @@ describe('InputPrompt', () => {
       mockBuffer.text = '@files/emoji\\ 👍\\ test.txt';
       mockBuffer.lines = ['@files/emoji\\ 👍\\ test.txt'];
       mockBuffer.cursor = [0, 25]; // After the escaped space and emoji
-      
+
       mockedUseCompletion.mockReturnValue({
         ...mockCompletion,
         showSuggestions: true,
-        suggestions: [{ label: 'emoji 👍 test.txt', value: 'emoji 👍 test.txt' }],
+        suggestions: [
+          { label: 'emoji 👍 test.txt', value: 'emoji 👍 test.txt' },
+        ],
       });
 
       const { unmount } = render(<InputPrompt {...props} />);
