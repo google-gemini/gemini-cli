@@ -318,7 +318,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Store current key for next iteration
       prevKeyRef.current = key;
-
       if (
         key.sequence === '!' &&
         buffer.text === '' &&
@@ -423,6 +422,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           const [row, col] = buffer.cursor;
           const line = buffer.lines[row];
           const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
+          
           if (charBefore === '\\') {
             buffer.backspace();
             buffer.newline();
