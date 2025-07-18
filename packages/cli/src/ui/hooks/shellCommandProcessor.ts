@@ -17,6 +17,7 @@ import { type PartListUnion } from '@google/genai';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import { isBinary } from '../utils/textUtils.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { SHELL_COMMAND_NAME } from '../constants.js';
 import crypto from 'crypto';
 import path from 'path';
 import os from 'os';
@@ -254,7 +255,7 @@ export const useShellCommandProcessor = (
 
         const initialToolDisplay: IndividualToolCallDisplay = {
           callId,
-          name: 'Shell Command',
+          name: SHELL_COMMAND_NAME,
           description: rawQuery,
           status: ToolCallStatus.Executing,
           resultDisplay: '',
