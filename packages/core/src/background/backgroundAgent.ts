@@ -108,9 +108,11 @@ export class BackgroundAgent {
     tool: DiscoveredMCPTool,
     params: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
-    const parts = await tool.mcpCall(params);
+    const { llmContent: parts } = await tool.execute(params);
     if (
+      !Array.isArray(parts) ||
       parts.length !== 1 ||
+      typeof parts[0] !== 'object' ||
       parts[0]?.functionResponse?.response === undefined
     ) {
       throw new Error('Expected exactly one part with a functionResponse');

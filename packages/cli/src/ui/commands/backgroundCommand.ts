@@ -7,14 +7,22 @@
 import { SlashCommand, CommandContext } from './types.js';
 import {
   Config,
-  BackgroundAgentTask,
+  BackgroundAgentMessage,
   partListUnionToString,
 } from '@google/gemini-cli-core';
 
 const MAX_STATUS_MESSAGE_LENGTH = 100;
 
-function getTaskStatusString(task: BackgroundAgentTask): string {
-  return partListUnionToString(task.status.message?.parts ?? []).trim();
+function toMessageString(message?: BackgroundAgentMessage): string {
+  return partListUnionToString(message?.parts ?? []).trim();
+}
+
+function toOneliner(input: string, maxlength: number) {
+  let output = input.replace(/\r?\n|\r/g, ' ');
+  if (output.length > maxlength) {
+    output = output.substring(0, maxlength) + '...';
+  }
+  return output;
 }
 
 function getActiveAgent(context: CommandContext) {
@@ -40,7 +48,8 @@ function addClientHistory(context: CommandContext, text: string) {
 
 const startSubcommand: SlashCommand = {
   name: 'start',
-  description: 'Start a new task with the provided prompt',
+  description:
+    'Start a new task with the provided prompt. Usage: /bg start <prompt>',
   action: async (context, args) => {
     if (!args || args.trim() === '') {
       return {
@@ -50,7 +59,8 @@ const startSubcommand: SlashCommand = {
       };
     }
 
-    const task = await getActiveAgent(context).startTask(args);
+    const agent = getActiveAgent(context);
+    const task = await agent.startTask(args);
 
     addClientHistory(
       context,
@@ -67,7 +77,7 @@ const startSubcommand: SlashCommand = {
 
 const stopSubcommand: SlashCommand = {
   name: 'stop',
-  description: 'Stops a running task',
+  description: 'Stops a running task. Usage: /bg stop <task_id>',
   action: async (context, args) => {
     if (!args || args.trim() === '') {
       return {
@@ -76,7 +86,8 @@ const stopSubcommand: SlashCommand = {
         content: 'The `stop` command requires a task id.',
       };
     }
-    await getActiveAgent(context).cancelTask(args);
+    const agent = getActiveAgent(context);
+    await agent.cancelTask(args);
     addClientHistory(context, `I canceled the background task with id ${args}`);
     return {
       type: 'message',
@@ -98,22 +109,19 @@ const listSubcommand: SlashCommand = {
       };
     }
 
-    const tasks = await getActiveAgent(context).listTasks();
+    const agent = getActiveAgent(context);
+    const tasks = await agent.listTasks();
     let content: string;
     if (tasks.length === 0) {
       content = 'No background tasks found.';
     } else {
       const taskList = tasks
         .map((task) => {
-          let statusMessage = getTaskStatusString(task).replace(
-            /\r?\n|\r/g,
-            ' ',
+          const shortStatus = toOneliner(
+            toMessageString(task.status.message),
+            MAX_STATUS_MESSAGE_LENGTH,
           );
-          if (statusMessage.length > MAX_STATUS_MESSAGE_LENGTH) {
-            statusMessage =
-              statusMessage.substring(0, MAX_STATUS_MESSAGE_LENGTH) + '...';
-          }
-          return `  - ${task.id}: (${task.status.state}) ${statusMessage}`;
+          return `  - ${task.id}: (${task.status.state}) ${shortStatus}`;
         })
         .join('\n');
       content = `Background tasks:\n${taskList}`;
@@ -128,7 +136,7 @@ const listSubcommand: SlashCommand = {
 
 const getSubcommand: SlashCommand = {
   name: 'get',
-  description: 'View a task',
+  description: 'View a task. Usage: /bg get <task_id>',
   action: async (context, args) => {
     if (!args || args.trim() === '') {
       return {
@@ -137,9 +145,10 @@ const getSubcommand: SlashCommand = {
         content: 'The `get` command requires a task id.',
       };
     }
-    const task = await getActiveAgent(context).getTask(args);
+    const agent = getActiveAgent(context);
+    const task = await agent.getTask(args);
     const content = `Task Details for ${task.id}:
-Status: (${task.status.state}) ${getTaskStatusString(task)}}`;
+Status: (${task.status.state}) ${toMessageString(task.status.message)}}`;
 
     return {
       type: 'message',
@@ -151,7 +160,7 @@ Status: (${task.status.state}) ${getTaskStatusString(task)}}`;
 
 const logsSubcommand: SlashCommand = {
   name: 'logs',
-  description: "View a task's recent logs",
+  description: "View a task's recent logs. Usage: /bg log <task_id>",
   action: async (context, args) => {
     if (!args || args.trim() === '') {
       return {
@@ -160,20 +169,26 @@ const logsSubcommand: SlashCommand = {
         content: 'The `log` command requires a task id.',
       };
     }
-    const task = await getActiveAgent(context).getTask(args);
-    const content = `Task logs for ${task.id}. status: (${task.status.state})\n${getTaskStatusString(task)}`;
-
+    const agent = getActiveAgent(context);
+    const task = await agent.getTask(args, 5);
+    const contents = [
+      `Task logs for ${task.id}. status: (${task.status.state})`,
+    ];
+    (task.history ?? []).forEach((message) => {
+      contents.push(toMessageString(message));
+    });
     return {
       type: 'message',
       messageType: 'info',
-      content,
+      content: contents.join('\n\n'),
     };
   },
 };
 
 const messageSubcommand: SlashCommand = {
   name: 'message',
-  description: 'Send a message to a task',
+  description:
+    'Send a message to a task. Usage: /bg message <task_id> <message>',
   action: async (context, args) => {
     if (!args || args.trim() === '' || !args.trim().includes(' ')) {
       return {
@@ -187,7 +202,8 @@ const messageSubcommand: SlashCommand = {
     const id = args.substring(0, firstSpaceIndex);
     const message = args.substring(firstSpaceIndex + 1);
 
-    await getActiveAgent(context).messageTask(id, message);
+    const agent = getActiveAgent(context);
+    await agent.messageTask(id, message);
     addClientHistory(
       context,
       `I sent a message to the background task with id '${id}':\n${message}`,
@@ -203,7 +219,7 @@ const messageSubcommand: SlashCommand = {
 
 const deleteSubcommand: SlashCommand = {
   name: 'delete',
-  description: 'Deletes a task.',
+  description: 'Deletes a task. Usage: /bg delete <task_id>',
   action: async (context, args) => {
     if (!args) {
       return {
@@ -212,7 +228,8 @@ const deleteSubcommand: SlashCommand = {
         content: 'The `delete` command requires a task id.',
       };
     }
-    await getActiveAgent(context).deleteTask(args);
+    const agent = getActiveAgent(context);
+    await agent.deleteTask(args);
     addClientHistory(context, `I deleted the background task with id ${args}`);
     return {
       type: 'message',

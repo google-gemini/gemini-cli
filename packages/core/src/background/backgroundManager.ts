@@ -5,7 +5,7 @@
  */
 
 import { MCPServerConfig } from '../config/config.js';
-import { BackgroundAgent, loadBackgroundAgent } from './agent.js';
+import { BackgroundAgent, loadBackgroundAgent } from './backgroundAgent.js';
 
 export async function loadBackgroundAgentManager(
   backgroundAgentConfigs: Record<string, MCPServerConfig> | undefined,

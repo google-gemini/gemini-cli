@@ -93,19 +93,14 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     return confirmationDetails;
   }
 
-  async mcpCall(params: ToolParams): Promise<Part[]> {
+  async execute(params: ToolParams): Promise<ToolResult> {
     const functionCalls: FunctionCall[] = [
       {
         name: this.serverToolName,
         args: params,
       },
     ];
-
-    return await this.mcpTool.callTool(functionCalls);
-  }
-
-  async execute(params: ToolParams): Promise<ToolResult> {
-    const responseParts = await this.mcpCall(params);
+    const responseParts = await this.mcpTool.callTool(functionCalls);
     return {
       llmContent: responseParts,
       returnDisplay: getStringifiedResultForDisplay(responseParts),

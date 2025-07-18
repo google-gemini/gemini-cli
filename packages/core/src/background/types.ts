@@ -92,6 +92,10 @@ export const BackgroundAgentTaskSchema = z.object({
     .optional(),
 });
 
+export type BackgroundAgentMessage = z.infer<
+  typeof BackgroundAgentMessageSchema
+>;
+
 export type BackgroundAgentTask = z.infer<typeof BackgroundAgentTaskSchema>;
 
 export const BackgroundAgentTaskResponseSchema = z.object({

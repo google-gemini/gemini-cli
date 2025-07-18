@@ -48,7 +48,7 @@ import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js'
 import {
   BackgroundAgentManager,
   loadBackgroundAgentManager,
-} from '../background/manager.js';
+} from '../background/backgroundManager.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',

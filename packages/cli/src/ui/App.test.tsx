@@ -9,6 +9,7 @@ import { render } from 'ink-testing-library';
 import { AppWrapper as App } from './App.js';
 import {
   Config as ServerConfig,
+  BackgroundAgentManager,
   MCPServerConfig,
   ApprovalMode,
   ToolRegistry,
@@ -21,7 +22,6 @@ import process from 'node:process';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { StreamingState } from './types.js';
 import { Tips } from './components/Tips.js';
-import { BackgroundAgentManager } from '@google/gemini-cli-core/src/background/manager.js';
 
 // Define a more complete mock server config based on actual Config
 interface MockServerConfig {
