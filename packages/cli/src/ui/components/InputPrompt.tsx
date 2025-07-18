@@ -61,34 +61,25 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   // Check if cursor is after @ or / without unescaped spaces
   const isCursorAfterCommandWithoutSpace = useCallback(() => {
-    const text = buffer.text;
     const [row, col] = buffer.cursor;
+    const currentLine = buffer.lines[row] || '';
 
-    // Calculate offset from row/col using Unicode-aware cpLen
-    let offset = 0;
-    for (let i = 0; i < row; i++) {
-      offset += cpLen(buffer.lines[i]) + 1; // +1 for newline
-    }
-    offset += col;
+    // Convert current line to code points for Unicode-aware processing
+    const codePoints = toCodePoints(currentLine);
 
-    // Search backwards from cursor position using code points
-    const codePoints = toCodePoints(text);
-
-    for (let i = offset - 1; i >= 0; i--) {
+    // Search backwards from cursor position within the current line only
+    for (let i = col - 1; i >= 0; i--) {
       const char = codePoints[i];
 
-      if (char === ' ' || char === '\n') {
-        // Check if this space is escaped by looking at the character before it
-        let isEscaped = false;
+      if (char === ' ') {
+        // Check if this space is escaped by counting backslashes before it
         let backslashCount = 0;
-
-        // Count consecutive backslashes before the space
         for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
           backslashCount++;
         }
 
         // If there's an odd number of backslashes, the space is escaped
-        isEscaped = backslashCount % 2 === 1;
+        const isEscaped = backslashCount % 2 === 1;
 
         if (!isEscaped) {
           // Found unescaped space before @ or /, return false
@@ -102,7 +93,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
 
     return false;
-  }, [buffer.text, buffer.cursor, buffer.lines]);
+  }, [buffer.cursor, buffer.lines]);
 
   const shouldShowCompletion = useCallback(
     () =>
