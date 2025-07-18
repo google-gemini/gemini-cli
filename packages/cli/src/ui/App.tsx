@@ -157,7 +157,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
-  const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -193,29 +192,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       }
     }
   }, [settings.merged.selectedAuthType, openAuthDialog, setAuthError]);
-
-  // Sync user tier from config when authentication changes
-  useEffect(() => {
-    const syncUserTier = async () => {
-      try {
-        const configUserTier = await config.getUserTier();
-        if (configUserTier !== userTier) {
-          setUserTier(configUserTier);
-        }
-      } catch (error) {
-        // Silently fail - this is not critical functionality
-        // Only log in debug mode to avoid cluttering the console
-        if (config.getDebugMode()) {
-          console.debug('Failed to sync user tier:', error);
-        }
-      }
-    };
-
-    // Only sync when not currently authenticating
-    if (!isAuthenticating) {
-      syncUserTier();
-    }
-  }, [config, userTier, isAuthenticating]);
 
   const {
     isEditorDialogOpen,
@@ -371,7 +347,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     };
 
     config.setFlashFallbackHandler(flashFallbackHandler);
-  }, [config, addItem, userTier]);
+  }, [config, addItem]);
 
   const {
     handleSlashCommand,

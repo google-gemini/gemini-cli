@@ -170,8 +170,6 @@ vi.mock('./hooks/useAuthCommand', () => ({
     openAuthDialog: vi.fn(),
     handleAuthSelect: vi.fn(),
     handleAuthHighlight: vi.fn(),
-    isAuthenticating: false,
-    cancelAuthentication: vi.fn(),
   })),
 }));
 
