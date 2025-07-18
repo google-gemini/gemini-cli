@@ -58,6 +58,12 @@ interface MockServerConfig {
   getToolCallCommand: Mock<() => string | undefined>;
   getMcpServerCommand: Mock<() => string | undefined>;
   getMcpServers: Mock<() => Record<string, MCPServerConfig> | undefined>;
+  getExtensions: Mock<
+    () => Array<{ name: string; version: string; isActive: boolean }>
+  >;
+  getBlockedMcpServers: Mock<
+    () => Array<{ name: string; extensionName: string }>
+  >;
   getUserAgent: Mock<() => string>;
   getUserMemory: Mock<() => string>;
   setUserMemory: Mock<(newUserMemory: string) => void>;
@@ -118,6 +124,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getToolCallCommand: vi.fn(() => opts.toolCallCommand),
         getMcpServerCommand: vi.fn(() => opts.mcpServerCommand),
         getMcpServers: vi.fn(() => opts.mcpServers),
+        getExtensions: vi.fn(() => []),
+        getBlockedMcpServers: vi.fn(() => []),
         getUserAgent: vi.fn(() => opts.userAgent || 'test-agent'),
         getUserMemory: vi.fn(() => opts.userMemory || ''),
         setUserMemory: vi.fn(),

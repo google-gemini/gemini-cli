@@ -63,6 +63,7 @@ describe('mcpCommand', () => {
   let mockConfig: {
     getToolRegistry: ReturnType<typeof vi.fn>;
     getMcpServers: ReturnType<typeof vi.fn>;
+    getBlockedMcpServers: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -83,6 +84,7 @@ describe('mcpCommand', () => {
         getAllTools: vi.fn().mockReturnValue([]),
       }),
       getMcpServers: vi.fn().mockReturnValue({}),
+      getBlockedMcpServers: vi.fn().mockReturnValue([]),
     };
 
     mockContext = createMockCommandContext({
@@ -416,6 +418,61 @@ describe('mcpCommand', () => {
         );
         expect(message).toContain(
           '🔄 \u001b[1mserver2\u001b[0m - Starting... (first startup may take longer) (tools will appear when ready)',
+        );
+      }
+    });
+
+    it('should display the extension name for servers from extensions', async () => {
+      const mockMcpServers = {
+        server1: { command: 'cmd1', extensionName: 'my-extension' },
+      };
+      mockConfig.getMcpServers = vi.fn().mockReturnValue(mockMcpServers);
+
+      const result = await mcpCommand.action!(mockContext, '');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        const message = result.content;
+        expect(message).toContain('server1 (from my-extension)');
+      }
+    });
+
+    it('should display blocked MCP servers', async () => {
+      mockConfig.getMcpServers = vi.fn().mockReturnValue({});
+      const blockedServers = [
+        { name: 'blocked-server', extensionName: 'my-extension' },
+      ];
+      mockConfig.getBlockedMcpServers = vi.fn().mockReturnValue(blockedServers);
+
+      const result = await mcpCommand.action!(mockContext, '');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        const message = result.content;
+        expect(message).toContain(
+          '🔴 \u001b[1mblocked-server (from my-extension)\u001b[0m - Blocked',
+        );
+      }
+    });
+
+    it('should display both active and blocked servers correctly', async () => {
+      const mockMcpServers = {
+        server1: { command: 'cmd1', extensionName: 'my-extension' },
+      };
+      mockConfig.getMcpServers = vi.fn().mockReturnValue(mockMcpServers);
+      const blockedServers = [
+        { name: 'blocked-server', extensionName: 'another-extension' },
+      ];
+      mockConfig.getBlockedMcpServers = vi.fn().mockReturnValue(blockedServers);
+
+      const result = await mcpCommand.action!(mockContext, '');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        const message = result.content;
+        expect(message).toContain('server1 (from my-extension)');
+        expect(message).toContain(
+          '🔴 \u001b[1mblocked-server (from another-extension)\u001b[0m - Blocked',
         );
       }
     });
