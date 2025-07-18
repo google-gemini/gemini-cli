@@ -10,7 +10,7 @@ import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { TextBuffer } from './shared/text-buffer.js';
-import { cpSlice, cpLen } from '../utils/textUtils.js';
+import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
@@ -59,33 +59,50 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
 
-  // Check if cursor is after @ or / without spaces
+  // Check if cursor is after @ or / without unescaped spaces
   const isCursorAfterCommandWithoutSpace = useCallback(() => {
     const text = buffer.text;
     const [row, col] = buffer.cursor;
 
-    // Calculate offset from row/col (same logic as in text-buffer.ts)
+    // Calculate offset from row/col using Unicode-aware cpLen
     let offset = 0;
     for (let i = 0; i < row; i++) {
-      offset += buffer.lines[i].length + 1; // +1 for newline
+      offset += cpLen(buffer.lines[i]) + 1; // +1 for newline
     }
     offset += col;
 
-    // Search backwards from cursor position
+    // Search backwards from cursor position using code points
+    const codePoints = toCodePoints(text);
+    
     for (let i = offset - 1; i >= 0; i--) {
-      const char = text[i];
+      const char = codePoints[i];
+      
       if (char === ' ' || char === '\n') {
-        // Found space before @ or /, return false
-        return false;
-      }
-      if (char === '@' || char === '/') {
-        // Found @ or / without space in between
+        // Check if this space is escaped by looking at the character before it
+        let isEscaped = false;
+        let backslashCount = 0;
+        
+        // Count consecutive backslashes before the space
+        for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+          backslashCount++;
+        }
+        
+        // If there's an odd number of backslashes, the space is escaped
+        isEscaped = backslashCount % 2 === 1;
+        
+        if (!isEscaped) {
+          // Found unescaped space before @ or /, return false
+          return false;
+        }
+        // If escaped, continue searching backwards
+      } else if (char === '@' || char === '/') {
+        // Found @ or / without unescaped space in between
         return true;
       }
     }
 
     return false;
-  }, [buffer]);
+  }, [buffer.text, buffer.cursor, buffer.lines]);
 
   const shouldShowCompletion = useCallback(
     () =>
