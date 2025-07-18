@@ -48,6 +48,7 @@ export interface CliArgs {
   showMemoryUsage: boolean | undefined;
   show_memory_usage: boolean | undefined;
   yolo: boolean | undefined;
+  showStatus: boolean | undefined;
   telemetry: boolean | undefined;
   checkpointing: boolean | undefined;
   telemetryTarget: string | undefined;
@@ -134,6 +135,11 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description:
         'Automatically accept all actions (aka YOLO mode, see https://www.youtube.com/watch?v=xvFZjo5PgG0 for more details)?',
+      default: false,
+    })
+    .option('show-status', {
+      type: 'boolean',
+      description: 'Show status in terminal title',
       default: false,
     })
     .option('telemetry', {
@@ -410,6 +416,7 @@ export async function loadCliConfig(
     noBrowser: !!process.env.NO_BROWSER,
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
+    showStatus: argv.showStatus || false,
   });
 }
 

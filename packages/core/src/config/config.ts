@@ -151,6 +151,7 @@ export interface ConfigParameters {
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideMode?: boolean;
+  showStatus?: boolean;
 }
 
 export class Config {
@@ -191,6 +192,7 @@ export class Config {
   private readonly extensionContextFilePaths: string[];
   private readonly noBrowser: boolean;
   private readonly ideMode: boolean;
+  private readonly showStatus: boolean;
   private modelSwitchedDuringSession: boolean = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
@@ -249,6 +251,7 @@ export class Config {
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.ideMode = params.ideMode ?? false;
+    this.showStatus = params.showStatus ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -521,6 +524,10 @@ export class Config {
 
   getIdeMode(): boolean {
     return this.ideMode;
+  }
+
+  getShowStatus(): boolean {
+    return this.showStatus;
   }
 
   async getGitService(): Promise<GitService> {
