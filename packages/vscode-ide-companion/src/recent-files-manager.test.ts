@@ -156,4 +156,40 @@ describe('RecentFilesManager', () => {
     expect(manager.recentFiles).toHaveLength(1);
     expect(manager.recentFiles[0].filePath).toBe('/test/file2.txt');
   });
+
+  describe('with MAX_RECENT_FILES from environment variable', () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      vi.resetModules();
+      process.env = { ...originalEnv };
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    it('uses the value from the environment variable', async () => {
+      process.env['IDE_MODE_MAX_RECENT_FILES'] = '5';
+      const { RecentFilesManager } = await import('./recent-files-manager.js');
+      const manager = new RecentFilesManager(context);
+      for (let i = 0; i < 10; i++) {
+        manager.add(vscode.Uri.file(`/test/file${i}.txt`));
+      }
+      expect(manager.recentFiles).toHaveLength(5);
+    });
+
+    it('uses the default value if the environment variable is invalid', async () => {
+      process.env['IDE_MODE_MAX_RECENT_FILES'] = 'not-a-number';
+      const { RecentFilesManager, getMaxRecentFiles } = await import(
+        './recent-files-manager.js'
+      );
+      expect(getMaxRecentFiles()).toBe(10);
+      const manager = new RecentFilesManager(context);
+      for (let i = 0; i < 20; i++) {
+        manager.add(vscode.Uri.file(`/test/file${i}.txt`));
+      }
+      expect(manager.recentFiles).toHaveLength(10);
+    });
+  });
 });

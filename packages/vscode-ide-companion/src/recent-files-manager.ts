@@ -6,7 +6,9 @@
 
 import * as vscode from 'vscode';
 
-export const MAX_RECENT_FILES = 10;
+export function getMaxRecentFiles() {
+  return parseInt(process.env['IDE_MODE_MAX_RECENT_FILES'] ?? '', 10) || 10;
+}
 
 interface RecentFile {
   uri: vscode.Uri;
@@ -23,10 +25,13 @@ export class RecentFilesManager {
   private readonly onDidChangeEmitter = new vscode.EventEmitter<void>();
   readonly onDidChange = this.onDidChangeEmitter.event;
 
+  private readonly maxRecentFiles: number;
+
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly maxRecentFiles = MAX_RECENT_FILES,
+    maxRecentFiles?: number,
   ) {
+    this.maxRecentFiles = maxRecentFiles ?? getMaxRecentFiles();
     const editorWatcher = vscode.window.onDidChangeActiveTextEditor(
       (editor) => {
         if (editor) {
