@@ -69,7 +69,7 @@ describe('editor utils', () => {
       { editor: 'cursor', commands: ['cursor'], win32Commands: ['cursor'] },
       { editor: 'vim', commands: ['vim'], win32Commands: ['vim'] },
       { editor: 'neovim', commands: ['nvim'], win32Commands: ['nvim'] },
-      { editor: 'zed', commands: ['zeditor', 'zed'], win32Commands: ['zed'] },
+      { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
     ];
 
     for (const { editor, commands, win32Commands } of testCases) {
@@ -168,7 +168,7 @@ describe('editor utils', () => {
         win32Commands: ['windsurf'],
       },
       { editor: 'cursor', commands: ['cursor'], win32Commands: ['cursor'] },
-      { editor: 'zed', commands: ['zeditor', 'zed'], win32Commands: ['zed'] },
+      { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
     ];
 
     for (const { editor, commands, win32Commands } of guiEditors) {

@@ -58,7 +58,7 @@ const editorCommands: Record<
   cursor: { win32: ['cursor'], default: ['cursor'] },
   vim: { win32: ['vim'], default: ['vim'] },
   neovim: { win32: ['nvim'], default: ['nvim'] },
-  zed: { win32: ['zed'], default: ['zeditor', 'zed'] },
+  zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
@@ -110,7 +110,6 @@ export function getDiffCommand(
     case 'vscodium':
     case 'windsurf':
     case 'cursor':
-      return { command, args: ['--wait', '--diff', oldPath, newPath] };
     case 'zed':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
     case 'vim':
