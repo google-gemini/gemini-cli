@@ -26,6 +26,7 @@ import {
   clearCachedGoogleAccount,
 } from '../utils/user_account.js';
 import { AuthType } from '../core/contentGenerator.js';
+import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import readline from 'node:readline';
 
 //  OAuth Client ID used to initiate OAuth2Client class.
@@ -64,55 +65,6 @@ const CREDENTIAL_FILENAME = 'oauth_creds.json';
 export interface OauthWebLogin {
   authUrl: string;
   loginCompletePromise: Promise<void>;
-  server: http.Server;
-}
-
-/**
- * Determines if we should attempt to launch a browser for authentication
- * based on the user's environment.
- *
- * This is an adaptation of the logic from the Google Cloud SDK.
- * @returns True if the tool should attempt to launch a browser.
- */
-function shouldAttemptBrowserLaunch(): boolean {
-  // A list of browser names that indicate we should not attempt to open a
-  // web browser for the user.
-  const browserBlocklist = ['www-browser', 'lynx', 'links', 'w3m'];
-  const browserEnv = process.env.BROWSER;
-  if (browserEnv && browserBlocklist.includes(browserEnv)) {
-    return false;
-  }
-  // Common environment variables used in CI/CD or other non-interactive shells.
-  if (process.env.CI || process.env.DEBIAN_FRONTEND === 'noninteractive') {
-    return false;
-  }
-
-  // The presence of SSH_CONNECTION indicates a remote session.
-  // We should not attempt to launch a browser unless a display is explicitly available
-  // (checked below for Linux).
-  const isSSH = !!process.env.SSH_CONNECTION;
-
-  // On Linux, the presence of a display server is a strong indicator of a GUI.
-  if (process.platform === 'linux') {
-    // These are environment variables that can indicate a running compositor on
-    // Linux.
-    const displayVariables = ['DISPLAY', 'WAYLAND_DISPLAY', 'MIR_SOCKET'];
-    const hasDisplay = displayVariables.some((v) => !!process.env[v]);
-    if (!hasDisplay) {
-      return false;
-    }
-  }
-
-  // If in an SSH session on a non-Linux OS (e.g., macOS), don't launch browser.
-  // The Linux case is handled above (it's allowed if DISPLAY is set).
-  if (isSSH && process.platform !== 'linux') {
-    return false;
-  }
-
-  // For non-Linux OSes, we generally assume a GUI is available
-  // unless other signals (like SSH) suggest otherwise.
-  // The `open` command's error handling will catch final edge cases.
-  return true;
 }
 
 export async function getOauthClient(
@@ -171,82 +123,56 @@ export async function getOauthClient(
   }
 
   if (config.getNoBrowser() || !shouldAttemptBrowserLaunch()) {
-    if (config.getNoBrowser()) {
-      console.log('Proceeding with no-browser flow due to user request.');
-    } else {
-      console.log(
-        'Proceeding with no-browser flow due to environment detection.',
-      );
-    }
-    const success = await authWithUserCodeWithRetries(client);
-    if (!success) {
-      console.error('\nFailed to authenticate with user code.');
-      process.exit(1);
-    }
-  } else {
-    const webLogin = await authWithWeb(client);
-    try {
-      console.log(
-        `\n\nCode Assist login required.\n` +
-          `Attempting to open authentication page in your browser.\n` +
-          `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
-      );
-
-      // We race the login promise against a promise that rejects if the browser
-      // launch fails. This handles both immediate failures (e.g., no browser found)
-      // and asynchronous failures (e.g., process spawns but then errors).
-      const browserLaunchPromise = new Promise<void>((_, reject) => {
-        // Attempt to open the authentication URL in the default browser.
-        open(webLogin.authUrl)
-          .then((childProcess) => {
-            // IMPORTANT: Attach an error handler to the returned child process.
-            // Without this, if `open` fails to spawn a process (e.g., `xdg-open` is not found
-            // in a minimal Docker container), it will emit an unhandled 'error' event,
-            // causing the entire Node.js process to crash.
-            childProcess.on('error', (err) => {
-              reject(err);
-            });
-          })
-          .catch((err) => {
-            reject(err);
-          });
-      });
-
-      console.log('Waiting for authentication...');
-      await Promise.race([webLogin.loginCompletePromise, browserLaunchPromise]);
-    } catch {
-      // This is the primary failure mode (e.g., `open` could not find a browser).
-      // We will fall back to the user code flow.
-      webLogin.server.close();
-      console.log(
-        '\nFailed to open browser automatically. Falling back to user code flow.',
-      );
-      const success = await authWithUserCodeWithRetries(client);
+    let success = false;
+    const maxRetries = 2;
+    for (let i = 0; !success && i < maxRetries; i++) {
+      success = await authWithUserCode(client);
       if (!success) {
-        console.error('\nFailed to authenticate with user code.');
-        process.exit(1);
-      }
-    }
-  }
-
-  return client;
-}
-
-async function authWithUserCodeWithRetries(
-  client: OAuth2Client,
-): Promise<boolean> {
-  let success = false;
-  const maxRetries = 2;
-  for (let i = 0; !success && i < maxRetries; i++) {
-    success = await authWithUserCode(client);
-    if (!success && i < maxRetries - 1) {
         console.error(
           '\nFailed to authenticate with user code.',
           i === maxRetries - 1 ? '' : 'Retrying...\n',
         );
+      }
     }
+    if (!success) {
+      process.exit(1);
+    }
+  } else {
+    const webLogin = await authWithWeb(client);
+
+    console.log(
+      `\n\nCode Assist login required.\n` +
+        `Attempting to open authentication page in your browser.\n` +
+        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
+    );
+    try {
+      // Attempt to open the authentication URL in the default browser.
+      // We do not use the `wait` option here because the main script's execution
+      // is already paused by `loginCompletePromise`, which awaits the server callback.
+      const childProcess = await open(webLogin.authUrl);
+
+      // IMPORTANT: Attach an error handler to the returned child process.
+      // Without this, if `open` fails to spawn a process (e.g., `xdg-open` is not found
+      // in a minimal Docker container), it will emit an unhandled 'error' event,
+      // causing the entire Node.js process to crash.
+      childProcess.on('error', (_) => {
+        console.error(
+          'Failed to open browser automatically. Please try running again with NO_BROWSER=true set.',
+        );
+      });
+    } catch (err) {
+      console.error(
+        'An unexpected error occurred while trying to open the browser:',
+        err,
+        '\nPlease try running again with NO_BROWSER=true set.'
+      );
+    }
+    console.log('Waiting for authentication...');
+
+    await webLogin.loginCompletePromise;
   }
-  return success;
+
+  return client;
 }
 
 async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
@@ -312,9 +238,8 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
     state,
   });
 
-  let server: http.Server;
   const loginCompletePromise = new Promise<void>((resolve, reject) => {
-    server = http.createServer(async (req, res) => {
+    const server = http.createServer(async (req, res) => {
       try {
         if (req.url!.indexOf('/oauth2callback') === -1) {
           res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
@@ -367,7 +292,6 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   return {
     authUrl,
     loginCompletePromise,
-    server: server!,
   };
 }
 
