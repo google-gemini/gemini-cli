@@ -159,6 +159,7 @@ export async function getOauthClient(
         console.error(
           'Failed to open browser automatically. Please try running again with NO_BROWSER=true set.',
         );
+        process.exit(1);
       });
     } catch (err) {
       console.error(
@@ -166,6 +167,7 @@ export async function getOauthClient(
         err,
         '\nPlease try running again with NO_BROWSER=true set.',
       );
+      process.exit(1);
     }
     console.log('Waiting for authentication...');
 
