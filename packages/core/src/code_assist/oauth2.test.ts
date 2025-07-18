@@ -105,7 +105,7 @@ describe('oauth2', () => {
 
     let capturedPort = 0;
     const mockHttpServer = {
-      listen: vi.fn((port: number, callback?: () => void) => {
+      listen: vi.fn((port: number, _host: string, callback?: () => void) => {
         capturedPort = port;
         if (callback) {
           callback();
