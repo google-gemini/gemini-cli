@@ -176,7 +176,7 @@ export async function getOauthClient(
 }
 
 async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
-  const redirectUri = 'https://sdk.cloud.google.com/authcode_cloudcode.html';
+  const redirectUri = 'https://codeassist.google.com/authcode';
   const codeVerifier = await client.generateCodeVerifierAsync();
   const state = crypto.randomBytes(32).toString('hex');
   const authUrl: string = client.generateAuthUrl({

@@ -236,7 +236,7 @@ describe('oauth2', () => {
     expect(mockGetToken).toHaveBeenCalledWith({
       code: mockCode,
       codeVerifier: mockCodeVerifier.codeVerifier,
-      redirect_uri: 'https://sdk.cloud.google.com/authcode_cloudcode.html',
+      redirect_uri: 'https://codeassist.google.com/authcode',
     });
     expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
 
