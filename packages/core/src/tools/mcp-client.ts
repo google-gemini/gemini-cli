@@ -29,6 +29,8 @@ import {
   ideContext,
 } from '../services/ideContext.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { AuthProviderType } from '../config/config.js';
+import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -852,6 +854,28 @@ export async function createTransport(
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
 ): Promise<Transport> {
+  if (
+    mcpServerConfig.authProviderType === AuthProviderType.GOOGLE_CREDENTIALS
+  ) {
+    const provider = new GoogleCredentialProvider(mcpServerConfig);
+    const transportOptions:
+      | StreamableHTTPClientTransportOptions
+      | SSEClientTransportOptions = {
+      authProvider: provider,
+    };
+    if (mcpServerConfig.httpUrl) {
+      return new StreamableHTTPClientTransport(
+        new URL(mcpServerConfig.httpUrl),
+        transportOptions,
+      );
+    } else if (mcpServerConfig.url) {
+      return new SSEClientTransport(
+        new URL(mcpServerConfig.url),
+        transportOptions,
+      );
+    }
+    throw new Error('No URL configured for Google Credentials MCP server');
+  }
   // Check if we have OAuth configuration or stored tokens
   let accessToken: string | null = null;
   let hasOAuthConfig = mcpServerConfig.oauth?.enabled;
