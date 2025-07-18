@@ -324,6 +324,13 @@ This is the cursor position in the file:
     }
 
     const turn = new Turn(this.getChat(), prompt_id);
+
+    const loopDetected = await this.loopDetector.turnStarted(signal);
+    if (loopDetected) {
+      yield { type: GeminiEventType.LoopDetected };
+      return turn;
+    }
+
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
