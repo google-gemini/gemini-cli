@@ -39,7 +39,7 @@ const loadBuiltInCommands = async (
     bugCommand,
     chatCommand,
     clearCommand,
-    copyCommand
+    copyCommand,
     compressCommand,
     corgiCommand,
     docsCommand,

@@ -93,7 +93,7 @@ vi.mock('../ui/commands/restoreCommand.js', () => ({
 }));
 
 describe('CommandService', () => {
-  const subCommandLen = 18;
+  const subCommandLen = 19;
   let mockConfig: Mocked<Config>;
 
   beforeEach(() => {
