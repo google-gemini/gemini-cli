@@ -217,16 +217,8 @@ export function useCompletion(
             (cmd.name.startsWith(partial) || cmd.altName?.startsWith(partial)),
         );
 
-        // If a user's input is an exact match and it is a leaf command,
-        // enter should submit immediately.
-        if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
-          const perfectMatch = potentialSuggestions.find(
-            (s) => s.name === partial || s.altName === partial,
-          );
-          if (perfectMatch && !perfectMatch.subCommands) {
-            potentialSuggestions = [];
-          }
-        }
+        // Remove the logic that hides suggestions for exact matches
+        // This ensures help text remains visible even when full command name is typed
 
         const finalSuggestions = potentialSuggestions.map((cmd) => ({
           label: cmd.name,
