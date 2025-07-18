@@ -244,7 +244,7 @@ describe('RecentFilesManager', () => {
       const { RecentFilesManager, getMaxFileAge } = await import(
         './recent-files-manager.js'
       );
-      expect(getMaxFileAge()).toBe(20160);
+      expect(getMaxFileAge()).toBe(10);
       const manager = new RecentFilesManager(context);
       const uri1 = vscode.Uri.file('/test/file1.txt');
       const uri2 = vscode.Uri.file('/test/file2.txt');
@@ -259,5 +259,15 @@ describe('RecentFilesManager', () => {
       expect(manager.recentFiles).toHaveLength(1);
       expect(manager.recentFiles[0].filePath).toBe('/test/file1.txt');
     });
+  });
+
+  it('fires onDidChange only once when adding an existing file', () => {
+    const manager = new RecentFilesManager(context);
+    const uri = vscode.Uri.file('/test/file1.txt');
+    manager.add(uri);
+
+    const spy = vi.spyOn(manager['onDidChangeEmitter'], 'fire');
+    manager.add(uri);
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });
