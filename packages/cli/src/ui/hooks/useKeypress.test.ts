@@ -101,6 +101,8 @@ describe('useKeypress', () => {
   const mockSetRawMode = vi.fn();
   const onKeypress = vi.fn();
   let originalNodeVersion: string;
+  let originalPlatform: string | undefined;
+  let originalGeminiCtrlBackspaceEnv: string | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -111,7 +113,10 @@ describe('useKeypress', () => {
     });
 
     originalNodeVersion = process.versions.node;
+    originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
+    originalGeminiCtrlBackspaceEnv = process.env.GEMINI_CLI_CTRL_BACKSPACE_MODE;
     delete process.env['PASTE_WORKAROUND'];
+    delete process.env['GEMINI_CLI_CTRL_BACKSPACE_MODE'];
   });
 
   afterEach(() => {
@@ -119,6 +124,16 @@ describe('useKeypress', () => {
       value: originalNodeVersion,
       configurable: true,
     });
+
+    if (originalPlatform) {
+      Object.defineProperty(process, 'platform', originalPlatform);
+    }
+
+    delete process.env.GEMINI_CLI_CTRL_BACKSPACE_MODE;
+    if (originalGeminiCtrlBackspaceEnv !== undefined) {
+      process.env.GEMINI_CLI_CTRL_BACKSPACE_MODE =
+        originalGeminiCtrlBackspaceEnv;
+    }
   });
 
   const setNodeVersion = (version: string) => {
@@ -126,6 +141,21 @@ describe('useKeypress', () => {
       value: version,
       configurable: true,
     });
+  };
+
+  const setPlatform = (platform: string) => {
+    Object.defineProperty(process, 'platform', {
+      value: platform,
+      configurable: true,
+    });
+  };
+
+  const setCtrlBackspaceMode = (value: string | undefined) => {
+    if (value === undefined) {
+      delete process.env.GEMINI_CLI_CTRL_BACKSPACE_MODE;
+    } else {
+      process.env.GEMINI_CLI_CTRL_BACKSPACE_MODE = value;
+    }
   };
 
   it('should not listen if isActive is false', () => {
@@ -166,6 +196,141 @@ describe('useKeypress', () => {
     expect(onKeypress).toHaveBeenCalledWith(
       expect.objectContaining({ ...key, meta: true, paste: false }),
     );
+  });
+
+  describe('Ctrl+Backspace Detection', () => {
+    describe('when GEMINI_CLI_CTRL_BACKSPACE_MODE=true', () => {
+      beforeEach(() => {
+        setCtrlBackspaceMode('true');
+      });
+
+      it('should recognize byte sequence \\x08 on linux as ctrl modifier', () => {
+        setPlatform('linux');
+        renderHook(() => useKeypress(onKeypress, { isActive: true }));
+
+        const key = { name: 'backspace', ctrl: false, sequence: '\x08' };
+        act(() => stdin.pressKey(key));
+
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'backspace',
+            ctrl: true,
+            sequence: '\x08',
+          }),
+        );
+      });
+
+      it('should recognize byte sequence \\x7f on windows as ctrl modifier', () => {
+        setPlatform('win32');
+        renderHook(() => useKeypress(onKeypress, { isActive: true }));
+
+        const key = { name: 'backspace', ctrl: false, sequence: '\x7f' };
+        act(() => stdin.pressKey(key));
+
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'backspace',
+            ctrl: true,
+            sequence: '\x7f',
+          }),
+        );
+      });
+
+      it('should treat \\x08 as regular backspace on Windows', () => {
+        setPlatform('win32');
+        renderHook(() => useKeypress(onKeypress, { isActive: true }));
+
+        const key = { name: 'backspace', ctrl: false, sequence: '\x08' };
+        act(() => stdin.pressKey(key));
+
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'backspace',
+            ctrl: false,
+            sequence: '\x08',
+          }),
+        );
+      });
+
+      it('should treat \\x7f as regular backspace on Linux', () => {
+        setPlatform('linux');
+        renderHook(() => useKeypress(onKeypress, { isActive: true }));
+
+        const key = { name: 'backspace', ctrl: false, sequence: '\x7f' };
+        act(() => stdin.pressKey(key));
+
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'backspace',
+            ctrl: false,
+            sequence: '\x7f',
+          }),
+        );
+      });
+    });
+
+    describe('when GEMINI_CLI_CTRL_BACKSPACE_MODE=false', () => {
+      beforeEach(() => {
+        setCtrlBackspaceMode('false');
+      });
+
+      it('should treat \\x7f as regular backspace on Windows', () => {
+        setPlatform('win32');
+        renderHook(() => useKeypress(onKeypress, { isActive: true }));
+
+        const key = { name: 'backspace', ctrl: false, sequence: '\x7f' };
+        act(() => stdin.pressKey(key));
+
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'backspace',
+            ctrl: false,
+            sequence: '\x7f',
+          }),
+        );
+      });
+
+      it('should treat \\x08 as regular backspace on Linux', () => {
+        setPlatform('linux');
+        renderHook(() => useKeypress(onKeypress, { isActive: true }));
+
+        const key = { name: 'backspace', ctrl: false, sequence: '\x08' };
+        act(() => stdin.pressKey(key));
+
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'backspace',
+            ctrl: false,
+            sequence: '\x08',
+          }),
+        );
+      });
+    });
+
+    it('should treat sequences as regular backspace when GEMINI_CLI_CTRL_BACKSPACE_MODE is not set', () => {
+      setCtrlBackspaceMode(undefined);
+      renderHook(() => useKeypress(onKeypress, { isActive: true }));
+
+      const key1 = { name: 'backspace', ctrl: false, sequence: '\x08' };
+      act(() => stdin.pressKey(key1));
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: false,
+          sequence: '\x08',
+        }),
+      );
+
+      const key2 = { name: 'backspace', ctrl: false, sequence: '\x7f' };
+      act(() => stdin.pressKey(key2));
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: false,
+          sequence: '\x7f',
+        }),
+      );
+    });
   });
 
   describe.each([

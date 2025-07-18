@@ -87,6 +87,27 @@ export function useKeypress(
           if (key.name === 'return' && key.sequence === '\x1B\r') {
             key.meta = true;
           }
+
+          // readline doesn't set the ctrl flag for byte sequences x7f and x08
+          // so we need to set it up manually when needed
+          if (
+            key.name === 'backspace' &&
+            !key.ctrl &&
+            process.env.GEMINI_CLI_CTRL_BACKSPACE_MODE === 'true'
+          ) {
+            const ctrlBackspaceSequences = {
+              win32: '\x7f',
+              default: '\x08',
+            } as const;
+            const expectedSequence =
+              process.platform === 'win32'
+                ? ctrlBackspaceSequences.win32
+                : ctrlBackspaceSequences.default;
+            if (key.sequence === expectedSequence) {
+              key.ctrl = true;
+            }
+          }
+
           onKeypressRef.current({ ...key, paste: isPaste });
         }
       }
