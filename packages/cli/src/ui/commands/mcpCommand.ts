@@ -49,8 +49,9 @@ const getMcpStatus = async (
 
   const mcpServers = config.getMcpServers() || {};
   const serverNames = Object.keys(mcpServers);
+  const blockedMcpServers = config.getBlockedMcpServers() || [];
 
-  if (serverNames.length === 0) {
+  if (serverNames.length === 0 && blockedMcpServers.length === 0) {
     const docsUrl = 'https://goo.gle/gemini-cli-docs-mcp';
     if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
       return {
@@ -118,9 +119,13 @@ const getMcpStatus = async (
 
     // Get server description if available
     const server = mcpServers[serverName];
+    let serverDisplayName = serverName;
+    if (server.extensionName) {
+      serverDisplayName += ` (from ${server.extensionName})`;
+    }
 
     // Format server header with bold formatting and status
-    message += `${statusIndicator} \u001b[1m${serverName}\u001b[0m - ${statusText}`;
+    message += `${statusIndicator} \u001b[1m${serverDisplayName}\u001b[0m - ${statusText}`;
 
     // Add tool count with conditional messaging
     if (status === MCPServerStatus.CONNECTED) {
@@ -170,11 +175,13 @@ const getMcpStatus = async (
           // Use cyan color for the tool name even when not showing descriptions
           message += `  - ${COLOR_CYAN}${tool.name}${RESET_COLOR}\n`;
         }
-        if (showSchema && tool.parameterSchema) {
+        const parameters =
+          tool.schema.parametersJsonSchema ?? tool.schema.parameters;
+        if (showSchema && parameters) {
           // Prefix the parameters in cyan
           message += `    ${COLOR_CYAN}Parameters:${RESET_COLOR}\n`;
 
-          const paramsLines = JSON.stringify(tool.parameterSchema, null, 2)
+          const paramsLines = JSON.stringify(parameters, null, 2)
             .trim()
             .split('\n');
           if (paramsLines) {
@@ -188,6 +195,14 @@ const getMcpStatus = async (
       message += '  No tools available\n';
     }
     message += '\n';
+  }
+
+  for (const server of blockedMcpServers) {
+    let serverDisplayName = server.name;
+    if (server.extensionName) {
+      serverDisplayName += ` (from ${server.extensionName})`;
+    }
+    message += `🔴 \u001b[1m${serverDisplayName}\u001b[0m - Blocked\n\n`;
   }
 
   // Add helpful tips when no arguments are provided
