@@ -308,15 +308,15 @@ export class GeminiClient {
     if (this.config.getIdeMode()) {
       const activeFile = ideContext.getActiveFileContext();
       if (activeFile) {
-        let context = '';
+        const contextParts: string[] = [];
         if (activeFile.filePath) {
-          context += `
-This is the file that the user was most recently looking at:
-- Path: ${activeFile.filePath}`;
+          contextParts.push(
+            `This is the file that the user was most recently looking at:\n- Path: ${activeFile.filePath}`,
+          );
           if (activeFile.cursor) {
-            context += `
-This is the cursor position in the file:
-- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`;
+            contextParts.push(
+              `This is the cursor position in the file:\n- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`,
+            );
           }
         }
 
@@ -327,14 +327,14 @@ This is the cursor position in the file:
           const recentFiles = activeFile.recentOpenFiles
             .map((file) => `- ${file.filePath}`)
             .join('\n');
-          context += `
-Here are files the user has recently opened, with the most recent at the top:
-${recentFiles}`;
+          contextParts.push(
+            `Here are files the user has recently opened, with the most recent at the top:\n${recentFiles}`,
+          );
         }
 
-        if (context) {
+        if (contextParts.length > 0) {
           request = [
-            { text: context.trim() },
+            { text: contextParts.join('\n') },
             ...(Array.isArray(request) ? request : [request]),
           ];
         }
