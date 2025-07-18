@@ -430,6 +430,111 @@ describe('useTextBuffer', () => {
     });
   });
 
+  describe('Word Deletion ctrl+backspace', () => {
+    it('should handle ctrl+backspace to delete word left', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'ab cd',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      act(() => result.current.move('end'));
+      act(() =>
+        result.current.handleInput({
+          name: 'backspace',
+          ctrl: true,
+          meta: false,
+          shift: false,
+          paste: false,
+        }),
+      );
+      const state = getBufferState(result);
+      expect(state.text).toBe('ab ');
+      expect(state.cursor).toEqual([0, 3]);
+    });
+
+    it('should handle ctrl+backspace at line beginning to merge lines', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'hello\nworld',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      act(() => result.current.move('down'));
+      act(() =>
+        result.current.handleInput({
+          name: 'backspace',
+          ctrl: true,
+          meta: false,
+          shift: false,
+          paste: false,
+        }),
+      );
+      const state = getBufferState(result);
+      expect(state.text).toBe('helloworld');
+      expect(state.cursor).toEqual([0, 5]);
+    });
+
+    it('should handle ctrl+backspace with multiple spaces', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'word   more',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      // Position cursor after the spaces
+      act(() => result.current.move('right'));
+      act(() => result.current.move('right'));
+      act(() => result.current.move('right'));
+      act(() => result.current.move('right'));
+      act(() => result.current.move('right'));
+      act(() => result.current.move('right'));
+      act(() => result.current.move('right'));
+
+      act(() =>
+        result.current.handleInput({
+          name: 'backspace',
+          ctrl: true,
+          meta: false,
+          shift: false,
+          paste: false,
+        }),
+      );
+      const state = getBufferState(result);
+      expect(state.text).toBe('more');
+      expect(state.cursor).toEqual([0, 0]);
+    });
+
+    it('should handle ctrl+backspace at beginning of buffer', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'ab cd',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      act(() =>
+        result.current.handleInput({
+          name: 'backspace',
+          ctrl: true,
+          meta: false,
+          shift: false,
+          paste: false,
+        }),
+      );
+      const state = getBufferState(result);
+      expect(state.text).toBe('ab cd');
+      expect(state.cursor).toEqual([0, 0]);
+    });
+  });
+
   describe('Basic Editing', () => {
     it('insert: should insert a character and update cursor', () => {
       const { result } = renderHook(() =>

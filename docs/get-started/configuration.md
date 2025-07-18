@@ -119,6 +119,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable debug logging of keystrokes to the console.
   - **Default:** `false`
 
+- **`general.ctrlBackspaceModeFix`** (boolean):
+  - **Description:** Enables a fix for `Ctrl+Backspace` functionality in the CLI
+    prompt. This is useful if you are experiencing issues with word deletion in
+    your terminal.
+  - **Default:** `false`
+
 - **`general.sessionRetention.enabled`** (boolean):
   - **Description:** Enable automatic session cleanup.
   - **Default:** `false`
