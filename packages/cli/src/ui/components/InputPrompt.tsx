@@ -453,7 +453,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 display = display + ' '.repeat(inputWidth - currentVisualWidth);
               }
 
-              if (visualIdxInRenderedSet === cursorVisualRow) {
+              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
                 const relativeVisualColForHighlight = cursorVisualColAbsolute;
 
                 if (relativeVisualColForHighlight >= 0) {
