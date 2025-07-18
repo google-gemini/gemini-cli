@@ -14,7 +14,7 @@ import {
   TrackedToolCall,
   TrackedCompletedToolCall,
   TrackedExecutingToolCall,
-  TrackedCancelledToolCall,
+  TrackedCanceledToolCall,
 } from './useReactToolScheduler.js';
 import { Config, EditorType, AuthType } from '@google/gemini-cli-core';
 import { Part, PartListUnion } from '@google/genai';
@@ -572,8 +572,8 @@ describe('useGeminiStream', () => {
     );
   });
 
-  it('should handle all tool calls being cancelled', async () => {
-    const cancelledToolCalls: TrackedToolCall[] = [
+  it('should handle all tool calls being canceled', async () => {
+    const canceledToolCalls: TrackedToolCall[] = [
       {
         request: {
           callId: '1',
@@ -582,10 +582,10 @@ describe('useGeminiStream', () => {
           isClientInitiated: false,
           prompt_id: 'prompt-id-3',
         },
-        status: 'cancelled',
-        response: { callId: '1', responseParts: [{ text: 'cancelled' }] },
+        status: 'canceled',
+        response: { callId: '1', responseParts: [{ text: 'canceled' }] },
         responseSubmittedToGemini: false,
-      } as TrackedCancelledToolCall,
+      } as TrackedCanceledToolCall,
     ];
     const client = new MockedGeminiClientClass(mockConfig);
 
@@ -617,10 +617,10 @@ describe('useGeminiStream', () => {
       ),
     );
 
-    // Trigger the onComplete callback with cancelled tools
+    // Trigger the onComplete callback with canceled tools
     await act(async () => {
       if (capturedOnComplete) {
-        await capturedOnComplete(cancelledToolCalls);
+        await capturedOnComplete(canceledToolCalls);
       }
     });
 
@@ -628,15 +628,15 @@ describe('useGeminiStream', () => {
       expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['1']);
       expect(client.addHistory).toHaveBeenCalledWith({
         role: 'user',
-        parts: [{ text: 'cancelled' }],
+        parts: [{ text: 'canceled' }],
       });
       // Ensure we do NOT call back to the API
       expect(mockSendMessageStream).not.toHaveBeenCalled();
     });
   });
 
-  it('should group multiple cancelled tool call responses into a single history entry', async () => {
-    const cancelledToolCall1: TrackedCancelledToolCall = {
+  it('should group multiple canceled tool call responses into a single history entry', async () => {
+    const canceledToolCall1: TrackedCanceledToolCall = {
       request: {
         callId: 'cancel-1',
         name: 'toolA',
@@ -649,7 +649,7 @@ describe('useGeminiStream', () => {
         description: 'descA',
         getDescription: vi.fn(),
       } as any,
-      status: 'cancelled',
+      status: 'canceled',
       response: {
         callId: 'cancel-1',
         responseParts: [
@@ -660,7 +660,7 @@ describe('useGeminiStream', () => {
       },
       responseSubmittedToGemini: false,
     };
-    const cancelledToolCall2: TrackedCancelledToolCall = {
+    const canceledToolCall2: TrackedCanceledToolCall = {
       request: {
         callId: 'cancel-2',
         name: 'toolB',
@@ -673,7 +673,7 @@ describe('useGeminiStream', () => {
         description: 'descB',
         getDescription: vi.fn(),
       } as any,
-      status: 'cancelled',
+      status: 'canceled',
       response: {
         callId: 'cancel-2',
         responseParts: [
@@ -684,7 +684,7 @@ describe('useGeminiStream', () => {
       },
       responseSubmittedToGemini: false,
     };
-    const allCancelledTools = [cancelledToolCall1, cancelledToolCall2];
+    const allCanceledTools = [canceledToolCall1, canceledToolCall2];
     const client = new MockedGeminiClientClass(mockConfig);
 
     let capturedOnComplete:
@@ -714,10 +714,10 @@ describe('useGeminiStream', () => {
       ),
     );
 
-    // Trigger the onComplete callback with multiple cancelled tools
+    // Trigger the onComplete callback with multiple canceled tools
     await act(async () => {
       if (capturedOnComplete) {
-        await capturedOnComplete(allCancelledTools);
+        await capturedOnComplete(allCanceledTools);
       }
     });
 
@@ -735,8 +735,8 @@ describe('useGeminiStream', () => {
       expect(client.addHistory).toHaveBeenCalledWith({
         role: 'user',
         parts: [
-          ...(cancelledToolCall1.response.responseParts as Part[]),
-          ...(cancelledToolCall2.response.responseParts as Part[]),
+          ...(canceledToolCall1.response.responseParts as Part[]),
+          ...(canceledToolCall2.response.responseParts as Part[]),
         ],
       });
 
@@ -904,7 +904,7 @@ describe('useGeminiStream', () => {
         expect(mockAddItem).toHaveBeenCalledWith(
           {
             type: MessageType.INFO,
-            text: 'Request cancelled.',
+            text: 'Request canceled.',
           },
           expect.any(Number),
         );
@@ -925,7 +925,7 @@ describe('useGeminiStream', () => {
       // No change should happen, no cancellation message
       expect(mockAddItem).not.toHaveBeenCalledWith(
         expect.objectContaining({
-          text: 'Request cancelled.',
+          text: 'Request canceled.',
         }),
         expect.any(Number),
       );

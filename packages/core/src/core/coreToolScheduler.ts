@@ -70,8 +70,8 @@ export type ExecutingToolCall = {
   outcome?: ToolConfirmationOutcome;
 };
 
-export type CancelledToolCall = {
-  status: 'cancelled';
+export type CanceledToolCall = {
+  status: 'canceled';
   request: ToolCallRequestInfo;
   response: ToolCallResponseInfo;
   tool: Tool;
@@ -96,12 +96,12 @@ export type ToolCall =
   | ErroredToolCall
   | SuccessfulToolCall
   | ExecutingToolCall
-  | CancelledToolCall
+  | CanceledToolCall
   | WaitingToolCall;
 
 export type CompletedToolCall =
   | SuccessfulToolCall
-  | CancelledToolCall
+  | CanceledToolCall
   | ErroredToolCall;
 
 export type ConfirmHandler = (
@@ -260,7 +260,7 @@ export class CoreToolScheduler {
   ): void;
   private setStatusInternal(
     targetCallId: string,
-    status: 'cancelled',
+    status: 'canceled',
     reason: string,
   ): void;
   private setStatusInternal(
@@ -277,7 +277,7 @@ export class CoreToolScheduler {
         currentCall.request.callId !== targetCallId ||
         currentCall.status === 'success' ||
         currentCall.status === 'error' ||
-        currentCall.status === 'cancelled'
+        currentCall.status === 'canceled'
       ) {
         return currentCall;
       }
@@ -331,14 +331,14 @@ export class CoreToolScheduler {
             startTime: existingStartTime,
             outcome,
           } as ScheduledToolCall;
-        case 'cancelled': {
+        case 'canceled': {
           const durationMs = existingStartTime
             ? Date.now() - existingStartTime
             : undefined;
           return {
             request: currentCall.request,
             tool: toolInstance,
-            status: 'cancelled',
+            status: 'canceled',
             response: {
               callId: currentCall.request.callId,
               responseParts: {
@@ -346,7 +346,7 @@ export class CoreToolScheduler {
                   id: currentCall.request.callId,
                   name: currentCall.request.name,
                   response: {
-                    error: `[Operation Cancelled] Reason: ${auxiliaryData}`,
+                    error: `[Operation Canceled] Reason: ${auxiliaryData}`,
                   },
                 },
               },
@@ -355,7 +355,7 @@ export class CoreToolScheduler {
             },
             durationMs,
             outcome,
-          } as CancelledToolCall;
+          } as CanceledToolCall;
         }
         case 'validating':
           return {
@@ -519,7 +519,7 @@ export class CoreToolScheduler {
     if (outcome === ToolConfirmationOutcome.Cancel || signal.aborted) {
       this.setStatusInternal(
         callId,
-        'cancelled',
+        'canceled',
         'User did not allow tool call',
       );
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
@@ -612,7 +612,7 @@ export class CoreToolScheduler {
     const allCallsFinalOrScheduled = this.toolCalls.every(
       (call) =>
         call.status === 'scheduled' ||
-        call.status === 'cancelled' ||
+        call.status === 'canceled' ||
         call.status === 'success' ||
         call.status === 'error',
     );
@@ -650,8 +650,8 @@ export class CoreToolScheduler {
             if (signal.aborted) {
               this.setStatusInternal(
                 callId,
-                'cancelled',
-                'User cancelled tool execution.',
+                'canceled',
+                'User canceled tool execution.',
               );
               return;
             }
@@ -691,7 +691,7 @@ export class CoreToolScheduler {
       (call) =>
         call.status === 'success' ||
         call.status === 'error' ||
-        call.status === 'cancelled',
+        call.status === 'canceled',
     );
 
     if (this.toolCalls.length > 0 && allCallsAreTerminal) {
