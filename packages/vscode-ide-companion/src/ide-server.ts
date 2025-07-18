@@ -87,7 +87,7 @@ export class IDEServer {
             );
             clearInterval(keepAlive);
           }
-        }, 30000); // Send ping every 30 seconds
+        }, 60000); // Send ping every 60 seconds
 
         transport.onclose = () => {
           clearInterval(keepAlive);
