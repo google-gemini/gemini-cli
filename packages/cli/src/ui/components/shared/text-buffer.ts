@@ -14,6 +14,13 @@ import stringWidth from 'string-width';
 import { unescapePath } from '@google/gemini-cli-core';
 import { toCodePoints, cpLen, cpSlice } from '../../utils/textUtils.js';
 
+// Constants for newline input sequences
+export const NEWLINE_INPUT_SEQUENCES = [
+  '\n',
+  '\r\n',
+  '\\\r', // VSCode terminal represents shift + enter this way
+];
+
 export type Direction =
   | 'left'
   | 'right'
@@ -1167,9 +1174,7 @@ export function useTextBuffer({
 
       if (
         key.name === 'return' ||
-        input === '\r' ||
-        input === '\n' ||
-        input === '\\\r' // VSCode terminal represents shift + enter this way
+        (input && NEWLINE_INPUT_SEQUENCES.includes(input))
       )
         newline();
       else if (key.name === 'left' && !key.meta && !key.ctrl) move('left');
