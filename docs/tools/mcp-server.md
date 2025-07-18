@@ -168,6 +168,28 @@ Use the `/mcp auth` command to manage OAuth authentication:
 - **`redirectUri`** (string): Custom redirect URI (defaults to `http://localhost:7777/oauth/callback`)
 - **`tokenParamName`** (string): Query parameter name for tokens in SSE URLs
 
+#### Authentication Provider Type
+
+You can specify the authentication provider type using the `authProviderType` property:
+
+- **`authProviderType`** (string): Specifies the authentication provider. Can be one of the following:
+  - **`dynamic_discovery`** (default): The CLI will automatically discover the OAuth configuration from the server.
+  - **`google_credentials`**: The CLI will use the Google Application Default Credentials (ADC) to authenticate with the server. When using this provider, you must specify the required scopes.
+
+```json
+{
+  "mcpServers": {
+    "googleCloudServer": {
+      "httpUrl": "https://my-gcp-service.run.app/mcp",
+      "authProviderType": "google_credentials",
+      "oauth": {
+        "scopes": ["https://www.googleapis.com/auth/userinfo.email"]
+      }
+    }
+  }
+}
+```
+
 #### Token Management
 
 OAuth tokens are automatically:
