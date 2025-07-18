@@ -139,7 +139,7 @@ export class ToolRegistry {
   registerTool(tool: Tool): void {
     if (this.tools.has(tool.name)) {
       if (tool instanceof DiscoveredMCPTool) {
-        tool = tool.asUnambiguousTool();
+        tool = tool.asFullyQualifiedTool();
       } else {
         // Decide on behavior: throw error, log warning, or allow overwrite
         console.warn(

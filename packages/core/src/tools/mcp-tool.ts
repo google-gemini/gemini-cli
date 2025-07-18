@@ -33,12 +33,10 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     readonly parameterSchemaJson: unknown,
     readonly timeout?: number,
     readonly trust?: boolean,
-    disambiguate?: boolean,
+    nameOverride?: string,
   ) {
     super(
-      generateValidName(
-        disambiguate ? `${serverName}__${serverToolName}` : serverToolName,
-      ),
+      nameOverride ?? generateValidName(serverToolName),
       `${serverToolName} (${serverName} MCP Server)`,
       description,
       Icon.Hammer,
@@ -48,7 +46,7 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     );
   }
 
-  asUnambiguousTool(): DiscoveredMCPTool {
+  asFullyQualifiedTool(): DiscoveredMCPTool {
     return new DiscoveredMCPTool(
       this.mcpTool,
       this.serverName,
@@ -57,7 +55,7 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
       this.parameterSchemaJson,
       this.timeout,
       this.trust,
-      true,
+      `${this.serverName}__${this.serverToolName}`,
     );
   }
 
