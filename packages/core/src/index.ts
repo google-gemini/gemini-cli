@@ -24,6 +24,9 @@ export * from './code_assist/oauth2.js';
 export * from './code_assist/server.js';
 export * from './code_assist/types.js';
 
+export * from './background/types.js';
+export * from './background/backgroundManager.js';
+
 // Export utilities
 export * from './utils/paths.js';
 export * from './utils/schemaValidator.js';
