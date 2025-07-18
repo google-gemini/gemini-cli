@@ -18,8 +18,9 @@ import {
 import { parse } from 'shell-quote';
 import { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { FunctionDeclaration, Type, mcpToTool } from '@google/genai';
-import { sanitizeParameters, ToolRegistry } from './tool-registry.js';
+
+import { FunctionDeclaration, mcpToTool } from '@google/genai';
+import { ToolRegistry } from './tool-registry.js';
 import {
   ActiveFileNotificationSchema,
   IDE_SERVER_NAME,
@@ -214,6 +215,9 @@ export async function connectAndDiscover(
       mcpClient.onerror = (error) => {
         console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
         updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+        if (mcpServerName === IDE_SERVER_NAME) {
+          ideContext.clearActiveFileContext();
+        }
       };
 
       if (mcpServerName === IDE_SERVER_NAME) {
@@ -275,15 +279,13 @@ export async function discoverTools(
 
       const toolNameForModel = generateValidName(funcDecl, mcpServerName);
 
-      sanitizeParameters(funcDecl.parameters);
-
       discoveredTools.push(
         new DiscoveredMCPTool(
           mcpCallableTool,
           mcpServerName,
           toolNameForModel,
           funcDecl.description ?? '',
-          funcDecl.parameters ?? { type: Type.OBJECT, properties: {} },
+          funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
           funcDecl.name!,
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
           mcpServerConfig.trust,

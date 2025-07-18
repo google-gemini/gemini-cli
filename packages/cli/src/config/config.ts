@@ -54,9 +54,11 @@ export interface CliArgs {
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
   allowedMcpServerNames: string[] | undefined;
+  experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   ideMode: boolean | undefined;
+  proxy: string | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -161,6 +163,10 @@ export async function parseArguments(): Promise<CliArgs> {
       description: 'Enables checkpointing of file edits',
       default: false,
     })
+    .option('experimental-acp', {
+      type: 'boolean',
+      description: 'Starts the agent in ACP mode',
+    })
     .option('allowed-mcp-server-names', {
       type: 'array',
       string: true,
@@ -182,7 +188,11 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'Run in IDE mode?',
     })
-
+    .option('proxy', {
+      type: 'string',
+      description:
+        'Proxy for gemini client, like schema://user:password@host:port',
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -306,28 +316,34 @@ export async function loadCliConfig(
   }
 
   if (ideMode) {
-    const companionPort = process.env.GEMINI_CLI_IDE_SERVER_PORT;
-    if (!companionPort) {
-      throw new Error(
-        "Could not run in ide mode, make sure you're running in vs code integrated terminal. Try running in a fresh terminal.",
+    if (mcpServers[IDE_SERVER_NAME]) {
+      logger.warn(
+        `Ignoring user-defined MCP server config for "${IDE_SERVER_NAME}" as it is a reserved name.`,
       );
     }
-    const httpUrl = `http://localhost:${companionPort}/mcp`;
-    mcpServers[IDE_SERVER_NAME] = new MCPServerConfig(
-      undefined, // command
-      undefined, // args
-      undefined, // env
-      undefined, // cwd
-      undefined, // url
-      httpUrl, // httpUrl
-      undefined, // headers
-      undefined, // tcp
-      undefined, // timeout
-      false, // trust
-      'IDE connection', // description
-      undefined, // includeTools
-      undefined, // excludeTools
-    );
+    const companionPort = process.env.GEMINI_CLI_IDE_SERVER_PORT;
+    if (companionPort) {
+      const httpUrl = `http://localhost:${companionPort}/mcp`;
+      mcpServers[IDE_SERVER_NAME] = new MCPServerConfig(
+        undefined, // command
+        undefined, // args
+        undefined, // env
+        undefined, // cwd
+        undefined, // url
+        httpUrl, // httpUrl
+        undefined, // headers
+        undefined, // tcp
+        undefined, // timeout
+        false, // trust
+        'IDE connection', // description
+        undefined, // includeTools
+        undefined, // excludeTools
+      );
+    } else {
+      logger.warn(
+        'Could not connect to IDE. Make sure you have the companion VS Code extension installed from the marketplace or via /ide install.',
+      );
+    }
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
@@ -374,6 +390,7 @@ export async function loadCliConfig(
     },
     checkpointing: argv.checkpointing || settings.checkpointing?.enabled,
     proxy:
+      argv.proxy ||
       process.env.HTTPS_PROXY ||
       process.env.https_proxy ||
       process.env.HTTP_PROXY ||
@@ -384,6 +401,7 @@ export async function loadCliConfig(
     model: argv.model!,
     extensionContextFilePaths,
     maxSessionTurns: settings.maxSessionTurns ?? -1,
+    experimentalAcp: argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,
     activeExtensions: activeExtensions.map((e) => ({
       name: e.config.name,

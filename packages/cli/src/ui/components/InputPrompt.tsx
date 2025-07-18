@@ -95,7 +95,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const inputHistory = useInputHistory({
     userMessages,
     onSubmit: handleSubmitAndClear,
-    isActive: !completion.showSuggestions && !shellModeActive,
+    isActive:
+      (!completion.showSuggestions || completion.suggestions.length === 1) &&
+      !shellModeActive,
     currentQuery: buffer.text,
     onChange: customSetTextAndResetCompletionSignal,
   });
@@ -160,7 +162,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         // - Otherwise, the base is everything EXCEPT the last partial part.
         const basePath =
           hasTrailingSpace || isParentPath ? parts : parts.slice(0, -1);
-        const newValue = `/${[...basePath, suggestion].join(' ')} `;
+        const newValue = `/${[...basePath, suggestion].join(' ')}`;
 
         buffer.setText(newValue);
       } else {
@@ -264,14 +266,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // If the command is a perfect match, pressing enter should execute it.
+      if (completion.isPerfectMatch && key.name === 'return') {
+        handleSubmitAndClear(buffer.text);
+        return;
+      }
+
       if (completion.showSuggestions) {
-        if (key.name === 'up') {
-          completion.navigateUp();
-          return;
-        }
-        if (key.name === 'down') {
-          completion.navigateDown();
-          return;
+        if (completion.suggestions.length > 1) {
+          if (key.name === 'up') {
+            completion.navigateUp();
+            return;
+          }
+          if (key.name === 'down') {
+            completion.navigateDown();
+            return;
+          }
         }
 
         if (key.name === 'tab' || (key.name === 'return' && !key.ctrl)) {
@@ -286,61 +296,61 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
           return;
         }
-      } else {
-        if (!shellModeActive) {
-          if (key.ctrl && key.name === 'p') {
-            inputHistory.navigateUp();
-            return;
-          }
-          if (key.ctrl && key.name === 'n') {
-            inputHistory.navigateDown();
-            return;
-          }
-          // Handle arrow-up/down for history on single-line or at edges
-          if (
-            key.name === 'up' &&
-            (buffer.allVisualLines.length === 1 ||
-              (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
-          ) {
-            inputHistory.navigateUp();
-            return;
-          }
-          if (
-            key.name === 'down' &&
-            (buffer.allVisualLines.length === 1 ||
-              buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
-          ) {
-            inputHistory.navigateDown();
-            return;
-          }
-        } else {
-          // Shell History Navigation
-          if (key.name === 'up') {
-            const prevCommand = shellHistory.getPreviousCommand();
-            if (prevCommand !== null) buffer.setText(prevCommand);
-            return;
-          }
-          if (key.name === 'down') {
-            const nextCommand = shellHistory.getNextCommand();
-            if (nextCommand !== null) buffer.setText(nextCommand);
-            return;
-          }
-        }
+      }
 
-        if (key.name === 'return' && !key.ctrl && !key.meta && !key.paste) {
-          if (buffer.text.trim()) {
-            const [row, col] = buffer.cursor;
-            const line = buffer.lines[row];
-            const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
-            if (charBefore === '\\') {
-              buffer.backspace();
-              buffer.newline();
-            } else {
-              handleSubmitAndClear(buffer.text);
-            }
-          }
+      if (!shellModeActive) {
+        if (key.ctrl && key.name === 'p') {
+          inputHistory.navigateUp();
           return;
         }
+        if (key.ctrl && key.name === 'n') {
+          inputHistory.navigateDown();
+          return;
+        }
+        // Handle arrow-up/down for history on single-line or at edges
+        if (
+          key.name === 'up' &&
+          (buffer.allVisualLines.length === 1 ||
+            (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
+        ) {
+          inputHistory.navigateUp();
+          return;
+        }
+        if (
+          key.name === 'down' &&
+          (buffer.allVisualLines.length === 1 ||
+            buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
+        ) {
+          inputHistory.navigateDown();
+          return;
+        }
+      } else {
+        // Shell History Navigation
+        if (key.name === 'up') {
+          const prevCommand = shellHistory.getPreviousCommand();
+          if (prevCommand !== null) buffer.setText(prevCommand);
+          return;
+        }
+        if (key.name === 'down') {
+          const nextCommand = shellHistory.getNextCommand();
+          if (nextCommand !== null) buffer.setText(nextCommand);
+          return;
+        }
+      }
+
+      if (key.name === 'return' && !key.ctrl && !key.meta && !key.paste) {
+        if (buffer.text.trim()) {
+          const [row, col] = buffer.cursor;
+          const line = buffer.lines[row];
+          const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
+          if (charBefore === '\\') {
+            buffer.backspace();
+            buffer.newline();
+          } else {
+            handleSubmitAndClear(buffer.text);
+          }
+        }
+        return;
       }
 
       // Newline insertion
@@ -449,7 +459,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 display = display + ' '.repeat(inputWidth - currentVisualWidth);
               }
 
-              if (visualIdxInRenderedSet === cursorVisualRow) {
+              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
                 const relativeVisualColForHighlight = cursorVisualColAbsolute;
 
                 if (relativeVisualColForHighlight >= 0) {
