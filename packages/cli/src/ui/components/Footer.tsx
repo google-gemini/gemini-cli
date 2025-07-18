@@ -4,12 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { shortenPath, tildeifyPath, tokenLimit } from '@google/gemini-cli-core';
+import {
+  shortenPath,
+  tildeifyPath,
+  tokenLimit,
+  ideContext,
+  ActiveFile,
+} from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
+import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 
 interface FooterProps {
@@ -23,6 +30,7 @@ interface FooterProps {
   showErrorDetails: boolean;
   showMemoryUsage?: boolean;
   promptTokenCount: number;
+  nightly: boolean;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -36,17 +44,58 @@ export const Footer: React.FC<FooterProps> = ({
   showErrorDetails,
   showMemoryUsage,
   promptTokenCount,
+  nightly,
 }) => {
   const limit = tokenLimit(model);
   const percentage = promptTokenCount / limit;
 
+  const [activeFile, setActiveFile] = useState<ActiveFile | undefined>(
+    undefined,
+  );
+
+  useEffect(() => {
+    const updateActiveFile = () => {
+      const currentActiveFile = ideContext.getActiveFileContext();
+      setActiveFile(currentActiveFile);
+    };
+
+    updateActiveFile();
+
+    const unsubscribe = ideContext.subscribeToActiveFile(setActiveFile);
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   return (
     <Box marginTop={1} justifyContent="space-between" width="100%">
       <Box>
-        <Text color={Colors.LightBlue}>
-          {shortenPath(tildeifyPath(targetDir), 70)}
-          {branchName && <Text color={Colors.Gray}> ({branchName}*)</Text>}
-        </Text>
+        {nightly ? (
+          <Gradient colors={Colors.GradientColors}>
+            <Text>
+              {shortenPath(tildeifyPath(targetDir), 70)}
+              {branchName && <Text> ({branchName}*)</Text>}
+            </Text>
+          </Gradient>
+        ) : (
+          <Text color={Colors.LightBlue}>
+            {shortenPath(tildeifyPath(targetDir), 70)}
+            {branchName && <Text color={Colors.Gray}> ({branchName}*)</Text>}
+          </Text>
+        )}
+        {activeFile && activeFile.filePath && (
+          <Text>
+            <Text color={Colors.Gray}> | </Text>
+            <Text color={Colors.LightBlue}>
+              {shortenPath(tildeifyPath(activeFile.filePath), 70)}
+            </Text>
+            {activeFile.cursor && (
+              <Text color={Colors.Gray}>
+                :{activeFile.cursor.line}:{activeFile.cursor.character}
+              </Text>
+            )}
+          </Text>
+        )}
         {debugMode && (
           <Text color={Colors.AccentRed}>
             {' ' + (debugMessage || '--debug')}

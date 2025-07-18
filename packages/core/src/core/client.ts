@@ -30,6 +30,7 @@ import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { tokenLimit } from './tokenLimits.js';
 import {
   AuthType,
@@ -39,10 +40,45 @@ import {
 } from './contentGenerator.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { LoopDetectionService } from '../services/loopDetectionService.js';
+import { ideContext } from '../services/ideContext.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
   return false;
+}
+
+/**
+ * Returns the index of the content after the fraction of the total characters in the history.
+ *
+ * Exported for testing purposes.
+ */
+export function findIndexAfterFraction(
+  history: Content[],
+  fraction: number,
+): number {
+  if (fraction <= 0 || fraction >= 1) {
+    throw new Error('Fraction must be between 0 and 1');
+  }
+
+  const contentLengths = history.map(
+    (content) => JSON.stringify(content).length,
+  );
+
+  const totalCharacters = contentLengths.reduce(
+    (sum, length) => sum + length,
+    0,
+  );
+  const targetCharacters = totalCharacters * fraction;
+
+  let charactersSoFar = 0;
+  for (let i = 0; i < contentLengths.length; i++) {
+    charactersSoFar += contentLengths[i];
+    if (charactersSoFar >= targetCharacters) {
+      return i;
+    }
+  }
+  return contentLengths.length;
 }
 
 export class GeminiClient {
@@ -53,8 +89,21 @@ export class GeminiClient {
     temperature: 0,
     topP: 1,
   };
+  private sessionTurnCount = 0;
   private readonly MAX_TURNS = 100;
-  private readonly TOKEN_THRESHOLD_FOR_SUMMARIZATION = 0.7;
+  /**
+   * Threshold for compression token count as a fraction of the model's token limit.
+   * If the chat history exceeds this threshold, it will be compressed.
+   */
+  private readonly COMPRESSION_TOKEN_THRESHOLD = 0.7;
+  /**
+   * The fraction of the latest chat history to keep. A value of 0.3
+   * means that only the last 30% of the chat history will be kept after compression.
+   */
+  private readonly COMPRESSION_PRESERVE_THRESHOLD = 0.3;
+
+  private readonly loopDetector: LoopDetectionService;
+  private lastPromptId?: string;
 
   constructor(private config: Config) {
     if (config.getProxy()) {
@@ -62,11 +111,13 @@ export class GeminiClient {
     }
 
     this.embeddingModel = config.getEmbeddingModel();
+    this.loopDetector = new LoopDetectionService(config);
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
     this.contentGenerator = await createContentGenerator(
       contentGeneratorConfig,
+      this.config,
       this.config.getSessionId(),
     );
     this.chat = await this.startChat();
@@ -90,11 +141,15 @@ export class GeminiClient {
     return this.chat;
   }
 
-  async getHistory(): Promise<Content[]> {
+  isInitialized(): boolean {
+    return this.chat !== undefined && this.contentGenerator !== undefined;
+  }
+
+  getHistory(): Content[] {
     return this.getChat().getHistory();
   }
 
-  async setHistory(history: Content[]): Promise<void> {
+  setHistory(history: Content[]) {
     this.getChat().setHistory(history);
   }
 
@@ -166,7 +221,7 @@ export class GeminiClient {
     return initialParts;
   }
 
-  private async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
+  async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     const envParts = await this.getEnvironment();
     const toolRegistry = await this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
@@ -219,24 +274,73 @@ export class GeminiClient {
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
+    prompt_id: string,
     turns: number = this.MAX_TURNS,
+    originalModel?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    if (this.lastPromptId !== prompt_id) {
+      this.loopDetector.reset();
+      this.lastPromptId = prompt_id;
+    }
+    this.sessionTurnCount++;
+    if (
+      this.config.getMaxSessionTurns() > 0 &&
+      this.sessionTurnCount > this.config.getMaxSessionTurns()
+    ) {
+      yield { type: GeminiEventType.MaxSessionTurns };
+      return new Turn(this.getChat(), prompt_id);
+    }
     // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
     const boundedTurns = Math.min(turns, this.MAX_TURNS);
     if (!boundedTurns) {
-      return new Turn(this.getChat());
+      return new Turn(this.getChat(), prompt_id);
     }
 
-    const compressed = await this.tryCompressChat();
+    // Track the original model from the first call to detect model switching
+    const initialModel = originalModel || this.config.getModel();
+
+    const compressed = await this.tryCompressChat(prompt_id);
+
     if (compressed) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
-    const turn = new Turn(this.getChat());
+
+    if (this.config.getIdeMode()) {
+      const activeFile = ideContext.getActiveFileContext();
+      if (activeFile?.filePath) {
+        let context = `
+This is the file that the user was most recently looking at:
+- Path: ${activeFile.filePath}`;
+        if (activeFile.cursor) {
+          context += `
+This is the cursor position in the file:
+- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`;
+        }
+        request = [
+          { text: context },
+          ...(Array.isArray(request) ? request : [request]),
+        ];
+      }
+    }
+
+    const turn = new Turn(this.getChat(), prompt_id);
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
+      if (this.loopDetector.addAndCheck(event)) {
+        yield { type: GeminiEventType.LoopDetected };
+        return turn;
+      }
       yield event;
     }
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
+      // Check if model was switched during the call (likely due to quota error)
+      const currentModel = this.config.getModel();
+      if (currentModel !== initialModel) {
+        // Model was switched (likely due to quota error fallback)
+        // Don't continue with recursive call to prevent unwanted Flash execution
+        return turn;
+      }
+
       const nextSpeakerCheck = await checkNextSpeaker(
         this.getChat(),
         this,
@@ -246,7 +350,13 @@ export class GeminiClient {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
-        yield* this.sendMessageStream(nextRequest, signal, boundedTurns - 1);
+        yield* this.sendMessageStream(
+          nextRequest,
+          signal,
+          prompt_id,
+          boundedTurns - 1,
+          initialModel,
+        );
       }
     }
     return turn;
@@ -256,9 +366,12 @@ export class GeminiClient {
     contents: Content[],
     schema: SchemaUnion,
     abortSignal: AbortSignal,
-    model: string = DEFAULT_GEMINI_FLASH_MODEL,
+    model?: string,
     config: GenerateContentConfig = {},
   ): Promise<Record<string, unknown>> {
+    // Use current model from config instead of hardcoded Flash model
+    const modelToUse =
+      model || this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
@@ -270,7 +383,7 @@ export class GeminiClient {
 
       const apiCall = () =>
         this.getContentGenerator().generateContent({
-          model,
+          model: modelToUse,
           config: {
             ...requestConfig,
             systemInstruction,
@@ -281,8 +394,8 @@ export class GeminiClient {
         });
 
       const result = await retryWithBackoff(apiCall, {
-        onPersistent429: async (authType?: string) =>
-          await this.handleFlashFallback(authType),
+        onPersistent429: async (authType?: string, error?: unknown) =>
+          await this.handleFlashFallback(authType, error),
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
 
@@ -344,8 +457,9 @@ export class GeminiClient {
     contents: Content[],
     generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
+    model?: string,
   ): Promise<GenerateContentResponse> {
-    const modelToUse = this.config.getModel();
+    const modelToUse = model ?? this.config.getModel();
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
       ...generationConfig,
@@ -369,8 +483,8 @@ export class GeminiClient {
         });
 
       const result = await retryWithBackoff(apiCall, {
-        onPersistent429: async (authType?: string) =>
-          await this.handleFlashFallback(authType),
+        onPersistent429: async (authType?: string, error?: unknown) =>
+          await this.handleFlashFallback(authType, error),
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
       return result;
@@ -430,6 +544,7 @@ export class GeminiClient {
   }
 
   async tryCompressChat(
+    prompt_id: string,
     force: boolean = false,
   ): Promise<ChatCompressionInfo | null> {
     const curatedHistory = this.getChat().getHistory(true);
@@ -441,33 +556,53 @@ export class GeminiClient {
 
     const model = this.config.getModel();
 
-    let { totalTokens: originalTokenCount } =
+    const { totalTokens: originalTokenCount } =
       await this.getContentGenerator().countTokens({
         model,
         contents: curatedHistory,
       });
     if (originalTokenCount === undefined) {
       console.warn(`Could not determine token count for model ${model}.`);
-      originalTokenCount = 0;
+      return null;
     }
 
     // Don't compress if not forced and we are under the limit.
     if (
       !force &&
-      originalTokenCount <
-        this.TOKEN_THRESHOLD_FOR_SUMMARIZATION * tokenLimit(model)
+      originalTokenCount < this.COMPRESSION_TOKEN_THRESHOLD * tokenLimit(model)
     ) {
       return null;
     }
 
-    const { text: summary } = await this.getChat().sendMessage({
-      message: {
-        text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+    let compressBeforeIndex = findIndexAfterFraction(
+      curatedHistory,
+      1 - this.COMPRESSION_PRESERVE_THRESHOLD,
+    );
+    // Find the first user message after the index. This is the start of the next turn.
+    while (
+      compressBeforeIndex < curatedHistory.length &&
+      (curatedHistory[compressBeforeIndex]?.role === 'model' ||
+        isFunctionResponse(curatedHistory[compressBeforeIndex]))
+    ) {
+      compressBeforeIndex++;
+    }
+
+    const historyToCompress = curatedHistory.slice(0, compressBeforeIndex);
+    const historyToKeep = curatedHistory.slice(compressBeforeIndex);
+
+    this.getChat().setHistory(historyToCompress);
+
+    const { text: summary } = await this.getChat().sendMessage(
+      {
+        message: {
+          text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+        },
+        config: {
+          systemInstruction: { text: getCompressionPrompt() },
+        },
       },
-      config: {
-        systemInstruction: { text: getCompressionPrompt() },
-      },
-    });
+      prompt_id,
+    );
     this.chat = await this.startChat([
       {
         role: 'user',
@@ -477,6 +612,7 @@ export class GeminiClient {
         role: 'model',
         parts: [{ text: 'Got it. Thanks for the additional context!' }],
       },
+      ...historyToKeep,
     ]);
 
     const { totalTokens: newTokenCount } =
@@ -500,7 +636,10 @@ export class GeminiClient {
    * Handles fallback to Flash model when persistent 429 errors occur for OAuth users.
    * Uses a fallback handler if provided by the config, otherwise returns null.
    */
-  private async handleFlashFallback(authType?: string): Promise<string | null> {
+  private async handleFlashFallback(
+    authType?: string,
+    error?: unknown,
+  ): Promise<string | null> {
     // Only handle fallback for OAuth users
     if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
       return null;
@@ -518,10 +657,18 @@ export class GeminiClient {
     const fallbackHandler = this.config.flashFallbackHandler;
     if (typeof fallbackHandler === 'function') {
       try {
-        const accepted = await fallbackHandler(currentModel, fallbackModel);
-        if (accepted) {
+        const accepted = await fallbackHandler(
+          currentModel,
+          fallbackModel,
+          error,
+        );
+        if (accepted !== false && accepted !== null) {
           this.config.setModel(fallbackModel);
           return fallbackModel;
+        }
+        // Check if the model was switched manually in the handler
+        if (this.config.getModel() === fallbackModel) {
+          return null; // Model was switched but don't continue with current prompt
         }
       } catch (error) {
         console.warn('Flash fallback handler failed:', error);

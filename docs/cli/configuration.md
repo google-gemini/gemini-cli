@@ -9,12 +9,13 @@ Configuration is applied in the following order of precedence (lower numbers are
 1.  **Default values:** Hardcoded defaults within the application.
 2.  **User settings file:** Global settings for the current user.
 3.  **Project settings file:** Project-specific settings.
-4.  **Environment variables:** System-wide or session-specific variables, potentially loaded from `.env` files.
-5.  **Command-line arguments:** Values passed when launching the CLI.
+4.  **System settings file:** System-wide settings.
+5.  **Environment variables:** System-wide or session-specific variables, potentially loaded from `.env` files.
+6.  **Command-line arguments:** Values passed when launching the CLI.
 
-## The user settings file and project settings file
+## Settings files
 
-Gemini CLI uses `settings.json` files for persistent configuration. There are two locations for these files:
+Gemini CLI uses `settings.json` files for persistent configuration. There are three locations for these files:
 
 - **User settings file:**
   - **Location:** `~/.gemini/settings.json` (where `~` is your home directory).
@@ -22,6 +23,9 @@ Gemini CLI uses `settings.json` files for persistent configuration. There are tw
 - **Project settings file:**
   - **Location:** `.gemini/settings.json` within your project's root directory.
   - **Scope:** Applies only when running Gemini CLI from that specific project. Project settings override user settings.
+- **System settings file:**
+  - **Location:** `/etc/gemini-cli/settings.json` (Linux), `C:\ProgramData\gemini-cli\settings.json` (Windows) or `/Library/Application Support/GeminiCli/settings.json` (macOS).
+  - **Scope:** Applies to all Gemini CLI sessions on the system, for all users. System settings override user and project settings. May be useful for system administrators at enterprises to have controls over users' Gemini CLI setups.
 
 **Note on environment variables in settings:** String values within your `settings.json` files can reference environment variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically resolved when the settings are loaded. For example, if you have an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`.
 
@@ -76,6 +80,18 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Security Note:** Command-specific restrictions in
     `excludeTools` for `run_shell_command` are based on simple string matching and can be easily bypassed. This feature is **not a security mechanism** and should not be relied upon to safely execute untrusted code. It is recommended to use `coreTools` to explicitly select commands
     that can be executed.
+
+- **`allowMCPServers`** (array of strings):
+  - **Description:** Allows you to specify a list of MCP server names that should be made available to the model. This can be used to restrict the set of MCP servers to connect to. Note that this will be ignored if `--allowed-mcp-server-names` is set.
+  - **Default:** All MCP servers are available for use by the Gemini model.
+  - **Example:** `"allowMCPServers": ["myPythonServer"]`.
+  - **Security Note:** This uses simple string matching on MCP server names, which can be modified. If you're a system administrator looking to prevent users from bypassing this, consider configuring the `mcpServers` at the system settings level such that the user will not be able to configure any MCP servers of their own. This should not be used as an airtight security mechanism.
+
+- **`excludeMCPServers`** (array of strings):
+  - **Description:** Allows you to specify a list of MCP server names that should be excluded from the model. A server listed in both `excludeMCPServers` and `allowMCPServers` is excluded. Note that this will be ignored if `--allowed-mcp-server-names` is set.
+  - **Default**: No MCP servers excluded.
+  - **Example:** `"excludeMCPServers": ["myNodeServer"]`.
+  - **Security Note:** This uses simple string matching on MCP server names, which can be modified. If you're a system administrator looking to prevent users from bypassing this, consider configuring the `mcpServers` at the system settings level such that the user will not be able to configure any MCP servers of their own. This should not be used as an airtight security mechanism.
 
 - **`autoAccept`** (boolean):
   - **Description:** Controls whether the CLI automatically accepts and executes tool calls that are considered safe (e.g., read-only operations) without explicit user confirmation. If set to `true`, the CLI will bypass the confirmation prompt for tools deemed safe.
@@ -132,11 +148,11 @@ In addition to a project settings file, a project's `.gemini` directory can cont
       },
       "myDockerServer": {
         "command": "docker",
-        "args": ["run", "i", "--rm", "-e", "API_KEY", "ghcr.io/foo/bar"],
+        "args": ["run", "-i", "--rm", "-e", "API_KEY", "ghcr.io/foo/bar"],
         "env": {
           "API_KEY": "$MY_API_TOKEN"
         }
-      },
+      }
     }
     ```
 
@@ -185,6 +201,36 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "hideTips": true
     ```
 
+- **`hideBanner`** (boolean):
+  - **Description:** Enables or disables the startup banner (ASCII art logo) in the CLI interface.
+  - **Default:** `false`
+  - **Example:**
+
+    ```json
+    "hideBanner": true
+    ```
+
+- **`maxSessionTurns`** (number):
+  - **Description:** Sets the maximum number of turns for a session. If the session exceeds this limit, the CLI will stop processing and start a new chat.
+  - **Default:** `-1` (unlimited)
+  - **Example:**
+    ```json
+    "maxSessionTurns": 10
+    ```
+
+- **`summarizeToolOutput`** (object):
+  - **Description:** Enables or disables the summarization of tool output. You can specify the token budget for the summarization using the `tokenBudget` setting.
+  - Note: Currently only the `run_shell_command` tool is supported.
+  - **Default:** `{}` (Disabled by default)
+  - **Example:**
+    ```json
+    "summarizeToolOutput": {
+      "run_shell_command": {
+        "tokenBudget": 2000
+      }
+    }
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -209,7 +255,14 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "logPrompts": true
   },
   "usageStatisticsEnabled": true,
-  "hideTips": false
+  "hideTips": false,
+  "hideBanner": false,
+  "maxSessionTurns": 10,
+  "summarizeToolOutput": {
+    "run_shell_command": {
+      "tokenBudget": 100
+    }
+  }
 }
 ```
 
@@ -242,12 +295,13 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
-  - Ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
+  - Ensure you have the necessary permissions.
   - Example: `export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"`.
 - **`GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID.
   - Required for using Code Assist or Vertex AI.
-  - If using Vertex AI, ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
+  - If using Vertex AI, ensure you have the necessary permissions in this project.
+  - **Cloud Shell Note:** When running in a Cloud Shell environment, this variable defaults to a special project allocated for Cloud Shell users. If you have `GOOGLE_CLOUD_PROJECT` set in your global environment in Cloud Shell, it will be overridden by this default. To use a different project in Cloud Shell, you must define `GOOGLE_CLOUD_PROJECT` in a `.env` file.
   - Example: `export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
 - **`GOOGLE_APPLICATION_CREDENTIALS`** (string):
   - **Description:** The path to your Google Application Credentials JSON file.
@@ -257,8 +311,7 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
 - **`GOOGLE_CLOUD_LOCATION`**:
   - Your Google Cloud Project Location (e.g., us-central1).
-  - Required for using Vertex AI in non-express mode.
-  - If using Vertex AI, ensure you have the necessary permissions and set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
+  - Required for using Vertex AI in non express mode.
   - Example: `export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"`.
 - **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
@@ -291,13 +344,13 @@ Arguments passed directly when running the CLI can override other configurations
   - Enables sandbox mode for this session.
 - **`--sandbox-image`**:
   - Sets the sandbox image URI.
-- **`--debug_mode`** (**`-d`**):
+- **`--debug`** (**`-d`**):
   - Enables debug mode for this session, providing more verbose output.
-- **`--all_files`** (**`-a`**):
+- **`--all-files`** (**`-a`**):
   - If set, recursively includes all files within the current directory as context for the prompt.
 - **`--help`** (or **`-h`**):
   - Displays help information about command-line arguments.
-- **`--show_memory_usage`**:
+- **`--show-memory-usage`**:
   - Displays the current memory usage.
 - **`--yolo`**:
   - Enables YOLO mode, which automatically approves all tool calls.
@@ -310,7 +363,16 @@ Arguments passed directly when running the CLI can override other configurations
 - **`--telemetry-log-prompts`**:
   - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md) for more information.
 - **`--checkpointing`**:
-  - Enables [checkpointing](./commands.md#checkpointing-commands).
+  - Enables [checkpointing](../checkpointing.md).
+- **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
+  - Specifies a list of extensions to use for the session. If not provided, all available extensions are used.
+  - Use the special term `gemini -e none` to disable all extensions.
+  - Example: `gemini -e my-extension -e my-other-extension`
+- **`--list-extensions`** (**`-l`**):
+  - Lists all available extensions and exits.
+- **`--proxy`**:
+  - Sets the proxy for the CLI.
+  - Example: `--proxy http://localhost:7890`.
 - **`--version`**:
   - Displays the version of the CLI.
 
