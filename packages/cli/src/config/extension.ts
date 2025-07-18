@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MCPServerConfig, AnnotatedExtension } from '@google/gemini-cli-core';
+import { MCPServerConfig, GeminiCLIExtension } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -113,8 +113,8 @@ function getContextFileNames(config: ExtensionConfig): string[] {
 export function annotateActiveExtensions(
   extensions: Extension[],
   enabledExtensionNames: string[],
-): AnnotatedExtension[] {
-  const annotatedExtensions: AnnotatedExtension[] = [];
+): GeminiCLIExtension[] {
+  const annotatedExtensions: GeminiCLIExtension[] = [];
 
   if (enabledExtensionNames.length === 0) {
     return extensions.map((extension) => ({

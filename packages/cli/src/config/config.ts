@@ -423,7 +423,7 @@ export async function loadCliConfig(
     maxSessionTurns: settings.maxSessionTurns ?? -1,
     experimentalAcp: argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,
-    allExtensions,
+    extensions: allExtensions,
     blockedMcpServers,
     noBrowser: !!process.env.NO_BROWSER,
     summarizeToolOutput: settings.summarizeToolOutput,

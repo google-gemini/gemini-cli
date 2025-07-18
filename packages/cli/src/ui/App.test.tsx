@@ -58,8 +58,7 @@ interface MockServerConfig {
   getToolCallCommand: Mock<() => string | undefined>;
   getMcpServerCommand: Mock<() => string | undefined>;
   getMcpServers: Mock<() => Record<string, MCPServerConfig> | undefined>;
-  getActiveExtensions: Mock<() => Array<{ name: string; version: string }>>;
-  getAllExtensions: Mock<
+  getExtensions: Mock<
     () => Array<{ name: string; version: string; isActive: boolean }>
   >;
   getBlockedMcpServers: Mock<
@@ -125,8 +124,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getToolCallCommand: vi.fn(() => opts.toolCallCommand),
         getMcpServerCommand: vi.fn(() => opts.mcpServerCommand),
         getMcpServers: vi.fn(() => opts.mcpServers),
-        getActiveExtensions: vi.fn(() => []),
-        getAllExtensions: vi.fn(() => []),
+        getExtensions: vi.fn(() => []),
         getBlockedMcpServers: vi.fn(() => []),
         getUserAgent: vi.fn(() => opts.userAgent || 'test-agent'),
         getUserMemory: vi.fn(() => opts.userMemory || ''),

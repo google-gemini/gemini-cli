@@ -71,12 +71,9 @@ export interface TelemetrySettings {
   logPrompts?: boolean;
 }
 
-export interface ActiveExtension {
+export interface GeminiCLIExtension {
   name: string;
   version: string;
-}
-
-export interface AnnotatedExtension extends ActiveExtension {
   isActive: boolean;
 }
 
@@ -152,7 +149,7 @@ export interface ConfigParameters {
   maxSessionTurns?: number;
   experimentalAcp?: boolean;
   listExtensions?: boolean;
-  allExtensions?: AnnotatedExtension[];
+  extensions?: GeminiCLIExtension[];
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
@@ -200,7 +197,7 @@ export class Config {
   private modelSwitchedDuringSession: boolean = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
-  private readonly _allExtensions: AnnotatedExtension[];
+  private readonly _extensions: GeminiCLIExtension[];
   private readonly _blockedMcpServers: Array<{
     name: string;
     extensionName: string;
@@ -255,7 +252,7 @@ export class Config {
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalAcp = params.experimentalAcp ?? false;
     this.listExtensions = params.listExtensions ?? false;
-    this._allExtensions = params.allExtensions ?? [];
+    this._extensions = params.extensions ?? [];
     this._blockedMcpServers = params.blockedMcpServers ?? [];
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
@@ -516,12 +513,8 @@ export class Config {
     return this.listExtensions;
   }
 
-  getActiveExtensions(): ActiveExtension[] {
-    return this._allExtensions.filter((ext) => ext.isActive);
-  }
-
-  getAllExtensions(): AnnotatedExtension[] {
-    return this._allExtensions;
+  getExtensions(): GeminiCLIExtension[] {
+    return this._extensions;
   }
 
   getBlockedMcpServers(): Array<{ name: string; extensionName: string }> {
