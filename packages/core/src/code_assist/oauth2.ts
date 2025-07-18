@@ -164,7 +164,7 @@ export async function getOauthClient(
       console.error(
         'An unexpected error occurred while trying to open the browser:',
         err,
-        '\nPlease try running again with NO_BROWSER=true set.'
+        '\nPlease try running again with NO_BROWSER=true set.',
       );
     }
     console.log('Waiting for authentication...');
