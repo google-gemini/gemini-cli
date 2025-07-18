@@ -248,7 +248,16 @@ export async function ensureBinary(
       );
     }
 
-    fs.renameSync(foundBinaryPath, executablePath);
+    try {
+      fs.renameSync(foundBinaryPath, executablePath);
+    } catch (error) {
+      if (error.code === 'EXDEV') {
+        fs.copyFileSync(foundBinaryPath, executablePath);
+        fs.unlinkSync(foundBinaryPath);
+      } else {
+        throw error;
+      }
+    }
 
     if (platform !== 'windows') {
       fs.chmodSync(executablePath, '755');
