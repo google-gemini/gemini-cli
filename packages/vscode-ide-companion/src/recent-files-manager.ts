@@ -7,7 +7,12 @@
 import * as vscode from 'vscode';
 
 export function getMaxRecentFiles() {
-  return parseInt(process.env['IDE_MODE_MAX_RECENT_FILES'] ?? '', 10) || 10;
+  return parseInt(process.env['IDE_MODE_MAX_RECENT_FILES'] ?? '', 10);
+}
+
+// Threshold of minutes since the file was last active.
+export function getMaxFileAge() {
+  return parseInt(process.env['IDE_MODE_MAX_FILE_AGE_MINUTES'] ?? '', 10);
 }
 
 interface RecentFile {
@@ -16,9 +21,13 @@ interface RecentFile {
 }
 
 /**
- * Keeps track of the MAX_RECENT_FILES # of recently-opened files. If a file
+ * Keeps track of the IDE_MODE_MAX_RECENT_FILES # of recently-opened files
+ * opened less than IDE_MODE_MAX_FILE_AGE_MINUTES ago. If a file
  * is closed or deleted, it will be removed. If the length is maxxed out,
  * the now-removed file will not be replaced by an older file.
+ *
+ * You can configure the thresholds for IDE_MODE_MAX_RECENT_FILES
+ * and IDE_MODE_MAX_FILE_AGE_MINUTES using environment variables.
  */
 export class RecentFilesManager {
   private readonly files: RecentFile[] = [];
@@ -26,12 +35,15 @@ export class RecentFilesManager {
   readonly onDidChange = this.onDidChangeEmitter.event;
 
   private readonly maxRecentFiles: number;
+  private readonly maxFileAge: number;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     maxRecentFiles?: number,
+    maxFileAge?: number,
   ) {
     this.maxRecentFiles = maxRecentFiles ?? getMaxRecentFiles();
+    this.maxFileAge = maxFileAge ?? getMaxFileAge();
     const editorWatcher = vscode.window.onDidChangeActiveTextEditor(
       (editor) => {
         if (editor) {
@@ -73,9 +85,13 @@ export class RecentFilesManager {
   }
 
   get recentFiles(): { filePath: string; timestamp: number }[] {
-    return this.files.map((file) => ({
-      filePath: file.uri.fsPath,
-      timestamp: file.timestamp,
-    }));
+    const now = Date.now();
+    const maxAgeInMs = this.maxFileAge * 60 * 1000;
+    return this.files
+      .filter((file) => now - file.timestamp < maxAgeInMs)
+      .map((file) => ({
+        filePath: file.uri.fsPath,
+        timestamp: file.timestamp,
+      }));
   }
 }
