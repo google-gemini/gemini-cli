@@ -58,10 +58,46 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+
+  // Check if cursor is after @ or / without spaces
+  const isCursorAfterCommandWithoutSpace = useCallback(() => {
+    const text = buffer.text;
+    const [row, col] = buffer.cursor;
+
+    // Calculate offset from row/col (same logic as in text-buffer.ts)
+    let offset = 0;
+    for (let i = 0; i < row; i++) {
+      offset += buffer.lines[i].length + 1; // +1 for newline
+    }
+    offset += col;
+
+    // Search backwards from cursor position
+    for (let i = offset - 1; i >= 0; i--) {
+      const char = text[i];
+      if (char === ' ' || char === '\n') {
+        // Found space before @ or /, return false
+        return false;
+      }
+      if (char === '@' || char === '/') {
+        // Found @ or / without space in between
+        return true;
+      }
+    }
+
+    return false;
+  }, [buffer]);
+
+  const shouldShowCompletion = useCallback(
+    () =>
+      (isAtCommand(buffer.text) || isSlashCommand(buffer.text)) &&
+      isCursorAfterCommandWithoutSpace(),
+    [buffer.text, isCursorAfterCommandWithoutSpace],
+  );
+
   const completion = useCompletion(
     buffer.text,
     config.getTargetDir(),
-    isAtCommand(buffer.text) || isSlashCommand(buffer.text),
+    shouldShowCompletion(),
     slashCommands,
     commandContext,
     config,
