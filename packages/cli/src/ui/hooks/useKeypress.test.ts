@@ -101,7 +101,6 @@ describe('useKeypress', () => {
   const mockSetRawMode = vi.fn();
   const onKeypress = vi.fn();
   let originalNodeVersion: string;
-  let originalPlatform: string | undefined;
   let originalGeminiCtrlBackspaceEnv: string | undefined;
 
   beforeEach(() => {
@@ -113,7 +112,6 @@ describe('useKeypress', () => {
     });
 
     originalNodeVersion = process.versions.node;
-    originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
     originalGeminiCtrlBackspaceEnv = process.env.GEMINI_CLI_CTRL_BACKSPACE_MODE;
     delete process.env['PASTE_WORKAROUND'];
     delete process.env['GEMINI_CLI_CTRL_BACKSPACE_MODE'];
@@ -125,9 +123,7 @@ describe('useKeypress', () => {
       configurable: true,
     });
 
-    if (originalPlatform) {
-      Object.defineProperty(process, 'platform', originalPlatform);
-    }
+    vi.restoreAllMocks();
 
     delete process.env.GEMINI_CLI_CTRL_BACKSPACE_MODE;
     if (originalGeminiCtrlBackspaceEnv !== undefined) {
@@ -143,11 +139,8 @@ describe('useKeypress', () => {
     });
   };
 
-  const setPlatform = (platform: string) => {
-    Object.defineProperty(process, 'platform', {
-      value: platform,
-      configurable: true,
-    });
+  const setPlatform = (platform: NodeJS.Platform) => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue(platform);
   };
 
   const setCtrlBackspaceMode = (value: string | undefined) => {
