@@ -14,14 +14,14 @@ import {
   afterEach,
   Mocked,
 } from 'vitest';
+import { Config, ConfigParameters, ApprovalMode } from '../config/config.js';
 import {
   ToolRegistry,
   DiscoveredTool,
   sanitizeParameters,
 } from './tool-registry.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { Config, ConfigParameters, ApprovalMode } from '../config/config.js';
-import { BaseTool, ToolResult } from './tools.js';
+import { BaseTool, Icon, ToolResult } from './tools.js';
 import {
   FunctionDeclaration,
   CallableTool,
@@ -109,7 +109,7 @@ class MockTool extends BaseTool<{ param: string }, ToolResult> {
     displayName = 'A mock tool',
     description = 'A mock tool description',
   ) {
-    super(name, displayName, description, {
+    super(name, displayName, description, Icon.Hammer, {
       type: Type.OBJECT,
       properties: {
         param: { type: Type.STRING },

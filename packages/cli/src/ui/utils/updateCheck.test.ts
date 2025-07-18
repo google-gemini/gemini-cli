@@ -20,6 +20,23 @@ vi.mock('update-notifier', () => ({
 describe('checkForUpdates', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // Clear DEV environment variable before each test
+    delete process.env.DEV;
+  });
+
+  it('should return null when running from source (DEV=true)', async () => {
+    process.env.DEV = 'true';
+    getPackageJson.mockResolvedValue({
+      name: 'test-package',
+      version: '1.0.0',
+    });
+    updateNotifier.mockReturnValue({
+      update: { current: '1.0.0', latest: '1.1.0' },
+    });
+    const result = await checkForUpdates();
+    expect(result).toBeNull();
+    expect(getPackageJson).not.toHaveBeenCalled();
+    expect(updateNotifier).not.toHaveBeenCalled();
   });
 
   it('should return null if package.json is missing', async () => {

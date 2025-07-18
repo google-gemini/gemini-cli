@@ -50,6 +50,7 @@ export type ContentGeneratorConfig = {
   apiKey?: string;
   vertexai?: boolean;
   authType?: AuthType | undefined;
+  proxy?: string | undefined;
 };
 
 export function createContentGeneratorConfig(
@@ -67,6 +68,7 @@ export function createContentGeneratorConfig(
   const contentGeneratorConfig: ContentGeneratorConfig = {
     model: effectiveModel,
     authType,
+    proxy: config?.getProxy(),
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
@@ -83,11 +85,8 @@ export function createContentGeneratorConfig(
     getEffectiveModel(
       contentGeneratorConfig.apiKey,
       contentGeneratorConfig.model,
-    ).then((newModel) => {
-      if (newModel !== contentGeneratorConfig.model) {
-        config.flashFallbackHandler?.(contentGeneratorConfig.model, newModel);
-      }
-    });
+      contentGeneratorConfig.proxy,
+    );
 
     return contentGeneratorConfig;
   }
