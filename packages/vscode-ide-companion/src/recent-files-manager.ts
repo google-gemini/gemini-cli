@@ -6,13 +6,25 @@
 
 import * as vscode from 'vscode';
 
+const DEFAULT_MAX_RECENT_FILES = 10;
+
 export function getMaxRecentFiles() {
-  return parseInt(process.env['IDE_MODE_MAX_RECENT_FILES'] ?? '', 10);
+  const value = process.env['IDE_MODE_MAX_RECENT_FILES'];
+  if (!value) {
+    return DEFAULT_MAX_RECENT_FILES;
+  }
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? DEFAULT_MAX_RECENT_FILES : parsed;
 }
 
 // Threshold of minutes since the file was last active.
 export function getMaxFileAge() {
-  return parseInt(process.env['IDE_MODE_MAX_FILE_AGE_MINUTES'] ?? '', 10);
+  const value = process.env['IDE_MODE_MAX_FILE_AGE_MINUTES'];
+  if (!value) {
+    return 10;
+  }
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? 10 : parsed;
 }
 
 interface RecentFile {
@@ -62,19 +74,21 @@ export class RecentFilesManager {
     context.subscriptions.push(editorWatcher, fileWatcher, closeWatcher);
   }
 
-  private remove(uri: vscode.Uri) {
+  private remove(uri: vscode.Uri, fireEvent = true) {
     const index = this.files.findIndex(
       (file) => file.uri.fsPath === uri.fsPath,
     );
     if (index !== -1) {
       this.files.splice(index, 1);
-      this.onDidChangeEmitter.fire();
+      if (fireEvent) {
+        this.onDidChangeEmitter.fire();
+      }
     }
   }
 
   add(uri: vscode.Uri) {
     // Remove if it already exists to avoid duplicates and move it to the top.
-    this.remove(uri);
+    this.remove(uri, false);
 
     this.files.unshift({ uri, timestamp: Date.now() });
 
@@ -84,7 +98,7 @@ export class RecentFilesManager {
     this.onDidChangeEmitter.fire();
   }
 
-  get recentFiles(): { filePath: string; timestamp: number }[] {
+  get recentFiles(): Array<{ filePath: string; timestamp: number }> {
     const now = Date.now();
     const maxAgeInMs = this.maxFileAge * 60 * 1000;
     return this.files
