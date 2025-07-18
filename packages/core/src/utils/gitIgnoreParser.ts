@@ -61,13 +61,18 @@ export class GitIgnoreParser implements GitIgnoreFilter {
       ? path.relative(this.projectRoot, filePath)
       : filePath;
 
-    if (relativePath === '' || relativePath.startsWith('..')) {
+    if (relativePath.startsWith('..')) {
       return false;
     }
 
     let normalizedPath = relativePath.replace(/\\/g, '/');
     if (normalizedPath.startsWith('./')) {
       normalizedPath = normalizedPath.substring(2);
+    }
+
+    // Additional safety check: ensure normalized path is not root or empty
+    if (normalizedPath === '' || normalizedPath === '/' || normalizedPath === '.') {
+      return false;
     }
 
     return this.ig.ignores(normalizedPath);
