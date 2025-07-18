@@ -9,7 +9,7 @@ import { lightTheme, Theme, type ColorsTheme } from './theme.js';
 const googleCodeColors: ColorsTheme = {
   type: 'light',
   Background: 'white',
-  Foreground: 'black',
+  Foreground: '#444',
   LightBlue: '#066',
   AccentBlue: '#008',
   AccentPurple: '#606',
