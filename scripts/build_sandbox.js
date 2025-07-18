@@ -141,7 +141,6 @@ function buildImage(imageName, dockerfile) {
   console.log(`built ${finalImageName}`);
 
   // If an output file path was provided via command-line, write the final image URI to it.
-  // TODO: Need a change to push the branch. REMOVE THIS
   if (argv.outputFile) {
     console.log(
       `Writing final image URI for CI artifact to: ${argv.outputFile}`,
