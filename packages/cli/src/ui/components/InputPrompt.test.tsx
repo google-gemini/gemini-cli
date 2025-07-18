@@ -9,15 +9,17 @@ import { InputPrompt, InputPromptProps } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 import { Config } from '@google/gemini-cli-core';
 import { CommandContext, SlashCommand } from '../commands/types.js';
-import { vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
+import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
+vi.mock('../utils/clipboardUtils.js');
 
 type MockedUseShellHistory = ReturnType<typeof useShellHistory>;
 type MockedUseCompletion = ReturnType<typeof useCompletion>;
@@ -76,6 +78,7 @@ describe('InputPrompt', () => {
         mockBuffer.viewportVisualLines = [newText];
         mockBuffer.allVisualLines = [newText];
       }),
+      replaceRangeByOffset: vi.fn(),
       viewportVisualLines: [''],
       allVisualLines: [''],
       visualCursor: [0, 0],
@@ -87,7 +90,7 @@ describe('InputPrompt', () => {
       killLineLeft: vi.fn(),
       openInExternalEditor: vi.fn(),
       newline: vi.fn(),
-      replaceRangeByOffset: vi.fn(),
+      backspace: vi.fn(),
     } as unknown as TextBuffer;
 
     mockShellHistory = {
@@ -218,7 +221,127 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should complete a partial parent command and add a space', async () => {
+  describe('clipboard image paste', () => {
+    beforeEach(() => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(null);
+      vi.mocked(clipboardUtils.cleanupOldClipboardImages).mockResolvedValue(
+        undefined,
+      );
+    });
+
+    it('should handle Ctrl+V when clipboard has an image', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(
+        '/test/.gemini-clipboard/clipboard-123.png',
+      );
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      // Send Ctrl+V
+      stdin.write('\x16'); // Ctrl+V
+      await wait();
+
+      expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
+      expect(clipboardUtils.saveClipboardImage).toHaveBeenCalledWith(
+        props.config.getTargetDir(),
+      );
+      expect(clipboardUtils.cleanupOldClipboardImages).toHaveBeenCalledWith(
+        props.config.getTargetDir(),
+      );
+      expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should not insert anything when clipboard has no image', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x16'); // Ctrl+V
+      await wait();
+
+      expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
+      expect(clipboardUtils.saveClipboardImage).not.toHaveBeenCalled();
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should handle image save failure gracefully', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(null);
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x16'); // Ctrl+V
+      await wait();
+
+      expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should insert image path at cursor position with proper spacing', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(
+        '/test/.gemini-clipboard/clipboard-456.png',
+      );
+
+      // Set initial text and cursor position
+      mockBuffer.text = 'Hello world';
+      mockBuffer.cursor = [0, 5]; // Cursor after "Hello"
+      mockBuffer.lines = ['Hello world'];
+      mockBuffer.replaceRangeByOffset = vi.fn();
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x16'); // Ctrl+V
+      await wait();
+
+      // Should insert at cursor position with spaces
+      expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
+
+      // Get the actual call to see what path was used
+      const actualCall = vi.mocked(mockBuffer.replaceRangeByOffset).mock
+        .calls[0];
+      expect(actualCall[0]).toBe(5); // start offset
+      expect(actualCall[1]).toBe(5); // end offset
+      expect(actualCall[2]).toMatch(
+        /@.*\.gemini-clipboard\/clipboard-456\.png/,
+      ); // flexible path match
+      unmount();
+    });
+
+    it('should handle errors during clipboard operations', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      vi.mocked(clipboardUtils.clipboardHasImage).mockRejectedValue(
+        new Error('Clipboard error'),
+      );
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x16'); // Ctrl+V
+      await wait();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error handling clipboard image:',
+        expect.any(Error),
+      );
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+
+      consoleErrorSpy.mockRestore();
+      unmount();
+    });
+  });
+
+  it('should complete a partial parent command', async () => {
     // SCENARIO: /mem -> Tab
     mockedUseCompletion.mockReturnValue({
       ...mockCompletion,
@@ -234,12 +357,12 @@ describe('InputPrompt', () => {
     stdin.write('\t'); // Press Tab
     await wait();
 
-    expect(props.buffer.setText).toHaveBeenCalledWith('/memory ');
+    expect(props.buffer.setText).toHaveBeenCalledWith('/memory');
     unmount();
   });
 
-  it('should append a sub-command when the parent command is already complete with a space', async () => {
-    // SCENARIO: /memory  -> Tab (to accept 'add')
+  it('should append a sub-command when the parent command is already complete', async () => {
+    // SCENARIO: /memory -> Tab (to accept 'add')
     mockedUseCompletion.mockReturnValue({
       ...mockCompletion,
       showSuggestions: true,
@@ -257,13 +380,12 @@ describe('InputPrompt', () => {
     stdin.write('\t'); // Press Tab
     await wait();
 
-    expect(props.buffer.setText).toHaveBeenCalledWith('/memory add ');
+    expect(props.buffer.setText).toHaveBeenCalledWith('/memory add');
     unmount();
   });
 
   it('should handle the "backspace" edge case correctly', async () => {
-    // SCENARIO: /memory  -> Backspace -> /memory -> Tab (to accept 'show')
-    // This is the critical bug we fixed.
+    // SCENARIO: /memory -> Backspace -> /memory -> Tab (to accept 'show')
     mockedUseCompletion.mockReturnValue({
       ...mockCompletion,
       showSuggestions: true,
@@ -282,8 +404,8 @@ describe('InputPrompt', () => {
     stdin.write('\t'); // Press Tab
     await wait();
 
-    // It should NOT become '/show '. It should correctly become '/memory show '.
-    expect(props.buffer.setText).toHaveBeenCalledWith('/memory show ');
+    // It should NOT become '/show'. It should correctly become '/memory show'.
+    expect(props.buffer.setText).toHaveBeenCalledWith('/memory show');
     unmount();
   });
 
@@ -303,7 +425,7 @@ describe('InputPrompt', () => {
     stdin.write('\t'); // Press Tab
     await wait();
 
-    expect(props.buffer.setText).toHaveBeenCalledWith('/chat resume fix-foo ');
+    expect(props.buffer.setText).toHaveBeenCalledWith('/chat resume fix-foo');
     unmount();
   });
 
@@ -323,7 +445,7 @@ describe('InputPrompt', () => {
     await wait();
 
     // The app should autocomplete the text, NOT submit.
-    expect(props.buffer.setText).toHaveBeenCalledWith('/memory ');
+    expect(props.buffer.setText).toHaveBeenCalledWith('/memory');
 
     expect(props.onSubmit).not.toHaveBeenCalled();
     unmount();
@@ -348,14 +470,12 @@ describe('InputPrompt', () => {
     const { stdin, unmount } = render(<InputPrompt {...props} />);
     await wait();
 
-    stdin.write('\t'); // Press Tab
+    stdin.write('\t'); // Press Tab for autocomplete
     await wait();
 
-    expect(props.buffer.setText).toHaveBeenCalledWith('/help ');
+    expect(props.buffer.setText).toHaveBeenCalledWith('/help');
     unmount();
   });
-
-  // ADD this test for defensive coverage
 
   it('should not submit on Enter when the buffer is empty or only contains whitespace', async () => {
     props.buffer.setText('   '); // Set buffer to whitespace
@@ -384,7 +504,6 @@ describe('InputPrompt', () => {
     await wait();
 
     expect(props.onSubmit).toHaveBeenCalledWith('/clear');
-    expect(props.buffer.setText).not.toHaveBeenCalledWith('/clear ');
     unmount();
   });
 
@@ -405,6 +524,50 @@ describe('InputPrompt', () => {
 
     expect(props.buffer.replaceRangeByOffset).toHaveBeenCalled();
     expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should add a newline on enter when the line ends with a backslash', async () => {
+    // This test simulates multi-line input, not submission
+    mockBuffer.text = 'first line\\';
+    mockBuffer.cursor = [0, 11];
+    mockBuffer.lines = ['first line\\'];
+
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\r');
+    await wait();
+
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(props.buffer.backspace).toHaveBeenCalled();
+    expect(props.buffer.newline).toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should clear the buffer on Ctrl+C if it has text', async () => {
+    props.buffer.setText('some text to clear');
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\x03'); // Ctrl+C character
+    await wait();
+
+    expect(props.buffer.setText).toHaveBeenCalledWith('');
+    expect(mockCompletion.resetCompletionState).toHaveBeenCalled();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should NOT clear the buffer on Ctrl+C if it is empty', async () => {
+    props.buffer.text = '';
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\x03'); // Ctrl+C character
+    await wait();
+
+    expect(props.buffer.setText).not.toHaveBeenCalled();
     unmount();
   });
 });
