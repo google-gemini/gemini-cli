@@ -8,16 +8,19 @@
  * Terminal setup utility for configuring Shift+Enter and Ctrl+Enter support.
  *
  * This module provides automatic detection and configuration of various terminal
- * emulators to support CSI u format escape sequences for modified Enter keys.
+ * emulators to support multiline input through modified Enter keys.
  *
  * Supported terminals:
- * - VS Code: Configures keybindings.json
- * - Cursor: Configures keybindings.json (VS Code fork)
- * - Windsurf: Configures keybindings.json (VS Code fork)
+ * - VS Code: Configures keybindings.json to send \\\r\n
+ * - Cursor: Configures keybindings.json to send \\\r\n (VS Code fork)
+ * - Windsurf: Configures keybindings.json to send \\\r\n (VS Code fork)
  *
- * The module sends CSI u format sequences:
- * - Shift+Enter: \x1b[13;2u
- * - Ctrl+Enter: \x1b[13;5u
+ * For VS Code and its forks:
+ * - Shift+Enter: Sends \\\r\n (backslash followed by CRLF)
+ * - Ctrl+Enter: Sends \\\r\n (backslash followed by CRLF)
+ * 
+ * The module will not modify existing shift+enter or ctrl+enter keybindings
+ * to avoid conflicts with user customizations.
  */
 
 import { promises as fs } from 'fs';
@@ -91,351 +94,179 @@ async function backupFile(filePath: string): Promise<void> {
   }
 }
 
+// Helper function to get VS Code-style config directory
+function getVSCodeStyleConfigDir(appName: string): string | null {
+  const platform = os.platform();
+  
+  if (platform === 'darwin') {
+    return path.join(
+      os.homedir(),
+      'Library',
+      'Application Support',
+      appName,
+      'User',
+    );
+  } else if (platform === 'win32') {
+    if (!process.env.APPDATA) {
+      return null;
+    }
+    return path.join(process.env.APPDATA, appName, 'User');
+  } else {
+    // Linux - Cursor and Windsurf don't use 'User' subdirectory on Linux
+    if (appName === 'Cursor' || appName === 'Windsurf') {
+      return path.join(os.homedir(), '.config', appName);
+    }
+    return path.join(os.homedir(), '.config', appName, 'User');
+  }
+}
+
+// Generic VS Code-style terminal configuration
+async function configureVSCodeStyle(
+  terminalName: string,
+  appName: string
+): Promise<TerminalSetupResult> {
+  const configDir = getVSCodeStyleConfigDir(appName);
+  
+  if (!configDir) {
+    return {
+      success: false,
+      message:
+        `Could not determine ${terminalName} config path on Windows: APPDATA environment variable is not set.`,
+    };
+  }
+
+  const keybindingsFile = path.join(configDir, 'keybindings.json');
+
+  try {
+    await fs.mkdir(configDir, { recursive: true });
+
+    let keybindings: unknown[] = [];
+    try {
+      const content = await fs.readFile(keybindingsFile, 'utf8');
+      await backupFile(keybindingsFile);
+      try {
+        const parsedContent = JSON.parse(content);
+        if (!Array.isArray(parsedContent)) {
+          return {
+            success: false,
+            message:
+              `${terminalName} keybindings.json exists but is not a valid JSON array. ` +
+              `Please fix the file manually or delete it to allow automatic configuration.\n` +
+              `File: ${keybindingsFile}`,
+          };
+        }
+        keybindings = parsedContent;
+      } catch (parseError) {
+        return {
+          success: false,
+          message:
+            `Failed to parse ${terminalName} keybindings.json. The file contains invalid JSON.\n` +
+            `Please fix the file manually or delete it to allow automatic configuration.\n` +
+            `File: ${keybindingsFile}\n` +
+            `Error: ${parseError}`,
+        };
+      }
+    } catch {
+      // File doesn't exist, will create new one
+    }
+
+    const shiftEnterBinding = {
+      key: 'shift+enter',
+      command: 'workbench.action.terminal.sendSequence',
+      when: 'terminalFocus',
+      args: { text: '\\\r\n' },
+    };
+
+    const ctrlEnterBinding = {
+      key: 'ctrl+enter',
+      command: 'workbench.action.terminal.sendSequence',
+      when: 'terminalFocus',
+      args: { text: '\\\r\n' },
+    };
+
+    // Check if ANY shift+enter or ctrl+enter bindings already exist
+    const existingShiftEnter = keybindings.find((kb) => {
+      const binding = kb as { key?: string };
+      return binding.key === 'shift+enter';
+    });
+
+    const existingCtrlEnter = keybindings.find((kb) => {
+      const binding = kb as { key?: string };
+      return binding.key === 'ctrl+enter';
+    });
+
+    if (existingShiftEnter || existingCtrlEnter) {
+      const messages: string[] = [];
+      if (existingShiftEnter) {
+        messages.push(`- Shift+Enter binding already exists`);
+      }
+      if (existingCtrlEnter) {
+        messages.push(`- Ctrl+Enter binding already exists`);
+      }
+      return {
+        success: false,
+        message: 
+          `Existing keybindings detected. Will not modify to avoid conflicts.\n` +
+          messages.join('\n') + '\n' +
+          `Please check and modify manually if needed: ${keybindingsFile}`,
+      };
+    }
+
+    // Check if our specific bindings already exist
+    const hasOurShiftEnter = keybindings.some((kb) => {
+      const binding = kb as { command?: string; args?: { text?: string }; key?: string };
+      return (
+        binding.key === 'shift+enter' &&
+        binding.command === 'workbench.action.terminal.sendSequence' &&
+        binding.args?.text === '\\\r\n'
+      );
+    });
+
+    const hasOurCtrlEnter = keybindings.some((kb) => {
+      const binding = kb as { command?: string; args?: { text?: string }; key?: string };
+      return (
+        binding.key === 'ctrl+enter' &&
+        binding.command === 'workbench.action.terminal.sendSequence' &&
+        binding.args?.text === '\\\r\n'
+      );
+    });
+
+    if (!hasOurShiftEnter || !hasOurCtrlEnter) {
+      if (!hasOurShiftEnter) keybindings.unshift(shiftEnterBinding);
+      if (!hasOurCtrlEnter) keybindings.unshift(ctrlEnterBinding);
+
+      await fs.writeFile(keybindingsFile, JSON.stringify(keybindings, null, 4));
+      return {
+        success: true,
+        message: `Added Shift+Enter and Ctrl+Enter keybindings to ${terminalName}.\nModified: ${keybindingsFile}`,
+        requiresRestart: true,
+      };
+    } else {
+      return {
+        success: true,
+        message: `${terminalName} keybindings already configured.`,
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to configure ${terminalName}.\nFile: ${keybindingsFile}\nError: ${error}`,
+    };
+  }
+}
+
 // Terminal-specific configuration functions
 
 async function configureVSCode(): Promise<TerminalSetupResult> {
-  const platform = os.platform();
-  let configDir: string;
-
-  if (platform === 'darwin') {
-    configDir = path.join(
-      os.homedir(),
-      'Library',
-      'Application Support',
-      'Code',
-      'User',
-    );
-  } else if (platform === 'win32') {
-    if (!process.env.APPDATA) {
-      return {
-        success: false,
-        message:
-          'Could not determine VS Code config path on Windows: APPDATA environment variable is not set.',
-      };
-    }
-    configDir = path.join(process.env.APPDATA, 'Code', 'User');
-  } else {
-    configDir = path.join(os.homedir(), '.config', 'Code', 'User');
-  }
-
-  const keybindingsFile = path.join(configDir, 'keybindings.json');
-
-  try {
-    await fs.mkdir(configDir, { recursive: true });
-
-    let keybindings: unknown[] = [];
-    try {
-      const content = await fs.readFile(keybindingsFile, 'utf8');
-      await backupFile(keybindingsFile);
-      try {
-        const parsedContent = JSON.parse(content);
-        if (!Array.isArray(parsedContent)) {
-          return {
-            success: false,
-            message:
-              `VS Code keybindings.json exists but is not a valid JSON array. ` +
-              `Please fix the file manually or delete it to allow automatic configuration.\n` +
-              `File: ${keybindingsFile}`,
-          };
-        }
-        keybindings = parsedContent;
-      } catch (parseError) {
-        return {
-          success: false,
-          message:
-            `Failed to parse VS Code keybindings.json. The file contains invalid JSON.\n` +
-            `Please fix the file manually or delete it to allow automatic configuration.\n` +
-            `File: ${keybindingsFile}\n` +
-            `Error: ${parseError}`,
-        };
-      }
-    } catch {
-      // File doesn't exist, will create new one
-    }
-
-    const shiftEnterBinding = {
-      key: 'shift+enter',
-      command: 'workbench.action.terminal.sendSequence',
-      when: 'terminalFocus',
-      args: { text: '\u001b[13;2u' },
-    };
-
-    const ctrlEnterBinding = {
-      key: 'ctrl+enter',
-      command: 'workbench.action.terminal.sendSequence',
-      when: 'terminalFocus',
-      args: { text: '\u001b[13;5u' },
-    };
-
-    // Check if bindings already exist
-    const hasShiftEnter = keybindings.some((kb) => {
-      const binding = kb as { command?: string; args?: { text?: string } };
-      return (
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === '\u001b[13;2u'
-      );
-    });
-
-    const hasCtrlEnter = keybindings.some((kb) => {
-      const binding = kb as { command?: string; args?: { text?: string } };
-      return (
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === '\u001b[13;5u'
-      );
-    });
-
-    if (!hasShiftEnter || !hasCtrlEnter) {
-      if (!hasShiftEnter) keybindings.unshift(shiftEnterBinding);
-      if (!hasCtrlEnter) keybindings.unshift(ctrlEnterBinding);
-
-      await fs.writeFile(keybindingsFile, JSON.stringify(keybindings, null, 4));
-      return {
-        success: true,
-        message: `Added Shift+Enter and Ctrl+Enter keybindings to VS Code.\nModified: ${keybindingsFile}`,
-        requiresRestart: true,
-      };
-    } else {
-      return {
-        success: true,
-        message: 'VS Code keybindings already configured.',
-      };
-    }
-  } catch (error) {
-    return {
-      success: false,
-      message: `Failed to configure VS Code.\nFile: ${keybindingsFile}\nError: ${error}`,
-    };
-  }
+  return configureVSCodeStyle('VS Code', 'Code');
 }
 
 async function configureCursor(): Promise<TerminalSetupResult> {
-  const platform = os.platform();
-  let configDir: string;
-
-  if (platform === 'darwin') {
-    configDir = path.join(
-      os.homedir(),
-      'Library',
-      'Application Support',
-      'Cursor',
-      'User',
-    );
-  } else if (platform === 'win32') {
-    if (!process.env.APPDATA) {
-      return {
-        success: false,
-        message:
-          'Could not determine Cursor config path on Windows: APPDATA environment variable is not set.',
-      };
-    }
-    configDir = path.join(process.env.APPDATA, 'Cursor', 'User');
-  } else {
-    configDir = path.join(os.homedir(), '.config', 'Cursor');
-  }
-
-  const keybindingsFile = path.join(configDir, 'keybindings.json');
-
-  try {
-    await fs.mkdir(configDir, { recursive: true });
-
-    let keybindings: unknown[] = [];
-    try {
-      const content = await fs.readFile(keybindingsFile, 'utf8');
-      await backupFile(keybindingsFile);
-      try {
-        const parsedContent = JSON.parse(content);
-        if (!Array.isArray(parsedContent)) {
-          return {
-            success: false,
-            message:
-              `Cursor keybindings.json exists but is not a valid JSON array. ` +
-              `Please fix the file manually or delete it to allow automatic configuration.\n` +
-              `File: ${keybindingsFile}`,
-          };
-        }
-        keybindings = parsedContent;
-      } catch (parseError) {
-        return {
-          success: false,
-          message:
-            `Failed to parse Cursor keybindings.json. The file contains invalid JSON.\n` +
-            `Please fix the file manually or delete it to allow automatic configuration.\n` +
-            `File: ${keybindingsFile}\n` +
-            `Error: ${parseError}`,
-        };
-      }
-    } catch {
-      // File doesn't exist, will create new one
-    }
-
-    const shiftEnterBinding = {
-      key: 'shift+enter',
-      command: 'workbench.action.terminal.sendSequence',
-      when: 'terminalFocus',
-      args: { text: '\u001b[13;2u' },
-    };
-
-    const ctrlEnterBinding = {
-      key: 'ctrl+enter',
-      command: 'workbench.action.terminal.sendSequence',
-      when: 'terminalFocus',
-      args: { text: '\u001b[13;5u' },
-    };
-
-    // Check if bindings already exist
-    const hasShiftEnter = keybindings.some((kb) => {
-      const binding = kb as { command?: string; args?: { text?: string } };
-      return (
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === '\u001b[13;2u'
-      );
-    });
-
-    const hasCtrlEnter = keybindings.some((kb) => {
-      const binding = kb as { command?: string; args?: { text?: string } };
-      return (
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === '\u001b[13;5u'
-      );
-    });
-
-    if (!hasShiftEnter || !hasCtrlEnter) {
-      if (!hasShiftEnter) keybindings.unshift(shiftEnterBinding);
-      if (!hasCtrlEnter) keybindings.unshift(ctrlEnterBinding);
-
-      await fs.writeFile(keybindingsFile, JSON.stringify(keybindings, null, 4));
-      return {
-        success: true,
-        message: `Added Shift+Enter and Ctrl+Enter keybindings to Cursor.\nModified: ${keybindingsFile}`,
-        requiresRestart: true,
-      };
-    } else {
-      return {
-        success: true,
-        message: 'Cursor keybindings already configured.',
-      };
-    }
-  } catch (error) {
-    return {
-      success: false,
-      message: `Failed to configure Cursor.\nFile: ${keybindingsFile}\nError: ${error}`,
-    };
-  }
+  return configureVSCodeStyle('Cursor', 'Cursor');
 }
 
 async function configureWindsurf(): Promise<TerminalSetupResult> {
-  const platform = os.platform();
-  let configDir: string;
-
-  if (platform === 'darwin') {
-    configDir = path.join(
-      os.homedir(),
-      'Library',
-      'Application Support',
-      'Windsurf',
-      'User',
-    );
-  } else if (platform === 'win32') {
-    if (!process.env.APPDATA) {
-      return {
-        success: false,
-        message:
-          'Could not determine Windsurf config path on Windows: APPDATA environment variable is not set.',
-      };
-    }
-    configDir = path.join(process.env.APPDATA, 'Windsurf', 'User');
-  } else {
-    configDir = path.join(os.homedir(), '.config', 'Windsurf');
-  }
-
-  const keybindingsFile = path.join(configDir, 'keybindings.json');
-
-  try {
-    await fs.mkdir(configDir, { recursive: true });
-
-    let keybindings: unknown[] = [];
-    try {
-      const content = await fs.readFile(keybindingsFile, 'utf8');
-      await backupFile(keybindingsFile);
-      try {
-        const parsedContent = JSON.parse(content);
-        if (!Array.isArray(parsedContent)) {
-          return {
-            success: false,
-            message:
-              `Windsurf keybindings.json exists but is not a valid JSON array. ` +
-              `Please fix the file manually or delete it to allow automatic configuration.\n` +
-              `File: ${keybindingsFile}`,
-          };
-        }
-        keybindings = parsedContent;
-      } catch (parseError) {
-        return {
-          success: false,
-          message:
-            `Failed to parse Windsurf keybindings.json. The file contains invalid JSON.\n` +
-            `Please fix the file manually or delete it to allow automatic configuration.\n` +
-            `File: ${keybindingsFile}\n` +
-            `Error: ${parseError}`,
-        };
-      }
-    } catch {
-      // File doesn't exist, will create new one
-    }
-
-    const shiftEnterBinding = {
-      key: 'shift+enter',
-      command: 'workbench.action.terminal.sendSequence',
-      when: 'terminalFocus',
-      args: { text: '\u001b[13;2u' },
-    };
-
-    const ctrlEnterBinding = {
-      key: 'ctrl+enter',
-      command: 'workbench.action.terminal.sendSequence',
-      when: 'terminalFocus',
-      args: { text: '\u001b[13;5u' },
-    };
-
-    // Check if bindings already exist
-    const hasShiftEnter = keybindings.some((kb) => {
-      const binding = kb as { command?: string; args?: { text?: string } };
-      return (
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === '\u001b[13;2u'
-      );
-    });
-
-    const hasCtrlEnter = keybindings.some((kb) => {
-      const binding = kb as { command?: string; args?: { text?: string } };
-      return (
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === '\u001b[13;5u'
-      );
-    });
-
-    if (!hasShiftEnter || !hasCtrlEnter) {
-      if (!hasShiftEnter) keybindings.unshift(shiftEnterBinding);
-      if (!hasCtrlEnter) keybindings.unshift(ctrlEnterBinding);
-
-      await fs.writeFile(keybindingsFile, JSON.stringify(keybindings, null, 4));
-      return {
-        success: true,
-        message: `Added Shift+Enter and Ctrl+Enter keybindings to Windsurf.\nModified: ${keybindingsFile}`,
-        requiresRestart: true,
-      };
-    } else {
-      return {
-        success: true,
-        message: 'Windsurf keybindings already configured.',
-      };
-    }
-  } catch (error) {
-    return {
-      success: false,
-      message: `Failed to configure Windsurf.\nFile: ${keybindingsFile}\nError: ${error}`,
-    };
-  }
+  return configureVSCodeStyle('Windsurf', 'Windsurf');
 }
 
 /**

@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import { TextBuffer, NEWLINE_INPUT_SEQUENCES } from './shared/text-buffer.js';
+import { TextBuffer } from './shared/text-buffer.js';
 import { cpSlice, cpLen } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
@@ -60,6 +60,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const prevKeyRef = useRef<Key | null>(null);
   const kittyProtocolStatus = useKittyKeyboardProtocol();
 
   const completion = useCompletion(
@@ -243,6 +244,48 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Check if this is the special backslash+return sequence
+      const isPrevBackslash = prevKeyRef.current && 
+                             prevKeyRef.current.sequence === '\\' && 
+                             prevKeyRef.current.name === undefined &&
+                             !prevKeyRef.current.ctrl &&
+                             !prevKeyRef.current.meta &&
+                             !prevKeyRef.current.shift &&
+                             !prevKeyRef.current.paste;
+      
+      const isCurrentReturn = key.name === 'return' && 
+                             key.sequence === '\r' &&
+                             !key.ctrl && 
+                             !key.meta && 
+                             !key.paste;
+
+      // Handle the \+Enter sequence BEFORE it reaches the buffer
+      if (isPrevBackslash && isCurrentReturn) {
+        // Remove the backslash that was just inserted
+        buffer.backspace();
+        // Insert a newline instead of processing normally
+        buffer.newline();
+        prevKeyRef.current = null; // Reset
+        return;
+      }
+
+      // Check if this is a backslash that might be part of shift+enter
+      const isBackslash = key.sequence === '\\' && 
+                         key.name === undefined &&
+                         !key.ctrl &&
+                         !key.meta &&
+                         !key.shift &&
+                         !key.paste;
+
+      // Store current key for next iteration
+      prevKeyRef.current = key;
+
+      // Don't process the backslash yet - wait to see if return follows
+      if (isBackslash) {
+        // We need to let it through but track it
+        // The backslash will be inserted, but if followed by return, we'll remove it
+      }
+
       if (
         key.sequence === '!' &&
         buffer.text === '' &&
@@ -347,6 +390,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           const [row, col] = buffer.cursor;
           const line = buffer.lines[row];
           const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
+          
           if (charBefore === '\\') {
             buffer.backspace();
             buffer.newline();
