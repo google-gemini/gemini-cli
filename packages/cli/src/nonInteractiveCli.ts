@@ -11,6 +11,7 @@ import {
   ToolRegistry,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
+  PromptMetadata,
 } from '@google/gemini-cli-core';
 import {
   Content,
@@ -46,7 +47,7 @@ function getResponseText(response: GenerateContentResponse): string | null {
 export async function runNonInteractive(
   config: Config,
   input: string,
-  prompt_id: string,
+  promptMetadata: PromptMetadata,
 ): Promise<void> {
   await config.initialize();
   // Handle EPIPE errors when the output is piped to a command that closes early.
@@ -88,7 +89,7 @@ export async function runNonInteractive(
             ],
           },
         },
-        prompt_id,
+        promptMetadata.getPromptId(),
       );
 
       for await (const resp of responseStream) {
@@ -115,7 +116,8 @@ export async function runNonInteractive(
             name: fc.name as string,
             args: (fc.args ?? {}) as Record<string, unknown>,
             isClientInitiated: false,
-            prompt_id,
+            // TODO rename prompt_id to promptId.
+            prompt_id: promptMetadata.getPromptId(),
           };
 
           const toolResponse = await executeToolCall(

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { getCoreSystemPrompt } from './prompts.js';
+import { getCoreSystemPrompt, PromptMetadata } from './prompts.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 
 // Mock tool names if they are dynamically generated or complex
@@ -104,5 +104,12 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt();
     expect(prompt).not.toContain('# Git Repository');
     expect(prompt).toMatchSnapshot();
+  });
+});
+
+describe('Prompt Metadata', () => {
+  it('getPromptId', () => {
+    const promptMetadata = new PromptMetadata('prompt-id-1');
+    expect(promptMetadata.getPromptId()).toBe('prompt-id-1');
   });
 });
