@@ -182,7 +182,6 @@ export function ThemeDialog({
   // The code block is slightly longer than the diff, so give it more space.
   const codeBlockHeight = Math.ceil(availableHeightForPanes * 0.6);
   const diffHeight = Math.floor(availableHeightForPanes * 0.4);
-  console.log(themeItems);
   const themeType = capitalize(themeManager.getActiveTheme().type);
   return (
     <Box
