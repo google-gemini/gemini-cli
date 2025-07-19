@@ -159,20 +159,16 @@ export const useSlashCommandProcessor = (
     ],
   );
 
-  const commandService = useMemo(() => {
-    // TODO - Add other loaders for custom commands.
-    const loaders = [new BuiltinCommandLoader(config)];
-    return new CommandService(loaders);
-  }, [config]);
-
   useEffect(() => {
     const load = async () => {
-      await commandService.loadCommands();
+      // TODO - Add other loaders for custom commands.
+      const loaders = [new BuiltinCommandLoader(config)];
+      const commandService = await CommandService.create(loaders);
       setCommands(commandService.getCommands());
     };
 
     load();
-  }, [commandService]);
+  }, [config]);
 
   const handleSlashCommand = useCallback(
     async (

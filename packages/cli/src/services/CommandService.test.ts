@@ -264,16 +264,10 @@ describe('CommandService', () => {
 >>>>>>> 3d81bcd6 ((prefactor): Use loader system for slash commands)
   });
 
-  it('should initialize with an empty list of commands', () => {
-    const service = new CommandService([]);
-    expect(service.getCommands()).toEqual([]);
-  });
-
   it('should load commands from a single loader', async () => {
     const mockLoader = new MockCommandLoader([mockCommandA, mockCommandB]);
-    const service = new CommandService([mockLoader]);
+    const service = await CommandService.create([mockLoader]);
 
-    await service.loadCommands();
     const commands = service.getCommands();
 
     expect(mockLoader.loadCommands).toHaveBeenCalledTimes(1);
@@ -286,9 +280,8 @@ describe('CommandService', () => {
   it('should aggregate commands from multiple loaders', async () => {
     const loader1 = new MockCommandLoader([mockCommandA]);
     const loader2 = new MockCommandLoader([mockCommandC]);
-    const service = new CommandService([loader1, loader2]);
+    const service = await CommandService.create([loader1, loader2]);
 
-    await service.loadCommands();
     const commands = service.getCommands();
 
     expect(loader1.loadCommands).toHaveBeenCalledTimes(1);
@@ -305,9 +298,8 @@ describe('CommandService', () => {
       mockCommandB_Override,
       mockCommandC,
     ]);
-    const service = new CommandService([loader1, loader2]);
+    const service = await CommandService.create([loader1, loader2]);
 
-    await service.loadCommands();
     const commands = service.getCommands();
 
     expect(commands).toHaveLength(3); // Should be A, C, and the overridden B.
@@ -332,9 +324,12 @@ describe('CommandService', () => {
     const loader1 = new MockCommandLoader([mockCommandA]);
     const emptyLoader = new MockCommandLoader([]);
     const loader3 = new MockCommandLoader([mockCommandB]);
-    const service = new CommandService([loader1, emptyLoader, loader3]);
+    const service = await CommandService.create([
+      loader1,
+      emptyLoader,
+      loader3,
+    ]);
 
-    await service.loadCommands();
     const commands = service.getCommands();
 
     expect(emptyLoader.loadCommands).toHaveBeenCalledTimes(1);
@@ -344,39 +339,16 @@ describe('CommandService', () => {
     );
   });
 
-  it('should clear existing commands and reload when loadCommands is called again', async () => {
-    const loader = new MockCommandLoader([]);
-    const loadCommandsSpy = vi.spyOn(loader, 'loadCommands');
-    const service = new CommandService([loader]);
-
-    // First load
-    loadCommandsSpy.mockResolvedValueOnce([mockCommandA]);
-    await service.loadCommands();
-    expect(service.getCommands()).toEqual([mockCommandA]);
-    expect(service.getCommands()).toHaveLength(1);
-
-    // Second load with different data
-    loadCommandsSpy.mockResolvedValueOnce([mockCommandB, mockCommandC]);
-    await service.loadCommands();
-    const finalCommands = service.getCommands();
-
-    // Assert: The list should be completely replaced, not appended to.
-    expect(finalCommands).toHaveLength(2);
-    expect(finalCommands).toEqual(
-      expect.arrayContaining([mockCommandB, mockCommandC]),
-    );
-    expect(finalCommands).not.toContain(mockCommandA);
-    expect(loadCommandsSpy).toHaveBeenCalledTimes(2);
-  });
-
   it('should load commands from successful loaders even if one fails', async () => {
     const successfulLoader = new MockCommandLoader([mockCommandA]);
     const failingLoader = new MockCommandLoader([]);
     const error = new Error('Loader failed');
     vi.spyOn(failingLoader, 'loadCommands').mockRejectedValue(error);
 
-    const service = new CommandService([successfulLoader, failingLoader]);
-    await service.loadCommands();
+    const service = await CommandService.create([
+      successfulLoader,
+      failingLoader,
+    ]);
 
     const commands = service.getCommands();
     expect(commands).toHaveLength(1);
@@ -388,8 +360,9 @@ describe('CommandService', () => {
   });
 
   it('getCommands should return a readonly array that cannot be mutated', async () => {
-    const service = new CommandService([new MockCommandLoader([mockCommandA])]);
-    await service.loadCommands();
+    const service = await CommandService.create([
+      new MockCommandLoader([mockCommandA]),
+    ]);
 
     const commands = service.getCommands();
 

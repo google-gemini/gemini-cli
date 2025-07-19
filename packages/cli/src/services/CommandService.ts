@@ -75,33 +75,29 @@ import { ICommandLoader } from './types.js';
  * system to be extended with new sources without modifying the service itself.
  */
 export class CommandService {
-  // Use ReadonlyArray to enforce immutability on our internal state.
-  private commands: readonly SlashCommand[] = [];
+  /**
+   * Private constructor to enforce the use of the async factory.
+   * @param commands A readonly array of the fully loaded and de-duplicated commands.
+   */
+  private constructor(private readonly commands: readonly SlashCommand[]) {}
 
   /**
-   * Constructs the CommandService.
+   * Asynchronously creates and initializes a new CommandService instance.
+   *
+   * This factory method orchestrates the entire command loading process. It
+   * runs all provided loaders in parallel, aggregates their results, handles
+   * name conflicts by letting the last-loaded command win, and then returns a
+   * fully constructed `CommandService` instance.
    *
    * @param loaders An array of objects that conform to the `ICommandLoader`
    *   interface. The order of loaders is significant: if multiple loaders
    *   provide a command with the same name, the command from the loader that
-   *   appears later in the array will take precedence and override any earlier ones.
+   *   appears later in the array will take precedence.
+   * @returns A promise that resolves to a new, fully initialized `CommandService` instance.
    */
-  constructor(private loaders: ICommandLoader[]) {}
-
-  /**
-   * Triggers all registered command loaders to discover and load their respective
-   * commands.
-   *
-   * This method runs all loaders in parallel using `Promise.allSettled` to ensure
-   * that a failure in one loader does not prevent others from succeeding. It
-   * aggregates the results from successful loaders, resolves any name conflicts
-   * by letting the last-loaded command win, and stores the unified list internally.
-   *
-   * @returns A promise that resolves when all loading and processing is complete.
-   */
-  async loadCommands(): Promise<void> {
+  static async create(loaders: ICommandLoader[]): Promise<CommandService> {
     const results = await Promise.allSettled(
-      this.loaders.map((loader) => loader.loadCommands()),
+      loaders.map((loader) => loader.loadCommands()),
     );
 
     const allCommands: SlashCommand[] = [];
@@ -121,7 +117,8 @@ export class CommandService {
       commandMap.set(cmd.name, cmd);
     }
 
-    this.commands = Object.freeze(Array.from(commandMap.values()));
+    const finalCommands = Object.freeze(Array.from(commandMap.values()));
+    return new CommandService(finalCommands);
   }
 
   /**
