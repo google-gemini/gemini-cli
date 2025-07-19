@@ -22,10 +22,15 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import { FunctionDeclaration, mcpToTool } from '@google/genai';
 import { ToolRegistry } from './tool-registry.js';
 import {
+  ListPromptsResponseSchema,
+  ListToolsResponseSchema,
+} from './mcp-protocol.js';
+import {
   ActiveFileNotificationSchema,
   IDE_SERVER_NAME,
   ideContext,
 } from '../services/ideContext.js';
+import { promptRegistry, McpPrompt } from '../services/prompt-registry.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -57,6 +62,7 @@ export enum MCPDiscoveryState {
  * Map to track the status of each MCP server within the core package
  */
 const mcpServerStatusesInternal: Map<string, MCPServerStatus> = new Map();
+const mcpClients: Map<string, Client> = new Map();
 
 /**
  * Track the overall MCP discovery state
@@ -203,45 +209,67 @@ export async function connectAndDiscover(
 ): Promise<void> {
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
+  let mcpClient: Client | undefined;
   try {
-    const mcpClient = await connectToMcpServer(
+    mcpClient = await connectToMcpServer(
       mcpServerName,
       mcpServerConfig,
       debugMode,
     );
-    try {
-      updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
+    mcpClients.set(mcpServerName, mcpClient);
 
-      mcpClient.onerror = (error) => {
-        console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
-        updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
-        if (mcpServerName === IDE_SERVER_NAME) {
-          ideContext.clearActiveFileContext();
-        }
-      };
+    updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
 
+    mcpClient.onerror = (error) => {
+      console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
+      updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
       if (mcpServerName === IDE_SERVER_NAME) {
-        mcpClient.setNotificationHandler(
-          ActiveFileNotificationSchema,
-          (notification) => {
-            ideContext.setActiveFileContext(notification.params);
-          },
-        );
+        ideContext.clearActiveFileContext();
       }
+    };
 
-      const tools = await discoverTools(
+    if (mcpServerName === IDE_SERVER_NAME) {
+      mcpClient.setNotificationHandler(
+        ActiveFileNotificationSchema,
+        (notification) => {
+          ideContext.setActiveFileContext(notification.params);
+        },
+      );
+    }
+
+    try {
+      const { tools, prompts } = await discoverToolsAndPrompts(
         mcpServerName,
         mcpServerConfig,
         mcpClient,
       );
+
       for (const tool of tools) {
         toolRegistry.registerTool(tool);
       }
+
+      for (const prompt of prompts) {
+        promptRegistry.registerPrompt({
+          ...prompt,
+          serverName: mcpServerName,
+        });
+      }
+
+      if (tools.length === 0 && prompts.length === 0) {
+        // No tools or prompts were found, so we don't need to keep the connection open.
+        mcpClient.close();
+      }
     } catch (error) {
+      console.error(
+        `[DEBUG] Discovery failed for '${mcpServerName}':`, error,
+      );
       mcpClient.close();
-      throw error;
+      updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
     }
   } catch (error) {
+    if (mcpClient) {
+      mcpClient.close();
+    }
     console.error(`Error connecting to MCP server '${mcpServerName}':`, error);
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   }
@@ -258,21 +286,25 @@ export async function connectAndDiscover(
  * @returns A promise that resolves to an array of discovered and enabled tools.
  * @throws An error if no enabled tools are found or if the server provides invalid function declarations.
  */
-export async function discoverTools(
+export async function discoverToolsAndPrompts(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   mcpClient: Client,
-): Promise<DiscoveredMCPTool[]> {
+): Promise<{ tools: DiscoveredMCPTool[]; prompts: McpPrompt[] }> {
+  const discoveredTools: DiscoveredMCPTool[] = [];
+  const discoveredPrompts: McpPrompt[] = [];
+
+  // Using a try-catch block for each discovery type to allow one to succeed
+  // even if the other fails.
   try {
+    const toolsResponse = await mcpClient.request(
+      { method: 'tools/list' },
+      ListToolsResponseSchema,
+    );
+
     const mcpCallableTool = mcpToTool(mcpClient);
-    const tool = await mcpCallableTool.tool();
 
-    if (!Array.isArray(tool.functionDeclarations)) {
-      throw new Error(`Server did not return valid function declarations.`);
-    }
-
-    const discoveredTools: DiscoveredMCPTool[] = [];
-    for (const funcDecl of tool.functionDeclarations) {
+    for (const funcDecl of toolsResponse.tools as FunctionDeclaration[]) {
       if (!isEnabled(funcDecl, mcpServerName, mcpServerConfig)) {
         continue;
       }
@@ -289,12 +321,50 @@ export async function discoverTools(
         ),
       );
     }
-    if (discoveredTools.length === 0) {
-      throw Error('No enabled tools found');
+  } catch (e) {
+    // It's okay if this fails, maybe the server only has prompts.
+    console.debug(`Could not discover tools from '${mcpServerName}': ${e}`);
+  }
+
+  try {
+    const promptsResponse = await mcpClient.request(
+      { method: 'prompts/list' },
+      ListPromptsResponseSchema,
+    );
+
+    for (const prompt of promptsResponse.prompts) {
+      // TODO: Add filtering for prompts as well.
+      discoveredPrompts.push(prompt);
     }
-    return discoveredTools;
-  } catch (error) {
-    throw new Error(`Error discovering tools: ${error}`);
+  } catch (e) {
+    // It's okay if this fails, maybe the server only has tools.
+    console.debug(`Could not discover prompts from '${mcpServerName}': ${e}`);
+  }
+
+  return { tools: discoveredTools, prompts: discoveredPrompts };
+}
+
+import { z } from 'zod';
+
+export async function mcpRequest<T, U extends object>(
+  serverName: string,
+  method: string,
+  params: T,
+  responseSchema: z.ZodType<U>,
+): Promise<{ type: 'success'; result: U } | { type: 'error'; error: string }> {
+  const client = mcpClients.get(serverName);
+  if (!client) {
+    return { type: 'error', error: `MCP server not found: ${serverName}` };
+  }
+
+  try {
+    const result = await client.request(
+      { method, params: params as Record<string, unknown> },
+      responseSchema,
+    );
+    return { type: 'success', result: result as U };
+  } catch (e) {
+    return { type: 'error', error: (e as Error).message };
   }
 }
 

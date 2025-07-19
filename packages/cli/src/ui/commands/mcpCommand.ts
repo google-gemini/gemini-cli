@@ -15,6 +15,7 @@ import {
   getMCPServerStatus,
   MCPDiscoveryState,
   MCPServerStatus,
+  promptRegistry,
 } from '@google/gemini-cli-core';
 import open from 'open';
 
@@ -90,11 +91,15 @@ const getMcpStatus = async (
   message += 'Configured MCP servers:\n\n';
 
   const allTools = toolRegistry.getAllTools();
+  const allPrompts = promptRegistry.getAllPrompts();
   for (const serverName of serverNames) {
     const serverTools = allTools.filter(
       (tool) =>
         tool instanceof DiscoveredMCPTool && tool.serverName === serverName,
     ) as DiscoveredMCPTool[];
+    const serverPrompts = allPrompts.filter(
+      (prompt) => prompt.serverName === serverName,
+    );
 
     const status = getMCPServerStatus(serverName);
 
@@ -127,13 +132,14 @@ const getMcpStatus = async (
     // Format server header with bold formatting and status
     message += `${statusIndicator} \u001b[1m${serverDisplayName}\u001b[0m - ${statusText}`;
 
+    const itemCount = serverTools.length + serverPrompts.length;
     // Add tool count with conditional messaging
     if (status === MCPServerStatus.CONNECTED) {
-      message += ` (${serverTools.length} tools)`;
+      message += ` (${itemCount} items)`;
     } else if (status === MCPServerStatus.CONNECTING) {
-      message += ` (tools will appear when ready)`;
+      message += ` (items will appear when ready)`;
     } else {
-      message += ` (${serverTools.length} tools cached)`;
+      message += ` (${itemCount} items cached)`;
     }
 
     // Add server description with proper handling of multi-line descriptions
@@ -158,7 +164,7 @@ const getMcpStatus = async (
       serverTools.forEach((tool) => {
         if (showDescriptions && tool.description) {
           // Format tool name in cyan using simple ANSI cyan color
-          message += `  - ${COLOR_CYAN}${tool.name}${RESET_COLOR}`;
+          message += `  - ${COLOR_CYAN}${tool.name}${RESET_COLOR} (tool)\n`;
 
           // Handle multi-line descriptions by properly indenting and preserving formatting
           const descLines = tool.description.trim().split('\n');
@@ -173,7 +179,7 @@ const getMcpStatus = async (
           // Reset is handled inline with each line now
         } else {
           // Use cyan color for the tool name even when not showing descriptions
-          message += `  - ${COLOR_CYAN}${tool.name}${RESET_COLOR}\n`;
+          message += `  - ${COLOR_CYAN}${tool.name}${RESET_COLOR} (tool)\n`;
         }
         const parameters =
           tool.schema.parametersJsonSchema ?? tool.schema.parameters;
@@ -191,8 +197,30 @@ const getMcpStatus = async (
           }
         }
       });
-    } else {
-      message += '  No tools available\n';
+    }
+
+    if (serverPrompts.length > 0) {
+      serverPrompts.forEach((prompt) => {
+        if (showDescriptions && prompt.description) {
+          message += `  - ${COLOR_CYAN}${prompt.name}${RESET_COLOR} (prompt)`;
+          const descLines = prompt.description.trim().split('\n');
+          if (descLines) {
+            message += ':\n';
+            for (const descLine of descLines) {
+              message += `      ${COLOR_GREEN}${descLine}${RESET_COLOR}\n`;
+            }
+          } else {
+            message += '\n';
+          }
+        } else {
+          message += `  - ${COLOR_CYAN}${prompt.name}${RESET_COLOR} (prompt)\n`;
+        }
+        // TODO: Show prompt schema?
+      });
+    }
+
+    if (itemCount === 0) {
+      message += '  No tools or prompts available\n';
     }
     message += '\n';
   }

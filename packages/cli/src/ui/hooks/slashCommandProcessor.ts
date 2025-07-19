@@ -281,6 +281,13 @@ export const useSlashCommandProcessor = (
                   process.exit(0);
                 }, 100);
                 return { type: 'handled' };
+              case 'prompt':
+                return {
+                  type: 'prompt',
+                  prompt: result.prompt,
+                  promptType: result.promptType,
+                  context: result.context,
+                };
               default: {
                 const unhandled: never = result;
                 throw new Error(`Unhandled slash command result: ${unhandled}`);

@@ -13,6 +13,8 @@ import {
   getMCPServerStatus,
   getMCPDiscoveryState,
   DiscoveredMCPTool,
+  DiscoveredMcpPrompt,
+  promptRegistry,
 } from '@google/gemini-cli-core';
 import open from 'open';
 import { MessageActionReturn } from './types.js';
@@ -30,6 +32,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ...actual,
     getMCPServerStatus: vi.fn(),
     getMCPDiscoveryState: vi.fn(),
+    promptRegistry: {
+      getAllPrompts: vi.fn(),
+    },
   };
 });
 
@@ -45,6 +50,7 @@ const createMockMCPTool = (
   name: string,
   serverName: string,
   description?: string,
+  schema: Record<string, unknown> = { type: Type.OBJECT, properties: {} },
 ) =>
   new DiscoveredMCPTool(
     {
@@ -54,9 +60,25 @@ const createMockMCPTool = (
     serverName,
     name,
     description || `Description for ${name}`,
-    { type: Type.OBJECT, properties: {} },
+    schema,
     name, // serverToolName same as name for simplicity
   );
+
+const createMockMCPPrompt = (
+  name: string,
+  serverName: string,
+  description?: string,
+): DiscoveredMcpPrompt => ({
+  name,
+  serverName,
+  description: description || `Description for ${name}`,
+  template: `template for ${name}`,
+  parameters: {
+    type: 'object',
+    properties: {},
+    required: [],
+  },
+});
 
 describe('mcpCommand', () => {
   let mockContext: ReturnType<typeof createMockCommandContext>;
@@ -77,6 +99,7 @@ describe('mcpCommand', () => {
     vi.mocked(getMCPDiscoveryState).mockReturnValue(
       MCPDiscoveryState.COMPLETED,
     );
+    vi.mocked(promptRegistry.getAllPrompts).mockReturnValue([]);
 
     // Create mock config with all necessary methods
     mockConfig = {
@@ -192,6 +215,13 @@ describe('mcpCommand', () => {
         ...mockServer3Tools,
       ];
 
+      const mockServer1Prompts = [
+        createMockMCPPrompt('server1_prompt1', 'server1'),
+      ];
+      vi.mocked(promptRegistry.getAllPrompts).mockReturnValue(
+        mockServer1Prompts,
+      );
+
       mockConfig.getToolRegistry = vi.fn().mockResolvedValue({
         getAllTools: vi.fn().mockReturnValue(allTools),
       });
@@ -209,22 +239,23 @@ describe('mcpCommand', () => {
         const message = result.content;
         // Server 1 - Connected
         expect(message).toContain(
-          '🟢 \u001b[1mserver1\u001b[0m - Ready (2 tools)',
+          ' \u001b[1mserver1\u001b[0m - Ready (3 items)',
         );
-        expect(message).toContain('server1_tool1');
-        expect(message).toContain('server1_tool2');
+        expect(message).toContain('server1_tool1 (tool)');
+        expect(message).toContain('server1_tool2 (tool)');
+        expect(message).toContain('server1_prompt1 (prompt)');
 
         // Server 2 - Connected
         expect(message).toContain(
-          '🟢 \u001b[1mserver2\u001b[0m - Ready (1 tools)',
+          ' \u001b[1mserver2\u001b[0m - Ready (1 items)',
         );
-        expect(message).toContain('server2_tool1');
+        expect(message).toContain('server2_tool1 (tool)');
 
         // Server 3 - Disconnected
         expect(message).toContain(
-          '🔴 \u001b[1mserver3\u001b[0m - Disconnected (1 tools cached)',
+          ' \u001b[1mserver3\u001b[0m - Disconnected (1 items cached)',
         );
-        expect(message).toContain('server3_tool1');
+        expect(message).toContain('server3_tool1 (tool)');
 
         // Check that helpful tips are displayed when no arguments are provided
         expect(message).toContain('💡 Tips:');
@@ -251,6 +282,17 @@ describe('mcpCommand', () => {
         createMockMCPTool('tool2', 'server1', 'This is tool 2 description'),
       ];
 
+      const mockServerPrompts = [
+        createMockMCPPrompt(
+          'prompt1',
+          'server1',
+          'This is prompt 1 description',
+        ),
+      ];
+      vi.mocked(promptRegistry.getAllPrompts).mockReturnValue(
+        mockServerPrompts,
+      );
+
       mockConfig.getToolRegistry = vi.fn().mockResolvedValue({
         getAllTools: vi.fn().mockReturnValue(mockServerTools),
       });
@@ -269,21 +311,19 @@ describe('mcpCommand', () => {
 
         // Check that server description is included
         expect(message).toContain(
-          '\u001b[1mserver1\u001b[0m - Ready (2 tools)',
+          '\u001b[1mserver1\u001b[0m - Ready (3 items)',
         );
         expect(message).toContain(
           '\u001b[32mThis is a server description\u001b[0m',
         );
 
         // Check that tool descriptions are included
-        expect(message).toContain('\u001b[36mtool1\u001b[0m');
-        expect(message).toContain(
-          '\u001b[32mThis is tool 1 description\u001b[0m',
-        );
-        expect(message).toContain('\u001b[36mtool2\u001b[0m');
-        expect(message).toContain(
-          '\u001b[32mThis is tool 2 description\u001b[0m',
-        );
+        expect(message).toContain('tool1 (tool)');
+        expect(message).toContain('This is tool 1 description');
+        expect(message).toContain('tool2 (tool)');
+        expect(message).toContain('This is tool 2 description');
+        expect(message).toContain('prompt1 (prompt)');
+        expect(message).toContain('This is prompt 1 description');
 
         // Check that tips are NOT displayed when arguments are provided
         expect(message).not.toContain('💡 Tips:');
@@ -323,7 +363,7 @@ describe('mcpCommand', () => {
         // Check that descriptions are not included
         expect(message).not.toContain('This is a server description');
         expect(message).not.toContain('This is tool 1 description');
-        expect(message).toContain('\u001b[36mtool1\u001b[0m');
+        expect(message).toContain('tool1 (tool)');
 
         // Check that tips are NOT displayed when arguments are provided
         expect(message).not.toContain('💡 Tips:');
@@ -358,13 +398,13 @@ describe('mcpCommand', () => {
       if (isMessageAction(result)) {
         const message = result.content;
         expect(message).toContain(
-          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tools)',
+          ' \u001b[1mserver1\u001b[0m - Ready (1 items)',
         );
-        expect(message).toContain('\u001b[36mserver1_tool1\u001b[0m');
+        expect(message).toContain('server1_tool1 (tool)');
         expect(message).toContain(
-          '🔴 \u001b[1mserver2\u001b[0m - Disconnected (0 tools cached)',
+          ' \u001b[1mserver2\u001b[0m - Disconnected (0 items cached)',
         );
-        expect(message).toContain('No tools available');
+        expect(message).toContain('No tools or prompts available');
       }
     });
 
@@ -414,10 +454,10 @@ describe('mcpCommand', () => {
 
         // Check server statuses
         expect(message).toContain(
-          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tools)',
+          ' \u001b[1mserver1\u001b[0m - Ready (1 items)',
         );
         expect(message).toContain(
-          '🔄 \u001b[1mserver2\u001b[0m - Starting... (first startup may take longer) (tools will appear when ready)',
+          ' \u001b[1mserver2\u001b[0m - Starting... (first startup may take longer) (items will appear when ready)',
         );
       }
     });
@@ -548,7 +588,7 @@ describe('mcpCommand', () => {
         const message = result.content;
 
         // Check that server description is included
-        expect(message).toContain('Ready (2 tools)');
+        expect(message).toContain('Ready (2 items)');
         expect(message).toContain('This is a server description');
 
         // Check that tool descriptions and schemas are included
@@ -589,7 +629,7 @@ describe('mcpCommand', () => {
       expect(isMessageAction(result)).toBe(true);
       if (isMessageAction(result)) {
         const message = result.content;
-        expect(message).toContain('tool1');
+        expect(message).toContain('tool1 (tool)');
         expect(message).toContain('Tool without schema');
         // Should not crash when parameterSchema is undefined
       }
@@ -635,7 +675,7 @@ describe('mcpCommand', () => {
         const message = result.content;
         expect(message).not.toContain('Test tool');
         expect(message).not.toContain('Server description');
-        expect(message).toContain('\u001b[36mtool1\u001b[0m');
+        expect(message).toContain('tool1 (tool)');
       }
     });
 
@@ -695,7 +735,7 @@ describe('mcpCommand', () => {
         expect(message).not.toContain('Test tool');
         expect(message).not.toContain('Server description');
         expect(message).toContain('Parameters:'); // Schema should still show
-        expect(message).toContain('\u001b[36mtool1\u001b[0m');
+        expect(message).toContain('tool1 (tool)');
       }
     });
 
@@ -708,7 +748,7 @@ describe('mcpCommand', () => {
         expect(message).not.toContain('Test tool');
         expect(message).not.toContain('Server description');
         expect(message).not.toContain('Parameters:');
-        expect(message).toContain('\u001b[36mtool1\u001b[0m');
+        expect(message).toContain('tool1 (tool)');
       }
     });
 
@@ -724,7 +764,7 @@ describe('mcpCommand', () => {
         expect(message).not.toContain('Test tool');
         expect(message).not.toContain('Server description');
         expect(message).toContain('Parameters:'); // Schema should still show
-        expect(message).toContain('\u001b[36mtool1\u001b[0m');
+        expect(message).toContain('tool1 (tool)');
       }
     });
 
@@ -749,7 +789,7 @@ describe('mcpCommand', () => {
         expect(message).not.toContain('Test tool');
         expect(message).not.toContain('Server description');
         expect(message).not.toContain('Parameters:');
-        expect(message).toContain('\u001b[36mtool1\u001b[0m');
+        expect(message).toContain('tool1 (tool)');
       }
     });
 
@@ -762,7 +802,7 @@ describe('mcpCommand', () => {
         expect(message).not.toContain('Test tool');
         expect(message).not.toContain('Server description');
         expect(message).not.toContain('Parameters:');
-        expect(message).toContain('\u001b[36mtool1\u001b[0m');
+        expect(message).toContain('tool1 (tool)');
       }
     });
   });

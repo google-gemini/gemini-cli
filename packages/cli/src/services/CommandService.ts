@@ -4,8 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Config } from '@google/gemini-cli-core';
+import {
+  Config,
+  DiscoveredMcpPrompt,
+  promptRegistry,
+} from '@google/gemini-cli-core';
 import { SlashCommand } from '../ui/commands/types.js';
+import { promptCommand } from '../ui/commands/promptCommand.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
@@ -26,6 +31,11 @@ import { ideCommand } from '../ui/commands/ideCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
+
+const loadPromptCommands = async (): Promise<SlashCommand[]> => {
+  const prompts = promptRegistry.getAllPrompts();
+  return prompts.map((prompt: DiscoveredMcpPrompt) => promptCommand(prompt));
+};
 
 const loadBuiltInCommands = async (
   config: Config | null,
@@ -73,7 +83,9 @@ export class CommandService {
   async loadCommands(): Promise<void> {
     // For now, we only load the built-in commands.
     // File-based and remote commands will be added later.
-    this.commands = await this.commandLoader(this.config);
+    const builtInCommands = await this.commandLoader(this.config);
+    const promptCommands = await loadPromptCommands();
+    this.commands = [...builtInCommands, ...promptCommands];
   }
 
   getCommands(): SlashCommand[] {

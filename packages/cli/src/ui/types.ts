@@ -9,6 +9,8 @@ import {
   ToolResultDisplay,
 } from '@google/gemini-cli-core';
 
+import { Content } from '@google/genai';
+
 // Only defining the state enum needed by the UI
 export enum StreamingState {
   Idle = 'idle',
@@ -225,6 +227,12 @@ export type SlashCommandProcessorResult =
       type: 'schedule_tool';
       toolName: string;
       toolArgs: Record<string, unknown>;
+    }
+  | {
+      type: 'prompt';
+      prompt: string;
+      promptType: 'user' | 'tool';
+      context?: Content[];
     }
   | {
       type: 'handled'; // Indicates the command was processed and no further action is needed.

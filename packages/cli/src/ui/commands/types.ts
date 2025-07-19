@@ -99,12 +99,23 @@ export interface LoadHistoryActionReturn {
   clientHistory: Content[]; // The history for the generative client
 }
 
+/**
+ * The return type for a command action that results in a prompt being sent to the model.
+ */
+export interface PromptActionReturn {
+  type: 'prompt';
+  prompt: string;
+  promptType: 'user' | 'tool';
+  context?: Content[];
+}
+
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
   | QuitActionReturn
   | OpenDialogActionReturn
-  | LoadHistoryActionReturn;
+  | LoadHistoryActionReturn
+  | PromptActionReturn;
 
 // The standardized contract for any command in the system.
 export interface SlashCommand {

@@ -540,9 +540,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
-      if (trimmedValue.length > 0) {
-        submitQuery(trimmedValue);
+      if (trimmedValue.length === 0) {
+        return;
       }
+      submitQuery(trimmedValue);
     },
     [submitQuery],
   );
