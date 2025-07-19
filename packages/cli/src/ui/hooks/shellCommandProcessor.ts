@@ -27,18 +27,25 @@ const MAX_OUTPUT_LENGTH = 10000;
 let cachedSystemEncoding: string | null = null;
 
 /**
- * Returns the cached system encoding it if not cached.
- * This function is used to ensure we only detect the system encoding
- * by calling `getSystemEncoding()` or `detectEncodingFromBuffer()` once,
- * and then reuse the cached value for subsequent calls.
- * @param buffer A buffer to use for detecting the system encoding.
+ * Returns the system encoding, caching the result to avoid repeated system calls.
+ * If system encoding detection fails, falls back to detecting from the provided buffer.
+ * Note: Only the system encoding is cached - buffer-based detection runs for each buffer
+ * since different buffers may have different encodings.
+ * @param buffer A buffer to use for detecting encoding if system detection fails.
  */
-function getCachedSystemEncoding(buffer: Buffer) {
+function getEncodingForBuffer(buffer: Buffer): string {
+  // Cache system encoding detection since it's system-wide
   if (cachedSystemEncoding === null) {
-    // If the system encoding detection fails, we fallback to chardet.
-    cachedSystemEncoding = getSystemEncoding() || detectEncodingFromBuffer(buffer);
+    cachedSystemEncoding = getSystemEncoding();
   }
-  return cachedSystemEncoding;
+  
+  // If we have a cached system encoding, use it
+  if (cachedSystemEncoding) {
+    return cachedSystemEncoding;
+  }
+  
+  // Otherwise, detect from this specific buffer (don't cache this result)
+  return detectEncodingFromBuffer(buffer) || 'utf-8';
 }
 
 function getSystemEncoding() {
@@ -200,7 +207,7 @@ function executeShellCommand(
     const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
 
       if (!stdoutDecoder || !stderrDecoder) {
-        const encoding = getCachedSystemEncoding(data) || 'utf-8';
+        const encoding = getEncodingForBuffer(data);
         stdoutDecoder = new TextDecoder(encoding);
         stderrDecoder = new TextDecoder(encoding);
       }
