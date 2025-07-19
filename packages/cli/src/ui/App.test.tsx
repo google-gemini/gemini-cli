@@ -9,7 +9,6 @@ import { render } from 'ink-testing-library';
 import { AppWrapper as App } from './App.js';
 import {
   Config as ServerConfig,
-  BackgroundAgentManager,
   MCPServerConfig,
   ApprovalMode,
   ToolRegistry,
@@ -52,7 +51,6 @@ interface MockServerConfig {
   getSandbox: Mock<() => SandboxConfig | undefined>;
   getTargetDir: Mock<() => string>;
   getToolRegistry: Mock<() => ToolRegistry>; // Use imported ToolRegistry type
-  getBackgroundAgentManager: Mock<() => BackgroundAgentManager>;
   getDebugMode: Mock<() => boolean>;
   getQuestion: Mock<() => string | undefined>;
   getFullContext: Mock<() => boolean>;
@@ -119,7 +117,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getSandbox: vi.fn(() => opts.sandbox),
         getTargetDir: vi.fn(() => opts.targetDir || '/test/dir'),
         getToolRegistry: vi.fn(() => ({}) as ToolRegistry), // Simple mock
-        getBackgroundAgentManager: vi.fn(() => new BackgroundAgentManager([])),
         getDebugMode: vi.fn(() => opts.debugMode || false),
         getQuestion: vi.fn(() => opts.question),
         getFullContext: vi.fn(() => opts.fullContext ?? false),

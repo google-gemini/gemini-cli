@@ -64,7 +64,6 @@ export interface Settings {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
-  backgroundAgents?: Record<string, MCPServerConfig>;
   allowMCPServers?: string[];
   excludeMCPServers?: string[];
   showMemoryUsage?: boolean;
