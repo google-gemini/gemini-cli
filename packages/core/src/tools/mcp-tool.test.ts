@@ -14,7 +14,7 @@ import {
   afterEach,
   Mocked,
 } from 'vitest';
-import { DiscoveredMCPTool } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
+import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
 import { ToolResult, ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
 import { CallableTool, Part } from '@google/genai';
 
@@ -29,9 +29,42 @@ const mockCallableToolInstance: Mocked<CallableTool> = {
   // Add other methods if DiscoveredMCPTool starts using them
 };
 
+describe('generateValidName', () => {
+  it('should return a valid name for a simple function', () => {
+    expect(generateValidName('myFunction')).toBe('myFunction');
+  });
+
+  it('should replace invalid characters with underscores', () => {
+    expect(generateValidName('invalid-name with spaces')).toBe(
+      'invalid-name_with_spaces',
+    );
+  });
+
+  it('should truncate long names', () => {
+    expect(generateValidName('x'.repeat(80))).toBe(
+      'xxxxxxxxxxxxxxxxxxxxxxxxxxxx___xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    );
+  });
+
+  it('should handle names with only invalid characters', () => {
+    expect(generateValidName('!@#$%^&*()')).toBe('__________');
+  });
+
+  it('should handle names that are exactly 63 characters long', () => {
+    expect(generateValidName('a'.repeat(63)).length).toBe(63);
+  });
+
+  it('should handle names that are exactly 64 characters long', () => {
+    expect(generateValidName('a'.repeat(64)).length).toBe(63);
+  });
+
+  it('should handle names that are longer than 64 characters', () => {
+    expect(generateValidName('a'.repeat(80)).length).toBe(63);
+  });
+});
+
 describe('DiscoveredMCPTool', () => {
   const serverName = 'mock-mcp-server';
-  const toolNameForModel = 'test-mcp-tool-for-model';
   const serverToolName = 'actual-server-tool-name';
   const baseDescription = 'A test MCP tool.';
   const inputSchema: Record<string, unknown> = {
@@ -52,18 +85,17 @@ describe('DiscoveredMCPTool', () => {
   });
 
   describe('constructor', () => {
-    it('should set properties correctly (non-generic server)', () => {
+    it('should set properties correctly', () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
-        serverName, // serverName is 'mock-mcp-server', not 'mcp'
-        toolNameForModel,
+        serverName,
+        serverToolName,
         baseDescription,
         inputSchema,
-        serverToolName,
       );
 
-      expect(tool.name).toBe(toolNameForModel);
-      expect(tool.schema.name).toBe(toolNameForModel);
+      expect(tool.name).toBe(serverToolName);
+      expect(tool.schema.name).toBe(serverToolName);
       expect(tool.schema.description).toBe(baseDescription);
       expect(tool.schema.parameters).toBeUndefined();
       expect(tool.schema.parametersJsonSchema).toEqual(inputSchema);
@@ -71,30 +103,14 @@ describe('DiscoveredMCPTool', () => {
       expect(tool.timeout).toBeUndefined();
     });
 
-    it('should set properties correctly (generic "mcp" server)', () => {
-      const genericServerName = 'mcp';
-      const tool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        genericServerName, // serverName is 'mcp'
-        toolNameForModel,
-        baseDescription,
-        inputSchema,
-        serverToolName,
-      );
-      expect(tool.schema.description).toBe(baseDescription);
-      expect(tool.schema.parameters).toBeUndefined();
-      expect(tool.schema.parametersJsonSchema).toEqual(inputSchema);
-    });
-
     it('should accept and store a custom timeout', () => {
       const customTimeout = 5000;
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
-        toolNameForModel,
+        serverToolName,
         baseDescription,
         inputSchema,
-        serverToolName,
         customTimeout,
       );
       expect(tool.timeout).toBe(customTimeout);
@@ -106,10 +122,9 @@ describe('DiscoveredMCPTool', () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
-        toolNameForModel,
+        serverToolName,
         baseDescription,
         inputSchema,
-        serverToolName,
       );
       const params = { param: 'testValue' };
       const mockToolSuccessResultObject = {
@@ -146,10 +161,9 @@ describe('DiscoveredMCPTool', () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
-        toolNameForModel,
+        serverToolName,
         baseDescription,
         inputSchema,
-        serverToolName,
       );
       const params = { param: 'testValue' };
       const mockMcpToolResponsePartsEmpty: Part[] = [];
@@ -162,10 +176,9 @@ describe('DiscoveredMCPTool', () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
-        toolNameForModel,
+        serverToolName,
         baseDescription,
         inputSchema,
-        serverToolName,
       );
       const params = { param: 'failCase' };
       const expectedError = new Error('MCP call failed');
@@ -182,10 +195,9 @@ describe('DiscoveredMCPTool', () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
-        toolNameForModel,
+        serverToolName,
         baseDescription,
         inputSchema,
-        serverToolName,
         undefined,
         true,
       );
@@ -199,10 +211,9 @@ describe('DiscoveredMCPTool', () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
-        toolNameForModel,
+        serverToolName,
         baseDescription,
         inputSchema,
-        serverToolName,
       );
       expect(
         await tool.shouldConfirmExecute({}, new AbortController().signal),
@@ -215,10 +226,9 @@ describe('DiscoveredMCPTool', () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
-        toolNameForModel,
+        serverToolName,
         baseDescription,
         inputSchema,
-        serverToolName,
       );
       expect(
         await tool.shouldConfirmExecute({}, new AbortController().signal),
@@ -229,10 +239,9 @@ describe('DiscoveredMCPTool', () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
-        toolNameForModel,
+        serverToolName,
         baseDescription,
         inputSchema,
-        serverToolName,
       );
       const confirmation = await tool.shouldConfirmExecute(
         {},
@@ -260,10 +269,9 @@ describe('DiscoveredMCPTool', () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
-        toolNameForModel,
+        serverToolName,
         baseDescription,
         inputSchema,
-        serverToolName,
       );
       const confirmation = await tool.shouldConfirmExecute(
         {},
@@ -291,10 +299,9 @@ describe('DiscoveredMCPTool', () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
-        toolNameForModel,
+        serverToolName,
         baseDescription,
         inputSchema,
-        serverToolName,
       );
       const toolAllowlistKey = `${serverName}.${serverToolName}`;
       const confirmation = await tool.shouldConfirmExecute(
