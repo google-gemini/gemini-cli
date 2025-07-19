@@ -31,6 +31,9 @@ vi.mock('http');
 vi.mock('open');
 vi.mock('crypto');
 vi.mock('node:readline');
+vi.mock('../utils/browser.js', () => ({
+  shouldAttemptBrowserLaunch: () => true,
+}));
 
 const mockConfig = {
   getNoBrowser: () => false,
