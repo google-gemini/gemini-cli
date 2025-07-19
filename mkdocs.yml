@@ -1,0 +1,70 @@
+site_name: Gemini CLI
+site_url: https://S1M0N38.github.io/gemini-cli/
+repo_url: https://github.com/S1M0N38/gemini-cli
+repo_name: S1M0N38/gemini-cli
+edit_uri: edit/main/docs/
+theme:
+  name: material
+  icon:
+    logo: fontawesome/solid/terminal
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  features:
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+plugins:
+  - search
+nav:
+  - 'index.md'
+  - 'architecture.md'
+  - 'checkpointing.md'
+  - 'deployment.md'
+  - 'extension.md'
+  - 'integration-tests.md'
+  - 'npm.md'
+  - 'quota-and-pricing.md'
+  - 'sandbox.md'
+  - 'telemetry.md'
+  - 'tos-privacy.md'
+  - 'troubleshooting.md'
+  - 'Uninstall.md'
+  - CLI:
+      - 'cli/index.md'
+      - 'cli/authentication.md'
+      - 'cli/commands.md'
+      - 'cli/configuration.md'
+      - 'cli/themes.md'
+      - 'cli/token-caching.md'
+      - 'cli/tutorials.md'
+  - Core:
+      - 'core/index.md'
+      - 'core/memport.md'
+      - 'core/tools-api.md'
+  - Examples:
+      - 'examples/proxy-script.md'
+  - Tools:
+      - 'tools/index.md'
+      - 'tools/file-system.md'
+      - 'tools/mcp-server.md'
+      - 'tools/memory.md'
+      - 'tools/multi-file.md'
+      - 'tools/shell.md'
+      - 'tools/web-fetch.md'
+      - 'tools/web-search.md'
