@@ -19,7 +19,7 @@ export function AuthInProgress({
   const [timedOut, setTimedOut] = useState(false);
 
   useInput((_, key) => {
-    if (key.escape) {
+    if ((key.escape) || (key.ctrl && _ === 'c')) {
       onTimeout();
     }
   });
