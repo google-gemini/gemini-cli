@@ -142,7 +142,7 @@ export interface SlashCommandDefinition {
     partialArg: string,
   ) => Promise<string[]>;
 
-  subCommands?: SlashCommandDefinition[];
+  subCommands?: readonly SlashCommandDefinition[];
 }
 
 // The standardized contract for any command in the system.
