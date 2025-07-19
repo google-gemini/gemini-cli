@@ -60,6 +60,10 @@ export interface BugCommandSettings {
   urlTemplate: string;
 }
 
+export interface SummarizeToolOutputSettings {
+  tokenBudget?: number;
+}
+
 export interface TelemetrySettings {
   enabled?: boolean;
   target?: TelemetryTarget;
@@ -67,9 +71,10 @@ export interface TelemetrySettings {
   logPrompts?: boolean;
 }
 
-export interface ActiveExtension {
+export interface GeminiCLIExtension {
   name: string;
   version: string;
+  isActive: boolean;
 }
 
 export class MCPServerConfig {
@@ -93,6 +98,7 @@ export class MCPServerConfig {
     readonly description?: string,
     readonly includeTools?: string[],
     readonly excludeTools?: string[],
+    readonly extensionName?: string,
   ) {}
 }
 
@@ -141,9 +147,13 @@ export interface ConfigParameters {
   model: string;
   extensionContextFilePaths?: string[];
   maxSessionTurns?: number;
+  experimentalAcp?: boolean;
   listExtensions?: boolean;
-  activeExtensions?: ActiveExtension[];
+  extensions?: GeminiCLIExtension[];
+  blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   noBrowser?: boolean;
+  summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
+  ideMode?: boolean;
 }
 
 export class Config {
@@ -183,12 +193,21 @@ export class Config {
   private readonly model: string;
   private readonly extensionContextFilePaths: string[];
   private readonly noBrowser: boolean;
+  private readonly ideMode: boolean;
   private modelSwitchedDuringSession: boolean = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
-  private readonly _activeExtensions: ActiveExtension[];
+  private readonly _extensions: GeminiCLIExtension[];
+  private readonly _blockedMcpServers: Array<{
+    name: string;
+    extensionName: string;
+  }>;
   flashFallbackHandler?: FlashFallbackHandler;
   private quotaErrorOccurred: boolean = false;
+  private readonly summarizeToolOutput:
+    | Record<string, SummarizeToolOutputSettings>
+    | undefined;
+  private readonly experimentalAcp: boolean = false;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -231,9 +250,13 @@ export class Config {
     this.model = params.model;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
+    this.experimentalAcp = params.experimentalAcp ?? false;
     this.listExtensions = params.listExtensions ?? false;
-    this._activeExtensions = params.activeExtensions ?? [];
+    this._extensions = params.extensions ?? [];
+    this._blockedMcpServers = params.blockedMcpServers ?? [];
     this.noBrowser = params.noBrowser ?? false;
+    this.summarizeToolOutput = params.summarizeToolOutput;
+    this.ideMode = params.ideMode ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -256,18 +279,14 @@ export class Config {
     // Initialize centralized FileDiscoveryService
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
-      try {
-        await this.getGitService();
-      } catch {
-        // For now swallow the error, later log it.
-      }
+      await this.getGitService();
     }
     this.toolRegistry = await this.createToolRegistry();
   }
 
   async refreshAuth(authMethod: AuthType) {
-    this.contentGeneratorConfig = await createContentGeneratorConfig(
-      this.model,
+    this.contentGeneratorConfig = createContentGeneratorConfig(
+      this,
       authMethod,
     );
 
@@ -486,16 +505,34 @@ export class Config {
     return this.extensionContextFilePaths;
   }
 
+  getExperimentalAcp(): boolean {
+    return this.experimentalAcp;
+  }
+
   getListExtensions(): boolean {
     return this.listExtensions;
   }
 
-  getActiveExtensions(): ActiveExtension[] {
-    return this._activeExtensions;
+  getExtensions(): GeminiCLIExtension[] {
+    return this._extensions;
+  }
+
+  getBlockedMcpServers(): Array<{ name: string; extensionName: string }> {
+    return this._blockedMcpServers;
   }
 
   getNoBrowser(): boolean {
     return this.noBrowser;
+  }
+
+  getSummarizeToolOutputConfig():
+    | Record<string, SummarizeToolOutputSettings>
+    | undefined {
+    return this.summarizeToolOutput;
+  }
+
+  getIdeMode(): boolean {
+    return this.ideMode;
   }
 
   async getGitService(): Promise<GitService> {
@@ -522,7 +559,6 @@ export class Config {
 
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this);
-    const targetDir = this.getTargetDir();
 
     // helper to create & register core tools that are enabled
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -557,14 +593,14 @@ export class Config {
       }
     };
 
-    registerCoreTool(LSTool, targetDir, this);
-    registerCoreTool(ReadFileTool, targetDir, this);
-    registerCoreTool(GrepTool, targetDir);
-    registerCoreTool(GlobTool, targetDir, this);
+    registerCoreTool(LSTool, this);
+    registerCoreTool(ReadFileTool, this);
+    registerCoreTool(GrepTool, this);
+    registerCoreTool(GlobTool, this);
     registerCoreTool(EditTool, this);
     registerCoreTool(WriteFileTool, this);
     registerCoreTool(WebFetchTool, this);
-    registerCoreTool(ReadManyFilesTool, targetDir, this);
+    registerCoreTool(ReadManyFilesTool, this);
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
