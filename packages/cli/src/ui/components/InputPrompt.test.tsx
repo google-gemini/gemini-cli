@@ -21,6 +21,13 @@ vi.mock('../hooks/useCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
 vi.mock('../utils/clipboardUtils.js');
 
+// Mock chalk.inverse to make highlighting detectable in plain text output
+vi.mock('chalk', () => ({
+  default: {
+    inverse: vi.fn((text: string) => `[${text}]`), // Wrap the character in brackets
+  },
+}));
+
 type MockedUseShellHistory = ReturnType<typeof useShellHistory>;
 type MockedUseCompletion = ReturnType<typeof useCompletion>;
 type MockedUseInputHistory = ReturnType<typeof useInputHistory>;
@@ -219,6 +226,187 @@ describe('InputPrompt', () => {
     expect(mockInputHistory.navigateDown).toHaveBeenCalled();
     expect(props.onSubmit).toHaveBeenCalledWith('some text');
     unmount();
+  });
+
+  describe('cursor highlighting behavior', () => {
+    it('should show cursor highlighting when focused and hide it when unfocused', async () => {
+      // Set up buffer with text content where cursor highlighting would be visible
+      mockBuffer.text = 'test';
+      mockBuffer.lines = ['test'];
+      mockBuffer.viewportVisualLines = ['test'];
+      mockBuffer.visualCursor = [0, 1]; // Position cursor on 'e'
+
+      // Start with focus=true
+      props.focus = true;
+      const { lastFrame, rerender, unmount } = render(
+        <InputPrompt {...props} />,
+      );
+
+      try {
+        await wait();
+        const focusedOutput = lastFrame();
+
+        // Test with focus=false - cursor highlighting should NOT be visible
+        props.focus = false;
+        rerender(<InputPrompt {...props} />);
+        await wait();
+        const unfocusedOutput = lastFrame();
+
+        // Both should contain the base text, but focused output should show the mocked highlight
+        expect(focusedOutput).toContain('t[e]st'); // Assuming cursor on 'e' in 'test'
+        expect(unfocusedOutput).toContain('test');
+        expect(unfocusedOutput).not.toContain('t[e]st'); // Ensure unfocused doesn't have the highlight
+        expect(focusedOutput).not.toEqual(unfocusedOutput); // Crucial: outputs must be different
+
+        // The outputs should be defined and non-empty (keep these if desired, but the above are more specific)
+        expect(focusedOutput).toBeDefined();
+        expect(unfocusedOutput).toBeDefined();
+        expect(focusedOutput?.length).toBeGreaterThan(0);
+        expect(unfocusedOutput?.length).toBeGreaterThan(0);
+      } finally {
+        unmount();
+      }
+    });
+
+    it('should handle placeholder rendering with focus states', async () => {
+      props.placeholder = 'Type here';
+      mockBuffer.text = '';
+      mockBuffer.lines = [''];
+      mockBuffer.viewportVisualLines = [''];
+
+      // Start with focus=true
+      props.focus = true;
+      const { lastFrame, rerender, unmount } = render(
+        <InputPrompt {...props} />,
+      );
+
+      try {
+        await wait();
+        const focusedOutput = lastFrame();
+
+        // Test unfocused state - placeholder logic with focus=false
+        props.focus = false;
+        rerender(<InputPrompt {...props} />);
+        await wait();
+        const unfocusedOutput = lastFrame();
+
+        // Validate that both contain the placeholder text (with mocked highlighting for focused)
+        expect(focusedOutput).toContain('[T]ype here'); // First character highlighted when focused
+        expect(unfocusedOutput).toContain('Type here');
+        expect(unfocusedOutput).not.toContain('[T]ype here');
+        expect(focusedOutput).not.toEqual(unfocusedOutput); // Ensure outputs differ
+
+        // Validate both states render successfully
+        expect(focusedOutput).toBeDefined();
+        expect(unfocusedOutput).toBeDefined();
+
+        // The placeholder logic already properly handles focus conditionally
+        // This test ensures our fix doesn't break placeholder rendering
+      } finally {
+        unmount();
+      }
+    });
+
+    it('should handle text input with different focus states', async () => {
+      mockBuffer.text = 'test';
+      mockBuffer.lines = ['test'];
+      mockBuffer.viewportVisualLines = ['test'];
+      mockBuffer.visualCursor = [0, 1];
+
+      // Start with focus=true
+      props.focus = true;
+      const { lastFrame, rerender, unmount } = render(
+        <InputPrompt {...props} />,
+      );
+
+      try {
+        await wait();
+        const focusedOutput = lastFrame();
+
+        // Test with focus=false
+        props.focus = false;
+        rerender(<InputPrompt {...props} />);
+        await wait();
+        const unfocusedOutput = lastFrame();
+
+        // Both should contain the text, but focused should have highlighting
+        expect(focusedOutput).toContain('t[e]st'); // Cursor on 'e' should be highlighted
+        expect(unfocusedOutput).toContain('test');
+        expect(unfocusedOutput).not.toContain('t[e]st');
+        expect(focusedOutput).not.toEqual(unfocusedOutput); // Ensure outputs differ
+      } finally {
+        unmount();
+      }
+    });
+
+    it('should not crash when focus changes during rendering', async () => {
+      props.focus = true;
+      mockBuffer.text = 'hello world';
+      mockBuffer.lines = ['hello world'];
+      mockBuffer.viewportVisualLines = ['hello world'];
+      mockBuffer.visualCursor = [0, 5];
+
+      const { rerender, lastFrame, unmount } = render(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const initialOutput = lastFrame();
+      expect(initialOutput).toContain('hello[ ]world'); // Space is highlighted when focused
+
+      // Change focus and re-render
+      props.focus = false;
+      rerender(<InputPrompt {...props} />);
+      await wait();
+
+      const updatedOutput = lastFrame();
+      expect(updatedOutput).toContain('hello world');
+
+      unmount();
+    });
+
+    it('should properly handle cursor highlighting during focus transitions', async () => {
+      // This test validates that cursor highlighting toggles correctly during focus changes
+
+      // Set up a scenario where cursor highlighting logic would be triggered
+      mockBuffer.text = 'hello world';
+      mockBuffer.lines = ['hello world'];
+      mockBuffer.viewportVisualLines = ['hello world'];
+      mockBuffer.visualCursor = [0, 5]; // Position cursor on the space between words
+
+      // Start with focus=true
+      props.focus = true;
+      const { rerender, lastFrame, unmount } = render(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+      const focusedOutput = lastFrame();
+
+      // Transition to focus=false
+      props.focus = false;
+      rerender(<InputPrompt {...props} />);
+      await wait();
+      const unfocusedOutput = lastFrame();
+
+      // Transition back to focus=true
+      props.focus = true;
+      rerender(<InputPrompt {...props} />);
+      await wait();
+      const refocusedOutput = lastFrame();
+
+      unmount();
+
+      // All states should render the text content
+      expect(focusedOutput).toContain('hello[ ]world'); // Space highlighted when focused
+      expect(unfocusedOutput).toContain('hello world');
+      expect(unfocusedOutput).not.toContain('hello[ ]world'); // No highlighting when unfocused
+      expect(refocusedOutput).toContain('hello[ ]world'); // Space highlighted again when refocused
+
+      // Ensure no crashes during focus transitions
+      expect(focusedOutput).toBeDefined();
+      expect(unfocusedOutput).toBeDefined();
+      expect(refocusedOutput).toBeDefined();
+    });
   });
 
   describe('clipboard image paste', () => {
@@ -457,6 +645,7 @@ describe('InputPrompt', () => {
       name: 'help',
       altName: '?',
       description: '...',
+      action: vi.fn(),
     });
 
     mockedUseCompletion.mockReturnValue({
