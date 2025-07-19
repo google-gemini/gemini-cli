@@ -14,6 +14,7 @@ import {
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Server as HTTPServer } from 'node:http';
+import { RecentFilesManager } from './recent-files-manager.js';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
@@ -21,6 +22,7 @@ const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 function sendActiveFileChangedNotification(
   transport: StreamableHTTPServerTransport,
   logger: vscode.OutputChannel,
+  recentFilesManager: RecentFilesManager,
 ) {
   const editor = vscode.window.activeTextEditor;
   const filePath = editor ? editor.document.uri.fsPath : '';
@@ -28,7 +30,10 @@ function sendActiveFileChangedNotification(
   const notification: JSONRPCNotification = {
     jsonrpc: '2.0',
     method: 'ide/activeFileChanged',
-    params: { filePath },
+    params: {
+      filePath,
+      recentOpenFiles: recentFilesManager.recentFiles,
+    },
   };
   transport.send(notification);
 }
@@ -52,9 +57,14 @@ export class IDEServer {
     app.use(express.json());
     const mcpServer = createMcpServer();
 
-    const disposable = vscode.window.onDidChangeActiveTextEditor((_editor) => {
+    const recentFilesManager = new RecentFilesManager(context);
+    const disposable = recentFilesManager.onDidChange(() => {
       for (const transport of Object.values(transports)) {
-        sendActiveFileChangedNotification(transport, this.logger);
+        sendActiveFileChangedNotification(
+          transport,
+          this.logger,
+          recentFilesManager,
+        );
       }
     });
     context.subscriptions.push(disposable);
@@ -158,7 +168,11 @@ export class IDEServer {
       }
 
       if (!sessionsWithInitialNotification.has(sessionId)) {
-        sendActiveFileChangedNotification(transport, this.logger);
+        sendActiveFileChangedNotification(
+          transport,
+          this.logger,
+          recentFilesManager,
+        );
         sessionsWithInitialNotification.add(sessionId);
       }
     };
