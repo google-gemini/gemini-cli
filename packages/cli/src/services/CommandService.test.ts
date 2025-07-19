@@ -13,7 +13,7 @@ import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
 import { corgiCommand } from '../ui/commands/corgiCommand.js';
 import { docsCommand } from '../ui/commands/docsCommand.js';
-import { chatCommand } from '../ui/commands/chatCommand.js';
+import { forkCommand } from '../ui/commands/forkCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
@@ -75,6 +75,9 @@ vi.mock('../ui/commands/compressCommand.js', () => ({
 vi.mock('../ui/commands/mcpCommand.js', () => ({
   mcpCommand: { name: 'mcp', description: 'Mock MCP' },
 }));
+vi.mock('../ui/commands/forkCommand.js', () => ({
+  forkCommand: { name: 'fork', description: 'Mock Fork' },
+}));
 vi.mock('../ui/commands/editorCommand.js', () => ({
   editorCommand: { name: 'editor', description: 'Mock Editor' },
 }));
@@ -135,7 +138,7 @@ describe('CommandService', () => {
         expect(commandNames).toContain('compress');
         expect(commandNames).toContain('corgi');
         expect(commandNames).toContain('docs');
-        expect(commandNames).toContain('chat');
+        expect(commandNames).toContain('fork');
         expect(commandNames).toContain('theme');
         expect(commandNames).toContain('stats');
         expect(commandNames).toContain('privacy');
@@ -143,6 +146,7 @@ describe('CommandService', () => {
         expect(commandNames).toContain('extensions');
         expect(commandNames).toContain('tools');
         expect(commandNames).toContain('mcp');
+        expect(commandNames).toContain('fork');
         expect(commandNames).not.toContain('ide');
       });
 
@@ -203,13 +207,13 @@ describe('CommandService', () => {
           aboutCommand,
           authCommand,
           bugCommand,
-          chatCommand,
           clearCommand,
           compressCommand,
           corgiCommand,
           docsCommand,
           editorCommand,
           extensionsCommand,
+          forkCommand,
           helpCommand,
           mcpCommand,
           memoryCommand,

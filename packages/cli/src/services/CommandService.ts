@@ -14,8 +14,8 @@ import { docsCommand } from '../ui/commands/docsCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
+import { forkCommand } from '../ui/commands/forkCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
-import { chatCommand } from '../ui/commands/chatCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
@@ -34,13 +34,13 @@ const loadBuiltInCommands = async (
     aboutCommand,
     authCommand,
     bugCommand,
-    chatCommand,
     clearCommand,
     compressCommand,
     corgiCommand,
     docsCommand,
     editorCommand,
     extensionsCommand,
+    forkCommand,
     helpCommand,
     ideCommand(config),
     mcpCommand,
