@@ -37,13 +37,30 @@ export const ToolConfirmationMessage: React.FC<
   availableTerminalHeight,
   terminalWidth,
 }) => {
-  const { onConfirm } = confirmationDetails;
+  const { onConfirm, type: confirmationType } = confirmationDetails;
   const childWidth = terminalWidth - 2; // 2 for padding
 
-  useInput((_, key) => {
+  useInput((input, key) => {
     if (!isFocused) return;
     if (key.escape) {
       onConfirm(ToolConfirmationOutcome.Cancel);
+    }
+    if (input === 'y' || input === 'Y') {
+      onConfirm(ToolConfirmationOutcome.ProceedOnce);
+    }
+    if (input === 'a' || input === 'A') {
+      if (confirmationType === 'mcp') {
+        onConfirm(ToolConfirmationOutcome.ProceedAlwaysServer);
+      } else {
+        onConfirm(ToolConfirmationOutcome.ProceedAlways);
+      }
+    }
+    if (input === 'm' || input === 'M') {
+      if (confirmationType === 'edit') {
+        onConfirm(ToolConfirmationOutcome.ModifyWithEditor);
+      } else if (confirmationType === 'mcp') {
+        onConfirm(ToolConfirmationOutcome.ProceedAlwaysTool);
+      }
     }
   });
 
@@ -107,15 +124,15 @@ export const ToolConfirmationMessage: React.FC<
     question = `Apply this change?`;
     options.push(
       {
-        label: 'Yes, allow once',
+        label: 'Yes (y), allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: 'Yes, allow always',
+        label: 'Yes (a), allow always',
         value: ToolConfirmationOutcome.ProceedAlways,
       },
       {
-        label: 'Modify with external editor',
+        label: 'Modify (m) with external editor',
         value: ToolConfirmationOutcome.ModifyWithEditor,
       },
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
@@ -135,11 +152,11 @@ export const ToolConfirmationMessage: React.FC<
     question = `Allow execution?`;
     options.push(
       {
-        label: 'Yes, allow once',
+        label: 'Yes (y), allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: `Yes, allow always "${executionProps.rootCommand} ..."`,
+        label: `Yes (a), allow always "${executionProps.rootCommand} ..."`,
         value: ToolConfirmationOutcome.ProceedAlways,
       },
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
@@ -172,11 +189,11 @@ export const ToolConfirmationMessage: React.FC<
     question = `Do you want to proceed?`;
     options.push(
       {
-        label: 'Yes, allow once',
+        label: 'Yes (y), allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: 'Yes, allow always',
+        label: 'Yes (a), allow always',
         value: ToolConfirmationOutcome.ProceedAlways,
       },
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
@@ -209,15 +226,15 @@ export const ToolConfirmationMessage: React.FC<
     question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
     options.push(
       {
-        label: 'Yes, allow once',
+        label: 'Yes (y), allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
+        label: `Yes (m), always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
         value: ToolConfirmationOutcome.ProceedAlwaysTool, // Cast until types are updated
       },
       {
-        label: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
+        label: `Yes (a), always allow all tools from server "${mcpProps.serverName}"`,
         value: ToolConfirmationOutcome.ProceedAlwaysServer,
       },
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
