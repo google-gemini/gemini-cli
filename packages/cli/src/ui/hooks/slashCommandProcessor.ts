@@ -18,32 +18,9 @@ import {
   HistoryItem,
   SlashCommandProcessorResult,
 } from '../types.js';
-import { promises as fs } from 'fs';
-import path from 'path';
 import { LoadedSettings } from '../../config/settings.js';
-import {
-  type CommandContext,
-  type SlashCommandActionReturn,
-  type SlashCommand,
-} from '../commands/types.js';
+import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
-
-// This interface is for the old, inline command definitions.
-// It will be removed once all commands are migrated to the new system.
-export interface LegacySlashCommand {
-  name: string;
-  altName?: string;
-  description?: string;
-  completion?: () => Promise<string[]>;
-  action: (
-    mainCommand: string,
-    subCommand?: string,
-    args?: string,
-  ) =>
-    | void
-    | SlashCommandActionReturn
-    | Promise<void | SlashCommandActionReturn>;
-}
 
 /**
  * Hook to define and process slash commands (e.g., /help, /clear).
@@ -51,7 +28,6 @@ export interface LegacySlashCommand {
 export const useSlashCommandProcessor = (
   config: Config | null,
   settings: LoadedSettings,
-  history: HistoryItem[],
   addItem: UseHistoryManagerReturn['addItem'],
   clearItems: UseHistoryManagerReturn['clearItems'],
   loadHistory: UseHistoryManagerReturn['loadHistory'],
@@ -155,9 +131,11 @@ export const useSlashCommandProcessor = (
           console.clear();
           refreshStatic();
         },
+        loadHistory,
         setDebugMessage: onDebugMessage,
         pendingItem: pendingCompressionItemRef.current,
         setPendingItem: setPendingCompressionItem,
+        toggleCorgiMode,
       },
       session: {
         stats: session.stats,
@@ -168,6 +146,7 @@ export const useSlashCommandProcessor = (
       settings,
       gitService,
       logger,
+      loadHistory,
       addItem,
       clearItems,
       refreshStatic,
@@ -175,6 +154,7 @@ export const useSlashCommandProcessor = (
       onDebugMessage,
       pendingCompressionItemRef,
       setPendingCompressionItem,
+      toggleCorgiMode,
     ],
   );
 
@@ -188,143 +168,6 @@ export const useSlashCommandProcessor = (
 
     load();
   }, [commandService]);
-
-  // Define legacy commands
-  // This list contains all commands that have NOT YET been migrated to the
-  // new system. As commands are migrated, they are removed from this list.
-  const legacyCommands: LegacySlashCommand[] = useMemo(() => {
-    const commands: LegacySlashCommand[] = [
-      // `/help` and `/clear` have been migrated and REMOVED from this list.
-      {
-        name: 'corgi',
-        action: (_mainCommand, _subCommand, _args) => {
-          toggleCorgiMode();
-        },
-      },
-    ];
-
-    if (config?.getCheckpointingEnabled()) {
-      commands.push({
-        name: 'restore',
-        description:
-          'restore a tool call. This will reset the conversation and file history to the state it was in when the tool call was suggested',
-        completion: async () => {
-          const checkpointDir = config?.getProjectTempDir()
-            ? path.join(config.getProjectTempDir(), 'checkpoints')
-            : undefined;
-          if (!checkpointDir) {
-            return [];
-          }
-          try {
-            const files = await fs.readdir(checkpointDir);
-            return files
-              .filter((file) => file.endsWith('.json'))
-              .map((file) => file.replace('.json', ''));
-          } catch (_err) {
-            return [];
-          }
-        },
-        action: async (_mainCommand, subCommand, _args) => {
-          const checkpointDir = config?.getProjectTempDir()
-            ? path.join(config.getProjectTempDir(), 'checkpoints')
-            : undefined;
-
-          if (!checkpointDir) {
-            addMessage({
-              type: MessageType.ERROR,
-              content: 'Could not determine the .gemini directory path.',
-              timestamp: new Date(),
-            });
-            return;
-          }
-
-          try {
-            // Ensure the directory exists before trying to read it.
-            await fs.mkdir(checkpointDir, { recursive: true });
-            const files = await fs.readdir(checkpointDir);
-            const jsonFiles = files.filter((file) => file.endsWith('.json'));
-
-            if (!subCommand) {
-              if (jsonFiles.length === 0) {
-                addMessage({
-                  type: MessageType.INFO,
-                  content: 'No restorable tool calls found.',
-                  timestamp: new Date(),
-                });
-                return;
-              }
-              const truncatedFiles = jsonFiles.map((file) => {
-                const components = file.split('.');
-                if (components.length <= 1) {
-                  return file;
-                }
-                components.pop();
-                return components.join('.');
-              });
-              const fileList = truncatedFiles.join('\n');
-              addMessage({
-                type: MessageType.INFO,
-                content: `Available tool calls to restore:\n\n${fileList}`,
-                timestamp: new Date(),
-              });
-              return;
-            }
-
-            const selectedFile = subCommand.endsWith('.json')
-              ? subCommand
-              : `${subCommand}.json`;
-
-            if (!jsonFiles.includes(selectedFile)) {
-              addMessage({
-                type: MessageType.ERROR,
-                content: `File not found: ${selectedFile}`,
-                timestamp: new Date(),
-              });
-              return;
-            }
-
-            const filePath = path.join(checkpointDir, selectedFile);
-            const data = await fs.readFile(filePath, 'utf-8');
-            const toolCallData = JSON.parse(data);
-
-            if (toolCallData.history) {
-              loadHistory(toolCallData.history);
-            }
-
-            if (toolCallData.clientHistory) {
-              await config
-                ?.getGeminiClient()
-                ?.setHistory(toolCallData.clientHistory);
-            }
-
-            if (toolCallData.commitHash) {
-              await gitService?.restoreProjectFromSnapshot(
-                toolCallData.commitHash,
-              );
-              addMessage({
-                type: MessageType.INFO,
-                content: `Restored project to the state before the tool call.`,
-                timestamp: new Date(),
-              });
-            }
-
-            return {
-              type: 'tool',
-              toolName: toolCallData.toolCall.name,
-              toolArgs: toolCallData.toolCall.args,
-            };
-          } catch (error) {
-            addMessage({
-              type: MessageType.ERROR,
-              content: `Could not read restorable tool calls. This is the error: ${error}`,
-              timestamp: new Date(),
-            });
-          }
-        },
-      });
-    }
-    return commands;
-  }, [addMessage, toggleCorgiMode, config, gitService, loadHistory]);
 
   const handleSlashCommand = useCallback(
     async (
@@ -349,8 +192,6 @@ export const useSlashCommandProcessor = (
 
       const parts = trimmed.substring(1).trim().split(/\s+/);
       const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
-
-      // --- Start of New Tree Traversal Logic ---
 
       let currentCommands = commands;
       let commandToExecute: SlashCommand | undefined;
@@ -461,45 +302,6 @@ export const useSlashCommandProcessor = (
         }
       }
 
-      // --- End of New Tree Traversal Logic ---
-
-      // --- Legacy Fallback Logic (for commands not yet migrated) ---
-
-      const mainCommand = parts[0];
-      const subCommand = parts[1];
-      const legacyArgs = parts.slice(2).join(' ');
-
-      for (const cmd of legacyCommands) {
-        if (mainCommand === cmd.name || mainCommand === cmd.altName) {
-          const actionResult = await cmd.action(
-            mainCommand,
-            subCommand,
-            legacyArgs,
-          );
-
-          if (actionResult?.type === 'tool') {
-            return {
-              type: 'schedule_tool',
-              toolName: actionResult.toolName,
-              toolArgs: actionResult.toolArgs,
-            };
-          }
-          if (actionResult?.type === 'message') {
-            addItem(
-              {
-                type:
-                  actionResult.messageType === 'error'
-                    ? MessageType.ERROR
-                    : MessageType.INFO,
-                text: actionResult.content,
-              },
-              Date.now(),
-            );
-          }
-          return { type: 'handled' };
-        }
-      }
-
       addMessage({
         type: MessageType.ERROR,
         content: `Unknown command: ${trimmed}`,
@@ -513,7 +315,6 @@ export const useSlashCommandProcessor = (
       setShowHelp,
       openAuthDialog,
       commands,
-      legacyCommands,
       commandContext,
       addMessage,
       openThemeDialog,
@@ -523,38 +324,9 @@ export const useSlashCommandProcessor = (
     ],
   );
 
-  const allCommands = useMemo(() => {
-    // Adapt legacy commands to the new SlashCommand interface
-    const adaptedLegacyCommands: SlashCommand[] = legacyCommands.map(
-      (legacyCmd) => ({
-        name: legacyCmd.name,
-        altName: legacyCmd.altName,
-        description: legacyCmd.description,
-        action: async (_context: CommandContext, args: string) => {
-          const parts = args.split(/\s+/);
-          const subCommand = parts[0] || undefined;
-          const restOfArgs = parts.slice(1).join(' ') || undefined;
-
-          return legacyCmd.action(legacyCmd.name, subCommand, restOfArgs);
-        },
-        completion: legacyCmd.completion
-          ? async (_context: CommandContext, _partialArg: string) =>
-              legacyCmd.completion!()
-          : undefined,
-      }),
-    );
-
-    const newCommandNames = new Set(commands.map((c) => c.name));
-    const filteredAdaptedLegacy = adaptedLegacyCommands.filter(
-      (c) => !newCommandNames.has(c.name),
-    );
-
-    return [...commands, ...filteredAdaptedLegacy];
-  }, [commands, legacyCommands]);
-
   return {
     handleSlashCommand,
-    slashCommands: allCommands,
+    slashCommands: commands,
     pendingHistoryItems,
     commandContext,
   };
