@@ -11,6 +11,7 @@ import { ToolMessage } from './ToolMessage.js';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { Colors } from '../../colors.js';
 import { Config } from '@google/gemini-cli-core';
+import { SHELL_COMMAND_NAME } from '../../constants.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
@@ -32,7 +33,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const hasPending = !toolCalls.every(
     (t) => t.status === ToolCallStatus.Success,
   );
-  const borderColor = hasPending ? Colors.AccentYellow : Colors.Gray;
+  const isShellCommand = toolCalls.some((t) => t.name === SHELL_COMMAND_NAME);
+  const borderColor =
+    hasPending || isShellCommand ? Colors.AccentYellow : Colors.Gray;
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
   // This is a bit of a magic number, but it accounts for the border and
