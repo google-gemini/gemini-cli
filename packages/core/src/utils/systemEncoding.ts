@@ -31,12 +31,12 @@ export function getCachedEncodingForBuffer(buffer: Buffer): string {
   if (cachedSystemEncoding === undefined) {
     cachedSystemEncoding = getSystemEncoding();
   }
-  
+
   // If we have a cached system encoding, use it
   if (cachedSystemEncoding) {
     return cachedSystemEncoding;
   }
-  
+
   // Otherwise, detect from this specific buffer (don't cache this result)
   return detectEncodingFromBuffer(buffer) || 'utf-8';
 }
@@ -63,12 +63,12 @@ export function getSystemEncoding(): string | null {
       }
       // Only warn if we can't parse the output format, not if windowsCodePageToEncoding fails
       throw new Error(
-        `Unable to parse Windows code page from 'chcp' output "${output.trim()}". `
+        `Unable to parse Windows code page from 'chcp' output "${output.trim()}". `,
       );
     } catch (error) {
       console.warn(
         `Failed to get Windows code page using 'chcp' command: ${error instanceof Error ? error.message : String(error)}. ` +
-        `Will attempt to detect encoding from command output instead.`
+          `Will attempt to detect encoding from command output instead.`,
       );
     }
     return null;
@@ -76,7 +76,7 @@ export function getSystemEncoding(): string | null {
 
   // Unix-like
   // Use environment variables LC_ALL, LC_CTYPE, and LANG to determine the
-  // system encoding. However, these environment variables might not always 
+  // system encoding. However, these environment variables might not always
   // be set or accurate. Handle cases where none of these variables are set.
   const env = process.env;
   let locale = env.LC_ALL || env.LC_CTYPE || env.LANG || '';
@@ -84,7 +84,9 @@ export function getSystemEncoding(): string | null {
   // Fallback to querying the system directly when environment variables are missing
   if (!locale) {
     try {
-      locale = execSync('locale charmap', { encoding: 'utf8' }).toString().trim();
+      locale = execSync('locale charmap', { encoding: 'utf8' })
+        .toString()
+        .trim();
     } catch (_e) {
       console.warn('Failed to get locale charmap.');
       return null;
@@ -107,7 +109,7 @@ export function getSystemEncoding(): string | null {
 /**
  * Converts a Windows code page number to a corresponding encoding name.
  * @param cp The Windows code page number (e.g., 437, 850, etc.)
- * @returns 
+ * @returns The corresponding encoding name as a string, or null if no mapping exists.
  */
 export function windowsCodePageToEncoding(cp: number): string | null {
   // Most common mappings; extend as needed
@@ -132,7 +134,7 @@ export function windowsCodePageToEncoding(cp: number): string | null {
     1256: 'windows-1256',
     1257: 'windows-1257',
     1258: 'windows-1258',
-    65001: 'utf-8'
+    65001: 'utf-8',
   };
 
   if (map[cp]) {
@@ -159,6 +161,6 @@ export function detectEncodingFromBuffer(buffer: Buffer): string | null {
   } catch (error) {
     console.warn('Failed to detect encoding with chardet:', error);
   }
-  
+
   return null;
 }
