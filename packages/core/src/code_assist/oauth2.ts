@@ -15,9 +15,7 @@ import url from 'url';
 import crypto from 'crypto';
 import * as net from 'net';
 import open from 'open';
-import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import * as os from 'os';
 import { Config } from '../config/config.js';
 import { getErrorMessage } from '../utils/errors.js';
 import {
@@ -28,6 +26,10 @@ import {
 import { AuthType } from '../core/contentGenerator.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import readline from 'node:readline';
+import {
+  getOAuthCredsPath,
+  ensureInternalDirExists,
+} from '../utils/migration.js';
 
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
@@ -53,9 +55,6 @@ const SIGN_IN_SUCCESS_URL =
   'https://developers.google.com/gemini-code-assist/auth_success_gemini';
 const SIGN_IN_FAILURE_URL =
   'https://developers.google.com/gemini-code-assist/auth_failure_gemini';
-
-const GEMINI_DIR = '.gemini';
-const CREDENTIAL_FILENAME = 'oauth_creds.json';
 
 /**
  * An Authentication URL for updating the credentials of a Oauth2Client
@@ -352,15 +351,15 @@ async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
 }
 
 async function cacheCredentials(credentials: Credentials) {
+  ensureInternalDirExists();
   const filePath = getCachedCredentialPath();
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
 
   const credString = JSON.stringify(credentials, null, 2);
   await fs.writeFile(filePath, credString);
 }
 
 function getCachedCredentialPath(): string {
-  return path.join(os.homedir(), GEMINI_DIR, CREDENTIAL_FILENAME);
+  return getOAuthCredsPath();
 }
 
 export async function clearCachedCredentialFile() {

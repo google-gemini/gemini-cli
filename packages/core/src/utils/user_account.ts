@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'node:path';
 import { promises as fsp, existsSync, readFileSync } from 'node:fs';
-import * as os from 'os';
-import { GEMINI_DIR, GOOGLE_ACCOUNTS_FILENAME } from './paths.js';
+import { ensureInternalDirExists, getGoogleAccountsPath } from './migration.js';
 
 interface UserAccounts {
   active: string | null;
@@ -15,7 +13,7 @@ interface UserAccounts {
 }
 
 function getGoogleAccountsCachePath(): string {
-  return path.join(os.homedir(), GEMINI_DIR, GOOGLE_ACCOUNTS_FILENAME);
+  return getGoogleAccountsPath();
 }
 
 async function readAccounts(filePath: string): Promise<UserAccounts> {
@@ -37,8 +35,8 @@ async function readAccounts(filePath: string): Promise<UserAccounts> {
 }
 
 export async function cacheGoogleAccount(email: string): Promise<void> {
+  ensureInternalDirExists();
   const filePath = getGoogleAccountsCachePath();
-  await fsp.mkdir(path.dirname(filePath), { recursive: true });
 
   const accounts = await readAccounts(filePath);
 
