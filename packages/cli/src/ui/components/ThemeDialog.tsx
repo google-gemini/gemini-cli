@@ -148,8 +148,8 @@ export function ThemeDialog({
   const colorizeCodeWidth = Math.max(
     Math.floor(
       (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
-      PREVIEW_PANE_WIDTH_PERCENTAGE *
-      PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+        PREVIEW_PANE_WIDTH_PERCENTAGE *
+        PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
     ),
     1,
   );

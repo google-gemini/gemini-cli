@@ -49,7 +49,7 @@ describe('AuthDialog', () => {
 
     const { lastFrame } = render(
       <AuthDialog
-        onSelect={() => { }}
+        onSelect={() => {}}
         settings={settings}
         initialErrorMessage="GEMINI_API_KEY  environment variable not found"
       />,
@@ -85,7 +85,7 @@ describe('AuthDialog', () => {
       );
 
       const { lastFrame } = render(
-        <AuthDialog onSelect={() => { }} settings={settings} />,
+        <AuthDialog onSelect={() => {}} settings={settings} />,
       );
 
       expect(lastFrame()).toContain(
@@ -118,7 +118,7 @@ describe('AuthDialog', () => {
       );
 
       const { lastFrame } = render(
-        <AuthDialog onSelect={() => { }} settings={settings} />,
+        <AuthDialog onSelect={() => {}} settings={settings} />,
       );
 
       expect(lastFrame()).not.toContain(
@@ -151,7 +151,7 @@ describe('AuthDialog', () => {
       );
 
       const { lastFrame } = render(
-        <AuthDialog onSelect={() => { }} settings={settings} />,
+        <AuthDialog onSelect={() => {}} settings={settings} />,
       );
 
       expect(lastFrame()).toContain(
@@ -185,7 +185,7 @@ describe('AuthDialog', () => {
       );
 
       const { lastFrame } = render(
-        <AuthDialog onSelect={() => { }} settings={settings} />,
+        <AuthDialog onSelect={() => {}} settings={settings} />,
       );
 
       // This is a bit brittle, but it's the best way to check which item is selected.
@@ -214,7 +214,7 @@ describe('AuthDialog', () => {
       );
 
       const { lastFrame } = render(
-        <AuthDialog onSelect={() => { }} settings={settings} />,
+        <AuthDialog onSelect={() => {}} settings={settings} />,
       );
 
       // Default is LOGIN_WITH_GOOGLE
@@ -245,7 +245,7 @@ describe('AuthDialog', () => {
       );
 
       const { lastFrame } = render(
-        <AuthDialog onSelect={() => { }} settings={settings} />,
+        <AuthDialog onSelect={() => {}} settings={settings} />,
       );
 
       expect(lastFrame()).toContain(
