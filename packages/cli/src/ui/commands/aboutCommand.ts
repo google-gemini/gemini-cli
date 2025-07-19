@@ -5,11 +5,11 @@
  */
 
 import { getCliVersion } from '../../utils/version.js';
-import { SlashCommand } from './types.js';
+import { SlashCommandDefinition } from './types.js';
 import process from 'node:process';
 import { MessageType, type HistoryItemAbout } from '../types.js';
 
-export const aboutCommand: SlashCommand = {
+export const aboutCommand: SlashCommandDefinition = {
   name: 'about',
   description: 'show version info',
   action: async (context) => {

@@ -6,9 +6,9 @@
 
 import { getErrorMessage } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
-import { SlashCommand, SlashCommandActionReturn } from './types.js';
+import { SlashCommandDefinition, SlashCommandActionReturn } from './types.js';
 
-export const memoryCommand: SlashCommand = {
+export const memoryCommand: SlashCommandDefinition = {
   name: 'memory',
   description: 'Commands for interacting with memory.',
   subCommands: [

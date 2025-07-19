@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OpenDialogActionReturn, SlashCommand } from './types.js';
+import { OpenDialogActionReturn, SlashCommandDefinition } from './types.js';
 
-export const privacyCommand: SlashCommand = {
+export const privacyCommand: SlashCommandDefinition = {
   name: 'privacy',
   description: 'display the privacy notice',
   action: (): OpenDialogActionReturn => ({

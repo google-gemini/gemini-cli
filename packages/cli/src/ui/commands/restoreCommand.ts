@@ -8,7 +8,7 @@ import * as fs from 'fs/promises';
 import path from 'path';
 import {
   type CommandContext,
-  type SlashCommand,
+  type SlashCommandDefinition,
   type SlashCommandActionReturn,
 } from './types.js';
 import { Config } from '@google/gemini-cli-core';
@@ -140,7 +140,9 @@ async function completion(
   }
 }
 
-export const restoreCommand = (config: Config | null): SlashCommand | null => {
+export const restoreCommand = (
+  config: Config | null,
+): SlashCommandDefinition | null => {
   if (!config?.getCheckpointingEnabled()) {
     return null;
   }
