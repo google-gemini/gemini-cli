@@ -535,6 +535,32 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   pendingHistoryItems.push(...pendingGeminiHistoryItems);
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
+  const showStatus = config.getShowStatus();
+
+  // Effect to update the terminal title with the current status.
+  useEffect(() => {
+    if (!showStatus) return;
+
+    const originalTitle = process.title;
+    let title = 'Gemini CLI';
+
+    if (streamingState !== StreamingState.Idle) {
+      const statusText =
+        thought?.subject || currentLoadingPhrase || 'Working...';
+      title = statusText;
+    }
+
+    // Pad the title to a fixed width to prevent taskbar icon resizing.
+    const paddedTitle = title.padEnd(80, ' ');
+
+    // Use ANSI escape code to set terminal title.
+    stdout.write(`\x1b]0;${paddedTitle}\x07`);
+
+    // Cleanup function to restore the original title when the app exits.
+    return () => {
+      stdout.write(`\x1b]0;${originalTitle}\x07`);
+    };
+  }, [streamingState, thought, currentLoadingPhrase, showStatus, stdout]);
   const showAutoAcceptIndicator = useAutoAcceptIndicator({ config });
 
   const handleFinalSubmit = useCallback(
