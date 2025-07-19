@@ -171,7 +171,8 @@ describe('loadCliConfig', () => {
   });
 
   it('should call setSystemSettingsPath when SYSTEM_SETTINGS_PATH is provided', async () => {
-    process.env.SYSTEM_SETTINGS_PATH = '/custom/path/to/settings.json';
+    const customPath = '/custom/path/to/settings.json';
+    process.env.SYSTEM_SETTINGS_PATH = customPath;
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const _config = await loadCliConfig({}, [], 'test-session', argv);
