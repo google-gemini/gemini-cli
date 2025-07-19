@@ -397,6 +397,32 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Ctrl+A (Home)
+      if ((key.ctrl && key.name === 'a') || key.name === 'home') {
+        buffer.moveToOffset(0);
+        return;
+      }
+      // Ctrl+E (End)
+      if ((key.ctrl && key.name === 'e') || key.name === 'end') {
+        buffer.moveToOffset(cpLen(buffer.text));
+        return;
+      }
+      // Ctrl+L (Clear Screen)
+      if (key.ctrl && key.name === 'l') {
+        onClearScreen();
+        return;
+      }
+      // Ctrl+P (History Up)
+      if (key.ctrl && key.name === 'p' && !completion.showSuggestions) {
+        inputHistory.navigateUp();
+        return;
+      }
+      // Ctrl+N (History Down)
+      if (key.ctrl && key.name === 'n' && !completion.showSuggestions) {
+        inputHistory.navigateDown();
+        return;
+      }
+
       // Newline insertion
       if (key.name === 'return' && (key.ctrl || key.meta || key.paste)) {
         buffer.newline();

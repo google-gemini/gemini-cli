@@ -221,6 +221,29 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should move cursor to home on "home" key press', async () => {
+    props.buffer.setText('some text');
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+    stdin.write('\u001b[H'); // Home key
+    await wait();
+
+    expect(props.buffer.moveToOffset).toHaveBeenCalledWith(0);
+    unmount();
+  });
+
+  it('should move cursor to end on "end" key press', async () => {
+    const bufferText = 'some text';
+    props.buffer.setText(bufferText);
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+    stdin.write('\u001b[F'); // End key
+    await wait();
+
+    expect(props.buffer.moveToOffset).toHaveBeenCalledWith(bufferText.length);
+    unmount();
+  });
+
   describe('clipboard image paste', () => {
     beforeEach(() => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
