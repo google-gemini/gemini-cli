@@ -6,9 +6,9 @@
 
 import { MessageType, HistoryItemStats } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
-import { type CommandContext, type SlashCommand } from './types.js';
+import { type CommandContext, type SlashCommandDefinition } from './types.js';
 
-export const statsCommand: SlashCommand = {
+export const statsCommand: SlashCommandDefinition = {
   name: 'stats',
   altName: 'usage',
   description: 'check session stats. Usage: /stats [model|tools]',

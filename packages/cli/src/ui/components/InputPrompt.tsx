@@ -32,7 +32,7 @@ export interface InputPromptProps {
   userMessages: readonly string[];
   onClearScreen: () => void;
   config: Config;
-  slashCommands: SlashCommand[];
+  slashCommands: readonly SlashCommand[];
   commandContext: CommandContext;
   placeholder?: string;
   focus?: boolean;
@@ -180,7 +180,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         // If there's no trailing space, we need to check if the current query
         // is already a complete path to a parent command.
         if (!hasTrailingSpace) {
-          let currentLevel: SlashCommand[] | undefined = slashCommands;
+          let currentLevel: readonly SlashCommand[] | undefined = slashCommands;
           for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
             const found: SlashCommand | undefined = currentLevel?.find(
@@ -191,7 +191,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               if (i === parts.length - 1 && found.subCommands) {
                 isParentPath = true;
               }
-              currentLevel = found.subCommands;
+              currentLevel = found.subCommands as
+                | readonly SlashCommand[]
+                | undefined;
             } else {
               // Path is invalid, so it can't be a parent path.
               currentLevel = undefined;

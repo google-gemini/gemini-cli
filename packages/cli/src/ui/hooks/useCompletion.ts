@@ -41,7 +41,7 @@ export function useCompletion(
   query: string,
   cwd: string,
   isActive: boolean,
-  slashCommands: SlashCommand[],
+  slashCommands: readonly SlashCommand[],
   commandContext: CommandContext,
   config?: Config,
 ): UseCompletionReturn {
@@ -151,7 +151,7 @@ export function useCompletion(
       }
 
       // Traverse the Command Tree using the tentative completed path
-      let currentLevel: SlashCommand[] | undefined = slashCommands;
+      let currentLevel: readonly SlashCommand[] | undefined = slashCommands;
       let leafCommand: SlashCommand | null = null;
 
       for (const part of commandPathParts) {
@@ -165,7 +165,9 @@ export function useCompletion(
         );
         if (found) {
           leafCommand = found;
-          currentLevel = found.subCommands;
+          currentLevel = found.subCommands as
+            | readonly SlashCommand[]
+            | undefined;
         } else {
           leafCommand = null;
           currentLevel = [];

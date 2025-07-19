@@ -15,7 +15,7 @@ import {
 } from '@google/gemini-cli-core';
 import {
   CommandContext,
-  SlashCommand,
+  SlashCommandDefinition,
   SlashCommandActionReturn,
 } from './types.js';
 import * as child_process from 'child_process';
@@ -40,7 +40,9 @@ function isVSCodeInstalled(): boolean {
   }
 }
 
-export const ideCommand = (config: Config | null): SlashCommand | null => {
+export const ideCommand = (
+  config: Config | null,
+): SlashCommandDefinition | null => {
   if (!config?.getIdeMode()) {
     return null;
   }

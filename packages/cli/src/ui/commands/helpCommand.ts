@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OpenDialogActionReturn, SlashCommand } from './types.js';
+import { OpenDialogActionReturn, SlashCommandDefinition } from './types.js';
 
-export const helpCommand: SlashCommand = {
+export const helpCommand: SlashCommandDefinition = {
   name: 'help',
   altName: '?',
   description: 'for help on gemini-cli',

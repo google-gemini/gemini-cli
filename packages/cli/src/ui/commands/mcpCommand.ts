@@ -5,7 +5,7 @@
  */
 
 import {
-  SlashCommand,
+  SlashCommandDefinition,
   SlashCommandActionReturn,
   CommandContext,
 } from './types.js';
@@ -226,7 +226,7 @@ const getMcpStatus = async (
   };
 };
 
-export const mcpCommand: SlashCommand = {
+export const mcpCommand: SlashCommandDefinition = {
   name: 'mcp',
   description: 'list configured MCP servers and tools',
   action: async (context: CommandContext, args: string) => {

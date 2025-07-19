@@ -5,7 +5,11 @@
  */
 
 import * as fsPromises from 'fs/promises';
-import { CommandContext, SlashCommand, MessageActionReturn } from './types.js';
+import {
+  CommandContext,
+  SlashCommandDefinition,
+  MessageActionReturn,
+} from './types.js';
 import path from 'path';
 import { HistoryItemWithoutId, MessageType } from '../types.js';
 
@@ -51,7 +55,7 @@ const getSavedChatTags = async (
   }
 };
 
-const listCommand: SlashCommand = {
+const listCommand: SlashCommandDefinition = {
   name: 'list',
   description: 'List saved conversation checkpoints',
   action: async (context): Promise<MessageActionReturn> => {
@@ -77,7 +81,7 @@ const listCommand: SlashCommand = {
   },
 };
 
-const saveCommand: SlashCommand = {
+const saveCommand: SlashCommandDefinition = {
   name: 'save',
   description:
     'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
@@ -120,7 +124,7 @@ const saveCommand: SlashCommand = {
   },
 };
 
-const resumeCommand: SlashCommand = {
+const resumeCommand: SlashCommandDefinition = {
   name: 'resume',
   altName: 'load',
   description:
@@ -190,7 +194,7 @@ const resumeCommand: SlashCommand = {
   },
 };
 
-export const chatCommand: SlashCommand = {
+export const chatCommand: SlashCommandDefinition = {
   name: 'chat',
   description: 'Manage conversation history.',
   subCommands: [listCommand, saveCommand, resumeCommand],

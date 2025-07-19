@@ -106,11 +106,53 @@ export type SlashCommandActionReturn =
   | OpenDialogActionReturn
   | LoadHistoryActionReturn;
 
+/**
+ * Metadata describing a command's origin and expected behavior.
+ */
+export interface SlashCommandMetadata {
+  /** The source of the command definition. */
+  source: 'built-in' | 'file';
+
+  /** The primary behavior of the command. 'Custom' is for commands with unique,
+   * hard-coded logic (e.g., opening a dialog).
+   */
+  behavior: 'Custom'; // `| 'Prompt'` will be added in next PR for Custom Commands.
+
+  /** The absolute path to the definition file, if applicable. */
+  // TODO: filePath?: string;
+}
+
+export interface SlashCommandDefinition {
+  name: string;
+  altName?: string;
+  description?: string;
+
+  // The action to run. Optional for parent commands that only group sub-commands.
+  action?: (
+    context: CommandContext,
+    args: string,
+  ) =>
+    | void
+    | SlashCommandActionReturn
+    | Promise<void | SlashCommandActionReturn>;
+
+  // Provides argument completion (e.g., completing a tag for `/chat resume <tag>`).
+  completion?: (
+    context: CommandContext,
+    partialArg: string,
+  ) => Promise<string[]>;
+
+  subCommands?: SlashCommandDefinition[];
+}
+
 // The standardized contract for any command in the system.
+// This version is separated from SlashCommandDefinition as it requires metadata.
 export interface SlashCommand {
   name: string;
   altName?: string;
   description?: string;
+
+  metadata: SlashCommandMetadata;
 
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (

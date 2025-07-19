@@ -6,13 +6,13 @@
 
 import open from 'open';
 import process from 'node:process';
-import { type CommandContext, type SlashCommand } from './types.js';
+import { type CommandContext, type SlashCommandDefinition } from './types.js';
 import { MessageType } from '../types.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
 
-export const bugCommand: SlashCommand = {
+export const bugCommand: SlashCommandDefinition = {
   name: 'bug',
   description: 'submit a bug report',
   action: async (context: CommandContext, args?: string): Promise<void> => {

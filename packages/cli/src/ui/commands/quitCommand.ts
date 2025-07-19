@@ -5,9 +5,9 @@
  */
 
 import { formatDuration } from '../utils/formatters.js';
-import { type SlashCommand } from './types.js';
+import { type SlashCommandDefinition } from './types.js';
 
-export const quitCommand: SlashCommand = {
+export const quitCommand: SlashCommandDefinition = {
   name: 'quit',
   altName: 'exit',
   description: 'exit the cli',

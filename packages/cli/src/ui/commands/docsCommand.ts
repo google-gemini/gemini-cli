@@ -6,10 +6,10 @@
 
 import open from 'open';
 import process from 'node:process';
-import { type CommandContext, type SlashCommand } from './types.js';
+import { type CommandContext, type SlashCommandDefinition } from './types.js';
 import { MessageType } from '../types.js';
 
-export const docsCommand: SlashCommand = {
+export const docsCommand: SlashCommandDefinition = {
   name: 'docs',
   description: 'open full Gemini CLI documentation in your browser',
   action: async (context: CommandContext): Promise<void> => {

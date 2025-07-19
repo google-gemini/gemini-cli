@@ -5,9 +5,9 @@
  */
 
 import { HistoryItemCompression, MessageType } from '../types.js';
-import { SlashCommand } from './types.js';
+import { SlashCommandDefinition } from './types.js';
 
-export const compressCommand: SlashCommand = {
+export const compressCommand: SlashCommandDefinition = {
   name: 'compress',
   altName: 'summarize',
   description: 'Compresses the context by replacing it with a summary.',
