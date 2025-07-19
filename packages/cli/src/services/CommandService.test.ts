@@ -375,4 +375,19 @@ describe('CommandService', () => {
     // Verify the original array was not mutated.
     expect(service.getCommands()).toHaveLength(1);
   });
+
+  it('should pass the abort signal to all loaders', async () => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    const loader1 = new MockCommandLoader([mockCommandA]);
+    const loader2 = new MockCommandLoader([mockCommandB]);
+
+    await CommandService.create([loader1, loader2], signal);
+
+    expect(loader1.loadCommands).toHaveBeenCalledTimes(1);
+    expect(loader1.loadCommands).toHaveBeenCalledWith(signal);
+    expect(loader2.loadCommands).toHaveBeenCalledTimes(1);
+    expect(loader2.loadCommands).toHaveBeenCalledWith(signal);
+  });
 });

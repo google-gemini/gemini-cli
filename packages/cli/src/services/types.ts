@@ -17,7 +17,8 @@ import { SlashCommand } from '../ui/commands/types.js';
 export interface ICommandLoader {
   /**
    * Discovers and returns a list of slash commands from the loader's source.
+   * @param signal An optional AbortSignal to allow cancellation.
    * @returns A promise that resolves to an array of SlashCommand objects.
    */
-  loadCommands(): Promise<SlashCommand[]>;
+  loadCommands(signal?: AbortSignal): Promise<SlashCommand[]>;
 }

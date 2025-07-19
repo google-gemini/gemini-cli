@@ -160,14 +160,22 @@ export const useSlashCommandProcessor = (
   );
 
   useEffect(() => {
+    const controller = new AbortController();
     const load = async () => {
       // TODO - Add other loaders for custom commands.
       const loaders = [new BuiltinCommandLoader(config)];
-      const commandService = await CommandService.create(loaders);
+      const commandService = await CommandService.create(
+        loaders,
+        controller.signal,
+      );
       setCommands(commandService.getCommands());
     };
 
     load();
+
+    return () => {
+      controller.abort();
+    };
   }, [config]);
 
   const handleSlashCommand = useCallback(

@@ -332,4 +332,32 @@ describe('useSlashCommandProcessor', () => {
       expect(action).toHaveBeenCalledWith(expect.anything(), 'with-args');
     });
   });
+
+  describe('Lifecycle', () => {
+    it('should abort command loading when the hook unmounts', async () => {
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+      const { unmount } = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          mockSettings,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          vi.fn(), // refreshStatic
+          mockSetShowHelp,
+          vi.fn(), // onDebugMessage
+          vi.fn(), // openThemeDialog
+          mockOpenAuthDialog,
+          vi.fn(), // openEditorDialog
+          vi.fn(), // toggleCorgiMode
+          mockSetQuittingMessages,
+          vi.fn(), // openPrivacyNotice
+        ),
+      );
+
+      unmount();
+
+      expect(abortSpy).toHaveBeenCalledTimes(1);
+    });
+  });
 });
