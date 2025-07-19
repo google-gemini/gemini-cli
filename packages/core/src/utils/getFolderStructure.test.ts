@@ -8,7 +8,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import fsPromises from 'fs/promises';
 import * as fs from 'fs';
-import { Dirent as FSDirent } from 'fs';
 import * as nodePath from 'path';
 import { getFolderStructure } from './getFolderStructure.js';
 import * as gitUtils from './gitUtils.js';
@@ -30,8 +29,21 @@ vi.mock('./gitUtils.js');
 // Import 'path' again here, it will be the mocked version
 import * as path from 'path';
 
+interface TestDirent {
+  name: string;
+  isFile: () => boolean;
+  isDirectory: () => boolean;
+  isBlockDevice: () => boolean;
+  isCharacterDevice: () => boolean;
+  isSymbolicLink: () => boolean;
+  isFIFO: () => boolean;
+  isSocket: () => boolean;
+  path: string;
+  parentPath: string;
+}
+
 // Helper to create Dirent-like objects for mocking fs.readdir
-const createDirent = (name: string, type: 'file' | 'dir'): FSDirent => ({
+const createDirent = (name: string, type: 'file' | 'dir'): TestDirent => ({
   name,
   isFile: () => type === 'file',
   isDirectory: () => type === 'dir',
@@ -77,7 +89,7 @@ describe('getFolderStructure', () => {
     vi.restoreAllMocks(); // Restores spies (like fsPromises.readdir) and resets vi.fn mocks (like path.resolve)
   });
 
-  const mockFsStructure: Record<string, FSDirent[]> = {
+  const mockFsStructure: Record<string, TestDirent[]> = {
     '/testroot': [
       createDirent('file1.txt', 'file'),
       createDirent('subfolderA', 'dir'),
