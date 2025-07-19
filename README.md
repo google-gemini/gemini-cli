@@ -72,6 +72,14 @@ The Vertex AI API provides a [free tier](https://cloud.google.com/vertex-ai/gene
 
 For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
 
+## Basic Usage
+
+- **Enter prompts:** Type your question or command and press Enter to submit
+- **Multiline input:** Use **Alt+Enter** to insert line breaks in your prompts
+- **Include files:** Use `@filename` to include file contents in your prompt
+- **Run commands:** Use `!command` to execute shell commands
+- **View commands:** Type `/help` to see all available slash commands
+
 ## Examples
 
 Once the CLI is running, you can start interacting with Gemini from your shell.
