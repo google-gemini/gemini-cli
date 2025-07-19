@@ -1,3 +1,6 @@
+#!/bin/bash
+set -e
+
 # 0. install bun and the project, build bundle/gemini.js
 # brew tap oven-sh/bun/bun # for macOS and Linux
 # brew install bun 
