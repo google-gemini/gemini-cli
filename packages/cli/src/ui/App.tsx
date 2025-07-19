@@ -251,6 +251,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         process.cwd(),
         config.getDebugMode(),
         config.getFileService(),
+        settings.merged,
         config.getExtensionContextFilePaths(),
       );
       config.setUserMemory(memoryContent);
@@ -280,7 +281,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       );
       console.error('Error refreshing memory:', error);
     }
-  }, [config, addItem]);
+  }, [config, addItem, settings.merged]);
 
   // Watch for model changes (e.g., from Flash fallback)
   useEffect(() => {

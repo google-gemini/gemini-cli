@@ -218,6 +218,7 @@ export async function loadHierarchicalGeminiMemory(
   currentWorkingDirectory: string,
   debugMode: boolean,
   fileService: FileDiscoveryService,
+  settings: Settings,
   extensionContextFilePaths: string[] = [],
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode) {
@@ -232,6 +233,7 @@ export async function loadHierarchicalGeminiMemory(
     debugMode,
     fileService,
     extensionContextFilePaths,
+    settings.memoryDiscoveryMaxDirs,
   );
 }
 
@@ -282,6 +284,7 @@ export async function loadCliConfig(
     process.cwd(),
     debugMode,
     fileService,
+    settings,
     extensionContextFilePaths,
   );
 

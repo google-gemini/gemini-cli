@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getErrorMessage } from '@google/gemini-cli-core';
+import {
+  getErrorMessage,
+  loadServerHierarchicalMemory,
+} from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
 import { SlashCommand, SlashCommandActionReturn } from './types.js';
 
@@ -73,10 +76,19 @@ export const memoryCommand: SlashCommand = {
         );
 
         try {
-          const result = await context.services.config?.refreshMemory();
+          const config = await context.services.config;
+          if (config) {
+            const { memoryContent, fileCount } =
+              await loadServerHierarchicalMemory(
+                config.getWorkingDir(),
+                config.getDebugMode(),
+                config.getFileService(),
+                config.getExtensionContextFilePaths(),
+                context.services.settings.merged.memoryDiscoveryMaxDirs,
+              );
+            config.setUserMemory(memoryContent);
+            config.setGeminiMdFileCount(fileCount);
 
-          if (result) {
-            const { memoryContent, fileCount } = result;
             const successMessage =
               memoryContent.length > 0
                 ? `Memory refreshed successfully. Loaded ${memoryContent.length} characters from ${fileCount} file(s).`

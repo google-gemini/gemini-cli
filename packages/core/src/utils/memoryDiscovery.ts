@@ -29,8 +29,6 @@ const logger = {
     console.error('[ERROR] [MemoryDiscovery]', ...args),
 };
 
-const MAX_DIRECTORIES_TO_SCAN_FOR_MEMORY = 200;
-
 interface GeminiFileContent {
   filePath: string;
   content: string | null;
@@ -85,6 +83,7 @@ async function getGeminiMdFilePathsInternal(
   debugMode: boolean,
   fileService: FileDiscoveryService,
   extensionContextFilePaths: string[] = [],
+  maxDirs: number,
 ): Promise<string[]> {
   const allPaths = new Set<string>();
   const geminiMdFilenames = getAllGeminiMdFilenames();
@@ -183,7 +182,7 @@ async function getGeminiMdFilePathsInternal(
 
     const downwardPaths = await bfsFileSearch(resolvedCwd, {
       fileName: geminiMdFilename,
-      maxDirs: MAX_DIRECTORIES_TO_SCAN_FOR_MEMORY,
+      maxDirs,
       debug: debugMode,
       fileService,
     });
@@ -282,6 +281,7 @@ export async function loadServerHierarchicalMemory(
   debugMode: boolean,
   fileService: FileDiscoveryService,
   extensionContextFilePaths: string[] = [],
+  maxDirs: number = 200,
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode)
     logger.debug(
@@ -296,6 +296,7 @@ export async function loadServerHierarchicalMemory(
     debugMode,
     fileService,
     extensionContextFilePaths,
+    maxDirs,
   );
   if (filePaths.length === 0) {
     if (debugMode) logger.debug('No GEMINI.md files found in hierarchy.');

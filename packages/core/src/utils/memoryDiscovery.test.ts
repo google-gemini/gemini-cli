@@ -543,13 +543,13 @@ describe('loadServerHierarchicalMemory', () => {
     );
   });
 
-  it('should respect MAX_DIRECTORIES_TO_SCAN_FOR_MEMORY during downward scan', async () => {
+  it('should respect the maxDirs parameter during downward scan', async () => {
     const consoleDebugSpy = vi
       .spyOn(console, 'debug')
       .mockImplementation(() => {});
 
     const dirNames: Dirent[] = [];
-    for (let i = 0; i < 250; i++) {
+    for (let i = 0; i < 100; i++) {
       dirNames.push({
         name: `deep_dir_${i}`,
         isFile: () => false,
@@ -567,11 +567,12 @@ describe('loadServerHierarchicalMemory', () => {
     }) as unknown as typeof fsPromises.readdir);
     mockFs.access.mockRejectedValue(new Error('not found'));
 
-    await loadServerHierarchicalMemory(CWD, true, fileService);
+    // Pass the custom limit directly to the function
+    await loadServerHierarchicalMemory(CWD, true, fileService, [], 50);
 
     expect(consoleDebugSpy).toHaveBeenCalledWith(
       expect.stringContaining('[DEBUG] [BfsFileSearch]'),
-      expect.stringContaining('Scanning [200/200]:'),
+      expect.stringContaining('Scanning [50/50]:'),
     );
     consoleDebugSpy.mockRestore();
   });
