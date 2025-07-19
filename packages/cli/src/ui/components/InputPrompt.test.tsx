@@ -227,7 +227,7 @@ describe('InputPrompt', () => {
     await wait();
     stdin.write('\u001b[H'); // Home key
     await wait();
-    
+
     expect(props.buffer.moveToOffset).toHaveBeenCalledWith(0);
     unmount();
   });
