@@ -42,6 +42,13 @@ export interface LogResponse {
   nextRequestWaitMs?: number;
 }
 
+export class ClearcutDecodeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ClearcutDecodeError';
+  }
+}
+
 // Singleton class for batch posting log events to Clearcut. When a new event comes in, the elapsed time
 // is checked and events are flushed to Clearcut if at least a minute has passed since the last flush.
 export class ClearcutLogger {
@@ -159,7 +166,7 @@ export class ClearcutLogger {
       .then((buf: Buffer) => {
         try {
           this.last_flush_time = Date.now();
-          return this.decodeLogResponse(buf) || {};
+          return this.decodeLogResponse(buf);
         } catch (error: unknown) {
           console.error('Error flushing log events:', error);
           return {};
@@ -174,18 +181,17 @@ export class ClearcutLogger {
   }
 
   // Visible for testing. Decodes protobuf-encoded response from Clearcut server.
-  decodeLogResponse(buf: Buffer): LogResponse | undefined {
-    // TODO(obrienowen): return specific errors to facilitate debugging.
+  decodeLogResponse(buf: Buffer): LogResponse {
     if (buf.length < 1) {
-      return undefined;
+      throw new ClearcutDecodeError('empty response buffer');
     }
 
     // The first byte of the buffer is `field<<3 | type`. We're looking for field
     // 1, with type varint, represented by type=0. If the first byte isn't 8, that
     // means field 1 is missing or the message is corrupted. Either way, we return
-    // undefined.
+    // ClearcutDecodeError.
     if (buf.readUInt8(0) !== 8) {
-      return undefined;
+      throw new ClearcutDecodeError('missing field 1 in response');
     }
 
     let ms = BigInt(0);
@@ -203,7 +209,7 @@ export class ClearcutLogger {
     if (cont) {
       // We have fallen off the buffer without seeing a terminating byte. The
       // message is corrupted.
-      return undefined;
+      throw new ClearcutDecodeError('unterminated varint in response');
     }
 
     const returnVal = {
