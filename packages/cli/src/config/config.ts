@@ -247,8 +247,8 @@ export async function loadCliConfig(
       (v) => v === 'true' || v === '1',
     );
 
-  if (process.env.SYSTEM_SETTINGS_PATH) {
-    setSystemSettingsPath(process.env.SYSTEM_SETTINGS_PATH);
+  if (process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH) {
+    setSystemSettingsPath(process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH);
   }
 
   const ideMode =
