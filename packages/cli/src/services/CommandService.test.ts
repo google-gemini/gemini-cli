@@ -11,6 +11,7 @@ import { type SlashCommand } from '../ui/commands/types.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
+import { corgiCommand } from '../ui/commands/corgiCommand.js';
 import { docsCommand } from '../ui/commands/docsCommand.js';
 import { chatCommand } from '../ui/commands/chatCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
@@ -24,6 +25,9 @@ import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
+import { bugCommand } from '../ui/commands/bugCommand.js';
+import { quitCommand } from '../ui/commands/quitCommand.js';
+import { restoreCommand } from '../ui/commands/restoreCommand.js';
 
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
@@ -34,6 +38,9 @@ vi.mock('../ui/commands/helpCommand.js', () => ({
 }));
 vi.mock('../ui/commands/clearCommand.js', () => ({
   clearCommand: { name: 'clear', description: 'Mock Clear' },
+}));
+vi.mock('../ui/commands/corgiCommand.js', () => ({
+  corgiCommand: { name: 'corgi', description: 'Mock Corgi' },
 }));
 vi.mock('../ui/commands/docsCommand.js', () => ({
   docsCommand: { name: 'docs', description: 'Mock Docs' },
@@ -71,16 +78,27 @@ vi.mock('../ui/commands/mcpCommand.js', () => ({
 vi.mock('../ui/commands/editorCommand.js', () => ({
   editorCommand: { name: 'editor', description: 'Mock Editor' },
 }));
+vi.mock('../ui/commands/bugCommand.js', () => ({
+  bugCommand: { name: 'bug', description: 'Mock Bug' },
+}));
+vi.mock('../ui/commands/quitCommand.js', () => ({
+  quitCommand: { name: 'quit', description: 'Mock Quit' },
+}));
+vi.mock('../ui/commands/restoreCommand.js', () => ({
+  restoreCommand: vi.fn(),
+}));
 
 describe('CommandService', () => {
-  const subCommandLen = 15;
+  const subCommandLen = 18;
   let mockConfig: Mocked<Config>;
 
   beforeEach(() => {
     mockConfig = {
       getIdeMode: vi.fn(),
+      getCheckpointingEnabled: vi.fn(),
     } as unknown as Mocked<Config>;
     vi.mocked(ideCommand).mockReturnValue(null);
+    vi.mocked(restoreCommand).mockReturnValue(null);
   });
 
   describe('when using default production loader', () => {
@@ -110,9 +128,12 @@ describe('CommandService', () => {
 
         const commandNames = tree.map((cmd) => cmd.name);
         expect(commandNames).toContain('auth');
+        expect(commandNames).toContain('bug');
         expect(commandNames).toContain('memory');
         expect(commandNames).toContain('help');
         expect(commandNames).toContain('clear');
+        expect(commandNames).toContain('compress');
+        expect(commandNames).toContain('corgi');
         expect(commandNames).toContain('docs');
         expect(commandNames).toContain('chat');
         expect(commandNames).toContain('theme');
@@ -121,7 +142,6 @@ describe('CommandService', () => {
         expect(commandNames).toContain('about');
         expect(commandNames).toContain('extensions');
         expect(commandNames).toContain('tools');
-        expect(commandNames).toContain('compress');
         expect(commandNames).toContain('mcp');
         expect(commandNames).not.toContain('ide');
       });
@@ -139,6 +159,21 @@ describe('CommandService', () => {
         const commandNames = tree.map((cmd) => cmd.name);
         expect(commandNames).toContain('ide');
         expect(commandNames).toContain('editor');
+        expect(commandNames).toContain('quit');
+      });
+
+      it('should include restore command when checkpointing is on', async () => {
+        mockConfig.getCheckpointingEnabled.mockReturnValue(true);
+        vi.mocked(restoreCommand).mockReturnValue({
+          name: 'restore',
+          description: 'Mock Restore',
+        });
+        await commandService.loadCommands();
+        const tree = commandService.getCommands();
+
+        expect(tree.length).toBe(subCommandLen + 1);
+        const commandNames = tree.map((cmd) => cmd.name);
+        expect(commandNames).toContain('restore');
       });
 
       it('should overwrite any existing commands when called again', async () => {
@@ -167,9 +202,11 @@ describe('CommandService', () => {
         expect(loadedTree).toEqual([
           aboutCommand,
           authCommand,
+          bugCommand,
           chatCommand,
           clearCommand,
           compressCommand,
+          corgiCommand,
           docsCommand,
           editorCommand,
           extensionsCommand,
@@ -177,6 +214,7 @@ describe('CommandService', () => {
           mcpCommand,
           memoryCommand,
           privacyCommand,
+          quitCommand,
           statsCommand,
           themeCommand,
           toolsCommand,

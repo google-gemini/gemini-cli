@@ -14,7 +14,7 @@ vi.mock('node:process', () => ({
     cwd: vi.fn(() => '/mock/cwd'),
     get env() {
       return process.env;
-    }, // Use a getter to ensure current process.env is used
+    },
     platform: 'test-platform',
     version: 'test-node-version',
     memoryUsage: vi.fn(() => ({
@@ -25,12 +25,11 @@ vi.mock('node:process', () => ({
       arrayBuffers: 123456,
     })),
   },
-  // Provide top-level exports as well for compatibility
   exit: mockProcessExit,
   cwd: vi.fn(() => '/mock/cwd'),
   get env() {
     return process.env;
-  }, // Use a getter here too
+  },
   platform: 'test-platform',
   version: 'test-node-version',
   memoryUsage: vi.fn(() => ({
@@ -54,16 +53,7 @@ vi.mock('../../utils/version.js', () => ({
 }));
 
 import { act, renderHook } from '@testing-library/react';
-import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  beforeAll,
-  Mock,
-} from 'vitest';
+import { vi, describe, it, expect, beforeEach, beforeAll, Mock } from 'vitest';
 import open from 'open';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
 import { SlashCommandProcessorResult } from '../types.js';
@@ -71,7 +61,6 @@ import { Config, GeminiClient } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { LoadedSettings } from '../../config/settings.js';
 import * as ShowMemoryCommandModule from './useShowMemoryCommand.js';
-import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { CommandService } from '../../services/CommandService.js';
 import { SlashCommand } from '../commands/types.js';
 
@@ -116,19 +105,7 @@ describe('useSlashCommandProcessor', () => {
   const mockUseSessionStats = useSessionStats as Mock;
 
   beforeEach(() => {
-    // Reset all mocks to clear any previous state or calls.
     vi.clearAllMocks();
-
-    // Default mock setup for CommandService for all the OLD tests.
-    // This makes them pass again by simulating the original behavior where
-    // the service is constructed but doesn't do much yet.
-    vi.mocked(CommandService).mockImplementation(
-      () =>
-        ({
-          loadCommands: vi.fn().mockResolvedValue(undefined),
-          getCommands: vi.fn().mockReturnValue([]), // Return an empty array by default
-        }) as unknown as CommandService,
-    );
 
     mockAddItem = vi.fn();
     mockClearItems = vi.fn();
@@ -187,7 +164,6 @@ describe('useSlashCommandProcessor', () => {
       useSlashCommandProcessor(
         mockConfig,
         settings,
-        [],
         mockAddItem,
         mockClearItems,
         mockLoadHistory,
@@ -204,9 +180,7 @@ describe('useSlashCommandProcessor', () => {
     );
   };
 
-  const getProcessor = () => getProcessorHook().result.current;
-
-  describe('New command registry', () => {
+  describe('Command Processing', () => {
     let ActualCommandService: typeof CommandService;
 
     beforeAll(async () => {
@@ -220,7 +194,7 @@ describe('useSlashCommandProcessor', () => {
       vi.clearAllMocks();
     });
 
-    it('should execute a command from the new registry', async () => {
+    it('should execute a registered command', async () => {
       const mockAction = vi.fn();
       const newCommand: SlashCommand = { name: 'test', action: mockAction };
       const mockLoader = async () => [newCommand];
@@ -255,7 +229,7 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
-    it('should return "schedule_tool" when a new command returns a tool action', async () => {
+    it('should return "schedule_tool" for a command returning a tool action', async () => {
       const mockAction = vi.fn().mockResolvedValue({
         type: 'tool',
         toolName: 'my_tool',
@@ -288,7 +262,7 @@ describe('useSlashCommandProcessor', () => {
       });
     });
 
-    it('should return "handled" when a new command returns a message action', async () => {
+    it('should return "handled" for a command returning a message action', async () => {
       const mockAction = vi.fn().mockResolvedValue({
         type: 'message',
         messageType: 'info',
@@ -324,7 +298,7 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
-    it('should return "handled" when a new command returns a dialog action', async () => {
+    it('should return "handled" for a command returning a dialog action', async () => {
       const mockAction = vi.fn().mockResolvedValue({
         type: 'dialog',
         dialog: 'help',
@@ -353,7 +327,7 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
-    it('should open the auth dialog when a new command returns an auth dialog action', async () => {
+    it('should open the auth dialog for a command returning an auth dialog action', async () => {
       const mockAction = vi.fn().mockResolvedValue({
         type: 'dialog',
         dialog: 'auth',
@@ -383,7 +357,7 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
-    it('should open the theme dialog when a new command returns a theme dialog action', async () => {
+    it('should open the theme dialog for a command returning a theme dialog action', async () => {
       const mockAction = vi.fn().mockResolvedValue({
         type: 'dialog',
         dialog: 'theme',
@@ -451,156 +425,5 @@ describe('useSlashCommandProcessor', () => {
         expect.any(Number),
       );
     });
-  });
-
-  describe('/bug command', () => {
-    const originalEnv = process.env;
-    beforeEach(() => {
-      vi.resetModules();
-      mockGetCliVersionFn.mockResolvedValue('0.1.0');
-      process.env = { ...originalEnv };
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-      process.env = originalEnv;
-    });
-
-    const getExpectedUrl = (
-      description?: string,
-      sandboxEnvVar?: string,
-      seatbeltProfileVar?: string,
-      cliVersion?: string,
-    ) => {
-      const osVersion = 'test-platform test-node-version';
-      let sandboxEnvStr = 'no sandbox';
-      if (sandboxEnvVar && sandboxEnvVar !== 'sandbox-exec') {
-        sandboxEnvStr = sandboxEnvVar.replace(/^gemini-(?:code-)?/, '');
-      } else if (sandboxEnvVar === 'sandbox-exec') {
-        sandboxEnvStr = `sandbox-exec (${seatbeltProfileVar || 'unknown'})`;
-      }
-      const modelVersion = 'test-model';
-      // Use the mocked memoryUsage value
-      const memoryUsage = '11.8 MB';
-
-      const info = `
-*   **CLI Version:** ${cliVersion}
-*   **Git Commit:** ${GIT_COMMIT_INFO}
-*   **Operating System:** ${osVersion}
-*   **Sandbox Environment:** ${sandboxEnvStr}
-*   **Model Version:** ${modelVersion}
-*   **Memory Usage:** ${memoryUsage}
-`;
-      let url =
-        'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml';
-      if (description) {
-        url += `&title=${encodeURIComponent(description)}`;
-      }
-      url += `&info=${encodeURIComponent(info)}`;
-      return url;
-    };
-
-    it('should call open with the correct GitHub issue URL and return true', async () => {
-      mockGetCliVersionFn.mockResolvedValue('test-version');
-      process.env.SANDBOX = 'gemini-sandbox';
-      process.env.SEATBELT_PROFILE = 'test_profile';
-      const { handleSlashCommand } = getProcessor();
-      const bugDescription = 'This is a test bug';
-      const expectedUrl = getExpectedUrl(
-        bugDescription,
-        process.env.SANDBOX,
-        process.env.SEATBELT_PROFILE,
-        'test-version',
-      );
-      let commandResult: SlashCommandProcessorResult | false = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand(`/bug ${bugDescription}`);
-      });
-
-      expect(mockAddItem).toHaveBeenCalledTimes(2);
-      expect(open).toHaveBeenCalledWith(expectedUrl);
-      expect(commandResult).toEqual({ type: 'handled' });
-    });
-
-    it('should use the custom bug command URL from config if available', async () => {
-      process.env.CLI_VERSION = '0.1.0';
-      process.env.SANDBOX = 'sandbox-exec';
-      process.env.SEATBELT_PROFILE = 'permissive-open';
-      const bugCommand = {
-        urlTemplate:
-          'https://custom-bug-tracker.com/new?title={title}&info={info}',
-      };
-      mockConfig = {
-        ...mockConfig,
-        getBugCommand: vi.fn(() => bugCommand),
-      } as unknown as Config;
-      process.env.CLI_VERSION = '0.1.0';
-
-      const { handleSlashCommand } = getProcessor();
-      const bugDescription = 'This is a custom bug';
-      const info = `
-*   **CLI Version:** 0.1.0
-*   **Git Commit:** ${GIT_COMMIT_INFO}
-*   **Operating System:** test-platform test-node-version
-*   **Sandbox Environment:** sandbox-exec (permissive-open)
-*   **Model Version:** test-model
-*   **Memory Usage:** 11.8 MB
-`;
-      const expectedUrl = bugCommand.urlTemplate
-        .replace('{title}', encodeURIComponent(bugDescription))
-        .replace('{info}', encodeURIComponent(info));
-
-      let commandResult: SlashCommandProcessorResult | false = false;
-      await act(async () => {
-        commandResult = await handleSlashCommand(`/bug ${bugDescription}`);
-      });
-
-      expect(mockAddItem).toHaveBeenCalledTimes(2);
-      expect(open).toHaveBeenCalledWith(expectedUrl);
-      expect(commandResult).toEqual({ type: 'handled' });
-    });
-  });
-
-  describe('/quit and /exit commands', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    it.each([['/quit'], ['/exit']])(
-      'should handle %s, set quitting messages, and exit the process',
-      async (command) => {
-        const { handleSlashCommand } = getProcessor();
-        const mockDate = new Date('2025-01-01T01:02:03.000Z');
-        vi.setSystemTime(mockDate);
-
-        await act(async () => {
-          handleSlashCommand(command);
-        });
-
-        expect(mockAddItem).not.toHaveBeenCalled();
-        expect(mockSetQuittingMessages).toHaveBeenCalledWith([
-          {
-            type: 'user',
-            text: command,
-            id: expect.any(Number),
-          },
-          {
-            type: 'quit',
-            duration: '1h 2m 3s',
-            id: expect.any(Number),
-          },
-        ]);
-
-        // Fast-forward timers to trigger process.exit
-        await act(async () => {
-          vi.advanceTimersByTime(100);
-        });
-        expect(mockProcessExit).toHaveBeenCalledWith(0);
-      },
-    );
   });
 });

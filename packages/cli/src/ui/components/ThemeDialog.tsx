@@ -36,6 +36,7 @@ export function ThemeDialog({
     SettingScope.User,
   );
 
+
   // Track the currently highlighted theme name
   const [highlightedThemeName, setHighlightedThemeName] = useState<
     string | undefined
@@ -65,6 +66,16 @@ export function ThemeDialog({
       themeTypeDisplay: 'Custom',
     })),
   ];
+
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  // Generate theme items
+  const themeItems = themeManager.getAvailableThemes().map((theme) => ({
+    label: theme.name,
+    value: theme.name,
+    themeNameDisplay: theme.name,
+    themeTypeDisplay: capitalize(theme.type),
+  }));
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
 
   // Find the index of the selected theme, but only if it exists in the list
@@ -199,10 +210,17 @@ export function ThemeDialog({
     availableTerminalHeight -
     PREVIEW_PANE_FIXED_VERTICAL_SPACE -
     (includePadding ? 2 : 0) * 2;
-  // Give slightly more space to the code block as it is 3 lines longer.
-  const diffHeight = Math.floor(availableTerminalHeightCodeBlock / 2) - 1;
-  const codeBlockHeight = Math.ceil(availableTerminalHeightCodeBlock / 2) + 1;
 
+  // Subtract margin between code blocks from available height.
+  const availableHeightForPanes = Math.max(
+    0,
+    availableTerminalHeightCodeBlock - 1,
+  );
+
+  // The code block is slightly longer than the diff, so give it more space.
+  const codeBlockHeight = Math.ceil(availableHeightForPanes * 0.6);
+  const diffHeight = Math.floor(availableHeightForPanes * 0.4);
+  const themeType = capitalize(themeManager.getActiveTheme().type);
   return (
     <Box
       borderStyle="round"
@@ -230,6 +248,7 @@ export function ThemeDialog({
             isFocused={currenFocusedSection === 'theme'}
             maxItemsToShow={8}
             showScrollArrows={true}
+            showNumbers={currenFocusedSection === 'theme'}
           />
 
           {/* Scope Selection */}
@@ -244,6 +263,7 @@ export function ThemeDialog({
                 onSelect={handleScopeSelect}
                 onHighlight={handleScopeHighlight}
                 isFocused={currenFocusedSection === 'scope'}
+                showNumbers={currenFocusedSection === 'scope'}
               />
             </Box>
           )}
@@ -289,6 +309,7 @@ export function ThemeDialog({
               </Box>
             );
           })()}
+
         </Box>
       </Box>
       <Box marginTop={1}>
