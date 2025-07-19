@@ -9,13 +9,14 @@ import os from 'os';
 import { detect as chardetDetect } from 'chardet';
 
 // Cache for system encoding to avoid repeated detection
-let cachedSystemEncoding: string | null = null;
+// Use undefined to indicate "not yet checked" vs null meaning "checked but failed"
+let cachedSystemEncoding: string | null | undefined = undefined;
 
 /**
  * Reset the encoding cache - useful for testing
  */
 export function resetEncodingCache(): void {
-  cachedSystemEncoding = null;
+  cachedSystemEncoding = undefined;
 }
 
 /**
@@ -27,7 +28,7 @@ export function resetEncodingCache(): void {
  */
 export function getCachedEncodingForBuffer(buffer: Buffer): string {
   // Cache system encoding detection since it's system-wide
-  if (cachedSystemEncoding === null) {
+  if (cachedSystemEncoding === undefined) {
     cachedSystemEncoding = getSystemEncoding();
   }
   
