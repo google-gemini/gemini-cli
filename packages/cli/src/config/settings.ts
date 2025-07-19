@@ -95,6 +95,7 @@ export interface Settings {
 
   // Add other settings here.
   ideMode?: boolean;
+  'session.persistence'?: boolean;
 }
 
 export interface SettingsError {
