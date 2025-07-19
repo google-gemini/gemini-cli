@@ -170,9 +170,9 @@ describe('loadCliConfig', () => {
     setSystemSettingsPathSpy.mockRestore();
   });
 
-  it('should call setSystemSettingsPath when --system-settings-path is provided', async () => {
-    const customPath = '/custom/path/to/settings.json';
-    process.argv = ['node', 'script.js', '--system-settings-path', customPath];
+  it('should call setSystemSettingsPath when SYSTEM_SETTINGS_PATH is provided', async () => {
+    process.env.SYSTEM_SETTINGS_PATH = '/custom/path/to/settings.json';
+    process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const _config = await loadCliConfig({}, [], 'test-session', argv);
     expect(setSystemSettingsPathSpy).toHaveBeenCalledWith(customPath);
