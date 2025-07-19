@@ -71,6 +71,9 @@ vi.mock('../telemetry/index.js', () => ({
   logApiResponse: vi.fn(),
   logApiError: vi.fn(),
 }));
+vi.mock('../telemetry/metrics.js', () => ({
+  recordTurnMetrics: vi.fn(),
+}));
 
 describe('findIndexAfterFraction', () => {
   const history: Content[] = [
@@ -916,6 +919,241 @@ describe('Gemini Client (client.ts)', () => {
         `Infinite loop protection working: checkNextSpeaker called ${callCount} times, ` +
           `${eventCount} events generated (properly bounded by MAX_TURNS)`,
       );
+    });
+
+    describe('turn telemetry tracking', () => {
+      let recordTurnMetrics: ReturnType<typeof vi.fn>;
+
+      beforeEach(async () => {
+        // Reset the mock before each test
+        const metricsModule = await import('../telemetry/metrics.js');
+        recordTurnMetrics = vi.mocked(metricsModule.recordTurnMetrics);
+        recordTurnMetrics.mockClear();
+      });
+
+      it('should record telemetry when turn limit is reached', async () => {
+        // Configure checkNextSpeaker to always return 'model' to trigger recursion
+        const { checkNextSpeaker } = await import(
+          '../utils/nextSpeakerChecker.js'
+        );
+        const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
+        mockCheckNextSpeaker.mockResolvedValue({
+          next_speaker: 'model',
+          reasoning: 'Test - always continue',
+        });
+
+        // Mock Turn to have no pending tool calls
+        const mockStream = (async function* () {
+          yield { type: 'content', value: 'Continue...' };
+        })();
+        mockTurnRunFn.mockReturnValue(mockStream);
+
+        const mockChat: Partial<GeminiChat> = {
+          addHistory: vi.fn(),
+          getHistory: vi.fn().mockReturnValue([]),
+        };
+        client['chat'] = mockChat as GeminiChat;
+
+        const mockGenerator: Partial<ContentGenerator> = {
+          countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        };
+        client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+        const signal = new AbortController().signal;
+        const model = 'gemini-pro';
+        vi.spyOn(client['config'], 'getModel').mockReturnValue(model);
+
+        // Start with 0 turns to trigger limit reached immediately
+        const stream = client.sendMessageStream(
+          [{ text: 'Start conversation' }],
+          signal,
+          'prompt-id-telemetry-1',
+          0, // No turns remaining - triggers limit reached
+        );
+
+        // Consume the stream
+        const events = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+
+        // Verify telemetry was called with limit reached
+        expect(recordTurnMetrics).toHaveBeenCalledWith(
+          client['config'],
+          model,
+          100, // MAX_TURNS (100) - boundedTurns (0)
+          100, // MAX_TURNS
+          true, // limit reached
+          expect.any(Number), // sessionTurnCount
+        );
+      });
+
+      it('should record telemetry when conversation ends normally', async () => {
+        // Configure checkNextSpeaker to return 'user' to end conversation
+        const { checkNextSpeaker } = await import(
+          '../utils/nextSpeakerChecker.js'
+        );
+        const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
+        mockCheckNextSpeaker.mockResolvedValue({
+          next_speaker: 'user',
+          reasoning: 'Test - user turn',
+        });
+
+        // Mock Turn to have no pending tool calls
+        const mockStream = (async function* () {
+          yield { type: 'content', value: 'Response' };
+        })();
+        mockTurnRunFn.mockReturnValue(mockStream);
+
+        const mockChat: Partial<GeminiChat> = {
+          addHistory: vi.fn(),
+          getHistory: vi.fn().mockReturnValue([]),
+        };
+        client['chat'] = mockChat as GeminiChat;
+
+        const mockGenerator: Partial<ContentGenerator> = {
+          countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        };
+        client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+        const signal = new AbortController().signal;
+        const model = 'gemini-pro';
+        vi.spyOn(client['config'], 'getModel').mockReturnValue(model);
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hello' }],
+          signal,
+          'prompt-id-telemetry-2',
+        );
+
+        // Consume the stream
+        for await (const _event of stream) {
+          // consume events
+        }
+
+        // Verify telemetry was called when conversation ended normally
+        expect(recordTurnMetrics).toHaveBeenCalledWith(
+          client['config'],
+          model,
+          1, // MAX_TURNS (100) - boundedTurns (100) + 1
+          100, // MAX_TURNS
+          false, // limit not reached
+          expect.any(Number), // sessionTurnCount
+        );
+      });
+
+      it('should record telemetry when turn ends with pending tool calls', async () => {
+        // Mock Turn.run to return a stream and set pendingToolCalls on the instance
+        const mockStream = (async function* () {
+          yield { type: 'content', value: 'Response with tool call' };
+        })();
+
+        mockTurnRunFn.mockImplementation(function (this: {
+          pendingToolCalls: Array<{
+            name: string;
+            args: Record<string, unknown>;
+          }>;
+        }) {
+          // Set pendingToolCalls on the Turn instance
+          this.pendingToolCalls = [{ name: 'tool1', args: {} }];
+          return mockStream;
+        });
+
+        const mockChat: Partial<GeminiChat> = {
+          addHistory: vi.fn(),
+          getHistory: vi.fn().mockReturnValue([]),
+        };
+        client['chat'] = mockChat as GeminiChat;
+
+        const mockGenerator: Partial<ContentGenerator> = {
+          countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        };
+        client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+        const signal = new AbortController().signal;
+        const model = 'gemini-pro';
+        vi.spyOn(client['config'], 'getModel').mockReturnValue(model);
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hello' }],
+          signal,
+          'prompt-id-telemetry-3',
+        );
+
+        // Consume the stream
+        for await (const _event of stream) {
+          // consume events
+        }
+
+        // Verify telemetry was called when turn ended with pending tool calls
+        expect(recordTurnMetrics).toHaveBeenCalledWith(
+          client['config'],
+          model,
+          1, // MAX_TURNS (100) - boundedTurns (100) + 1
+          100, // MAX_TURNS
+          false, // limit not reached
+          expect.any(Number), // sessionTurnCount
+        );
+      });
+
+      it('should track recursive turns correctly', async () => {
+        // Configure checkNextSpeaker to return 'model' twice, then 'user'
+        const { checkNextSpeaker } = await import(
+          '../utils/nextSpeakerChecker.js'
+        );
+        const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
+        let callCount = 0;
+        mockCheckNextSpeaker.mockImplementation(async () => {
+          callCount++;
+          return {
+            next_speaker: callCount <= 2 ? 'model' : 'user',
+            reasoning: 'Test - conditional continue',
+          };
+        });
+
+        // Mock Turn to have no pending tool calls
+        const mockStream = (async function* () {
+          yield { type: 'content', value: 'Response' };
+        })();
+        mockTurnRunFn.mockReturnValue(mockStream);
+
+        const mockChat: Partial<GeminiChat> = {
+          addHistory: vi.fn(),
+          getHistory: vi.fn().mockReturnValue([]),
+        };
+        client['chat'] = mockChat as GeminiChat;
+
+        const mockGenerator: Partial<ContentGenerator> = {
+          countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        };
+        client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+        const signal = new AbortController().signal;
+        const model = 'gemini-pro';
+        vi.spyOn(client['config'], 'getModel').mockReturnValue(model);
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Start' }],
+          signal,
+          'prompt-id-telemetry-4',
+        );
+
+        // Consume the stream
+        for await (const _event of stream) {
+          // consume events
+        }
+
+        // Should be called once when the conversation ends after 3 turns
+        expect(recordTurnMetrics).toHaveBeenCalledTimes(1);
+        expect(recordTurnMetrics).toHaveBeenCalledWith(
+          client['config'],
+          model,
+          3, // 3 turns were used (initial + 2 recursive)
+          100, // MAX_TURNS
+          false, // limit not reached
+          expect.any(Number), // sessionTurnCount
+        );
+      });
     });
   });
 
