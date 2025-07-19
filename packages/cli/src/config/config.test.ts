@@ -4,10 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from 'vitest';
 import * as os from 'os';
 import { loadCliConfig, parseArguments } from './config.js';
 import { Settings } from './settings.js';
+import * as settings from './settings.js';
 import { Extension } from './extension.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 
@@ -143,6 +152,7 @@ describe('parseArguments', () => {
 describe('loadCliConfig', () => {
   const originalArgv = process.argv;
   const originalEnv = { ...process.env };
+  const setSystemSettingsPathSpy = vi.spyOn(settings, 'setSystemSettingsPath');
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -154,6 +164,19 @@ describe('loadCliConfig', () => {
     process.argv = originalArgv;
     process.env = originalEnv;
     vi.restoreAllMocks();
+  });
+
+  afterAll(() => {
+    setSystemSettingsPathSpy.mockRestore();
+  });
+
+  it('should call setSystemSettingsPath when GEMINI_CLI_SYSTEM_SETTINGS_PATH is provided', async () => {
+    const customPath = '/custom/path/to/settings.json';
+    process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH = customPath;
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const _config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(setSystemSettingsPathSpy).toHaveBeenCalledWith(customPath);
   });
 
   it('should set showMemoryUsage to true when --show-memory-usage flag is present', async () => {
