@@ -295,10 +295,10 @@ function executeShellCommand(
 
       // Handle any final bytes lingering in the decoders
       if (stdoutDecoder) {
-        stdoutDecoder.decode();
+        stdout += stdoutDecoder.decode();
       }
       if (stderrDecoder) {
-        stderrDecoder.decode();
+        stderr += stderrDecoder.decode();
       }
 
       const finalBuffer = Buffer.concat(outputChunks);
