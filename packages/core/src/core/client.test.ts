@@ -13,7 +13,12 @@ import {
   GenerateContentResponse,
   GoogleGenAI,
 } from '@google/genai';
-import { findIndexAfterFraction, GeminiClient } from './client.js';
+import {
+  findIndexAfterFraction,
+  calculateCharacterLimit,
+  COMPRESSION_LIMIT_THRESHOLD,
+  GeminiClient,
+} from './client.js';
 import { AuthType, ContentGenerator } from './contentGenerator.js';
 import { GeminiChat } from './geminiChat.js';
 import { Config } from '../config/config.js';
@@ -127,6 +132,50 @@ describe('findIndexAfterFraction', () => {
       { role: 'user', parts: [{ text: 'Message 2' }] },
     ];
     expect(findIndexAfterFraction(historyWithEmptyParts, 0.5)).toBe(1);
+  });
+});
+
+describe('calculateCharacterLimit', () => {
+  it('should return 0 if tokenLimit is 0 to prevent division by zero', () => {
+    expect(calculateCharacterLimit(100, 0, 50)).toBe(0);
+  });
+
+  it('should return 0 if tokenConsumed is 0', () => {
+    expect(calculateCharacterLimit(0, 8192, 50)).toBe(0);
+  });
+
+  it('should return 0 if historyCharacterLength is 0', () => {
+    expect(calculateCharacterLimit(100, 8192, 0)).toBe(0);
+  });
+
+  it('should calculate the correct limit under normal conditions', () => {
+    const tokenConsumed = 4096; // 50% of limit
+    const tokenLimit = 8192;
+    const historyCharacterLength = 100;
+    const expected = Math.floor(
+      (historyCharacterLength / (tokenConsumed / tokenLimit)) *
+        COMPRESSION_LIMIT_THRESHOLD,
+    ); // 100 / 0.5 * 0.4 = 20
+    expect(
+      calculateCharacterLimit(
+        tokenConsumed,
+        tokenLimit,
+        historyCharacterLength,
+      ),
+    ).toBe(expected);
+  });
+
+  it('should always return an integer', () => {
+    // Use values that would produce a float
+    const tokenConsumed = 1;
+    const tokenLimit = 3;
+    const historyCharacterLength = 10;
+    const result = calculateCharacterLimit(
+      tokenConsumed,
+      tokenLimit,
+      historyCharacterLength,
+    );
+    expect(Number.isInteger(result)).toBe(true);
   });
 });
 

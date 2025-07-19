@@ -81,6 +81,45 @@ export function findIndexAfterFraction(
   return contentLengths.length;
 }
 
+/**
+ * The scaling factor for chat history compression.
+ *
+ * A value of 0.4 means that the summary's character limit will be
+ * 40% of the total token allowance.
+ *
+ * Exported for testing purposes.
+ */
+export const COMPRESSION_LIMIT_THRESHOLD = 0.4;
+
+/**
+ * Returns the upper bound for the total character count for the summarized history.
+ *
+ * This function calculates a dynamic character limit for the chat history summary
+ * based on the current token usage and the number of turns in the conversation.
+ * The goal is to create a summary that is long enough to be useful but short
+ * enough to free up a meaningful number of tokens.
+ *
+ * Exported for testing purposes.
+ *
+ * @param tokenConsumed The number of tokens already used in the chat history.
+ * @param tokenLimit The total token limit for the model.
+ * @param historyLength The number of characters in the chat history.
+ * @returns The calculated character limit for the summary.
+ */
+export function calculateCharacterLimit(
+  tokenConsumed: number,
+  tokenLimit: number,
+  historyLength: number,
+): number {
+  if (tokenConsumed === 0) {
+    return 0;
+  }
+
+  const charsPerToken = historyLength / tokenConsumed;
+  const charsLimit = tokenLimit * charsPerToken;
+  return COMPRESSION_LIMIT_THRESHOLD * charsLimit;
+}
+
 export class GeminiClient {
   private chat?: GeminiChat;
   private contentGenerator?: ContentGenerator;
@@ -556,7 +595,6 @@ This is the cursor position in the file:
   ): Promise<ChatCompressionInfo | null> {
     const curatedHistory = this.getChat().getHistory(true);
 
-    // Regardless of `force`, don't do anything if the history is empty.
     if (curatedHistory.length === 0) {
       return null;
     }
@@ -573,13 +611,25 @@ This is the cursor position in the file:
       return null;
     }
 
+    const limit = tokenLimit(model);
+
     // Don't compress if not forced and we are under the limit.
     if (
       !force &&
-      originalTokenCount < this.COMPRESSION_TOKEN_THRESHOLD * tokenLimit(model)
+      originalTokenCount < this.COMPRESSION_TOKEN_THRESHOLD * limit
     ) {
       return null;
     }
+
+    const historyCharacterLength = curatedHistory.reduce((acc, content) => {
+      if (!content.parts) {
+        return acc;
+      }
+      const text = content.parts
+        .map((part) => (part as { text: string }).text)
+        .join('');
+      return acc + text.length;
+    }, 0);
 
     let compressBeforeIndex = findIndexAfterFraction(
       curatedHistory,
@@ -605,7 +655,15 @@ This is the cursor position in the file:
           text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
         },
         config: {
-          systemInstruction: { text: getCompressionPrompt() },
+          systemInstruction: {
+            text: getCompressionPrompt(
+              calculateCharacterLimit(
+                originalTokenCount,
+                limit,
+                historyCharacterLength,
+              ),
+            ),
+          },
         },
       },
       prompt_id,
