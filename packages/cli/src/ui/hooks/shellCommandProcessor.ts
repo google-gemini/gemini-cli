@@ -12,7 +12,11 @@ import {
   ToolCallStatus,
 } from '../types.js';
 import { useCallback } from 'react';
-import { Config, GeminiClient, getCachedEncodingForBuffer } from '@google/gemini-cli-core';
+import {
+  Config,
+  GeminiClient,
+  getCachedEncodingForBuffer,
+} from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import { isBinary } from '../utils/textUtils.js';
@@ -85,7 +89,6 @@ function executeShellCommand(
     let sniffedBytes = 0;
 
     const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
-
       if (!stdoutDecoder || !stderrDecoder) {
         const encoding = getCachedEncodingForBuffer(data);
         stdoutDecoder = new TextDecoder(encoding);
