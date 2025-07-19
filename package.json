@@ -81,5 +81,8 @@
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2"
+  },
+  "dependencies": {
+    "chardet": "^2.1.0"
   }
 }
