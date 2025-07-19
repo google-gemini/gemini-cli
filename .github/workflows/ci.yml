@@ -10,8 +10,8 @@ on:
   merge_group:
 
 jobs:
-  build:
-    name: Build and Lint
+  build-linux:
+    name: Build and Lint (Linux)
     runs-on: ubuntu-latest
     permissions:
       contents: read # For checkout
@@ -52,10 +52,54 @@ jobs:
           path: |
             packages/*/dist
             package-lock.json # Only upload dist and lockfile
-  test:
-    name: Test
+
+  build-macos:
+    name: Build and Lint (macOS)
+    runs-on: macos-latest
+    permissions:
+      contents: read # For checkout
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x, 24.x]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run formatter check
+        run: |
+          npm run format
+          git diff --exit-code
+
+      - name: Run linter
+        run: npm run lint:ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run type check
+        run: npm run typecheck
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-artifacts-macos-${{ matrix.node-version }}
+          path: |
+            packages/*/dist
+            package-lock.json # Only upload dist and lockfile
+
+  test-linux:
+    name: Test (Linux)
     runs-on: ubuntu-latest
-    needs: build # This job depends on the 'build' job
+    needs: build-linux # This job depends on the 'build-linux' job
     permissions:
       contents: read
       checks: write
@@ -113,10 +157,71 @@ jobs:
           name: coverage-reports-${{ matrix.node-version }}
           path: packages/*/coverage
 
+  test-macos:
+    name: Test (macOS)
+    runs-on: macos-latest
+    needs: build-macos # This job depends on the 'build-macos' job
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x, 24.x] # Should match the build job's matrix
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: build-artifacts-macos-${{ matrix.node-version }}
+          path: . # Download to the root, this will include package-lock.json and packages/*/dist
+
+      # Restore/create package structure for dist folders if necessary.
+      # The download-artifact action with path: . should place them correctly if the
+      # upload paths were relative to the workspace root.
+      # Example: if uploaded `packages/cli/dist`, it will be at `./packages/cli/dist`.
+
+      - name: Install dependencies for testing
+        run: npm ci # Install fresh dependencies using the downloaded package-lock.json
+
+      - name: Run tests and generate reports
+        run: NO_COLOR=true npm run test:ci
+
+      - name: Publish Test Report (for non-forks)
+        if: always() && (github.event.pull_request.head.repo.full_name == github.repository)
+        uses: dorny/test-reporter@890a17cecf52a379fc869ab770a71657660be727 # v2
+        with:
+          name: Test Results (macOS, Node ${{ matrix.node-version }})
+          path: packages/*/junit.xml
+          reporter: java-junit
+          fail-on-error: 'false'
+
+      - name: Upload Test Results Artifact (for forks)
+        if: always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-results-macos-fork-${{ matrix.node-version }}
+          path: packages/*/junit.xml
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: coverage-reports-macos-${{ matrix.node-version }}
+          path: packages/*/coverage
+
   post_coverage_comment:
     name: Post Coverage Comment
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test-linux, test-macos]
     if: always() && github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name == github.repository)
     continue-on-error: true
     permissions:
