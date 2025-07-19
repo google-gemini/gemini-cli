@@ -382,7 +382,6 @@ export async function loadCliConfig(
     toolCallCommand: settings.toolCallCommand,
     mcpServerCommand: settings.mcpServerCommand,
     mcpServers,
-    backgroundAgents: settings.backgroundAgents,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
