@@ -36,15 +36,9 @@ const hoistedMockInit = vi.hoisted(() => vi.fn());
 const hoistedMockRaw = vi.hoisted(() => vi.fn());
 const hoistedMockAdd = vi.hoisted(() => vi.fn());
 const hoistedMockCommit = vi.hoisted(() => vi.fn());
+
 vi.mock('simple-git', () => ({
-  simpleGit: hoistedMockSimpleGit.mockImplementation(() => ({
-    checkIsRepo: hoistedMockCheckIsRepo,
-    init: hoistedMockInit,
-    raw: hoistedMockRaw,
-    add: hoistedMockAdd,
-    commit: hoistedMockCommit,
-    env: hoistedMockEnv,
-  })),
+  simpleGit: hoistedMockSimpleGit,
   CheckRepoActions: { IS_REPO_ROOT: 'is-repo-root' },
 }));
 
@@ -103,21 +97,22 @@ describe('GitService', () => {
     hoistedMockCreateHash.mockUpdate.mockReturnThis();
     hoistedMockCreateHash.mockDigest.mockReturnValue(mockHash);
 
-    hoistedMockEnv.mockImplementation(() => ({
-      checkIsRepo: hoistedMockCheckIsRepo,
-      init: hoistedMockInit,
-      raw: hoistedMockRaw,
-      add: hoistedMockAdd,
-      commit: hoistedMockCommit,
-    }));
-    hoistedMockSimpleGit.mockImplementation(() => ({
+    // Set up the git instance mock
+    const gitInstance = {
       checkIsRepo: hoistedMockCheckIsRepo,
       init: hoistedMockInit,
       raw: hoistedMockRaw,
       add: hoistedMockAdd,
       commit: hoistedMockCommit,
       env: hoistedMockEnv,
-    }));
+    };
+
+    // Make env return the git instance for chaining
+    hoistedMockEnv.mockReturnValue(gitInstance);
+
+    // Make simpleGit return the git instance for all calls
+    hoistedMockSimpleGit.mockReturnValue(gitInstance);
+
     hoistedMockCheckIsRepo.mockResolvedValue(false);
     hoistedMockInit.mockResolvedValue(undefined);
     hoistedMockRaw.mockResolvedValue('');
@@ -144,7 +139,7 @@ describe('GitService', () => {
     });
 
     it('should resolve false if git --version command fails', async () => {
-      hoistedMockExec.mockImplementation((command, callback) => {
+      hoistedMockExec.mockImplementation((_command, callback) => {
         callback(new Error('git not found'));
         return {} as ChildProcess;
       });
@@ -155,7 +150,7 @@ describe('GitService', () => {
 
   describe('initialize', () => {
     it('should throw an error if Git is not available', async () => {
-      hoistedMockExec.mockImplementation((command, callback) => {
+      hoistedMockExec.mockImplementation((_command, callback) => {
         callback(new Error('git not found'));
         return {} as ChildProcess;
       });
@@ -193,6 +188,26 @@ describe('GitService', () => {
       );
     });
 
+    it('should use isolated git config when initializing repository', async () => {
+      hoistedMockCheckIsRepo.mockResolvedValue(false);
+      const service = new GitService(mockProjectRoot);
+      await service.setupShadowGitRepository();
+
+      // Verify that simpleGit was called with the repo directory
+      expect(hoistedMockSimpleGit).toHaveBeenCalledWith(repoDir);
+
+      // Verify that env() was called with the isolation settings
+      expect(hoistedMockEnv).toHaveBeenCalledWith({
+        HOME: repoDir,
+        XDG_CONFIG_HOME: repoDir,
+      });
+
+      // Verify that subsequent git operations used the isolated instance
+      expect(hoistedMockCheckIsRepo).toHaveBeenCalled();
+      expect(hoistedMockInit).toHaveBeenCalled();
+      expect(hoistedMockCommit).toHaveBeenCalled();
+    });
+
     it('should create history and repository directories', async () => {
       const service = new GitService(mockProjectRoot);
       await service.setupShadowGitRepository();
@@ -206,6 +221,10 @@ describe('GitService', () => {
       const service = new GitService(mockProjectRoot);
       await service.setupShadowGitRepository();
       expect(hoistedMockSimpleGit).toHaveBeenCalledWith(repoDir);
+      expect(hoistedMockEnv).toHaveBeenCalledWith({
+        HOME: repoDir,
+        XDG_CONFIG_HOME: repoDir,
+      });
       expect(hoistedMockInit).toHaveBeenCalled();
     });
 
@@ -268,6 +287,33 @@ describe('GitService', () => {
       const service = new GitService(mockProjectRoot);
       await service.setupShadowGitRepository();
       expect(hoistedMockCommit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('shadowGitRepository', () => {
+    const repoDir = path.join(mockHomedir, '.gemini', 'history', mockHash);
+
+    it('should configure environment variables to isolate git config', async () => {
+      const service = new GitService(mockProjectRoot);
+      await service.getCurrentCommitHash();
+
+      // Clear mock history to isolate the test of shadowGitRepository getter
+      hoistedMockSimpleGit.mockClear();
+      hoistedMockEnv.mockClear();
+
+      // Access the private shadowGitRepository getter via a method that uses it
+      await service.getCurrentCommitHash();
+
+      // Verify simpleGit was called with the correct directory
+      expect(hoistedMockSimpleGit).toHaveBeenCalledWith(mockProjectRoot);
+
+      // Verify env was called with the correct isolation settings for shadowGitRepository
+      expect(hoistedMockEnv).toHaveBeenCalledWith({
+        GIT_DIR: path.join(repoDir, '.git'),
+        GIT_WORK_TREE: mockProjectRoot,
+        HOME: repoDir,
+        XDG_CONFIG_HOME: repoDir,
+      });
     });
   });
 });
