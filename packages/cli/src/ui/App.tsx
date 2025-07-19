@@ -28,10 +28,8 @@ import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { Header } from './components/Header.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
-import { AutoAcceptIndicator } from './components/AutoAcceptIndicator.js';
-import { ShellModeIndicator } from './components/ShellModeIndicator.js';
 import { InputPrompt } from './components/InputPrompt.js';
-import { Footer } from './components/Footer.js';
+import { StatusBar } from './components/StatusBar.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
 import { AuthDialog } from './components/AuthDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
@@ -45,14 +43,12 @@ import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup } from '../utils/cleanup.js';
 import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
-import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
 import {
   getErrorMessage,
   type Config,
   getAllGeminiMdFilenames,
-  ApprovalMode,
   isEditorAvailable,
   EditorType,
   FlashFallbackEvent,
@@ -142,7 +138,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [authError, setAuthError] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [footerHeight, setFooterHeight] = useState<number>(0);
-  const [corgiMode, setCorgiMode] = useState(false);
+  const [_, setCorgiMode] = useState(false);
   const [currentModel, setCurrentModel] = useState(config.getModel());
   const [shellModeActive, setShellModeActive] = useState(false);
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
@@ -173,11 +169,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setShowPrivacyNotice(true);
   }, []);
   const initialPromptSubmitted = useRef(false);
-
-  const errorCount = useMemo(
-    () => consoleMessages.filter((msg) => msg.type === 'error').length,
-    [consoleMessages],
-  );
 
   const {
     isThemeDialogOpen,
@@ -873,13 +864,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 }
                 elapsedTime={elapsedTime}
               />
-              <Box
-                marginTop={1}
-                display="flex"
-                justifyContent="space-between"
-                width="100%"
-              >
-                <Box>
+              {/* Show Ctrl+C/D warning if needed, otherwise show nothing here since status is in the StatusBar */}
+              {(ctrlCPressedOnce || ctrlDPressedOnce) && (
+                <Box marginTop={1}>
                   {process.env.GEMINI_SYSTEM_MD && (
                     <Text color={Colors.AccentRed}>|⌐■_■| </Text>
                   )}
@@ -902,16 +889,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     />
                   )}
                 </Box>
-                <Box>
-                  {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
-                    !shellModeActive && (
-                      <AutoAcceptIndicator
-                        approvalMode={showAutoAcceptIndicator}
-                      />
-                    )}
-                  {shellModeActive && <ShellModeIndicator />}
-                </Box>
-              </Box>
+              )}
 
               {showErrorDetails && (
                 <OverflowProvider>
@@ -979,21 +957,22 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               )}
             </Box>
           )}
-          <Footer
-            model={currentModel}
-            targetDir={config.getTargetDir()}
-            debugMode={config.getDebugMode()}
-            branchName={branchName}
-            debugMessage={debugMessage}
-            corgiMode={corgiMode}
-            errorCount={errorCount}
-            showErrorDetails={showErrorDetails}
-            showMemoryUsage={
-              config.getDebugMode() || config.getShowMemoryUsage()
-            }
-            promptTokenCount={sessionStats.lastPromptTokenCount}
-            nightly={nightly}
-          />
+          <Box>
+            <StatusBar
+              targetDir={config.getTargetDir()}
+              branchName={branchName}
+              geminiMdFileCount={geminiMdFileCount}
+              contextFileNames={contextFileNames}
+              mcpServers={config.getMcpServers()}
+              model={currentModel}
+              promptTokenCount={sessionStats.lastPromptTokenCount}
+              approvalMode={showAutoAcceptIndicator}
+              shellModeActive={shellModeActive}
+              debugMode={config.getDebugMode()}
+              debugMessage={debugMessage}
+              compact={true}
+            />
+          </Box>
         </Box>
       </Box>
     </StreamingContext.Provider>
