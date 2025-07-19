@@ -48,8 +48,8 @@ describe('ThemeManager', () => {
 
   it('should set and get the active theme', () => {
     expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
-    themeManager.setActiveTheme('AyuDark');
-    expect(themeManager.getActiveTheme().name).toBe('AyuDark');
+    themeManager.setActiveTheme('Ayu');
+    expect(themeManager.getActiveTheme().name).toBe('Ayu');
   });
 
   it('should set and get a custom active theme', () => {
@@ -75,7 +75,7 @@ describe('ThemeManager', () => {
   });
 
   it('should get a theme by name', () => {
-    expect(themeManager.getTheme('AyuDark')).toBeDefined();
+    expect(themeManager.getTheme('Ayu')).toBeDefined();
     themeManager.loadCustomThemes({ MyCustomTheme: validCustomTheme });
     expect(themeManager.getTheme('MyCustomTheme')).toBeDefined();
   });

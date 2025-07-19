@@ -135,23 +135,24 @@ export class LoadedSettings {
   }
 
   private computeMergedSettings(): Settings {
+    const system = this.system.settings;
     const user = this.user.settings;
     const workspace = this.workspace.settings;
 
     return {
       ...user,
       ...workspace,
+      ...system,
       customThemes: {
         ...(user.customThemes || {}),
         ...(workspace.customThemes || {}),
+        ...(system.customThemes || {}),
       },
       mcpServers: {
         ...(user.mcpServers || {}),
         ...(workspace.mcpServers || {}),
+        ...(system.mcpServers || {}),
       },
-      ...this.user.settings,
-      ...this.workspace.settings,
-      ...this.system.settings,
     };
   }
 

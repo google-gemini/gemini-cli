@@ -36,7 +36,6 @@ export function ThemeDialog({
     SettingScope.User,
   );
 
-
   // Track the currently highlighted theme name
   const [highlightedThemeName, setHighlightedThemeName] = useState<
     string | undefined
@@ -51,13 +50,14 @@ export function ThemeDialog({
     .getAvailableThemes()
     .filter((theme) => theme.type !== 'custom');
   const customThemeNames = Object.keys(customThemes);
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  // Generate theme items
   const themeItems = [
     ...builtInThemes.map((theme) => ({
       label: theme.name,
       value: theme.name,
       themeNameDisplay: theme.name,
-      themeTypeDisplay:
-        theme.type.charAt(0).toUpperCase() + theme.type.slice(1),
+      themeTypeDisplay: capitalize(theme.type),
     })),
     ...customThemeNames.map((name) => ({
       label: name,
@@ -66,16 +66,6 @@ export function ThemeDialog({
       themeTypeDisplay: 'Custom',
     })),
   ];
-
-  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
-  // Generate theme items
-  const themeItems = themeManager.getAvailableThemes().map((theme) => ({
-    label: theme.name,
-    value: theme.name,
-    themeNameDisplay: theme.name,
-    themeTypeDisplay: capitalize(theme.type),
-  }));
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
 
   // Find the index of the selected theme, but only if it exists in the list
@@ -158,8 +148,8 @@ export function ThemeDialog({
   const colorizeCodeWidth = Math.max(
     Math.floor(
       (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
-        PREVIEW_PANE_WIDTH_PERCENTAGE *
-        PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+      PREVIEW_PANE_WIDTH_PERCENTAGE *
+      PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
     ),
     1,
   );
@@ -220,7 +210,6 @@ export function ThemeDialog({
   // The code block is slightly longer than the diff, so give it more space.
   const codeBlockHeight = Math.ceil(availableHeightForPanes * 0.6);
   const diffHeight = Math.floor(availableHeightForPanes * 0.4);
-  const themeType = capitalize(themeManager.getActiveTheme().type);
   return (
     <Box
       borderStyle="round"
@@ -309,7 +298,6 @@ export function ThemeDialog({
               </Box>
             );
           })()}
-
         </Box>
       </Box>
       <Box marginTop={1}>

@@ -206,9 +206,13 @@ export function isValidColor(color: string): boolean {
 export function resolveColor(colorValue: string): string | undefined {
   const lowerColor = colorValue.toLowerCase();
 
-  // 1. Check if it's already a hex code
+  // 1. Check if it's already a hex code and valid
   if (lowerColor.startsWith('#')) {
-    return lowerColor; // Use hex directly
+    if (/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(colorValue)) {
+      return lowerColor;
+    } else {
+      return undefined;
+    }
   }
   // 2. Check if it's an Ink supported name (lowercase)
   else if (INK_SUPPORTED_NAMES.has(lowerColor)) {

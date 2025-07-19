@@ -31,7 +31,7 @@ describe('AuthDialog', () => {
 
     const settings: LoadedSettings = new LoadedSettings(
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       {
@@ -41,7 +41,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       [],
@@ -49,7 +49,7 @@ describe('AuthDialog', () => {
 
     const { lastFrame } = render(
       <AuthDialog
-        onSelect={() => {}}
+        onSelect={() => { }}
         settings={settings}
         initialErrorMessage="GEMINI_API_KEY  environment variable not found"
       />,
@@ -68,18 +68,24 @@ describe('AuthDialog', () => {
         {
           settings: {
             selectedAuthType: undefined,
+            customThemes: {},
+            mcpServers: {},
           },
           path: '',
         },
         {
-          settings: {},
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
         [],
       );
 
       const { lastFrame } = render(
-        <AuthDialog onSelect={() => {}} settings={settings} />,
+        <AuthDialog onSelect={() => { }} settings={settings} />,
       );
 
       expect(lastFrame()).toContain(
@@ -95,18 +101,24 @@ describe('AuthDialog', () => {
         {
           settings: {
             selectedAuthType: undefined,
+            customThemes: {},
+            mcpServers: {},
           },
           path: '',
         },
         {
-          settings: {},
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
         [],
       );
 
       const { lastFrame } = render(
-        <AuthDialog onSelect={() => {}} settings={settings} />,
+        <AuthDialog onSelect={() => { }} settings={settings} />,
       );
 
       expect(lastFrame()).not.toContain(
@@ -122,18 +134,24 @@ describe('AuthDialog', () => {
         {
           settings: {
             selectedAuthType: undefined,
+            customThemes: {},
+            mcpServers: {},
           },
           path: '',
         },
         {
-          settings: {},
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
         [],
       );
 
       const { lastFrame } = render(
-        <AuthDialog onSelect={() => {}} settings={settings} />,
+        <AuthDialog onSelect={() => { }} settings={settings} />,
       );
 
       expect(lastFrame()).toContain(
@@ -150,18 +168,24 @@ describe('AuthDialog', () => {
         {
           settings: {
             selectedAuthType: undefined,
+            customThemes: {},
+            mcpServers: {},
           },
           path: '',
         },
         {
-          settings: {},
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
         [],
       );
 
       const { lastFrame } = render(
-        <AuthDialog onSelect={() => {}} settings={settings} />,
+        <AuthDialog onSelect={() => { }} settings={settings} />,
       );
 
       // This is a bit brittle, but it's the best way to check which item is selected.
@@ -173,18 +197,24 @@ describe('AuthDialog', () => {
         {
           settings: {
             selectedAuthType: undefined,
+            customThemes: {},
+            mcpServers: {},
           },
           path: '',
         },
         {
-          settings: {},
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
         [],
       );
 
       const { lastFrame } = render(
-        <AuthDialog onSelect={() => {}} settings={settings} />,
+        <AuthDialog onSelect={() => { }} settings={settings} />,
       );
 
       // Default is LOGIN_WITH_GOOGLE
@@ -198,18 +228,24 @@ describe('AuthDialog', () => {
         {
           settings: {
             selectedAuthType: undefined,
+            customThemes: {},
+            mcpServers: {},
           },
           path: '',
         },
         {
-          settings: {},
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
         [],
       );
 
       const { lastFrame } = render(
-        <AuthDialog onSelect={() => {}} settings={settings} />,
+        <AuthDialog onSelect={() => { }} settings={settings} />,
       );
 
       expect(lastFrame()).toContain(
@@ -225,17 +261,19 @@ describe('AuthDialog', () => {
     const onSelect = vi.fn();
     const settings: LoadedSettings = new LoadedSettings(
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       {
         settings: {
           selectedAuthType: undefined,
+          customThemes: {},
+          mcpServers: {},
         },
         path: '',
       },
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       [],
@@ -262,11 +300,19 @@ describe('AuthDialog', () => {
     const onSelect = vi.fn();
     const settings: LoadedSettings = new LoadedSettings(
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       {
-        settings: {},
+        settings: {
+          selectedAuthType: undefined,
+          customThemes: {},
+          mcpServers: {},
+        },
+        path: '',
+      },
+      {
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       [],
@@ -296,17 +342,19 @@ describe('AuthDialog', () => {
     const onSelect = vi.fn();
     const settings: LoadedSettings = new LoadedSettings(
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       {
         settings: {
           selectedAuthType: AuthType.USE_GEMINI,
+          customThemes: {},
+          mcpServers: {},
         },
         path: '',
       },
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       [],

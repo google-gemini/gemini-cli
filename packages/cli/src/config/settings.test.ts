@@ -127,7 +127,11 @@ describe('Settings Loading and Merging', () => {
       expect(settings.system.settings).toEqual(systemSettingsContent);
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual(systemSettingsContent);
+      expect(settings.merged).toEqual({
+        ...systemSettingsContent,
+        customThemes: {},
+        mcpServers: {},
+      });
     });
 
     it('should load user settings if only user file exists', () => {
@@ -275,6 +279,8 @@ describe('Settings Loading and Merging', () => {
         coreTools: ['tool1'],
         contextFileName: 'WORKSPACE_CONTEXT.md',
         allowMCPServers: ['server1', 'server2'],
+        customThemes: {},
+        mcpServers: {},
       });
     });
 
@@ -595,10 +601,13 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      // @ts-expect-error: dynamic property for test
       expect(settings.user.settings.apiKey).toBe('user_api_key_from_env');
+      // @ts-expect-error: dynamic property for test
       expect(settings.user.settings.someUrl).toBe(
         'https://test.com/user_api_key_from_env',
       );
+      // @ts-expect-error: dynamic property for test
       expect(settings.merged.apiKey).toBe('user_api_key_from_env');
       delete process.env.TEST_API_KEY;
     });
@@ -627,6 +636,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings.nested.value).toBe(
         'workspace_endpoint_from_env',
       );
+      // @ts-expect-error: dynamic property for test
       expect(settings.merged.endpoint).toBe('workspace_endpoint_from_env/api');
       delete process.env.WORKSPACE_ENDPOINT;
     });
@@ -656,13 +666,16 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
+      // @ts-expect-error: dynamic property for test
       expect(settings.user.settings.configValue).toBe(
         'user_value_for_user_read',
       );
+      // @ts-expect-error: dynamic property for test
       expect(settings.workspace.settings.configValue).toBe(
         'workspace_value_for_workspace_read',
       );
       // Merged should take workspace's resolved value
+      // @ts-expect-error: dynamic property for test
       expect(settings.merged.configValue).toBe(
         'workspace_value_for_workspace_read',
       );
@@ -744,13 +757,16 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
+      // @ts-expect-error: dynamic property for test
       expect(settings.system.settings.configValue).toBe(
         'system_value_for_system_read',
       );
+      // @ts-expect-error: dynamic property for test
       expect(settings.workspace.settings.configValue).toBe(
         'workspace_value_for_workspace_read',
       );
-      // Merged should take workspace's resolved value
+      // Merged should take system's resolved value
+      // @ts-expect-error: dynamic property for test
       expect(settings.merged.configValue).toBe('system_value_for_system_read');
 
       // Restore original environment variable state

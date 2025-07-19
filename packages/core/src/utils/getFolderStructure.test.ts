@@ -8,7 +8,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import fsPromises from 'fs/promises';
 import * as fs from 'fs';
-import { Dirent as FSDirent } from 'fs';
 import * as nodePath from 'path';
 import { getFolderStructure } from './getFolderStructure.js';
 import * as gitUtils from './gitUtils.js';
