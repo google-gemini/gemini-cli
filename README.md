@@ -23,10 +23,10 @@ With the Gemini CLI you can:
 2. **Run the CLI:** Execute the following command in your terminal:
 
    ```bash
-   npx https://github.com/google-gemini/gemini-cli
+   npx @google/gemini-cli
    ```
 
-   Or install it with:
+   Or install it globally:
 
    ```bash
    npm install -g @google/gemini-cli
@@ -37,6 +37,8 @@ With the Gemini CLI you can:
    ```bash
    gemini
    ```
+
+   > **Note:** If you encounter an error about "pathspec 'master'", use the npm registry version above instead of `npx https://github.com/google-gemini/gemini-cli`.
 
 3. **Pick a color theme**
 4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
