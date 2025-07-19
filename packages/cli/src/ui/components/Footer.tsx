@@ -12,6 +12,7 @@ import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
 import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
+import { type DisplaySettings } from '@google/gemini-cli-core';
 
 interface FooterProps {
   model: string;
@@ -25,6 +26,7 @@ interface FooterProps {
   showMemoryUsage?: boolean;
   promptTokenCount: number;
   nightly: boolean;
+  display: DisplaySettings;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -39,9 +41,14 @@ export const Footer: React.FC<FooterProps> = ({
   showMemoryUsage,
   promptTokenCount,
   nightly,
+  display,
 }) => {
   const limit = tokenLimit(model);
   const percentage = promptTokenCount / limit;
+
+  if (display.footer === false) {
+    return null;
+  }
 
   return (
     <Box marginTop={1} justifyContent="space-between" width="100%">
