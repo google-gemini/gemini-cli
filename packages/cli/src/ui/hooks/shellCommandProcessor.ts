@@ -60,8 +60,15 @@ function getSystemEncoding() {
           return windowsCodePageToEncoding(codePage);
         }
       }
-    } catch (_e) {
-      console.warn('Failed to get Windows code page.');
+      // Only warn if we can't parse the output format, not if windowsCodePageToEncoding fails
+      throw new Error(
+        `Unable to parse Windows code page from 'chcp' output "${output.trim()}". `
+      );
+    } catch (error) {
+      console.warn(
+        `Failed to get Windows code page using 'chcp' command: ${error instanceof Error ? error.message : String(error)}. ` +
+        `Will attempt to detect encoding from command output instead.`
+      );
     }
     return null;
   }
