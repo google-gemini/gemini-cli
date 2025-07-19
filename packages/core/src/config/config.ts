@@ -606,6 +606,7 @@ export class Config {
     registerCoreTool(WebSearchTool, this);
 
     await registry.discoverTools();
+    await registry.discoverVirtualTools();
     return registry;
   }
 }
