@@ -56,6 +56,10 @@ export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
 }
 
+export interface DisplaySettings {
+  footer?: boolean;
+}
+
 export interface BugCommandSettings {
   urlTemplate: string;
 }
@@ -133,6 +137,7 @@ export interface ConfigParameters {
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
+  display?: DisplaySettings;
   telemetry?: TelemetrySettings;
   usageStatisticsEnabled?: boolean;
   fileFiltering?: {
@@ -177,6 +182,7 @@ export class Config {
   private approvalMode: ApprovalMode;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
+  private readonly display: DisplaySettings;
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
   private geminiClient!: GeminiClient;
@@ -229,6 +235,7 @@ export class Config {
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
     this.accessibility = params.accessibility ?? {};
+    this.display = params.display ?? {};
     this.telemetrySettings = {
       enabled: params.telemetry?.enabled ?? false,
       target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
@@ -432,6 +439,10 @@ export class Config {
 
   getShowMemoryUsage(): boolean {
     return this.showMemoryUsage;
+  }
+
+  getDisplay(): DisplaySettings {
+    return this.display;
   }
 
   getAccessibility(): AccessibilitySettings {
