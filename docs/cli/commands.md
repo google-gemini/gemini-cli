@@ -28,6 +28,9 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/compress`**
   - **Description:** Replace the entire chat context with a summary. This saves on tokens used for future tasks while retaining a high level summary of what has happened.
 
+- **`/copy`**
+  - **Description:** Copies the last output produced by Gemini CLI to your clipboard, for easy sharing or reuse.
+
 - **`/editor`**
   - **Description:** Open a dialog for selecting supported editors.
 
