@@ -19,7 +19,7 @@ export function AuthInProgress({
   const [timedOut, setTimedOut] = useState(false);
 
   useInput((_, key) => {
-    if (key.escape) {
+    if ((key.escape) || (key.ctrl && _ === 'c')) {
       onTimeout();
     }
   });
@@ -48,7 +48,7 @@ export function AuthInProgress({
       ) : (
         <Box>
           <Text>
-            <Spinner type="dots" /> Waiting for auth... (Press ESC to cancel)
+            <Spinner type="dots" /> Waiting for auth... (Press ESC or CTRL+C to cancel)
           </Text>
         </Box>
       )}
