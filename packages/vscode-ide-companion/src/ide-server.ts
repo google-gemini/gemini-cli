@@ -75,7 +75,22 @@ export class IDEServer {
             transports[newSessionId] = transport;
           },
         });
+
+        const keepAlive = setInterval(() => {
+          try {
+            transport.send({ jsonrpc: '2.0', method: 'ping' });
+          } catch (e) {
+            // If sending a ping fails, the connection is likely broken.
+            // Log the error and clear the interval to prevent further attempts.
+            this.logger.append(
+              'Failed to send keep-alive ping, cleaning up interval.' + e,
+            );
+            clearInterval(keepAlive);
+          }
+        }, 60000); // Send ping every 60 seconds
+
         transport.onclose = () => {
+          clearInterval(keepAlive);
           if (transport.sessionId) {
             this.logger.appendLine(`Session closed: ${transport.sessionId}`);
             sessionsWithInitialNotification.delete(transport.sessionId);

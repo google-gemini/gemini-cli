@@ -170,43 +170,45 @@ describe('Gemini Client (client.ts)', () => {
       getTool: vi.fn().mockReturnValue(null),
     };
     const fileService = new FileDiscoveryService('/test/dir');
-    const MockedConfig = vi.mocked(Config, true);
     const contentGeneratorConfig = {
       model: 'test-model',
       apiKey: 'test-key',
       vertexai: false,
       authType: AuthType.USE_GEMINI,
     };
-    MockedConfig.mockImplementation(() => {
-      const mock = {
-        getContentGeneratorConfig: vi
-          .fn()
-          .mockReturnValue(contentGeneratorConfig),
-        getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
-        getModel: vi.fn().mockReturnValue('test-model'),
-        getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
-        getApiKey: vi.fn().mockReturnValue('test-key'),
-        getVertexAI: vi.fn().mockReturnValue(false),
-        getUserAgent: vi.fn().mockReturnValue('test-agent'),
-        getUserMemory: vi.fn().mockReturnValue(''),
-        getFullContext: vi.fn().mockReturnValue(false),
-        getSessionId: vi.fn().mockReturnValue('test-session-id'),
-        getProxy: vi.fn().mockReturnValue(undefined),
-        getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
-        getFileService: vi.fn().mockReturnValue(fileService),
-        getMaxSessionTurns: vi.fn().mockReturnValue(0),
-        getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
-        setQuotaErrorOccurred: vi.fn(),
-        getNoBrowser: vi.fn().mockReturnValue(false),
-        getIdeMode: vi.fn().mockReturnValue(false),
-      };
-      return mock as unknown as Config;
-    });
+    const mockConfigObject = {
+      getContentGeneratorConfig: vi
+        .fn()
+        .mockReturnValue(contentGeneratorConfig),
+      getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
+      getModel: vi.fn().mockReturnValue('test-model'),
+      getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+      getApiKey: vi.fn().mockReturnValue('test-key'),
+      getVertexAI: vi.fn().mockReturnValue(false),
+      getUserAgent: vi.fn().mockReturnValue('test-agent'),
+      getUserMemory: vi.fn().mockReturnValue(''),
+      getFullContext: vi.fn().mockReturnValue(false),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
+      getFileService: vi.fn().mockReturnValue(fileService),
+      getMaxSessionTurns: vi.fn().mockReturnValue(0),
+      getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
+      setQuotaErrorOccurred: vi.fn(),
+      getNoBrowser: vi.fn().mockReturnValue(false),
+      getIdeMode: vi.fn().mockReturnValue(false),
+      getGeminiClient: vi.fn(),
+    };
+    const MockedConfig = vi.mocked(Config, true);
+    MockedConfig.mockImplementation(
+      () => mockConfigObject as unknown as Config,
+    );
 
     // We can instantiate the client here since Config is mocked
     // and the constructor will use the mocked GoogleGenAI
-    const mockConfig = new Config({} as never);
-    client = new GeminiClient(mockConfig);
+    client = new GeminiClient(new Config({} as never));
+    mockConfigObject.getGeminiClient.mockReturnValue(client);
+
     await client.initialize(contentGeneratorConfig);
   });
 
@@ -655,6 +657,7 @@ describe('Gemini Client (client.ts)', () => {
 
       const mockGenerator: Partial<ContentGenerator> = {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        generateContent: mockGenerateContentFn,
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 
@@ -704,6 +707,7 @@ describe('Gemini Client (client.ts)', () => {
 
       const mockGenerator: Partial<ContentGenerator> = {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        generateContent: mockGenerateContentFn,
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 
@@ -796,6 +800,7 @@ describe('Gemini Client (client.ts)', () => {
 
       const mockGenerator: Partial<ContentGenerator> = {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        generateContent: mockGenerateContentFn,
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 
@@ -857,6 +862,7 @@ describe('Gemini Client (client.ts)', () => {
 
       const mockGenerator: Partial<ContentGenerator> = {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        generateContent: mockGenerateContentFn,
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 

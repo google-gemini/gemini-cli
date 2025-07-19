@@ -570,4 +570,383 @@ describe('InputPrompt', () => {
     expect(props.buffer.setText).not.toHaveBeenCalled();
     unmount();
   });
+
+  describe('cursor-based completion trigger', () => {
+    it('should trigger completion when cursor is after @ without spaces', async () => {
+      // Set up buffer state
+      mockBuffer.text = '@src/components';
+      mockBuffer.lines = ['@src/components'];
+      mockBuffer.cursor = [0, 15];
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: true,
+        suggestions: [{ label: 'Button.tsx', value: 'Button.tsx' }],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      // Verify useCompletion was called with true (should show completion)
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        '@src/components',
+        '/test/project/src',
+        true, // shouldShowCompletion should be true
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+
+    it('should trigger completion when cursor is after / without spaces', async () => {
+      mockBuffer.text = '/memory';
+      mockBuffer.lines = ['/memory'];
+      mockBuffer.cursor = [0, 7];
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: true,
+        suggestions: [{ label: 'show', value: 'show' }],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        '/memory',
+        '/test/project/src',
+        true, // shouldShowCompletion should be true
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+
+    it('should NOT trigger completion when cursor is after space following @', async () => {
+      mockBuffer.text = '@src/file.ts hello';
+      mockBuffer.lines = ['@src/file.ts hello'];
+      mockBuffer.cursor = [0, 18];
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: false,
+        suggestions: [],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        '@src/file.ts hello',
+        '/test/project/src',
+        false, // shouldShowCompletion should be false
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+
+    it('should NOT trigger completion when cursor is after space following /', async () => {
+      mockBuffer.text = '/memory add';
+      mockBuffer.lines = ['/memory add'];
+      mockBuffer.cursor = [0, 11];
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: false,
+        suggestions: [],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        '/memory add',
+        '/test/project/src',
+        false, // shouldShowCompletion should be false
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+
+    it('should NOT trigger completion when cursor is not after @ or /', async () => {
+      mockBuffer.text = 'hello world';
+      mockBuffer.lines = ['hello world'];
+      mockBuffer.cursor = [0, 5];
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: false,
+        suggestions: [],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        'hello world',
+        '/test/project/src',
+        false, // shouldShowCompletion should be false
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+
+    it('should handle multiline text correctly', async () => {
+      mockBuffer.text = 'first line\n/memory';
+      mockBuffer.lines = ['first line', '/memory'];
+      mockBuffer.cursor = [1, 7];
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: false,
+        suggestions: [],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        'first line\n/memory',
+        '/test/project/src',
+        false, // shouldShowCompletion should be false (isSlashCommand returns false because text doesn't start with /)
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+
+    it('should handle single line slash command correctly', async () => {
+      mockBuffer.text = '/memory';
+      mockBuffer.lines = ['/memory'];
+      mockBuffer.cursor = [0, 7];
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: true,
+        suggestions: [{ label: 'show', value: 'show' }],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        '/memory',
+        '/test/project/src',
+        true, // shouldShowCompletion should be true (isSlashCommand returns true AND cursor is after / without space)
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+
+    it('should handle Unicode characters (emojis) correctly in paths', async () => {
+      // Test with emoji in path after @
+      mockBuffer.text = '@src/file👍.txt';
+      mockBuffer.lines = ['@src/file👍.txt'];
+      mockBuffer.cursor = [0, 14]; // After the emoji character
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: true,
+        suggestions: [{ label: 'file👍.txt', value: 'file👍.txt' }],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        '@src/file👍.txt',
+        '/test/project/src',
+        true, // shouldShowCompletion should be true
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+
+    it('should handle Unicode characters with spaces after them', async () => {
+      // Test with emoji followed by space - should NOT trigger completion
+      mockBuffer.text = '@src/file👍.txt hello';
+      mockBuffer.lines = ['@src/file👍.txt hello'];
+      mockBuffer.cursor = [0, 20]; // After the space
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: false,
+        suggestions: [],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        '@src/file👍.txt hello',
+        '/test/project/src',
+        false, // shouldShowCompletion should be false
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+
+    it('should handle escaped spaces in paths correctly', async () => {
+      // Test with escaped space in path - should trigger completion
+      mockBuffer.text = '@src/my\\ file.txt';
+      mockBuffer.lines = ['@src/my\\ file.txt'];
+      mockBuffer.cursor = [0, 16]; // After the escaped space and filename
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: true,
+        suggestions: [{ label: 'my file.txt', value: 'my file.txt' }],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        '@src/my\\ file.txt',
+        '/test/project/src',
+        true, // shouldShowCompletion should be true
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+
+    it('should NOT trigger completion after unescaped space following escaped space', async () => {
+      // Test: @path/my\ file.txt hello (unescaped space after escaped space)
+      mockBuffer.text = '@path/my\\ file.txt hello';
+      mockBuffer.lines = ['@path/my\\ file.txt hello'];
+      mockBuffer.cursor = [0, 24]; // After "hello"
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: false,
+        suggestions: [],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        '@path/my\\ file.txt hello',
+        '/test/project/src',
+        false, // shouldShowCompletion should be false
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+
+    it('should handle multiple escaped spaces in paths', async () => {
+      // Test with multiple escaped spaces
+      mockBuffer.text = '@docs/my\\ long\\ file\\ name.md';
+      mockBuffer.lines = ['@docs/my\\ long\\ file\\ name.md'];
+      mockBuffer.cursor = [0, 29]; // At the end
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: true,
+        suggestions: [
+          { label: 'my long file name.md', value: 'my long file name.md' },
+        ],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        '@docs/my\\ long\\ file\\ name.md',
+        '/test/project/src',
+        true, // shouldShowCompletion should be true
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+
+    it('should handle escaped spaces in slash commands', async () => {
+      // Test escaped spaces with slash commands (though less common)
+      mockBuffer.text = '/memory\\ test';
+      mockBuffer.lines = ['/memory\\ test'];
+      mockBuffer.cursor = [0, 13]; // At the end
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: true,
+        suggestions: [{ label: 'test-command', value: 'test-command' }],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        '/memory\\ test',
+        '/test/project/src',
+        true, // shouldShowCompletion should be true
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+
+    it('should handle Unicode characters with escaped spaces', async () => {
+      // Test combining Unicode and escaped spaces
+      mockBuffer.text = '@files/emoji\\ 👍\\ test.txt';
+      mockBuffer.lines = ['@files/emoji\\ 👍\\ test.txt'];
+      mockBuffer.cursor = [0, 25]; // After the escaped space and emoji
+
+      mockedUseCompletion.mockReturnValue({
+        ...mockCompletion,
+        showSuggestions: true,
+        suggestions: [
+          { label: 'emoji 👍 test.txt', value: 'emoji 👍 test.txt' },
+        ],
+      });
+
+      const { unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        '@files/emoji\\ 👍\\ test.txt',
+        '/test/project/src',
+        true, // shouldShowCompletion should be true
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+      );
+
+      unmount();
+    });
+  });
 });
