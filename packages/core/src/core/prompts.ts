@@ -23,15 +23,18 @@ export function getCoreSystemPrompt(userMemory?: string): string {
   // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD
   let systemMdEnabled = false;
   let systemMdPath = path.resolve(path.join(GEMINI_CONFIG_DIR, 'system.md'));
-  const systemMdVar = process.env.GEMINI_SYSTEM_MD?.toLowerCase();
-  if (systemMdVar && !['0', 'false'].includes(systemMdVar)) {
-    systemMdEnabled = true; // enable system prompt override
-    if (!['1', 'true'].includes(systemMdVar)) {
-      systemMdPath = path.resolve(systemMdVar); // use custom path from GEMINI_SYSTEM_MD
-    }
-    // require file to exist when override is enabled
-    if (!fs.existsSync(systemMdPath)) {
-      throw new Error(`missing system prompt file '${systemMdPath}'`);
+  const systemMdVar = process.env.GEMINI_SYSTEM_MD;
+  if (systemMdVar) {
+    const systemMdVarLower = systemMdVar.toLowerCase();
+    if (!['0', 'false'].includes(systemMdVarLower)) {
+      systemMdEnabled = true; // enable system prompt override
+      if (!['1', 'true'].includes(systemMdVarLower)) {
+        systemMdPath = path.resolve(systemMdVar); // use custom path from GEMINI_SYSTEM_MD
+      }
+      // require file to exist when override is enabled
+      if (!fs.existsSync(systemMdPath)) {
+        throw new Error(`missing system prompt file '${systemMdPath}'`);
+      }
     }
   }
   const basePrompt = systemMdEnabled
@@ -256,12 +259,15 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
 `.trim();
 
   // if GEMINI_WRITE_SYSTEM_MD is set (and not 0|false), write base system prompt to file
-  const writeSystemMdVar = process.env.GEMINI_WRITE_SYSTEM_MD?.toLowerCase();
-  if (writeSystemMdVar && !['0', 'false'].includes(writeSystemMdVar)) {
-    if (['1', 'true'].includes(writeSystemMdVar)) {
-      fs.writeFileSync(systemMdPath, basePrompt); // write to default path, can be modified via GEMINI_SYSTEM_MD
-    } else {
-      fs.writeFileSync(path.resolve(writeSystemMdVar), basePrompt); // write to custom path from GEMINI_WRITE_SYSTEM_MD
+  const writeSystemMdVar = process.env.GEMINI_WRITE_SYSTEM_MD;
+  if (writeSystemMdVar) {
+    const writeSystemMdVarLower = writeSystemMdVar.toLowerCase();
+    if (!['0', 'false'].includes(writeSystemMdVarLower)) {
+      if (['1', 'true'].includes(writeSystemMdVarLower)) {
+        fs.writeFileSync(systemMdPath, basePrompt); // write to default path, can be modified via GEMINI_SYSTEM_MD
+      } else {
+        fs.writeFileSync(path.resolve(writeSystemMdVar), basePrompt); // write to custom path from GEMINI_WRITE_SYSTEM_MD
+      }
     }
   }
 
