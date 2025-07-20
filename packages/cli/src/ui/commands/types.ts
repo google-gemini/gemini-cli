@@ -112,7 +112,7 @@ export interface SlashCommand {
   altNames?: string[];
   description: string;
 
-  kind: 'built-in';
+  kind: 'built-in' | 'file';
 
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (

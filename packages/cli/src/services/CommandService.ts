@@ -5,63 +5,7 @@
  */
 
 import { SlashCommand } from '../ui/commands/types.js';
-<<<<<<< HEAD
-import { memoryCommand } from '../ui/commands/memoryCommand.js';
-import { helpCommand } from '../ui/commands/helpCommand.js';
-import { clearCommand } from '../ui/commands/clearCommand.js';
-import { copyCommand } from '../ui/commands/copyCommand.js';
-import { corgiCommand } from '../ui/commands/corgiCommand.js';
-import { docsCommand } from '../ui/commands/docsCommand.js';
-import { mcpCommand } from '../ui/commands/mcpCommand.js';
-import { authCommand } from '../ui/commands/authCommand.js';
-import { themeCommand } from '../ui/commands/themeCommand.js';
-import { editorCommand } from '../ui/commands/editorCommand.js';
-import { chatCommand } from '../ui/commands/chatCommand.js';
-import { statsCommand } from '../ui/commands/statsCommand.js';
-import { privacyCommand } from '../ui/commands/privacyCommand.js';
-import { aboutCommand } from '../ui/commands/aboutCommand.js';
-import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
-import { toolsCommand } from '../ui/commands/toolsCommand.js';
-import { compressCommand } from '../ui/commands/compressCommand.js';
-import { ideCommand } from '../ui/commands/ideCommand.js';
-import { bugCommand } from '../ui/commands/bugCommand.js';
-import { quitCommand } from '../ui/commands/quitCommand.js';
-import { restoreCommand } from '../ui/commands/restoreCommand.js';
-
-const loadBuiltInCommands = async (
-  config: Config | null,
-): Promise<SlashCommand[]> => {
-  const allCommands = [
-    aboutCommand,
-    authCommand,
-    bugCommand,
-    chatCommand,
-    clearCommand,
-    copyCommand,
-    compressCommand,
-    corgiCommand,
-    docsCommand,
-    editorCommand,
-    extensionsCommand,
-    helpCommand,
-    ideCommand(config),
-    mcpCommand,
-    memoryCommand,
-    privacyCommand,
-    quitCommand,
-    restoreCommand(config),
-    statsCommand,
-    themeCommand,
-    toolsCommand,
-  ];
-
-  return allCommands.filter(
-    (command): command is SlashCommand => command !== null,
-  );
-};
-=======
 import { ICommandLoader } from './types.js';
->>>>>>> 3d81bcd6 ((prefactor): Use loader system for slash commands)
 
 /**
  * Orchestrates the discovery and loading of all slash commands for the CLI.
