@@ -231,6 +231,15 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     }
     ```
 
+- **`temperature`** (number):
+  - **Description:** Controls the randomness of model responses. Lower values (closer to 0) make responses more deterministic and focused, while higher values (up to 2.0) make responses more creative and varied.
+  - **Range:** 0.0 to 2.0
+  - **Default:** `0` (deterministic)
+  - **Example:**
+    ```json
+    "temperature": 0.7
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -258,6 +267,7 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   "hideTips": false,
   "hideBanner": false,
   "maxSessionTurns": 10,
+  "temperature": 0.7,
   "summarizeToolOutput": {
     "run_shell_command": {
       "tokenBudget": 100
@@ -292,6 +302,11 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-2.5-flash"`
+- **`GEMINI_TEMPERATURE`**:
+  - Specifies the default temperature for model generation.
+  - Must be a number between 0.0 and 2.0.
+  - Overrides the hardcoded default of 0.
+  - Example: `export GEMINI_TEMPERATURE="0.7"`
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
@@ -338,6 +353,9 @@ Arguments passed directly when running the CLI can override other configurations
 - **`--model <model_name>`** (**`-m <model_name>`**):
   - Specifies the Gemini model to use for this session.
   - Example: `npm start -- --model gemini-1.5-pro-latest`
+- **`--temperature <value>`** (**`-t <value>`**):
+  - Sets the temperature for model generation (0.0-2.0). Higher values make output more random.
+  - Example: `npm start -- --temperature 0.7`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a non-interactive mode.
 - **`--sandbox`** (**`-s`**):

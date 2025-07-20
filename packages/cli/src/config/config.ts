@@ -59,6 +59,7 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   ideMode: boolean | undefined;
   proxy: string | undefined;
+  temperature: number | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -193,6 +194,15 @@ export async function parseArguments(): Promise<CliArgs> {
       description:
         'Proxy for gemini client, like schema://user:password@host:port',
     })
+    .option('temperature', {
+      alias: 't',
+      type: 'number',
+      description:
+        'Temperature for model generation (0.0-2.0). Higher values make output more random.',
+      default: process.env.GEMINI_TEMPERATURE
+        ? parseFloat(process.env.GEMINI_TEMPERATURE)
+        : undefined,
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -203,6 +213,12 @@ export async function parseArguments(): Promise<CliArgs> {
         throw new Error(
           'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
         );
+      }
+      if (
+        argv.temperature !== undefined &&
+        (argv.temperature < 0 || argv.temperature > 2)
+      ) {
+        throw new Error('Temperature must be between 0.0 and 2.0');
       }
       return true;
     });
@@ -428,6 +444,7 @@ export async function loadCliConfig(
     noBrowser: !!process.env.NO_BROWSER,
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
+    temperature: argv.temperature ?? settings.temperature,
   });
 }
 

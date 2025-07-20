@@ -95,6 +95,7 @@ export interface Settings {
 
   // Add other settings here.
   ideMode?: boolean;
+  temperature?: number;
 }
 
 export interface SettingsError {

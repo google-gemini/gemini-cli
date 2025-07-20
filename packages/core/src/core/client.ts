@@ -85,10 +85,7 @@ export class GeminiClient {
   private chat?: GeminiChat;
   private contentGenerator?: ContentGenerator;
   private embeddingModel: string;
-  private generateContentConfig: GenerateContentConfig = {
-    temperature: 0,
-    topP: 1,
-  };
+  private generateContentConfig: GenerateContentConfig;
   private sessionTurnCount = 0;
   private readonly MAX_TURNS = 100;
   /**
@@ -112,6 +109,12 @@ export class GeminiClient {
 
     this.embeddingModel = config.getEmbeddingModel();
     this.loopDetector = new LoopDetectionService(config);
+    
+    // Initialize generateContentConfig with temperature from config
+    this.generateContentConfig = {
+      temperature: config.getTemperature(),
+      topP: 1,
+    };
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {

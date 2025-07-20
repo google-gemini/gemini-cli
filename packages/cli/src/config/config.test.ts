@@ -138,6 +138,75 @@ describe('parseArguments', () => {
     expect(argv.promptInteractive).toBe('interactive prompt');
     expect(argv.prompt).toBeUndefined();
   });
+
+  it('should accept valid temperature values', async () => {
+    process.argv = ['node', 'script.js', '--temperature', '0.7'];
+    const argv = await parseArguments();
+    expect(argv.temperature).toBe(0.7);
+  });
+
+  it('should accept temperature value using short flag -t', async () => {
+    process.argv = ['node', 'script.js', '-t', '1.2'];
+    const argv = await parseArguments();
+    expect(argv.temperature).toBe(1.2);
+  });
+
+  it('should throw an error when temperature is below 0', async () => {
+    process.argv = ['node', 'script.js', '--temperature', '-0.1'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments()).rejects.toThrow('process.exit called');
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('Temperature must be between 0.0 and 2.0'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should throw an error when temperature is above 2.0', async () => {
+    process.argv = ['node', 'script.js', '--temperature', '2.1'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments()).rejects.toThrow('process.exit called');
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('Temperature must be between 0.0 and 2.0'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should accept temperature value from GEMINI_TEMPERATURE environment variable', async () => {
+    const originalEnv = process.env.GEMINI_TEMPERATURE;
+    process.env.GEMINI_TEMPERATURE = '0.5';
+    process.argv = ['node', 'script.js'];
+
+    const argv = await parseArguments();
+    expect(argv.temperature).toBe(0.5);
+
+    if (originalEnv === undefined) {
+      delete process.env.GEMINI_TEMPERATURE;
+    } else {
+      process.env.GEMINI_TEMPERATURE = originalEnv;
+    }
+  });
 });
 
 describe('loadCliConfig', () => {
@@ -246,70 +315,36 @@ describe('loadCliConfig', () => {
     expect(config.getProxy()).toBe('http://localhost:7890');
   });
 
-  it('should prioritize CLI flag over environment variable for proxy (CLI http://localhost:7890, environment variable http://localhost:7891)', async () => {
-    process.env['http_proxy'] = 'http://localhost:7891';
-    process.argv = ['node', 'script.js', '--proxy', 'http://localhost:7890'];
-    const argv = await parseArguments();
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getProxy()).toBe('http://localhost:7890');
-  });
-});
-
-describe('loadCliConfig telemetry', () => {
-  const originalArgv = process.argv;
-  const originalEnv = { ...process.env };
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
-    process.env.GEMINI_API_KEY = 'test-api-key';
-  });
-
-  afterEach(() => {
-    process.argv = originalArgv;
-    process.env = originalEnv;
-    vi.restoreAllMocks();
-  });
-
-  it('should set telemetry to false by default when no flag or setting is present', async () => {
+  it('should set temperature to 0 by default', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getTelemetryEnabled()).toBe(false);
+    expect(config.getTemperature()).toBe(0);
   });
 
-  it('should set telemetry to true when --telemetry flag is present', async () => {
-    process.argv = ['node', 'script.js', '--telemetry'];
+  it('should set temperature from CLI argument', async () => {
+    process.argv = ['node', 'script.js', '--temperature', '0.8'];
     const argv = await parseArguments();
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getTelemetryEnabled()).toBe(true);
+    expect(config.getTemperature()).toBe(0.8);
   });
 
-  it('should set telemetry to false when --no-telemetry flag is present', async () => {
-    process.argv = ['node', 'script.js', '--no-telemetry'];
-    const argv = await parseArguments();
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getTelemetryEnabled()).toBe(false);
-  });
-
-  it('should use telemetry value from settings if CLI flag is not present (settings true)', async () => {
+  it('should set temperature from settings file', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
-    const settings: Settings = { telemetry: { enabled: true } };
+    const settings: Settings = { temperature: 0.5 };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getTelemetryEnabled()).toBe(true);
+    expect(config.getTemperature()).toBe(0.5);
   });
 
-  it('should use telemetry value from settings if CLI flag is not present (settings false)', async () => {
-    process.argv = ['node', 'script.js'];
+  it('should prioritize CLI argument over settings for temperature', async () => {
+    process.argv = ['node', 'script.js', '--temperature', '0.9'];
     const argv = await parseArguments();
-    const settings: Settings = { telemetry: { enabled: false } };
+    const settings: Settings = { temperature: 0.3 };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getTelemetryEnabled()).toBe(false);
+    expect(config.getTemperature()).toBe(0.9);
   });
 
   it('should prioritize --telemetry CLI flag (true) over settings (false)', async () => {

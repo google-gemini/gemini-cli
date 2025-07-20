@@ -154,6 +154,7 @@ export interface ConfigParameters {
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideMode?: boolean;
+  temperature?: number;
 }
 
 export class Config {
@@ -208,6 +209,7 @@ export class Config {
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
   private readonly experimentalAcp: boolean = false;
+  private readonly temperature: number;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -236,6 +238,7 @@ export class Config {
       logPrompts: params.telemetry?.logPrompts ?? true,
     };
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
+    this.temperature = params.temperature ?? 0;
 
     this.fileFiltering = {
       respectGitIgnore: params.fileFiltering?.respectGitIgnore ?? true,
@@ -533,6 +536,10 @@ export class Config {
 
   getIdeMode(): boolean {
     return this.ideMode;
+  }
+
+  getTemperature(): number {
+    return this.temperature;
   }
 
   async getGitService(): Promise<GitService> {
