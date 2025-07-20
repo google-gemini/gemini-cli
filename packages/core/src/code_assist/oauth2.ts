@@ -29,6 +29,9 @@ import { AuthType } from '../core/contentGenerator.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import readline from 'node:readline';
 
+// Exit code used when user clears authentication method
+const EXIT_CODE_AUTH_CLEARED = 42;
+
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
   '681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com';
@@ -125,16 +128,38 @@ export async function getOauthClient(
   if (config.getNoBrowser() || !shouldAttemptBrowserLaunch()) {
     let success = false;
     const maxRetries = 2;
-    for (let i = 0; !success && i < maxRetries; i++) {
-      success = await authWithUserCode(client);
-      if (!success) {
-        console.error(
-          '\nFailed to authenticate with user code.',
-          i === maxRetries - 1 ? '' : 'Retrying...\n',
-        );
+    try {
+      for (let i = 0; !success && i < maxRetries; i++) {
+        try {
+          success = await authWithUserCode(client);
+          if (!success) {
+            console.error(
+              '\nFailed to authenticate with user code.',
+              i === maxRetries - 1 ? '' : 'Retrying...\n',
+            );
+          }
+        } catch (err: any) {
+          if (err?.message === 'USER_CLEARED_AUTH_METHOD') {
+            // User cleared auth method, propagate the error to trigger restart
+            throw err;
+          }
+          // For other errors, treat as authentication failure and continue retry logic
+          success = false;
+          console.error(
+            '\nFailed to authenticate with user code.',
+            i === maxRetries - 1 ? '' : 'Retrying...\n',
+          );
+        }
       }
-    }
-    if (!success) {
+      if (!success) {
+        process.exit(1);
+      }
+    } catch (err: any) {
+      if (err?.message === 'USER_CLEARED_AUTH_METHOD') {
+        // Re-throw to be handled by the caller
+        throw err;
+      }
+      // For any other errors, exit
       process.exit(1);
     }
   } else {
@@ -194,12 +219,24 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
   console.log(authUrl);
   console.log('');
 
-  const code = await new Promise<string>((resolve) => {
+  const code = await new Promise<string>((resolve, reject) => {
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
     });
-    rl.question('Enter the authorization code: ', (code) => {
+    // Listen for CTRL+A to clear auth method
+    const onCtrlA = (chunk: Buffer) => {
+      if (chunk.length === 1 && chunk[0] === 1) { // CTRL+A is \u0001
+        rl.close();
+        clearCachedCredentialFile().then(() => {
+          // Let the caller handle settings cleanup
+          reject(new Error('USER_CLEARED_AUTH_METHOD'));
+        });
+      }
+    };
+    process.stdin.on('data', onCtrlA);
+    rl.question("Enter the authorization code (press CTRL+A to clear auth method): ", (code) => {
+      process.stdin.off('data', onCtrlA);
       rl.close();
       resolve(code.trim());
     });
