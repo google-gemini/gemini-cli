@@ -41,13 +41,13 @@ import type {
  */
 export class BedrockProvider implements ContentGenerator {
   private client: AnthropicBedrock;
-  private model: string;
   private config: Config;
+  private contentGeneratorConfig: ContentGeneratorConfig;
   private messageConverter: BedrockMessageConverter;
   private streamHandler: BedrockStreamHandler;
 
   constructor(config: ContentGeneratorConfig, gcConfig: Config) {
-    this.model = config.model;
+    this.contentGeneratorConfig = config;
     this.config = gcConfig;
     this.messageConverter = new BedrockMessageConverter();
     this.streamHandler = new BedrockStreamHandler(gcConfig);
@@ -98,14 +98,16 @@ export class BedrockProvider implements ContentGenerator {
     request: GenerateContentParameters,
   ): Promise<GenerateContentResponse> {
     try {
-      const bedrockRequest = this.prepareRequest(request);
+      const apiRequest = this.prepareRequest(request);
+      const currentModel = this.config.getModel();
 
       if (this.config.getDebugMode()) {
-        console.debug('[BedrockProvider] Sending request:', JSON.stringify(bedrockRequest, null, 2));
+        console.debug('[BedrockProvider] Sending request with model:', currentModel);
+        console.debug('[BedrockProvider] Full request:', JSON.stringify(apiRequest, null, 2));
       }
 
       const response = await this.client.messages.create(
-        bedrockRequest as MessageCreateParamsNonStreaming
+        apiRequest as MessageCreateParamsNonStreaming
       );
 
       if (this.config.getDebugMode()) {
@@ -122,11 +124,13 @@ export class BedrockProvider implements ContentGenerator {
     request: GenerateContentParameters,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     try {
-      const bedrockRequest = this.prepareRequest(request);
-      const streamRequest = { ...bedrockRequest, stream: true };
+      const apiRequest = this.prepareRequest(request);
+      const streamRequest = { ...apiRequest, stream: true };
+      const currentModel = this.config.getModel();
 
       if (this.config.getDebugMode()) {
-        console.debug('[BedrockProvider] Streaming request:', JSON.stringify(bedrockRequest, null, 2));
+        console.debug('[BedrockProvider] Streaming request with model:', currentModel);
+        console.debug('[BedrockProvider] Full streaming request:', JSON.stringify(streamRequest, null, 2));
       }
 
       const stream = await this.client.messages.create(
@@ -176,15 +180,18 @@ export class BedrockProvider implements ContentGenerator {
     const temperature = this.extractTemperature(request);
     const systemInstruction = this.extractSystemInstruction(request);
 
+    // Get the current model from config (may have been updated via /model command)
+    const currentModel = this.config.getModel();
+    
     const bedrockRequest: BedrockGenerateContentRequest = {
-      model: this.model,
+      model: currentModel,
       messages,
       maxTokens,
     };
     
     // Create the actual request with proper field name
     const apiRequest: BedrockAPIRequest = {
-      model: this.model,
+      model: currentModel,
       messages,
       max_tokens: maxTokens,
     };
@@ -202,6 +209,22 @@ export class BedrockProvider implements ContentGenerator {
         
         if (this.config.getDebugMode()) {
           console.debug('[BedrockProvider] Converted tools:', JSON.stringify(bedrockTools, null, 2));
+          
+          // Detailed logging for tool schema types
+          bedrockTools.forEach((tool, index) => {
+            console.debug(`[BedrockProvider] Tool ${index} (${tool.name}):`);
+            console.debug(`  - input_schema.type: ${typeof tool.input_schema?.type} = "${tool.input_schema?.type}"`);
+            
+            // Log properties if they exist
+            if (tool.input_schema?.properties) {
+              console.debug(`  - input_schema.properties:`, tool.input_schema.properties);
+              Object.entries(tool.input_schema.properties as Record<string, unknown>).forEach(([propName, propSchema]) => {
+                if (propSchema && typeof propSchema === 'object' && 'type' in propSchema) {
+                  console.debug(`    - ${propName}.type: ${typeof propSchema.type} = "${propSchema.type}"`);
+                }
+              });
+            }
+          });
         }
       }
     }
@@ -365,8 +388,15 @@ export class BedrockProvider implements ContentGenerator {
     const message = this.getErrorMessage(error);
     const errorCode = this.getErrorCode(error);
     const statusCode = this.getStatusCode(error);
+    const currentModel = this.config.getModel();
 
-    console.error(`[BedrockProvider] Error in ${operation}:`, message);
+    console.error(`[BedrockProvider] Error in ${operation}:`, {
+      message,
+      statusCode,
+      errorCode,
+      model: currentModel,
+      operation
+    });
 
     if (statusCode === 401) {
       return new BedrockError(
@@ -392,8 +422,13 @@ export class BedrockProvider implements ContentGenerator {
       );
     }
 
+    // Include model information in error messages for better debugging
+    const enhancedMessage = statusCode === 400 
+      ? `Bedrock operation failed: ${message} (Model: ${currentModel})`
+      : `Bedrock operation failed: ${message}`;
+    
     return new BedrockError(
-      `Bedrock operation failed: ${message}`,
+      enhancedMessage,
       errorCode,
       statusCode
     );
