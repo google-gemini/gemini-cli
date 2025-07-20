@@ -8,7 +8,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import fsPromises from 'fs/promises';
 import * as fs from 'fs';
-import { Dirent as FSDirent } from 'fs';
 import * as nodePath from 'path';
 import { getFolderStructure } from './getFolderStructure.js';
 import * as gitUtils from './gitUtils.js';
@@ -30,8 +29,21 @@ vi.mock('./gitUtils.js');
 // Import 'path' again here, it will be the mocked version
 import * as path from 'path';
 
+interface TestDirent {
+  name: string;
+  isFile: () => boolean;
+  isDirectory: () => boolean;
+  isBlockDevice: () => boolean;
+  isCharacterDevice: () => boolean;
+  isSymbolicLink: () => boolean;
+  isFIFO: () => boolean;
+  isSocket: () => boolean;
+  path: string;
+  parentPath: string;
+}
+
 // Helper to create Dirent-like objects for mocking fs.readdir
-const createDirent = (name: string, type: 'file' | 'dir'): FSDirent => ({
+const createDirent = (name: string, type: 'file' | 'dir'): TestDirent => ({
   name,
   isFile: () => type === 'file',
   isDirectory: () => type === 'dir',
@@ -77,7 +89,7 @@ describe('getFolderStructure', () => {
     vi.restoreAllMocks(); // Restores spies (like fsPromises.readdir) and resets vi.fn mocks (like path.resolve)
   });
 
-  const mockFsStructure: Record<string, FSDirent[]> = {
+  const mockFsStructure: Record<string, TestDirent[]> = {
     '/testroot': [
       createDirent('file1.txt', 'file'),
       createDirent('subfolderA', 'dir'),
@@ -295,6 +307,7 @@ describe('getFolderStructure gitignore', () => {
           createDirent('file1.txt', 'file'),
           createDirent('node_modules', 'dir'),
           createDirent('ignored.txt', 'file'),
+          createDirent('gem_ignored.txt', 'file'),
           createDirent('.gemini', 'dir'),
         ] as any;
       }
@@ -314,6 +327,9 @@ describe('getFolderStructure gitignore', () => {
       const path = p.toString();
       if (path === '/test/project/.gitignore') {
         return 'ignored.txt\nnode_modules/\n.gemini/\n!/.gemini/config.yaml';
+      }
+      if (path === '/test/project/.geminiignore') {
+        return 'gem_ignored.txt\nnode_modules/\n.gemini/\n!/.gemini/config.yaml';
       }
       return '';
     });
@@ -335,9 +351,36 @@ describe('getFolderStructure gitignore', () => {
     const fileService = new FileDiscoveryService('/test/project');
     const structure = await getFolderStructure('/test/project', {
       fileService,
-      respectGitIgnore: false,
+      fileFilteringOptions: {
+        respectGeminiIgnore: false,
+        respectGitIgnore: false,
+      },
     });
     expect(structure).toContain('ignored.txt');
+    // node_modules is still ignored by default
+    expect(structure).toContain('node_modules/...');
+  });
+
+  it('should ignore files and folders specified in .geminiignore', async () => {
+    const fileService = new FileDiscoveryService('/test/project');
+    const structure = await getFolderStructure('/test/project', {
+      fileService,
+    });
+    expect(structure).not.toContain('gem_ignored.txt');
+    expect(structure).toContain('node_modules/...');
+    expect(structure).not.toContain('logs.json');
+  });
+
+  it('should not ignore files if respectGeminiIgnore is false', async () => {
+    const fileService = new FileDiscoveryService('/test/project');
+    const structure = await getFolderStructure('/test/project', {
+      fileService,
+      fileFilteringOptions: {
+        respectGeminiIgnore: false,
+        respectGitIgnore: true, // Explicitly disable gemini ignore only
+      },
+    });
+    expect(structure).toContain('gem_ignored.txt');
     // node_modules is still ignored by default
     expect(structure).toContain('node_modules/...');
   });

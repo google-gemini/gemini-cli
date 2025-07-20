@@ -5,9 +5,11 @@
  */
 
 import { Schema } from '@google/genai';
-import * as ajv from 'ajv';
-
-const ajValidator = new ajv.Ajv();
+import AjvPkg from 'ajv';
+// Ajv's ESM/CJS interop: use 'any' for compatibility as recommended by Ajv docs
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AjvClass = (AjvPkg as any).default || AjvPkg;
+const ajValidator = new AjvClass();
 
 /**
  * Simple utility to validate objects against JSON Schemas

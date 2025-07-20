@@ -58,10 +58,13 @@ describe('ReadManyFilesTool', () => {
     const fileService = new FileDiscoveryService(tempRootDir);
     const mockConfig = {
       getFileService: () => fileService,
-      getFileFilteringRespectGitIgnore: () => true,
+
+      getFileFilteringOptions: () => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
       getTargetDir: () => tempRootDir,
     } as Partial<Config> as Config;
-
     tool = new ReadManyFilesTool(mockConfig);
 
     mockReadFileFn = mockControl.mockReadFile;

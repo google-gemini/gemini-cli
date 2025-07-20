@@ -161,6 +161,21 @@ src/*.tmp
       expect(parser.isIgnored('node_modules\\package')).toBe(true);
       expect(parser.isIgnored('src\\temp.tmp')).toBe(true);
     });
+
+    it('should handle root path "/" without throwing error', () => {
+      expect(() => parser.isIgnored('/')).not.toThrow();
+      expect(parser.isIgnored('/')).toBe(false);
+    });
+
+    it('should handle absolute-like paths without throwing error', () => {
+      expect(() => parser.isIgnored('/some/path')).not.toThrow();
+      expect(parser.isIgnored('/some/path')).toBe(false);
+    });
+
+    it('should handle paths that start with forward slash', () => {
+      expect(() => parser.isIgnored('/node_modules')).not.toThrow();
+      expect(parser.isIgnored('/node_modules')).toBe(false);
+    });
   });
 
   describe('getIgnoredPatterns', () => {
