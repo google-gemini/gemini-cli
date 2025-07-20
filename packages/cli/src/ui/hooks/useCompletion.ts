@@ -15,6 +15,7 @@ import {
   getErrorMessage,
   Config,
   FileDiscoveryService,
+  DEFAULT_FILE_FILTERING_OPTIONS,
 } from '@google/gemini-cli-core';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
@@ -28,6 +29,7 @@ export interface UseCompletionReturn {
   visibleStartIndex: number;
   showSuggestions: boolean;
   isLoadingSuggestions: boolean;
+  isPerfectMatch: boolean;
   setActiveSuggestionIndex: React.Dispatch<React.SetStateAction<number>>;
   setShowSuggestions: React.Dispatch<React.SetStateAction<boolean>>;
   resetCompletionState: () => void;
@@ -50,6 +52,7 @@ export function useCompletion(
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] =
     useState<boolean>(false);
+  const [isPerfectMatch, setIsPerfectMatch] = useState<boolean>(false);
 
   const resetCompletionState = useCallback(() => {
     setSuggestions([]);
@@ -57,6 +60,7 @@ export function useCompletion(
     setVisibleStartIndex(0);
     setShowSuggestions(false);
     setIsLoadingSuggestions(false);
+    setIsPerfectMatch(false);
   }, []);
 
   const navigateUp = useCallback(() => {
@@ -127,6 +131,9 @@ export function useCompletion(
     const trimmedQuery = query.trimStart();
 
     if (trimmedQuery.startsWith('/')) {
+      // Always reset perfect match at the beginning of processing.
+      setIsPerfectMatch(false);
+
       const fullPath = trimmedQuery.substring(1);
       const hasTrailingSpace = trimmedQuery.endsWith(' ');
 
@@ -183,6 +190,23 @@ export function useCompletion(
         }
       }
 
+      // Check for perfect, executable match
+      if (!hasTrailingSpace) {
+        if (leafCommand && partial === '' && leafCommand.action) {
+          // Case: /command<enter> - command has action, no sub-commands were suggested
+          setIsPerfectMatch(true);
+        } else if (currentLevel) {
+          // Case: /command subcommand<enter>
+          const perfectMatch = currentLevel.find(
+            (cmd) =>
+              (cmd.name === partial || cmd.altName === partial) && cmd.action,
+          );
+          if (perfectMatch) {
+            setIsPerfectMatch(true);
+          }
+        }
+      }
+
       const depth = commandPathParts.length;
 
       // Provide Suggestions based on the now-corrected context
@@ -221,9 +245,9 @@ export function useCompletion(
         // enter should submit immediately.
         if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
           const perfectMatch = potentialSuggestions.find(
-            (s) => s.name === partial,
+            (s) => s.name === partial || s.altName === partial,
           );
-          if (perfectMatch && !perfectMatch.subCommands) {
+          if (perfectMatch && perfectMatch.action) {
             potentialSuggestions = [];
           }
         }
@@ -392,10 +416,8 @@ export function useCompletion(
       const fileDiscoveryService = config ? config.getFileService() : null;
       const enableRecursiveSearch =
         config?.getEnableRecursiveFileSearch() ?? true;
-      const filterOptions = {
-        respectGitIgnore: config?.getFileFilteringRespectGitIgnore() ?? true,
-        respectGeminiIgnore: true,
-      };
+      const filterOptions =
+        config?.getFileFilteringOptions() ?? DEFAULT_FILE_FILTERING_OPTIONS;
 
       try {
         // If there's no slash, or it's the root, do a recursive search from cwd
@@ -471,7 +493,19 @@ export function useCompletion(
           if (aIsDir && !bIsDir) return -1;
           if (!aIsDir && bIsDir) return 1;
 
-          return a.label.localeCompare(b.label);
+          // exclude extension when comparing
+          const filenameA = a.label.substring(
+            0,
+            a.label.length - path.extname(a.label).length,
+          );
+          const filenameB = b.label.substring(
+            0,
+            b.label.length - path.extname(b.label).length,
+          );
+
+          return (
+            filenameA.localeCompare(filenameB) || a.label.localeCompare(b.label)
+          );
         });
 
         if (isMounted) {
@@ -522,6 +556,7 @@ export function useCompletion(
     visibleStartIndex,
     showSuggestions,
     isLoadingSuggestions,
+    isPerfectMatch,
     setActiveSuggestionIndex,
     setShowSuggestions,
     resetCompletionState,
