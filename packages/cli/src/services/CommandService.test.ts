@@ -11,6 +11,7 @@ import { type SlashCommand } from '../ui/commands/types.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
+import { copyCommand } from '../ui/commands/copyCommand.js';
 import { corgiCommand } from '../ui/commands/corgiCommand.js';
 import { docsCommand } from '../ui/commands/docsCommand.js';
 import { chatCommand } from '../ui/commands/chatCommand.js';
@@ -51,6 +52,9 @@ vi.mock('../ui/commands/authCommand.js', () => ({
 vi.mock('../ui/commands/themeCommand.js', () => ({
   themeCommand: { name: 'theme', description: 'Mock Theme' },
 }));
+vi.mock('../ui/commands/copyCommand.js', () => ({
+  copyCommand: { name: 'copy', description: 'Mock Copy' },
+}));
 vi.mock('../ui/commands/privacyCommand.js', () => ({
   privacyCommand: { name: 'privacy', description: 'Mock Privacy' },
 }));
@@ -89,7 +93,7 @@ vi.mock('../ui/commands/restoreCommand.js', () => ({
 }));
 
 describe('CommandService', () => {
-  const subCommandLen = 18;
+  const subCommandLen = 19;
   let mockConfig: Mocked<Config>;
 
   beforeEach(() => {
@@ -132,6 +136,7 @@ describe('CommandService', () => {
         expect(commandNames).toContain('memory');
         expect(commandNames).toContain('help');
         expect(commandNames).toContain('clear');
+        expect(commandNames).toContain('copy');
         expect(commandNames).toContain('compress');
         expect(commandNames).toContain('corgi');
         expect(commandNames).toContain('docs');
@@ -205,6 +210,7 @@ describe('CommandService', () => {
           bugCommand,
           chatCommand,
           clearCommand,
+          copyCommand,
           compressCommand,
           corgiCommand,
           docsCommand,
