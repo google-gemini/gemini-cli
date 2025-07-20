@@ -11,6 +11,7 @@ import {
   Config,
   clearCachedCredentialFile,
   getErrorMessage,
+  shouldAttemptBrowserLaunch,
 } from '@google/gemini-cli-core';
 import { runExitCleanup } from '../../utils/cleanup.js';
 
@@ -55,8 +56,12 @@ export const useAuthCommand = (
     async (authType: AuthType | undefined, scope: SettingScope) => {
       if (authType) {
         await clearCachedCredentialFile();
+
         settings.setValue(scope, 'selectedAuthType', authType);
-        if (authType === AuthType.LOGIN_WITH_GOOGLE && config.getNoBrowser()) {
+        if (
+          authType === AuthType.LOGIN_WITH_GOOGLE &&
+          (config.getNoBrowser() || !shouldAttemptBrowserLaunch())
+        ) {
           runExitCleanup();
           console.log(
             `
