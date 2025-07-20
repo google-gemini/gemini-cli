@@ -22,6 +22,7 @@ import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './hooks/useAuthCommand.js';
+import { useModelDialog } from './hooks/useModelDialog.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
@@ -35,6 +36,7 @@ import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
 import { AuthDialog } from './components/AuthDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
+import { ModelDialog } from './components/ModelDialog.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
@@ -193,6 +195,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     isAuthenticating,
     cancelAuthentication,
   } = useAuthCommand(settings, setAuthError, config);
+
+  const {
+    isModelDialogOpen,
+    openModelDialog,
+    handleModelSelect,
+  } = useModelDialog(config);
 
   useEffect(() => {
     if (settings.merged.selectedAuthType) {
@@ -399,6 +407,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setDebugMessage,
     openThemeDialog,
     openAuthDialog,
+    openModelDialog,
     openEditorDialog,
     toggleCorgiMode,
     setQuittingMessages,
@@ -837,6 +846,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 onSelect={handleAuthSelect}
                 settings={settings}
                 initialErrorMessage={authError}
+              />
+            </Box>
+          ) : isModelDialogOpen ? (
+            <Box flexDirection="column">
+              <ModelDialog
+                onSelect={handleModelSelect}
+                config={config}
               />
             </Box>
           ) : isEditorDialogOpen ? (

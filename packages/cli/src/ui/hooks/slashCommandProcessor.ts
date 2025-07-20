@@ -36,6 +36,7 @@ export const useSlashCommandProcessor = (
   onDebugMessage: (message: string) => void,
   openThemeDialog: () => void,
   openAuthDialog: () => void,
+  openModelDialog: () => void,
   openEditorDialog: () => void,
   toggleCorgiMode: () => void,
   setQuittingMessages: (message: HistoryItem[]) => void,
@@ -252,6 +253,9 @@ export const useSlashCommandProcessor = (
                   case 'theme':
                     openThemeDialog();
                     return { type: 'handled' };
+                  case 'model':
+                    openModelDialog();
+                    return { type: 'handled' };
                   case 'editor':
                     openEditorDialog();
                     return { type: 'handled' };
@@ -314,6 +318,7 @@ export const useSlashCommandProcessor = (
       addItem,
       setShowHelp,
       openAuthDialog,
+      openModelDialog,
       commands,
       commandContext,
       addMessage,
