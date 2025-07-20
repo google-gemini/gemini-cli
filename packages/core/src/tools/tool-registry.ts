@@ -5,7 +5,7 @@
  */
 
 import { FunctionDeclaration, Schema, Type } from '@google/genai';
-import { Tool, ToolResult, BaseTool } from './tools.js';
+import { Tool, ToolResult, BaseTool, Icon } from './tools.js';
 import { Config } from '../config/config.js';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
@@ -18,7 +18,7 @@ type ToolParams = Record<string, unknown>;
 export class DiscoveredTool extends BaseTool<ToolParams, ToolResult> {
   constructor(
     private readonly config: Config,
-    readonly name: string,
+    name: string,
     readonly description: string,
     readonly parameterSchema: Record<string, unknown>,
   ) {
@@ -44,6 +44,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
       name,
       name,
       description,
+      Icon.Hammer,
       parameterSchema,
       false, // isOutputMarkdown
       false, // canUpdateOutput
@@ -137,10 +138,14 @@ export class ToolRegistry {
    */
   registerTool(tool: Tool): void {
     if (this.tools.has(tool.name)) {
-      // Decide on behavior: throw error, log warning, or allow overwrite
-      console.warn(
-        `Tool with name "${tool.name}" is already registered. Overwriting.`,
-      );
+      if (tool instanceof DiscoveredMCPTool) {
+        tool = tool.asFullyQualifiedTool();
+      } else {
+        // Decide on behavior: throw error, log warning, or allow overwrite
+        console.warn(
+          `Tool with name "${tool.name}" is already registered. Overwriting.`,
+        );
+      }
     }
     this.tools.set(tool.name, tool);
   }
@@ -164,6 +169,7 @@ export class ToolRegistry {
       this.config.getMcpServers() ?? {},
       this.config.getMcpServerCommand(),
       this,
+      this.config.getDebugMode(),
     );
   }
 
@@ -307,7 +313,9 @@ export class ToolRegistry {
    * Returns an array of all registered and discovered tool instances.
    */
   getAllTools(): Tool[] {
-    return Array.from(this.tools.values());
+    return Array.from(this.tools.values()).sort((a, b) =>
+      a.displayName.localeCompare(b.displayName),
+    );
   }
 
   /**
@@ -320,7 +328,7 @@ export class ToolRegistry {
         serverTools.push(tool);
       }
     }
-    return serverTools;
+    return serverTools.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /**

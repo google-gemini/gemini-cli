@@ -13,6 +13,7 @@ describe('WebFetchTool', () => {
   const mockConfig = {
     getApprovalMode: vi.fn(),
     setApprovalMode: vi.fn(),
+    getProxy: vi.fn(),
   } as unknown as Config;
 
   describe('shouldConfirmExecute', () => {
