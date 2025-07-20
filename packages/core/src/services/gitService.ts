@@ -9,14 +9,36 @@ import * as path from 'path';
 import * as os from 'os';
 import { isNodeError } from '../utils/errors.js';
 import { exec } from 'node:child_process';
-import { simpleGit, SimpleGit, CheckRepoActions } from 'simple-git';
+import {
+  simpleGit,
+  SimpleGit,
+  CheckRepoActions,
+  SimpleGitOptions,
+} from 'simple-git';
 import { getProjectHash, GEMINI_DIR } from '../utils/paths.js';
+
+// We don't want to inherit the user's name, email, or gpg signing
+// preferences for the shadow repository, so we pass this config explicitly.
+const GIT_CONFIG = [
+  'user.name=Gemini CLI',
+  'user.email=gemini-cli@google.com',
+  'commit.gpgsign=false',
+];
+
+// A factory for creating SimpleGit instances.
+// This is useful for mocking in tests.
+type GitFactory = (options?: Partial<SimpleGitOptions>) => SimpleGit;
 
 export class GitService {
   private projectRoot: string;
+  private gitFactory: GitFactory;
 
-  constructor(projectRoot: string) {
+  constructor(
+    projectRoot: string,
+    gitFactory: GitFactory = simpleGit as unknown as GitFactory,
+  ) {
     this.projectRoot = path.resolve(projectRoot);
+    this.gitFactory = gitFactory;
   }
 
   private getHistoryDir(): string {
@@ -31,7 +53,7 @@ export class GitService {
         'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
       );
     }
-    this.setupShadowGitRepository();
+    await this.setupShadowGitRepository();
   }
 
   verifyGitAvailability(): Promise<boolean> {
@@ -52,17 +74,16 @@ export class GitService {
    */
   async setupShadowGitRepository() {
     const repoDir = this.getHistoryDir();
-    const gitConfigPath = path.join(repoDir, '.gitconfig');
-
     await fs.mkdir(repoDir, { recursive: true });
 
-    // We don't want to inherit the user's name, email, or gpg signing
-    // preferences for the shadow repository, so we create a dedicated gitconfig.
-    const gitConfigContent =
-      '[user]\n  name = Gemini CLI\n  email = gemini-cli@google.com\n[commit]\n  gpgsign = false\n';
-    await fs.writeFile(gitConfigPath, gitConfigContent);
+    const options: Partial<SimpleGitOptions> = {
+      baseDir: repoDir,
+      binary: 'git',
+      maxConcurrentProcesses: 6,
+      config: GIT_CONFIG,
+    };
 
-    const repo = simpleGit(repoDir);
+    const repo = this.gitFactory(options);
     const isRepoDefined = await repo.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
 
     if (!isRepoDefined) {
@@ -90,12 +111,16 @@ export class GitService {
 
   private get shadowGitRepository(): SimpleGit {
     const repoDir = this.getHistoryDir();
-    return simpleGit(this.projectRoot).env({
+    const options: Partial<SimpleGitOptions> = {
+      baseDir: this.projectRoot,
+      binary: 'git',
+      maxConcurrentProcesses: 6,
+      config: GIT_CONFIG,
+    };
+
+    return this.gitFactory(options).env({
       GIT_DIR: path.join(repoDir, '.git'),
       GIT_WORK_TREE: this.projectRoot,
-      // Prevent git from using the user's global git config.
-      HOME: repoDir,
-      XDG_CONFIG_HOME: repoDir,
     });
   }
 
