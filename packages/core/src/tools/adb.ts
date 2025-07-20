@@ -4,10 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
 import os from 'os';
-import crypto from 'crypto';
 import { Config } from '../config/config.js';
 import {
   BaseTool,
@@ -285,7 +282,7 @@ ${config.getAdbSudoMode() ? 'Note: Sudo mode is enabled - commands will be execu
     }
 
     // Build the adb command
-    let adbCommand = ['adb'];
+    const adbCommand = ['adb'];
     
     // Add device selection if specified
     if (params.deviceId) {
