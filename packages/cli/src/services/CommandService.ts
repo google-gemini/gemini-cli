@@ -42,7 +42,7 @@ export class CommandService {
    */
   static async create(
     loaders: ICommandLoader[],
-    signal?: AbortSignal,
+    signal: AbortSignal,
   ): Promise<CommandService> {
     const results = await Promise.allSettled(
       loaders.map((loader) => loader.loadCommands(signal)),
