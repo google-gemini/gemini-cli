@@ -100,9 +100,10 @@ export function colorizeCode(
   language: string | null,
   availableHeight?: number,
   maxWidth?: number,
+  theme?: Theme,
 ): React.ReactNode {
   const codeToHighlight = code.replace(/\n$/, '');
-  const activeTheme = themeManager.getActiveTheme();
+  const activeTheme = theme || themeManager.getActiveTheme();
 
   try {
     // Render the HAST tree using the adapted theme
