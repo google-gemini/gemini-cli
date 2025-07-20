@@ -9,6 +9,7 @@ import { SlashCommand } from '../ui/commands/types.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
+import { corgiCommand } from '../ui/commands/corgiCommand.js';
 import { docsCommand } from '../ui/commands/docsCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
@@ -24,6 +25,7 @@ import { compressCommand } from '../ui/commands/compressCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
+import { restoreCommand } from '../ui/commands/restoreCommand.js';
 
 const loadBuiltInCommands = async (
   config: Config | null,
@@ -35,6 +37,7 @@ const loadBuiltInCommands = async (
     chatCommand,
     clearCommand,
     compressCommand,
+    corgiCommand,
     docsCommand,
     editorCommand,
     extensionsCommand,
@@ -44,6 +47,7 @@ const loadBuiltInCommands = async (
     memoryCommand,
     privacyCommand,
     quitCommand,
+    restoreCommand(config),
     statsCommand,
     themeCommand,
     toolsCommand,

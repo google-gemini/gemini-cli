@@ -60,6 +60,8 @@ import {
   FlashFallbackEvent,
   logFlashFallback,
   AuthType,
+  type ActiveFile,
+  ideContext,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -69,6 +71,7 @@ import {
   useSessionStats,
 } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
+import { useFocus } from './hooks/useFocus.js';
 import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import * as fs from 'fs';
@@ -101,6 +104,7 @@ export const AppWrapper = (props: AppProps) => (
 );
 
 const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
+  const isFocused = useFocus();
   useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
@@ -165,6 +169,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
+  const [activeFile, setActiveFile] = useState<ActiveFile | undefined>();
+
+  useEffect(() => {
+    const unsubscribe = ideContext.subscribeToActiveFile(setActiveFile);
+    // Set the initial value
+    setActiveFile(ideContext.getActiveFileContext());
+    return unsubscribe;
+  }, []);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -409,7 +421,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   } = useSlashCommandProcessor(
     config,
     settings,
-    history,
     addItem,
     clearItems,
     loadHistory,
@@ -922,9 +933,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     </Text>
                   ) : (
                     <ContextSummaryDisplay
+                      activeFile={activeFile}
                       geminiMdFileCount={geminiMdFileCount}
                       contextFileNames={contextFileNames}
                       mcpServers={config.getMcpServers()}
+                      blockedMcpServers={config.getBlockedMcpServers()}
                       showToolDescriptions={showToolDescriptions}
                     />
                   )}
@@ -968,6 +981,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   commandContext={commandContext}
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
+                  focus={isFocused}
                 />
               )}
             </>
