@@ -7,22 +7,19 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CommandService } from './CommandService.js';
 import { type ICommandLoader } from './types.js';
-import { type SlashCommand } from '../ui/commands/types.js';
+import { CommandKind, type SlashCommand } from '../ui/commands/types.js';
 
-const createMockCommand = (
-  name: string,
-  kind: 'built-in' | 'file',
-): SlashCommand => ({
+const createMockCommand = (name: string, kind: CommandKind): SlashCommand => ({
   name,
   description: `Description for ${name}`,
   kind,
   action: vi.fn(),
 });
 
-const mockCommandA = createMockCommand('command-a', 'built-in');
-const mockCommandB = createMockCommand('command-b', 'built-in');
-const mockCommandC = createMockCommand('command-c', 'file');
-const mockCommandB_Override = createMockCommand('command-b', 'file');
+const mockCommandA = createMockCommand('command-a', CommandKind.BUILT_IN);
+const mockCommandB = createMockCommand('command-b', CommandKind.BUILT_IN);
+const mockCommandC = createMockCommand('command-c', CommandKind.FILE);
+const mockCommandB_Override = createMockCommand('command-b', CommandKind.FILE);
 
 class MockCommandLoader implements ICommandLoader {
   private commandsToLoad: SlashCommand[];
@@ -47,7 +44,10 @@ describe('CommandService', () => {
 
   it('should load commands from a single loader', async () => {
     const mockLoader = new MockCommandLoader([mockCommandA, mockCommandB]);
-    const service = await CommandService.create([mockLoader]);
+    const service = await CommandService.create(
+      [mockLoader],
+      new AbortController().signal,
+    );
 
     const commands = service.getCommands();
 
@@ -61,7 +61,10 @@ describe('CommandService', () => {
   it('should aggregate commands from multiple loaders', async () => {
     const loader1 = new MockCommandLoader([mockCommandA]);
     const loader2 = new MockCommandLoader([mockCommandC]);
-    const service = await CommandService.create([loader1, loader2]);
+    const service = await CommandService.create(
+      [loader1, loader2],
+      new AbortController().signal,
+    );
 
     const commands = service.getCommands();
 
@@ -79,7 +82,10 @@ describe('CommandService', () => {
       mockCommandB_Override,
       mockCommandC,
     ]);
-    const service = await CommandService.create([loader1, loader2]);
+    const service = await CommandService.create(
+      [loader1, loader2],
+      new AbortController().signal,
+    );
 
     const commands = service.getCommands();
 
@@ -88,7 +94,7 @@ describe('CommandService', () => {
     // The final list should contain the override from the *last* loader.
     const commandB = commands.find((cmd) => cmd.name === 'command-b');
     expect(commandB).toBeDefined();
-    expect(commandB?.kind).toBe('file'); // Verify it's the overridden version.
+    expect(commandB?.kind).toBe(CommandKind.FILE); // Verify it's the overridden version.
     expect(commandB).toEqual(mockCommandB_Override);
 
     // Ensure the other commands are still present.
@@ -105,11 +111,10 @@ describe('CommandService', () => {
     const loader1 = new MockCommandLoader([mockCommandA]);
     const emptyLoader = new MockCommandLoader([]);
     const loader3 = new MockCommandLoader([mockCommandB]);
-    const service = await CommandService.create([
-      loader1,
-      emptyLoader,
-      loader3,
-    ]);
+    const service = await CommandService.create(
+      [loader1, emptyLoader, loader3],
+      new AbortController().signal,
+    );
 
     const commands = service.getCommands();
 
@@ -126,10 +131,10 @@ describe('CommandService', () => {
     const error = new Error('Loader failed');
     vi.spyOn(failingLoader, 'loadCommands').mockRejectedValue(error);
 
-    const service = await CommandService.create([
-      successfulLoader,
-      failingLoader,
-    ]);
+    const service = await CommandService.create(
+      [successfulLoader, failingLoader],
+      new AbortController().signal,
+    );
 
     const commands = service.getCommands();
     expect(commands).toHaveLength(1);
@@ -141,9 +146,10 @@ describe('CommandService', () => {
   });
 
   it('getCommands should return a readonly array that cannot be mutated', async () => {
-    const service = await CommandService.create([
-      new MockCommandLoader([mockCommandA]),
-    ]);
+    const service = await CommandService.create(
+      [new MockCommandLoader([mockCommandA])],
+      new AbortController().signal,
+    );
 
     const commands = service.getCommands();
 

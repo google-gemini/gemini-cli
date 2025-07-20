@@ -8,6 +8,7 @@ import {
   SlashCommand,
   SlashCommandActionReturn,
   CommandContext,
+  CommandKind,
 } from './types.js';
 import {
   DiscoveredMCPTool,
@@ -229,7 +230,7 @@ const getMcpStatus = async (
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
   description: 'list configured MCP servers and tools',
-  kind: 'built-in',
+  kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext, args: string) => {
     const lowerCaseArgs = args.toLowerCase().split(/\s+/).filter(Boolean);
 

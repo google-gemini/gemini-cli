@@ -4,22 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { BuiltinCommandLoader } from './BuiltinCommandLoader.js';
-import { Config } from '@google/gemini-cli-core';
-
-vi.mock('../ui/commands/aboutCommand.js', () => ({
-  aboutCommand: {
-    name: 'about',
-    description: 'About the CLI',
-    kind: 'built-in',
-  },
-}));
+vi.mock('../ui/commands/aboutCommand.js', async () => {
+  const { CommandKind } = await import('../ui/commands/types.js');
+  return {
+    aboutCommand: {
+      name: 'about',
+      description: 'About the CLI',
+      kind: CommandKind.BUILT_IN,
+    },
+  };
+});
 
 vi.mock('../ui/commands/ideCommand.js', () => ({ ideCommand: vi.fn() }));
 vi.mock('../ui/commands/restoreCommand.js', () => ({
   restoreCommand: vi.fn(),
 }));
+
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { BuiltinCommandLoader } from './BuiltinCommandLoader.js';
+import { Config } from '@google/gemini-cli-core';
+import { CommandKind } from '../ui/commands/types.js';
 
 import { ideCommand } from '../ui/commands/ideCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
@@ -57,12 +61,12 @@ describe('BuiltinCommandLoader', () => {
     ideCommandMock.mockReturnValue({
       name: 'ide',
       description: 'IDE command',
-      kind: 'built-in',
+      kind: CommandKind.BUILT_IN,
     });
     restoreCommandMock.mockReturnValue({
       name: 'restore',
       description: 'Restore command',
-      kind: 'built-in',
+      kind: CommandKind.BUILT_IN,
     });
   });
 
@@ -106,7 +110,7 @@ describe('BuiltinCommandLoader', () => {
 
     const aboutCmd = commands.find((c) => c.name === 'about');
     expect(aboutCmd).toBeDefined();
-    expect(aboutCmd?.kind).toBe('built-in');
+    expect(aboutCmd?.kind).toBe(CommandKind.BUILT_IN);
 
     const ideCmd = commands.find((c) => c.name === 'ide');
     expect(ideCmd).toBeDefined();

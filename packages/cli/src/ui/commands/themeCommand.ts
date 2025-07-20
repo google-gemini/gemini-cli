@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OpenDialogActionReturn, SlashCommand } from './types.js';
+import { CommandKind, OpenDialogActionReturn, SlashCommand } from './types.js';
 
 export const themeCommand: SlashCommand = {
   name: 'theme',
   description: 'change the theme',
-  kind: 'built-in',
+  kind: CommandKind.BUILT_IN,
   action: (_context, _args): OpenDialogActionReturn => ({
     type: 'dialog',
     dialog: 'theme',

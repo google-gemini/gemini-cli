@@ -6,13 +6,17 @@
 
 import { MessageType, HistoryItemStats } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
-import { type CommandContext, type SlashCommand } from './types.js';
+import {
+  type CommandContext,
+  type SlashCommand,
+  CommandKind,
+} from './types.js';
 
 export const statsCommand: SlashCommand = {
   name: 'stats',
   altNames: ['usage'],
   description: 'check session stats. Usage: /stats [model|tools]',
-  kind: 'built-in',
+  kind: CommandKind.BUILT_IN,
   action: (context: CommandContext) => {
     const now = new Date();
     const { sessionStartTime } = context.session.stats;
@@ -39,7 +43,7 @@ export const statsCommand: SlashCommand = {
     {
       name: 'model',
       description: 'Show model-specific usage statistics.',
-      kind: 'built-in',
+      kind: CommandKind.BUILT_IN,
       action: (context: CommandContext) => {
         context.ui.addItem(
           {
@@ -52,7 +56,7 @@ export const statsCommand: SlashCommand = {
     {
       name: 'tools',
       description: 'Show tool-specific usage statistics.',
-      kind: 'built-in',
+      kind: CommandKind.BUILT_IN,
       action: (context: CommandContext) => {
         context.ui.addItem(
           {
