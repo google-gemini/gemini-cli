@@ -64,6 +64,7 @@ export const useSlashCommandProcessor = (
   toggleCorgiMode: () => void,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
+  openSessionBrowser: () => void,
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<SlashCommand[]>([]);
@@ -416,6 +417,9 @@ export const useSlashCommandProcessor = (
                     return { type: 'handled' };
                   case 'privacy':
                     openPrivacyNotice();
+                    return { type: 'handled' };
+                  case 'sessionBrowser':
+                    openSessionBrowser();
                     return { type: 'handled' };
                   default: {
                     const unhandled: never = result.dialog;

@@ -384,7 +384,12 @@ export class CoreToolScheduler {
       }
     });
     this.notifyToolCallsUpdate();
-    this.checkAndNotifyCompletion();
+    // Note: Not awaiting to avoid making setStatusInternal async
+    this.checkAndNotifyCompletion().catch((error) => {
+      if (this.config.getDebugMode()) {
+        console.error('Error in checkAndNotifyCompletion:', error);
+      }
+    });
   }
 
   private setArgsInternal(targetCallId: string, args: unknown): void {
@@ -494,7 +499,12 @@ export class CoreToolScheduler {
       }
     }
     this.attemptExecutionOfScheduledCalls(signal);
-    this.checkAndNotifyCompletion();
+    // Note: Not awaiting to avoid making schedule async
+    this.checkAndNotifyCompletion().catch((error) => {
+      if (this.config.getDebugMode()) {
+        console.error('Error in checkAndNotifyCompletion:', error);
+      }
+    });
   }
 
   async handleConfirmationResponse(
@@ -690,7 +700,7 @@ export class CoreToolScheduler {
     }
   }
 
-  private checkAndNotifyCompletion(): void {
+  private async checkAndNotifyCompletion(): Promise<void> {
     const isToolCallTerminal = (call: ToolCall) =>
       call.status === 'success' ||
       call.status === 'error' ||
@@ -699,15 +709,31 @@ export class CoreToolScheduler {
 
     // Add all the tool calls in their current state: pending, executing success, or any other.
     if (this.chatRecordingService) {
+      const toolRegistry = await this.toolRegistry;
+      
       this.chatRecordingService.recordToolCalls(
-        this.toolCalls.map((c) => ({
-          id: c.request.callId,
-          name: c.request.name,
-          args: c.request.args,
-          result: isToolCallTerminal(c) ? c.response?.responseParts : null,
-          status: c.status,
-          timestamp: new Date().toISOString(),
-        })),
+        this.toolCalls.map((c) => {
+          // Get UI data from tool registry
+          const toolInstance = toolRegistry.getTool(c.request.name);
+          const displayName = toolInstance?.displayName || c.request.name;
+          const description = toolInstance?.getDescription(c.request.args) || '';
+          const renderOutputAsMarkdown = toolInstance?.isOutputMarkdown || false;
+          const resultDisplayRaw = 'response' in c ? c.response?.resultDisplay : undefined;
+          const resultDisplay = typeof resultDisplayRaw === 'string' ? resultDisplayRaw : undefined;
+          
+          return {
+            id: c.request.callId,
+            name: c.request.name,
+            args: c.request.args,
+            result: isToolCallTerminal(c) ? c.response?.responseParts : null,
+            status: c.status,
+            timestamp: new Date().toISOString(),
+            displayName,
+            description,
+            resultDisplay,
+            renderOutputAsMarkdown,
+          };
+        }),
       );
     }
 

@@ -11,6 +11,7 @@ import {
   SlashCommand,
   MessageActionReturn,
   LoadHistoryActionReturn,
+  OpenDialogActionReturn,
 } from './types.js';
 import { HistoryItemWithoutId, MessageType } from '../types.js';
 
@@ -24,91 +25,18 @@ interface ConversationData {
   }>;
 }
 
-interface SessionInfo {
-  file: string;
-  startTime: string;
-  messageCount: number;
-  lastUpdated: string;
-}
-
 const listCommand: SlashCommand = {
   name: 'list',
-  description: 'List auto-saved conversations',
-  action: async (context: CommandContext): Promise<MessageActionReturn> => {
-    const { config } = context.services;
-    if (!config) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'Configuration not available.',
-      };
-    }
-
-    const chatsDir = path.join(config.getProjectTempDir(), 'chats');
-
-    try {
-      const files = await fs.readdir(chatsDir);
-      const chatFiles = files.filter((f) => f.endsWith('.json'));
-
-      if (chatFiles.length === 0) {
-        return {
-          type: 'message',
-          messageType: 'info',
-          content: 'No auto-saved conversations found.',
-        };
-      }
-
-      // Read metadata from each file
-      const sessions = await Promise.all(
-        chatFiles.map(async (file) => {
-          const filePath = path.join(chatsDir, file);
-          try {
-            const data: ConversationData = JSON.parse(
-              await fs.readFile(filePath, 'utf8'),
-            );
-            return {
-              file: file.replace('.json', ''),
-              startTime: data.startTime,
-              messageCount: data.messages.length,
-              lastUpdated: data.lastUpdated,
-            };
-          } catch {
-            return null;
-          }
-        }),
-      );
-
-      const validSessions = sessions.filter(
-        (s): s is SessionInfo => s !== null,
-      );
-      const list = validSessions
-        .sort(
-          (a, b) =>
-            new Date(b.lastUpdated).getTime() -
-            new Date(a.lastUpdated).getTime(),
-        )
-        .map(
-          (s) =>
-            `${s.file} (${s.messageCount} messages, ${new Date(
-              s.startTime,
-            ).toLocaleString()})`,
-        )
-        .join('\n');
-
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: `Auto-saved conversations:\n${list}`,
-      };
-    } catch (error) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: `Error listing conversations: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      };
-    }
+  description: 'Browse auto-saved conversations interactively',
+  action: async (
+    context: CommandContext,
+    args: string,
+  ): Promise<OpenDialogActionReturn> => {
+    // The interactive session browser will be opened via the dialog system
+    return {
+      type: 'dialog',
+      dialog: 'sessionBrowser',
+    };
   },
 };
 
@@ -139,10 +67,12 @@ const resumeCommand: SlashCommand = {
     }
 
     try {
-      const chatsDir = path.join(config.getProjectTempDir(), 'chats');
-      const filePath = path.join(chatsDir, `${sessionId}.json`);
+      // Read the selected conversation JSON file.
       const conversation: ConversationData = JSON.parse(
-        await fs.readFile(filePath, 'utf8'),
+        await fs.readFile(
+          path.join(config.getProjectTempDir(), 'chats', `${sessionId}.json`),
+          'utf8',
+        ),
       );
 
       // Convert to UI history format
@@ -281,9 +211,23 @@ const searchCommand: SlashCommand = {
   },
 };
 
+const saveCommand: SlashCommand = {
+  name: 'save',
+  description: 'Save conversation (deprecated - auto-saving is enabled)',
+  action: async (context: CommandContext): Promise<MessageActionReturn> => {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `You don't need to save your chats anymore—they're automatically saved.
+
+Use '/chat list' to see your saved conversations or '/chat resume <session-id>' to resume one.`,
+    };
+  },
+};
+
 export const chatCommand: SlashCommand = {
   name: 'chat',
   description:
-    'Browse auto-saved conversations. Usage: /chat <list|resume|search>',
-  subCommands: [listCommand, resumeCommand, searchCommand],
+    'Browse and manage auto-saved conversations. Usage: /chat <list|resume|search|save>',
+  subCommands: [listCommand, resumeCommand, searchCommand, saveCommand],
 };

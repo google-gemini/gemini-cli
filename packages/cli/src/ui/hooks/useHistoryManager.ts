@@ -15,7 +15,11 @@ type HistoryItemUpdater = (
 
 export interface UseHistoryManagerReturn {
   history: HistoryItem[];
-  addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number; // Returns the generated ID
+  addItem: (
+    itemData: Omit<HistoryItem, 'id'>,
+    baseTimestamp: number,
+    isResuming?: boolean,
+  ) => number; // Returns the generated ID
   updateItem: (
     id: number,
     updates: Partial<Omit<HistoryItem, 'id'>> | HistoryItemUpdater,
@@ -51,7 +55,11 @@ export function useHistory({
 
   // Adds a new item to the history state with a unique ID.
   const addItem = useCallback(
-    (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number): number => {
+    (
+      itemData: Omit<HistoryItem, 'id'>,
+      baseTimestamp: number,
+      isResuming: boolean = false,
+    ): number => {
       const id = getNextMessageId(baseTimestamp);
       const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
 
@@ -70,8 +78,8 @@ export function useHistory({
         return [...prevHistory, newItem];
       });
 
-      // Record useful info.
-      if (chatRecordingService) {
+      // Record useful info, but don't do it if we're actually loading an existing session.
+      if (!isResuming && chatRecordingService) {
         switch (itemData.type) {
           case 'compression':
           case 'info':

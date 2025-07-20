@@ -78,7 +78,7 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy';
+  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy' | 'sessionBrowser';
 }
 
 /**

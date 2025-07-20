@@ -37,6 +37,11 @@ interface ToolCallRecord {
   result?: unknown;
   status: Status;
   timestamp: string;
+  // UI-specific fields for display purposes
+  displayName?: string;
+  description?: string;
+  resultDisplay?: string;
+  renderOutputAsMarkdown?: boolean;
 }
 
 // Message type and message type-specific fields.
@@ -105,6 +110,60 @@ export class ChatRecordingService {
     } catch (error) {
       if (this.config.getDebugMode()) {
         console.error('Error initializing chat recording service:', error);
+      }
+    }
+  }
+
+  /**
+   * Reinitializes the chat recording service with a new session ID, optionally copying from an
+   * existing session. This allows session resumption to create a new branched conversation file.
+   */
+  reinitializeWithSession(newSessionId: string, sourceFilePath?: string): void {
+    try {
+      this.sessionId = newSessionId;
+
+      const chatsDir = path.join(this.config.getProjectTempDir(), 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+
+      const timestamp = new Date()
+        .toISOString()
+        .slice(0, 16)
+        .replace(/:/g, '-');
+      const filename = `session-${timestamp}-${newSessionId.slice(0, 8)}.json`;
+      this.conversationFile = path.join(chatsDir, filename);
+
+      if (sourceFilePath && fs.existsSync(sourceFilePath)) {
+        // Copy existing session to new file
+        const sourceData = fs.readFileSync(sourceFilePath, 'utf8');
+        const conversation: ConversationRecord = JSON.parse(sourceData);
+
+        // Update with new session ID and timestamp
+        conversation.sessionId = newSessionId;
+        conversation.lastUpdated = new Date().toISOString();
+
+        this.writeConversation(conversation);
+
+        // Clear any cached data to force fresh reads
+        this.cachedLastConvData = null;
+      } else {
+        // Create new empty session
+        const initialRecord: ConversationRecord = {
+          sessionId: newSessionId,
+          projectHash: this.projectHash,
+          startTime: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+          messages: [],
+        };
+
+        this.writeConversation(initialRecord);
+      }
+
+      // Clear any queued data since this is a fresh start
+      this.queuedThoughts = [];
+      this.queuedTokens = null;
+    } catch (error) {
+      if (this.config.getDebugMode()) {
+        console.error('Error reinitializing chat recording service:', error);
       }
     }
   }
@@ -222,6 +281,10 @@ export class ChatRecordingService {
       result?: unknown;
       status: Status;
       timestamp: string;
+      displayName?: string;
+      description?: string;
+      resultDisplay?: string;
+      renderOutputAsMarkdown?: boolean;
     }>,
   ): void {
     if (!this.conversationFile) return;

@@ -9,6 +9,7 @@ import { themeManager } from '../themes/theme-manager.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
 import { type HistoryItem, MessageType } from '../types.js';
 import process from 'node:process';
+import { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
@@ -23,7 +24,7 @@ interface UseThemeCommandReturn {
 export const useThemeCommand = (
   loadedSettings: LoadedSettings,
   setThemeError: (error: string | null) => void,
-  addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
+  addItem: UseHistoryManagerReturn['addItem'],
 ): UseThemeCommandReturn => {
   // Determine the effective theme
   const effectiveTheme = loadedSettings.merged.theme;

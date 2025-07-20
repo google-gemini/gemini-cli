@@ -22,6 +22,7 @@ import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './hooks/useAuthCommand.js';
+import { useSessionBrowser } from './hooks/useSessionBrowser.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
@@ -36,6 +37,7 @@ import { ThemeDialog } from './components/ThemeDialog.js';
 import { AuthDialog } from './components/AuthDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
+import { SessionBrowser } from './components/SessionBrowser.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -114,6 +116,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { history, addItem, clearItems, loadHistory } = useHistory({
     chatRecordingService,
   });
+
   const {
     consoleMessages,
     handleNewMessage,
@@ -187,6 +190,27 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     isAuthenticating,
     cancelAuthentication,
   } = useAuthCommand(settings, setAuthError, config);
+
+  const {
+    isSessionBrowserOpen,
+    openSessionBrowser,
+    closeSessionBrowser,
+    handleResumeSession,
+  } = useSessionBrowser(config, chatRecordingService, (result) => {
+    // Handle the load history result
+    if (result.type === 'load_history') {
+      setQuittingMessages(null);
+      clearItems();
+
+      // Copy over the loaded history into the current session.
+      result.history.forEach((item, index) => {
+        addItem(item, index, true);
+      });
+
+      // Set the client history
+      config.getGeminiClient()?.setHistory(result.clientHistory);
+    }
+  });
 
   useEffect(() => {
     if (settings.merged.selectedAuthType) {
@@ -398,6 +422,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     toggleCorgiMode,
     setQuittingMessages,
     openPrivacyNotice,
+    openSessionBrowser,
   );
   const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
 
@@ -846,6 +871,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 onSelect={handleEditorSelect}
                 settings={settings}
                 onExit={exitEditorDialog}
+              />
+            </Box>
+          ) : isSessionBrowserOpen ? (
+            <Box flexDirection="column">
+              <SessionBrowser
+                config={config}
+                onResumeSession={handleResumeSession}
+                onExit={closeSessionBrowser}
               />
             </Box>
           ) : showPrivacyNotice ? (
