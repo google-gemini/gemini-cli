@@ -307,6 +307,7 @@ describe('getFolderStructure gitignore', () => {
           createDirent('file1.txt', 'file'),
           createDirent('node_modules', 'dir'),
           createDirent('ignored.txt', 'file'),
+          createDirent('gem_ignored.txt', 'file'),
           createDirent('.gemini', 'dir'),
         ] as any;
       }
@@ -326,6 +327,9 @@ describe('getFolderStructure gitignore', () => {
       const path = p.toString();
       if (path === '/test/project/.gitignore') {
         return 'ignored.txt\nnode_modules/\n.gemini/\n!/.gemini/config.yaml';
+      }
+      if (path === '/test/project/.geminiignore') {
+        return 'gem_ignored.txt\nnode_modules/\n.gemini/\n!/.gemini/config.yaml';
       }
       return '';
     });
@@ -347,9 +351,36 @@ describe('getFolderStructure gitignore', () => {
     const fileService = new FileDiscoveryService('/test/project');
     const structure = await getFolderStructure('/test/project', {
       fileService,
-      respectGitIgnore: false,
+      fileFilteringOptions: {
+        respectGeminiIgnore: false,
+        respectGitIgnore: false,
+      },
     });
     expect(structure).toContain('ignored.txt');
+    // node_modules is still ignored by default
+    expect(structure).toContain('node_modules/...');
+  });
+
+  it('should ignore files and folders specified in .geminiignore', async () => {
+    const fileService = new FileDiscoveryService('/test/project');
+    const structure = await getFolderStructure('/test/project', {
+      fileService,
+    });
+    expect(structure).not.toContain('gem_ignored.txt');
+    expect(structure).toContain('node_modules/...');
+    expect(structure).not.toContain('logs.json');
+  });
+
+  it('should not ignore files if respectGeminiIgnore is false', async () => {
+    const fileService = new FileDiscoveryService('/test/project');
+    const structure = await getFolderStructure('/test/project', {
+      fileService,
+      fileFilteringOptions: {
+        respectGeminiIgnore: false,
+        respectGitIgnore: true, // Explicitly disable gemini ignore only
+      },
+    });
+    expect(structure).toContain('gem_ignored.txt');
     // node_modules is still ignored by default
     expect(structure).toContain('node_modules/...');
   });
