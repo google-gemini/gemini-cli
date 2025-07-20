@@ -4,9 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getCoreSystemPrompt } from './prompts.js';
 import { isGitRepository } from '../utils/gitUtils.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -26,8 +29,15 @@ vi.mock('../tools/write-file', () => ({
 vi.mock('../utils/gitUtils', () => ({
   isGitRepository: vi.fn(),
 }));
+vi.mock('node:fs');
 
 describe('Core System Prompt (prompts.ts)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
+    vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
+  });
+
   it('should return the base prompt when no userMemory is provided', () => {
     vi.stubEnv('SANDBOX', undefined);
     const prompt = getCoreSystemPrompt();
@@ -104,5 +114,67 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt();
     expect(prompt).not.toContain('# Git Repository');
     expect(prompt).toMatchSnapshot();
+  });
+
+  describe('GEMINI_SYSTEM_MD environment variable', () => {
+    it('should use default prompt when GEMINI_SYSTEM_MD is "false"', () => {
+      vi.stubEnv('GEMINI_SYSTEM_MD', 'false');
+      const prompt = getCoreSystemPrompt();
+      expect(fs.readFileSync).not.toHaveBeenCalled();
+      expect(prompt).not.toContain('custom system prompt');
+    });
+
+    it('should use default prompt when GEMINI_SYSTEM_MD is "0"', () => {
+      vi.stubEnv('GEMINI_SYSTEM_MD', '0');
+      const prompt = getCoreSystemPrompt();
+      expect(fs.readFileSync).not.toHaveBeenCalled();
+      expect(prompt).not.toContain('custom system prompt');
+    });
+
+    it('should throw error if GEMINI_SYSTEM_MD points to a non-existent file', () => {
+      const customPath = '/non/existent/path/system.md';
+      vi.stubEnv('GEMINI_SYSTEM_MD', customPath);
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      expect(() => getCoreSystemPrompt()).toThrow(
+        `missing system prompt file '${path.resolve(customPath)}'`,
+      );
+    });
+
+    it('should read from default path when GEMINI_SYSTEM_MD is "true"', () => {
+      const defaultPath = path.resolve(
+        path.join(GEMINI_CONFIG_DIR, 'system.md'),
+      );
+      vi.stubEnv('GEMINI_SYSTEM_MD', 'true');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
+
+      const prompt = getCoreSystemPrompt();
+      expect(fs.readFileSync).toHaveBeenCalledWith(defaultPath, 'utf8');
+      expect(prompt).toBe('custom system prompt');
+    });
+
+    it('should read from default path when GEMINI_SYSTEM_MD is "1"', () => {
+      const defaultPath = path.resolve(
+        path.join(GEMINI_CONFIG_DIR, 'system.md'),
+      );
+      vi.stubEnv('GEMINI_SYSTEM_MD', '1');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
+
+      const prompt = getCoreSystemPrompt();
+      expect(fs.readFileSync).toHaveBeenCalledWith(defaultPath, 'utf8');
+      expect(prompt).toBe('custom system prompt');
+    });
+
+    it('should read from custom path when GEMINI_SYSTEM_MD provides one, preserving case', () => {
+      const customPath = path.resolve('/custom/path/SyStEm.Md');
+      vi.stubEnv('GEMINI_SYSTEM_MD', customPath);
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
+
+      const prompt = getCoreSystemPrompt();
+      expect(fs.readFileSync).toHaveBeenCalledWith(customPath, 'utf8');
+      expect(prompt).toBe('custom system prompt');
+    });
   });
 });
