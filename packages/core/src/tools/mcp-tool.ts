@@ -86,7 +86,7 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
       DiscoveredMCPTool.allowlist.has(serverAllowListKey) ||
       DiscoveredMCPTool.allowlist.has(toolAllowListKey)
     ) {
-      return false; // server and/or tool already allow listed
+      return false; // server and/or tool already allowlisted
     }
 
     const confirmationDetails: ToolMcpConfirmationDetails = {

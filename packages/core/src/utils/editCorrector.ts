@@ -77,10 +77,10 @@ function getTimestampFromFunctionId(fcnId: string): number {
 
 /**
  * Will look through the gemini client history and determine when the most recent
- * edit to a target file occured. If no edit happened, it will return -1
+ * edit to a target file occurred. If no edit happened, it will return -1
  * @param filePath the path to the file
  * @param client the geminiClient, so that we can get the history
- * @returns a DateTime (as a number) of when the last edit occured, or -1 if no edit was found.
+ * @returns a DateTime (as a number) of when the last edit occurred, or -1 if no edit was found.
  */
 async function findLastEditTimestamp(
   filePath: string,
@@ -132,8 +132,8 @@ async function findLastEditTimestamp(
 
       // Use the "blunt hammer" approach to find the file path in the content.
       // Note that the tool response data is inconsistent in their formatting
-      // with successes and errors - so, we just check for the existance
-      // as the best guess to if error/failed occured with the response.
+      // with successes and errors - so, we just check for the existence
+      // as the best guess to if error/failed occurred with the response.
       const stringified = JSON.stringify(content);
       if (
         !stringified.includes('Error') && // only applicable for functionResponse
