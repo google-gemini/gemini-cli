@@ -54,6 +54,10 @@ export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
 }
 
+export interface DisplaySettings {
+  footer?: boolean;
+}
+
 export interface Settings {
   theme?: string;
   selectedAuthType?: AuthType;
@@ -69,6 +73,7 @@ export interface Settings {
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
+  display?: DisplaySettings;
   telemetry?: TelemetrySettings;
   usageStatisticsEnabled?: boolean;
   preferredEditor?: string;

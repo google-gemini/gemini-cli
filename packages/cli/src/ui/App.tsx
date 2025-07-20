@@ -993,7 +993,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             }
             promptTokenCount={sessionStats.lastPromptTokenCount}
             nightly={nightly}
-            display={config.getDisplay()}
+            display={settings.merged.display ?? {}}
           />
         </Box>
       </Box>

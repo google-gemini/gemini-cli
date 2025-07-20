@@ -183,3 +183,13 @@ Only write high-value comments if at all. Avoid talking to the user through comm
 ## General style requirements
 
 Use hyphens instead of underscores in flag names (e.g. `my-flag` instead of `my_flag`).
+
+## Configuration and Settings
+
+When adding new user-configurable settings that should be accessible via `settings.json`, follow these conventions:
+
+1.  **Define the Setting in `settings.ts`**: All user-facing settings must be defined in the `Settings` interface located in `packages/cli/src/config/settings.ts`. This file is the single source of truth for what can be configured by a user in their `settings.json` files (user, workspace, or system scope).
+
+2.  **Avoid Core Dependencies on CLI Settings**: The `@google/gemini-cli-core` package should remain independent of the CLI's UI-specific settings. Do not add settings that only affect the CLI's display or behavior to the `Config` class in the core package. This prevents circular dependencies and keeps the core library reusable.
+
+3.  **Access Settings from the `LoadedSettings` Object**: In the CLI application code (e.g., in UI components), access the configured values from the `LoadedSettings` object, which is passed down, typically as `settings.merged`. Do not attempt to access these settings directly from the `core` `Config` object.

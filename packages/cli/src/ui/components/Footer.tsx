@@ -12,7 +12,7 @@ import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
 import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
-import { type DisplaySettings } from '@google/gemini-cli-core';
+import { type DisplaySettings } from '../../config/settings.js';
 
 interface FooterProps {
   model: string;
@@ -47,6 +47,13 @@ export const Footer: React.FC<FooterProps> = ({
   const percentage = promptTokenCount / limit;
 
   if (display.footer === false) {
+    if (errorCount > 0) {
+      return (
+        <Box marginTop={1} justifyContent="flex-end" width="100%">
+          <ConsoleSummaryDisplay errorCount={errorCount} />
+        </Box>
+      );
+    }
     return null;
   }
 
