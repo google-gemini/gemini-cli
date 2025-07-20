@@ -37,7 +37,7 @@ export class CommandService {
    *   interface. The order of loaders is significant: if multiple loaders
    *   provide a command with the same name, the command from the loader that
    *   appears later in the array will take precedence.
-   * @param signal An optional AbortSignal to cancel the loading process.
+   * @param signal An AbortSignal to cancel the loading process.
    * @returns A promise that resolves to a new, fully initialized `CommandService` instance.
    */
   static async create(

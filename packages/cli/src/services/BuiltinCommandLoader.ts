@@ -40,10 +40,10 @@ export class BuiltinCommandLoader implements ICommandLoader {
    * Gathers all raw built-in command definitions, injects dependencies where
    * needed (e.g., config) and filters out any that are not available.
    *
-   * @param _signal An optional AbortSignal (unused for this synchronous loader).
+   * @param _signal An AbortSignal (unused for this synchronous loader).
    * @returns A promise that resolves to an array of `SlashCommand` objects.
    */
-  async loadCommands(_signal?: AbortSignal): Promise<SlashCommand[]> {
+  async loadCommands(_signal: AbortSignal): Promise<SlashCommand[]> {
     const allDefinitions: Array<SlashCommand | null> = [
       aboutCommand,
       authCommand,
