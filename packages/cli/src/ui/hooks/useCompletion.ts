@@ -44,6 +44,7 @@ export function useCompletion(
   slashCommands: readonly SlashCommand[],
   commandContext: CommandContext,
   config?: Config,
+  shellHistory?: string[],
 ): UseCompletionReturn {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] =
@@ -125,6 +126,18 @@ export function useCompletion(
   useEffect(() => {
     if (!isActive) {
       resetCompletionState();
+      return;
+    }
+
+    if (shellHistory?.length) {
+      const matches = shellHistory.filter((cmd) =>
+        cmd.toLowerCase().includes(query.toLowerCase()),
+      );
+
+      const matchedHistory = matches.map((s) => ({ label: s, value: s }));
+      setSuggestions(matchedHistory);
+      setShowSuggestions(matchedHistory.length > 0);
+      setActiveSuggestionIndex(matchedHistory.length > 0 ? 0 : -1);
       return;
     }
 
@@ -547,11 +560,12 @@ export function useCompletion(
   }, [
     query,
     cwd,
-    isActive,
     resetCompletionState,
     slashCommands,
     commandContext,
     config,
+    shellHistory,
+    isActive,
   ]);
 
   return {

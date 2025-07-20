@@ -97,12 +97,8 @@ describe('InputPrompt', () => {
       addCommandToHistory: vi.fn(),
       getPreviousCommand: vi.fn().mockReturnValue(null),
       getNextCommand: vi.fn().mockReturnValue(null),
-      getMatchingCommand: vi.fn().mockReturnValue(null),
-      getNextMatchingCommand: vi.fn().mockReturnValue(null),
-      getPreviousMatchingCommand: vi.fn().mockReturnValue(null),
-      resetMatching: vi.fn(),
-
       resetHistoryPosition: vi.fn(),
+      history: [],
     };
     mockedUseShellHistory.mockReturnValue(mockShellHistory);
 
@@ -201,62 +197,6 @@ describe('InputPrompt', () => {
 
     expect(mockShellHistory.addCommandToHistory).toHaveBeenCalledWith('ls -l');
     expect(props.onSubmit).toHaveBeenCalledWith('ls -l');
-    unmount();
-  });
-
-  it('should call reverse search methods on up key when reverse search is active', async () => {
-    props.shellModeActive = true;
-    vi.mocked(mockShellHistory.getPreviousMatchingCommand).mockReturnValue(
-      'ls -l',
-    );
-    const { stdin, unmount } = render(<InputPrompt {...props} />);
-    await wait();
-    // Write Ctrl+R to activate reverse search
-    stdin.write('\u0012'); // Ctrl+R
-    await wait();
-    stdin.write('\u001B[A'); // Up arrow
-    await wait();
-
-    expect(mockShellHistory.getPreviousMatchingCommand).toHaveBeenCalled();
-    expect(props.buffer.setText).toHaveBeenCalledWith('ls -l');
-    unmount();
-  });
-
-  it('should call reverse search methods on down key when reverse search is active', async () => {
-    props.shellModeActive = true;
-    vi.mocked(mockShellHistory.getNextMatchingCommand).mockReturnValue('ls -l');
-    const { stdin, unmount } = render(<InputPrompt {...props} />);
-    await wait();
-    // Write Ctrl+R to activate reverse search
-    stdin.write('\u0012'); // Ctrl+R
-    await wait();
-    stdin.write('\u001B[B'); // Down arrow
-    await wait();
-
-    expect(mockShellHistory.getNextMatchingCommand).toHaveBeenCalled();
-    expect(props.buffer.setText).toHaveBeenCalledWith('ls -l');
-    unmount();
-  });
-
-  it('should NOT call shell history methods when not in shell mode', async () => {
-    props.buffer.setText('some text');
-    const { stdin, unmount } = render(<InputPrompt {...props} />);
-    await wait();
-
-    stdin.write('\u001B[A'); // Up arrow
-    await wait();
-    stdin.write('\u001B[B'); // Down arrow
-    await wait();
-    stdin.write('\r'); // Enter
-    await wait();
-
-    expect(mockShellHistory.getPreviousCommand).not.toHaveBeenCalled();
-    expect(mockShellHistory.getNextCommand).not.toHaveBeenCalled();
-    expect(mockShellHistory.addCommandToHistory).not.toHaveBeenCalled();
-
-    expect(mockInputHistory.navigateUp).toHaveBeenCalled();
-    expect(mockInputHistory.navigateDown).toHaveBeenCalled();
-    expect(props.onSubmit).toHaveBeenCalledWith('some text');
     unmount();
   });
 
@@ -607,6 +547,69 @@ describe('InputPrompt', () => {
     await wait();
 
     expect(props.buffer.setText).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  describe('reverse shell search', () => {
+    beforeEach(() => {
+      props.shellModeActive = true;
+      mockShellHistory.history = [
+        'git status',
+        'npm install',
+        'git commit -m "test"',
+        'ls -la',
+      ];
+    });
+
+    it('should activate reverse search on Ctrl+R in shell mode', async () => {
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x12');
+      await wait();
+
+      expect(mockedUseCompletion).toHaveBeenCalledWith(
+        '',
+        '/test/project/src',
+        true,
+        mockSlashCommands,
+        mockCommandContext,
+        expect.any(Object),
+        mockShellHistory.history,
+      );
+      unmount();
+    });
+
+    it('should not activate reverse search on Ctrl+R when not in shell mode', async () => {
+      props.shellModeActive = false;
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x12');
+      await wait();
+
+      expect(mockedUseCompletion).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        true,
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        mockShellHistory.history,
+      );
+      unmount();
+    });
+  });
+
+  it('should call inputHistory.navigateDown on down arrow in non-shell mode', async () => {
+    props.shellModeActive = false;
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\u001B[B');
+    await wait();
+
+    expect(mockShellHistory.getNextCommand).not.toHaveBeenCalled();
     unmount();
   });
 

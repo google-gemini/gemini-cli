@@ -19,13 +19,29 @@ async function getHistoryFilePath(projectRoot: string): Promise<string> {
 
 async function readHistoryFile(filePath: string): Promise<string[]> {
   try {
-    const content = await fs.readFile(filePath, 'utf-8');
-    return content.split('\n').filter(Boolean);
-  } catch (error) {
-    if (isNodeError(error) && error.code === 'ENOENT') {
-      return [];
+    const text = await fs.readFile(filePath, 'utf-8');
+    const result: string[] = [];
+    let cur = '';
+
+    for (const raw of text.split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line) continue;
+
+      const m = cur.match(/(\\+)$/);
+      if (m && m[1].length % 2) {
+        // odd number of trailing '\'
+        cur = cur.slice(0, -1).trimEnd() + ' ' + line;
+      } else {
+        if (cur) result.push(cur);
+        cur = line;
+      }
     }
-    console.error('Error reading shell history:', error);
+
+    if (cur) result.push(cur);
+    return result;
+  } catch (err) {
+    if (isNodeError(err) && err.code === 'ENOENT') return [];
+    console.error('Error reading history:', err);
     return [];
   }
 }
@@ -46,8 +62,6 @@ export function useShellHistory(projectRoot: string) {
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [historyFilePath, setHistoryFilePath] = useState<string | null>(null);
-  const [matchingCommands, setMatchingCommands] = useState<string[]>([]);
-  const [matchingIndex, setMatchingIndex] = useState(-1);
 
   useEffect(() => {
     async function loadHistory() {
@@ -96,67 +110,15 @@ export function useShellHistory(projectRoot: string) {
     return history[newIndex] ?? null;
   }, [history, historyIndex]);
 
-  const getMatchingCommand = useCallback(
-    (toMatch: string) => {
-      const query = toMatch.trim();
-      if (!query) {
-        setMatchingCommands([]);
-        setMatchingIndex(-1);
-        return null;
-      }
-
-      const matches = history.filter((cmd) =>
-        cmd.toLowerCase().includes(query.toLowerCase()),
-      );
-
-      setMatchingCommands(matches);
-      if (matches.length > 0) {
-        setMatchingIndex(0);
-        return matches[0];
-      }
-      setMatchingIndex(-1);
-      return null;
-    },
-    [history],
-  );
-
-  const getPreviousMatchingCommand = useCallback((): string | null => {
-    if (matchingCommands.length === 0) return null;
-    const newIndex =
-      matchingIndex < 0
-        ? 0
-        : Math.min(matchingIndex + 1, matchingCommands.length - 1);
-    setMatchingIndex(newIndex);
-    return matchingCommands[newIndex] ?? null;
-  }, [matchingCommands, matchingIndex]);
-
-  const getNextMatchingCommand = useCallback((): string | null => {
-    if (matchingCommands.length === 0) {
-      return null;
-    }
-    const newIndex = matchingIndex - 1;
-    if (newIndex < 0) {
-      setMatchingIndex(-1);
-      return '';
-    }
-    setMatchingIndex(newIndex);
-    return matchingCommands[newIndex] ?? null;
-  }, [matchingCommands, matchingIndex]);
-
-  const resetMatching = useCallback(() => {
-    setMatchingCommands([]);
-    setMatchingIndex(-1);
+  const resetHistoryPosition = useCallback(() => {
+    setHistoryIndex(-1);
   }, []);
 
   return {
+    history,
     addCommandToHistory,
     getPreviousCommand,
     getNextCommand,
-    getMatchingCommand,
-    getPreviousMatchingCommand,
-    getNextMatchingCommand,
-    resetMatching,
-
-    resetHistoryPosition: () => setHistoryIndex(-1),
+    resetHistoryPosition,
   };
 }
