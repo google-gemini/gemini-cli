@@ -10,7 +10,7 @@ import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { TextBuffer } from './shared/text-buffer.js';
-import { cpSlice, cpLen } from '../utils/textUtils.js';
+import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
@@ -58,10 +58,54 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+
+  // Check if cursor is after @ or / without unescaped spaces
+  const isCursorAfterCommandWithoutSpace = useCallback(() => {
+    const [row, col] = buffer.cursor;
+    const currentLine = buffer.lines[row] || '';
+
+    // Convert current line to code points for Unicode-aware processing
+    const codePoints = toCodePoints(currentLine);
+
+    // Search backwards from cursor position within the current line only
+    for (let i = col - 1; i >= 0; i--) {
+      const char = codePoints[i];
+
+      if (char === ' ') {
+        // Check if this space is escaped by counting backslashes before it
+        let backslashCount = 0;
+        for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+          backslashCount++;
+        }
+
+        // If there's an odd number of backslashes, the space is escaped
+        const isEscaped = backslashCount % 2 === 1;
+
+        if (!isEscaped) {
+          // Found unescaped space before @ or /, return false
+          return false;
+        }
+        // If escaped, continue searching backwards
+      } else if (char === '@' || char === '/') {
+        // Found @ or / without unescaped space in between
+        return true;
+      }
+    }
+
+    return false;
+  }, [buffer.cursor, buffer.lines]);
+
+  const shouldShowCompletion = useCallback(
+    () =>
+      (isAtCommand(buffer.text) || isSlashCommand(buffer.text)) &&
+      isCursorAfterCommandWithoutSpace(),
+    [buffer.text, isCursorAfterCommandWithoutSpace],
+  );
+
   const completion = useCompletion(
     buffer.text,
     config.getTargetDir(),
-    isAtCommand(buffer.text) || isSlashCommand(buffer.text),
+    shouldShowCompletion(),
     slashCommands,
     commandContext,
     config,
@@ -162,7 +206,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         // - Otherwise, the base is everything EXCEPT the last partial part.
         const basePath =
           hasTrailingSpace || isParentPath ? parts : parts.slice(0, -1);
-        const newValue = `/${[...basePath, suggestion].join(' ')} `;
+        const newValue = `/${[...basePath, suggestion].join(' ')}`;
 
         buffer.setText(newValue);
       } else {
@@ -263,6 +307,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (key.ctrl && key.name === 'l') {
         onClearScreen();
+        return;
+      }
+
+      // If the command is a perfect match, pressing enter should execute it.
+      if (completion.isPerfectMatch && key.name === 'return') {
+        handleSubmitAndClear(buffer.text);
         return;
       }
 
