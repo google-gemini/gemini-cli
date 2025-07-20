@@ -42,7 +42,7 @@ function isWordChar(ch: string | undefined): boolean {
  */
 function stripUnsafeCharacters(str: string): string {
   const stripped = stripAnsi(str);
-  return toCodePoints(stripAnsi(stripped))
+  return toCodePoints(stripped)
     .filter((char) => {
       if (char.length > 1) return false;
       const code = char.codePointAt(0);
@@ -75,6 +75,7 @@ interface UseTextBufferProps {
   setRawMode?: (mode: boolean) => void; // For external editor
   onChange?: (text: string) => void; // Callback for when text changes
   isValidPath: (path: string) => boolean;
+  shellModeActive?: boolean; // Whether the text buffer is in shell mode
 }
 
 interface UndoHistoryEntry {
@@ -988,6 +989,7 @@ export function useTextBuffer({
   setRawMode,
   onChange,
   isValidPath,
+  shellModeActive = false,
 }: UseTextBufferProps): TextBuffer {
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
@@ -1057,7 +1059,7 @@ export function useTextBuffer({
       }
 
       const minLengthToInferAsDragDrop = 3;
-      if (ch.length >= minLengthToInferAsDragDrop) {
+      if (ch.length >= minLengthToInferAsDragDrop && !shellModeActive) {
         let potentialPath = ch;
         if (
           potentialPath.length > 2 &&
@@ -1089,7 +1091,7 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText });
       }
     },
-    [isValidPath],
+    [isValidPath, shellModeActive],
   );
 
   const newline = useCallback((): void => {

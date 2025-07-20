@@ -15,7 +15,9 @@ import {
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
   ToolConfirmationOutcome,
+  Icon,
 } from './tools.js';
+import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import stripAnsi from 'strip-ansi';
@@ -26,6 +28,7 @@ export interface ShellToolParams {
   directory?: string;
 }
 import { spawn } from 'child_process';
+import { summarizeToolOutput } from '../utils/summarizer.js';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -50,20 +53,21 @@ Exit Code: Exit code or \`(none)\` if terminated by signal.
 Signal: Signal number or \`(none)\` if no signal was received.
 Background PIDs: List of background processes started or \`(none)\`.
 Process Group PGID: Process group started or \`(none)\``,
+      Icon.Terminal,
       {
-        type: 'object',
+        type: Type.OBJECT,
         properties: {
           command: {
-            type: 'string',
+            type: Type.STRING,
             description: 'Exact bash command to execute as `bash -c <command>`',
           },
           description: {
-            type: 'string',
+            type: Type.STRING,
             description:
               'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
           },
           directory: {
-            type: 'string',
+            type: Type.STRING,
             description:
               '(OPTIONAL) Directory to run the command in, if not the project root directory. Must be relative to the project root directory and must already exist.',
           },
@@ -112,12 +116,16 @@ Process Group PGID: Process group started or \`(none)\``,
    * the tool's configuration including allowlists and blocklists.
    *
    * @param command The shell command string to validate
-   * @returns True if the command is allowed to execute, false otherwise
+   * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed
    */
-  isCommandAllowed(command: string): boolean {
+  isCommandAllowed(command: string): { allowed: boolean; reason?: string } {
     // 0. Disallow command substitution
-    if (command.includes('$(') || command.includes('`')) {
-      return false;
+    if (command.includes('$(')) {
+      return {
+        allowed: false,
+        reason:
+          'Command substitution using $() is not allowed for security reasons',
+      };
     }
 
     const SHELL_TOOL_NAMES = [ShellTool.name, ShellTool.Name];
@@ -157,7 +165,10 @@ Process Group PGID: Process group started or \`(none)\``,
 
     // 1. Check if the shell tool is globally disabled.
     if (SHELL_TOOL_NAMES.some((name) => excludeTools.includes(name))) {
-      return false;
+      return {
+        allowed: false,
+        reason: 'Shell tool is globally disabled in configuration',
+      };
     }
 
     const blockedCommands = new Set(extractCommands(excludeTools));
@@ -170,43 +181,55 @@ Process Group PGID: Process group started or \`(none)\``,
 
     const commandsToValidate = command.split(/&&|\|\||\||;/).map(normalize);
 
+    const blockedCommandsArr = [...blockedCommands];
+
     for (const cmd of commandsToValidate) {
       // 2. Check if the command is on the blocklist.
-      const isBlocked = [...blockedCommands].some((blocked) =>
+      const isBlocked = blockedCommandsArr.some((blocked) =>
         isPrefixedBy(cmd, blocked),
       );
       if (isBlocked) {
-        return false;
+        return {
+          allowed: false,
+          reason: `Command '${cmd}' is blocked by configuration`,
+        };
       }
 
       // 3. If in strict allow-list mode, check if the command is permitted.
       const isStrictAllowlist =
         hasSpecificAllowedCommands && !isWildcardAllowed;
+      const allowedCommandsArr = [...allowedCommands];
       if (isStrictAllowlist) {
-        const isAllowed = [...allowedCommands].some((allowed) =>
+        const isAllowed = allowedCommandsArr.some((allowed) =>
           isPrefixedBy(cmd, allowed),
         );
         if (!isAllowed) {
-          return false;
+          return {
+            allowed: false,
+            reason: `Command '${cmd}' is not in the allowed commands list`,
+          };
         }
       }
     }
 
     // 4. If all checks pass, the command is allowed.
-    return true;
+    return { allowed: true };
   }
 
   validateToolParams(params: ShellToolParams): string | null {
-    if (!this.isCommandAllowed(params.command)) {
-      return `Command is not allowed: ${params.command}`;
+    const commandCheck = this.isCommandAllowed(params.command);
+    if (!commandCheck.allowed) {
+      if (!commandCheck.reason) {
+        console.error(
+          'Unexpected: isCommandAllowed returned false without a reason',
+        );
+        return `Command is not allowed: ${params.command}`;
+      }
+      return commandCheck.reason;
     }
-    if (
-      !SchemaValidator.validate(
-        this.parameterSchema as Record<string, unknown>,
-        params,
-      )
-    ) {
-      return `Parameters failed schema validation.`;
+    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    if (errors) {
+      return errors;
     }
     if (!params.command.trim()) {
       return 'Command cannot be empty.';
@@ -468,6 +491,23 @@ Process Group PGID: Process group started or \`(none)\``,
       }
     }
 
-    return { llmContent, returnDisplay: returnDisplayMessage };
+    const summarizeConfig = this.config.getSummarizeToolOutputConfig();
+    if (summarizeConfig && summarizeConfig[this.name]) {
+      const summary = await summarizeToolOutput(
+        llmContent,
+        this.config.getGeminiClient(),
+        abortSignal,
+        summarizeConfig[this.name].tokenBudget,
+      );
+      return {
+        llmContent: summary,
+        returnDisplay: returnDisplayMessage,
+      };
+    }
+
+    return {
+      llmContent,
+      returnDisplay: returnDisplayMessage,
+    };
   }
 }

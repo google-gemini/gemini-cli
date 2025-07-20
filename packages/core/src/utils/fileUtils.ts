@@ -36,8 +36,8 @@ export function isWithinRoot(
   pathToCheck: string,
   rootDirectory: string,
 ): boolean {
-  const normalizedPathToCheck = path.normalize(pathToCheck);
-  const normalizedRootDirectory = path.normalize(rootDirectory);
+  const normalizedPathToCheck = path.resolve(pathToCheck);
+  const normalizedRootDirectory = path.resolve(rootDirectory);
 
   // Ensure the rootDirectory path ends with a separator for correct startsWith comparison,
   // unless it's the root path itself (e.g., '/' or 'C:\').
@@ -98,13 +98,17 @@ export function isBinaryFile(filePath: string): boolean {
  */
 export function detectFileType(
   filePath: string,
-): 'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' {
+): 'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg' {
   const ext = path.extname(filePath).toLowerCase();
 
   // The mimetype for "ts" is MPEG transport stream (a video format) but we want
   // to assume these are typescript files instead.
   if (ext === '.ts') {
     return 'text';
+  }
+
+  if (ext === '.svg') {
+    return 'svg';
   }
 
   const lookedUpMimeType = mime.lookup(filePath); // Returns false if not found, or the mime type string
@@ -233,6 +237,20 @@ export async function processSingleFileContent(
         return {
           llmContent: `Cannot display content of binary file: ${relativePathForDisplay}`,
           returnDisplay: `Skipped binary file: ${relativePathForDisplay}`,
+        };
+      }
+      case 'svg': {
+        const SVG_MAX_SIZE_BYTES = 1 * 1024 * 1024;
+        if (stats.size > SVG_MAX_SIZE_BYTES) {
+          return {
+            llmContent: `Cannot display content of SVG file larger than 1MB: ${relativePathForDisplay}`,
+            returnDisplay: `Skipped large SVG file (>1MB): ${relativePathForDisplay}`,
+          };
+        }
+        const content = await fs.promises.readFile(filePath, 'utf8');
+        return {
+          llmContent: content,
+          returnDisplay: `Read SVG as text: ${relativePathForDisplay}`,
         };
       }
       case 'text': {

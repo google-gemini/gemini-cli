@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
@@ -36,16 +36,15 @@ export function ThemeDialog({
     SettingScope.User,
   );
 
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
   // Generate theme items
-  const themeItems = themeManager.getAvailableThemes().map((theme) => {
-    const typeString = theme.type.charAt(0).toUpperCase() + theme.type.slice(1);
-    return {
-      label: theme.name,
-      value: theme.name,
-      themeNameDisplay: theme.name,
-      themeTypeDisplay: typeString,
-    };
-  });
+  const themeItems = themeManager.getAvailableThemes().map((theme) => ({
+    label: theme.name,
+    value: theme.name,
+    themeNameDisplay: theme.name,
+    themeTypeDisplay: capitalize(theme.type),
+  }));
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
 
   // Determine which radio button should be initially selected in the theme list
@@ -57,21 +56,28 @@ export function ThemeDialog({
   const scopeItems = [
     { label: 'User Settings', value: SettingScope.User },
     { label: 'Workspace Settings', value: SettingScope.Workspace },
+    { label: 'System Settings', value: SettingScope.System },
   ];
 
-  const handleThemeSelect = (themeName: string) => {
-    onSelect(themeName, selectedScope);
-  };
+  const handleThemeSelect = useCallback(
+    (themeName: string) => {
+      onSelect(themeName, selectedScope);
+    },
+    [onSelect, selectedScope],
+  );
 
-  const handleScopeHighlight = (scope: SettingScope) => {
+  const handleScopeHighlight = useCallback((scope: SettingScope) => {
     setSelectedScope(scope);
     setSelectInputKey(Date.now());
-  };
+  }, []);
 
-  const handleScopeSelect = (scope: SettingScope) => {
-    handleScopeHighlight(scope);
-    setFocusedSection('theme'); // Reset focus to theme section
-  };
+  const handleScopeSelect = useCallback(
+    (scope: SettingScope) => {
+      handleScopeHighlight(scope);
+      setFocusedSection('theme'); // Reset focus to theme section
+    },
+    [handleScopeHighlight],
+  );
 
   const [focusedSection, setFocusedSection] = useState<'theme' | 'scope'>(
     'theme',
@@ -86,16 +92,21 @@ export function ThemeDialog({
     }
   });
 
+  const otherScopes = Object.values(SettingScope).filter(
+    (scope) => scope !== selectedScope,
+  );
+
+  const modifiedInOtherScopes = otherScopes.filter(
+    (scope) => settings.forScope(scope).settings.theme !== undefined,
+  );
+
   let otherScopeModifiedMessage = '';
-  const otherScope =
-    selectedScope === SettingScope.User
-      ? SettingScope.Workspace
-      : SettingScope.User;
-  if (settings.forScope(otherScope).settings.theme !== undefined) {
+  if (modifiedInOtherScopes.length > 0) {
+    const modifiedScopesStr = modifiedInOtherScopes.join(', ');
     otherScopeModifiedMessage =
       settings.forScope(selectedScope).settings.theme !== undefined
-        ? `(Also modified in ${otherScope})`
-        : `(Modified in ${otherScope})`;
+        ? `(Also modified in ${modifiedScopesStr})`
+        : `(Modified in ${modifiedScopesStr})`;
   }
 
   // Constants for calculating preview pane layout.
@@ -115,7 +126,7 @@ export function ThemeDialog({
     1,
   );
 
-  const DAILOG_PADDING = 2;
+  const DIALOG_PADDING = 2;
   const selectThemeHeight = themeItems.length + 1;
   const SCOPE_SELECTION_HEIGHT = 4; // Height for the scope selection section + margin.
   const SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO = 1;
@@ -125,7 +136,7 @@ export function ThemeDialog({
   availableTerminalHeight -= TAB_TO_SELECT_HEIGHT;
 
   let totalLeftHandSideHeight =
-    DAILOG_PADDING +
+    DIALOG_PADDING +
     selectThemeHeight +
     SCOPE_SELECTION_HEIGHT +
     SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO;
@@ -136,7 +147,7 @@ export function ThemeDialog({
   // Remove content from the LHS that can be omitted if it exceeds the available height.
   if (totalLeftHandSideHeight > availableTerminalHeight) {
     includePadding = false;
-    totalLeftHandSideHeight -= DAILOG_PADDING;
+    totalLeftHandSideHeight -= DIALOG_PADDING;
   }
 
   if (totalLeftHandSideHeight > availableTerminalHeight) {
@@ -161,10 +172,17 @@ export function ThemeDialog({
     availableTerminalHeight -
     PREVIEW_PANE_FIXED_VERTICAL_SPACE -
     (includePadding ? 2 : 0) * 2;
-  // Give slightly more space to the code block as it is 3 lines longer.
-  const diffHeight = Math.floor(availableTerminalHeightCodeBlock / 2) - 1;
-  const codeBlockHeight = Math.ceil(availableTerminalHeightCodeBlock / 2) + 1;
 
+  // Subtract margin between code blocks from available height.
+  const availableHeightForPanes = Math.max(
+    0,
+    availableTerminalHeightCodeBlock - 1,
+  );
+
+  // The code block is slightly longer than the diff, so give it more space.
+  const codeBlockHeight = Math.ceil(availableHeightForPanes * 0.6);
+  const diffHeight = Math.floor(availableHeightForPanes * 0.4);
+  const themeType = capitalize(themeManager.getActiveTheme().type);
   return (
     <Box
       borderStyle="round"
@@ -190,6 +208,9 @@ export function ThemeDialog({
             onSelect={handleThemeSelect}
             onHighlight={onHighlight}
             isFocused={currenFocusedSection === 'theme'}
+            maxItemsToShow={8}
+            showScrollArrows={true}
+            showNumbers={currenFocusedSection === 'theme'}
           />
 
           {/* Scope Selection */}
@@ -204,6 +225,7 @@ export function ThemeDialog({
                 onSelect={handleScopeSelect}
                 onHighlight={handleScopeHighlight}
                 isFocused={currenFocusedSection === 'scope'}
+                showNumbers={currenFocusedSection === 'scope'}
               />
             </Box>
           )}
@@ -211,7 +233,7 @@ export function ThemeDialog({
 
         {/* Right Column: Preview */}
         <Box flexDirection="column" width="55%" paddingLeft={2}>
-          <Text bold>Preview</Text>
+          <Text bold>{themeType} Theme Preview</Text>
           <Box
             borderStyle="single"
             borderColor={Colors.Gray}
@@ -222,25 +244,25 @@ export function ThemeDialog({
             flexDirection="column"
           >
             {colorizeCode(
-              `# function
--def fibonacci(n):
--    a, b = 0, 1
--    for _ in range(n):
--        a, b = b, a + b
--    return a`,
+              `# python function
+def fibonacci(n):
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a`,
               'python',
               codeBlockHeight,
               colorizeCodeWidth,
             )}
             <Box marginTop={1} />
             <DiffRenderer
-              diffContent={`--- a/old_file.txt
--+++ b/new_file.txt
--@@ -1,4 +1,5 @@
-- This is a context line.
---This line was deleted.
--+This line was added.
--`}
+              diffContent={`--- a/util.py
++++ b/util.py
+@@ -1,3 +1,3 @@
+ def greet(name):
+-    print("Hello, " + name)
++    print(f"Hello, {name}!")
+`}
               availableTerminalHeight={diffHeight}
               terminalWidth={colorizeCodeWidth}
             />
