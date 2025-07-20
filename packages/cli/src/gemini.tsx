@@ -253,7 +253,7 @@ export async function main() {
     gitServiceDuration = gitServiceEnd - gitServiceStart;
   }
 
-  // Load custom themes from settings  
+  // Load custom themes from settings
   themeManager.loadCustomThemes(settings.merged.customThemes);
 
   // Theme loading phase
