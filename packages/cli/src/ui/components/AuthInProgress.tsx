@@ -18,8 +18,8 @@ export function AuthInProgress({
 }: AuthInProgressProps): React.JSX.Element {
   const [timedOut, setTimedOut] = useState(false);
 
-  useInput((_, key) => {
-    if ((key.escape) || (key.ctrl && _ === 'c')) {
+  useInput((input, key) => {
+    if ((key.escape) || (key.ctrl && input === 'c')) {
       onTimeout();
     }
   });
