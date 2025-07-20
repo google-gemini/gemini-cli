@@ -75,7 +75,7 @@ For other authentication methods, including Google Workspace accounts, see the [
 ## Basic Usage
 
 - **Enter prompts:** Type your question or command and press Enter to submit
-- **Multiline input:** Use **Alt+Enter** to insert line breaks in your prompts
+- **Multiline input:** Use **Alt+Enter** to insert line breaks in your prompts. (Note: This shortcut's availability may vary depending on your terminal and operating system).
 - **Include files:** Use `@filename` to include file contents in your prompt
 - **Run commands:** Use `!command` to execute shell commands
 - **View commands:** Type `/help` to see all available slash commands
