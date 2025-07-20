@@ -55,6 +55,10 @@ describe('useCompletion', () => {
       getFileFilteringRespectGitIgnore: vi.fn(() => true),
       getFileService: vi.fn().mockReturnValue(mockFileDiscoveryService),
       getEnableRecursiveFileSearch: vi.fn(() => true),
+      getFileFilteringOptions: vi.fn(() => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      })),
     } as unknown as Mocked<Config>;
 
     mockCommandContext = {} as CommandContext;
