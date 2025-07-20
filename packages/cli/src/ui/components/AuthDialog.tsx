@@ -77,6 +77,7 @@ export function AuthDialog({
       value: AuthType.USE_GEMINI,
     },
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
+    { label: 'Amazon Bedrock', value: AuthType.USE_AWS_BEDROCK },
   ];
 
   const initialAuthIndex = items.findIndex((item) => {

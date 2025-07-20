@@ -43,6 +43,7 @@ export enum AuthType {
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
+  USE_AWS_BEDROCK = 'aws-bedrock',
 }
 
 export type ContentGeneratorConfig = {
@@ -71,10 +72,11 @@ export function createContentGeneratorConfig(
     proxy: config?.getProxy(),
   };
 
-  // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
+  // If we are using Google auth, Cloud Shell, or AWS Bedrock, there is nothing else to validate for now
   if (
     authType === AuthType.LOGIN_WITH_GOOGLE ||
-    authType === AuthType.CLOUD_SHELL
+    authType === AuthType.CLOUD_SHELL ||
+    authType === AuthType.USE_AWS_BEDROCK
   ) {
     return contentGeneratorConfig;
   }
@@ -138,6 +140,12 @@ export async function createContentGenerator(
     });
 
     return googleGenAI.models;
+  }
+
+  if (config.authType === AuthType.USE_AWS_BEDROCK) {
+    // Lazy load the BedrockProvider to avoid loading AWS SDK when not needed
+    const { BedrockProvider } = await import('../providers/bedrock/index.js');
+    return new BedrockProvider(config, gcConfig);
   }
 
   throw new Error(

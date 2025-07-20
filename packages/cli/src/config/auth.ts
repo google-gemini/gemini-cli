@@ -38,5 +38,12 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     return null;
   }
 
+  if (authMethod === AuthType.USE_AWS_BEDROCK) {
+    if (!process.env.AWS_REGION) {
+      return 'AWS_REGION environment variable not found. Add that to your environment and try again (no reload needed if using .env)!';
+    }
+    return null;
+  }
+
   return 'Invalid auth method selected.';
 };
