@@ -4,21 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
 import { render } from 'ink-testing-library';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ModelDialog } from './ModelDialog.js';
 import { Config, AuthType } from '@google/gemini-cli-core';
 
 describe('ModelDialog', () => {
   const mockOnSelect = vi.fn();
   
-  const createMockConfig = (authType?: AuthType, model?: string) => {
-    return {
-      getContentGeneratorConfig: () => ({ authType, model: model || 'gemini-2.5-pro' }),
-      getModel: () => model || 'gemini-2.5-pro',
-    } as unknown as Config;
-  };
+  const createMockConfig = (authType?: AuthType, model?: string) => ({
+    getContentGeneratorConfig: () => ({ authType, model: model || 'gemini-2.5-pro' }),
+    getModel: () => model || 'gemini-2.5-pro',
+  } as unknown as Config);
 
   beforeEach(() => {
     mockOnSelect.mockClear();
@@ -42,9 +39,9 @@ describe('ModelDialog', () => {
     );
 
     expect(lastFrame()).toContain('Select Model');
-    expect(lastFrame()).toContain('Claude 3 Sonnet');
-    expect(lastFrame()).toContain('Claude 3 Haiku');
-    expect(lastFrame()).toContain('Claude 3 Opus');
+    expect(lastFrame()).toContain('Claude 3.7 Sonnet');
+    expect(lastFrame()).toContain('Claude 3.5 Haiku');
+    expect(lastFrame()).toContain('Claude 4 Opus');
   });
 
   it('should mark current model', () => {

@@ -8,12 +8,17 @@ import React from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Colors } from '../colors.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
-import { Config, AuthType, DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_FLASH_MODEL } from '@google/gemini-cli-core';
-
-// Bedrock model constants
-const DEFAULT_BEDROCK_MODEL = 'anthropic.claude-3-sonnet-20240229-v1:0';
-const DEFAULT_BEDROCK_SMALL_FAST_MODEL = 'anthropic.claude-3-haiku-20240307-v1:0';
-const DEFAULT_BEDROCK_OPUS_MODEL = 'anthropic.claude-3-opus-20240229-v1:0';
+import { 
+  Config, 
+  AuthType, 
+  DEFAULT_GEMINI_MODEL, 
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_BEDROCK_MODEL,
+  DEFAULT_BEDROCK_SMALL_FAST_MODEL,
+  DEFAULT_BEDROCK_OPUS_MODEL,
+  DEFAULT_BEDROCK_SONNET_4_MODEL,
+  DEFAULT_BEDROCK_CLAUDE_35_SONNET_V2_MODEL
+} from '@google/gemini-cli-core';
 
 interface ModelDialogProps {
   onSelect: (model: string | undefined) => void;
@@ -30,29 +35,29 @@ function getModelsForAuthType(authType: AuthType | undefined): ModelOption[] {
   if (authType === AuthType.USE_AWS_BEDROCK) {
     return [
       {
-        label: 'Claude 3 Sonnet',
-        value: DEFAULT_BEDROCK_MODEL,
-        description: 'Balanced performance and cost'
+        label: 'Claude Sonnet 4 (Latest)',
+        value: DEFAULT_BEDROCK_SONNET_4_MODEL,
+        description: 'Latest and most capable Claude model'
       },
       {
-        label: 'Claude 3 Haiku (Fast)',
-        value: DEFAULT_BEDROCK_SMALL_FAST_MODEL,
-        description: 'Fastest responses, lower cost'
-      },
-      {
-        label: 'Claude 3 Opus (Powerful)',
+        label: 'Claude 4 Opus (Most Powerful)',
         value: DEFAULT_BEDROCK_OPUS_MODEL,
-        description: 'Most capable, higher cost'
+        description: 'Most capable model, highest cost'
       },
       {
-        label: 'Claude 3.5 Sonnet (Latest)',
-        value: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
-        description: 'Latest model with best performance'
+        label: 'Claude 3.7 Sonnet (Default)',
+        value: DEFAULT_BEDROCK_MODEL,
+        description: 'Default Claude model with enhanced reasoning'
       },
       {
-        label: 'Claude 3.5 Haiku (Latest Fast)',
-        value: 'anthropic.claude-3-5-haiku-20241022-v1:0',
-        description: 'Latest fast model'
+        label: 'Claude 3.5 Sonnet V2',
+        value: DEFAULT_BEDROCK_CLAUDE_35_SONNET_V2_MODEL,
+        description: 'Improved 3.5 Sonnet with better performance'
+      },
+      {
+        label: 'Claude 3.5 Haiku (Fast)',
+        value: DEFAULT_BEDROCK_SMALL_FAST_MODEL,
+        description: 'Fast responses with good capability'
       }
     ];
   }
@@ -83,6 +88,8 @@ export function ModelDialog({ onSelect, config }: ModelDialogProps): React.JSX.E
   }));
 
   const initialIndex = models.findIndex(model => model.value === currentModel);
+  const selectedIndex = initialIndex >= 0 ? initialIndex : 0;
+  const selectedModel = models[selectedIndex];
 
   const handleModelSelect = (model: string) => {
     onSelect(model);
@@ -109,19 +116,17 @@ export function ModelDialog({ onSelect, config }: ModelDialogProps): React.JSX.E
       <Box marginTop={1}>
         <RadioButtonSelect
           items={items}
-          initialIndex={initialIndex >= 0 ? initialIndex : 0}
+          initialIndex={selectedIndex}
           onSelect={handleModelSelect}
           isFocused={true}
         />
       </Box>
       <Box marginTop={1} flexDirection="column">
-        {models.map((model, index) => (
-          model.value === items[initialIndex >= 0 ? initialIndex : 0].value && model.description ? (
-            <Text key={index} color={Colors.Gray}>
-              {model.description}
-            </Text>
-          ) : null
-        ))}
+        {selectedModel?.description && (
+          <Text color={Colors.Gray}>
+            {selectedModel.description}
+          </Text>
+        )}
       </Box>
       <Box marginTop={1}>
         <Text color={Colors.Gray}>(Use arrow keys to navigate, Enter to select, Esc to cancel)</Text>
