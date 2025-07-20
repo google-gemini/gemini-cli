@@ -21,55 +21,55 @@ import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import stripAnsi from 'strip-ansi';
-
-export interface ShellToolParams {
-  command: string;
-  description?: string;
-  directory?: string;
-}
 import { spawn } from 'child_process';
 import { summarizeToolOutput } from '../utils/summarizer.js';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
-export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
-  static Name: string = 'run_shell_command';
+export interface AdbToolParams {
+  command: string;
+  description?: string;
+  deviceId?: string;
+}
+
+export class AdbTool extends BaseTool<AdbToolParams, ToolResult> {
+  static Name: string = 'run_adb_command';
   private whitelist: Set<string> = new Set();
 
   constructor(private readonly config: Config) {
     super(
-      ShellTool.Name,
-      'Shell',
-      `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
+      AdbTool.Name,
+      'ADB',
+      `This tool executes adb (Android Debug Bridge) commands to interact with connected Android devices. The tool automatically manages device selection and sudo permissions.
 
 The following information is returned:
 
-Command: Executed command.
-Directory: Directory (relative to project root) where command was executed, or \`(root)\`.
-Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+Command: Executed adb command.
+Device: Target device ID or '(auto-selected)' if no specific device was specified.
+Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error.
+Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error.
 Error: Error or \`(none)\` if no error was reported for the subprocess.
 Exit Code: Exit code or \`(none)\` if terminated by signal.
 Signal: Signal number or \`(none)\` if no signal was received.
-Background PIDs: List of background processes started or \`(none)\`.
-Process Group PGID: Process group started or \`(none)\``,
+
+${config.getAdbSudoMode() ? 'Note: Sudo mode is enabled - commands will be executed with "su -c" prefix for root access on the device.' : 'Note: Sudo mode is disabled - commands will be executed with standard user permissions.'}`,
       Icon.Terminal,
       {
         type: Type.OBJECT,
         properties: {
           command: {
             type: Type.STRING,
-            description: 'Exact bash command to execute as `bash -c <command>`',
+            description: 'Adb command to execute (without the "adb" prefix). Example: "shell ls /data/data", "devices", "install app.apk"',
           },
           description: {
             type: Type.STRING,
             description:
               'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
           },
-          directory: {
+          deviceId: {
             type: Type.STRING,
             description:
-              '(OPTIONAL) Directory to run the command in, if not the project root directory. Can be an absolute path or relative to the project root directory. Directory must already exist.',
+              '(OPTIONAL) Specific device ID to target. If not provided, adb will automatically select a device or use the only connected device.',
           },
         },
         required: ['command'],
@@ -79,12 +79,11 @@ Process Group PGID: Process group started or \`(none)\``,
     );
   }
 
-  getDescription(params: ShellToolParams): string {
-    let description = `${params.command}`;
-    // append optional [in directory]
-    // note description is needed even if validation fails due to absolute path
-    if (params.directory) {
-      description += ` [in ${params.directory}]`;
+  getDescription(params: AdbToolParams): string {
+    let description = `adb ${params.command}`;
+    // append optional [for device]
+    if (params.deviceId) {
+      description += ` [for device ${params.deviceId}]`;
     }
     // append optional (description), replacing any line breaks with spaces
     if (params.description) {
@@ -94,13 +93,13 @@ Process Group PGID: Process group started or \`(none)\``,
   }
 
   /**
-   * Extracts the root command from a given shell command string.
+   * Extracts the root command from an adb command string.
    * This is used to identify the base command for permission checks.
    *
-   * @param command The shell command string to parse
+   * @param command The adb command string to parse
    * @returns The root command name, or undefined if it cannot be determined
-   * @example getCommandRoot("ls -la /tmp") returns "ls"
-   * @example getCommandRoot("git status && npm test") returns "git"
+   * @example getCommandRoot("shell ls -la") returns "shell"
+   * @example getCommandRoot("devices") returns "devices"
    */
   getCommandRoot(command: string): string | undefined {
     return command
@@ -112,14 +111,14 @@ Process Group PGID: Process group started or \`(none)\``,
   }
 
   /**
-   * Determines whether a given shell command is allowed to execute based on
+   * Determines whether a given adb command is allowed to execute based on
    * the tool's configuration including allowlists and blocklists.
    *
-   * @param command The shell command string to validate
+   * @param command The adb command string to validate
    * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed
    */
   isCommandAllowed(command: string): { allowed: boolean; reason?: string } {
-    // 0. Disallow command substitution
+    // 0. Disallow command substitution for security
     if (command.includes('$(')) {
       return {
         allowed: false,
@@ -128,16 +127,13 @@ Process Group PGID: Process group started or \`(none)\``,
       };
     }
 
-    const SHELL_TOOL_NAMES = [ShellTool.name, ShellTool.Name];
+    const ADB_TOOL_NAMES = [AdbTool.name, AdbTool.Name];
 
     const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
 
     /**
      * Checks if a command string starts with a given prefix, ensuring it's a
      * whole word match (i.e., followed by a space or it's an exact match).
-     * e.g., `isPrefixedBy('npm install', 'npm')` -> true
-     * e.g., `isPrefixedBy('npm', 'npm')` -> true
-     * e.g., `isPrefixedBy('npminstall', 'npm')` -> false
      */
     const isPrefixedBy = (cmd: string, prefix: string): boolean => {
       if (!cmd.startsWith(prefix)) {
@@ -147,12 +143,12 @@ Process Group PGID: Process group started or \`(none)\``,
     };
 
     /**
-     * Extracts and normalizes shell commands from a list of tool strings.
-     * e.g., 'ShellTool("ls -l")' becomes 'ls -l'
+     * Extracts and normalizes adb commands from a list of tool strings.
+     * e.g., 'AdbTool("shell ls")' becomes 'shell ls'
      */
     const extractCommands = (tools: string[]): string[] =>
       tools.flatMap((tool) => {
-        for (const toolName of SHELL_TOOL_NAMES) {
+        for (const toolName of ADB_TOOL_NAMES) {
           if (tool.startsWith(`${toolName}(`) && tool.endsWith(')')) {
             return [normalize(tool.slice(toolName.length + 1, -1))];
           }
@@ -163,11 +159,11 @@ Process Group PGID: Process group started or \`(none)\``,
     const coreTools = this.config.getCoreTools() || [];
     const excludeTools = this.config.getExcludeTools() || [];
 
-    // 1. Check if the shell tool is globally disabled.
-    if (SHELL_TOOL_NAMES.some((name) => excludeTools.includes(name))) {
+    // 1. Check if the adb tool is globally disabled.
+    if (ADB_TOOL_NAMES.some((name) => excludeTools.includes(name))) {
       return {
         allowed: false,
-        reason: 'Shell tool is globally disabled in configuration',
+        reason: 'ADB tool is globally disabled in configuration',
       };
     }
 
@@ -175,7 +171,7 @@ Process Group PGID: Process group started or \`(none)\``,
     const allowedCommands = new Set(extractCommands(coreTools));
 
     const hasSpecificAllowedCommands = allowedCommands.size > 0;
-    const isWildcardAllowed = SHELL_TOOL_NAMES.some((name) =>
+    const isWildcardAllowed = ADB_TOOL_NAMES.some((name) =>
       coreTools.includes(name),
     );
 
@@ -191,7 +187,7 @@ Process Group PGID: Process group started or \`(none)\``,
       if (isBlocked) {
         return {
           allowed: false,
-          reason: `Command '${cmd}' is blocked by configuration`,
+          reason: `ADB command '${cmd}' is blocked by configuration`,
         };
       }
 
@@ -206,7 +202,7 @@ Process Group PGID: Process group started or \`(none)\``,
         if (!isAllowed) {
           return {
             allowed: false,
-            reason: `Command '${cmd}' is not in the allowed commands list`,
+            reason: `ADB command '${cmd}' is not in the allowed commands list`,
           };
         }
       }
@@ -216,14 +212,14 @@ Process Group PGID: Process group started or \`(none)\``,
     return { allowed: true };
   }
 
-  validateToolParams(params: ShellToolParams): string | null {
+  validateToolParams(params: AdbToolParams): string | null {
     const commandCheck = this.isCommandAllowed(params.command);
     if (!commandCheck.allowed) {
       if (!commandCheck.reason) {
         console.error(
           'Unexpected: isCommandAllowed returned false without a reason',
         );
-        return `Command is not allowed: ${params.command}`;
+        return `ADB command is not allowed: ${params.command}`;
       }
       return commandCheck.reason;
     }
@@ -232,25 +228,16 @@ Process Group PGID: Process group started or \`(none)\``,
       return errors;
     }
     if (!params.command.trim()) {
-      return 'Command cannot be empty.';
+      return 'ADB command cannot be empty.';
     }
     if (!this.getCommandRoot(params.command)) {
-      return 'Could not identify command root to obtain permission from user.';
-    }
-    if (params.directory) {
-      // Allow both absolute and relative paths
-      const directory = path.isAbsolute(params.directory)
-        ? params.directory
-        : path.resolve(this.config.getTargetDir(), params.directory);
-      if (!fs.existsSync(directory)) {
-        return 'Directory must exist.';
-      }
+      return 'Could not identify adb command root to obtain permission from user.';
     }
     return null;
   }
 
   async shouldConfirmExecute(
-    params: ShellToolParams,
+    params: AdbToolParams,
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.validateToolParams(params)) {
@@ -262,8 +249,8 @@ Process Group PGID: Process group started or \`(none)\``,
     }
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
-      title: 'Confirm Shell Command',
-      command: params.command,
+      title: 'Confirm ADB Command',
+      command: `adb ${params.command}`,
       rootCommand,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
@@ -275,7 +262,7 @@ Process Group PGID: Process group started or \`(none)\``,
   }
 
   async execute(
-    params: ShellToolParams,
+    params: AdbToolParams,
     abortSignal: AbortSignal,
     updateOutput?: (chunk: string) => void,
   ): Promise<ToolResult> {
@@ -283,7 +270,7 @@ Process Group PGID: Process group started or \`(none)\``,
     if (validationError) {
       return {
         llmContent: [
-          `Command rejected: ${params.command}`,
+          `ADB command rejected: ${params.command}`,
           `Reason: ${validationError}`,
         ].join('\n'),
         returnDisplay: `Error: ${validationError}`,
@@ -292,44 +279,40 @@ Process Group PGID: Process group started or \`(none)\``,
 
     if (abortSignal.aborted) {
       return {
-        llmContent: 'Command was cancelled by user before it could start.',
-        returnDisplay: 'Command cancelled by user.',
+        llmContent: 'ADB command was cancelled by user before it could start.',
+        returnDisplay: 'ADB command cancelled by user.',
       };
     }
 
+    // Build the adb command
+    let adbCommand = ['adb'];
+    
+    // Add device selection if specified
+    if (params.deviceId) {
+      adbCommand.push('-s', params.deviceId);
+    }
+
+    // Handle sudo mode for shell commands
+    if (this.config.getAdbSudoMode() && params.command.startsWith('shell ')) {
+      const shellCommand = params.command.slice(6); // Remove 'shell ' prefix
+      adbCommand.push('shell', 'su', '-c', shellCommand);
+    } else {
+      // Split the command and add to adb command array
+      adbCommand.push(...params.command.split(' '));
+    }
+
     const isWindows = os.platform() === 'win32';
-    const tempFileName = `shell_pgrep_${crypto
-      .randomBytes(6)
-      .toString('hex')}.tmp`;
-    const tempFilePath = path.join(os.tmpdir(), tempFileName);
 
-    // pgrep is not available on Windows, so we can't get background PIDs
-    const command = isWindows
-      ? params.command
-      : (() => {
-          // wrap command to append subprocess pids (via pgrep) to temporary file
-          let command = params.command.trim();
-          if (!command.endsWith('&')) command += ';';
-          return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
-        })();
-
-    // spawn command in specified directory (or project root if not specified)
-    const workingDirectory = params.directory
-      ? path.isAbsolute(params.directory)
-        ? params.directory
-        : path.resolve(this.config.getTargetDir(), params.directory)
-      : this.config.getTargetDir();
-
+    // spawn adb command
     const shell = isWindows
-      ? spawn('cmd.exe', ['/c', command], {
+      ? spawn('cmd.exe', ['/c', ...adbCommand], {
           stdio: ['ignore', 'pipe', 'pipe'],
-          // detached: true, // ensure subprocess starts its own process group (esp. in Linux)
-          cwd: workingDirectory,
+          cwd: this.config.getTargetDir(),
         })
-      : spawn('bash', ['-c', command], {
+      : spawn(adbCommand[0], adbCommand.slice(1), {
           stdio: ['ignore', 'pipe', 'pipe'],
-          detached: true, // ensure subprocess starts its own process group (esp. in Linux)
-          cwd: workingDirectory,
+          detached: true,
+          cwd: this.config.getTargetDir(),
         });
 
     let exited = false;
@@ -349,9 +332,6 @@ Process Group PGID: Process group started or \`(none)\``,
     };
 
     shell.stdout.on('data', (data: Buffer) => {
-      // continue to consume post-exit for background processes
-      // removing listeners can overflow OS buffer and block subprocesses
-      // destroying (e.g. shell.stdout.destroy()) can terminate subprocesses via SIGPIPE
       if (!exited) {
         const str = stripAnsi(data.toString());
         stdout += str;
@@ -372,7 +352,7 @@ Process Group PGID: Process group started or \`(none)\``,
     shell.on('error', (err: Error) => {
       error = err;
       // remove wrapper from user's command in error message
-      error.message = error.message.replace(command, params.command);
+      error.message = error.message.replace(adbCommand.join(' '), `adb ${params.command}`);
     });
 
     let code: number | null = null;
@@ -408,7 +388,7 @@ Process Group PGID: Process group started or \`(none)\``,
                 shell.kill('SIGKILL');
               }
             } catch (_e) {
-              console.error(`failed to kill shell process ${shell.pid}: ${_e}`);
+              console.error(`failed to kill adb process ${shell.pid}: ${_e}`);
             }
           }
         }
@@ -416,42 +396,16 @@ Process Group PGID: Process group started or \`(none)\``,
     };
     abortSignal.addEventListener('abort', abortHandler);
 
-    // wait for the shell to exit
+    // wait for the adb command to exit
     try {
       await new Promise((resolve) => shell.on('exit', resolve));
     } finally {
       abortSignal.removeEventListener('abort', abortHandler);
     }
 
-    // parse pids (pgrep output) from temporary file and remove it
-    const backgroundPIDs: number[] = [];
-    if (os.platform() !== 'win32') {
-      if (fs.existsSync(tempFilePath)) {
-        const pgrepLines = fs
-          .readFileSync(tempFilePath, 'utf8')
-          .split('\n')
-          .filter(Boolean);
-        for (const line of pgrepLines) {
-          if (!/^\d+$/.test(line)) {
-            console.error(`pgrep: ${line}`);
-          }
-          const pid = Number(line);
-          // exclude the shell subprocess pid
-          if (pid !== shell.pid) {
-            backgroundPIDs.push(pid);
-          }
-        }
-        fs.unlinkSync(tempFilePath);
-      } else {
-        if (!abortSignal.aborted) {
-          console.error('missing pgrep output');
-        }
-      }
-    }
-
     let llmContent = '';
     if (abortSignal.aborted) {
-      llmContent = 'Command was cancelled by user before it could complete.';
+      llmContent = 'ADB command was cancelled by user before it could complete.';
       if (output.trim()) {
         llmContent += ` Below is the output (on stdout and stderr) before it was cancelled:\n${output}`;
       } else {
@@ -459,15 +413,13 @@ Process Group PGID: Process group started or \`(none)\``,
       }
     } else {
       llmContent = [
-        `Command: ${params.command}`,
-        `Directory: ${params.directory || '(root)'}`,
+        `Command: adb ${params.command}`,
+        `Device: ${params.deviceId || '(auto-selected)'}`,
         `Stdout: ${stdout || '(empty)'}`,
         `Stderr: ${stderr || '(empty)'}`,
         `Error: ${error ?? '(none)'}`,
         `Exit Code: ${code ?? '(none)'}`,
         `Signal: ${processSignal ?? '(none)'}`,
-        `Background PIDs: ${backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'}`,
-        `Process Group PGID: ${shell.pid ?? '(none)'}`,
       ].join('\n');
     }
 
@@ -480,14 +432,13 @@ Process Group PGID: Process group started or \`(none)\``,
       } else {
         // Output is empty, let's provide a reason if the command failed or was cancelled
         if (abortSignal.aborted) {
-          returnDisplayMessage = 'Command cancelled by user.';
+          returnDisplayMessage = 'ADB command cancelled by user.';
         } else if (processSignal) {
-          returnDisplayMessage = `Command terminated by signal: ${processSignal}`;
+          returnDisplayMessage = `ADB command terminated by signal: ${processSignal}`;
         } else if (error) {
-          // If error is not null, it's an Error object (or other truthy value)
-          returnDisplayMessage = `Command failed: ${getErrorMessage(error)}`;
+          returnDisplayMessage = `ADB command failed: ${getErrorMessage(error)}`;
         } else if (code !== null && code !== 0) {
-          returnDisplayMessage = `Command exited with code: ${code}`;
+          returnDisplayMessage = `ADB command exited with code: ${code}`;
         }
         // If output is empty and command succeeded (code 0, no error/signal/abort),
         // returnDisplayMessage will remain empty, which is fine.
