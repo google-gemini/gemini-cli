@@ -10,6 +10,7 @@ import {
   type CommandContext,
   type SlashCommand,
   type SlashCommandActionReturn,
+  CommandKind,
 } from './types.js';
 import { Config } from '@google/gemini-cli-core';
 
@@ -149,6 +150,7 @@ export const restoreCommand = (config: Config | null): SlashCommand | null => {
     name: 'restore',
     description:
       'Restore a tool call. This will reset the conversation and file history to the state it was in when the tool call was suggested',
+    kind: CommandKind.BUILT_IN,
     action: restoreAction,
     completion,
   };

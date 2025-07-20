@@ -32,9 +32,9 @@ describe('helpCommand', () => {
   });
 
   it("should also be triggered by its alternative name '?'", () => {
-    // This test is more conceptual. The routing of altName to the command
+    // This test is more conceptual. The routing of altNames to the command
     // is handled by the slash command processor, but we can assert the
-    // altName is correctly defined on the command object itself.
-    expect(helpCommand.altName).toBe('?');
+    // altNames is correctly defined on the command object itself.
+    expect(helpCommand.altNames).toContain('?');
   });
 });
