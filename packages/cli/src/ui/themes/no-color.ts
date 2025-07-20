@@ -22,7 +22,7 @@ const noColorColorsTheme: ColorsTheme = {
 };
 
 export const NoColorTheme: Theme = new Theme(
-  'NoColor',
+  'No Color',
   'dark',
   {
     hljs: {

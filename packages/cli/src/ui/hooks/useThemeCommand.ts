@@ -25,18 +25,39 @@ export const useThemeCommand = (
   setThemeError: (error: string | null) => void,
   addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
 ): UseThemeCommandReturn => {
-  const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(false);
+  // Determine the effective theme
+  const effectiveTheme = loadedSettings.merged.theme;
 
-  // Check for invalid theme configuration on startup
+  // Initial state: Open dialog if no theme is set in either user or workspace settings
+  const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(
+    effectiveTheme === undefined && !process.env.NO_COLOR,
+  );
+  // TODO: refactor how theme's are accessed to avoid requiring a forced render.
+  const [, setForceRender] = useState(0);
+
+  // Apply initial theme on component mount
   useEffect(() => {
-    const effectiveTheme = loadedSettings.merged.theme;
-    if (effectiveTheme && !themeManager.findThemeByName(effectiveTheme)) {
+    if (effectiveTheme === undefined) {
+      if (process.env.NO_COLOR) {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: 'Theme configuration unavailable due to NO_COLOR env variable.',
+          },
+          Date.now(),
+        );
+      }
+      // If no theme is set and NO_COLOR is not set, the dialog is already open.
+      return;
+    }
+
+    if (!themeManager.setActiveTheme(effectiveTheme)) {
       setIsThemeDialogOpen(true);
       setThemeError(`Theme "${effectiveTheme}" not found.`);
     } else {
       setThemeError(null);
     }
-  }, [loadedSettings.merged.theme, setThemeError]);
+  }, [effectiveTheme, setThemeError, addItem]); // Re-run if effectiveTheme or setThemeError changes
 
   const openThemeDialog = useCallback(() => {
     if (process.env.NO_COLOR) {
@@ -59,10 +80,11 @@ export const useThemeCommand = (
         setIsThemeDialogOpen(true);
         setThemeError(`Theme "${themeName}" not found.`);
       } else {
+        setForceRender((v) => v + 1); // Trigger potential re-render
         setThemeError(null); // Clear any previous theme error on success
       }
     },
-    [setThemeError],
+    [setForceRender, setThemeError],
   );
 
   const handleThemeHighlight = useCallback(
@@ -74,31 +96,15 @@ export const useThemeCommand = (
 
   const handleThemeSelect = useCallback(
     (themeName: string | undefined, scope: SettingScope) => {
+      // Added scope parameter
       try {
-        // Merge user and workspace custom themes (workspace takes precedence)
-        const mergedCustomThemes = {
-          ...(loadedSettings.user.settings.customThemes || {}),
-          ...(loadedSettings.workspace.settings.customThemes || {}),
-        };
-        // Only allow selecting themes available in the merged custom themes or built-in themes
-        const isBuiltIn = themeManager.findThemeByName(themeName);
-        const isCustom = themeName && mergedCustomThemes[themeName];
-        if (!isBuiltIn && !isCustom) {
-          setThemeError(`Theme "${themeName}" not found in selected scope.`);
-          setIsThemeDialogOpen(true);
-          return;
-        }
         loadedSettings.setValue(scope, 'theme', themeName); // Update the merged settings
-        if (loadedSettings.merged.customThemes) {
-          themeManager.loadCustomThemes(loadedSettings.merged.customThemes);
-        }
         applyTheme(loadedSettings.merged.theme); // Apply the current theme
-        setThemeError(null);
       } finally {
         setIsThemeDialogOpen(false); // Close the dialog
       }
     },
-    [applyTheme, loadedSettings, setThemeError],
+    [applyTheme, loadedSettings],
   );
 
   return {

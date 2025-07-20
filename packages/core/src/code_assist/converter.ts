@@ -80,7 +80,6 @@ interface VertexGenerateContentResponse {
   promptFeedback?: GenerateContentResponsePromptFeedback;
   usageMetadata?: GenerateContentResponseUsageMetadata;
 }
-
 export interface CaCountTokenRequest {
   request: VertexCountTokenRequest;
 }

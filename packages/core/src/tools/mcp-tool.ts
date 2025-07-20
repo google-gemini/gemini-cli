@@ -10,15 +10,8 @@ import {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolMcpConfirmationDetails,
-  Icon,
 } from './tools.js';
-import {
-  CallableTool,
-  Part,
-  FunctionCall,
-  FunctionDeclaration,
-  Type,
-} from '@google/genai';
+import { CallableTool, Part, FunctionCall } from '@google/genai';
 
 type ToolParams = Record<string, unknown>;
 
@@ -28,47 +21,21 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
   constructor(
     private readonly mcpTool: CallableTool,
     readonly serverName: string,
+    readonly name: string,
+    readonly description: string,
+    readonly parameterSchema: Record<string, unknown>,
     readonly serverToolName: string,
-    description: string,
-    readonly parameterSchemaJson: unknown,
     readonly timeout?: number,
     readonly trust?: boolean,
-    nameOverride?: string,
   ) {
     super(
-      nameOverride ?? generateValidName(serverToolName),
+      name,
       `${serverToolName} (${serverName} MCP Server)`,
       description,
-      Icon.Hammer,
-      { type: Type.OBJECT }, // this is a dummy Schema for MCP, will be not be used to construct the FunctionDeclaration
+      parameterSchema,
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
-  }
-
-  asFullyQualifiedTool(): DiscoveredMCPTool {
-    return new DiscoveredMCPTool(
-      this.mcpTool,
-      this.serverName,
-      this.serverToolName,
-      this.description,
-      this.parameterSchemaJson,
-      this.timeout,
-      this.trust,
-      `${this.serverName}__${this.serverToolName}`,
-    );
-  }
-
-  /**
-   * Overrides the base schema to use parametersJsonSchema when building
-   * FunctionDeclaration
-   */
-  override get schema(): FunctionDeclaration {
-    return {
-      name: this.name,
-      description: this.description,
-      parametersJsonSchema: this.parameterSchemaJson,
-    };
   }
 
   async shouldConfirmExecute(
@@ -178,18 +145,4 @@ function getStringifiedResultForDisplay(result: Part[]) {
   }
 
   return '```json\n' + JSON.stringify(processedResults, null, 2) + '\n```';
-}
-
-/** Visible for testing */
-export function generateValidName(name: string) {
-  // Replace invalid characters (based on 400 error message from Gemini API) with underscores
-  let validToolname = name.replace(/[^a-zA-Z0-9_.-]/g, '_');
-
-  // If longer than 63 characters, replace middle with '___'
-  // (Gemini API says max length 64, but actual limit seems to be 63)
-  if (validToolname.length > 63) {
-    validToolname =
-      validToolname.slice(0, 28) + '___' + validToolname.slice(-32);
-  }
-  return validToolname;
 }

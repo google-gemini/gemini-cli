@@ -8,10 +8,8 @@ import fs from 'fs';
 import path from 'path';
 import { glob } from 'glob';
 import { SchemaValidator } from '../utils/schemaValidator.js';
-import { BaseTool, Icon, ToolResult } from './tools.js';
-import { Type } from '@google/genai';
+import { BaseTool, ToolResult } from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
-import { isWithinRoot } from '../utils/fileUtils.js';
 import { Config } from '../config/config.js';
 
 // Subset of 'Path' interface provided by 'glob' that we can implement for testing
@@ -80,39 +78,66 @@ export interface GlobToolParams {
  */
 export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
   static readonly Name = 'glob';
-
-  constructor(private config: Config) {
+  /**
+   * Creates a new instance of the GlobLogic
+   * @param rootDirectory Root directory to ground this tool in.
+   */
+  constructor(
+    private rootDirectory: string,
+    private config: Config,
+  ) {
     super(
       GlobTool.Name,
       'FindFiles',
       'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
-      Icon.FileSearch,
       {
         properties: {
           pattern: {
             description:
               "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
-            type: Type.STRING,
+            type: 'string',
           },
           path: {
             description:
               'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
-            type: Type.STRING,
+            type: 'string',
           },
           case_sensitive: {
             description:
               'Optional: Whether the search should be case-sensitive. Defaults to false.',
-            type: Type.BOOLEAN,
+            type: 'boolean',
           },
           respect_git_ignore: {
             description:
               'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
-            type: Type.BOOLEAN,
+            type: 'boolean',
           },
         },
         required: ['pattern'],
-        type: Type.OBJECT,
+        type: 'object',
       },
+    );
+
+    this.rootDirectory = path.resolve(rootDirectory);
+  }
+
+  /**
+   * Checks if a given path is within the root directory bounds.
+   * This security check prevents accessing files outside the designated root directory.
+   *
+   * @param pathToCheck The absolute path to validate
+   * @returns True if the path is within the root directory, false otherwise
+   */
+  private isWithinRoot(pathToCheck: string): boolean {
+    const absolutePathToCheck = path.resolve(pathToCheck);
+    const normalizedPath = path.normalize(absolutePathToCheck);
+    const normalizedRoot = path.normalize(this.rootDirectory);
+    const rootWithSep = normalizedRoot.endsWith(path.sep)
+      ? normalizedRoot
+      : normalizedRoot + path.sep;
+    return (
+      normalizedPath === normalizedRoot ||
+      normalizedPath.startsWith(rootWithSep)
     );
   }
 
@@ -120,21 +145,26 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
    * Validates the parameters for the tool.
    */
   validateToolParams(params: GlobToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
-    if (errors) {
-      return errors;
+    if (
+      this.schema.parameters &&
+      !SchemaValidator.validate(
+        this.schema.parameters as Record<string, unknown>,
+        params,
+      )
+    ) {
+      return "Parameters failed schema validation. Ensure 'pattern' is a string, 'path' (if provided) is a string, and 'case_sensitive' (if provided) is a boolean.";
     }
 
     const searchDirAbsolute = path.resolve(
-      this.config.getTargetDir(),
+      this.rootDirectory,
       params.path || '.',
     );
 
-    if (!isWithinRoot(searchDirAbsolute, this.config.getTargetDir())) {
-      return `Search path ("${searchDirAbsolute}") resolves outside the tool's root directory ("${this.config.getTargetDir()}").`;
+    if (!this.isWithinRoot(searchDirAbsolute)) {
+      return `Search path ("${searchDirAbsolute}") resolves outside the tool's root directory ("${this.rootDirectory}").`;
     }
 
-    const targetDir = searchDirAbsolute || this.config.getTargetDir();
+    const targetDir = searchDirAbsolute || this.rootDirectory;
     try {
       if (!fs.existsSync(targetDir)) {
         return `Search path does not exist ${targetDir}`;
@@ -163,11 +193,8 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
   getDescription(params: GlobToolParams): string {
     let description = `'${params.pattern}'`;
     if (params.path) {
-      const searchDir = path.resolve(
-        this.config.getTargetDir(),
-        params.path || '.',
-      );
-      const relativePath = makeRelative(searchDir, this.config.getTargetDir());
+      const searchDir = path.resolve(this.rootDirectory, params.path || '.');
+      const relativePath = makeRelative(searchDir, this.rootDirectory);
       description += ` within ${shortenPath(relativePath)}`;
     }
     return description;
@@ -190,7 +217,7 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
 
     try {
       const searchDirAbsolute = path.resolve(
-        this.config.getTargetDir(),
+        this.rootDirectory,
         params.path || '.',
       );
 
@@ -218,15 +245,13 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
 
       if (respectGitIgnore) {
         const relativePaths = entries.map((p) =>
-          path.relative(this.config.getTargetDir(), p.fullpath()),
+          path.relative(this.rootDirectory, p.fullpath()),
         );
         const filteredRelativePaths = fileDiscovery.filterFiles(relativePaths, {
           respectGitIgnore,
         });
         const filteredAbsolutePaths = new Set(
-          filteredRelativePaths.map((p) =>
-            path.resolve(this.config.getTargetDir(), p),
-          ),
+          filteredRelativePaths.map((p) => path.resolve(this.rootDirectory, p)),
         );
 
         filteredEntries = entries.filter((entry) =>

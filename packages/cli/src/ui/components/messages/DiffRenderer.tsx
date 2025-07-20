@@ -93,7 +93,6 @@ interface DiffRendererProps {
   tabWidth?: number;
   availableTerminalHeight?: number;
   terminalWidth: number;
-  theme?: import('../../themes/theme.js').Theme;
 }
 
 const DEFAULT_TAB_WIDTH = 4; // Spaces per tab for normalization
@@ -104,7 +103,6 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight,
   terminalWidth,
-  theme,
 }) => {
   if (!diffContent || typeof diffContent !== 'string') {
     return <Text color={Colors.AccentYellow}>No diff content.</Text>;
@@ -148,7 +146,6 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
       language,
       availableTerminalHeight,
       terminalWidth,
-      theme,
     );
   } else {
     renderedOutput = renderDiffContent(
@@ -157,7 +154,6 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
       tabWidth,
       availableTerminalHeight,
       terminalWidth,
-      theme,
     );
   }
 
@@ -170,7 +166,6 @@ const renderDiffContent = (
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight: number | undefined,
   terminalWidth: number,
-  theme?: import('../../themes/theme.js').Theme,
 ) => {
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
@@ -251,13 +246,13 @@ const renderDiffContent = (
         switch (line.type) {
           case 'add':
             gutterNumStr = (line.newLine ?? '').toString();
-            color = theme?.colors?.AccentGreen || 'green';
+            color = 'green';
             prefixSymbol = '+';
             lastLineNumber = line.newLine ?? null;
             break;
           case 'del':
             gutterNumStr = (line.oldLine ?? '').toString();
-            color = theme?.colors?.AccentRed || 'red';
+            color = 'red';
             prefixSymbol = '-';
             // For deletions, update lastLineNumber based on oldLine if it's advancing.
             // This helps manage gaps correctly if there are multiple consecutive deletions

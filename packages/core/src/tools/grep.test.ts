@@ -9,7 +9,6 @@ import { GrepTool, GrepToolParams } from './grep.js';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
-import { Config } from '../config/config.js';
 
 // Mock the child_process module to control grep/git grep behavior
 vi.mock('child_process', () => ({
@@ -31,13 +30,9 @@ describe('GrepTool', () => {
   let grepTool: GrepTool;
   const abortSignal = new AbortController().signal;
 
-  const mockConfig = {
-    getTargetDir: () => tempRootDir,
-  } as unknown as Config;
-
   beforeEach(async () => {
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'grep-tool-root-'));
-    grepTool = new GrepTool(mockConfig);
+    grepTool = new GrepTool(tempRootDir);
 
     // Create some test files and directories
     await fs.writeFile(
@@ -85,8 +80,8 @@ describe('GrepTool', () => {
 
     it('should return error if pattern is missing', () => {
       const params = { path: '.' } as unknown as GrepToolParams;
-      expect(grepTool.validateToolParams(params)).toBe(
-        `params must have required property 'pattern'`,
+      expect(grepTool.validateToolParams(params)).toContain(
+        'Parameters failed schema validation',
       );
     });
 
@@ -209,11 +204,11 @@ describe('GrepTool', () => {
     it('should return an error if params are invalid', async () => {
       const params = { path: '.' } as unknown as GrepToolParams; // Invalid: pattern missing
       const result = await grepTool.execute(params, abortSignal);
-      expect(result.llmContent).toBe(
-        "Error: Invalid parameters provided. Reason: params must have required property 'pattern'",
+      expect(result.llmContent).toContain(
+        'Error: Invalid parameters provided. Reason: Parameters failed schema validation',
       );
-      expect(result.returnDisplay).toBe(
-        "Model provided invalid parameters. Error: params must have required property 'pattern'",
+      expect(result.returnDisplay).toContain(
+        'Model provided invalid parameters. Error: Parameters failed schema validation',
       );
     });
   });
@@ -239,9 +234,7 @@ describe('GrepTool', () => {
       };
       // The path will be relative to the tempRootDir, so we check for containment.
       expect(grepTool.getDescription(params)).toContain("'testPattern' within");
-      expect(grepTool.getDescription(params)).toContain(
-        path.join('src', 'app'),
-      );
+      expect(grepTool.getDescription(params)).toContain('src/app');
     });
 
     it('should generate correct description with pattern, include, and path', () => {

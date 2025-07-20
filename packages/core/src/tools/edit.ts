@@ -9,24 +9,21 @@ import * as path from 'path';
 import * as Diff from 'diff';
 import {
   BaseTool,
-  Icon,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolEditConfirmationDetails,
-  ToolLocation,
   ToolResult,
   ToolResultDisplay,
 } from './tools.js';
-import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
+import { GeminiClient } from '../core/client.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
-import { isWithinRoot } from '../utils/fileUtils.js';
 
 /**
  * Parameters for the Edit tool
@@ -75,8 +72,15 @@ export class EditTool
   implements ModifiableTool<EditToolParams>
 {
   static readonly Name = 'replace';
+  private readonly config: Config;
+  private readonly rootDirectory: string;
+  private readonly client: GeminiClient;
 
-  constructor(private readonly config: Config) {
+  /**
+   * Creates a new instance of the EditLogic
+   * @param rootDirectory Root directory to ground this tool in.
+   */
+  constructor(config: Config) {
     super(
       EditTool.Name,
       'Edit',
@@ -91,34 +95,53 @@ Expectation for required parameters:
 4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
 **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
 **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
-      Icon.Pencil,
       {
         properties: {
           file_path: {
             description:
               "The absolute path to the file to modify. Must start with '/'.",
-            type: Type.STRING,
+            type: 'string',
           },
           old_string: {
             description:
               'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. For multiple replacements, specify expected_replacements parameter. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
-            type: Type.STRING,
+            type: 'string',
           },
           new_string: {
             description:
               'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
-            type: Type.STRING,
+            type: 'string',
           },
           expected_replacements: {
-            type: Type.NUMBER,
+            type: 'number',
             description:
               'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
             minimum: 1,
           },
         },
         required: ['file_path', 'old_string', 'new_string'],
-        type: Type.OBJECT,
+        type: 'object',
       },
+    );
+    this.config = config;
+    this.rootDirectory = path.resolve(this.config.getTargetDir());
+    this.client = config.getGeminiClient();
+  }
+
+  /**
+   * Checks if a path is within the root directory.
+   * @param pathToCheck The absolute path to check.
+   * @returns True if the path is within the root directory, false otherwise.
+   */
+  private isWithinRoot(pathToCheck: string): boolean {
+    const normalizedPath = path.normalize(pathToCheck);
+    const normalizedRoot = this.rootDirectory;
+    const rootWithSep = normalizedRoot.endsWith(path.sep)
+      ? normalizedRoot
+      : normalizedRoot + path.sep;
+    return (
+      normalizedPath === normalizedRoot ||
+      normalizedPath.startsWith(rootWithSep)
     );
   }
 
@@ -128,29 +151,25 @@ Expectation for required parameters:
    * @returns Error message string or null if valid
    */
   validateToolParams(params: EditToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
-    if (errors) {
-      return errors;
+    if (
+      this.schema.parameters &&
+      !SchemaValidator.validate(
+        this.schema.parameters as Record<string, unknown>,
+        params,
+      )
+    ) {
+      return 'Parameters failed schema validation.';
     }
 
     if (!path.isAbsolute(params.file_path)) {
       return `File path must be absolute: ${params.file_path}`;
     }
 
-    if (!isWithinRoot(params.file_path, this.config.getTargetDir())) {
-      return `File path must be within the root directory (${this.config.getTargetDir()}): ${params.file_path}`;
+    if (!this.isWithinRoot(params.file_path)) {
+      return `File path must be within the root directory (${this.rootDirectory}): ${params.file_path}`;
     }
 
     return null;
-  }
-
-  /**
-   * Determines any file locations affected by the tool execution
-   * @param params Parameters for the tool execution
-   * @returns A list of such paths
-   */
-  toolLocations(params: EditToolParams): ToolLocation[] {
-    return [{ path: params.file_path }];
   }
 
   private _applyReplacement(
@@ -217,10 +236,9 @@ Expectation for required parameters:
     } else if (currentContent !== null) {
       // Editing an existing file
       const correctedEdit = await ensureCorrectEdit(
-        params.file_path,
         currentContent,
         params,
-        this.config.getGeminiClient(),
+        this.client,
         abortSignal,
       );
       finalOldString = correctedEdit.params.old_string;
@@ -315,11 +333,9 @@ Expectation for required parameters:
     );
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
-      title: `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.config.getTargetDir()))}`,
+      title: `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`,
       fileName,
       fileDiff,
-      originalContent: editData.currentContent,
-      newContent: editData.newContent,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
@@ -333,10 +349,7 @@ Expectation for required parameters:
     if (!params.file_path || !params.old_string || !params.new_string) {
       return `Model did not provide valid parameters for edit tool`;
     }
-    const relativePath = makeRelative(
-      params.file_path,
-      this.config.getTargetDir(),
-    );
+    const relativePath = makeRelative(params.file_path, this.rootDirectory);
     if (params.old_string === '') {
       return `Create ${shortenPath(relativePath)}`;
     }
@@ -395,7 +408,7 @@ Expectation for required parameters:
 
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {
-        displayResult = `Created ${shortenPath(makeRelative(params.file_path, this.config.getTargetDir()))}`;
+        displayResult = `Created ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`;
       } else {
         // Generate diff for display, even though core logic doesn't technically need it
         // The CLI wrapper will use this part of the ToolResult
@@ -408,12 +421,7 @@ Expectation for required parameters:
           'Proposed',
           DEFAULT_DIFF_OPTIONS,
         );
-        displayResult = {
-          fileDiff,
-          fileName,
-          originalContent: editData.currentContent,
-          newContent: editData.newContent,
-        };
+        displayResult = { fileDiff, fileName };
       }
 
       const llmSuccessMessageParts = [

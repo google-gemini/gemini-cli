@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { setGlobalDispatcher, ProxyAgent } from 'undici';
 import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -21,7 +20,6 @@ import {
 export async function getEffectiveModel(
   apiKey: string,
   currentConfiguredModel: string,
-  proxy?: string,
 ): Promise<string> {
   if (currentConfiguredModel !== DEFAULT_GEMINI_MODEL) {
     // Only check if the user is trying to use the specific pro model we want to fallback from.
@@ -30,14 +28,14 @@ export async function getEffectiveModel(
 
   const modelToTest = DEFAULT_GEMINI_MODEL;
   const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelToTest}:generateContent`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelToTest}:generateContent?key=${apiKey}`;
   const body = JSON.stringify({
     contents: [{ parts: [{ text: 'test' }] }],
     generationConfig: {
       maxOutputTokens: 1,
       temperature: 0,
       topK: 1,
-      thinkingConfig: { thinkingBudget: 128, includeThoughts: false },
+      thinkingConfig: { thinkingBudget: 0, includeThoughts: false },
     },
   });
 
@@ -45,15 +43,9 @@ export async function getEffectiveModel(
   const timeoutId = setTimeout(() => controller.abort(), 2000); // 500ms timeout for the request
 
   try {
-    if (proxy) {
-      setGlobalDispatcher(new ProxyAgent(proxy));
-    }
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body,
       signal: controller.signal,
     });

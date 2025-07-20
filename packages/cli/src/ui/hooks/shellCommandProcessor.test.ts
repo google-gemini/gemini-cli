@@ -10,7 +10,6 @@ import { useShellCommandProcessor } from './shellCommandProcessor';
 import { Config, GeminiClient } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import EventEmitter from 'events';
-import { ToolCallStatus } from '../types';
 
 // Mock dependencies
 vi.mock('child_process');
@@ -105,15 +104,8 @@ describe('useShellCommandProcessor', () => {
 
     expect(addItemToHistoryMock).toHaveBeenCalledTimes(2);
     expect(addItemToHistoryMock.mock.calls[1][0]).toEqual({
-      type: 'tool_group',
-      tools: [
-        expect.objectContaining({
-          name: 'Shell Command',
-          description: 'ls -l',
-          status: ToolCallStatus.Success,
-          resultDisplay: 'file1.txt\nfile2.txt',
-        }),
-      ],
+      type: 'info',
+      text: 'file1.txt\nfile2.txt',
     });
     expect(geminiClientMock.addHistory).toHaveBeenCalledTimes(1);
   });
@@ -148,16 +140,8 @@ describe('useShellCommandProcessor', () => {
 
     expect(addItemToHistoryMock).toHaveBeenCalledTimes(2);
     expect(addItemToHistoryMock.mock.calls[1][0]).toEqual({
-      type: 'tool_group',
-      tools: [
-        expect.objectContaining({
-          name: 'Shell Command',
-          description: 'cat myimage.png',
-          status: ToolCallStatus.Success,
-          resultDisplay:
-            '[Command produced binary output, which is not shown.]',
-        }),
-      ],
+      type: 'info',
+      text: '[Command produced binary output, which is not shown.]',
     });
   });
 
@@ -188,15 +172,8 @@ describe('useShellCommandProcessor', () => {
 
     expect(addItemToHistoryMock).toHaveBeenCalledTimes(2);
     expect(addItemToHistoryMock.mock.calls[1][0]).toEqual({
-      type: 'tool_group',
-      tools: [
-        expect.objectContaining({
-          name: 'Shell Command',
-          description: 'a-bad-command',
-          status: ToolCallStatus.Error,
-          resultDisplay: 'Command exited with code 127.\ncommand not found',
-        }),
-      ],
+      type: 'error',
+      text: 'Command exited with code 127.\ncommand not found',
     });
   });
 });

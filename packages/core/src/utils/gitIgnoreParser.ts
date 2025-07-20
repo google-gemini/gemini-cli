@@ -61,12 +61,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
       ? path.relative(this.projectRoot, filePath)
       : filePath;
 
-    if (
-      relativePath === '' ||
-      relativePath.startsWith('..') ||
-      relativePath === '/' ||
-      relativePath.startsWith('/')
-    ) {
+    if (relativePath === '' || relativePath.startsWith('..')) {
       return false;
     }
 

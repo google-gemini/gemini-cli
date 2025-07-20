@@ -28,7 +28,7 @@ export class ProjectIdRequiredError extends Error {
  * @returns the user's actual project id
  */
 export async function setupUser(client: OAuth2Client): Promise<string> {
-  let projectId = process.env.GOOGLE_CLOUD_PROJECT || undefined;
+  let projectId = process.env.GOOGLE_CLOUD_PROJECT;
   const caServer = new CodeAssistServer(client, projectId);
 
   const clientMetadata: ClientMetadata = {

@@ -15,9 +15,7 @@ import {
   ToolEditConfirmationDetails,
   ToolConfirmationOutcome,
   ToolCallConfirmationDetails,
-  Icon,
 } from './tools.js';
-import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
@@ -25,9 +23,10 @@ import {
   ensureCorrectEdit,
   ensureCorrectFileContent,
 } from '../utils/editCorrector.js';
+import { GeminiClient } from '../core/client.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
-import { getSpecificMimeType, isWithinRoot } from '../utils/fileUtils.js';
+import { getSpecificMimeType } from '../utils/fileUtils.js';
 import {
   recordFileOperationMetric,
   FileOperation,
@@ -68,6 +67,7 @@ export class WriteFileTool
   implements ModifiableTool<WriteFileToolParams>
 {
   static readonly Name: string = 'write_file';
+  private readonly client: GeminiClient;
 
   constructor(private readonly config: Config) {
     super(
@@ -76,36 +76,60 @@ export class WriteFileTool
       `Writes content to a specified file in the local filesystem.
 
       The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
-      Icon.Pencil,
       {
         properties: {
           file_path: {
             description:
               "The absolute path to the file to write to (e.g., '/home/user/project/file.txt'). Relative paths are not supported.",
-            type: Type.STRING,
+            type: 'string',
           },
           content: {
             description: 'The content to write to the file.',
-            type: Type.STRING,
+            type: 'string',
           },
         },
         required: ['file_path', 'content'],
-        type: Type.OBJECT,
+        type: 'object',
       },
+    );
+
+    this.client = this.config.getGeminiClient();
+  }
+
+  /**
+   * Checks if a given path is within the root directory bounds.
+   * This security check prevents writing files outside the designated root directory.
+   *
+   * @param pathToCheck The absolute path to validate
+   * @returns True if the path is within the root directory, false otherwise
+   */
+  private isWithinRoot(pathToCheck: string): boolean {
+    const normalizedPath = path.normalize(pathToCheck);
+    const normalizedRoot = path.normalize(this.config.getTargetDir());
+    const rootWithSep = normalizedRoot.endsWith(path.sep)
+      ? normalizedRoot
+      : normalizedRoot + path.sep;
+    return (
+      normalizedPath === normalizedRoot ||
+      normalizedPath.startsWith(rootWithSep)
     );
   }
 
   validateToolParams(params: WriteFileToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
-    if (errors) {
-      return errors;
+    if (
+      this.schema.parameters &&
+      !SchemaValidator.validate(
+        this.schema.parameters as Record<string, unknown>,
+        params,
+      )
+    ) {
+      return 'Parameters failed schema validation.';
     }
-
     const filePath = params.file_path;
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute: ${filePath}`;
     }
-    if (!isWithinRoot(filePath, this.config.getTargetDir())) {
+    if (!this.isWithinRoot(filePath)) {
       return `File path must be within the root directory (${this.config.getTargetDir()}): ${filePath}`;
     }
 
@@ -186,8 +210,6 @@ export class WriteFileTool
       title: `Confirm Write: ${shortenPath(relativePath)}`,
       fileName,
       fileDiff,
-      originalContent,
-      newContent: correctedContent,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
@@ -273,12 +295,7 @@ export class WriteFileTool
         );
       }
 
-      const displayResult: FileDiff = {
-        fileDiff,
-        fileName,
-        originalContent: correctedContentResult.originalContent,
-        newContent: correctedContentResult.correctedContent,
-      };
+      const displayResult: FileDiff = { fileDiff, fileName };
 
       const lines = fileContent.split('\n').length;
       const mimetype = getSpecificMimeType(params.file_path);
@@ -350,14 +367,13 @@ export class WriteFileTool
     if (fileExists) {
       // This implies originalContent is available
       const { params: correctedParams } = await ensureCorrectEdit(
-        filePath,
         originalContent,
         {
           old_string: originalContent, // Treat entire current content as old_string
           new_string: proposedContent,
           file_path: filePath,
         },
-        this.config.getGeminiClient(),
+        this.client,
         abortSignal,
       );
       correctedContent = correctedParams.new_string;
@@ -365,7 +381,7 @@ export class WriteFileTool
       // This implies new file (ENOENT)
       correctedContent = await ensureCorrectFileContent(
         proposedContent,
-        this.config.getGeminiClient(),
+        this.client,
         abortSignal,
       );
     }

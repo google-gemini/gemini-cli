@@ -112,12 +112,7 @@ describe('gemini.tsx main function', () => {
       path: '/workspace/.gemini/settings.json',
       settings: {},
     };
-    const systemSettingsFile: SettingsFile = {
-      path: '/system/settings.json',
-      settings: {},
-    };
     const mockLoadedSettings = new LoadedSettings(
-      systemSettingsFile,
       userSettingsFile,
       workspaceSettingsFile,
       [settingsError],

@@ -13,7 +13,6 @@ exports[`Core System Prompt (prompts.ts) > should append userMemory with separat
 - **Proactiveness:** Fulfill the user's request thoroughly, including reasonable, directly implied follow-up actions.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Path Construction:** Before using any file system tool (e.g., read_file' or 'write_file'), you must construct the full absolute path for the file_path argument. Always combine the absolute path of the project's root directory with the file's path relative to the root. For example, if the project root is /path/to/project/ and the file is foo/bar/baz.txt, the final path you must use is /path/to/project/foo/bar/baz.txt. If the user provides a relative path, you must resolve it against the root directory to create an absolute path.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
 # Primary Workflows
@@ -93,7 +92,7 @@ model: true
 
 <example>
 user: list files here.
-model: [tool_call: list_directory for path '/path/to/project']
+model: [tool_call: list_directory for path '.']
 </example>
 
 <example>
@@ -133,7 +132,7 @@ All checks passed. This is a stable checkpoint.
 
 <example>
 user: Delete the temp directory.
-model: I can run \`rm -rf /path/to/project/temp\`. This will permanently delete the directory and all its contents.
+model: I can run \`rm -rf ./temp\`. This will permanently delete the directory and all its contents.
 </example>
 
 <example>
@@ -194,7 +193,6 @@ exports[`Core System Prompt (prompts.ts) > should include git instructions when 
 - **Proactiveness:** Fulfill the user's request thoroughly, including reasonable, directly implied follow-up actions.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Path Construction:** Before using any file system tool (e.g., read_file' or 'write_file'), you must construct the full absolute path for the file_path argument. Always combine the absolute path of the project's root directory with the file's path relative to the root. For example, if the project root is /path/to/project/ and the file is foo/bar/baz.txt, the final path you must use is /path/to/project/foo/bar/baz.txt. If the user provides a relative path, you must resolve it against the root directory to create an absolute path.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
 # Primary Workflows
@@ -289,7 +287,7 @@ model: true
 
 <example>
 user: list files here.
-model: [tool_call: list_directory for path '/path/to/project']
+model: [tool_call: list_directory for path '.']
 </example>
 
 <example>
@@ -329,7 +327,7 @@ Would you like me to write a commit message and commit these changes?
 
 <example>
 user: Delete the temp directory.
-model: I can run \`rm -rf /path/to/project/temp\`. This will permanently delete the directory and all its contents.
+model: I can run \`rm -rf ./temp\`. This will permanently delete the directory and all its contents.
 </example>
 
 <example>
@@ -385,7 +383,6 @@ exports[`Core System Prompt (prompts.ts) > should include non-sandbox instructio
 - **Proactiveness:** Fulfill the user's request thoroughly, including reasonable, directly implied follow-up actions.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Path Construction:** Before using any file system tool (e.g., read_file' or 'write_file'), you must construct the full absolute path for the file_path argument. Always combine the absolute path of the project's root directory with the file's path relative to the root. For example, if the project root is /path/to/project/ and the file is foo/bar/baz.txt, the final path you must use is /path/to/project/foo/bar/baz.txt. If the user provides a relative path, you must resolve it against the root directory to create an absolute path.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
 # Primary Workflows
@@ -465,7 +462,7 @@ model: true
 
 <example>
 user: list files here.
-model: [tool_call: list_directory for path '/path/to/project']
+model: [tool_call: list_directory for path '.']
 </example>
 
 <example>
@@ -505,7 +502,7 @@ All checks passed. This is a stable checkpoint.
 
 <example>
 user: Delete the temp directory.
-model: I can run \`rm -rf /path/to/project/temp\`. This will permanently delete the directory and all its contents.
+model: I can run \`rm -rf ./temp\`. This will permanently delete the directory and all its contents.
 </example>
 
 <example>
@@ -561,7 +558,6 @@ exports[`Core System Prompt (prompts.ts) > should include sandbox-specific instr
 - **Proactiveness:** Fulfill the user's request thoroughly, including reasonable, directly implied follow-up actions.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Path Construction:** Before using any file system tool (e.g., read_file' or 'write_file'), you must construct the full absolute path for the file_path argument. Always combine the absolute path of the project's root directory with the file's path relative to the root. For example, if the project root is /path/to/project/ and the file is foo/bar/baz.txt, the final path you must use is /path/to/project/foo/bar/baz.txt. If the user provides a relative path, you must resolve it against the root directory to create an absolute path.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
 # Primary Workflows
@@ -641,7 +637,7 @@ model: true
 
 <example>
 user: list files here.
-model: [tool_call: list_directory for path '/path/to/project']
+model: [tool_call: list_directory for path '.']
 </example>
 
 <example>
@@ -681,7 +677,7 @@ All checks passed. This is a stable checkpoint.
 
 <example>
 user: Delete the temp directory.
-model: I can run \`rm -rf /path/to/project/temp\`. This will permanently delete the directory and all its contents.
+model: I can run \`rm -rf ./temp\`. This will permanently delete the directory and all its contents.
 </example>
 
 <example>
@@ -737,7 +733,6 @@ exports[`Core System Prompt (prompts.ts) > should include seatbelt-specific inst
 - **Proactiveness:** Fulfill the user's request thoroughly, including reasonable, directly implied follow-up actions.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Path Construction:** Before using any file system tool (e.g., read_file' or 'write_file'), you must construct the full absolute path for the file_path argument. Always combine the absolute path of the project's root directory with the file's path relative to the root. For example, if the project root is /path/to/project/ and the file is foo/bar/baz.txt, the final path you must use is /path/to/project/foo/bar/baz.txt. If the user provides a relative path, you must resolve it against the root directory to create an absolute path.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
 # Primary Workflows
@@ -817,7 +812,7 @@ model: true
 
 <example>
 user: list files here.
-model: [tool_call: list_directory for path '/path/to/project']
+model: [tool_call: list_directory for path '.']
 </example>
 
 <example>
@@ -857,7 +852,7 @@ All checks passed. This is a stable checkpoint.
 
 <example>
 user: Delete the temp directory.
-model: I can run \`rm -rf /path/to/project/temp\`. This will permanently delete the directory and all its contents.
+model: I can run \`rm -rf ./temp\`. This will permanently delete the directory and all its contents.
 </example>
 
 <example>
@@ -913,7 +908,6 @@ exports[`Core System Prompt (prompts.ts) > should not include git instructions w
 - **Proactiveness:** Fulfill the user's request thoroughly, including reasonable, directly implied follow-up actions.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Path Construction:** Before using any file system tool (e.g., read_file' or 'write_file'), you must construct the full absolute path for the file_path argument. Always combine the absolute path of the project's root directory with the file's path relative to the root. For example, if the project root is /path/to/project/ and the file is foo/bar/baz.txt, the final path you must use is /path/to/project/foo/bar/baz.txt. If the user provides a relative path, you must resolve it against the root directory to create an absolute path.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
 # Primary Workflows
@@ -993,7 +987,7 @@ model: true
 
 <example>
 user: list files here.
-model: [tool_call: list_directory for path '/path/to/project']
+model: [tool_call: list_directory for path '.']
 </example>
 
 <example>
@@ -1033,7 +1027,7 @@ All checks passed. This is a stable checkpoint.
 
 <example>
 user: Delete the temp directory.
-model: I can run \`rm -rf /path/to/project/temp\`. This will permanently delete the directory and all its contents.
+model: I can run \`rm -rf ./temp\`. This will permanently delete the directory and all its contents.
 </example>
 
 <example>
@@ -1089,7 +1083,6 @@ exports[`Core System Prompt (prompts.ts) > should return the base prompt when no
 - **Proactiveness:** Fulfill the user's request thoroughly, including reasonable, directly implied follow-up actions.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Path Construction:** Before using any file system tool (e.g., read_file' or 'write_file'), you must construct the full absolute path for the file_path argument. Always combine the absolute path of the project's root directory with the file's path relative to the root. For example, if the project root is /path/to/project/ and the file is foo/bar/baz.txt, the final path you must use is /path/to/project/foo/bar/baz.txt. If the user provides a relative path, you must resolve it against the root directory to create an absolute path.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
 # Primary Workflows
@@ -1169,7 +1162,7 @@ model: true
 
 <example>
 user: list files here.
-model: [tool_call: list_directory for path '/path/to/project']
+model: [tool_call: list_directory for path '.']
 </example>
 
 <example>
@@ -1209,7 +1202,7 @@ All checks passed. This is a stable checkpoint.
 
 <example>
 user: Delete the temp directory.
-model: I can run \`rm -rf /path/to/project/temp\`. This will permanently delete the directory and all its contents.
+model: I can run \`rm -rf ./temp\`. This will permanently delete the directory and all its contents.
 </example>
 
 <example>
@@ -1265,7 +1258,6 @@ exports[`Core System Prompt (prompts.ts) > should return the base prompt when us
 - **Proactiveness:** Fulfill the user's request thoroughly, including reasonable, directly implied follow-up actions.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Path Construction:** Before using any file system tool (e.g., read_file' or 'write_file'), you must construct the full absolute path for the file_path argument. Always combine the absolute path of the project's root directory with the file's path relative to the root. For example, if the project root is /path/to/project/ and the file is foo/bar/baz.txt, the final path you must use is /path/to/project/foo/bar/baz.txt. If the user provides a relative path, you must resolve it against the root directory to create an absolute path.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
 # Primary Workflows
@@ -1345,7 +1337,7 @@ model: true
 
 <example>
 user: list files here.
-model: [tool_call: list_directory for path '/path/to/project']
+model: [tool_call: list_directory for path '.']
 </example>
 
 <example>
@@ -1385,7 +1377,7 @@ All checks passed. This is a stable checkpoint.
 
 <example>
 user: Delete the temp directory.
-model: I can run \`rm -rf /path/to/project/temp\`. This will permanently delete the directory and all its contents.
+model: I can run \`rm -rf ./temp\`. This will permanently delete the directory and all its contents.
 </example>
 
 <example>
@@ -1441,7 +1433,6 @@ exports[`Core System Prompt (prompts.ts) > should return the base prompt when us
 - **Proactiveness:** Fulfill the user's request thoroughly, including reasonable, directly implied follow-up actions.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Path Construction:** Before using any file system tool (e.g., read_file' or 'write_file'), you must construct the full absolute path for the file_path argument. Always combine the absolute path of the project's root directory with the file's path relative to the root. For example, if the project root is /path/to/project/ and the file is foo/bar/baz.txt, the final path you must use is /path/to/project/foo/bar/baz.txt. If the user provides a relative path, you must resolve it against the root directory to create an absolute path.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
 # Primary Workflows
@@ -1521,7 +1512,7 @@ model: true
 
 <example>
 user: list files here.
-model: [tool_call: list_directory for path '/path/to/project']
+model: [tool_call: list_directory for path '.']
 </example>
 
 <example>
@@ -1561,7 +1552,7 @@ All checks passed. This is a stable checkpoint.
 
 <example>
 user: Delete the temp directory.
-model: I can run \`rm -rf /path/to/project/temp\`. This will permanently delete the directory and all its contents.
+model: I can run \`rm -rf ./temp\`. This will permanently delete the directory and all its contents.
 </example>
 
 <example>

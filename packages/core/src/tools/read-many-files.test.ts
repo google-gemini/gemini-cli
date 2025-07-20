@@ -58,14 +58,10 @@ describe('ReadManyFilesTool', () => {
     const fileService = new FileDiscoveryService(tempRootDir);
     const mockConfig = {
       getFileService: () => fileService,
-
-      getFileFilteringOptions: () => ({
-        respectGitIgnore: true,
-        respectGeminiIgnore: true,
-      }),
-      getTargetDir: () => tempRootDir,
+      getFileFilteringRespectGitIgnore: () => true,
     } as Partial<Config> as Config;
-    tool = new ReadManyFilesTool(mockConfig);
+
+    tool = new ReadManyFilesTool(tempRootDir, mockConfig);
 
     mockReadFileFn = mockControl.mockReadFile;
     mockReadFileFn.mockReset();
@@ -142,7 +138,7 @@ describe('ReadManyFilesTool', () => {
     it('should return error if paths array is empty', () => {
       const params = { paths: [] };
       expect(tool.validateParams(params)).toBe(
-        'params/paths must NOT have fewer than 1 items',
+        'The "paths" parameter is required and must be a non-empty array of strings/glob patterns.',
       );
     });
 
@@ -158,7 +154,7 @@ describe('ReadManyFilesTool', () => {
     it('should return error if paths array contains an empty string', () => {
       const params = { paths: ['file1.txt', ''] };
       expect(tool.validateParams(params)).toBe(
-        'params/paths/1 must NOT have fewer than 1 characters',
+        'Each item in "paths" must be a non-empty string/glob pattern.',
       );
     });
 
@@ -168,7 +164,7 @@ describe('ReadManyFilesTool', () => {
         include: ['*.ts', 123] as string[],
       };
       expect(tool.validateParams(params)).toBe(
-        'params/include/1 must be string',
+        'If provided, "include" must be an array of strings/glob patterns.',
       );
     });
 
@@ -178,7 +174,7 @@ describe('ReadManyFilesTool', () => {
         exclude: ['*.log', {}] as string[],
       };
       expect(tool.validateParams(params)).toBe(
-        'params/exclude/1 must be string',
+        'If provided, "exclude" must be an array of strings/glob patterns.',
       );
     });
   });
@@ -199,9 +195,8 @@ describe('ReadManyFilesTool', () => {
       createFile('file1.txt', 'Content of file1');
       const params = { paths: ['file1.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
-      const expectedPath = path.join(tempRootDir, 'file1.txt');
       expect(result.llmContent).toEqual([
-        `--- ${expectedPath} ---\n\nContent of file1\n\n`,
+        '--- file1.txt ---\n\nContent of file1\n\n',
       ]);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
@@ -214,16 +209,12 @@ describe('ReadManyFilesTool', () => {
       const params = { paths: ['file1.txt', 'subdir/file2.js'] };
       const result = await tool.execute(params, new AbortController().signal);
       const content = result.llmContent as string[];
-      const expectedPath1 = path.join(tempRootDir, 'file1.txt');
-      const expectedPath2 = path.join(tempRootDir, 'subdir/file2.js');
       expect(
-        content.some((c) =>
-          c.includes(`--- ${expectedPath1} ---\n\nContent1\n\n`),
-        ),
+        content.some((c) => c.includes('--- file1.txt ---\n\nContent1\n\n')),
       ).toBe(true);
       expect(
         content.some((c) =>
-          c.includes(`--- ${expectedPath2} ---\n\nContent2\n\n`),
+          c.includes('--- subdir/file2.js ---\n\nContent2\n\n'),
         ),
       ).toBe(true);
       expect(result.returnDisplay).toContain(
@@ -238,16 +229,12 @@ describe('ReadManyFilesTool', () => {
       const params = { paths: ['*.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
       const content = result.llmContent as string[];
-      const expectedPath1 = path.join(tempRootDir, 'file.txt');
-      const expectedPath2 = path.join(tempRootDir, 'another.txt');
       expect(
-        content.some((c) =>
-          c.includes(`--- ${expectedPath1} ---\n\nText file\n\n`),
-        ),
+        content.some((c) => c.includes('--- file.txt ---\n\nText file\n\n')),
       ).toBe(true);
       expect(
         content.some((c) =>
-          c.includes(`--- ${expectedPath2} ---\n\nAnother text\n\n`),
+          c.includes('--- another.txt ---\n\nAnother text\n\n'),
         ),
       ).toBe(true);
       expect(content.find((c) => c.includes('sub/data.json'))).toBeUndefined();
@@ -262,8 +249,7 @@ describe('ReadManyFilesTool', () => {
       const params = { paths: ['src/**/*.ts'], exclude: ['**/*.test.ts'] };
       const result = await tool.execute(params, new AbortController().signal);
       const content = result.llmContent as string[];
-      const expectedPath = path.join(tempRootDir, 'src/main.ts');
-      expect(content).toEqual([`--- ${expectedPath} ---\n\nMain content\n\n`]);
+      expect(content).toEqual(['--- src/main.ts ---\n\nMain content\n\n']);
       expect(
         content.find((c) => c.includes('src/main.test.ts')),
       ).toBeUndefined();
@@ -289,8 +275,7 @@ describe('ReadManyFilesTool', () => {
       const params = { paths: ['**/*.js'] };
       const result = await tool.execute(params, new AbortController().signal);
       const content = result.llmContent as string[];
-      const expectedPath = path.join(tempRootDir, 'src/app.js');
-      expect(content).toEqual([`--- ${expectedPath} ---\n\napp code\n\n`]);
+      expect(content).toEqual(['--- src/app.js ---\n\napp code\n\n']);
       expect(
         content.find((c) => c.includes('node_modules/some-lib/index.js')),
       ).toBeUndefined();
@@ -305,20 +290,13 @@ describe('ReadManyFilesTool', () => {
       const params = { paths: ['**/*.js'], useDefaultExcludes: false };
       const result = await tool.execute(params, new AbortController().signal);
       const content = result.llmContent as string[];
-      const expectedPath1 = path.join(
-        tempRootDir,
-        'node_modules/some-lib/index.js',
-      );
-      const expectedPath2 = path.join(tempRootDir, 'src/app.js');
       expect(
         content.some((c) =>
-          c.includes(`--- ${expectedPath1} ---\n\nlib code\n\n`),
+          c.includes('--- node_modules/some-lib/index.js ---\n\nlib code\n\n'),
         ),
       ).toBe(true);
       expect(
-        content.some((c) =>
-          c.includes(`--- ${expectedPath2} ---\n\napp code\n\n`),
-        ),
+        content.some((c) => c.includes('--- src/app.js ---\n\napp code\n\n')),
       ).toBe(true);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **2 file(s)**',
@@ -372,12 +350,9 @@ describe('ReadManyFilesTool', () => {
       const params = { paths: ['*'] }; // Generic glob, not specific to .pdf
       const result = await tool.execute(params, new AbortController().signal);
       const content = result.llmContent as string[];
-      const expectedPath = path.join(tempRootDir, 'notes.txt');
       expect(
         content.some(
-          (c) =>
-            typeof c === 'string' &&
-            c.includes(`--- ${expectedPath} ---\n\ntext notes\n\n`),
+          (c) => typeof c === 'string' && c.includes('--- notes.txt ---'),
         ),
       ).toBe(true);
       expect(result.returnDisplay).toContain('**Skipped 1 item(s):**');

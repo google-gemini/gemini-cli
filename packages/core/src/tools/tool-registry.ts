@@ -5,7 +5,7 @@
  */
 
 import { FunctionDeclaration, Schema, Type } from '@google/genai';
-import { Tool, ToolResult, BaseTool, Icon } from './tools.js';
+import { Tool, ToolResult, BaseTool } from './tools.js';
 import { Config } from '../config/config.js';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
@@ -18,7 +18,7 @@ type ToolParams = Record<string, unknown>;
 export class DiscoveredTool extends BaseTool<ToolParams, ToolResult> {
   constructor(
     private readonly config: Config,
-    name: string,
+    readonly name: string,
     readonly description: string,
     readonly parameterSchema: Record<string, unknown>,
   ) {
@@ -44,7 +44,6 @@ Signal: Signal number or \`(none)\` if no signal was received.
       name,
       name,
       description,
-      Icon.Hammer,
       parameterSchema,
       false, // isOutputMarkdown
       false, // canUpdateOutput
@@ -126,6 +125,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
 
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
+  private discovery: Promise<void> | null = null;
   private config: Config;
 
   constructor(config: Config) {
@@ -138,14 +138,10 @@ export class ToolRegistry {
    */
   registerTool(tool: Tool): void {
     if (this.tools.has(tool.name)) {
-      if (tool instanceof DiscoveredMCPTool) {
-        tool = tool.asFullyQualifiedTool();
-      } else {
-        // Decide on behavior: throw error, log warning, or allow overwrite
-        console.warn(
-          `Tool with name "${tool.name}" is already registered. Overwriting.`,
-        );
-      }
+      // Decide on behavior: throw error, log warning, or allow overwrite
+      console.warn(
+        `Tool with name "${tool.name}" is already registered. Overwriting.`,
+      );
     }
     this.tools.set(tool.name, tool);
   }
@@ -159,6 +155,8 @@ export class ToolRegistry {
     for (const tool of this.tools.values()) {
       if (tool instanceof DiscoveredTool || tool instanceof DiscoveredMCPTool) {
         this.tools.delete(tool.name);
+      } else {
+        // Keep manually registered tools
       }
     }
 
@@ -169,7 +167,6 @@ export class ToolRegistry {
       this.config.getMcpServers() ?? {},
       this.config.getMcpServerCommand(),
       this,
-      this.config.getDebugMode(),
     );
   }
 
@@ -313,9 +310,7 @@ export class ToolRegistry {
    * Returns an array of all registered and discovered tool instances.
    */
   getAllTools(): Tool[] {
-    return Array.from(this.tools.values()).sort((a, b) =>
-      a.displayName.localeCompare(b.displayName),
-    );
+    return Array.from(this.tools.values());
   }
 
   /**
@@ -328,7 +323,7 @@ export class ToolRegistry {
         serverTools.push(tool);
       }
     }
-    return serverTools.sort((a, b) => a.name.localeCompare(b.name));
+    return serverTools;
   }
 
   /**

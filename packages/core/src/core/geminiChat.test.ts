@@ -43,8 +43,6 @@ describe('GeminiChat', () => {
       }),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       setModel: vi.fn(),
-      getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
-      setQuotaErrorOccurred: vi.fn(),
       flashFallbackHandler: undefined,
     } as unknown as Config;
 
@@ -77,7 +75,7 @@ describe('GeminiChat', () => {
       } as unknown as GenerateContentResponse;
       vi.mocked(mockModelsModule.generateContent).mockResolvedValue(response);
 
-      await chat.sendMessage({ message: 'hello' }, 'prompt-id-1');
+      await chat.sendMessage({ message: 'hello' });
 
       expect(mockModelsModule.generateContent).toHaveBeenCalledWith({
         model: 'gemini-pro',
@@ -109,7 +107,7 @@ describe('GeminiChat', () => {
         response,
       );
 
-      await chat.sendMessageStream({ message: 'hello' }, 'prompt-id-1');
+      await chat.sendMessageStream({ message: 'hello' });
 
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledWith({
         model: 'gemini-pro',

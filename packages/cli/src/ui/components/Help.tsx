@@ -7,7 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { SlashCommand } from '../commands/types.js';
+import { SlashCommand } from '../hooks/slashCommandProcessor.js';
 
 interface Help {
   commands: SlashCommand[];
@@ -67,25 +67,13 @@ export const Help: React.FC<Help> = ({ commands }) => (
     {commands
       .filter((command) => command.description)
       .map((command: SlashCommand) => (
-        <Box key={command.name} flexDirection="column">
-          <Text color={Colors.Foreground}>
-            <Text bold color={Colors.AccentPurple}>
-              {' '}
-              /{command.name}
-            </Text>
-            {command.description && ' - ' + command.description}
+        <Text key={command.name} color={Colors.Foreground}>
+          <Text bold color={Colors.AccentPurple}>
+            {' '}
+            /{command.name}
           </Text>
-          {command.subCommands &&
-            command.subCommands.map((subCommand) => (
-              <Text key={subCommand.name} color={Colors.Foreground}>
-                <Text bold color={Colors.AccentPurple}>
-                  {'   '}
-                  {subCommand.name}
-                </Text>
-                {subCommand.description && ' - ' + subCommand.description}
-              </Text>
-            ))}
-        </Box>
+          {command.description && ' - ' + command.description}
+        </Text>
       ))}
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
@@ -132,12 +120,6 @@ export const Help: React.FC<Help> = ({ commands }) => (
         Shift+Tab
       </Text>{' '}
       - Toggle auto-accepting edits
-    </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Ctrl+Y
-      </Text>{' '}
-      - Toggle YOLO mode
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>

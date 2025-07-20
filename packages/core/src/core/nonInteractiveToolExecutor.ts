@@ -40,7 +40,6 @@ export async function executeToolCall(
       duration_ms: durationMs,
       success: false,
       error: error.message,
-      prompt_id: toolCallRequest.prompt_id,
     });
     // Ensure the response structure matches what the API expects for an error
     return {
@@ -68,10 +67,6 @@ export async function executeToolCall(
       // No live output callback for non-interactive mode
     );
 
-    const tool_output = toolResult.llmContent;
-
-    const tool_display = toolResult.returnDisplay;
-
     const durationMs = Date.now() - startTime;
     logToolCall(config, {
       'event.name': 'tool_call',
@@ -80,19 +75,18 @@ export async function executeToolCall(
       function_args: toolCallRequest.args,
       duration_ms: durationMs,
       success: true,
-      prompt_id: toolCallRequest.prompt_id,
     });
 
     const response = convertToFunctionResponse(
       toolCallRequest.name,
       toolCallRequest.callId,
-      tool_output,
+      toolResult.llmContent,
     );
 
     return {
       callId: toolCallRequest.callId,
       responseParts: response,
-      resultDisplay: tool_display,
+      resultDisplay: toolResult.returnDisplay,
       error: undefined,
     };
   } catch (e) {
@@ -106,7 +100,6 @@ export async function executeToolCall(
       duration_ms: durationMs,
       success: false,
       error: error.message,
-      prompt_id: toolCallRequest.prompt_id,
     });
     return {
       callId: toolCallRequest.callId,

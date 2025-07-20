@@ -97,25 +97,13 @@ describe('<LoadingIndicator />', () => {
   it('should display the elapsedTime correctly when Responding', () => {
     const props = {
       currentLoadingPhrase: 'Working...',
-      elapsedTime: 60,
+      elapsedTime: 8,
     };
     const { lastFrame } = renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
-    expect(lastFrame()).toContain('(esc to cancel, 1m)');
-  });
-
-  it('should display the elapsedTime correctly in human-readable format', () => {
-    const props = {
-      currentLoadingPhrase: 'Working...',
-      elapsedTime: 125,
-    };
-    const { lastFrame } = renderWithContext(
-      <LoadingIndicator {...props} />,
-      StreamingState.Responding,
-    );
-    expect(lastFrame()).toContain('(esc to cancel, 2m 5s)');
+    expect(lastFrame()).toContain('(esc to cancel, 8s)');
   });
 
   it('should render rightContent when provided', () => {

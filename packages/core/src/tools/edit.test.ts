@@ -38,19 +38,21 @@ describe('EditTool', () => {
   let tempDir: string;
   let rootDir: string;
   let mockConfig: Config;
-  let geminiClient: any;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
 
-    geminiClient = {
+    // The client instance that EditTool will use
+    const mockClientInstanceWithGenerateJson = {
       generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
     };
 
     mockConfig = {
-      getGeminiClient: vi.fn().mockReturnValue(geminiClient),
+      getGeminiClient: vi
+        .fn()
+        .mockReturnValue(mockClientInstanceWithGenerateJson),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
@@ -82,22 +84,20 @@ describe('EditTool', () => {
 
     // Reset mocks and set default implementation for ensureCorrectEdit
     mockEnsureCorrectEdit.mockReset();
-    mockEnsureCorrectEdit.mockImplementation(
-      async (_, currentContent, params) => {
-        let occurrences = 0;
-        if (params.old_string && currentContent) {
-          // Simple string counting for the mock
-          let index = currentContent.indexOf(params.old_string);
-          while (index !== -1) {
-            occurrences++;
-            index = currentContent.indexOf(params.old_string, index + 1);
-          }
-        } else if (params.old_string === '') {
-          occurrences = 0; // Creating a new file
+    mockEnsureCorrectEdit.mockImplementation(async (currentContent, params) => {
+      let occurrences = 0;
+      if (params.old_string && currentContent) {
+        // Simple string counting for the mock
+        let index = currentContent.indexOf(params.old_string);
+        while (index !== -1) {
+          occurrences++;
+          index = currentContent.indexOf(params.old_string, index + 1);
         }
-        return Promise.resolve({ params, occurrences });
-      },
-    );
+      } else if (params.old_string === '') {
+        occurrences = 0; // Creating a new file
+      }
+      return Promise.resolve({ params, occurrences });
+    });
 
     // Default mock for generateJson to return the snippet unchanged
     mockGenerateJson.mockReset();
@@ -333,11 +333,11 @@ describe('EditTool', () => {
       // Set a specific mock for this test case
       let mockCalled = false;
       mockEnsureCorrectEdit.mockImplementationOnce(
-        async (_, content, p, client) => {
+        async (content, p, client) => {
           mockCalled = true;
           expect(content).toBe(originalContent);
           expect(p).toBe(params);
-          expect(client).toBe(geminiClient);
+          expect(client).toBe((tool as any).client);
           return {
             params: {
               file_path: filePath,
@@ -383,7 +383,7 @@ describe('EditTool', () => {
     beforeEach(() => {
       filePath = path.join(rootDir, testFile);
       // Default for execute tests, can be overridden
-      mockEnsureCorrectEdit.mockImplementation(async (_, content, params) => {
+      mockEnsureCorrectEdit.mockImplementation(async (content, params) => {
         let occurrences = 0;
         if (params.old_string && content) {
           let index = content.indexOf(params.old_string);

@@ -7,7 +7,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
-import { UserTierId } from './types.js';
 
 vi.mock('google-auth-library');
 
@@ -116,14 +115,7 @@ describe('CodeAssistServer', () => {
     const client = new OAuth2Client();
     const server = new CodeAssistServer(client, 'test-project');
     const mockResponse = {
-      currentTier: {
-        id: UserTierId.FREE,
-        name: 'Free',
-        description: 'free tier',
-      },
-      allowedTiers: [],
-      ineligibleTiers: [],
-      cloudaicompanionProject: 'projects/test',
+      // TODO: Add mock response
     };
     vi.spyOn(server, 'requestPost').mockResolvedValue(mockResponse);
 
@@ -135,7 +127,7 @@ describe('CodeAssistServer', () => {
       'loadCodeAssist',
       expect.any(Object),
     );
-    expect(response).toEqual(mockResponse);
+    expect(response).toBe(mockResponse);
   });
 
   it('should return 0 for countTokens', async () => {
