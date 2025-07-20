@@ -14,10 +14,17 @@ vi.mock('node:process', () => ({
   },
 }));
 
-const mockLoadCommands = vi.fn();
+const mockBuiltinLoadCommands = vi.fn();
 vi.mock('../../services/BuiltinCommandLoader.js', () => ({
   BuiltinCommandLoader: vi.fn().mockImplementation(() => ({
-    loadCommands: mockLoadCommands,
+    loadCommands: mockBuiltinLoadCommands,
+  })),
+}));
+
+const mockFileLoadCommands = vi.fn();
+vi.mock('../../services/FileCommandLoader.js', () => ({
+  FileCommandLoader: vi.fn().mockImplementation(() => ({
+    loadCommands: mockFileLoadCommands,
   })),
 }));
 
@@ -55,11 +62,17 @@ describe('useSlashCommandProcessor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (vi.mocked(BuiltinCommandLoader) as Mock).mockClear();
-    mockLoadCommands.mockResolvedValue([]);
+    mockBuiltinLoadCommands.mockResolvedValue([]);
+    mockFileLoadCommands.mockResolvedValue([]);
   });
 
-  const setupProcessorHook = (commands: SlashCommand[] = []) => {
-    mockLoadCommands.mockResolvedValue(Object.freeze(commands));
+  const setupProcessorHook = (
+    builtinCommands: SlashCommand[] = [],
+    fileCommands: SlashCommand[] = [],
+  ) => {
+    mockBuiltinLoadCommands.mockResolvedValue(Object.freeze(builtinCommands));
+    mockFileLoadCommands.mockResolvedValue(Object.freeze(fileCommands));
+
     const { result } = renderHook(() =>
       useSlashCommandProcessor(
         mockConfig,
@@ -102,7 +115,8 @@ describe('useSlashCommandProcessor', () => {
       });
 
       expect(result.current.slashCommands[0]?.name).toBe('test');
-      expect(mockLoadCommands).toHaveBeenCalledTimes(1);
+      expect(mockBuiltinLoadCommands).toHaveBeenCalledTimes(1);
+      expect(mockFileLoadCommands).toHaveBeenCalledTimes(1);
     });
 
     it('should provide an immutable array of commands to consumers', async () => {
@@ -127,6 +141,36 @@ describe('useSlashCommandProcessor', () => {
           kind: 'built-in',
         });
       }).toThrow(TypeError);
+    });
+
+    it('should override built-in commands with file-based commands of the same name', async () => {
+      const builtinAction = vi.fn();
+      const fileAction = vi.fn();
+
+      const builtinCommand = createTestCommand({
+        name: 'override',
+        description: 'builtin',
+        action: builtinAction,
+      });
+      const fileCommand = createTestCommand(
+        { name: 'override', description: 'file', action: fileAction },
+        'file',
+      );
+
+      const result = setupProcessorHook([builtinCommand], [fileCommand]);
+
+      await waitFor(() => {
+        // The service should only return one command with the name 'override'
+        expect(result.current.slashCommands).toHaveLength(1);
+      });
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/override');
+      });
+
+      // Only the file-based command's action should be called.
+      expect(fileAction).toHaveBeenCalledTimes(1);
+      expect(builtinAction).not.toHaveBeenCalled();
     });
   });
 
@@ -300,6 +344,37 @@ describe('useSlashCommandProcessor', () => {
         }
       });
     });
+
+    it('should handle "submit_prompt" action returned from a file-based command', async () => {
+      const fileCommand = createTestCommand(
+        {
+          name: 'filecmd',
+          description: 'A command from a file',
+          action: async () => ({
+            type: 'submit_prompt',
+            content: 'The actual prompt from the TOML file.',
+          }),
+        },
+        'file',
+      );
+
+      const result = setupProcessorHook([], [fileCommand]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      const actionResult = await act(
+        async () => await result.current.handleSlashCommand('/filecmd'),
+      );
+
+      expect(actionResult).toEqual({
+        type: 'submit_prompt',
+        content: 'The actual prompt from the TOML file.',
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({ type: MessageType.USER, text: '/filecmd' }),
+        expect.any(Number),
+      );
+    });
   });
 
   describe('Command Parsing and Matching', () => {
@@ -331,6 +406,7 @@ describe('useSlashCommandProcessor', () => {
       const action = vi.fn();
       const command: SlashCommand = {
         name: 'main',
+        description: 'main',
         altNames: ['alias'],
         description: 'a command with an alias',
         kind: 'built-in',

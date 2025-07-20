@@ -22,6 +22,7 @@ import { LoadedSettings } from '../../config/settings.js';
 import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
+import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 
 /**
  * Hook to define and process slash commands (e.g., /help, /clear).
@@ -162,8 +163,10 @@ export const useSlashCommandProcessor = (
   useEffect(() => {
     const controller = new AbortController();
     const load = async () => {
-      // TODO - Add other loaders for custom commands.
-      const loaders = [new BuiltinCommandLoader(config)];
+      const loaders = [
+        new BuiltinCommandLoader(config),
+        new FileCommandLoader(config),
+      ];
       const commandService = await CommandService.create(
         loaders,
         controller.signal,
@@ -290,6 +293,12 @@ export const useSlashCommandProcessor = (
                   process.exit(0);
                 }, 100);
                 return { type: 'handled' };
+
+              case 'submit_prompt':
+                return {
+                  type: 'submit_prompt',
+                  content: result.content,
+                };
               default: {
                 const unhandled: never = result;
                 throw new Error(`Unhandled slash command result: ${unhandled}`);
