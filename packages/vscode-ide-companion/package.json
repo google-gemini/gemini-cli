@@ -2,7 +2,7 @@
   "name": "gemini-cli-vscode-ide-companion",
   "displayName": "Gemini CLI VSCode IDE Companion",
   "description": "",
-  "version": "0.0.1",
+  "version": "0.1.13",
   "publisher": "google",
   "icon": "assets/icon.png",
   "repository": {
@@ -29,7 +29,9 @@
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "vsce package --no-dependencies",
     "check-types": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "echo \"vscode-ide-companion has no tests yet\"",
+    "test:ci": "echo \"vscode-ide-companion has no tests yet\""
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
