@@ -21,6 +21,7 @@ import {
 import { LoadedSettings } from '../../config/settings.js';
 import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
+import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 
 /**
  * Hook to define and process slash commands (e.g., /help, /clear).
@@ -42,7 +43,7 @@ export const useSlashCommandProcessor = (
   openPrivacyNotice: () => void,
 ) => {
   const session = useSessionStats();
-  const [commands, setCommands] = useState<SlashCommand[]>([]);
+  const [commands, setCommands] = useState<readonly SlashCommand[]>([]);
   const gitService = useMemo(() => {
     if (!config?.getProjectRoot()) {
       return;
@@ -158,16 +159,24 @@ export const useSlashCommandProcessor = (
     ],
   );
 
-  const commandService = useMemo(() => new CommandService(config), [config]);
-
   useEffect(() => {
+    const controller = new AbortController();
     const load = async () => {
-      await commandService.loadCommands();
+      // TODO - Add other loaders for custom commands.
+      const loaders = [new BuiltinCommandLoader(config)];
+      const commandService = await CommandService.create(
+        loaders,
+        controller.signal,
+      );
       setCommands(commandService.getCommands());
     };
 
     load();
-  }, [commandService]);
+
+    return () => {
+      controller.abort();
+    };
+  }, [config]);
 
   const handleSlashCommand = useCallback(
     async (
@@ -199,7 +208,7 @@ export const useSlashCommandProcessor = (
 
       for (const part of commandPath) {
         const foundCommand = currentCommands.find(
-          (cmd) => cmd.name === part || cmd.altName === part,
+          (cmd) => cmd.name === part || cmd.altNames?.includes(part),
         );
 
         if (foundCommand) {

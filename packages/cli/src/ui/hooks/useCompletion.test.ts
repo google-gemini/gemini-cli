@@ -66,13 +66,13 @@ describe('useCompletion', () => {
     mockSlashCommands = [
       {
         name: 'help',
-        altName: '?',
+        altNames: ['?'],
         description: 'Show help',
         action: vi.fn(),
       },
       {
         name: 'stats',
-        altName: 'usage',
+        altNames: ['usage'],
         description: 'check session stats. Usage: /stats [model|tools]',
         action: vi.fn(),
       },
@@ -410,7 +410,7 @@ describe('useCompletion', () => {
     });
 
     it.each([['/?'], ['/usage']])(
-      'should not suggest commands when altName is fully typed',
+      'should not suggest commands when altNames is fully typed',
       (altName) => {
         const { result } = renderHook(() =>
           useCompletion(
@@ -427,7 +427,7 @@ describe('useCompletion', () => {
       },
     );
 
-    it('should suggest commands based on partial altName matches', () => {
+    it('should suggest commands based on partial altNames matches', () => {
       const { result } = renderHook(() =>
         useCompletion(
           '/usag', // part of the word "usage"
