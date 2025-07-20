@@ -21,6 +21,7 @@ import {
   METRIC_TOKEN_USAGE,
   METRIC_SESSION_COUNT,
   METRIC_FILE_OPERATION_COUNT,
+  METRIC_TURN_COUNT,
 } from './constants.js';
 import { Config } from '../config/config.js';
 
@@ -37,6 +38,7 @@ let apiRequestCounter: Counter | undefined;
 let apiRequestLatencyHistogram: Histogram | undefined;
 let tokenUsageCounter: Counter | undefined;
 let fileOperationCounter: Counter | undefined;
+let turnCounter: Counter | undefined;
 let isMetricsInitialized = false;
 
 function getCommonAttributes(config: Config): Attributes {
@@ -85,6 +87,11 @@ export function initializeMetrics(config: Config): void {
   });
   fileOperationCounter = meter.createCounter(METRIC_FILE_OPERATION_COUNT, {
     description: 'Counts file operations (create, read, update).',
+    valueType: ValueType.INT,
+  });
+  turnCounter = meter.createCounter(METRIC_TURN_COUNT, {
+    description:
+      'Counts conversation turns, tagged by recursion depth and limit reached status.',
     valueType: ValueType.INT,
   });
   const sessionCounter = meter.createCounter(METRIC_SESSION_COUNT, {
@@ -199,4 +206,24 @@ export function recordFileOperationMetric(
   if (mimetype !== undefined) attributes.mimetype = mimetype;
   if (extension !== undefined) attributes.extension = extension;
   fileOperationCounter.add(1, attributes);
+}
+
+export function recordTurnMetrics(
+  config: Config,
+  model: string,
+  turnsUsed: number,
+  maxTurns: number,
+  limitReached: boolean,
+  sessionTurnCount: number,
+): void {
+  if (!turnCounter || !isMetricsInitialized) return;
+  const attributes: Attributes = {
+    ...getCommonAttributes(config),
+    model,
+    turns_used: turnsUsed,
+    max_turns: maxTurns,
+    limit_reached: limitReached,
+    session_turn_count: sessionTurnCount,
+  };
+  turnCounter.add(1, attributes);
 }
