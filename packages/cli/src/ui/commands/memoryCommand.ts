@@ -6,15 +6,17 @@
 
 import { getErrorMessage } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
-import { SlashCommandDefinition, SlashCommandActionReturn } from './types.js';
+import { SlashCommand, SlashCommandActionReturn } from './types.js';
 
-export const memoryCommand: SlashCommandDefinition = {
+export const memoryCommand: SlashCommand = {
   name: 'memory',
   description: 'Commands for interacting with memory.',
+  kind: 'built-in',
   subCommands: [
     {
       name: 'show',
       description: 'Show the current memory contents.',
+      kind: 'built-in',
       action: async (context) => {
         const memoryContent = context.services.config?.getUserMemory() || '';
         const fileCount = context.services.config?.getGeminiMdFileCount() || 0;
@@ -36,6 +38,7 @@ export const memoryCommand: SlashCommandDefinition = {
     {
       name: 'add',
       description: 'Add content to the memory.',
+      kind: 'built-in',
       action: (context, args): SlashCommandActionReturn | void => {
         if (!args || args.trim() === '') {
           return {
@@ -63,6 +66,7 @@ export const memoryCommand: SlashCommandDefinition = {
     {
       name: 'refresh',
       description: 'Refresh the memory from the source.',
+      kind: 'built-in',
       action: async (context) => {
         context.ui.addItem(
           {

@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type CommandContext, type SlashCommandDefinition } from './types.js';
+import { type CommandContext, type SlashCommand } from './types.js';
 import { MessageType } from '../types.js';
 
-export const extensionsCommand: SlashCommandDefinition = {
+export const extensionsCommand: SlashCommand = {
   name: 'extensions',
   description: 'list active extensions',
+  kind: 'built-in',
   action: async (context: CommandContext): Promise<void> => {
     const activeExtensions = context.services.config
       ?.getExtensions()

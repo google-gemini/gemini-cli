@@ -5,11 +5,7 @@
  */
 
 import * as fsPromises from 'fs/promises';
-import {
-  CommandContext,
-  SlashCommandDefinition,
-  MessageActionReturn,
-} from './types.js';
+import { CommandContext, SlashCommand, MessageActionReturn } from './types.js';
 import path from 'path';
 import { HistoryItemWithoutId, MessageType } from '../types.js';
 
@@ -55,9 +51,10 @@ const getSavedChatTags = async (
   }
 };
 
-const listCommand: SlashCommandDefinition = {
+const listCommand: SlashCommand = {
   name: 'list',
   description: 'List saved conversation checkpoints',
+  kind: 'built-in',
   action: async (context): Promise<MessageActionReturn> => {
     const chatDetails = await getSavedChatTags(context, false);
     if (chatDetails.length === 0) {
@@ -81,10 +78,11 @@ const listCommand: SlashCommandDefinition = {
   },
 };
 
-const saveCommand: SlashCommandDefinition = {
+const saveCommand: SlashCommand = {
   name: 'save',
   description:
     'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
+  kind: 'built-in',
   action: async (context, args): Promise<MessageActionReturn> => {
     const tag = args.trim();
     if (!tag) {
@@ -124,11 +122,12 @@ const saveCommand: SlashCommandDefinition = {
   },
 };
 
-const resumeCommand: SlashCommandDefinition = {
+const resumeCommand: SlashCommand = {
   name: 'resume',
   altNames: ['load'],
   description:
     'Resume a conversation from a checkpoint. Usage: /chat resume <tag>',
+  kind: 'built-in',
   action: async (context, args) => {
     const tag = args.trim();
     if (!tag) {
@@ -194,8 +193,9 @@ const resumeCommand: SlashCommandDefinition = {
   },
 };
 
-export const chatCommand: SlashCommandDefinition = {
+export const chatCommand: SlashCommand = {
   name: 'chat',
   description: 'Manage conversation history.',
+  kind: 'built-in',
   subCommands: [listCommand, saveCommand, resumeCommand],
 };

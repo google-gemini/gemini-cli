@@ -5,12 +5,13 @@
  */
 
 import { HistoryItemCompression, MessageType } from '../types.js';
-import { SlashCommandDefinition } from './types.js';
+import { SlashCommand } from './types.js';
 
-export const compressCommand: SlashCommandDefinition = {
+export const compressCommand: SlashCommand = {
   name: 'compress',
   altNames: ['summarize'],
   description: 'Compresses the context by replacing it with a summary.',
+  kind: 'built-in',
   action: async (context) => {
     const { ui } = context;
     if (ui.pendingItem) {

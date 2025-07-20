@@ -4,14 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  type OpenDialogActionReturn,
-  type SlashCommandDefinition,
-} from './types.js';
+import { type OpenDialogActionReturn, type SlashCommand } from './types.js';
 
-export const editorCommand: SlashCommandDefinition = {
+export const editorCommand: SlashCommand = {
   name: 'editor',
   description: 'set external editor preference',
+  kind: 'built-in',
   action: (): OpenDialogActionReturn => ({
     type: 'dialog',
     dialog: 'editor',

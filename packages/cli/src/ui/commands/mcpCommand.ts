@@ -5,7 +5,7 @@
  */
 
 import {
-  SlashCommandDefinition,
+  SlashCommand,
   SlashCommandActionReturn,
   CommandContext,
 } from './types.js';
@@ -226,9 +226,10 @@ const getMcpStatus = async (
   };
 };
 
-export const mcpCommand: SlashCommandDefinition = {
+export const mcpCommand: SlashCommand = {
   name: 'mcp',
   description: 'list configured MCP servers and tools',
+  kind: 'built-in',
   action: async (context: CommandContext, args: string) => {
     const lowerCaseArgs = args.toLowerCase().split(/\s+/).filter(Boolean);
 

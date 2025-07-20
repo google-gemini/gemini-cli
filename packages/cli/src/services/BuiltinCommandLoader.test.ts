@@ -9,13 +9,10 @@ import { BuiltinCommandLoader } from './BuiltinCommandLoader.js';
 import { Config } from '@google/gemini-cli-core';
 
 vi.mock('../ui/commands/aboutCommand.js', () => ({
-  aboutCommand: { name: 'about', description: 'About the CLI' },
-}));
-vi.mock('../ui/commands/chatCommand.js', () => ({
-  chatCommand: {
-    name: 'chat',
-    description: 'A nested command',
-    subCommands: [{ name: 'save', description: 'A subcommand' }],
+  aboutCommand: {
+    name: 'about',
+    description: 'About the CLI',
+    kind: 'built-in',
   },
 }));
 
@@ -29,6 +26,7 @@ import { restoreCommand } from '../ui/commands/restoreCommand.js';
 
 vi.mock('../ui/commands/authCommand.js', () => ({ authCommand: {} }));
 vi.mock('../ui/commands/bugCommand.js', () => ({ bugCommand: {} }));
+vi.mock('../ui/commands/chatCommand.js', () => ({ chatCommand: {} }));
 vi.mock('../ui/commands/clearCommand.js', () => ({ clearCommand: {} }));
 vi.mock('../ui/commands/compressCommand.js', () => ({ compressCommand: {} }));
 vi.mock('../ui/commands/corgiCommand.js', () => ({ corgiCommand: {} }));
@@ -59,39 +57,12 @@ describe('BuiltinCommandLoader', () => {
     ideCommandMock.mockReturnValue({
       name: 'ide',
       description: 'IDE command',
+      kind: 'built-in',
     });
     restoreCommandMock.mockReturnValue({
       name: 'restore',
       description: 'Restore command',
-    });
-  });
-
-  it('should load all command definitions and add built-in metadata', async () => {
-    const loader = new BuiltinCommandLoader(mockConfig);
-    const commands = await loader.loadCommands();
-    const aboutCmd = commands.find((c) => c.name === 'about');
-    expect(aboutCmd).toBeDefined();
-    expect(aboutCmd?.metadata).toEqual({
-      source: 'built-in',
-      behavior: 'Custom',
-    });
-  });
-
-  it('should recursively add metadata to nested sub-commands', async () => {
-    const loader = new BuiltinCommandLoader(mockConfig);
-    const commands = await loader.loadCommands();
-    const chatCmd = commands.find((c) => c.name === 'chat');
-    expect(chatCmd).toBeDefined();
-    expect(chatCmd?.metadata).toEqual({
-      source: 'built-in',
-      behavior: 'Custom',
-    });
-    expect(chatCmd?.subCommands).toHaveLength(1);
-    const saveSubCmd = chatCmd?.subCommands?.[0];
-    expect(saveSubCmd?.name).toBe('save');
-    expect(saveSubCmd?.metadata).toEqual({
-      source: 'built-in',
-      behavior: 'Custom',
+      kind: 'built-in',
     });
   });
 
@@ -106,12 +77,16 @@ describe('BuiltinCommandLoader', () => {
   });
 
   it('should filter out null command definitions returned by factories', async () => {
-    // Override the imported mock's behavior for this test
+    // Override the mock's behavior for this specific test.
     ideCommandMock.mockReturnValue(null);
     const loader = new BuiltinCommandLoader(mockConfig);
     const commands = await loader.loadCommands();
+
+    // The 'ide' command should be filtered out.
     const ideCmd = commands.find((c) => c.name === 'ide');
     expect(ideCmd).toBeUndefined();
+
+    // Other commands should still be present.
     const aboutCmd = commands.find((c) => c.name === 'about');
     expect(aboutCmd).toBeDefined();
   });
@@ -125,15 +100,15 @@ describe('BuiltinCommandLoader', () => {
     expect(restoreCommandMock).toHaveBeenCalledWith(null);
   });
 
-  it('should not modify the original command definition objects', async () => {
-    const { chatCommand: originalChatCommand } = await import(
-      '../ui/commands/chatCommand.js'
-    );
+  it('should return a list of all loaded commands', async () => {
     const loader = new BuiltinCommandLoader(mockConfig);
     const commands = await loader.loadCommands();
-    const transformedChatCommand = commands.find((c) => c.name === 'chat');
 
-    expect(transformedChatCommand?.metadata).toBeDefined();
-    expect(originalChatCommand).not.toHaveProperty('metadata');
+    const aboutCmd = commands.find((c) => c.name === 'about');
+    expect(aboutCmd).toBeDefined();
+    expect(aboutCmd?.kind).toBe('built-in');
+
+    const ideCmd = commands.find((c) => c.name === 'ide');
+    expect(ideCmd).toBeDefined();
   });
 });

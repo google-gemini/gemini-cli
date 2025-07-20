@@ -8,7 +8,7 @@ import * as fs from 'fs/promises';
 import path from 'path';
 import {
   type CommandContext,
-  type SlashCommandDefinition,
+  type SlashCommand,
   type SlashCommandActionReturn,
 } from './types.js';
 import { Config } from '@google/gemini-cli-core';
@@ -140,9 +140,7 @@ async function completion(
   }
 }
 
-export const restoreCommand = (
-  config: Config | null,
-): SlashCommandDefinition | null => {
+export const restoreCommand = (config: Config | null): SlashCommand | null => {
   if (!config?.getCheckpointingEnabled()) {
     return null;
   }
@@ -151,6 +149,7 @@ export const restoreCommand = (
     name: 'restore',
     description:
       'Restore a tool call. This will reset the conversation and file history to the state it was in when the tool call was suggested',
+    kind: 'built-in',
     action: restoreAction,
     completion,
   };

@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type SlashCommandDefinition } from './types.js';
+import { type SlashCommand } from './types.js';
 
-export const corgiCommand: SlashCommandDefinition = {
+export const corgiCommand: SlashCommand = {
   name: 'corgi',
   description: 'Toggles corgi mode.',
+  kind: 'built-in',
   action: (context, _args) => {
     context.ui.toggleCorgiMode();
   },

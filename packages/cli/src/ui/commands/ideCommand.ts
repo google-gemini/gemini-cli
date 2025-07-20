@@ -15,7 +15,7 @@ import {
 } from '@google/gemini-cli-core';
 import {
   CommandContext,
-  SlashCommandDefinition,
+  SlashCommand,
   SlashCommandActionReturn,
 } from './types.js';
 import * as child_process from 'child_process';
@@ -40,9 +40,7 @@ function isVSCodeInstalled(): boolean {
   }
 }
 
-export const ideCommand = (
-  config: Config | null,
-): SlashCommandDefinition | null => {
+export const ideCommand = (config: Config | null): SlashCommand | null => {
   if (!config?.getIdeMode()) {
     return null;
   }
@@ -50,10 +48,12 @@ export const ideCommand = (
   return {
     name: 'ide',
     description: 'manage IDE integration',
+    kind: 'built-in',
     subCommands: [
       {
         name: 'status',
         description: 'check status of IDE integration',
+        kind: 'built-in',
         action: (_context: CommandContext): SlashCommandActionReturn => {
           const status = getMCPServerStatus(IDE_SERVER_NAME);
           const discoveryState = getMCPDiscoveryState();
@@ -91,6 +91,7 @@ export const ideCommand = (
       {
         name: 'install',
         description: 'install required VS Code companion extension',
+        kind: 'built-in',
         action: async (context) => {
           if (!isVSCodeInstalled()) {
             context.ui.addItem(

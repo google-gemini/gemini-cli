@@ -28,25 +28,11 @@ vi.mock('../contexts/SessionContext.js', () => ({
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
-import { SlashCommand, SlashCommandDefinition } from '../commands/types.js';
+import { SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
-
-// Helper function to create a fully hydrated SlashCommand for testing
-const createTestCommand = (
-  definition: SlashCommandDefinition,
-): SlashCommand => {
-  const command: SlashCommand = {
-    ...definition,
-    metadata: { source: 'built-in', behavior: 'Custom' },
-    subCommands: definition.subCommands
-      ? definition.subCommands.map(createTestCommand)
-      : undefined,
-  };
-  return command;
-};
 
 describe('useSlashCommandProcessor', () => {
   const mockAddItem = vi.fn();
@@ -104,7 +90,11 @@ describe('useSlashCommandProcessor', () => {
     });
 
     it('should call loadCommands and populate state after mounting', async () => {
-      const testCommand = createTestCommand({ name: 'test' });
+      const testCommand: SlashCommand = {
+        name: 'test',
+        description: 'a test command',
+        kind: 'built-in',
+      };
       const result = setupProcessorHook([testCommand]);
 
       await waitFor(() => {
@@ -116,7 +106,11 @@ describe('useSlashCommandProcessor', () => {
     });
 
     it('should provide an immutable array of commands to consumers', async () => {
-      const testCommand = createTestCommand({ name: 'test' });
+      const testCommand: SlashCommand = {
+        name: 'test',
+        description: 'a test command',
+        kind: 'built-in',
+      };
       const result = setupProcessorHook([testCommand]);
 
       await waitFor(() => {
@@ -127,7 +121,11 @@ describe('useSlashCommandProcessor', () => {
 
       expect(() => {
         // @ts-expect-error - We are intentionally testing a violation of the readonly type.
-        commands.push(createTestCommand({ name: 'rogue' }));
+        commands.push({
+          name: 'rogue',
+          description: 'a rogue command',
+          kind: 'built-in',
+        });
       }).toThrow(TypeError);
     });
   });
@@ -153,10 +151,18 @@ describe('useSlashCommandProcessor', () => {
     });
 
     it('should display help for a parent command invoked without a subcommand', async () => {
-      const parentCommand = createTestCommand({
+      const parentCommand: SlashCommand = {
         name: 'parent',
-        subCommands: [{ name: 'child1', description: 'First child.' }],
-      });
+        description: 'a parent command',
+        kind: 'built-in',
+        subCommands: [
+          {
+            name: 'child1',
+            description: 'First child.',
+            kind: 'built-in',
+          },
+        ],
+      };
       const result = setupProcessorHook([parentCommand]);
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
@@ -178,10 +184,19 @@ describe('useSlashCommandProcessor', () => {
 
     it('should correctly find and execute a nested subcommand', async () => {
       const childAction = vi.fn();
-      const parentCommand = createTestCommand({
+      const parentCommand: SlashCommand = {
         name: 'parent',
-        subCommands: [{ name: 'child', action: childAction }],
-      });
+        description: 'a parent command',
+        kind: 'built-in',
+        subCommands: [
+          {
+            name: 'child',
+            description: 'a child command',
+            kind: 'built-in',
+            action: childAction,
+          },
+        ],
+      };
       const result = setupProcessorHook([parentCommand]);
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
@@ -207,10 +222,12 @@ describe('useSlashCommandProcessor', () => {
 
   describe('Action Result Handling', () => {
     it('should handle "dialog: help" action', async () => {
-      const command = createTestCommand({
+      const command: SlashCommand = {
         name: 'helpcmd',
+        description: 'a help command',
+        kind: 'built-in',
         action: vi.fn().mockResolvedValue({ type: 'dialog', dialog: 'help' }),
-      });
+      };
       const result = setupProcessorHook([command]);
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
@@ -222,14 +239,16 @@ describe('useSlashCommandProcessor', () => {
     });
 
     it('should handle "load_history" action', async () => {
-      const command = createTestCommand({
+      const command: SlashCommand = {
         name: 'load',
+        description: 'a load command',
+        kind: 'built-in',
         action: vi.fn().mockResolvedValue({
           type: 'load_history',
           history: [{ type: MessageType.USER, text: 'old prompt' }],
           clientHistory: [{ role: 'user', parts: [{ text: 'old prompt' }] }],
         }),
-      });
+      };
       const result = setupProcessorHook([command]);
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
@@ -251,7 +270,12 @@ describe('useSlashCommandProcessor', () => {
         const quitAction = vi
           .fn()
           .mockResolvedValue({ type: 'quit', messages: [] });
-        const command = createTestCommand({ name: 'exit', action: quitAction });
+        const command: SlashCommand = {
+          name: 'exit',
+          description: 'an exit command',
+          kind: 'built-in',
+          action: quitAction,
+        };
         const result = setupProcessorHook([command]);
 
         await waitFor(() =>
@@ -280,7 +304,11 @@ describe('useSlashCommandProcessor', () => {
 
   describe('Command Parsing and Matching', () => {
     it('should be case-sensitive', async () => {
-      const command = createTestCommand({ name: 'test' });
+      const command: SlashCommand = {
+        name: 'test',
+        description: 'a test command',
+        kind: 'built-in',
+      };
       const result = setupProcessorHook([command]);
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
@@ -301,11 +329,13 @@ describe('useSlashCommandProcessor', () => {
 
     it('should correctly match an altName', async () => {
       const action = vi.fn();
-      const command = createTestCommand({
+      const command: SlashCommand = {
         name: 'main',
         altNames: ['alias'],
+        description: 'a command with an alias',
+        kind: 'built-in',
         action,
-      });
+      };
       const result = setupProcessorHook([command]);
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
@@ -321,7 +351,12 @@ describe('useSlashCommandProcessor', () => {
 
     it('should handle extra whitespace around the command', async () => {
       const action = vi.fn();
-      const command = createTestCommand({ name: 'test', action });
+      const command: SlashCommand = {
+        name: 'test',
+        description: 'a test command',
+        kind: 'built-in',
+        action,
+      };
       const result = setupProcessorHook([command]);
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 

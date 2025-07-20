@@ -5,7 +5,7 @@
  */
 
 import { ICommandLoader } from './types.js';
-import { SlashCommand, SlashCommandDefinition } from '../ui/commands/types.js';
+import { SlashCommand } from '../ui/commands/types.js';
 import { Config } from '@google/gemini-cli-core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
@@ -29,48 +29,21 @@ import { themeCommand } from '../ui/commands/themeCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
 
 /**
- * Recursively transforms a raw SlashCommandDefinition into a fully hydrated
- * SlashCommand by adding the required 'built-in' metadata.
- *
- * @param definition The raw command definition.
- * @returns A new SlashCommand object with metadata applied recursively.
- */
-function addBuiltinMetadata(definition: SlashCommandDefinition): SlashCommand {
-  const { subCommands, ...rest } = definition;
-
-  const command: SlashCommand = {
-    ...rest,
-    // Add the required metadata.
-    metadata: {
-      source: 'built-in',
-      behavior: 'Custom',
-    },
-
-    subCommands: subCommands ? subCommands.map(addBuiltinMetadata) : undefined,
-  };
-
-  return command;
-}
-
-/**
  * Loads the core, hard-coded slash commands that are an integral part
- * of the Gemini CLI application. It is responsible for taking the raw
- * command definitions and transforming them to include the necessary
- * system-level metadata before they are used by the rest of the application.
+ * of the Gemini CLI application.
  */
 export class BuiltinCommandLoader implements ICommandLoader {
   constructor(private config: Config | null) {}
 
   /**
    * Gathers all raw built-in command definitions, injects dependencies where
-   * needed (e.g., config), filters out any that are not available, and
-   * transforms them into the final SlashCommand structure.
+   * needed (e.g., config) and filters out any that are not available.
    *
    * @param _signal An optional AbortSignal (unused for this synchronous loader).
-   * @returns A promise that resolves to an array of fully-formed `SlashCommand` objects.
+   * @returns A promise that resolves to an array of `SlashCommand` objects.
    */
   async loadCommands(_signal?: AbortSignal): Promise<SlashCommand[]> {
-    const allDefinitions: Array<SlashCommandDefinition | null> = [
+    const allDefinitions: Array<SlashCommand | null> = [
       aboutCommand,
       authCommand,
       bugCommand,
@@ -93,8 +66,6 @@ export class BuiltinCommandLoader implements ICommandLoader {
       toolsCommand,
     ];
 
-    return allDefinitions
-      .filter((cmd): cmd is SlashCommandDefinition => cmd !== null)
-      .map(addBuiltinMetadata);
+    return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);
   }
 }
