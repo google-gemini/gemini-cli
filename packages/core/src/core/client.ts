@@ -30,6 +30,7 @@ import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { tokenLimit } from './tokenLimits.js';
 import {
   AuthType,
@@ -39,6 +40,8 @@ import {
 } from './contentGenerator.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { LoopDetectionService } from '../services/loopDetectionService.js';
+import { ideContext } from '../services/ideContext.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -86,6 +89,7 @@ export class GeminiClient {
     temperature: 0,
     topP: 1,
   };
+  private sessionTurnCount = 0;
   private readonly MAX_TURNS = 100;
   /**
    * Threshold for compression token count as a fraction of the model's token limit.
@@ -98,17 +102,22 @@ export class GeminiClient {
    */
   private readonly COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
+  private readonly loopDetector: LoopDetectionService;
+  private lastPromptId?: string;
+
   constructor(private config: Config) {
     if (config.getProxy()) {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
     }
 
     this.embeddingModel = config.getEmbeddingModel();
+    this.loopDetector = new LoopDetectionService(config);
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
     this.contentGenerator = await createContentGenerator(
       contentGeneratorConfig,
+      this.config,
       this.config.getSessionId(),
     );
     this.chat = await this.startChat();
@@ -130,6 +139,10 @@ export class GeminiClient {
       throw new Error('Chat not initialized');
     }
     return this.chat;
+  }
+
+  isInitialized(): boolean {
+    return this.chat !== undefined && this.contentGenerator !== undefined;
   }
 
   getHistory(): Content[] {
@@ -208,7 +221,7 @@ export class GeminiClient {
     return initialParts;
   }
 
-  private async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
+  async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     const envParts = await this.getEnvironment();
     const toolRegistry = await this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
@@ -265,6 +278,18 @@ export class GeminiClient {
     turns: number = this.MAX_TURNS,
     originalModel?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    if (this.lastPromptId !== prompt_id) {
+      this.loopDetector.reset();
+      this.lastPromptId = prompt_id;
+    }
+    this.sessionTurnCount++;
+    if (
+      this.config.getMaxSessionTurns() > 0 &&
+      this.sessionTurnCount > this.config.getMaxSessionTurns()
+    ) {
+      yield { type: GeminiEventType.MaxSessionTurns };
+      return new Turn(this.getChat(), prompt_id);
+    }
     // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
     const boundedTurns = Math.min(turns, this.MAX_TURNS);
     if (!boundedTurns) {
@@ -279,9 +304,39 @@ export class GeminiClient {
     if (compressed) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
+
+    if (this.config.getIdeMode()) {
+      const activeFile = ideContext.getActiveFileContext();
+      if (activeFile?.filePath) {
+        let context = `
+This is the file that the user was most recently looking at:
+- Path: ${activeFile.filePath}`;
+        if (activeFile.cursor) {
+          context += `
+This is the cursor position in the file:
+- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`;
+        }
+        request = [
+          { text: context },
+          ...(Array.isArray(request) ? request : [request]),
+        ];
+      }
+    }
+
     const turn = new Turn(this.getChat(), prompt_id);
+
+    const loopDetected = await this.loopDetector.turnStarted(signal);
+    if (loopDetected) {
+      yield { type: GeminiEventType.LoopDetected };
+      return turn;
+    }
+
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
+      if (this.loopDetector.addAndCheck(event)) {
+        yield { type: GeminiEventType.LoopDetected };
+        return turn;
+      }
       yield event;
     }
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
@@ -409,8 +464,9 @@ export class GeminiClient {
     contents: Content[],
     generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
+    model?: string,
   ): Promise<GenerateContentResponse> {
-    const modelToUse = this.config.getModel();
+    const modelToUse = model ?? this.config.getModel();
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
       ...generationConfig,
@@ -532,7 +588,8 @@ export class GeminiClient {
     // Find the first user message after the index. This is the start of the next turn.
     while (
       compressBeforeIndex < curatedHistory.length &&
-      curatedHistory[compressBeforeIndex]?.role !== 'user'
+      (curatedHistory[compressBeforeIndex]?.role === 'model' ||
+        isFunctionResponse(curatedHistory[compressBeforeIndex]))
     ) {
       compressBeforeIndex++;
     }

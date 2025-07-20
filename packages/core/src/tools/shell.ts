@@ -15,6 +15,7 @@ import {
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
   ToolConfirmationOutcome,
+  Icon,
 } from './tools.js';
 import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
@@ -27,6 +28,7 @@ export interface ShellToolParams {
   directory?: string;
 }
 import { spawn } from 'child_process';
+import { summarizeToolOutput } from '../utils/summarizer.js';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -51,6 +53,7 @@ Exit Code: Exit code or \`(none)\` if terminated by signal.
 Signal: Signal number or \`(none)\` if no signal was received.
 Background PIDs: List of background processes started or \`(none)\`.
 Process Group PGID: Process group started or \`(none)\``,
+      Icon.Terminal,
       {
         type: Type.OBJECT,
         properties: {
@@ -488,6 +491,23 @@ Process Group PGID: Process group started or \`(none)\``,
       }
     }
 
-    return { llmContent, returnDisplay: returnDisplayMessage };
+    const summarizeConfig = this.config.getSummarizeToolOutputConfig();
+    if (summarizeConfig && summarizeConfig[this.name]) {
+      const summary = await summarizeToolOutput(
+        llmContent,
+        this.config.getGeminiClient(),
+        abortSignal,
+        summarizeConfig[this.name].tokenBudget,
+      );
+      return {
+        llmContent: summary,
+        returnDisplay: returnDisplayMessage,
+      };
+    }
+
+    return {
+      llmContent,
+      returnDisplay: returnDisplayMessage,
+    };
   }
 }

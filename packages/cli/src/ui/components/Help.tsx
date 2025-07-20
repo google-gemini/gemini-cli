@@ -10,7 +10,7 @@ import { Colors } from '../colors.js';
 import { SlashCommand } from '../commands/types.js';
 
 interface Help {
-  commands: SlashCommand[];
+  commands: readonly SlashCommand[];
 }
 
 export const Help: React.FC<Help> = ({ commands }) => (
@@ -78,8 +78,8 @@ export const Help: React.FC<Help> = ({ commands }) => (
           {command.subCommands &&
             command.subCommands.map((subCommand) => (
               <Text key={subCommand.name} color={Colors.Foreground}>
-                <Text> </Text>
                 <Text bold color={Colors.AccentPurple}>
+                  {'   '}
                   {subCommand.name}
                 </Text>
                 {subCommand.description && ' - ' + subCommand.description}

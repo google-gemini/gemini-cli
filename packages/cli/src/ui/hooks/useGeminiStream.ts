@@ -141,6 +141,8 @@ export const useGeminiStream = (
     [toolCalls],
   );
 
+  const loopDetectedRef = useRef(false);
+
   const onExec = useCallback(async (done: Promise<void>) => {
     setIsResponding(true);
     await done;
@@ -223,7 +225,12 @@ export const useGeminiStream = (
         const trimmedQuery = query.trim();
         logUserPrompt(
           config,
-          new UserPromptEvent(trimmedQuery.length, prompt_id, trimmedQuery),
+          new UserPromptEvent(
+            trimmedQuery.length,
+            prompt_id,
+            config.getContentGeneratorConfig()?.authType,
+            trimmedQuery,
+          ),
         );
         onDebugMessage(`User query: '${trimmedQuery}'`);
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
@@ -403,7 +410,7 @@ export const useGeminiStream = (
           type: MessageType.ERROR,
           text: parseAndFormatApiError(
             eventValue.error,
-            config.getContentGeneratorConfig().authType,
+            config.getContentGeneratorConfig()?.authType,
             undefined,
             config.getModel(),
             DEFAULT_GEMINI_FLASH_MODEL,
@@ -430,6 +437,30 @@ export const useGeminiStream = (
       ),
     [addItem, config],
   );
+
+  const handleMaxSessionTurnsEvent = useCallback(
+    () =>
+      addItem(
+        {
+          type: 'info',
+          text:
+            `The session has reached the maximum number of turns: ${config.getMaxSessionTurns()}. ` +
+            `Please update this limit in your setting.json file.`,
+        },
+        Date.now(),
+      ),
+    [addItem, config],
+  );
+
+  const handleLoopDetectedEvent = useCallback(() => {
+    addItem(
+      {
+        type: 'info',
+        text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
+      },
+      Date.now(),
+    );
+  }, [addItem]);
 
   const processGeminiStreamEvents = useCallback(
     async (
@@ -467,6 +498,14 @@ export const useGeminiStream = (
           case ServerGeminiEventType.ToolCallResponse:
             // do nothing
             break;
+          case ServerGeminiEventType.MaxSessionTurns:
+            handleMaxSessionTurnsEvent();
+            break;
+          case ServerGeminiEventType.LoopDetected:
+            // handle later because we want to move pending history to history
+            // before we add loop detected message to history
+            loopDetectedRef.current = true;
+            break;
           default: {
             // enforces exhaustive switch-case
             const unreachable: never = event;
@@ -485,6 +524,7 @@ export const useGeminiStream = (
       handleErrorEvent,
       scheduleToolCalls,
       handleChatCompressionEvent,
+      handleMaxSessionTurnsEvent,
     ],
   );
 
@@ -556,6 +596,10 @@ export const useGeminiStream = (
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
           setPendingHistoryItem(null);
         }
+        if (loopDetectedRef.current) {
+          loopDetectedRef.current = false;
+          handleLoopDetectedEvent();
+        }
       } catch (error: unknown) {
         if (error instanceof UnauthorizedError) {
           onAuthError();
@@ -565,7 +609,7 @@ export const useGeminiStream = (
               type: MessageType.ERROR,
               text: parseAndFormatApiError(
                 getErrorMessage(error) || 'Unknown error',
-                config.getContentGeneratorConfig().authType,
+                config.getContentGeneratorConfig()?.authType,
                 undefined,
                 config.getModel(),
                 DEFAULT_GEMINI_FLASH_MODEL,
@@ -593,6 +637,7 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
+      handleLoopDetectedEvent,
     ],
   );
 
