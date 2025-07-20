@@ -451,13 +451,13 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should complete a command based on its altName', async () => {
-    // Add a command with an altName to our mock for this test
+  it('should complete a command based on its altNames', async () => {
+    // Add a command with an altNames to our mock for this test
     props.slashCommands.push({
       name: 'help',
-      altName: '?',
+      altNames: ['?'],
       description: '...',
-    });
+    } as SlashCommand);
 
     mockedUseCompletion.mockReturnValue({
       ...mockCompletion,
