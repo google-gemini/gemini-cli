@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Patch: Unset NO_COLOR at the very top before any imports
+if (process.env.NO_COLOR !== undefined) {
+  delete process.env.NO_COLOR;
+}
+
 import { describe, it, expect, beforeEach } from 'vitest';
 import { themeManager, DEFAULT_THEME } from './theme-manager.js';
 import { CustomTheme } from './theme.js';
@@ -92,6 +97,10 @@ describe('ThemeManager', () => {
     const original = process.env.NO_COLOR;
     process.env.NO_COLOR = '1';
     expect(themeManager.getActiveTheme().name).toBe('NoColor');
-    process.env.NO_COLOR = original;
+    if (original === undefined) {
+      delete process.env.NO_COLOR;
+    } else {
+      process.env.NO_COLOR = original;
+    }
   });
 });
