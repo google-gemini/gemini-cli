@@ -203,11 +203,19 @@ const extractFirstUserMessage = (
 const getSessionFiles = async (
   chatsDir: string,
   loadFullContent: boolean = false,
+  currentSessionId?: string,
 ): Promise<SessionInfo[]> => {
   try {
     const files = await fs.readdir(chatsDir);
     const sessionFiles = files
       .filter((f) => f.startsWith('session-') && f.endsWith('.json'))
+      .filter((f) => {
+        // Exclude the current session if currentSessionId is provided
+        if (currentSessionId) {
+          return !f.includes(currentSessionId.slice(0, 8));
+        }
+        return true;
+      })
       .sort(); // Initial sort by filename (includes timestamp)
 
     const sessionPromises = sessionFiles.map(async (file, index) => {
@@ -807,7 +815,11 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
     const loadSessions = async () => {
       try {
         const chatsDir = path.join(config.getProjectTempDir(), 'chats');
-        const sessionData = await getSessionFiles(chatsDir, true);
+        const sessionData = await getSessionFiles(
+          chatsDir,
+          true,
+          config.getSessionId(),
+        );
         state.setSessions(sessionData);
         state.setLoading(false);
       } catch (err) {
