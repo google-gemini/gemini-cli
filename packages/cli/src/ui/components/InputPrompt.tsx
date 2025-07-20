@@ -184,7 +184,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
             const found: SlashCommand | undefined = currentLevel?.find(
-              (cmd) => cmd.name === part || cmd.altName === part,
+              (cmd) => cmd.name === part || cmd.altNames?.includes(part),
             );
 
             if (found) {

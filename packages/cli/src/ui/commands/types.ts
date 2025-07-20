@@ -124,7 +124,7 @@ export interface SlashCommandMetadata {
 
 export interface SlashCommandDefinition {
   name: string;
-  altName?: string;
+  altNames?: string[];
   description?: string;
 
   // The action to run. Optional for parent commands that only group sub-commands.
@@ -149,7 +149,7 @@ export interface SlashCommandDefinition {
 // This version is separated from SlashCommandDefinition as it requires metadata.
 export interface SlashCommand {
   name: string;
-  altName?: string;
+  altNames?: string[];
   description?: string;
 
   metadata: SlashCommandMetadata;

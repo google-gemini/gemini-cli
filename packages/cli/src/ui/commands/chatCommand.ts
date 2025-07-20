@@ -126,7 +126,7 @@ const saveCommand: SlashCommandDefinition = {
 
 const resumeCommand: SlashCommandDefinition = {
   name: 'resume',
-  altName: 'load',
+  altNames: ['load'],
   description:
     'Resume a conversation from a checkpoint. Usage: /chat resume <tag>',
   action: async (context, args) => {

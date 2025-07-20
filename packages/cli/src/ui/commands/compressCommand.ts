@@ -9,7 +9,7 @@ import { SlashCommandDefinition } from './types.js';
 
 export const compressCommand: SlashCommandDefinition = {
   name: 'compress',
-  altName: 'summarize',
+  altNames: ['summarize'],
   description: 'Compresses the context by replacing it with a summary.',
   action: async (context) => {
     const { ui } = context;

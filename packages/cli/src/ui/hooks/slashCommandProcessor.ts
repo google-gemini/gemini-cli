@@ -208,7 +208,7 @@ export const useSlashCommandProcessor = (
 
       for (const part of commandPath) {
         const foundCommand = currentCommands.find(
-          (cmd) => cmd.name === part || cmd.altName === part,
+          (cmd) => cmd.name === part || cmd.altNames?.includes(part),
         );
 
         if (foundCommand) {

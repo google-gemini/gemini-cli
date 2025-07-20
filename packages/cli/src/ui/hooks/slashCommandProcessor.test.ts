@@ -303,7 +303,7 @@ describe('useSlashCommandProcessor', () => {
       const action = vi.fn();
       const command = createTestCommand({
         name: 'main',
-        altName: 'alias',
+        altNames: ['alias'],
         action,
       });
       const result = setupProcessorHook([command]);

@@ -161,7 +161,7 @@ export function useCompletion(
           break;
         }
         const found: SlashCommand | undefined = currentLevel.find(
-          (cmd) => cmd.name === part || cmd.altName === part,
+          (cmd) => cmd.name === part || cmd.altNames?.includes(part),
         );
         if (found) {
           leafCommand = found;
@@ -179,7 +179,7 @@ export function useCompletion(
       if (!hasTrailingSpace && currentLevel) {
         const exactMatchAsParent = currentLevel.find(
           (cmd) =>
-            (cmd.name === partial || cmd.altName === partial) &&
+            (cmd.name === partial || cmd.altNames?.includes(partial)) &&
             cmd.subCommands,
         );
 
@@ -201,7 +201,8 @@ export function useCompletion(
           // Case: /command subcommand<enter>
           const perfectMatch = currentLevel.find(
             (cmd) =>
-              (cmd.name === partial || cmd.altName === partial) && cmd.action,
+              (cmd.name === partial || cmd.altNames?.includes(partial)) &&
+              cmd.action,
           );
           if (perfectMatch) {
             setIsPerfectMatch(true);
@@ -240,14 +241,15 @@ export function useCompletion(
         let potentialSuggestions = commandsToSearch.filter(
           (cmd) =>
             cmd.description &&
-            (cmd.name.startsWith(partial) || cmd.altName?.startsWith(partial)),
+            (cmd.name.startsWith(partial) ||
+              cmd.altNames?.some((alt) => alt.startsWith(partial))),
         );
 
         // If a user's input is an exact match and it is a leaf command,
         // enter should submit immediately.
         if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
           const perfectMatch = potentialSuggestions.find(
-            (s) => s.name === partial || s.altName === partial,
+            (s) => s.name === partial || s.altNames?.includes(partial),
           );
           if (perfectMatch && perfectMatch.action) {
             potentialSuggestions = [];

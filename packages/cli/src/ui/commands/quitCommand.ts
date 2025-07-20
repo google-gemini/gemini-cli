@@ -9,7 +9,7 @@ import { type SlashCommandDefinition } from './types.js';
 
 export const quitCommand: SlashCommandDefinition = {
   name: 'quit',
-  altName: 'exit',
+  altNames: ['exit'],
   description: 'exit the cli',
   action: (context) => {
     const now = Date.now();

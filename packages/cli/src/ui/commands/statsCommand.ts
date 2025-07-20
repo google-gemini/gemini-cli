@@ -10,7 +10,7 @@ import { type CommandContext, type SlashCommandDefinition } from './types.js';
 
 export const statsCommand: SlashCommandDefinition = {
   name: 'stats',
-  altName: 'usage',
+  altNames: ['usage'],
   description: 'check session stats. Usage: /stats [model|tools]',
   action: (context: CommandContext) => {
     const now = new Date();
