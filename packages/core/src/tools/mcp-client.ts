@@ -26,6 +26,7 @@ import {
   IDE_SERVER_NAME,
   ideContext,
 } from '../services/ideContext.js';
+import { getErrorMessage } from '../utils/errors.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -242,7 +243,9 @@ export async function connectAndDiscover(
       throw error;
     }
   } catch (error) {
-    console.error(`Error connecting to MCP server '${mcpServerName}':`, error);
+    console.error(
+      `Error connecting to MCP server '${mcpServerName}': ${getErrorMessage(error)}`,
+    );
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   }
 }

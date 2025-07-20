@@ -54,7 +54,7 @@ describe('simple-mcp-server', () => {
       console.error(`stderr: ${data}`);
     });
     // Wait for the server to be ready
-    return new Promise((resolve) => setTimeout(resolve, 500));
+    return new Promise((resolve) => setTimeout(resolve, 2000));
   });
 
   after(() => {
