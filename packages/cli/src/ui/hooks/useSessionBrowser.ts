@@ -76,6 +76,10 @@ export const useSessionBrowser = (
         const uiHistory: HistoryItemWithoutId[] = [];
 
         for (const msg of conversation.messages) {
+          if (msg.content == '/resume') {
+            continue;
+          }
+
           // Add the message only if it has content
           if (msg.content && msg.content.trim()) {
             uiHistory.push({
