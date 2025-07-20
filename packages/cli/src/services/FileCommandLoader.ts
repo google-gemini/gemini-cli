@@ -13,7 +13,7 @@ import {
   getUserCommandsDir,
 } from '@google/gemini-cli-core';
 import { ICommandLoader } from './types.js';
-import { SlashCommand } from '../ui/commands/types.js';
+import { CommandKind, SlashCommand } from '../ui/commands/types.js';
 
 /**
  * Defines the structure of a valid command definition within a .toml file.
@@ -205,11 +205,7 @@ export class FileCommandLoader implements ICommandLoader {
       name: commandName,
       description:
         parsed.description || `Custom command from ${path.basename(filePath)}`,
-      metadata: {
-        source: 'file',
-        behavior: 'Prompt',
-        filePath,
-      },
+      kind: CommandKind.FILE,
       action: async () => ({
         type: 'submit_prompt',
         content: parsed.prompt,

@@ -211,4 +211,23 @@ describe('FileCommandLoader', () => {
     expect(command).toBeDefined();
     expect(command.description).toBe('My test command');
   });
+
+  it('should sanitize colons in filenames to prevent namespace conflicts', async () => {
+    const userCommandsDir = getUserCommandsDir();
+    mock({
+      [userCommandsDir]: {
+        'legacy:command.toml': 'prompt = "This is a legacy command"',
+      },
+    });
+
+    const loader = new FileCommandLoader(null as unknown as Config);
+    const commands = await loader.loadCommands();
+
+    expect(commands).toHaveLength(1);
+    const command = commands[0];
+    expect(command).toBeDefined();
+
+    // Verify that the ':' in the filename was replaced with an '_'
+    expect(command.name).toBe('legacy_command');
+  });
 });
