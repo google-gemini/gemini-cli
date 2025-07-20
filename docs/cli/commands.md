@@ -112,8 +112,8 @@ If a command in the project directory has the same name as a command in the user
 
 The name of a command is determined by its file path relative to its `commands` directory. Subdirectories are used to create namespaced commands, with the path separator (`/` or `\`) being converted to a colon (`:`).
 
--   A file at `~/.gemini/commands/test.toml` becomes the command `/test`.
--   A file at `<project>/.gemini/commands/git/commit.toml` becomes the namespaced command `/git:commit`.
+- A file at `~/.gemini/commands/test.toml` becomes the command `/test`.
+- A file at `<project>/.gemini/commands/git/commit.toml` becomes the namespaced command `/git:commit`.
 
 #### TOML File Format (v1)
 
@@ -121,11 +121,11 @@ Your command definition files must be written in the TOML format and use the `.t
 
 ##### Required Fields
 
--   `prompt` (String): The prompt that will be sent to the Gemini model when the command is executed. This can be a single-line or multi-line string.
+- `prompt` (String): The prompt that will be sent to the Gemini model when the command is executed. This can be a single-line or multi-line string.
 
 ##### Optional Fields
 
--   `description` (String): A brief, one-line description of what the command does. This text will be displayed next to your command in the `/help` menu. **If you omit this field, a generic description will be generated from the filename.**
+- `description` (String): A brief, one-line description of what the command does. This text will be displayed next to your command in the `/help` menu. **If you omit this field, a generic description will be generated from the filename.**
 
 ---
 
@@ -177,8 +177,8 @@ Gemini CLI will then execute the multi-line prompt defined in your TOML file.
 
 This initial version of custom commands is focused on static prompts. Future updates are planned to introduce more dynamic capabilities, including:
 
--   **Argument Support:** Passing arguments from the command line directly into your `prompt` template.
--   **Shell Execution:** Creating commands that can run local shell scripts to gather context before running the prompt.
+- **Argument Support:** Passing arguments from the command line directly into your `prompt` template.
+- **Shell Execution:** Creating commands that can run local shell scripts to gather context before running the prompt.
 
 ## At commands (`@`)
 
