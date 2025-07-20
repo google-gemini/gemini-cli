@@ -14,7 +14,6 @@ import { docsCommand } from '../ui/commands/docsCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
-import { chatCommand } from '../ui/commands/chatCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
@@ -26,6 +25,7 @@ import { ideCommand } from '../ui/commands/ideCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
+import { resumeCommand } from '../ui/commands/resumeCommand.js';
 
 const loadBuiltInCommands = async (
   config: Config | null,
@@ -34,7 +34,6 @@ const loadBuiltInCommands = async (
     aboutCommand,
     authCommand,
     bugCommand,
-    chatCommand,
     clearCommand,
     compressCommand,
     corgiCommand,
@@ -48,6 +47,7 @@ const loadBuiltInCommands = async (
     privacyCommand,
     quitCommand,
     restoreCommand(config),
+    resumeCommand,
     statsCommand,
     themeCommand,
     toolsCommand,

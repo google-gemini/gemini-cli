@@ -76,11 +76,13 @@ export const useSessionBrowser = (
         const uiHistory: HistoryItemWithoutId[] = [];
 
         for (const msg of conversation.messages) {
-          // Add the message
-          uiHistory.push({
-            type: msg.type === 'user' ? MessageType.USER : MessageType.GEMINI,
-            text: msg.content,
-          });
+          // Add the message only if it has content
+          if (msg.content && msg.content.trim()) {
+            uiHistory.push({
+              type: msg.type === 'user' ? MessageType.USER : MessageType.GEMINI,
+              text: msg.content,
+            });
+          }
 
           // Add tool calls if present (they come after assistant responses)
           if (
@@ -89,7 +91,7 @@ export const useSessionBrowser = (
             msg.toolCalls.length > 0
           ) {
             uiHistory.push({
-              type: 'tool_group' as any,
+              type: 'tool_group',
               tools: msg.toolCalls.map((tool) => ({
                 callId: tool.id,
                 name: tool.displayName || tool.name,

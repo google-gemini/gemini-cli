@@ -57,6 +57,8 @@ interface SessionInfo {
   displayName: string;
   /** Cleaned first user message content */
   firstUserMessage: string;
+  /** Whether this is the currently active session */
+  isCurrentSession: boolean;
   /** Full concatenated content (only loaded when needed for search) */
   fullContent?: string;
   /** Processed messages with normalized roles (only loaded when needed) */
@@ -209,13 +211,6 @@ const getSessionFiles = async (
     const files = await fs.readdir(chatsDir);
     const sessionFiles = files
       .filter((f) => f.startsWith('session-') && f.endsWith('.json'))
-      .filter((f) => {
-        // Exclude the current session if currentSessionId is provided
-        if (currentSessionId) {
-          return !f.includes(currentSessionId.slice(0, 8));
-        }
-        return true;
-      })
       .sort(); // Initial sort by filename (includes timestamp)
 
     const sessionPromises = sessionFiles.map(async (file, index) => {
@@ -239,8 +234,13 @@ const getSessionFiles = async (
             }))
           : undefined;
 
+        const sessionId = extractSessionId(file);
+        const isCurrentSession = currentSessionId
+          ? file.includes(currentSessionId.slice(0, 8))
+          : false;
+
         return {
-          id: extractSessionId(file),
+          id: sessionId,
           file: file.replace('.json', ''),
           fileName: file,
           startTime: content.startTime,
@@ -248,6 +248,7 @@ const getSessionFiles = async (
           messageCount: content.messages.length,
           displayName: firstUserMessage, // This could be changed to a conversation title, if we choose to generate one in the future.
           firstUserMessage,
+          isCurrentSession,
           fullContent,
           messages,
           index: sessionFiles.length - sessionFiles.indexOf(file),
@@ -605,12 +606,22 @@ const SessionItem = ({
   const originalIndex =
     state.startIndex + state.visibleSessions.indexOf(session);
   const isActive = originalIndex === state.activeIndex;
-  const textColor = (c: string = Colors.Foreground) =>
-    isActive ? Colors.AccentPurple : c;
+  const isDisabled = session.isCurrentSession;
+  const textColor = (c: string = Colors.Foreground) => {
+    if (isDisabled) {
+      return Colors.Gray;
+    }
+    return isActive ? Colors.AccentPurple : c;
+  };
 
   const prefix = isActive ? '❯ ' : '  ';
   let additionalInfo = '';
   let matchDisplay = null;
+
+  // Add "(current)" label for the current session
+  if (session.isCurrentSession) {
+    additionalInfo = ' (current)';
+  }
 
   // Show match snippets if searching and matches exist
   if (
@@ -623,7 +634,7 @@ const SessionItem = ({
     );
 
     if (session.matchCount && session.matchCount > 1) {
-      additionalInfo = ` (+${session.matchCount - 1} more)`;
+      additionalInfo += ` (+${session.matchCount - 1} more)`;
     }
   }
 
@@ -644,23 +655,38 @@ const SessionItem = ({
 
   return (
     <Box key={session.id} flexDirection="row">
-      <Text color={textColor()}>{prefix}</Text>
+      <Text color={textColor()} dimColor={isDisabled}>
+        {prefix}
+      </Text>
       <Box width={5}>
-        <Text color={textColor()}>#{state.totalSessions - originalIndex}</Text>
+        <Text color={textColor()} dimColor={isDisabled}>
+          #{state.totalSessions - originalIndex}
+        </Text>
       </Box>
-      <Text color={textColor(Colors.Gray)}> │ </Text>
+      <Text color={textColor(Colors.Gray)} dimColor={isDisabled}>
+        {' '}
+        │{' '}
+      </Text>
       <Box width={4}>
-        <Text color={textColor()}>{session.messageCount}</Text>
+        <Text color={textColor()} dimColor={isDisabled}>
+          {session.messageCount}
+        </Text>
       </Box>
-      <Text color={textColor(Colors.Gray)}> │ </Text>
+      <Text color={textColor(Colors.Gray)} dimColor={isDisabled}>
+        {' '}
+        │{' '}
+      </Text>
       <Box width={4}>
-        <Text color={textColor()}>
+        <Text color={textColor()} dimColor={isDisabled}>
           {formatRelativeTime(session.lastUpdated)}
         </Text>
       </Box>
-      <Text color={textColor(Colors.Gray)}> │ </Text>
+      <Text color={textColor(Colors.Gray)} dimColor={isDisabled}>
+        {' '}
+        │{' '}
+      </Text>
       <Box flexGrow={1}>
-        <Text color={textColor(Colors.Comment)}>
+        <Text color={textColor(Colors.Comment)} dimColor={isDisabled}>
           {truncatedMessage}
           {additionalInfo && (
             <Text color={textColor(Colors.Gray)} dimColor bold={false}>
@@ -934,7 +960,12 @@ const useSessionBrowserInput = (
 
     // Handling regardless of search mode.
     if (key.return && state.filteredAndSortedSessions[state.activeIndex]) {
-      onResumeSession(state.filteredAndSortedSessions[state.activeIndex].id);
+      const selectedSession =
+        state.filteredAndSortedSessions[state.activeIndex];
+      // Don't allow resuming the current session
+      if (!selectedSession.isCurrentSession) {
+        onResumeSession(selectedSession.id);
+      }
     } else if (key.upArrow) {
       moveSelection(-1);
     } else if (key.downArrow) {

@@ -115,38 +115,36 @@ export class ChatRecordingService {
   }
 
   /**
-   * Reinitializes the chat recording service with a new session ID, optionally copying from an
-   * existing session. This allows session resumption to create a new branched conversation file.
+   * Reinitializes the chat recording service with a new session ID, optionally using an
+   * existing session file to continue appending to it.
    */
   reinitializeWithSession(newSessionId: string, sourceFilePath?: string): void {
     try {
       this.sessionId = newSessionId;
 
-      const chatsDir = path.join(this.config.getProjectTempDir(), 'chats');
-      fs.mkdirSync(chatsDir, { recursive: true });
-
-      const timestamp = new Date()
-        .toISOString()
-        .slice(0, 16)
-        .replace(/:/g, '-');
-      const filename = `session-${timestamp}-${newSessionId.slice(0, 8)}.json`;
-      this.conversationFile = path.join(chatsDir, filename);
-
       if (sourceFilePath && fs.existsSync(sourceFilePath)) {
-        // Copy existing session to new file
-        const sourceData = fs.readFileSync(sourceFilePath, 'utf8');
-        const conversation: ConversationRecord = JSON.parse(sourceData);
+        // Use the existing session file directly instead of copying
+        this.conversationFile = sourceFilePath;
 
-        // Update with new session ID and timestamp
-        conversation.sessionId = newSessionId;
-        conversation.lastUpdated = new Date().toISOString();
-
-        this.writeConversation(conversation);
+        // Update the session ID in the existing file
+        this.updateConversation((conversation) => {
+          conversation.sessionId = newSessionId;
+        });
 
         // Clear any cached data to force fresh reads
         this.cachedLastConvData = null;
       } else {
         // Create new empty session
+        const chatsDir = path.join(this.config.getProjectTempDir(), 'chats');
+        fs.mkdirSync(chatsDir, { recursive: true });
+
+        const timestamp = new Date()
+          .toISOString()
+          .slice(0, 16)
+          .replace(/:/g, '-');
+        const filename = `session-${timestamp}-${newSessionId.slice(0, 8)}.json`;
+        this.conversationFile = path.join(chatsDir, filename);
+
         const initialRecord: ConversationRecord = {
           sessionId: newSessionId,
           projectHash: this.projectHash,

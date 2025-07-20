@@ -87,6 +87,7 @@ import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import { useChatRecordingService } from './hooks/useChatRecording.js';
+import { appendFileSync } from 'node:fs';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -120,7 +121,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { history, addItem, clearItems, loadHistory } = useHistory({
     chatRecordingService,
   });
-
+  appendFileSync("history_recording.json", JSON.stringify(history) + '\n');
   const {
     consoleMessages,
     handleNewMessage,
@@ -221,6 +222,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
       // Set the client history
       config.getGeminiClient()?.setHistory(result.clientHistory);
+      
+      // Force Static component to re-render with the updated history
+      refreshStatic();
     }
   });
 
