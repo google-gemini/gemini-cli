@@ -6,9 +6,11 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { homedir } from 'os';
+import { homedir, platform } from 'os';
+import * as dotenv from 'dotenv';
 import {
   MCPServerConfig,
+  GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
   BugCommandSettings,
   TelemetrySettings,
@@ -17,18 +19,37 @@ import {
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
+import { CustomTheme } from '../ui/themes/theme.js';
 
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 
+export function getSystemSettingsPath(): string {
+  if (process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH) {
+    return process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
+  }
+  if (platform() === 'darwin') {
+    return '/Library/Application Support/GeminiCli/settings.json';
+  } else if (platform() === 'win32') {
+    return 'C:\\ProgramData\\gemini-cli\\settings.json';
+  } else {
+    return '/etc/gemini-cli/settings.json';
+  }
+}
+
 export enum SettingScope {
   User = 'User',
   Workspace = 'Workspace',
+  System = 'System',
 }
 
 export interface CheckpointingSettings {
   enabled?: boolean;
+}
+
+export interface SummarizeToolOutputSettings {
+  tokenBudget?: number;
 }
 
 export interface AccessibilitySettings {
@@ -37,6 +58,7 @@ export interface AccessibilitySettings {
 
 export interface Settings {
   theme?: string;
+  customThemes?: Record<string, CustomTheme>;
   selectedAuthType?: AuthType;
   sandbox?: boolean | string;
   coreTools?: string[];
@@ -45,6 +67,8 @@ export interface Settings {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
+  allowMCPServers?: string[];
+  excludeMCPServers?: string[];
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
@@ -58,14 +82,24 @@ export interface Settings {
   // Git-aware file filtering settings
   fileFiltering?: {
     respectGitIgnore?: boolean;
+    respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
   };
 
   // UI setting. Does not display the ANSI-controlled terminal title.
   hideWindowTitle?: boolean;
+
   hideTips?: boolean;
+  hideBanner?: boolean;
+
+  // Setting for setting maximum number of user/model/tool turns in a session.
+  maxSessionTurns?: number;
+
+  // A map of tool names to their summarization settings.
+  summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
 
   // Add other settings here.
+  ideMode?: boolean;
 }
 
 export interface SettingsError {
@@ -79,16 +113,19 @@ export interface SettingsFile {
 }
 export class LoadedSettings {
   constructor(
+    system: SettingsFile,
     user: SettingsFile,
     workspace: SettingsFile,
     errors: SettingsError[],
   ) {
+    this.system = system;
     this.user = user;
     this.workspace = workspace;
     this.errors = errors;
     this._merged = this.computeMergedSettings();
   }
 
+  readonly system: SettingsFile;
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
   readonly errors: SettingsError[];
@@ -100,9 +137,24 @@ export class LoadedSettings {
   }
 
   private computeMergedSettings(): Settings {
+    const system = this.system.settings;
+    const user = this.user.settings;
+    const workspace = this.workspace.settings;
+
     return {
-      ...this.user.settings,
-      ...this.workspace.settings,
+      ...user,
+      ...workspace,
+      ...system,
+      customThemes: {
+        ...(user.customThemes || {}),
+        ...(workspace.customThemes || {}),
+        ...(system.customThemes || {}),
+      },
+      mcpServers: {
+        ...(user.mcpServers || {}),
+        ...(workspace.mcpServers || {}),
+        ...(system.mcpServers || {}),
+      },
     };
   }
 
@@ -112,18 +164,19 @@ export class LoadedSettings {
         return this.user;
       case SettingScope.Workspace:
         return this.workspace;
+      case SettingScope.System:
+        return this.system;
       default:
         throw new Error(`Invalid scope: ${scope}`);
     }
   }
 
-  setValue(
+  setValue<K extends keyof Settings>(
     scope: SettingScope,
-    key: keyof Settings,
-    value: string | Record<string, MCPServerConfig> | undefined,
+    key: K,
+    value: Settings[K],
   ): void {
     const settingsFile = this.forScope(scope);
-    // @ts-expect-error - value can be string | Record<string, MCPServerConfig>
     settingsFile.settings[key] = value;
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
@@ -172,14 +225,95 @@ function resolveEnvVarsInObject<T>(obj: T): T {
   return obj;
 }
 
+function findEnvFile(startDir: string): string | null {
+  let currentDir = path.resolve(startDir);
+  while (true) {
+    // prefer gemini-specific .env under GEMINI_DIR
+    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
+    if (fs.existsSync(geminiEnvPath)) {
+      return geminiEnvPath;
+    }
+    const envPath = path.join(currentDir, '.env');
+    if (fs.existsSync(envPath)) {
+      return envPath;
+    }
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir || !parentDir) {
+      // check .env under home as fallback, again preferring gemini-specific .env
+      const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
+      if (fs.existsSync(homeGeminiEnvPath)) {
+        return homeGeminiEnvPath;
+      }
+      const homeEnvPath = path.join(homedir(), '.env');
+      if (fs.existsSync(homeEnvPath)) {
+        return homeEnvPath;
+      }
+      return null;
+    }
+    currentDir = parentDir;
+  }
+}
+
+export function setUpCloudShellEnvironment(envFilePath: string | null): void {
+  // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
+  // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
+  // set by the user using "gcloud config set project" we do not want to
+  // use its value. So, unless the user overrides GOOGLE_CLOUD_PROJECT in
+  // one of the .env files, we set the Cloud Shell-specific default here.
+  if (envFilePath && fs.existsSync(envFilePath)) {
+    const envFileContent = fs.readFileSync(envFilePath);
+    const parsedEnv = dotenv.parse(envFileContent);
+    if (parsedEnv.GOOGLE_CLOUD_PROJECT) {
+      // .env file takes precedence in Cloud Shell
+      process.env.GOOGLE_CLOUD_PROJECT = parsedEnv.GOOGLE_CLOUD_PROJECT;
+    } else {
+      // If not in .env, set to default and override global
+      process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
+    }
+  } else {
+    // If no .env file, set to default and override global
+    process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
+  }
+}
+
+export function loadEnvironment(): void {
+  const envFilePath = findEnvFile(process.cwd());
+
+  if (process.env.CLOUD_SHELL === 'true') {
+    setUpCloudShellEnvironment(envFilePath);
+  }
+
+  if (envFilePath) {
+    dotenv.config({ path: envFilePath, quiet: true });
+  }
+}
+
 /**
  * Loads settings from user and workspace directories.
  * Project settings override user settings.
  */
 export function loadSettings(workspaceDir: string): LoadedSettings {
+  loadEnvironment();
+  let systemSettings: Settings = {};
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};
   const settingsErrors: SettingsError[] = [];
+  const systemSettingsPath = getSystemSettingsPath();
+  // Load system settings
+  try {
+    if (fs.existsSync(systemSettingsPath)) {
+      const systemContent = fs.readFileSync(systemSettingsPath, 'utf-8');
+      const parsedSystemSettings = JSON.parse(
+        stripJsonComments(systemContent),
+      ) as Settings;
+      systemSettings = resolveEnvVarsInObject(parsedSystemSettings);
+    }
+  } catch (error: unknown) {
+    settingsErrors.push({
+      message: getErrorMessage(error),
+      path: systemSettingsPath,
+    });
+  }
 
   // Load user settings
   try {
@@ -234,6 +368,10 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   }
 
   return new LoadedSettings(
+    {
+      path: systemSettingsPath,
+      settings: systemSettings,
+    },
     {
       path: USER_SETTINGS_PATH,
       settings: userSettings,

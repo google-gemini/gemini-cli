@@ -28,8 +28,14 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/compress`**
   - **Description:** Replace the entire chat context with a summary. This saves on tokens used for future tasks while retaining a high level summary of what has happened.
 
+- **`/copy`**
+  - **Description:** Copies the last output produced by Gemini CLI to your clipboard, for easy sharing or reuse.
+
 - **`/editor`**
   - **Description:** Open a dialog for selecting supported editors.
+
+- **`/extensions`**
+  - **Description:** Lists all active extensions in the current Gemini CLI session. See [Gemini CLI Extensions](../extension.md).
 
 - **`/help`** (or **`/?`**)
   - **Description:** Display help information about the Gemini CLI, including available commands and their usage.
@@ -80,6 +86,9 @@ Slash commands provide meta-level control over the CLI itself.
       - **Description:** Show detailed descriptions of each tool, including each tool's name with its full description as provided to the model.
     - **`nodesc`** or **`nodescriptions`**:
       - **Description:** Hide tool descriptions, showing only the tool names.
+
+- **`/privacy`**
+  - **Description:** Display the Privacy Notice and allow users to select whether they consent to the collection of their data for service improvement purposes.
 
 - **`/quit`** (or **`/exit`**)
   - **Description:** Exit Gemini CLI.
