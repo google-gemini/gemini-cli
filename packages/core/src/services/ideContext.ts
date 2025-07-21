@@ -26,6 +26,14 @@ export type Cursor = z.infer<typeof CursorSchema>;
 export const ActiveFileSchema = z.object({
   filePath: z.string(),
   cursor: CursorSchema.optional(),
+  recentOpenFiles: z
+    .array(
+      z.object({
+        filePath: z.string(),
+        timestamp: z.number(),
+      }),
+    )
+    .optional(),
 });
 export type ActiveFile = z.infer<typeof ActiveFileSchema>;
 
