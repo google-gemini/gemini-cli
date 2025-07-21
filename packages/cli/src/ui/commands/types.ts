@@ -6,7 +6,12 @@
 
 import { Content } from '@google/genai';
 import { HistoryItemWithoutId } from '../types.js';
-import { Config, GitService, Logger } from '@google/gemini-cli-core';
+import {
+  Config,
+  GitService,
+  Logger,
+  ChatRecordingService,
+} from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
 import { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import type { HistoryItem } from '../types.js';
@@ -21,6 +26,7 @@ export interface CommandContext {
     settings: LoadedSettings;
     git: GitService | undefined;
     logger: Logger;
+    chatRecording: ChatRecordingService | null;
   };
   // UI state and history management
   ui: {
