@@ -22,6 +22,7 @@ import {
   ChatCompressionInfo,
 } from './turn.js';
 import { Config } from '../config/config.js';
+import { UserTierId } from '../code_assist/types.js';
 import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
@@ -128,6 +129,10 @@ export class GeminiClient {
       throw new Error('Content generator not initialized');
     }
     return this.contentGenerator;
+  }
+
+  getUserTier(): UserTierId | undefined {
+    return this.contentGenerator?.userTier;
   }
 
   async addHistory(content: Content) {
@@ -306,20 +311,40 @@ export class GeminiClient {
     }
 
     if (this.config.getIdeMode()) {
-      const activeFile = ideContext.getActiveFileContext();
-      if (activeFile?.filePath) {
-        let context = `
-This is the file that the user was most recently looking at:
-- Path: ${activeFile.filePath}`;
-        if (activeFile.cursor) {
-          context += `
-This is the cursor position in the file:
-- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`;
+      const openFiles = ideContext.getOpenFilesContext();
+      if (openFiles) {
+        const contextParts: string[] = [];
+        if (openFiles.activeFile) {
+          contextParts.push(
+            `This is the file that the user was most recently looking at:\n- Path: ${openFiles.activeFile}`,
+          );
+          if (openFiles.cursor) {
+            contextParts.push(
+              `This is the cursor position in the file:\n- Cursor Position: Line ${openFiles.cursor.line}, Character ${openFiles.cursor.character}`,
+            );
+          }
+          if (openFiles.selectedText) {
+            contextParts.push(
+              `This is the selected text in the active file:\n- ${openFiles.selectedText}`,
+            );
+          }
         }
-        request = [
-          { text: context },
-          ...(Array.isArray(request) ? request : [request]),
-        ];
+
+        if (openFiles.recentOpenFiles && openFiles.recentOpenFiles.length > 0) {
+          const recentFiles = openFiles.recentOpenFiles
+            .map((file) => `- ${file.filePath}`)
+            .join('\n');
+          contextParts.push(
+            `Here are files the user has recently opened, with the most recent at the top:\n${recentFiles}`,
+          );
+        }
+
+        if (contextParts.length > 0) {
+          request = [
+            { text: contextParts.join('\n') },
+            ...(Array.isArray(request) ? request : [request]),
+          ];
+        }
       }
     }
 
@@ -640,8 +665,8 @@ This is the cursor position in the file:
   }
 
   /**
-   * Handles fallback to Flash model when persistent 429 errors occur for OAuth users.
-   * Uses a fallback handler if provided by the config, otherwise returns null.
+   * Handles falling back to Flash model when persistent 429 errors occur for OAuth users.
+   * Uses a fallback handler if provided by the config; otherwise, returns null.
    */
   private async handleFlashFallback(
     authType?: string,

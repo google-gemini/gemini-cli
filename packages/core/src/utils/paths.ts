@@ -44,7 +44,7 @@ export function shortenPath(filePath: string, maxLen: number = 35): string {
 
   // Handle cases with no segments after root (e.g., "/", "C:\") or only one segment
   if (segments.length <= 1) {
-    // Fallback to simple start/end truncation for very short paths or single segments
+    // Fall back to simple start/end truncation for very short paths or single segments
     const keepLen = Math.floor((maxLen - 3) / 2);
     // Ensure keepLen is not negative if maxLen is very small
     if (keepLen <= 0) {

@@ -156,7 +156,7 @@ function executeShellCommand(
               process.kill(-child.pid, 'SIGKILL');
             }
           } catch (_e) {
-            // Fallback to killing just the main process if group kill fails.
+            // Fall back to killing just the main process if group kill fails.
             if (!exited) child.kill('SIGKILL');
           }
         }

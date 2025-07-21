@@ -14,21 +14,26 @@ import {
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Server as HTTPServer } from 'node:http';
+import { RecentFilesManager } from './recent-files-manager.js';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 
-function sendActiveFileChangedNotification(
+function sendOpenFilesChangedNotification(
   transport: StreamableHTTPServerTransport,
   logger: vscode.OutputChannel,
+  recentFilesManager: RecentFilesManager,
 ) {
   const editor = vscode.window.activeTextEditor;
   const filePath = editor ? editor.document.uri.fsPath : '';
   logger.appendLine(`Sending active file changed notification: ${filePath}`);
   const notification: JSONRPCNotification = {
     jsonrpc: '2.0',
-    method: 'ide/activeFileChanged',
-    params: { filePath },
+    method: 'ide/openFilesChanged',
+    params: {
+      activeFile: filePath,
+      recentOpenFiles: recentFilesManager.recentFiles,
+    },
   };
   transport.send(notification);
 }
@@ -52,9 +57,14 @@ export class IDEServer {
     app.use(express.json());
     const mcpServer = createMcpServer();
 
-    const disposable = vscode.window.onDidChangeActiveTextEditor((_editor) => {
+    const recentFilesManager = new RecentFilesManager(context);
+    const disposable = recentFilesManager.onDidChange(() => {
       for (const transport of Object.values(transports)) {
-        sendActiveFileChangedNotification(transport, this.logger);
+        sendOpenFilesChangedNotification(
+          transport,
+          this.logger,
+          recentFilesManager,
+        );
       }
     });
     context.subscriptions.push(disposable);
@@ -158,7 +168,11 @@ export class IDEServer {
       }
 
       if (!sessionsWithInitialNotification.has(sessionId)) {
-        sendActiveFileChangedNotification(transport, this.logger);
+        sendOpenFilesChangedNotification(
+          transport,
+          this.logger,
+          recentFilesManager,
+        );
         sessionsWithInitialNotification.add(sessionId);
       }
     };
@@ -210,7 +224,7 @@ const createMcpServer = () => {
     { capabilities: { logging: {} } },
   );
   server.registerTool(
-    'getActiveFile',
+    'getOpenFiles',
     {
       description:
         '(IDE Tool) Get the path of the file currently active in VS Code.',
