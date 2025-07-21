@@ -221,6 +221,83 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should call completion.navigateUp for both up arrow and Ctrl+P when suggestions are showing', async () => {
+    mockedUseCompletion.mockReturnValue({
+      ...mockCompletion,
+      showSuggestions: true,
+      suggestions: [
+        { label: 'memory', value: 'memory' },
+        { label: 'memcache', value: 'memcache' },
+      ],
+    });
+
+    props.buffer.setText('/mem');
+
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    // Test up arrow
+    stdin.write('\u001B[A'); // Up arrow
+    await wait();
+
+    stdin.write('\u0010'); // Ctrl+P
+    await wait();
+    expect(mockCompletion.navigateUp).toHaveBeenCalledTimes(2);
+    expect(mockCompletion.navigateDown).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('should call completion.navigateDown for both down arrow and Ctrl+N when suggestions are showing', async () => {
+    mockedUseCompletion.mockReturnValue({
+      ...mockCompletion,
+      showSuggestions: true,
+      suggestions: [
+        { label: 'memory', value: 'memory' },
+        { label: 'memcache', value: 'memcache' },
+      ],
+    });
+    props.buffer.setText('/mem');
+
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    // Test down arrow
+    stdin.write('\u001B[B'); // Down arrow
+    await wait();
+
+    stdin.write('\u000E'); // Ctrl+N
+    await wait();
+    expect(mockCompletion.navigateDown).toHaveBeenCalledTimes(2);
+    expect(mockCompletion.navigateUp).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('should NOT call completion navigation when suggestions are not showing', async () => {
+    mockedUseCompletion.mockReturnValue({
+      ...mockCompletion,
+      showSuggestions: false,
+    });
+    props.buffer.setText('some text');
+
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\u001B[A'); // Up arrow
+    await wait();
+    stdin.write('\u001B[B'); // Down arrow
+    await wait();
+    stdin.write('\u0010'); // Ctrl+P
+    await wait();
+    stdin.write('\u000E'); // Ctrl+N
+    await wait();
+
+    expect(mockCompletion.navigateUp).not.toHaveBeenCalled();
+    expect(mockCompletion.navigateDown).not.toHaveBeenCalled();
+    unmount();
+  });
+
   describe('clipboard image paste', () => {
     beforeEach(() => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
