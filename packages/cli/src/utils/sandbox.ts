@@ -99,7 +99,7 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
 }
 
 // docker does not allow container names to contain ':' or '/', so we
-// parse those out and make the name a little shorter
+// parse those out to shorten the name
 function parseImageName(image: string): string {
   const [fullName, tag] = image.split(':');
   const name = fullName.split('/').at(-1) ?? 'unknown-image';
@@ -187,7 +187,7 @@ export async function start_sandbox(
   if (config.command === 'sandbox-exec') {
     // disallow BUILD_SANDBOX
     if (process.env.BUILD_SANDBOX) {
-      console.error('ERROR: cannot BUILD_SANDBOX when using MacOS Seatbelt');
+      console.error('ERROR: cannot BUILD_SANDBOX when using macOS Seatbelt');
       process.exit(1);
     }
     const profile = (process.env.SEATBELT_PROFILE ??= 'permissive-open');
@@ -847,7 +847,7 @@ async function ensureSandboxImageIsPresent(
 
   console.info(`Sandbox image ${image} not found locally.`);
   if (image === LOCAL_DEV_SANDBOX_IMAGE_NAME) {
-    // user needs to build the image themself
+    // user needs to build the image themselves
     return false;
   }
 

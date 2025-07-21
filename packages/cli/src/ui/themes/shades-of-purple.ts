@@ -5,7 +5,7 @@
  */
 
 /**
- * Shades of Purple Theme — for Highlightjs.
+ * Shades of Purple Theme — for Highlight.js.
  * @author Ahmad Awais <https://twitter.com/mrahmadawais/>
  */
 import { type ColorsTheme, Theme } from './theme.js';

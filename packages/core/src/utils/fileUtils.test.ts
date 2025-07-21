@@ -42,7 +42,7 @@ describe('fileUtils', () => {
   let testImageFilePath: string;
   let testPdfFilePath: string;
   let testBinaryFilePath: string;
-  let nonExistentFilePath: string;
+  let nonexistentFilePath: string;
   let directoryPath: string;
 
   beforeEach(() => {
@@ -57,7 +57,7 @@ describe('fileUtils', () => {
     testImageFilePath = path.join(tempRootDir, 'image.png');
     testPdfFilePath = path.join(tempRootDir, 'document.pdf');
     testBinaryFilePath = path.join(tempRootDir, 'app.exe');
-    nonExistentFilePath = path.join(tempRootDir, 'notfound.txt');
+    nonexistentFilePath = path.join(tempRootDir, 'nonexistent.txt');
     directoryPath = path.join(tempRootDir, 'subdir');
 
     actualNodeFs.mkdirSync(directoryPath, { recursive: true }); // Ensure subdir exists
@@ -284,7 +284,7 @@ describe('fileUtils', () => {
 
     it('should handle file not found', async () => {
       const result = await processSingleFileContent(
-        nonExistentFilePath,
+        nonexistentFilePath,
         tempRootDir,
       );
       expect(result.error).toContain('File not found');

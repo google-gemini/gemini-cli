@@ -8,7 +8,7 @@ The Gemini CLI core (`packages/core`) features a robust system for defining, reg
   - `name`: A unique internal name (used in API calls to Gemini).
   - `displayName`: A user-friendly name.
   - `description`: A clear explanation of what the tool does, which is provided to the Gemini model.
-  - `parameterSchema`: A JSON schema defining the parameters the tool accepts. This is crucial for the Gemini model to understand how to call the tool correctly.
+  - `parameterSchema`: A JSON schema defining the parameters that the tool accepts. This is crucial for the Gemini model to understand how to call the tool correctly.
   - `validateToolParams()`: A method to validate incoming parameters.
   - `getDescription()`: A method to provide a human-readable description of what the tool will do with specific parameters before execution.
   - `shouldConfirmExecute()`: A method to determine if user confirmation is required before execution (e.g., for potentially destructive operations).

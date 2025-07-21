@@ -453,7 +453,7 @@ describe('Logger', () => {
     });
 
     it('should return an empty array if a tagged checkpoint file does not exist', async () => {
-      const loaded = await logger.loadCheckpoint('non-existent-tag');
+      const loaded = await logger.loadCheckpoint('nonexistent-tag');
       expect(loaded).toEqual([]);
     });
 

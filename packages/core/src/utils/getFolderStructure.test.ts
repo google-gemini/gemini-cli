@@ -245,7 +245,7 @@ Showing up to 1 items (files + folders). Folders or files indicated with ... con
     expect(structure.trim()).toBe(expectedRevisedMax1);
   });
 
-  it('should handle non-existent directory', async () => {
+  it('should handle nonexistent directory', async () => {
     // Temporarily make fsPromises.readdir throw ENOENT for this specific path
     const originalReaddir = fsPromises.readdir;
     (fsPromises.readdir as Mock).mockImplementation(
