@@ -908,6 +908,86 @@ describe('loadCliConfig extensions', () => {
   });
 });
 
+describe('loadCliConfig approvalMode', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('should use default approval mode when no --approval-mode flag is present', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+  });
+
+  it('should set approval mode to yolo when --approval-mode yolo is specified', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'yolo'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+  });
+
+  it('should set approval mode to auto_edit when --approval-mode auto_edit is specified', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.AUTO_EDIT);
+  });
+
+  it('should set approval mode to default when --approval-mode default is specified', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'default'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+  });
+
+  it('should prioritize --approval-mode flag over legacy --yolo flag', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit', '--yolo'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.AUTO_EDIT);
+  });
+
+  it('should fall back to legacy --yolo flag when no --approval-mode is specified', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+  });
+
+  it('should throw error for invalid approval mode value', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'invalid'];
+    
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(parseArguments()).rejects.toThrow('process.exit called');
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+});
+
 describe('loadCliConfig ideMode', () => {
   const originalArgv = process.argv;
   const originalEnv = { ...process.env };

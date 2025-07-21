@@ -356,8 +356,15 @@ Arguments passed directly when running the CLI can override other configurations
   - Displays help information about command-line arguments.
 - **`--show-memory-usage`**:
   - Displays the current memory usage.
+- **`--approval-mode <mode>`**:
+  - Sets the approval mode for tool calls. Valid options are:
+    - `default`: Ask for confirmation before executing tool calls (default behavior)
+    - `auto_edit`: Automatically accept file edit operations, but still ask for other tool calls
+    - `yolo`: Automatically approve all tool calls without confirmation
+  - Example: `gemini --approval-mode auto_edit`
 - **`--yolo`**:
-  - Enables YOLO mode, which automatically approves all tool calls.
+  - Enables YOLO mode, which automatically approves all tool calls. This is equivalent to `--approval-mode yolo`.
+  - **Note:** If both `--approval-mode` and `--yolo` are specified, `--approval-mode` takes precedence.
 - **`--telemetry`**:
   - Enables [telemetry](../telemetry.md).
 - **`--telemetry-target`**:
