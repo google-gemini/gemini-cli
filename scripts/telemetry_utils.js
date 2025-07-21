@@ -111,6 +111,32 @@ export function writeJsonFile(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
 
+export function moveBinary(source, destination) {
+  try {
+    fs.renameSync(source, destination);
+  } catch (error) {
+    if (error.code !== 'EXDEV') {
+      throw error;
+    }
+    // Handle a cross-device error: copy-to-temp-then-rename.
+    const destDir = path.dirname(destination);
+    const destFile = path.basename(destination);
+    const tempDest = path.join(destDir, `${destFile}.tmp`);
+
+    try {
+      fs.copyFileSync(source, tempDest);
+      fs.renameSync(tempDest, destination);
+    } catch (moveError) {
+      // If copy or rename fails, clean up the intermediate temp file.
+      if (fs.existsSync(tempDest)) {
+        fs.unlinkSync(tempDest);
+      }
+      throw moveError;
+    }
+    fs.unlinkSync(source);
+  }
+}
+
 export function waitForPort(port, timeout = 10000) {
   return new Promise((resolve, reject) => {
     const startTime = Date.now();
@@ -248,7 +274,7 @@ export async function ensureBinary(
       );
     }
 
-    fs.renameSync(foundBinaryPath, executablePath);
+    moveBinary(foundBinaryPath, executablePath);
 
     if (platform !== 'windows') {
       fs.chmodSync(executablePath, '755');
