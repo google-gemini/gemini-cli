@@ -23,6 +23,7 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { tokenLimit } from './tokenLimits.js';
+import { ideContext } from '../services/ideContext.js';
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
@@ -71,6 +72,7 @@ vi.mock('../telemetry/index.js', () => ({
   logApiResponse: vi.fn(),
   logApiError: vi.fn(),
 }));
+vi.mock('../services/ideContext.js');
 
 describe('findIndexAfterFraction', () => {
   const history: Content[] = [
@@ -642,6 +644,69 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   describe('sendMessageStream', () => {
+    it('should include IDE context when ideMode is enabled', async () => {
+      // Arrange
+      vi.mocked(ideContext.getOpenFilesContext).mockReturnValue({
+        activeFile: '/path/to/active/file.ts',
+        selectedText: 'hello',
+        cursor: { line: 5, character: 10 },
+        recentOpenFiles: [
+          { filePath: '/path/to/recent/file1.ts', timestamp: Date.now() },
+          { filePath: '/path/to/recent/file2.ts', timestamp: Date.now() },
+        ],
+      });
+
+      vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
+
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        generateContent: mockGenerateContentFn,
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      const initialRequest = [{ text: 'Hi' }];
+
+      // Act
+      const stream = client.sendMessageStream(
+        initialRequest,
+        new AbortController().signal,
+        'prompt-id-ide',
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      // Assert
+      expect(ideContext.getOpenFilesContext).toHaveBeenCalled();
+      const expectedContext = `
+This is the file that the user was most recently looking at:
+- Path: /path/to/active/file.ts
+This is the cursor position in the file:
+- Cursor Position: Line 5, Character 10
+This is the selected text in the active file:
+- hello
+Here are files the user has recently opened, with the most recent at the top:
+- /path/to/recent/file1.ts
+- /path/to/recent/file2.ts
+      `.trim();
+      const expectedRequest = [{ text: expectedContext }, ...initialRequest];
+      expect(mockTurnRunFn).toHaveBeenCalledWith(
+        expectedRequest,
+        expect.any(Object),
+      );
+    });
+
     it('should return the turn instance after the stream is complete', async () => {
       // Arrange
       const mockStream = (async function* () {
