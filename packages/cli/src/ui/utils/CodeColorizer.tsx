@@ -145,9 +145,6 @@ export function colorizeCode(
           const contentToRender = renderedNode !== null ? renderedNode : line;
           return (
             <Box key={index}>
-              <Text color={activeTheme.colors.Gray}>
-                {`${String(index + 1 + hiddenLinesCount).padStart(padWidth, ' ')} `}
-              </Text>
               <Text color={activeTheme.defaultColor} wrap="wrap">
                 {contentToRender}
               </Text>
@@ -162,7 +159,6 @@ export function colorizeCode(
       error,
     );
     // Fallback to plain text with default color on error
-    // Also display line numbers in fallback
     const lines = codeToHighlight.split('\n');
     const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
     return (
@@ -173,9 +169,6 @@ export function colorizeCode(
       >
         {lines.map((line, index) => (
           <Box key={index}>
-            <Text color={activeTheme.defaultColor}>
-              {`${String(index + 1).padStart(padWidth, ' ')} `}
-            </Text>
             <Text color={activeTheme.colors.Gray}>{line}</Text>
           </Box>
         ))}
