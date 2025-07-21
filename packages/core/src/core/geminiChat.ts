@@ -16,7 +16,7 @@ import {
   Part,
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
-import { retryWithBackoff } from '../utils/retry.js';
+import { retryWithBackoff, getErrorStatus } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { ContentGenerator, AuthType } from './contentGenerator.js';
 import { Config } from '../config/config.js';
@@ -302,9 +302,21 @@ export class GeminiChat {
 
       response = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
+          // First check for actual status codes
+          const status = getErrorStatus(error);
+          if (status) {
+            if (status === 429) return true;
+            if (status >= 500 && status < 600) return true;
+            return false;
+          }
+          // Fallback to message checking only if no status code is found
           if (error && error.message) {
+            // Only check for explicit status mentions, not any 5XX pattern
             if (error.message.includes('429')) return true;
-            if (error.message.match(/5\d{2}/)) return true;
+            if (error.message.includes('status 500') || 
+                error.message.includes('status 502') || 
+                error.message.includes('status 503') || 
+                error.message.includes('status 504')) return true;
           }
           return false;
         },
@@ -413,10 +425,21 @@ export class GeminiChat {
       // If errors occur mid-stream, this setup won't resume the stream; it will restart it.
       const streamResponse = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
-          // Check error messages for status codes, or specific error names if known
+          // First check for actual status codes
+          const status = getErrorStatus(error);
+          if (status) {
+            if (status === 429) return true;
+            if (status >= 500 && status < 600) return true;
+            return false;
+          }
+          // Fallback to message checking only if no status code is found
           if (error && error.message) {
+            // Only check for explicit status mentions, not any 5XX pattern
             if (error.message.includes('429')) return true;
-            if (error.message.match(/5\d{2}/)) return true;
+            if (error.message.includes('status 500') || 
+                error.message.includes('status 502') || 
+                error.message.includes('status 503') || 
+                error.message.includes('status 504')) return true;
           }
           return false; // Don't retry other errors by default
         },

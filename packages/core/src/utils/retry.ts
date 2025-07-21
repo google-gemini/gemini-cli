@@ -36,16 +36,23 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
  * @returns True if the error is a transient error, false otherwise.
  */
 function defaultShouldRetry(error: Error | unknown): boolean {
-  // Check for common transient error status codes either in message or a status property
-  if (error && typeof (error as { status?: number }).status === 'number') {
-    const status = (error as { status: number }).status;
+  // First check for actual status codes
+  const status = getErrorStatus(error);
+  if (status) {
     if (status === 429 || (status >= 500 && status < 600)) {
       return true;
     }
+    return false;
   }
+  
+  // Fallback to message checking only if no status code is found
   if (error instanceof Error && error.message) {
+    // Only check for explicit status mentions, not any 5XX pattern
     if (error.message.includes('429')) return true;
-    if (error.message.match(/5\d{2}/)) return true;
+    if (error.message.includes('status 500') || 
+        error.message.includes('status 502') || 
+        error.message.includes('status 503') || 
+        error.message.includes('status 504')) return true;
   }
   return false;
 }
@@ -221,6 +228,10 @@ export function getErrorStatus(error: unknown): number | undefined {
     if ('status' in error && typeof error.status === 'number') {
       return error.status;
     }
+    // Check for statusCode (common in some error types like BedrockError)
+    if ('statusCode' in error && typeof error.statusCode === 'number') {
+      return error.statusCode;
+    }
     // Check for error.response.status (common in axios errors)
     if (
       'response' in error &&
@@ -321,7 +332,10 @@ function logRetryAttempt(
         `Attempt ${attempt} failed with 429 error (no Retry-After header). Retrying with backoff...`,
         error,
       );
-    } else if (error.message.match(/5\d{2}/)) {
+    } else if (error.message.includes('status 500') || 
+               error.message.includes('status 502') || 
+               error.message.includes('status 503') || 
+               error.message.includes('status 504')) {
       console.error(
         `Attempt ${attempt} failed with 5xx error. Retrying with backoff...`,
         error,
