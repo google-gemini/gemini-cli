@@ -225,6 +225,10 @@ describe('InputPrompt', () => {
     mockedUseCompletion.mockReturnValue({
       ...mockCompletion,
       showSuggestions: true,
+      suggestions: [
+        { label: 'memory', value: 'memory' },
+        { label: 'memcache', value: 'memcache' },
+      ],
     });
 
     props.buffer.setText('/mem');
@@ -248,6 +252,10 @@ describe('InputPrompt', () => {
     mockedUseCompletion.mockReturnValue({
       ...mockCompletion,
       showSuggestions: true,
+      suggestions: [
+        { label: 'memory', value: 'memory' },
+        { label: 'memcache', value: 'memcache' },
+      ],
     });
     props.buffer.setText('/mem');
 
