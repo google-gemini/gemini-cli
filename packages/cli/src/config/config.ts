@@ -50,6 +50,7 @@ export interface CliArgs {
   showMemoryUsage: boolean | undefined;
   show_memory_usage: boolean | undefined;
   yolo: boolean | undefined;
+  acceptAll: boolean | undefined;
   telemetry: boolean | undefined;
   checkpointing: boolean | undefined;
   telemetryTarget: string | undefined;
@@ -136,6 +137,11 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description:
         'Automatically accept all actions (aka YOLO mode, see https://www.youtube.com/watch?v=xvFZjo5PgG0 for more details)?',
+      default: false,
+    })
+    .option('accept-all', {
+      type: 'boolean',
+      description: 'Automatically accept all file edits (equivalent to shift+tab)',
       default: false,
     })
     .option('telemetry', {
@@ -396,7 +402,9 @@ export async function loadCliConfig(
     mcpServers,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
-    approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
+    approvalMode: argv.yolo || false ? ApprovalMode.YOLO 
+      : argv.acceptAll || false ? ApprovalMode.AUTO_EDIT 
+      : ApprovalMode.DEFAULT,
     showMemoryUsage:
       argv.showMemoryUsage ||
       argv.show_memory_usage ||
