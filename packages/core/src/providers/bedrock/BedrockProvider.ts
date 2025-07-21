@@ -89,7 +89,10 @@ export class BedrockProvider implements ContentGenerator {
 
     if (!hasCredentials) {
       console.warn(
-        'No obvious AWS credentials found. Bedrock client will attempt to use the default credential chain.'
+        'WARNING: No AWS credentials detected. Please set one of the following:\n' +
+        '  - AWS_PROFILE=your-profile-name\n' +
+        '  - AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY\n' +
+        'Bedrock client will attempt to use the default credential chain.'
       );
     }
   }
@@ -416,9 +419,40 @@ export class BedrockProvider implements ContentGenerator {
 
     if (statusCode === 429) {
       return new BedrockError(
-        'Rate limit exceeded. Please try again later.',
+        `Rate limit exceeded for model ${currentModel}. The system will automatically retry with exponential backoff.`,
         'RATE_LIMIT',
         429
+      );
+    }
+
+    // Handle specific 400 error for tool_use/tool_result mismatch
+    if (statusCode === 400 && message.includes('tool_use') && message.includes('tool_result')) {
+      return new BedrockError(
+        `Conversation state error: ${message}\n\nThis typically occurs when a previous request was interrupted (e.g., by rate limiting). Please start a new conversation to resolve this issue.`,
+        'CONVERSATION_STATE_ERROR',
+        400
+      );
+    }
+
+    // Handle "Operation not allowed" error - usually means missing credentials or permissions
+    if (statusCode === 400 && message.includes('Operation not allowed')) {
+      return new BedrockError(
+        `AWS Bedrock: Operation not allowed. This typically means:\n\n` +
+        `1. Missing AWS credentials. Set one of these:\n` +
+        `   - AWS Profile: export AWS_PROFILE=your-profile-name\n` +
+        `   - Direct credentials:\n` +
+        `     export AWS_ACCESS_KEY_ID=your-access-key-id\n` +
+        `     export AWS_SECRET_ACCESS_KEY=your-secret-access-key\n` +
+        `     export AWS_SESSION_TOKEN=your-session-token (if using temporary credentials)\n\n` +
+        `2. Missing IAM permissions. Ensure your IAM user/role has:\n` +
+        `   - bedrock:InvokeModel permission\n` +
+        `   - Access to the specific model: ${currentModel}\n\n` +
+        `3. Model access not enabled. In AWS Bedrock console:\n` +
+        `   - Go to Model access\n` +
+        `   - Enable access for Claude models\n\n` +
+        `To verify your AWS credentials: aws sts get-caller-identity`,
+        'OPERATION_NOT_ALLOWED',
+        400
       );
     }
 

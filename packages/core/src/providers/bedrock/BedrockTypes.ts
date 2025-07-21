@@ -148,6 +148,7 @@ export interface BedrockToolConfig {
 export class BedrockError extends Error {
   readonly code?: string;
   readonly statusCode?: number;
+  readonly status?: number; // For compatibility with retry logic
   
   constructor(
     message: string,
@@ -158,5 +159,6 @@ export class BedrockError extends Error {
     this.name = 'BedrockError';
     this.code = code;
     this.statusCode = statusCode;
+    this.status = statusCode; // Mirror statusCode as status for compatibility
   }
 }
