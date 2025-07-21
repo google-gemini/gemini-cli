@@ -5,12 +5,13 @@
  */
 
 import { uiTelemetryService } from '@google/gemini-cli-core';
-import { SlashCommand } from './types.js';
+import { CommandKind, SlashCommand } from './types.js';
 import { randomUUID } from 'crypto';
 
 export const clearCommand: SlashCommand = {
   name: 'clear',
   description: 'clear the screen and conversation history',
+  kind: CommandKind.BUILT_IN,
   action: async (context, _args) => {
     const geminiClient = context.services.config?.getGeminiClient();
     const config = context.services.config;
