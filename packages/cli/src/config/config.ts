@@ -50,7 +50,7 @@ export interface CliArgs {
   showMemoryUsage: boolean | undefined;
   show_memory_usage: boolean | undefined;
   yolo: boolean | undefined;
-  acceptAll: boolean | undefined;
+  approvalMode: string | undefined;
   telemetry: boolean | undefined;
   checkpointing: boolean | undefined;
   telemetryTarget: string | undefined;
@@ -139,10 +139,10 @@ export async function parseArguments(): Promise<CliArgs> {
         'Automatically accept all actions (aka YOLO mode, see https://www.youtube.com/watch?v=xvFZjo5PgG0 for more details)?',
       default: false,
     })
-    .option('accept-all', {
-      type: 'boolean',
-      description: 'Automatically accept all file edits (equivalent to shift+tab)',
-      default: false,
+    .option('approval-mode', {
+      type: 'string',
+      choices: ['default', 'auto_edit', 'yolo'],
+      description: 'Set the approval mode: default (ask for confirmation), auto_edit (automatically accept file edits), or yolo (automatically accept all actions)',
     })
     .option('telemetry', {
       type: 'boolean',
@@ -244,6 +244,29 @@ export async function loadHierarchicalGeminiMemory(
     extensionContextFilePaths,
     fileFilteringOptions,
   );
+}
+
+function getApprovalMode(argv: CliArgs): ApprovalMode {
+  // If --approval-mode is explicitly set, use that value
+  if (argv.approvalMode) {
+    switch (argv.approvalMode) {
+      case 'yolo':
+        return ApprovalMode.YOLO;
+      case 'auto_edit':
+        return ApprovalMode.AUTO_EDIT;
+      case 'default':
+        return ApprovalMode.DEFAULT;
+      default:
+        throw new Error(`Invalid approval mode: ${argv.approvalMode}. Valid options are: default, auto_edit, yolo`);
+    }
+  }
+  
+  // Fall back to legacy flags for backward compatibility
+  if (argv.yolo) {
+    return ApprovalMode.YOLO;
+  }
+  
+  return ApprovalMode.DEFAULT;
 }
 
 export async function loadCliConfig(
@@ -402,9 +425,7 @@ export async function loadCliConfig(
     mcpServers,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
-    approvalMode: argv.yolo || false ? ApprovalMode.YOLO 
-      : argv.acceptAll || false ? ApprovalMode.AUTO_EDIT 
-      : ApprovalMode.DEFAULT,
+    approvalMode: getApprovalMode(argv),
     showMemoryUsage:
       argv.showMemoryUsage ||
       argv.show_memory_usage ||
