@@ -229,14 +229,14 @@ describe('runNonInteractive', () => {
   it('should not exit if a tool is not found, and should send error back to model', async () => {
     const functionCall: FunctionCall = {
       id: 'fcNotFound',
-      name: 'nonExistentTool',
+      name: 'nonexistentTool',
       args: {},
     };
     const errorResponsePart: Part = {
       functionResponse: {
-        name: 'nonExistentTool',
+        name: 'nonexistentTool',
         id: 'fcNotFound',
-        response: { error: 'Tool "nonExistentTool" not found in registry.' },
+        response: { error: 'Tool "nonexistentTool" not found in registry.' },
       },
     };
 
@@ -246,8 +246,8 @@ describe('runNonInteractive', () => {
     vi.mocked(mockCoreExecuteToolCall).mockResolvedValue({
       callId: 'fcNotFound',
       responseParts: [errorResponsePart],
-      resultDisplay: 'Tool "nonExistentTool" not found in registry.',
-      error: new Error('Tool "nonExistentTool" not found in registry.'),
+      resultDisplay: 'Tool "nonexistentTool" not found in registry.',
+      error: new Error('Tool "nonexistentTool" not found in registry.'),
     });
 
     const stream1 = (async function* () {
@@ -278,7 +278,7 @@ describe('runNonInteractive', () => {
     );
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Error executing tool nonExistentTool: Tool "nonExistentTool" not found in registry.',
+      'Error executing tool nonexistentTool: Tool "nonexistentTool" not found in registry.',
     );
 
     expect(mockProcessExit).not.toHaveBeenCalled();

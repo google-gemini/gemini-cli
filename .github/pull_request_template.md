@@ -4,7 +4,7 @@
 
 ## Dive Deeper
 
-<!-- more thoughts and in depth discussion here -->
+<!-- more thoughts and in-depth discussion here -->
 
 ## Reviewer Test Plan
 

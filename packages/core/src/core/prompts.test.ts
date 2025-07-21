@@ -67,7 +67,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.stubEnv('SANDBOX', 'true'); // Generic sandbox value
     const prompt = getCoreSystemPrompt();
     expect(prompt).toContain('# Sandbox');
-    expect(prompt).not.toContain('# MacOS Seatbelt');
+    expect(prompt).not.toContain('# macOS Seatbelt');
     expect(prompt).not.toContain('# Outside of Sandbox');
     expect(prompt).toMatchSnapshot();
   });
@@ -75,7 +75,7 @@ describe('Core System Prompt (prompts.ts)', () => {
   it('should include seatbelt-specific instructions when SANDBOX env var is "sandbox-exec"', () => {
     vi.stubEnv('SANDBOX', 'sandbox-exec');
     const prompt = getCoreSystemPrompt();
-    expect(prompt).toContain('# MacOS Seatbelt');
+    expect(prompt).toContain('# macOS Seatbelt');
     expect(prompt).not.toContain('# Sandbox');
     expect(prompt).not.toContain('# Outside of Sandbox');
     expect(prompt).toMatchSnapshot();
@@ -86,7 +86,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt();
     expect(prompt).toContain('# Outside of Sandbox');
     expect(prompt).not.toContain('# Sandbox');
-    expect(prompt).not.toContain('# MacOS Seatbelt');
+    expect(prompt).not.toContain('# macOS Seatbelt');
     expect(prompt).toMatchSnapshot();
   });
 

@@ -67,7 +67,7 @@ describe('useShellHistory', () => {
     expect(command).toBe('cmd2');
   });
 
-  it('should handle a non-existent history file gracefully', async () => {
+  it('should handle a nonexistent history file gracefully', async () => {
     const error = new Error('File not found') as NodeJS.ErrnoException;
     error.code = 'ENOENT';
     mockedFs.readFile.mockRejectedValue(error);

@@ -185,7 +185,7 @@ export async function detectFileType(
     return 'binary';
   }
 
-  // Fallback to content-based check if mime type wasn't conclusive for image/pdf
+  // Fall back to content-based check if mime type wasn't conclusive for image/pdf
   // and it's not a known binary extension.
   if (await isBinaryFile(filePath)) {
     return 'binary';

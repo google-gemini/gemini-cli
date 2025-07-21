@@ -90,7 +90,7 @@ The Gemini CLI provides a comprehensive suite of tools for interacting with the 
   - `path` (string, optional): The absolute path to the directory to search within. Defaults to the current working directory.
   - `include` (string, optional): A glob pattern to filter which files are searched (e.g., `"*.js"`, `"src/**/*.{ts,tsx}"`). If omitted, searches most files (respecting common ignores).
 - **Behavior:**
-  - Uses `git grep` if available in a Git repository for speed, otherwise falls back to system `grep` or a JavaScript-based search.
+  - Uses `git grep` if available in a Git repository for speed; otherwise, falls back to system `grep` or a JavaScript-based search.
   - Returns a list of matching lines, each prefixed with its file path (relative to the search directory) and line number.
 - **Output (`llmContent`):** A formatted string of matches, e.g.:
   ```
