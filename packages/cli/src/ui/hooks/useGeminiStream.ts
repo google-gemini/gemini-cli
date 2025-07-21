@@ -14,6 +14,7 @@ import {
   ServerGeminiContentEvent as ContentEvent,
   ServerGeminiErrorEvent as ErrorEvent,
   ServerGeminiChatCompressedEvent,
+  ServerGeminiFinishedEvent,
   getErrorMessage,
   isNodeError,
   MessageSenderType,
@@ -26,7 +27,7 @@ import {
   UserPromptEvent,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
-import { type Part, type PartListUnion } from '@google/genai';
+import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import {
   StreamingState,
   HistoryItem,
@@ -140,6 +141,8 @@ export const useGeminiStream = (
       toolCalls.length ? mapTrackedToolCallsToDisplay(toolCalls) : undefined,
     [toolCalls],
   );
+
+  const loopDetectedRef = useRef(false);
 
   const onExec = useCallback(async (done: Promise<void>) => {
     setIsResponding(true);
@@ -420,6 +423,46 @@ export const useGeminiStream = (
     [addItem, pendingHistoryItemRef, setPendingHistoryItem, config],
   );
 
+  const handleFinishedEvent = useCallback(
+    (event: ServerGeminiFinishedEvent, userMessageTimestamp: number) => {
+      const finishReason = event.value;
+
+      const finishReasonMessages: Record<FinishReason, string | undefined> = {
+        [FinishReason.FINISH_REASON_UNSPECIFIED]: undefined,
+        [FinishReason.STOP]: undefined,
+        [FinishReason.MAX_TOKENS]: 'Response truncated due to token limits.',
+        [FinishReason.SAFETY]: 'Response stopped due to safety reasons.',
+        [FinishReason.RECITATION]: 'Response stopped due to recitation policy.',
+        [FinishReason.LANGUAGE]:
+          'Response stopped due to unsupported language.',
+        [FinishReason.BLOCKLIST]: 'Response stopped due to forbidden terms.',
+        [FinishReason.PROHIBITED_CONTENT]:
+          'Response stopped due to prohibited content.',
+        [FinishReason.SPII]:
+          'Response stopped due to sensitive personally identifiable information.',
+        [FinishReason.OTHER]: 'Response stopped for other reasons.',
+        [FinishReason.MALFORMED_FUNCTION_CALL]:
+          'Response stopped due to malformed function call.',
+        [FinishReason.IMAGE_SAFETY]:
+          'Response stopped due to image safety violations.',
+        [FinishReason.UNEXPECTED_TOOL_CALL]:
+          'Response stopped due to unexpected tool call.',
+      };
+
+      const message = finishReasonMessages[finishReason];
+      if (message) {
+        addItem(
+          {
+            type: 'info',
+            text: `⚠️  ${message}`,
+          },
+          userMessageTimestamp,
+        );
+      }
+    },
+    [addItem],
+  );
+
   const handleChatCompressionEvent = useCallback(
     (eventValue: ServerGeminiChatCompressedEvent['value']) =>
       addItem(
@@ -449,6 +492,16 @@ export const useGeminiStream = (
       ),
     [addItem, config],
   );
+
+  const handleLoopDetectedEvent = useCallback(() => {
+    addItem(
+      {
+        type: 'info',
+        text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
+      },
+      Date.now(),
+    );
+  }, [addItem]);
 
   const processGeminiStreamEvents = useCallback(
     async (
@@ -489,6 +542,17 @@ export const useGeminiStream = (
           case ServerGeminiEventType.MaxSessionTurns:
             handleMaxSessionTurnsEvent();
             break;
+          case ServerGeminiEventType.Finished:
+            handleFinishedEvent(
+              event as ServerGeminiFinishedEvent,
+              userMessageTimestamp,
+            );
+            break;
+          case ServerGeminiEventType.LoopDetected:
+            // handle later because we want to move pending history to history
+            // before we add loop detected message to history
+            loopDetectedRef.current = true;
+            break;
           default: {
             // enforces exhaustive switch-case
             const unreachable: never = event;
@@ -507,6 +571,7 @@ export const useGeminiStream = (
       handleErrorEvent,
       scheduleToolCalls,
       handleChatCompressionEvent,
+      handleFinishedEvent,
       handleMaxSessionTurnsEvent,
     ],
   );
@@ -579,6 +644,10 @@ export const useGeminiStream = (
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
           setPendingHistoryItem(null);
         }
+        if (loopDetectedRef.current) {
+          loopDetectedRef.current = false;
+          handleLoopDetectedEvent();
+        }
       } catch (error: unknown) {
         if (error instanceof UnauthorizedError) {
           onAuthError();
@@ -616,6 +685,7 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
+      handleLoopDetectedEvent,
     ],
   );
 

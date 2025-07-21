@@ -33,10 +33,14 @@ export * from './utils/memoryDiscovery.js';
 export * from './utils/gitIgnoreParser.js';
 export * from './utils/editor.js';
 export * from './utils/quotaErrorDetection.js';
+export * from './utils/fileUtils.js';
+export * from './utils/retry.js';
+export * from './utils/systemEncoding.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
+export * from './services/ideContext.js';
 
 // Export base tool definitions
 export * from './tools/tools.js';
@@ -57,6 +61,21 @@ export * from './tools/read-many-files.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 
+// MCP OAuth
+export { MCPOAuthProvider } from './mcp/oauth-provider.js';
+export {
+  MCPOAuthToken,
+  MCPOAuthCredentials,
+  MCPOAuthTokenStorage,
+} from './mcp/oauth-token-storage.js';
+export type { MCPOAuthConfig } from './mcp/oauth-provider.js';
+export type {
+  OAuthAuthorizationServerMetadata,
+  OAuthProtectedResourceMetadata,
+} from './mcp/oauth-utils.js';
+export { OAuthUtils } from './mcp/oauth-utils.js';
+
 // Export telemetry functions
 export * from './telemetry/index.js';
 export { sessionId } from './utils/session.js';
+export * from './utils/browser.js';
