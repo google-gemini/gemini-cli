@@ -16,59 +16,59 @@ describe('ideContext - Active File', () => {
   });
 
   it('should return undefined initially for active file context', () => {
-    expect(ideContext.getActiveFileContext()).toBeUndefined();
+    expect(ideContext.getOpenFilesContext()).toBeUndefined();
   });
 
   it('should set and retrieve the active file context', () => {
     const testFile = {
-      filePath: '/path/to/test/file.ts',
-      cursor: { line: 5, character: 10 },
+      activeFile: '/path/to/test/file.ts',
+      selectedText: '1234',
     };
 
-    ideContext.setActiveFileContext(testFile);
+    ideContext.setOpenFilesContext(testFile);
 
-    const activeFile = ideContext.getActiveFileContext();
+    const activeFile = ideContext.getOpenFilesContext();
     expect(activeFile).toEqual(testFile);
   });
 
   it('should update the active file context when called multiple times', () => {
     const firstFile = {
-      filePath: '/path/to/first.js',
-      cursor: { line: 1, character: 1 },
+      activeFile: '/path/to/first.js',
+      selectedText: '1234',
     };
-    ideContext.setActiveFileContext(firstFile);
+    ideContext.setOpenFilesContext(firstFile);
 
     const secondFile = {
-      filePath: '/path/to/second.py',
+      activeFile: '/path/to/second.py',
       cursor: { line: 20, character: 30 },
     };
-    ideContext.setActiveFileContext(secondFile);
+    ideContext.setOpenFilesContext(secondFile);
 
-    const activeFile = ideContext.getActiveFileContext();
+    const activeFile = ideContext.getOpenFilesContext();
     expect(activeFile).toEqual(secondFile);
   });
 
   it('should handle empty string for file path', () => {
     const testFile = {
-      filePath: '',
-      cursor: { line: 0, character: 0 },
+      activeFile: '',
+      selectedText: '1234',
     };
-    ideContext.setActiveFileContext(testFile);
-    expect(ideContext.getActiveFileContext()).toEqual(testFile);
+    ideContext.setOpenFilesContext(testFile);
+    expect(ideContext.getOpenFilesContext()).toEqual(testFile);
   });
 
   it('should notify subscribers when active file context changes', () => {
     const subscriber1 = vi.fn();
     const subscriber2 = vi.fn();
 
-    ideContext.subscribeToActiveFile(subscriber1);
-    ideContext.subscribeToActiveFile(subscriber2);
+    ideContext.subscribeToOpenFiles(subscriber1);
+    ideContext.subscribeToOpenFiles(subscriber2);
 
     const testFile = {
-      filePath: '/path/to/subscribed.ts',
+      activeFile: '/path/to/subscribed.ts',
       cursor: { line: 15, character: 25 },
     };
-    ideContext.setActiveFileContext(testFile);
+    ideContext.setOpenFilesContext(testFile);
 
     expect(subscriber1).toHaveBeenCalledTimes(1);
     expect(subscriber1).toHaveBeenCalledWith(testFile);
@@ -77,10 +77,10 @@ describe('ideContext - Active File', () => {
 
     // Test with another update
     const newFile = {
-      filePath: '/path/to/new.js',
-      cursor: { line: 1, character: 1 },
+      activeFile: '/path/to/new.js',
+      selectedText: '1234',
     };
-    ideContext.setActiveFileContext(newFile);
+    ideContext.setOpenFilesContext(newFile);
 
     expect(subscriber1).toHaveBeenCalledTimes(2);
     expect(subscriber1).toHaveBeenCalledWith(newFile);
@@ -92,21 +92,21 @@ describe('ideContext - Active File', () => {
     const subscriber1 = vi.fn();
     const subscriber2 = vi.fn();
 
-    const unsubscribe1 = ideContext.subscribeToActiveFile(subscriber1);
-    ideContext.subscribeToActiveFile(subscriber2);
+    const unsubscribe1 = ideContext.subscribeToOpenFiles(subscriber1);
+    ideContext.subscribeToOpenFiles(subscriber2);
 
-    ideContext.setActiveFileContext({
-      filePath: '/path/to/file1.txt',
-      cursor: { line: 1, character: 1 },
+    ideContext.setOpenFilesContext({
+      activeFile: '/path/to/file1.txt',
+      selectedText: '1234',
     });
     expect(subscriber1).toHaveBeenCalledTimes(1);
     expect(subscriber2).toHaveBeenCalledTimes(1);
 
     unsubscribe1();
 
-    ideContext.setActiveFileContext({
-      filePath: '/path/to/file2.txt',
-      cursor: { line: 2, character: 2 },
+    ideContext.setOpenFilesContext({
+      activeFile: '/path/to/file2.txt',
+      selectedText: '1234',
     });
     expect(subscriber1).toHaveBeenCalledTimes(1); // Should not be called again
     expect(subscriber2).toHaveBeenCalledTimes(2);
@@ -114,27 +114,27 @@ describe('ideContext - Active File', () => {
 
   it('should allow the cursor to be optional', () => {
     const testFile = {
-      filePath: '/path/to/test/file.ts',
+      activeFile: '/path/to/test/file.ts',
     };
 
-    ideContext.setActiveFileContext(testFile);
+    ideContext.setOpenFilesContext(testFile);
 
-    const activeFile = ideContext.getActiveFileContext();
+    const activeFile = ideContext.getOpenFilesContext();
     expect(activeFile).toEqual(testFile);
   });
 
   it('should clear the active file context', () => {
     const testFile = {
-      filePath: '/path/to/test/file.ts',
-      cursor: { line: 5, character: 10 },
+      activeFile: '/path/to/test/file.ts',
+      selectedText: '1234',
     };
 
-    ideContext.setActiveFileContext(testFile);
+    ideContext.setOpenFilesContext(testFile);
 
-    expect(ideContext.getActiveFileContext()).toEqual(testFile);
+    expect(ideContext.getOpenFilesContext()).toEqual(testFile);
 
-    ideContext.clearActiveFileContext();
+    ideContext.clearOpenFilesContext();
 
-    expect(ideContext.getActiveFileContext()).toBeUndefined();
+    expect(ideContext.getOpenFilesContext()).toBeUndefined();
   });
 });
