@@ -246,6 +246,11 @@ Expectation for required parameters:
           display: `Failed to edit, expected ${expectedReplacements} ${occurenceTerm} but found ${occurrences}.`,
           raw: `Failed to edit, Expected ${expectedReplacements} ${occurenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
         };
+      } else if (finalOldString === finalNewString) {
+        error = {
+          display: `No changes to apply. The old_string and new_string are identical.`,
+          raw: `No changes to apply. The old_string and new_string are identical in file: ${params.file_path}`,
+        };
       }
     } else {
       // Should not happen if fileExists and no exception was thrown, but defensively:
