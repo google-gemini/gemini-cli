@@ -388,7 +388,8 @@ describe('BedrockStreamHandler', () => {
         expect.any(String)
       );
       expect(consoleDebugSpy).toHaveBeenCalledWith(
-        '[BedrockStreamHandler] Stream completed'
+        '[BedrockStreamHandler] Stream completed with final token usage:',
+        { inputTokens: 0, outputTokens: 0 }
       );
 
       consoleDebugSpy.mockRestore();

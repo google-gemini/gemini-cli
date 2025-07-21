@@ -77,14 +77,14 @@ describe('Bedrock MCP Integration', () => {
         name: 'get_weather',
         description: 'Get the current weather for a location',
         input_schema: {
-          type: Type.OBJECT,
+          type: 'object',
           properties: {
             location: {
-              type: Type.STRING,
+              type: 'string',
               description: 'The city and state, e.g. San Francisco, CA'
             },
             unit: {
-              type: Type.STRING,
+              type: 'string',
               enum: ['celsius', 'fahrenheit'],
               description: 'Temperature unit'
             }
@@ -142,9 +142,9 @@ describe('Bedrock MCP Integration', () => {
       const convertedTool = bedrockTools[0];
       
       expect(convertedTool.name).toBe('database_query');
-      expect(convertedTool.input_schema.type).toBe(Type.OBJECT);
-      const properties = convertedTool.input_schema.properties as Record<string, { type?: Type }>;
-      expect(properties?.parameters?.type).toBe(Type.ARRAY);
+      expect(convertedTool.input_schema.type).toBe('object');
+      const properties = convertedTool.input_schema.properties as Record<string, { type?: string }>;
+      expect(properties?.parameters?.type).toBe('array');
       // additionalProperties check removed as it's not part of Schema type
     });
 
@@ -371,8 +371,8 @@ describe('Bedrock MCP Integration', () => {
       
       expect(bedrockTools).toHaveLength(1);
       const tool = bedrockTools[0];
-      const properties = tool.input_schema.properties as Record<string, { type?: Type }>;
-      expect(properties?.metadata?.type).toBe(Type.OBJECT);
+      const properties = tool.input_schema.properties as Record<string, { type?: string }>;
+      expect(properties?.metadata?.type).toBe('object');
       // additionalProperties check removed as it's not part of Schema type
     });
   });

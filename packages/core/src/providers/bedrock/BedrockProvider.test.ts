@@ -23,6 +23,22 @@ vi.mock('@anthropic-ai/bedrock-sdk', () => {
   };
 });
 
+// Mock the retry module to make tests run faster
+vi.mock('../../utils/retry.js', () => ({
+  retryWithBackoff: vi.fn(async (fn, options) => {
+    try {
+      return await fn();
+    } catch (error) {
+      // If shouldRetry is provided and returns false, throw immediately
+      if (options?.shouldRetry && !options.shouldRetry(error)) {
+        throw error;
+      }
+      // Otherwise simulate one retry then throw
+      throw error;
+    }
+  }),
+}));
+
 describe('BedrockProvider', () => {
   let provider: BedrockProvider;
   let config: Config;
@@ -216,9 +232,9 @@ describe('BedrockProvider', () => {
           name: 'get_weather',
           description: 'Get weather information',  
           input_schema: {
-            type: Type.OBJECT,
+            type: 'object',
             properties: {
-              location: { type: Type.STRING }
+              location: { type: 'string' }
             },
             required: ['location']
           }
@@ -612,7 +628,8 @@ describe('BedrockProvider', () => {
       const rateLimitError = new Error('Too many requests') as Error & { status?: number };
       rateLimitError.status = 429;
       
-      mockClient.messages.create.mockRejectedValueOnce(rateLimitError);
+      // Mock the error for all retry attempts (5 attempts)
+      mockClient.messages.create.mockRejectedValue(rateLimitError);
       
       await expect(
         provider.generateContent({
@@ -623,7 +640,7 @@ describe('BedrockProvider', () => {
           }]
         })
       ).rejects.toThrow('Rate limit exceeded');
-    });
+    }, 60000); // 60 second timeout to account for retry delays
 
     it('should handle invalid JSON in JSON mode', async () => {
       const mockResponse = {

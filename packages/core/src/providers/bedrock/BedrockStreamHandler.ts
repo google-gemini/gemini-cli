@@ -13,6 +13,11 @@ import { Config } from '../../config/config.js';
  * Handles streaming responses from Bedrock and converts them to Gemini format
  */
 export class BedrockStreamHandler {
+  private cumulativeUsage: {
+    inputTokens: number;
+    outputTokens: number;
+  } = { inputTokens: 0, outputTokens: 0 };
+
   constructor(private config: Config) {}
 
   /**
@@ -21,6 +26,9 @@ export class BedrockStreamHandler {
   async *handleStream(
     stream: Stream<MessageStreamEvent>
   ): AsyncGenerator<GenerateContentResponse> {
+    // Reset cumulative usage for each new stream
+    this.cumulativeUsage = { inputTokens: 0, outputTokens: 0 };
+    
     let currentToolUse: {
       id?: string;
       name?: string;
@@ -76,18 +84,33 @@ export class BedrockStreamHandler {
             break;
 
           case 'message_start':
-          case 'message_delta':
-            // These events contain metadata but no content to yield
+            // Message start event - no content to yield
             if (this.config.getDebugMode()) {
-              console.debug(`[BedrockStreamHandler] ${event.type} event (no content to yield)`);
+              console.debug('[BedrockStreamHandler] message_start event');
+            }
+            break;
+
+          case 'message_delta':
+            // Message delta contains cumulative token usage
+            if ('usage' in event && event.usage) {
+              this.cumulativeUsage.inputTokens = event.usage.input_tokens || 0;
+              this.cumulativeUsage.outputTokens = event.usage.output_tokens || 0;
+              
+              if (this.config.getDebugMode()) {
+                console.debug('[BedrockStreamHandler] Token usage update:', {
+                  inputTokens: this.cumulativeUsage.inputTokens,
+                  outputTokens: this.cumulativeUsage.outputTokens
+                });
+              }
             }
             break;
 
           case 'message_stop':
             // End of message stream
             if (this.config.getDebugMode()) {
-              console.debug('[BedrockStreamHandler] Stream completed');
+              console.debug('[BedrockStreamHandler] Stream completed with final token usage:', this.cumulativeUsage);
             }
+            // Don't yield an empty chunk - usage metadata is already attached to content chunks
             break;
 
           default: {
@@ -109,7 +132,7 @@ export class BedrockStreamHandler {
    * Create a text response in Gemini format
    */
   private createTextResponse(text: string): GenerateContentResponse {
-    return Object.assign(Object.create(GenerateContentResponse.prototype), {
+    const response = Object.assign(Object.create(GenerateContentResponse.prototype), {
       candidates: [{
         index: 0,
         content: {
@@ -118,13 +141,23 @@ export class BedrockStreamHandler {
         },
       }],
     }) as GenerateContentResponse;
+    
+    // Attach current usage metadata if available
+    if (this.cumulativeUsage.inputTokens > 0 || this.cumulativeUsage.outputTokens > 0) {
+      response.usageMetadata = BedrockStreamHandler.createUsageMetadata(
+        this.cumulativeUsage.inputTokens,
+        this.cumulativeUsage.outputTokens
+      );
+    }
+    
+    return response;
   }
 
   /**
    * Create a tool call response in Gemini format
    */
   private createToolCallResponse(name: string, args: unknown): GenerateContentResponse {
-    return Object.assign(Object.create(GenerateContentResponse.prototype), {
+    const response = Object.assign(Object.create(GenerateContentResponse.prototype), {
       candidates: [{
         index: 0,
         content: {
@@ -138,6 +171,16 @@ export class BedrockStreamHandler {
         },
       }],
     }) as GenerateContentResponse;
+    
+    // Attach current usage metadata if available
+    if (this.cumulativeUsage.inputTokens > 0 || this.cumulativeUsage.outputTokens > 0) {
+      response.usageMetadata = BedrockStreamHandler.createUsageMetadata(
+        this.cumulativeUsage.inputTokens,
+        this.cumulativeUsage.outputTokens
+      );
+    }
+    
+    return response;
   }
 
   /**
