@@ -14,6 +14,8 @@ import {
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Server as HTTPServer } from 'node:http';
+import { z } from 'zod';
+import { DiffManager } from './diff-manager';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
@@ -34,30 +36,45 @@ function sendActiveFileChangedNotification(
 }
 
 export class IDEServer {
-  private server: HTTPServer | undefined;
-  private context: vscode.ExtensionContext | undefined;
-  private logger: vscode.OutputChannel;
+  server: HTTPServer | undefined;
+  context: vscode.ExtensionContext | undefined;
+  logger: vscode.OutputChannel;
+  diffManager: DiffManager;
+  transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
-  constructor(logger: vscode.OutputChannel) {
+  constructor(logger: vscode.OutputChannel, diffManager: DiffManager) {
     this.logger = logger;
+    this.diffManager = diffManager;
+  }
+
+  broadcastNotification(notification: JSONRPCNotification) {
+    this.logger.appendLine(`Broadcasting notification: ${notification.method}`);
+    for (const transport of Object.values(this.transports)) {
+      transport.send(notification);
+    }
   }
 
   async start(context: vscode.ExtensionContext) {
     this.context = context;
-    const transports: { [sessionId: string]: StreamableHTTPServerTransport } =
-      {};
     const sessionsWithInitialNotification = new Set<string>();
 
     const app = express();
     app.use(express.json());
-    const mcpServer = createMcpServer();
+    const mcpServer = createMcpServer(this.diffManager);
 
-    const disposable = vscode.window.onDidChangeActiveTextEditor((_editor) => {
-      for (const transport of Object.values(transports)) {
-        sendActiveFileChangedNotification(transport, this.logger);
-      }
-    });
-    context.subscriptions.push(disposable);
+    const onDidChangeActiveTextEditorDisposable =
+      vscode.window.onDidChangeActiveTextEditor((_editor) => {
+        for (const transport of Object.values(this.transports)) {
+          sendActiveFileChangedNotification(transport, this.logger);
+        }
+      });
+    context.subscriptions.push(onDidChangeActiveTextEditorDisposable);
+
+    const onDidCloseTextDocumentDisposable =
+      vscode.workspace.onDidCloseTextDocument(async (document) => {
+        this.diffManager.onDidCloseTextDocument(document);
+      });
+    context.subscriptions.push(onDidCloseTextDocumentDisposable);
 
     app.post('/mcp', async (req: Request, res: Response) => {
       const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
@@ -65,17 +82,16 @@ export class IDEServer {
         | undefined;
       let transport: StreamableHTTPServerTransport;
 
-      if (sessionId && transports[sessionId]) {
-        transport = transports[sessionId];
+      if (sessionId && this.transports[sessionId]) {
+        transport = this.transports[sessionId];
       } else if (!sessionId && isInitializeRequest(req.body)) {
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (newSessionId) => {
             this.logger.appendLine(`New session initialized: ${newSessionId}`);
-            transports[newSessionId] = transport;
+            this.transports[newSessionId] = transport;
           },
         });
-
         const keepAlive = setInterval(() => {
           try {
             transport.send({ jsonrpc: '2.0', method: 'ping' });
@@ -94,7 +110,7 @@ export class IDEServer {
           if (transport.sessionId) {
             this.logger.appendLine(`Session closed: ${transport.sessionId}`);
             sessionsWithInitialNotification.delete(transport.sessionId);
-            delete transports[transport.sessionId];
+            delete this.transports[transport.sessionId];
           }
         };
         mcpServer.connect(transport);
@@ -137,13 +153,13 @@ export class IDEServer {
       const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
         | string
         | undefined;
-      if (!sessionId || !transports[sessionId]) {
+      if (!sessionId || !this.transports[sessionId]) {
         this.logger.appendLine('Invalid or missing session ID');
         res.status(400).send('Invalid or missing session ID');
         return;
       }
 
-      const transport = transports[sessionId];
+      const transport = this.transports[sessionId];
       try {
         await transport.handleRequest(req, res);
       } catch (error) {
@@ -201,7 +217,7 @@ export class IDEServer {
   }
 }
 
-const createMcpServer = () => {
+const createMcpServer = (diffManager: DiffManager) => {
   const server = new McpServer(
     {
       name: 'gemini-cli-companion-mcp-server',
@@ -233,6 +249,34 @@ const createMcpServer = () => {
           ],
         };
       }
+    },
+  );
+  server.registerTool(
+    'openDiff',
+    {
+      description:
+        '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejcted.',
+      inputSchema: z.object({
+        filePath: z.string(),
+        newContent: z.string().optional(),
+      }).shape,
+    },
+    async ({
+      filePath,
+      newContent,
+    }: {
+      filePath: string;
+      newContent?: string;
+    }) => {
+      await diffManager.showDiff(filePath, newContent ?? '');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Showing diff for ${filePath}`,
+          },
+        ],
+      };
     },
   );
   return server;
