@@ -157,7 +157,6 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
       tabWidth,
       availableTerminalHeight,
       terminalWidth,
-      theme,
     );
   }
 
@@ -170,7 +169,6 @@ const renderDiffContent = (
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight: number | undefined,
   terminalWidth: number,
-  theme?: import('../../themes/theme.js').Theme,
 ) => {
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
@@ -244,20 +242,17 @@ const renderDiffContent = (
 
         const lineKey = `diff-line-${index}`;
         let gutterNumStr = '';
-        let color: string | undefined = undefined;
         let prefixSymbol = ' ';
         let dim = false;
 
         switch (line.type) {
           case 'add':
             gutterNumStr = (line.newLine ?? '').toString();
-            color = theme?.colors?.AccentGreen || 'green';
             prefixSymbol = '+';
             lastLineNumber = line.newLine ?? null;
             break;
           case 'del':
             gutterNumStr = (line.oldLine ?? '').toString();
-            color = theme?.colors?.AccentRed || 'red';
             prefixSymbol = '-';
             // For deletions, update lastLineNumber based on oldLine if it's advancing.
             // This helps manage gaps correctly if there are multiple consecutive deletions
@@ -281,12 +276,32 @@ const renderDiffContent = (
         acc.push(
           <Box key={lineKey} flexDirection="row">
             <Text color={Colors.Gray}>{gutterNumStr.padEnd(4)} </Text>
-            <Text color={color} dimColor={dim}>
-              {prefixSymbol}{' '}
-            </Text>
-            <Text color={color} dimColor={dim} wrap="wrap">
-              {displayContent}
-            </Text>
+            {line.type === 'context' ? (
+              <>
+                <Text dimColor={dim}>{prefixSymbol} </Text>
+                <Text dimColor={dim} wrap="wrap">
+                  {displayContent}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text
+                  backgroundColor={
+                    line.type === 'add' ? Colors.DiffAdded : Colors.DiffRemoved
+                  }
+                >
+                  {prefixSymbol}{' '}
+                </Text>
+                <Text
+                  backgroundColor={
+                    line.type === 'add' ? Colors.DiffAdded : Colors.DiffRemoved
+                  }
+                  wrap="wrap"
+                >
+                  {displayContent}
+                </Text>
+              </>
+            )}
           </Box>,
         );
         return acc;
