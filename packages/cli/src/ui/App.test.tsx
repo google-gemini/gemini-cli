@@ -349,7 +349,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve(); // Wait for any async updates
-    expect(lastFrame()).toContain('Using: 1 GEMINI.md File');
+    expect(lastFrame()).toContain('1 GEMINI.md');
   });
 
   it('should display default "GEMINI.md" with plural when contextFileName is not set and count is > 1', async () => {
@@ -366,7 +366,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using: 2 GEMINI.md Files');
+    expect(lastFrame()).toContain('2 GEMINI.md');
   });
 
   it('should display custom contextFileName in footer when set and count is 1', async () => {
@@ -386,7 +386,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using: 1 AGENTS.md File');
+    expect(lastFrame()).toContain('1 AGENTS.md');
   });
 
   it('should display a generic message when multiple context files with different names are provided', async () => {
@@ -409,7 +409,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using: 2 Context Files');
+    expect(lastFrame()).toContain('2 Instructions');
   });
 
   it('should display custom contextFileName with plural when set and count is > 1', async () => {
@@ -429,7 +429,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using: 3 MY_NOTES.TXT Files');
+    expect(lastFrame()).toContain('3 MY_NOTES.TXT');
   });
 
   it('should not display context file message if count is 0, even if contextFileName is set', async () => {
@@ -469,7 +469,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('1 MCP Server');
+    expect(lastFrame()).toContain('1 MCP');
   });
 
   it('should display only MCP server count when GEMINI.md count is 0', async () => {
@@ -490,7 +490,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using: 2 MCP Servers');
+    expect(lastFrame()).toContain('2 MCP');
   });
 
   it('should display Tips component by default', async () => {
