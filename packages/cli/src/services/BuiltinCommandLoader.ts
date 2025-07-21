@@ -10,7 +10,7 @@ import { Config } from '@google/gemini-cli-core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
-import { chatCommand } from '../ui/commands/chatCommand.js';
+import { resumeCommand } from '../ui/commands/resumeCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { copyCommand } from '../ui/commands/copyCommand.js';
@@ -48,7 +48,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       aboutCommand,
       authCommand,
       bugCommand,
-      chatCommand,
+      resumeCommand,
       clearCommand,
       compressCommand,
       copyCommand,

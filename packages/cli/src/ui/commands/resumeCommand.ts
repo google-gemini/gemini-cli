@@ -8,11 +8,13 @@ import {
   CommandContext,
   SlashCommand,
   OpenDialogActionReturn,
+  CommandKind,
 } from './types.js';
 
 export const resumeCommand: SlashCommand = {
   name: 'resume',
   description: 'Browse and resume auto-saved conversations',
+  kind: CommandKind.BUILT_IN,
   action: async (
     context: CommandContext,
     args: string,
