@@ -440,6 +440,69 @@ describe('useSlashCommandProcessor', () => {
     });
   });
 
+  describe('Command Precedence', () => {
+    it('should prioritize a command with a primary name over a command with a matching alias', async () => {
+      const quitAction = vi.fn();
+      const exitAction = vi.fn();
+
+      const quitCommand = createTestCommand({
+        name: 'quit',
+        altNames: ['exit'],
+        action: quitAction,
+      });
+
+      const exitCommand = createTestCommand(
+        {
+          name: 'exit',
+          action: exitAction,
+        },
+        CommandKind.FILE,
+      );
+
+      // The order of commands in the final loaded array is not guaranteed,
+      // so the test must work regardless of which comes first.
+      const result = setupProcessorHook([quitCommand], [exitCommand]);
+
+      await waitFor(() => {
+        expect(result.current.slashCommands).toHaveLength(2);
+      });
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/exit');
+      });
+
+      // The action for the command whose primary name is 'exit' should be called.
+      expect(exitAction).toHaveBeenCalledTimes(1);
+      // The action for the command that has 'exit' as an alias should NOT be called.
+      expect(quitAction).not.toHaveBeenCalled();
+    });
+
+    it('should add an overridden command to the history', async () => {
+      const quitCommand = createTestCommand({
+        name: 'quit',
+        altNames: ['exit'],
+        action: vi.fn(),
+      });
+      const exitCommand = createTestCommand(
+        { name: 'exit', action: vi.fn() },
+        CommandKind.FILE,
+      );
+
+      const result = setupProcessorHook([quitCommand], [exitCommand]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/exit');
+      });
+
+      // It should be added to the history.
+      expect(mockAddItem).toHaveBeenCalledWith(
+        { type: MessageType.USER, text: '/exit' },
+        expect.any(Number),
+      );
+    });
+  });
+
   describe('Lifecycle', () => {
     it('should abort command loading when the hook unmounts', async () => {
       const abortSpy = vi.spyOn(AbortController.prototype, 'abort');

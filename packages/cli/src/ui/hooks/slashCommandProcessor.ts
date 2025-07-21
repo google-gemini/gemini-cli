@@ -195,12 +195,7 @@ export const useSlashCommandProcessor = (
       }
 
       const userMessageTimestamp = Date.now();
-      if (trimmed !== '/quit' && trimmed !== '/exit') {
-        addItem(
-          { type: MessageType.USER, text: trimmed },
-          userMessageTimestamp,
-        );
-      }
+      addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
 
       const parts = trimmed.substring(1).trim().split(/\s+/);
       const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
@@ -210,9 +205,21 @@ export const useSlashCommandProcessor = (
       let pathIndex = 0;
 
       for (const part of commandPath) {
-        const foundCommand = currentCommands.find(
-          (cmd) => cmd.name === part || cmd.altNames?.includes(part),
-        );
+        // TODO: For better performance and architectural clarity, this two-pass
+        // search could be replaced. A more optimal approach would be to
+        // pre-compute a single lookup map in `CommandService.ts` that resolves
+        // all name and alias conflicts during the initial loading phase. The
+        // processor would then perform a single, fast lookup on that map.
+
+        // First pass: check for an exact match on the primary command name.
+        let foundCommand = currentCommands.find((cmd) => cmd.name === part);
+
+        // Second pass: if no primary name matches, check for an alias.
+        if (!foundCommand) {
+          foundCommand = currentCommands.find((cmd) =>
+            cmd.altNames?.includes(part),
+          );
+        }
 
         if (foundCommand) {
           commandToExecute = foundCommand;
