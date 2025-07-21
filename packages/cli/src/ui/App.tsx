@@ -220,8 +220,23 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         addItem(item, index, true);
       });
 
-      // Set the client history
-      config.getGeminiClient()?.setHistory(result.clientHistory);
+      // Filter out slash commands from client history before setting it
+      const filteredClientHistory = result.clientHistory.filter(content => {
+        // Filter out user messages that are slash commands
+        if (content.role === 'user' && content.parts) {
+          return !content.parts.some(part => {
+            if ('text' in part && typeof part.text === 'string') {
+              const trimmed = part.text.trim();
+              return trimmed.startsWith('/') || trimmed.startsWith('?');
+            }
+            return false;
+          });
+        }
+        return true; // Keep all non-user messages and user messages without slash commands
+      });
+
+      // Set the filtered client history
+      config.getGeminiClient()?.setHistory(filteredClientHistory);
       
       // Force Static component to re-render with the updated history
       refreshStatic();
