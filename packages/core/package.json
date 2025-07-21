@@ -44,7 +44,8 @@
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0",
     "undici": "^7.10.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "chardet": "^2.1.0"
   },
   "devDependencies": {
     "@types/diff": "^7.0.2",
