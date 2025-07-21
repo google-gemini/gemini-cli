@@ -19,7 +19,7 @@ import { RecentFilesManager } from './recent-files-manager.js';
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 
-function sendActiveFileChangedNotification(
+function sendOpenFilesChangedNotification(
   transport: StreamableHTTPServerTransport,
   logger: vscode.OutputChannel,
   recentFilesManager: RecentFilesManager,
@@ -29,9 +29,9 @@ function sendActiveFileChangedNotification(
   logger.appendLine(`Sending active file changed notification: ${filePath}`);
   const notification: JSONRPCNotification = {
     jsonrpc: '2.0',
-    method: 'ide/activeFileChanged',
+    method: 'ide/openFilesChanged',
     params: {
-      filePath,
+      activeFile: filePath,
       recentOpenFiles: recentFilesManager.recentFiles,
     },
   };
@@ -60,7 +60,7 @@ export class IDEServer {
     const recentFilesManager = new RecentFilesManager(context);
     const disposable = recentFilesManager.onDidChange(() => {
       for (const transport of Object.values(transports)) {
-        sendActiveFileChangedNotification(
+        sendOpenFilesChangedNotification(
           transport,
           this.logger,
           recentFilesManager,
@@ -168,7 +168,7 @@ export class IDEServer {
       }
 
       if (!sessionsWithInitialNotification.has(sessionId)) {
-        sendActiveFileChangedNotification(
+        sendOpenFilesChangedNotification(
           transport,
           this.logger,
           recentFilesManager,
@@ -224,7 +224,7 @@ const createMcpServer = () => {
     { capabilities: { logging: {} } },
   );
   server.registerTool(
-    'getActiveFile',
+    'getOpenFiles',
     {
       description:
         '(IDE Tool) Get the path of the file currently active in VS Code.',
