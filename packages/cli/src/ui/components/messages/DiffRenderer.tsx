@@ -8,7 +8,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../../colors.js';
 import crypto from 'crypto';
-import { colorizeCode } from '../../utils/CodeColorizer.js';
+import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 
 interface DiffLine {
@@ -189,6 +189,11 @@ const renderDiffContent = (
     );
   }
 
+  const fileExtension = filename?.split('.').pop() || null;
+  const language = fileExtension
+    ? getLanguageFromExtension(fileExtension)
+    : null;
+
   // Calculate the minimum indentation across all displayable lines
   let baseIndentation = Infinity; // Start high to find the minimum
   for (const line of displayableLines) {
@@ -243,7 +248,6 @@ const renderDiffContent = (
         const lineKey = `diff-line-${index}`;
         let gutterNumStr = '';
         let prefixSymbol = ' ';
-        let dim = false;
 
         switch (line.type) {
           case 'add':
@@ -263,7 +267,6 @@ const renderDiffContent = (
             break;
           case 'context':
             gutterNumStr = (line.newLine ?? '').toString();
-            dim = true;
             prefixSymbol = ' ';
             lastLineNumber = line.newLine ?? null;
             break;
@@ -278,9 +281,9 @@ const renderDiffContent = (
             <Text color={Colors.Gray}>{gutterNumStr.padEnd(4)} </Text>
             {line.type === 'context' ? (
               <>
-                <Text dimColor={dim}>{prefixSymbol} </Text>
-                <Text dimColor={dim} wrap="wrap">
-                  {displayContent}
+                <Text>{prefixSymbol} </Text>
+                <Text wrap="wrap">
+                  {colorizeLine(displayContent, language)}
                 </Text>
               </>
             ) : (
@@ -298,7 +301,7 @@ const renderDiffContent = (
                   }
                   wrap="wrap"
                 >
-                  {displayContent}
+                  {colorizeLine(displayContent, language)}
                 </Text>
               </>
             )}

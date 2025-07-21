@@ -88,6 +88,30 @@ function renderHastNode(
   return null;
 }
 
+export function colorizeLine(
+  line: string,
+  language: string | null,
+  theme?: Theme,
+): React.ReactNode {
+  const activeTheme = theme || themeManager.getActiveTheme();
+  try {
+    const getHighlightedLine = () =>
+      !language || !lowlight.registered(language)
+        ? lowlight.highlightAuto(line)
+        : lowlight.highlight(language, line);
+
+    const renderedNode = renderHastNode(
+      getHighlightedLine(),
+      activeTheme,
+      undefined,
+    );
+
+    return renderedNode !== null ? renderedNode : line;
+  } catch (_error) {
+    return line;
+  }
+}
+
 /**
  * Renders syntax-highlighted code for Ink applications using a selected theme.
  *
