@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MessageActionReturn, SlashCommand } from './types.js';
+import { MessageActionReturn, SlashCommand, CommandKind } from './types.js';
 import { terminalSetup } from '../utils/terminalSetup.js';
 
 /**
@@ -17,6 +17,7 @@ export const terminalSetupCommand: SlashCommand = {
   name: 'terminal-setup',
   description:
     'Configure terminal keybindings for multiline input (VS Code, Cursor, Windsurf)',
+  kind: CommandKind.BUILT_IN,
 
   action: async (): Promise<MessageActionReturn> => {
     try {

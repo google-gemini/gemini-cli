@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { terminalSetupCommand } from './terminalSetupCommand.js';
 import { terminalSetup } from '../utils/terminalSetup.js';
-import { MessageActionReturn, CommandContext } from './types.js';
+import { MessageActionReturn, CommandContext, CommandKind } from './types.js';
 
 // Mock the terminalSetup function
 vi.mock('../utils/terminalSetup.js', () => ({
@@ -24,6 +24,7 @@ describe('terminalSetupCommand', () => {
     expect(terminalSetupCommand.description).toContain(
       'Configure terminal keybindings',
     );
+    expect(terminalSetupCommand.kind).toBe(CommandKind.BUILT_IN);
     expect(terminalSetupCommand.action).toBeDefined();
   });
 

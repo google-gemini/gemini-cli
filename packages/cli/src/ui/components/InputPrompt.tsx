@@ -499,7 +499,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellHistory,
       handleClipboardImage,
       resetCompletionState,
-      kittyProtocolStatus.enabled,
     ],
   );
 
