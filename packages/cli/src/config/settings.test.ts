@@ -750,6 +750,46 @@ describe('Settings Loading and Merging', () => {
       delete process.env.TEST_HOST;
       delete process.env.TEST_PORT;
     });
+
+    describe('when GEMINI_CLI_SYSTEM_SETTINGS_PATH is set', () => {
+      const MOCK_ENV_SYSTEM_SETTINGS_PATH = '/mock/env/system/settings.json';
+
+      beforeEach(() => {
+        process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH =
+          MOCK_ENV_SYSTEM_SETTINGS_PATH;
+      });
+
+      afterEach(() => {
+        delete process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
+      });
+
+      it('should load system settings from the path specified in the environment variable', () => {
+        (mockFsExistsSync as Mock).mockImplementation(
+          (p: fs.PathLike) => p === MOCK_ENV_SYSTEM_SETTINGS_PATH,
+        );
+        const systemSettingsContent = {
+          theme: 'env-var-theme',
+          sandbox: true,
+        };
+        (fs.readFileSync as Mock).mockImplementation(
+          (p: fs.PathOrFileDescriptor) => {
+            if (p === MOCK_ENV_SYSTEM_SETTINGS_PATH)
+              return JSON.stringify(systemSettingsContent);
+            return '{}';
+          },
+        );
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(fs.readFileSync).toHaveBeenCalledWith(
+          MOCK_ENV_SYSTEM_SETTINGS_PATH,
+          'utf-8',
+        );
+        expect(settings.system.path).toBe(MOCK_ENV_SYSTEM_SETTINGS_PATH);
+        expect(settings.system.settings).toEqual(systemSettingsContent);
+        expect(settings.merged).toEqual(systemSettingsContent);
+      });
+    });
   });
 
   describe('LoadedSettings class', () => {

@@ -25,6 +25,9 @@ export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 
 function getSystemSettingsPath(): string {
+  if (process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH) {
+    return process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
+  }
   if (platform() === 'darwin') {
     return '/Library/Application Support/GeminiCli/settings.json';
   } else if (platform() === 'win32') {
@@ -34,11 +37,7 @@ function getSystemSettingsPath(): string {
   }
 }
 
-export let systemSettingsPath = getSystemSettingsPath();
-
-export function setSystemSettingsPath(newPath: string) {
-  systemSettingsPath = newPath;
-}
+export const systemSettingsPath = getSystemSettingsPath();
 
 export enum SettingScope {
   User = 'User',

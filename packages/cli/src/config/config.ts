@@ -20,7 +20,7 @@ import {
   MCPServerConfig,
   IDE_SERVER_NAME,
 } from '@google/gemini-cli-core';
-import { Settings, setSystemSettingsPath } from './settings.js';
+import { Settings } from './settings.js';
 
 import { Extension, annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
@@ -246,10 +246,6 @@ export async function loadCliConfig(
     [process.env.DEBUG, process.env.DEBUG_MODE].some(
       (v) => v === 'true' || v === '1',
     );
-
-  if (process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH) {
-    setSystemSettingsPath(process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH);
-  }
 
   const ideMode =
     (argv.ideMode ?? settings.ideMode ?? false) &&
