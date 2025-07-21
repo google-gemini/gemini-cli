@@ -26,6 +26,7 @@ import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
+import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';

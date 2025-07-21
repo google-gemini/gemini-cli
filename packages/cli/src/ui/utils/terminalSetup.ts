@@ -28,8 +28,18 @@ import * as os from 'os';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { isKittyProtocolEnabled } from './kittyProtocolDetector.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * Removes single-line JSON comments (// ...) from a string to allow parsing
+ * VS Code style JSON files that may contain comments.
+ */
+function stripJsonComments(content: string): string {
+  // Remove single-line comments (// ...)
+  return content.replace(/^\s*\/\/.*$/gm, '');
+}
 
 export interface TerminalSetupResult {
   success: boolean;
@@ -112,10 +122,6 @@ function getVSCodeStyleConfigDir(appName: string): string | null {
     }
     return path.join(process.env.APPDATA, appName, 'User');
   } else {
-    // Linux - Cursor and Windsurf don't use 'User' subdirectory on Linux
-    if (appName === 'Cursor' || appName === 'Windsurf') {
-      return path.join(os.homedir(), '.config', appName);
-    }
     return path.join(os.homedir(), '.config', appName, 'User');
   }
 }
@@ -144,7 +150,8 @@ async function configureVSCodeStyle(
       const content = await fs.readFile(keybindingsFile, 'utf8');
       await backupFile(keybindingsFile);
       try {
-        const parsedContent = JSON.parse(content);
+        const cleanContent = stripJsonComments(content);
+        const parsedContent = JSON.parse(cleanContent);
         if (!Array.isArray(parsedContent)) {
           return {
             success: false,
@@ -297,6 +304,15 @@ async function configureWindsurf(): Promise<TerminalSetupResult> {
  * }
  */
 export async function terminalSetup(): Promise<TerminalSetupResult> {
+  // Check if terminal already has optimal keyboard support
+  if (isKittyProtocolEnabled()) {
+    return {
+      success: true,
+      message:
+        'Your terminal is already configured for an optimal experience with multiline input (Shift+Enter and Ctrl+Enter).',
+    };
+  }
+
   const terminal = await detectTerminal();
 
   if (!terminal) {
