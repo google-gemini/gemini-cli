@@ -6,26 +6,8 @@
 
 import * as vscode from 'vscode';
 
-const DEFAULT_MAX_RECENT_FILES = 10;
-
-export function getMaxRecentFiles() {
-  const value = process.env['IDE_MODE_MAX_RECENT_FILES'];
-  if (!value) {
-    return DEFAULT_MAX_RECENT_FILES;
-  }
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? DEFAULT_MAX_RECENT_FILES : parsed;
-}
-
-// Threshold of minutes since the file was last active.
-export function getMaxFileAge() {
-  const value = process.env['IDE_MODE_MAX_FILE_AGE_MINUTES'];
-  if (!value) {
-    return 10;
-  }
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? 10 : parsed;
-}
+export const MAX_FILES = 10;
+export const MAX_FILE_AGE_MINUTES = 5;
 
 interface RecentFile {
   uri: vscode.Uri;
@@ -33,29 +15,17 @@ interface RecentFile {
 }
 
 /**
- * Keeps track of the IDE_MODE_MAX_RECENT_FILES # of recently-opened files
- * opened less than IDE_MODE_MAX_FILE_AGE_MINUTES ago. If a file
- * is closed or deleted, it will be removed. If the length is maxxed out,
+ * Keeps track of the 10 most recently-opened files
+ * opened less than 5 ago. If a file is closed or deleted,
+ * it will be removed. If the length is maxxed out,
  * the now-removed file will not be replaced by an older file.
- *
- * You can configure the thresholds for IDE_MODE_MAX_RECENT_FILES
- * and IDE_MODE_MAX_FILE_AGE_MINUTES using environment variables.
  */
 export class RecentFilesManager {
   private readonly files: RecentFile[] = [];
   private readonly onDidChangeEmitter = new vscode.EventEmitter<void>();
   readonly onDidChange = this.onDidChangeEmitter.event;
 
-  private readonly maxRecentFiles: number;
-  private readonly maxFileAge: number;
-
-  constructor(
-    private readonly context: vscode.ExtensionContext,
-    maxRecentFiles?: number,
-    maxFileAge?: number,
-  ) {
-    this.maxRecentFiles = maxRecentFiles ?? getMaxRecentFiles();
-    this.maxFileAge = maxFileAge ?? getMaxFileAge();
+  constructor(private readonly context: vscode.ExtensionContext) {
     const editorWatcher = vscode.window.onDidChangeActiveTextEditor(
       (editor) => {
         if (editor) {
@@ -71,7 +41,18 @@ export class RecentFilesManager {
     const closeWatcher = vscode.workspace.onDidCloseTextDocument((document) => {
       this.remove(document.uri);
     });
-    context.subscriptions.push(editorWatcher, fileWatcher, closeWatcher);
+    const renameWatcher = vscode.workspace.onDidRenameFiles((event) => {
+      for (const { oldUri, newUri } of event.files) {
+        this.remove(oldUri, false);
+        this.add(newUri);
+      }
+    });
+    context.subscriptions.push(
+      editorWatcher,
+      fileWatcher,
+      closeWatcher,
+      renameWatcher,
+    );
   }
 
   private remove(uri: vscode.Uri, fireEvent = true) {
@@ -92,7 +73,7 @@ export class RecentFilesManager {
 
     this.files.unshift({ uri, timestamp: Date.now() });
 
-    if (this.files.length > this.maxRecentFiles) {
+    if (this.files.length > MAX_FILES) {
       this.files.pop();
     }
     this.onDidChangeEmitter.fire();
@@ -100,7 +81,7 @@ export class RecentFilesManager {
 
   get recentFiles(): Array<{ filePath: string; timestamp: number }> {
     const now = Date.now();
-    const maxAgeInMs = this.maxFileAge * 60 * 1000;
+    const maxAgeInMs = MAX_FILE_AGE_MINUTES * 60 * 1000;
     return this.files
       .filter((file) => now - file.timestamp < maxAgeInMs)
       .map((file) => ({
