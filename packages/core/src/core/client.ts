@@ -41,6 +41,7 @@ import {
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
+import { ideContext } from '../services/ideContext.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -220,7 +221,7 @@ export class GeminiClient {
     return initialParts;
   }
 
-  private async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
+  async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     const envParts = await this.getEnvironment();
     const toolRegistry = await this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
@@ -238,7 +239,7 @@ export class GeminiClient {
     ];
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      const systemInstruction = getCoreSystemPrompt(userMemory);
       const generateContentConfigWithThinking = isThinkingSupported(
         this.config.getModel(),
       )
@@ -303,7 +304,33 @@ export class GeminiClient {
     if (compressed) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
+
+    if (this.config.getIdeMode()) {
+      const activeFile = ideContext.getActiveFileContext();
+      if (activeFile?.filePath) {
+        let context = `
+This is the file that the user was most recently looking at:
+- Path: ${activeFile.filePath}`;
+        if (activeFile.cursor) {
+          context += `
+This is the cursor position in the file:
+- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`;
+        }
+        request = [
+          { text: context },
+          ...(Array.isArray(request) ? request : [request]),
+        ];
+      }
+    }
+
     const turn = new Turn(this.getChat(), prompt_id);
+
+    const loopDetected = await this.loopDetector.turnStarted(signal);
+    if (loopDetected) {
+      yield { type: GeminiEventType.LoopDetected };
+      return turn;
+    }
+
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
@@ -354,7 +381,7 @@ export class GeminiClient {
       model || this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      const systemInstruction = getCoreSystemPrompt(userMemory);
       const requestConfig = {
         abortSignal,
         ...this.generateContentConfig,
@@ -447,7 +474,7 @@ export class GeminiClient {
 
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      const systemInstruction = getCoreSystemPrompt(userMemory);
 
       const requestConfig = {
         abortSignal,

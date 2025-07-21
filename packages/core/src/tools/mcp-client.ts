@@ -18,8 +18,9 @@ import {
 import { parse } from 'shell-quote';
 import { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { FunctionDeclaration, Type, mcpToTool } from '@google/genai';
-import { sanitizeParameters, ToolRegistry } from './tool-registry.js';
+
+import { FunctionDeclaration, mcpToTool } from '@google/genai';
+import { ToolRegistry } from './tool-registry.js';
 import {
   ActiveFileNotificationSchema,
   IDE_SERVER_NAME,
@@ -214,6 +215,9 @@ export async function connectAndDiscover(
       mcpClient.onerror = (error) => {
         console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
         updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+        if (mcpServerName === IDE_SERVER_NAME) {
+          ideContext.clearActiveFileContext();
+        }
       };
 
       if (mcpServerName === IDE_SERVER_NAME) {
@@ -273,18 +277,13 @@ export async function discoverTools(
         continue;
       }
 
-      const toolNameForModel = generateValidName(funcDecl, mcpServerName);
-
-      sanitizeParameters(funcDecl.parameters);
-
       discoveredTools.push(
         new DiscoveredMCPTool(
           mcpCallableTool,
           mcpServerName,
-          toolNameForModel,
-          funcDecl.description ?? '',
-          funcDecl.parameters ?? { type: Type.OBJECT, properties: {} },
           funcDecl.name!,
+          funcDecl.description ?? '',
+          funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
           mcpServerConfig.trust,
         ),
@@ -423,26 +422,6 @@ export function createTransport(
   throw new Error(
     `Invalid configuration: missing httpUrl (for Streamable HTTP), url (for SSE), and command (for stdio).`,
   );
-}
-
-/** Visible for testing */
-export function generateValidName(
-  funcDecl: FunctionDeclaration,
-  mcpServerName: string,
-) {
-  // Replace invalid characters (based on 400 error message from Gemini API) with underscores
-  let validToolname = funcDecl.name!.replace(/[^a-zA-Z0-9_.-]/g, '_');
-
-  // Prepend MCP server name to avoid conflicts with other tools
-  validToolname = mcpServerName + '__' + validToolname;
-
-  // If longer than 63 characters, replace middle with '___'
-  // (Gemini API says max length 64, but actual limit seems to be 63)
-  if (validToolname.length > 63) {
-    validToolname =
-      validToolname.slice(0, 28) + '___' + validToolname.slice(-32);
-  }
-  return validToolname;
 }
 
 /** Visible for testing */
