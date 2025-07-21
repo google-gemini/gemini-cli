@@ -16,9 +16,9 @@ import {
   TrackedExecutingToolCall,
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
-import { 
-  Config, 
-  EditorType, 
+import {
+  Config,
+  EditorType,
   AuthType,
   GeminiEventType as ServerGeminiEventType,
 } from '@google/gemini-cli-core';
@@ -1189,7 +1189,10 @@ describe('useGeminiStream', () => {
       // Setup mock to return a stream with MAX_TOKENS finish reason
       mockSendMessageStream.mockReturnValue(
         (async function* () {
-          yield { type: ServerGeminiEventType.Content, value: 'This is a truncated response...' };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'This is a truncated response...',
+          };
           yield { type: ServerGeminiEventType.Finished, value: 'MAX_TOKENS' };
         })(),
       );
@@ -1233,7 +1236,10 @@ describe('useGeminiStream', () => {
       // Setup mock to return a stream with STOP finish reason
       mockSendMessageStream.mockReturnValue(
         (async function* () {
-          yield { type: ServerGeminiEventType.Content, value: 'Complete response' };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Complete response',
+          };
           yield { type: ServerGeminiEventType.Finished, value: 'STOP' };
         })(),
       );
@@ -1262,11 +1268,11 @@ describe('useGeminiStream', () => {
       });
 
       // Wait a bit to ensure no message is added
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Check that no info message was added for STOP
       const infoMessages = mockAddItem.mock.calls.filter(
-        call => call[0].type === 'info'
+        (call) => call[0].type === 'info',
       );
       expect(infoMessages).toHaveLength(0);
     });
@@ -1275,8 +1281,14 @@ describe('useGeminiStream', () => {
       // Setup mock to return a stream with FINISH_REASON_UNSPECIFIED
       mockSendMessageStream.mockReturnValue(
         (async function* () {
-          yield { type: ServerGeminiEventType.Content, value: 'Response with unspecified finish' };
-          yield { type: ServerGeminiEventType.Finished, value: 'FINISH_REASON_UNSPECIFIED' };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Response with unspecified finish',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: 'FINISH_REASON_UNSPECIFIED',
+          };
         })(),
       );
 
@@ -1304,27 +1316,55 @@ describe('useGeminiStream', () => {
       });
 
       // Wait a bit to ensure no message is added
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Check that no info message was added
       const infoMessages = mockAddItem.mock.calls.filter(
-        call => call[0].type === 'info'
+        (call) => call[0].type === 'info',
       );
       expect(infoMessages).toHaveLength(0);
     });
 
     it('should add appropriate messages for other finish reasons', async () => {
       const testCases = [
-        { reason: 'SAFETY', message: '⚠️  Response stopped due to safety reasons.' },
-        { reason: 'RECITATION', message: '⚠️  Response stopped due to recitation policy.' },
-        { reason: 'LANGUAGE', message: '⚠️  Response stopped due to unsupported language.' },
-        { reason: 'BLOCKLIST', message: '⚠️  Response stopped due to forbidden terms.' },
-        { reason: 'PROHIBITED_CONTENT', message: '⚠️  Response stopped due to prohibited content.' },
-        { reason: 'SPII', message: '⚠️  Response stopped due to sensitive personally identifiable information.' },
+        {
+          reason: 'SAFETY',
+          message: '⚠️  Response stopped due to safety reasons.',
+        },
+        {
+          reason: 'RECITATION',
+          message: '⚠️  Response stopped due to recitation policy.',
+        },
+        {
+          reason: 'LANGUAGE',
+          message: '⚠️  Response stopped due to unsupported language.',
+        },
+        {
+          reason: 'BLOCKLIST',
+          message: '⚠️  Response stopped due to forbidden terms.',
+        },
+        {
+          reason: 'PROHIBITED_CONTENT',
+          message: '⚠️  Response stopped due to prohibited content.',
+        },
+        {
+          reason: 'SPII',
+          message:
+            '⚠️  Response stopped due to sensitive personally identifiable information.',
+        },
         { reason: 'OTHER', message: '⚠️  Response stopped for other reasons.' },
-        { reason: 'MALFORMED_FUNCTION_CALL', message: '⚠️  Response stopped due to malformed function call.' },
-        { reason: 'IMAGE_SAFETY', message: '⚠️  Response stopped due to image safety violations.' },
-        { reason: 'UNEXPECTED_TOOL_CALL', message: '⚠️  Response stopped due to unexpected tool call.' },
+        {
+          reason: 'MALFORMED_FUNCTION_CALL',
+          message: '⚠️  Response stopped due to malformed function call.',
+        },
+        {
+          reason: 'IMAGE_SAFETY',
+          message: '⚠️  Response stopped due to image safety violations.',
+        },
+        {
+          reason: 'UNEXPECTED_TOOL_CALL',
+          message: '⚠️  Response stopped due to unexpected tool call.',
+        },
       ];
 
       for (const { reason, message } of testCases) {
@@ -1332,7 +1372,10 @@ describe('useGeminiStream', () => {
         mockAddItem.mockClear();
         mockSendMessageStream.mockReturnValue(
           (async function* () {
-            yield { type: ServerGeminiEventType.Content, value: `Response for ${reason}` };
+            yield {
+              type: ServerGeminiEventType.Content,
+              value: `Response for ${reason}`,
+            };
             yield { type: ServerGeminiEventType.Finished, value: reason };
           })(),
         );

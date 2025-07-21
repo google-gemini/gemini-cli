@@ -316,7 +316,11 @@ describe('Turn', () => {
         yield {
           candidates: [
             {
-              content: { parts: [{ text: 'This is a long response that was cut off...' }] },
+              content: {
+                parts: [
+                  { text: 'This is a long response that was cut off...' },
+                ],
+              },
               finishReason: 'MAX_TOKENS',
             },
           ],
@@ -334,7 +338,10 @@ describe('Turn', () => {
       }
 
       expect(events).toEqual([
-        { type: GeminiEventType.Content, value: 'This is a long response that was cut off...' },
+        {
+          type: GeminiEventType.Content,
+          value: 'This is a long response that was cut off...',
+        },
         { type: GeminiEventType.Finished, value: 'MAX_TOKENS' },
       ]);
     });
@@ -390,7 +397,10 @@ describe('Turn', () => {
       }
 
       expect(events).toEqual([
-        { type: GeminiEventType.Content, value: 'Response without finish reason' },
+        {
+          type: GeminiEventType.Content,
+          value: 'Response without finish reason',
+        },
       ]);
       // No Finished event should be emitted
     });

@@ -233,7 +233,7 @@ export class Turn {
 
         // Check if response was truncated or stopped for various reasons
         const finishReason = resp.candidates?.[0]?.finishReason;
-        
+
         if (finishReason) {
           yield {
             type: GeminiEventType.Finished,
