@@ -57,12 +57,12 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
   // Check for Cursor-specific indicators
   if (
     process.env.CURSOR_TRACE_ID ||
-    process.env.VSCODE_GIT_ASKPASS_MAIN?.includes('/cursor/')
+    process.env.VSCODE_GIT_ASKPASS_MAIN?.toLowerCase().includes('cursor')
   ) {
     return 'cursor';
   }
   // Check for Windsurf-specific indicators
-  if (process.env.VSCODE_GIT_ASKPASS_MAIN?.includes('/windsurf/')) {
+  if (process.env.VSCODE_GIT_ASKPASS_MAIN?.toLowerCase().includes('windsurf')) {
     return 'windsurf';
   }
   // Check VS Code last since forks may also set VSCODE env vars
