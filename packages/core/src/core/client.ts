@@ -311,20 +311,40 @@ export class GeminiClient {
     }
 
     if (this.config.getIdeMode()) {
-      const activeFile = ideContext.getActiveFileContext();
-      if (activeFile?.filePath) {
-        let context = `
-This is the file that the user was most recently looking at:
-- Path: ${activeFile.filePath}`;
-        if (activeFile.cursor) {
-          context += `
-This is the cursor position in the file:
-- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`;
+      const openFiles = ideContext.getOpenFilesContext();
+      if (openFiles) {
+        const contextParts: string[] = [];
+        if (openFiles.activeFile) {
+          contextParts.push(
+            `This is the file that the user was most recently looking at:\n- Path: ${openFiles.activeFile}`,
+          );
+          if (openFiles.cursor) {
+            contextParts.push(
+              `This is the cursor position in the file:\n- Cursor Position: Line ${openFiles.cursor.line}, Character ${openFiles.cursor.character}`,
+            );
+          }
+          if (openFiles.selectedText) {
+            contextParts.push(
+              `This is the selected text in the active file:\n- ${openFiles.selectedText}`,
+            );
+          }
         }
-        request = [
-          { text: context },
-          ...(Array.isArray(request) ? request : [request]),
-        ];
+
+        if (openFiles.recentOpenFiles && openFiles.recentOpenFiles.length > 0) {
+          const recentFiles = openFiles.recentOpenFiles
+            .map((file) => `- ${file.filePath}`)
+            .join('\n');
+          contextParts.push(
+            `Here are files the user has recently opened, with the most recent at the top:\n${recentFiles}`,
+          );
+        }
+
+        if (contextParts.length > 0) {
+          request = [
+            { text: contextParts.join('\n') },
+            ...(Array.isArray(request) ? request : [request]),
+          ];
+        }
       }
     }
 
