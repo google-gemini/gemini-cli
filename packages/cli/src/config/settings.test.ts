@@ -46,7 +46,7 @@ import stripJsonComments from 'strip-json-comments'; // Will be mocked separatel
 import {
   loadSettings,
   USER_SETTINGS_PATH, // This IS the mocked path.
-  systemSettingsPath,
+  getSystemSettingsPath,
   SETTINGS_DIRECTORY_NAME, // This is from the original module, but used by the mock.
   SettingScope,
 } from './settings.js';
@@ -104,7 +104,7 @@ describe('Settings Loading and Merging', () => {
 
     it('should load system settings if only system file exists', () => {
       (mockFsExistsSync as Mock).mockImplementation(
-        (p: fs.PathLike) => p === systemSettingsPath,
+        (p: fs.PathLike) => p === getSystemSettingsPath(),
       );
       const systemSettingsContent = {
         theme: 'system-default',
@@ -112,7 +112,7 @@ describe('Settings Loading and Merging', () => {
       };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
-          if (p === systemSettingsPath)
+          if (p === getSystemSettingsPath())
             return JSON.stringify(systemSettingsContent);
           return '{}';
         },
@@ -120,7 +120,10 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      expect(fs.readFileSync).toHaveBeenCalledWith(systemSettingsPath, 'utf-8');
+      expect(fs.readFileSync).toHaveBeenCalledWith(
+        getSystemSettingsPath(),
+        'utf-8',
+      );
       expect(settings.system.settings).toEqual(systemSettingsContent);
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
@@ -254,7 +257,7 @@ describe('Settings Loading and Merging', () => {
 
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
-          if (p === systemSettingsPath)
+          if (p === getSystemSettingsPath())
             return JSON.stringify(systemSettingsContent);
           if (p === USER_SETTINGS_PATH)
             return JSON.stringify(userSettingsContent);
@@ -740,7 +743,7 @@ describe('Settings Loading and Merging', () => {
 
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
-          if (p === systemSettingsPath) {
+          if (p === getSystemSettingsPath()) {
             process.env.SHARED_VAR = 'system_value_for_system_read'; // Set for system settings read
             return JSON.stringify(systemSettingsContent);
           }
@@ -947,7 +950,11 @@ describe('Settings Loading and Merging', () => {
         );
         expect(settings.system.path).toBe(MOCK_ENV_SYSTEM_SETTINGS_PATH);
         expect(settings.system.settings).toEqual(systemSettingsContent);
-        expect(settings.merged).toEqual(systemSettingsContent);
+        expect(settings.merged).toEqual({
+          ...systemSettingsContent,
+          customThemes: {},
+          mcpServers: {},
+        });
       });
     });
   });

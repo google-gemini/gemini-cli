@@ -25,7 +25,7 @@ export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 
-function getSystemSettingsPath(): string {
+export function getSystemSettingsPath(): string {
   if (process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH) {
     return process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
   }
@@ -37,8 +37,6 @@ function getSystemSettingsPath(): string {
     return '/etc/gemini-cli/settings.json';
   }
 }
-
-export const systemSettingsPath = getSystemSettingsPath();
 
 export enum SettingScope {
   User = 'User',
@@ -300,7 +298,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};
   const settingsErrors: SettingsError[] = [];
-
+  const systemSettingsPath = getSystemSettingsPath();
   // Load system settings
   try {
     if (fs.existsSync(systemSettingsPath)) {
