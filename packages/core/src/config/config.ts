@@ -11,7 +11,6 @@ import {
   ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
-import { UserTierId } from '../code_assist/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
@@ -357,14 +356,6 @@ export class Config {
 
   getQuotaErrorOccurred(): boolean {
     return this.quotaErrorOccurred;
-  }
-
-  async getUserTier(): Promise<UserTierId | undefined> {
-    if (!this.geminiClient) {
-      return undefined;
-    }
-    const generator = this.geminiClient.getContentGenerator();
-    return await generator.getTier?.();
   }
 
   getEmbeddingModel(): string {
