@@ -726,16 +726,18 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         <Static
           key={staticKey}
           items={[
-            <Box flexDirection="column" key="header">
-              {!settings.merged.hideBanner && (
-                <Header
-                  terminalWidth={terminalWidth}
-                  version={version}
-                  nightly={nightly}
-                />
-              )}
-              {!settings.merged.hideTips && <Tips config={config} />}
-            </Box>,
+            !config.getAccessibility()?.viMode && ( // From feature/accessible-prompt
+              <Box flexDirection="column" key="header">
+                {!settings.merged.hideBanner && ( // From main
+                  <Header
+                    terminalWidth={terminalWidth}
+                    version={version} // From main
+                    nightly={nightly} // From main
+                  />
+                )}
+                {!settings.merged.hideTips && <Tips config={config} />}
+              </Box>
+            ),
             ...history.map((h) => (
               <HistoryItemDisplay
                 terminalWidth={mainAreaWidth}

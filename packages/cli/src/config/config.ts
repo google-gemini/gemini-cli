@@ -55,6 +55,7 @@ export interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  vi: boolean | undefined;
   allowedMcpServerNames: string[] | undefined;
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
@@ -158,6 +159,11 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description:
         'Enable or disable logging of user prompts for telemetry. Overrides settings files.',
+    })
+    .option('vi', {
+      type: 'boolean',
+      description: 'Enable VI mode for visually impaired users.',
+      default: false,
     })
     .option('checkpointing', {
       alias: 'c',
@@ -402,7 +408,7 @@ export async function loadCliConfig(
       argv.show_memory_usage ||
       settings.showMemoryUsage ||
       false,
-    accessibility: settings.accessibility,
+    accessibility: { settings.accessibility, viMode: argv.vi },
     telemetry: {
       enabled: argv.telemetry ?? settings.telemetry?.enabled,
       target: (argv.telemetryTarget ??

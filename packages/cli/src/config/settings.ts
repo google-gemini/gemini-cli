@@ -53,6 +53,7 @@ export interface SummarizeToolOutputSettings {
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
+  viMode?: boolean;
 }
 
 export interface Settings {
