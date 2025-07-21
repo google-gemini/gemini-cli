@@ -422,7 +422,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           const [row, col] = buffer.cursor;
           const line = buffer.lines[row];
           const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
-          
           if (charBefore === '\\') {
             buffer.backspace();
             buffer.newline();

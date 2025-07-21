@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { terminalSetupCommand } from './terminalSetupCommand.js';
 import { terminalSetup } from '../utils/terminalSetup.js';
-import { MessageActionReturn } from './types.js';
+import { MessageActionReturn, CommandContext } from './types.js';
 
 // Mock the terminalSetup function
 vi.mock('../utils/terminalSetup.js', () => ({
@@ -21,7 +21,9 @@ describe('terminalSetupCommand', () => {
 
   it('should have correct metadata', () => {
     expect(terminalSetupCommand.name).toBe('terminal-setup');
-    expect(terminalSetupCommand.description).toContain('Configure terminal keybindings');
+    expect(terminalSetupCommand.description).toContain(
+      'Configure terminal keybindings',
+    );
     expect(terminalSetupCommand.action).toBeDefined();
   });
 
@@ -33,8 +35,8 @@ describe('terminalSetupCommand', () => {
     };
     vi.mocked(terminalSetup).mockResolvedValue(mockResult);
 
-    const result = await terminalSetupCommand.action!({} as any);
-    
+    const result = await terminalSetupCommand.action!({} as CommandContext);
+
     expect(result).toEqual<MessageActionReturn>({
       type: 'message',
       content: mockResult.message,
@@ -46,16 +48,19 @@ describe('terminalSetupCommand', () => {
   it('should return success message with restart required', async () => {
     const mockResult = {
       success: true,
-      message: 'Added Shift+Enter and Ctrl+Enter keybindings to VS Code.\nModified: /path/to/keybindings.json',
+      message:
+        'Added Shift+Enter and Ctrl+Enter keybindings to VS Code.\nModified: /path/to/keybindings.json',
       requiresRestart: true,
     };
     vi.mocked(terminalSetup).mockResolvedValue(mockResult);
 
-    const result = await terminalSetupCommand.action!({} as any);
-    
+    const result = await terminalSetupCommand.action!({} as CommandContext);
+
     expect(result).toEqual<MessageActionReturn>({
       type: 'message',
-      content: mockResult.message + '\n\nPlease restart your terminal for the changes to take effect.',
+      content:
+        mockResult.message +
+        '\n\nPlease restart your terminal for the changes to take effect.',
       messageType: 'info',
     });
   });
@@ -63,12 +68,13 @@ describe('terminalSetupCommand', () => {
   it('should return error message when terminal setup fails', async () => {
     const mockResult = {
       success: false,
-      message: 'Could not detect terminal type. Supported terminals: VS Code, Cursor, and Windsurf.',
+      message:
+        'Could not detect terminal type. Supported terminals: VS Code, Cursor, and Windsurf.',
     };
     vi.mocked(terminalSetup).mockResolvedValue(mockResult);
 
-    const result = await terminalSetupCommand.action!({} as any);
-    
+    const result = await terminalSetupCommand.action!({} as CommandContext);
+
     expect(result).toEqual<MessageActionReturn>({
       type: 'message',
       content: mockResult.message,
@@ -85,8 +91,8 @@ Please check and modify manually if needed: /path/to/keybindings.json`,
     };
     vi.mocked(terminalSetup).mockResolvedValue(mockResult);
 
-    const result = await terminalSetupCommand.action!({} as any);
-    
+    const result = await terminalSetupCommand.action!({} as CommandContext);
+
     expect(result).toEqual<MessageActionReturn>({
       type: 'message',
       content: mockResult.message,
@@ -98,8 +104,8 @@ Please check and modify manually if needed: /path/to/keybindings.json`,
     const error = new Error('Unexpected error');
     vi.mocked(terminalSetup).mockRejectedValue(error);
 
-    const result = await terminalSetupCommand.action!({} as any);
-    
+    const result = await terminalSetupCommand.action!({} as CommandContext);
+
     expect(result).toEqual<MessageActionReturn>({
       type: 'message',
       content: 'Failed to configure terminal: Error: Unexpected error',

@@ -18,7 +18,7 @@
  * For VS Code and its forks:
  * - Shift+Enter: Sends \\\r\n (backslash followed by CRLF)
  * - Ctrl+Enter: Sends \\\r\n (backslash followed by CRLF)
- * 
+ *
  * The module will not modify existing shift+enter or ctrl+enter keybindings
  * to avoid conflicts with user customizations.
  */
@@ -97,7 +97,7 @@ async function backupFile(filePath: string): Promise<void> {
 // Helper function to get VS Code-style config directory
 function getVSCodeStyleConfigDir(appName: string): string | null {
   const platform = os.platform();
-  
+
   if (platform === 'darwin') {
     return path.join(
       os.homedir(),
@@ -123,15 +123,14 @@ function getVSCodeStyleConfigDir(appName: string): string | null {
 // Generic VS Code-style terminal configuration
 async function configureVSCodeStyle(
   terminalName: string,
-  appName: string
+  appName: string,
 ): Promise<TerminalSetupResult> {
   const configDir = getVSCodeStyleConfigDir(appName);
-  
+
   if (!configDir) {
     return {
       success: false,
-      message:
-        `Could not determine ${terminalName} config path on Windows: APPDATA environment variable is not set.`,
+      message: `Could not determine ${terminalName} config path on Windows: APPDATA environment variable is not set.`,
     };
   }
 
@@ -205,16 +204,21 @@ async function configureVSCodeStyle(
       }
       return {
         success: false,
-        message: 
+        message:
           `Existing keybindings detected. Will not modify to avoid conflicts.\n` +
-          messages.join('\n') + '\n' +
+          messages.join('\n') +
+          '\n' +
           `Please check and modify manually if needed: ${keybindingsFile}`,
       };
     }
 
     // Check if our specific bindings already exist
     const hasOurShiftEnter = keybindings.some((kb) => {
-      const binding = kb as { command?: string; args?: { text?: string }; key?: string };
+      const binding = kb as {
+        command?: string;
+        args?: { text?: string };
+        key?: string;
+      };
       return (
         binding.key === 'shift+enter' &&
         binding.command === 'workbench.action.terminal.sendSequence' &&
@@ -223,7 +227,11 @@ async function configureVSCodeStyle(
     });
 
     const hasOurCtrlEnter = keybindings.some((kb) => {
-      const binding = kb as { command?: string; args?: { text?: string }; key?: string };
+      const binding = kb as {
+        command?: string;
+        args?: { text?: string };
+        key?: string;
+      };
       return (
         binding.key === 'ctrl+enter' &&
         binding.command === 'workbench.action.terminal.sendSequence' &&
