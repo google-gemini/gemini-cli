@@ -82,8 +82,24 @@ export const useSessionBrowser = (
 
           // Add the message only if it has content
           if (msg.content && msg.content.trim()) {
+            let messageType: MessageType;
+            switch (msg.type) {
+              case 'user':
+                messageType = MessageType.USER;
+                break;
+              case 'system':
+                messageType = MessageType.INFO;
+                break;
+              case 'error':
+                messageType = MessageType.ERROR;
+                break;
+              default:
+                messageType = MessageType.GEMINI;
+                break;
+            }
+            
             uiHistory.push({
-              type: msg.type === 'user' ? MessageType.USER : MessageType.GEMINI,
+              type: messageType,
               text: msg.content,
             });
           }
