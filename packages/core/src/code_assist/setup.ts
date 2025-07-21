@@ -22,6 +22,11 @@ export class ProjectIdRequiredError extends Error {
   }
 }
 
+export interface UserData {
+  projectId: string;
+  userTier: UserTierId;
+}
+
 /**
  *
  * @param projectId the user's project id, if any
@@ -65,7 +70,10 @@ export async function setupUser(client: OAuth2Client): Promise<string> {
     await new Promise((f) => setTimeout(f, 5000));
     lroRes = await caServer.onboardUser(onboardReq);
   }
-  return lroRes.response?.cloudaicompanionProject?.id || '';
+  return {
+    projectId: lroRes.response?.cloudaicompanionProject?.id || '',
+    userTier: tier.id,
+  };
 }
 
 function getOnboardTier(res: LoadCodeAssistResponse): GeminiUserTier {
