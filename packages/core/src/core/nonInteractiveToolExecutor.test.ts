@@ -106,7 +106,7 @@ describe('executeToolCall', () => {
   it('should return an error if tool is not found', async () => {
     const request: ToolCallRequestInfo = {
       callId: 'call2',
-      name: 'nonExistentTool',
+      name: 'nonexistentTool',
       args: {},
       isClientInitiated: false,
       prompt_id: 'prompt-id-2',
@@ -123,17 +123,17 @@ describe('executeToolCall', () => {
     expect(response.callId).toBe('call2');
     expect(response.error).toBeInstanceOf(Error);
     expect(response.error?.message).toBe(
-      'Tool "nonExistentTool" not found in registry.',
+      'Tool "nonexistentTool" not found in registry.',
     );
     expect(response.resultDisplay).toBe(
-      'Tool "nonExistentTool" not found in registry.',
+      'Tool "nonexistentTool" not found in registry.',
     );
     expect(response.responseParts).toEqual([
       {
         functionResponse: {
-          name: 'nonExistentTool',
+          name: 'nonexistentTool',
           id: 'call2',
-          response: { error: 'Tool "nonExistentTool" not found in registry.' },
+          response: { error: 'Tool "nonexistentTool" not found in registry.' },
         },
       },
     ]);

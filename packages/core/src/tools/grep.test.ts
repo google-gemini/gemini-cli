@@ -17,7 +17,7 @@ vi.mock('child_process', () => ({
     on: (event: string, cb: (...args: unknown[]) => void) => {
       if (event === 'error' || event === 'close') {
         // Simulate command not found or error for git grep and system grep
-        // to force fallback to JS implementation.
+        // to force it to fall back to JS implementation.
         setTimeout(() => cb(1), 0); // cb(1) for error/close
       }
     },
