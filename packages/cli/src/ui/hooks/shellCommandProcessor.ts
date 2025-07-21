@@ -5,14 +5,18 @@
  */
 
 import { spawn } from 'child_process';
-import { StringDecoder } from 'string_decoder';
+import { TextDecoder } from 'util';
 import {
   HistoryItemWithoutId,
   IndividualToolCallDisplay,
   ToolCallStatus,
 } from '../types.js';
 import { useCallback } from 'react';
-import { Config, GeminiClient } from '@google/gemini-cli-core';
+import {
+  Config,
+  GeminiClient,
+  getCachedEncodingForBuffer,
+} from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import { isBinary } from '../utils/textUtils.js';
@@ -71,8 +75,8 @@ function executeShellCommand(
     });
 
     // Use decoders to handle multi-byte characters safely (for streaming output).
-    const stdoutDecoder = new StringDecoder('utf8');
-    const stderrDecoder = new StringDecoder('utf8');
+    let stdoutDecoder: TextDecoder | null = null;
+    let stderrDecoder: TextDecoder | null = null;
 
     let stdout = '';
     let stderr = '';
@@ -85,6 +89,12 @@ function executeShellCommand(
     let sniffedBytes = 0;
 
     const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
+      if (!stdoutDecoder || !stderrDecoder) {
+        const encoding = getCachedEncodingForBuffer(data);
+        stdoutDecoder = new TextDecoder(encoding);
+        stderrDecoder = new TextDecoder(encoding);
+      }
+
       outputChunks.push(data);
 
       if (streamToUi && sniffedBytes < MAX_SNIFF_SIZE) {
@@ -101,8 +111,8 @@ function executeShellCommand(
 
       const decodedChunk =
         stream === 'stdout'
-          ? stdoutDecoder.write(data)
-          : stderrDecoder.write(data);
+          ? stdoutDecoder.decode(data, { stream: true })
+          : stderrDecoder.decode(data, { stream: true });
       if (stream === 'stdout') {
         stdout += stripAnsi(decodedChunk);
       } else {
@@ -160,8 +170,12 @@ function executeShellCommand(
       abortSignal.removeEventListener('abort', abortHandler);
 
       // Handle any final bytes lingering in the decoders
-      stdout += stdoutDecoder.end();
-      stderr += stderrDecoder.end();
+      if (stdoutDecoder) {
+        stdout += stdoutDecoder.decode();
+      }
+      if (stderrDecoder) {
+        stderr += stderrDecoder.decode();
+      }
 
       const finalBuffer = Buffer.concat(outputChunks);
 
