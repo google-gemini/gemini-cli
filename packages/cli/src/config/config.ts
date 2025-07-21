@@ -57,6 +57,7 @@ export interface CliArgs {
   showMemoryUsage: boolean | undefined;
   show_memory_usage: boolean | undefined;
   yolo: boolean | undefined;
+  acceptAll: boolean | undefined;
   telemetry: boolean | undefined;
   checkpointing: boolean | undefined;
   telemetryTarget: string | undefined;
@@ -218,6 +219,11 @@ export async function parseArguments(): Promise<CliArgs> {
             // Handle comma-separated values
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
         })
+        .option('accept-all', {
+          type: 'boolean',
+          description: 'Automatically accept all file edits (equivalent to shift+tab)',
+          default: false,
+        })
         .check((argv) => {
           if (argv.prompt && argv.promptInteractive) {
             throw new Error(
@@ -363,8 +369,9 @@ export async function loadCliConfig(
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
   const question = argv.promptInteractive || argv.prompt || '';
-  const approvalMode =
-    argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
+  const approvalMode = argv.yolo || false ? ApprovalMode.YOLO 
+    : argv.acceptAll || false ? ApprovalMode.AUTO_EDIT 
+    : ApprovalMode.DEFAULT;
   const interactive =
     !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
   // In non-interactive and non-yolo mode, exclude interactive built in tools.
