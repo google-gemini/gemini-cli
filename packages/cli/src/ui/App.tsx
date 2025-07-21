@@ -121,7 +121,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { history, addItem, clearItems, loadHistory } = useHistory({
     chatRecordingService,
   });
-  appendFileSync("history_recording.json", JSON.stringify(history) + '\n');
+
   const {
     consoleMessages,
     handleNewMessage,
@@ -237,7 +237,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
       // Set the filtered client history
       config.getGeminiClient()?.setHistory(filteredClientHistory);
-      
+
       // Force Static component to re-render with the updated history
       refreshStatic();
     }
@@ -453,6 +453,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setQuittingMessages,
     openPrivacyNotice,
     openSessionBrowser,
+    chatRecordingService,
   );
   const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
 
