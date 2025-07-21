@@ -68,7 +68,7 @@ function renderHastNode(
     return <React.Fragment>{children}</React.Fragment>;
   }
 
-  // Handle Root Node: Start recursion with initial inherited color
+  // Handle Root Node: Start recursion with initially inherited color
   if (node.type === 'root') {
     // Check if children array is empty - this happens when lowlight can't detect language – fallback to plain text
     if (!node.children || node.children.length === 0) {
@@ -100,9 +100,10 @@ export function colorizeCode(
   language: string | null,
   availableHeight?: number,
   maxWidth?: number,
+  theme?: Theme,
 ): React.ReactNode {
   const codeToHighlight = code.replace(/\n$/, '');
-  const activeTheme = themeManager.getActiveTheme();
+  const activeTheme = theme || themeManager.getActiveTheme();
 
   try {
     // Render the HAST tree using the adapted theme
