@@ -158,6 +158,13 @@ export class GeminiClient {
     this.getChat().setHistory(history);
   }
 
+  async setTools(): Promise<void> {
+    const toolRegistry = await this.config.getToolRegistry();
+    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    this.getChat().setTools(tools);
+  }
+
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
   }
