@@ -83,5 +83,8 @@
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2"
+  },
+  "dependencies": {
+    "mnemonist": "^0.40.3"
   }
 }
