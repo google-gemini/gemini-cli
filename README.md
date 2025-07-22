@@ -93,6 +93,28 @@ The Vertex AI API provides a [free tier](https://cloud.google.com/vertex-ai/gene
 
 For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
 
+### Use an OpenAI-compatible API
+
+You can configure the Gemini CLI to use any OpenAI-compatible API. To do so, you will need to configure your API key and base URL in the `settings.json` file.
+
+1.  **Locate or create the `settings.json` file.** This file is usually located in the `.gemini` directory in your user's home directory.
+    *   **Windows:** `C:\\Users\\YourUsername\\.gemini\\settings.json`
+    *   **macOS/Linux:** `~/.gemini/settings.json`
+2.  **Add the following configuration to the `settings.json` file:**
+
+    ```json
+    {
+      "api": {
+        "baseUrl": "YOUR_BASE_URL",
+        "apiKey": "YOUR_API_KEY"
+      }
+    }
+    ```
+
+    Replace `YOUR_BASE_URL` with the base URL of your API, and `YOUR_API_KEY` with your API key. For example, if you are using a local server, your `baseUrl` might be `http://localhost:8080/v1`.
+
+3.  **Run the `/auth` command in the Gemini CLI and select "Use OpenAI compatible API".** This will tell the Gemini CLI to use the configuration you provided in the `settings.json` file.
+
 ## Examples
 
 Once the CLI is running, you can start interacting with Gemini from your shell.
