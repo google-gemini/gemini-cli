@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useCallback, useRef, useState } from 'react';
-import { DEFAULT_GEMINI_FLASH_MODEL, GeminiClient } from '@google/gemini-cli-core';
+import { useEffect, useCallback, useRef } from 'react';
+import { DEFAULT_GEMINI_FLASH_MODEL, GeminiClient  } from '@google/gemini-cli-core';
 import { Content, GenerateContentConfig } from '@google/genai';
 
 // Import getResponseText from core package utils
@@ -57,32 +57,6 @@ export const usePromptCompletion = (
   enabled: boolean = true,
 ) => {
   const abortControllerRef = useRef<AbortController | null>(null);
-  const [isClientReady, setIsClientReady] = useState(false);
-
-  // Monitor geminiClient initialization status
-  useEffect(() => {
-    const checkClientStatus = () => {
-      if (!geminiClient) {
-        setIsClientReady(false);
-        return;
-      }
-      
-      if (typeof geminiClient.isInitialized === 'function') {
-        const ready = geminiClient.isInitialized();
-        setIsClientReady(ready);
-      } else {
-        // Fallback: assume ready if client exists
-        setIsClientReady(!!geminiClient);
-      }
-    };
-
-    checkClientStatus();
-    const intervalId = setInterval(checkClientStatus, 2000);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [geminiClient]);
 
   const generateSuggestions = useCallback(async (text: string) => {
     // This is the only place that should clear suggestions.
@@ -92,7 +66,7 @@ export const usePromptCompletion = (
     }
 
     // If not enabled, or client not ready, do nothing. Don't clear.
-    if (!geminiClient || !enabled || !isClientReady) {
+    if (!geminiClient || !enabled) {
       return;
     }
 
@@ -105,7 +79,7 @@ export const usePromptCompletion = (
           role: 'user',
           parts: [
             {
-              text: `Act as an intelligent prompt co-pilot. Your goal is to take the user’s initial thought and seamlessly continue it, building it out into 1-2 fully-formed, insightful prompts that unlock greater potential.\nUser’s initial thought: \n'''\n${text}\n'\'\'\n\nYour task is to continue their sentence. Start your response with the user’s exact text (${text}) and then add the necessary detail, context, and creative direction to transform it from a fragment into a complete, high-impact prompt.\n\nFormatting:\nPlain text only.\nOne complete prompt suggestion per line.\nMatch the user’s language.`,
+              text: `Act as an intelligent prompt co-pilot. Your goal is to take the user’s initial thought and seamlessly continue it, building it out into 1-2 fully-formed, insightful prompts that unlock greater potential.\nUser’s initial thought: \n'''\n${text}\n'''\n\nYour task is to continue their sentence. Start your response with the user’s exact text (${text}) and then add the necessary detail, context, and creative direction to transform it from a fragment into a complete, high-impact prompt.\n\nFormatting:\nPlain text only.\nOne complete prompt suggestion per line.\nMatch the user’s language.`,
             },
           ],
         },
@@ -147,7 +121,8 @@ export const usePromptCompletion = (
         console.error('Error generating suggestions:', error);
       }
     }
-  }, [geminiClient, enabled, isClientReady, onSuggestionsUpdate]);
+  }, [geminiClient, enabled, onSuggestionsUpdate]);
+
 
   // Debounced effect to generate suggestions
   useEffect(() => {
