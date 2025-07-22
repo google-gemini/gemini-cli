@@ -26,6 +26,11 @@ This guide provides solutions to common issues and debugging tips.
 
 ## Common error messages and solutions
 
+- **Error: Character encoding issues on Windows (e.g., garbled text, incorrect display of special characters).**
+  - **Cause:** The default console code page on Windows might not be set to UTF-8, leading to improper display of Unicode characters in the CLI output or input.
+  - **Solution:** Add `chcp 65001 > nul` to your `gemini.bat` file (or the batch file you use to launch the CLI). This command sets the console's active code page to UTF-8, ensuring proper character encoding.
+
+
 - **Error: `EADDRINUSE` (Address already in use) when starting an MCP server.**
   - **Cause:** Another process is already using the port that the MCP server is trying to bind to.
   - **Solution:**
