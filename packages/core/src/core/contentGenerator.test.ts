@@ -17,7 +17,12 @@ import { Config } from '../config/config.js';
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('@google/genai');
 
-const mockConfig = {} as unknown as Config;
+const mockConfig = {
+  getApiConfig: () => ({
+    baseUrl: 'https://example.com',
+    apiKey: 'test-api-key',
+  }),
+} as unknown as Config;
 
 describe('createContentGenerator', () => {
   it('should create a CodeAssistContentGenerator', async () => {
@@ -57,6 +62,7 @@ describe('createContentGenerator', () => {
           'User-Agent': expect.any(String),
         },
       },
+      baseURL: 'https://example.com',
     });
     expect(generator).toBe((mockGenerator as GoogleGenAI).models);
   });

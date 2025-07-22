@@ -51,6 +51,8 @@ vi.mock('@google/gemini-cli-core', async () => {
       respectGitIgnore: true,
       respectGeminiIgnore: true,
     },
+    DEFAULT_GEMINI_MODEL: 'gemini-pro',
+    DEFAULT_GEMINI_EMBEDDING_MODEL: 'text-embedding-004',
   };
 });
 
