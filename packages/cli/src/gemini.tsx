@@ -7,7 +7,7 @@
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
-import { loadCliConfig } from './config/config.js';
+import { loadCliConfig, parseArguments, CliArgs } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
 import v8 from 'node:v8';
@@ -17,7 +17,6 @@ import { start_sandbox } from './utils/sandbox.js';
 import {
   LoadedSettings,
   loadSettings,
-  USER_SETTINGS_PATH,
   SettingScope,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
@@ -25,7 +24,8 @@ import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions, Extension } from './config/extension.js';
-import { cleanupCheckpoints } from './utils/cleanup.js';
+import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
+import { getCliVersion } from './utils/version.js';
 import {
   ApprovalMode,
   Config,
@@ -35,9 +35,11 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
+  getOauthClient,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -82,6 +84,7 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   await new Promise((resolve) => child.on('close', resolve));
   process.exit(0);
 }
+import { runAcpPeer } from './acp/acpPeer.js';
 
 export async function main() {
   const workspaceRoot = process.cwd();
@@ -100,8 +103,21 @@ export async function main() {
     process.exit(1);
   }
 
+  const argv = await parseArguments();
   const extensions = loadExtensions(workspaceRoot);
-  const config = await loadCliConfig(settings.merged, extensions, sessionId);
+  const config = await loadCliConfig(
+    settings.merged,
+    extensions,
+    sessionId,
+    argv,
+  );
+
+  if (argv.promptInteractive && !process.stdin.isTTY) {
+    console.error(
+      'Error: The --prompt-interactive flag is not supported when piping input from stdin.',
+    );
+    process.exit(1);
+  }
 
   if (config.getListExtensions()) {
     console.log('Installed extensions:');
@@ -125,6 +141,9 @@ export async function main() {
   setMaxSizedBoxDebugging(config.getDebugMode());
 
   await config.initialize();
+
+  // Load custom themes from settings
+  themeManager.loadCustomThemes(settings.merged.customThemes);
 
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
@@ -165,25 +184,45 @@ export async function main() {
       }
     }
   }
+
+  if (
+    settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
+    config.isBrowserLaunchSuppressed()
+  ) {
+    // Do oauth before app renders to make copying the link possible.
+    await getOauthClient(settings.merged.selectedAuthType, config);
+  }
+
+  if (config.getExperimentalAcp()) {
+    return runAcpPeer(config, settings);
+  }
+
   let input = config.getQuestion();
   const startupWarnings = [
     ...(await getStartupWarnings()),
     ...(await getUserStartupWarnings(workspaceRoot)),
   ];
 
+  const shouldBeInteractive =
+    !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0);
+
   // Render UI, passing necessary config values. Check that there is no command line question.
-  if (process.stdin.isTTY && input?.length === 0) {
+  if (shouldBeInteractive) {
+    const version = await getCliVersion();
     setWindowTitle(basename(workspaceRoot), settings);
-    render(
+    const instance = render(
       <React.StrictMode>
         <AppWrapper
           config={config}
           settings={settings}
           startupWarnings={startupWarnings}
+          version={version}
         />
       </React.StrictMode>,
       { exitOnCtrlC: false },
     );
+
+    registerCleanup(() => instance.unmount());
     return;
   }
   // If not a TTY, read from stdin
@@ -202,6 +241,7 @@ export async function main() {
     'event.timestamp': new Date().toISOString(),
     prompt: input,
     prompt_id,
+    auth_type: config.getContentGeneratorConfig()?.authType,
     prompt_length: input.length,
   });
 
@@ -210,6 +250,7 @@ export async function main() {
     config,
     extensions,
     settings,
+    argv,
   );
 
   await runNonInteractive(nonInteractiveConfig, input, prompt_id);
@@ -250,6 +291,7 @@ async function loadNonInteractiveConfig(
   config: Config,
   extensions: Extension[],
   settings: LoadedSettings,
+  argv: CliArgs,
 ) {
   let finalConfig = config;
   if (config.getApprovalMode() !== ApprovalMode.YOLO) {
@@ -273,37 +315,13 @@ async function loadNonInteractiveConfig(
       nonInteractiveSettings,
       extensions,
       config.getSessionId(),
+      argv,
     );
     await finalConfig.initialize();
   }
 
-  return await validateNonInterActiveAuth(
+  return await validateNonInteractiveAuth(
     settings.merged.selectedAuthType,
     finalConfig,
   );
-}
-
-async function validateNonInterActiveAuth(
-  selectedAuthType: AuthType | undefined,
-  nonInteractiveConfig: Config,
-) {
-  // making a special case for the cli. many headless environments might not have a settings.json set
-  // so if GEMINI_API_KEY is set, we'll use that. However since the oauth things are interactive anyway, we'll
-  // still expect that exists
-  if (!selectedAuthType && !process.env.GEMINI_API_KEY) {
-    console.error(
-      `Please set an Auth method in your ${USER_SETTINGS_PATH} OR specify GEMINI_API_KEY env variable file before running`,
-    );
-    process.exit(1);
-  }
-
-  selectedAuthType = selectedAuthType || AuthType.USE_GEMINI;
-  const err = validateAuthMethod(selectedAuthType);
-  if (err != null) {
-    console.error(err);
-    process.exit(1);
-  }
-
-  await nonInteractiveConfig.refreshAuth(selectedAuthType);
-  return nonInteractiveConfig;
 }

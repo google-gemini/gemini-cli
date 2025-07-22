@@ -9,6 +9,7 @@ import {
   GenerateContentResponse,
   FunctionCall,
   FunctionDeclaration,
+  FinishReason,
 } from '@google/genai';
 import {
   ToolCallConfirmationDetails,
@@ -48,6 +49,9 @@ export enum GeminiEventType {
   Error = 'error',
   ChatCompressed = 'chat_compressed',
   Thought = 'thought',
+  MaxSessionTurns = 'max_session_turns',
+  Finished = 'finished',
+  LoopDetected = 'loop_detected',
 }
 
 export interface StructuredError {
@@ -128,6 +132,19 @@ export type ServerGeminiChatCompressedEvent = {
   value: ChatCompressionInfo | null;
 };
 
+export type ServerGeminiMaxSessionTurnsEvent = {
+  type: GeminiEventType.MaxSessionTurns;
+};
+
+export type ServerGeminiFinishedEvent = {
+  type: GeminiEventType.Finished;
+  value: FinishReason;
+};
+
+export type ServerGeminiLoopDetectedEvent = {
+  type: GeminiEventType.LoopDetected;
+};
+
 // The original union type, now composed of the individual types
 export type ServerGeminiStreamEvent =
   | ServerGeminiContentEvent
@@ -137,7 +154,10 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiUserCancelledEvent
   | ServerGeminiErrorEvent
   | ServerGeminiChatCompressedEvent
-  | ServerGeminiThoughtEvent;
+  | ServerGeminiThoughtEvent
+  | ServerGeminiMaxSessionTurnsEvent
+  | ServerGeminiFinishedEvent
+  | ServerGeminiLoopDetectedEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
@@ -209,6 +229,16 @@ export class Turn {
           if (event) {
             yield event;
           }
+        }
+
+        // Check if response was truncated or stopped for various reasons
+        const finishReason = resp.candidates?.[0]?.finishReason;
+
+        if (finishReason) {
+          yield {
+            type: GeminiEventType.Finished,
+            value: finishReason as FinishReason,
+          };
         }
       }
     } catch (e) {

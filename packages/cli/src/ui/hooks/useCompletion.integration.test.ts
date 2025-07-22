@@ -10,11 +10,18 @@ import { renderHook, act } from '@testing-library/react';
 import { useCompletion } from './useCompletion.js';
 import * as fs from 'fs/promises';
 import { glob } from 'glob';
-import { CommandContext, SlashCommand } from '../commands/types.js';
+import {
+  CommandContext,
+  CommandKind,
+  SlashCommand,
+} from '../commands/types.js';
 import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
 
 interface MockConfig {
-  getFileFilteringRespectGitIgnore: () => boolean;
+  getFileFilteringOptions: () => {
+    respectGitIgnore: boolean;
+    respectGeminiIgnore: boolean;
+  };
   getEnableRecursiveFileSearch: () => boolean;
   getFileService: () => FileDiscoveryService | null;
 }
@@ -40,8 +47,18 @@ describe('useCompletion git-aware filtering integration', () => {
 
   const testCwd = '/test/project';
   const slashCommands = [
-    { name: 'help', description: 'Show help', action: vi.fn() },
-    { name: 'clear', description: 'Clear screen', action: vi.fn() },
+    {
+      name: 'help',
+      description: 'Show help',
+      kind: CommandKind.BUILT_IN,
+      action: vi.fn(),
+    },
+    {
+      name: 'clear',
+      description: 'Clear screen',
+      kind: CommandKind.BUILT_IN,
+      action: vi.fn(),
+    },
   ];
 
   // A minimal mock is sufficient for these tests.
@@ -50,28 +67,40 @@ describe('useCompletion git-aware filtering integration', () => {
   const mockSlashCommands: SlashCommand[] = [
     {
       name: 'help',
-      altName: '?',
+      altNames: ['?'],
       description: 'Show help',
       action: vi.fn(),
+      kind: CommandKind.BUILT_IN,
+    },
+    {
+      name: 'stats',
+      altNames: ['usage'],
+      description: 'check session stats. Usage: /stats [model|tools]',
+      action: vi.fn(),
+      kind: CommandKind.BUILT_IN,
     },
     {
       name: 'clear',
       description: 'Clear the screen',
       action: vi.fn(),
+      kind: CommandKind.BUILT_IN,
     },
     {
       name: 'memory',
       description: 'Manage memory',
+      kind: CommandKind.BUILT_IN,
       // This command is a parent, no action.
       subCommands: [
         {
           name: 'show',
           description: 'Show memory',
+          kind: CommandKind.BUILT_IN,
           action: vi.fn(),
         },
         {
           name: 'add',
           description: 'Add to memory',
+          kind: CommandKind.BUILT_IN,
           action: vi.fn(),
         },
       ],
@@ -79,15 +108,18 @@ describe('useCompletion git-aware filtering integration', () => {
     {
       name: 'chat',
       description: 'Manage chat history',
+      kind: CommandKind.BUILT_IN,
       subCommands: [
         {
           name: 'save',
           description: 'Save chat',
+          kind: CommandKind.BUILT_IN,
           action: vi.fn(),
         },
         {
           name: 'resume',
           description: 'Resume a saved chat',
+          kind: CommandKind.BUILT_IN,
           action: vi.fn(),
           // This command provides its own argument completions
           completion: vi
@@ -112,12 +144,16 @@ describe('useCompletion git-aware filtering integration', () => {
       projectRoot: '',
       gitIgnoreFilter: null,
       geminiIgnoreFilter: null,
+      isFileIgnored: vi.fn(),
     } as unknown as Mocked<FileDiscoveryService>;
 
     mockConfig = {
-      getFileFilteringRespectGitIgnore: vi.fn(() => true),
-      getFileService: vi.fn().mockReturnValue(mockFileDiscoveryService),
+      getFileFilteringOptions: vi.fn(() => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      })),
       getEnableRecursiveFileSearch: vi.fn(() => true),
+      getFileService: vi.fn(() => mockFileDiscoveryService),
     };
 
     vi.mocked(FileDiscoveryService).mockImplementation(
@@ -180,7 +216,7 @@ describe('useCompletion git-aware filtering integration', () => {
       { name: '.env', isDirectory: () => false },
     ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
-    // Mock git ignore service to ignore certain files
+    // Mock ignore service to ignore certain files
     mockFileDiscoveryService.shouldGitIgnoreFile.mockImplementation(
       (path: string) =>
         path.includes('node_modules') ||
@@ -189,8 +225,17 @@ describe('useCompletion git-aware filtering integration', () => {
     );
     mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
       (path: string, options) => {
-        if (options?.respectGitIgnore !== false) {
-          return mockFileDiscoveryService.shouldGitIgnoreFile(path);
+        if (
+          options?.respectGitIgnore &&
+          mockFileDiscoveryService.shouldGitIgnoreFile(path)
+        ) {
+          return true;
+        }
+        if (
+          options?.respectGeminiIgnore &&
+          mockFileDiscoveryService.shouldGeminiIgnoreFile
+        ) {
+          return mockFileDiscoveryService.shouldGeminiIgnoreFile(path);
         }
         return false;
       },
@@ -225,38 +270,54 @@ describe('useCompletion git-aware filtering integration', () => {
   it('should handle recursive search with git-aware filtering', async () => {
     // Mock the recursive file search scenario
     vi.mocked(fs.readdir).mockImplementation(
-      async (dirPath: string | Buffer | URL) => {
-        if (dirPath === testCwd) {
-          return [
-            { name: 'src', isDirectory: () => true },
-            { name: 'node_modules', isDirectory: () => true },
-            { name: 'temp', isDirectory: () => true },
-          ] as Array<{ name: string; isDirectory: () => boolean }>;
+      async (
+        dirPath: string | Buffer | URL,
+        options?: { withFileTypes?: boolean },
+      ) => {
+        const path = dirPath.toString();
+        if (options?.withFileTypes) {
+          if (path === testCwd) {
+            return [
+              { name: 'data', isDirectory: () => true },
+              { name: 'dist', isDirectory: () => true },
+              { name: 'node_modules', isDirectory: () => true },
+              { name: 'README.md', isDirectory: () => false },
+              { name: '.env', isDirectory: () => false },
+            ] as unknown as Awaited<ReturnType<typeof fs.readdir>>;
+          }
+          if (path.endsWith('/src')) {
+            return [
+              { name: 'index.ts', isDirectory: () => false },
+              { name: 'components', isDirectory: () => true },
+            ] as unknown as Awaited<ReturnType<typeof fs.readdir>>;
+          }
+          if (path.endsWith('/temp')) {
+            return [
+              { name: 'temp.log', isDirectory: () => false },
+            ] as unknown as Awaited<ReturnType<typeof fs.readdir>>;
+          }
         }
-        if (dirPath.endsWith('/src')) {
-          return [
-            { name: 'index.ts', isDirectory: () => false },
-            { name: 'components', isDirectory: () => true },
-          ] as Array<{ name: string; isDirectory: () => boolean }>;
-        }
-        if (dirPath.endsWith('/temp')) {
-          return [{ name: 'temp.log', isDirectory: () => false }] as Array<{
-            name: string;
-            isDirectory: () => boolean;
-          }>;
-        }
-        return [] as Array<{ name: string; isDirectory: () => boolean }>;
+        return [];
       },
     );
 
-    // Mock git ignore service
+    // Mock ignore service
     mockFileDiscoveryService.shouldGitIgnoreFile.mockImplementation(
       (path: string) => path.includes('node_modules') || path.includes('temp'),
     );
     mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
       (path: string, options) => {
-        if (options?.respectGitIgnore !== false) {
-          return mockFileDiscoveryService.shouldGitIgnoreFile(path);
+        if (
+          options?.respectGitIgnore &&
+          mockFileDiscoveryService.shouldGitIgnoreFile(path)
+        ) {
+          return true;
+        }
+        if (
+          options?.respectGeminiIgnore &&
+          mockFileDiscoveryService.shouldGeminiIgnoreFile
+        ) {
+          return mockFileDiscoveryService.shouldGeminiIgnoreFile(path);
         }
         return false;
       },
@@ -399,8 +460,11 @@ describe('useCompletion git-aware filtering integration', () => {
     );
     mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
       (path: string, options) => {
-        if (options?.respectGitIgnore !== false) {
+        if (options?.respectGitIgnore) {
           return mockFileDiscoveryService.shouldGitIgnoreFile(path);
+        }
+        if (options?.respectGeminiIgnore) {
+          return mockFileDiscoveryService.shouldGeminiIgnoreFile(path);
         }
         return false;
       },
@@ -511,10 +575,27 @@ describe('useCompletion git-aware filtering integration', () => {
     expect(result.current.showSuggestions).toBe(true);
   });
 
-  it('should suggest commands based on altName', async () => {
+  it.each([['/?'], ['/usage']])(
+    'should not suggest commands when altNames is fully typed',
+    async (altName) => {
+      const { result } = renderHook(() =>
+        useCompletion(
+          altName,
+          '/test/cwd',
+          true,
+          mockSlashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions).toHaveLength(0);
+    },
+  );
+
+  it('should suggest commands based on partial altNames matches', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/?',
+        '/usag', // part of the word "usage"
         '/test/cwd',
         true,
         mockSlashCommands,
@@ -523,7 +604,11 @@ describe('useCompletion git-aware filtering integration', () => {
     );
 
     expect(result.current.suggestions).toEqual([
-      { label: 'help', value: 'help', description: 'Show help' },
+      {
+        label: 'stats',
+        value: 'stats',
+        description: 'check session stats. Usage: /stats [model|tools]',
+      },
     ]);
   });
 
@@ -734,7 +819,7 @@ describe('useCompletion git-aware filtering integration', () => {
 
     expect(result.current.suggestions.length).toBe(mockSlashCommands.length);
     expect(result.current.suggestions.map((s) => s.label)).toEqual(
-      expect.arrayContaining(['help', 'clear', 'memory', 'chat']),
+      expect.arrayContaining(['help', 'clear', 'memory', 'chat', 'stats']),
     );
   });
 

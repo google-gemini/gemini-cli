@@ -9,7 +9,7 @@ import {
   CodeAssistGlobalUserSettingResponse,
   LoadCodeAssistRequest,
   LoadCodeAssistResponse,
-  LongrunningOperationResponse,
+  LongRunningOperationResponse,
   OnboardUserRequest,
   SetCodeAssistGlobalUserSettingRequest,
 } from './types.js';
@@ -23,6 +23,7 @@ import {
 } from '@google/genai';
 import * as readline from 'readline';
 import { ContentGenerator } from '../core/contentGenerator.js';
+import { UserTierId } from './types.js';
 import {
   CaCountTokenResponse,
   CaGenerateContentResponse,
@@ -31,23 +32,6 @@ import {
   toCountTokenRequest,
   toGenerateContentRequest,
 } from './converter.js';
-import { Readable } from 'node:stream';
-
-interface ErrorData {
-  error?: {
-    message?: string;
-  };
-}
-
-interface GaxiosResponse {
-  status: number;
-  data: unknown;
-}
-
-interface StreamError extends Error {
-  status?: number;
-  response?: GaxiosResponse;
-}
 
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
@@ -64,6 +48,7 @@ export class CodeAssistServer implements ContentGenerator {
     readonly projectId?: string,
     readonly httpOptions: HttpOptions = {},
     readonly sessionId?: string,
+    readonly userTier?: UserTierId,
   ) {}
 
   async generateContentStream(
@@ -94,8 +79,8 @@ export class CodeAssistServer implements ContentGenerator {
 
   async onboardUser(
     req: OnboardUserRequest,
-  ): Promise<LongrunningOperationResponse> {
-    return await this.requestPost<LongrunningOperationResponse>(
+  ): Promise<LongRunningOperationResponse> {
+    return await this.requestPost<LongRunningOperationResponse>(
       'onboardUser',
       req,
     );
@@ -193,45 +178,8 @@ export class CodeAssistServer implements ContentGenerator {
     });
 
     return (async function* (): AsyncGenerator<T> {
-      // Convert ReadableStream to Node.js stream if needed
-      let nodeStream: NodeJS.ReadableStream;
-
-      if (res.data instanceof ReadableStream) {
-        // Convert Web ReadableStream to Node.js Readable stream
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        nodeStream = Readable.fromWeb(res.data as any);
-      } else if (
-        res.data &&
-        typeof (res.data as NodeJS.ReadableStream).on === 'function'
-      ) {
-        // Already a Node.js stream
-        nodeStream = res.data as NodeJS.ReadableStream;
-      } else {
-        // If res.data is not a stream, it might be an error response
-        // Try to extract error information from the response
-        let errorMessage =
-          'Response data is not a readable stream. This may indicate a server error or quota issue.';
-
-        if (res.data && typeof res.data === 'object') {
-          // Check if this is an error response with error details
-          const errorData = res.data as ErrorData;
-          if (errorData.error?.message) {
-            errorMessage = errorData.error.message;
-          } else if (typeof errorData === 'string') {
-            errorMessage = errorData;
-          }
-        }
-
-        // Create an error that looks like a quota error if it contains quota information
-        const error: StreamError = new Error(errorMessage);
-        // Add status and response properties so it can be properly handled by retry logic
-        error.status = res.status;
-        error.response = res;
-        throw error;
-      }
-
       const rl = readline.createInterface({
-        input: nodeStream,
+        input: res.data as NodeJS.ReadableStream,
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
 
