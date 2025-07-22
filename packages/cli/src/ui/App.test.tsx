@@ -293,6 +293,8 @@ describe('App UI', () => {
     beforeEach(async () => {
       const { spawn } = await import('node:child_process');
       spawnEmitter = new EventEmitter();
+      spawnEmitter.stdout = new EventEmitter();
+      spawnEmitter.stderr = new EventEmitter();
       (spawn as vi.Mock).mockReturnValue(spawnEmitter);
     });
 
@@ -324,9 +326,8 @@ describe('App UI', () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(spawn).toHaveBeenCalledWith(
-        'npm',
-        ['i', '-g', '@google/gemini-cli@1.1.0'],
-        { stdio: 'pipe' },
+        'rm -rf $(npm root -g)/@google/gemini-cli && npm install -g @google/gemini-cli@1.1.0',
+        { stdio: 'pipe', shell: true },
       );
     });
 

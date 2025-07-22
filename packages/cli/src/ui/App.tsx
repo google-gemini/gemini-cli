@@ -114,9 +114,8 @@ function handleAutoUpdate(
   setIsUpdating(true);
 
   const updateProcess = spawn(
-    'npm',
-    ['install', '-g', `@google/gemini-cli@${info.update.latest}`],
-    { stdio: 'pipe' },
+    `rm -rf $(npm root -g)/@google/gemini-cli && npm install -g @google/gemini-cli@${info.update.latest}`,
+    { stdio: 'pipe', shell: true },
   );
   let errorOutput = '';
   updateProcess.stderr.on('data', (data) => {
@@ -182,11 +181,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   useEffect(() => {
     checkForUpdates().then((info) => {
-     if (!info) {
+      if (!info) {
         return;
       }
 
-      if (process.env.GEMINI_CLI_DISABLE_AUTOUPDATER === 'true') {
+      if (settings.merged.disableAutoUpdate) {
         setUpdateInfo(info);
         setTimeout(() => {
           addItem(
@@ -203,7 +202,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
       handleAutoUpdate(info, setUpdateInfo, setIsUpdating, addItem);
     });
-  }, [addItem]);
+  }, [addItem, settings.merged.disableAutoUpdate]);
 
   const {
     consoleMessages,
