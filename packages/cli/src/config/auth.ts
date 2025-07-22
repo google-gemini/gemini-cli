@@ -16,7 +16,7 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     return null;
   }
 
-  if (authMethod === AuthType.OPENAI_COMPATIBLE) {
+  if (authMethod === AuthType.OPENAI) {
     const settings = loadSettings(process.cwd());
     if (!settings.merged.api?.baseUrl || !settings.merged.api?.apiKey) {
       return 'When using an OpenAI-compatible API, you must specify `api.baseUrl` and `api.apiKey` in your settings file.';

@@ -59,7 +59,7 @@ export const useAuthCommand = (
         settings.setValue(scope, 'selectedAuthType', authType);
         if (
           (authType === AuthType.LOGIN_WITH_GOOGLE ||
-            authType === AuthType.OPENAI_COMPATIBLE) &&
+            authType === AuthType.OPENAI) &&
           config.isBrowserLaunchSuppressed()
         ) {
           runExitCleanup();

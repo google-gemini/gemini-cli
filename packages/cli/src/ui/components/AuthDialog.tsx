@@ -78,12 +78,8 @@ export function AuthDialog({
     },
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
     {
-      label: 'Use OpenAI compatible API',
+      label: 'Use OpenAI-compatible API',
       value: AuthType.OPENAI,
-    },
-    {
-      label: 'Use OpenAI-compatible API (Settings)',
-      value: AuthType.OPENAI_COMPATIBLE,
     },
   ];
 
