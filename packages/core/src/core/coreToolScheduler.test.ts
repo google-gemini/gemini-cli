@@ -19,6 +19,7 @@ import {
   ToolConfirmationPayload,
   ToolResult,
   Config,
+  Icon,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 
@@ -29,7 +30,7 @@ class MockTool extends BaseTool<Record<string, unknown>, ToolResult> {
   executeFn = vi.fn();
 
   constructor(name = 'mockTool') {
-    super(name, name, 'A mock tool', {});
+    super(name, name, 'A mock tool', Icon.Hammer, {});
   }
 
   async shouldConfirmExecute(
@@ -91,6 +92,8 @@ class MockModifiableTool
         title: 'Confirm Mock Tool',
         fileName: 'test.txt',
         fileDiff: 'diff',
+        originalContent: 'originalContent',
+        newContent: 'newContent',
         onConfirm: async () => {},
       };
     }
@@ -402,5 +405,125 @@ describe('convertToFunctionResponse', () => {
         response: { output: 'Tool execution succeeded.' },
       },
     });
+  });
+});
+
+describe('CoreToolScheduler edit cancellation', () => {
+  it('should preserve diff when an edit is cancelled', async () => {
+    class MockEditTool extends BaseTool<Record<string, unknown>, ToolResult> {
+      constructor() {
+        super(
+          'mockEditTool',
+          'mockEditTool',
+          'A mock edit tool',
+          Icon.Pencil,
+          {},
+        );
+      }
+
+      async shouldConfirmExecute(
+        _params: Record<string, unknown>,
+        _abortSignal: AbortSignal,
+      ): Promise<ToolCallConfirmationDetails | false> {
+        return {
+          type: 'edit',
+          title: 'Confirm Edit',
+          fileName: 'test.txt',
+          fileDiff:
+            '--- test.txt\n+++ test.txt\n@@ -1,1 +1,1 @@\n-old content\n+new content',
+          originalContent: 'old content',
+          newContent: 'new content',
+          onConfirm: async () => {},
+        };
+      }
+
+      async execute(
+        _params: Record<string, unknown>,
+        _abortSignal: AbortSignal,
+      ): Promise<ToolResult> {
+        return {
+          llmContent: 'Edited successfully',
+          returnDisplay: 'Edited successfully',
+        };
+      }
+    }
+
+    const mockEditTool = new MockEditTool();
+    const toolRegistry = {
+      getTool: () => mockEditTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {} as any,
+      registerTool: () => {},
+      getToolByName: () => mockEditTool,
+      getToolByDisplayName: () => mockEditTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    };
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      toolRegistry: Promise.resolve(toolRegistry as any),
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockEditTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-1',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    // Wait for the tool to reach awaiting_approval state
+    const awaitingCall = onToolCallsUpdate.mock.calls.find(
+      (call) => call[0][0].status === 'awaiting_approval',
+    )?.[0][0];
+
+    expect(awaitingCall).toBeDefined();
+
+    // Cancel the edit
+    const confirmationDetails = await mockEditTool.shouldConfirmExecute(
+      {},
+      abortController.signal,
+    );
+    if (confirmationDetails) {
+      await scheduler.handleConfirmationResponse(
+        '1',
+        confirmationDetails.onConfirm,
+        ToolConfirmationOutcome.Cancel,
+        abortController.signal,
+      );
+    }
+
+    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+
+    expect(completedCalls[0].status).toBe('cancelled');
+
+    // Check that the diff is preserved
+    const cancelledCall = completedCalls[0] as any;
+    expect(cancelledCall.response.resultDisplay).toBeDefined();
+    expect(cancelledCall.response.resultDisplay.fileDiff).toBe(
+      '--- test.txt\n+++ test.txt\n@@ -1,1 +1,1 @@\n-old content\n+new content',
+    );
+    expect(cancelledCall.response.resultDisplay.fileName).toBe('test.txt');
   });
 });

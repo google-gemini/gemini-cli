@@ -6,6 +6,8 @@
 
 import { Buffer } from 'buffer';
 import * as https from 'https';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+
 import {
   StartSessionEvent,
   EndSessionEvent,
@@ -15,6 +17,7 @@ import {
   ApiResponseEvent,
   ApiErrorEvent,
   FlashFallbackEvent,
+  LoopDetectedEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
@@ -33,6 +36,7 @@ const api_response_event_name = 'api_response';
 const api_error_event_name = 'api_error';
 const end_session_event_name = 'end_session';
 const flash_fallback_event_name = 'flash_fallback';
+const loop_detected_event_name = 'loop_detected';
 
 export interface LogResponse {
   nextRequestWaitMs?: number;
@@ -130,12 +134,18 @@ export class ClearcutLogger {
         headers: { 'Content-Length': Buffer.byteLength(body) },
       };
       const bufs: Buffer[] = [];
-      const req = https.request(options, (res) => {
-        res.on('data', (buf) => bufs.push(buf));
-        res.on('end', () => {
-          resolve(Buffer.concat(bufs));
-        });
-      });
+      const req = https.request(
+        {
+          ...options,
+          agent: this.getProxyAgent(),
+        },
+        (res) => {
+          res.on('data', (buf) => bufs.push(buf));
+          res.on('end', () => {
+            resolve(Buffer.concat(bufs));
+          });
+        },
+      );
       req.on('error', (e) => {
         if (this.config?.getDebugMode()) {
           console.log('Clearcut POST request error: ', e);
@@ -203,10 +213,15 @@ export class ClearcutLogger {
   }
 
   logStartSessionEvent(event: StartSessionEvent): void {
+    const surface = process.env.SURFACE || 'SURFACE_NOT_SET';
     const data = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
         value: event.model,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
       },
       {
         gemini_cli_key:
@@ -264,7 +279,12 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_START_SESSION_TELEMETRY_LOG_USER_PROMPTS_ENABLED,
         value: event.telemetry_log_user_prompts_enabled.toString(),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
     ];
+
     // Flush start event immediately
     this.enqueueLogEvent(this.createLogEvent(start_session_event_name, data));
     this.flushToClearcut().catch((error) => {
@@ -277,6 +297,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_PROMPT_LENGTH,
         value: JSON.stringify(event.prompt_length),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
@@ -440,6 +464,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
         value: JSON.stringify(event.auth_type),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(flash_fallback_event_name, data));
@@ -448,10 +476,26 @@ export class ClearcutLogger {
     });
   }
 
+  logLoopDetectedEvent(event: LoopDetectedEvent): void {
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_LOOP_DETECTED_TYPE,
+        value: JSON.stringify(event.loop_type),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(loop_detected_event_name, data));
+    this.flushIfNeeded();
+  }
+
   logEndSessionEvent(event: EndSessionEvent): void {
     const data = [
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_END_SESSION_ID,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
         value: event?.session_id?.toString() ?? '',
       },
     ];
@@ -461,6 +505,18 @@ export class ClearcutLogger {
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
+  }
+
+  getProxyAgent() {
+    const proxyUrl = this.config?.getProxy();
+    if (!proxyUrl) return undefined;
+    // undici which is widely used in the repo can only support http & https proxy protocol,
+    // https://github.com/nodejs/undici/issues/2224
+    if (proxyUrl.startsWith('http')) {
+      return new HttpsProxyAgent(proxyUrl);
+    } else {
+      throw new Error('Unsupported proxy type');
+    }
   }
 
   shutdown() {

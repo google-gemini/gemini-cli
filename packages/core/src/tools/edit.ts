@@ -9,9 +9,11 @@ import * as path from 'path';
 import * as Diff from 'diff';
 import {
   BaseTool,
+  Icon,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolEditConfirmationDetails,
+  ToolLocation,
   ToolResult,
   ToolResultDisplay,
 } from './tools.js';
@@ -24,6 +26,7 @@ import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
+import { isWithinRoot } from '../utils/fileUtils.js';
 
 /**
  * Parameters for the Edit tool
@@ -72,12 +75,7 @@ export class EditTool
   implements ModifiableTool<EditToolParams>
 {
   static readonly Name = 'replace';
-  private readonly rootDirectory: string;
 
-  /**
-   * Creates a new instance of the EditLogic
-   * @param rootDirectory Root directory to ground this tool in.
-   */
   constructor(private readonly config: Config) {
     super(
       EditTool.Name,
@@ -93,6 +91,7 @@ Expectation for required parameters:
 4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
 **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
 **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
+      Icon.Pencil,
       {
         properties: {
           file_path: {
@@ -121,24 +120,6 @@ Expectation for required parameters:
         type: Type.OBJECT,
       },
     );
-    this.rootDirectory = path.resolve(this.config.getTargetDir());
-  }
-
-  /**
-   * Checks if a path is within the root directory.
-   * @param pathToCheck The absolute path to check.
-   * @returns True if the path is within the root directory, false otherwise.
-   */
-  private isWithinRoot(pathToCheck: string): boolean {
-    const normalizedPath = path.normalize(pathToCheck);
-    const normalizedRoot = this.rootDirectory;
-    const rootWithSep = normalizedRoot.endsWith(path.sep)
-      ? normalizedRoot
-      : normalizedRoot + path.sep;
-    return (
-      normalizedPath === normalizedRoot ||
-      normalizedPath.startsWith(rootWithSep)
-    );
   }
 
   /**
@@ -156,11 +137,20 @@ Expectation for required parameters:
       return `File path must be absolute: ${params.file_path}`;
     }
 
-    if (!this.isWithinRoot(params.file_path)) {
-      return `File path must be within the root directory (${this.rootDirectory}): ${params.file_path}`;
+    if (!isWithinRoot(params.file_path, this.config.getTargetDir())) {
+      return `File path must be within the root directory (${this.config.getTargetDir()}): ${params.file_path}`;
     }
 
     return null;
+  }
+
+  /**
+   * Determines any file locations affected by the tool execution
+   * @param params Parameters for the tool execution
+   * @returns A list of such paths
+   */
+  toolLocations(params: EditToolParams): ToolLocation[] {
+    return [{ path: params.file_path }];
   }
 
   private _applyReplacement(
@@ -219,7 +209,7 @@ Expectation for required parameters:
       // Creating a new file
       isNewFile = true;
     } else if (!fileExists) {
-      // Trying to edit a non-existent file (and old_string is not empty)
+      // Trying to edit a nonexistent file (and old_string is not empty)
       error = {
         display: `File not found. Cannot apply edit. Use an empty old_string to create a new file.`,
         raw: `File not found: ${params.file_path}`,
@@ -249,12 +239,17 @@ Expectation for required parameters:
           raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
         };
       } else if (occurrences !== expectedReplacements) {
-        const occurenceTerm =
+        const occurrenceTerm =
           expectedReplacements === 1 ? 'occurrence' : 'occurrences';
 
         error = {
-          display: `Failed to edit, expected ${expectedReplacements} ${occurenceTerm} but found ${occurrences}.`,
-          raw: `Failed to edit, Expected ${expectedReplacements} ${occurenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
+          display: `Failed to edit, expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences}.`,
+          raw: `Failed to edit, Expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
+        };
+      } else if (finalOldString === finalNewString) {
+        error = {
+          display: `No changes to apply. The old_string and new_string are identical.`,
+          raw: `No changes to apply. The old_string and new_string are identical in file: ${params.file_path}`,
         };
       }
     } else {
@@ -325,9 +320,11 @@ Expectation for required parameters:
     );
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
-      title: `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`,
+      title: `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.config.getTargetDir()))}`,
       fileName,
       fileDiff,
+      originalContent: editData.currentContent,
+      newContent: editData.newContent,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
@@ -341,7 +338,10 @@ Expectation for required parameters:
     if (!params.file_path || !params.old_string || !params.new_string) {
       return `Model did not provide valid parameters for edit tool`;
     }
-    const relativePath = makeRelative(params.file_path, this.rootDirectory);
+    const relativePath = makeRelative(
+      params.file_path,
+      this.config.getTargetDir(),
+    );
     if (params.old_string === '') {
       return `Create ${shortenPath(relativePath)}`;
     }
@@ -400,7 +400,7 @@ Expectation for required parameters:
 
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {
-        displayResult = `Created ${shortenPath(makeRelative(params.file_path, this.rootDirectory))}`;
+        displayResult = `Created ${shortenPath(makeRelative(params.file_path, this.config.getTargetDir()))}`;
       } else {
         // Generate diff for display, even though core logic doesn't technically need it
         // The CLI wrapper will use this part of the ToolResult
@@ -413,7 +413,12 @@ Expectation for required parameters:
           'Proposed',
           DEFAULT_DIFF_OPTIONS,
         );
-        displayResult = { fileDiff, fileName };
+        displayResult = {
+          fileDiff,
+          fileName,
+          originalContent: editData.currentContent,
+          newContent: editData.newContent,
+        };
       }
 
       const llmSuccessMessageParts = [
