@@ -99,12 +99,22 @@ export interface LoadHistoryActionReturn {
   clientHistory: Content[]; // The history for the generative client
 }
 
+/**
+ * The return type for a command action that should immediately submit
+ * content as a prompt to the Gemini model.
+ */
+export interface SubmitPromptActionReturn {
+  type: 'submit_prompt';
+  content: string;
+}
+
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
   | QuitActionReturn
   | OpenDialogActionReturn
-  | LoadHistoryActionReturn;
+  | LoadHistoryActionReturn
+  | SubmitPromptActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
