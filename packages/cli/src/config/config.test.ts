@@ -23,11 +23,22 @@ vi.mock('open', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('read-package-up', () => ({
-  readPackageUp: vi.fn(() =>
-    Promise.resolve({ packageJson: { version: 'test-version' } }),
-  ),
+vi.mock('empathic/package', () => ({
+  up: vi.fn(() => '/mock/package.json'),
 }));
+
+vi.mock('fs/promises', async (importOriginal) => {
+  const actualFs = await importOriginal<typeof import('fs/promises')>();
+  return {
+    ...actualFs,
+    readFile: (path: string, encoding: BufferEncoding) => {
+      if (path.includes('package.json')) {
+        return Promise.resolve('{"version": "test-version"}');
+      }
+      return actualFs.readFile(path, encoding);
+    },
+  };
+});
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actualServer = await vi.importActual<typeof ServerConfig>(

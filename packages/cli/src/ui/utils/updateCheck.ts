@@ -21,8 +21,8 @@ export async function checkForUpdates(): Promise<string | null> {
     }
     const notifier = updateNotifier({
       pkg: {
-        name: packageJson.name,
-        version: packageJson.version,
+        name: String(packageJson.name),
+        version: String(packageJson.version),
       },
       // check every time
       updateCheckInterval: 0,

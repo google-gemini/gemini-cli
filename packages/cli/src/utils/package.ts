@@ -4,14 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  readPackageUp,
-  type PackageJson as BasePackageJson,
-} from 'read-package-up';
+import { up as readPackageUp } from 'empathic/package';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { readFile } from 'fs/promises';
 
-export type PackageJson = BasePackageJson & {
+export type PackageJson = Record<string, unknown> & {
   config?: {
     sandboxImageUri?: string;
   };
@@ -27,12 +25,17 @@ export async function getPackageJson(): Promise<PackageJson | undefined> {
     return packageJson;
   }
 
-  const result = await readPackageUp({ cwd: __dirname });
-  if (!result) {
+  const packagePath = readPackageUp({ cwd: __dirname });
+
+  if (!packagePath) {
     // TODO: Maybe bubble this up as an error.
     return;
   }
 
-  packageJson = result.packageJson;
-  return packageJson;
+  try {
+    const result = JSON.parse(await readFile(packagePath, 'utf8'));
+    return result;
+  } catch {
+    return;
+  }
 }
