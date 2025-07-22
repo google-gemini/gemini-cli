@@ -308,26 +308,20 @@ export function useCompletion(
       maxDepth = 8,
       maxResults = 30,
     ): Promise<Suggestion[]> => {
-      // Check if operation was aborted
-      if (signal.aborted) {
-        return [];
-      }
-
-      if (depth > maxDepth) {
+      if (depth > maxDepth || signal.aborted) {
         return [];
       }
 
       const lowerSearchPrefix = searchPrefix.toLowerCase();
       let foundSuggestions: Suggestion[] = [];
       try {
-        // Check abort signal before reading directory
+        const entries = await fs.readdir(startDir, { withFileTypes: true });
+        // Check abort signal after async operation
         if (signal.aborted) {
           return [];
         }
-        const entries = await fs.readdir(startDir, { withFileTypes: true });
         for (const entry of entries) {
-          // Check abort signal frequently during intensive operations
-          if (signal.aborted || foundSuggestions.length >= maxResults) break;
+          if (foundSuggestions.length >= maxResults) break;
 
           const entryPathRelative = path.join(currentRelativePath, entry.name);
           const entryPathFromRoot = path.relative(
