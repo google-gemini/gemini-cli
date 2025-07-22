@@ -128,8 +128,6 @@ export class ReadManyFilesTool extends BaseTool<
 > {
   static readonly Name: string = 'read_many_files';
 
-  private readonly geminiIgnorePatterns: string[] = [];
-
   constructor(private config: Config) {
     const parameterSchema: Schema = {
       type: Type.OBJECT,
@@ -213,9 +211,7 @@ Use this tool when the user's query implies needing the content of several files
       Icon.FileSearch,
       parameterSchema,
     );
-    this.geminiIgnorePatterns = config
-      .getFileService()
-      .getGeminiIgnorePatterns();
+
   }
 
   validateParams(params: ReadManyFilesParams): string | null {
@@ -233,17 +229,19 @@ Use this tool when the user's query implies needing the content of several files
     // Determine the final list of exclusion patterns exactly as in execute method
     const paramExcludes = params.exclude || [];
     const paramUseDefaultExcludes = params.useDefaultExcludes !== false;
-
+    const geminiIgnorePatterns = this.config
+      .getFileService()
+      .getGeminiIgnorePatterns();
     const finalExclusionPatternsForDescription: string[] =
       paramUseDefaultExcludes
-        ? [...DEFAULT_EXCLUDES, ...paramExcludes, ...this.geminiIgnorePatterns]
-        : [...paramExcludes, ...this.geminiIgnorePatterns];
+        ? [...DEFAULT_EXCLUDES, ...paramExcludes, ...geminiIgnorePatterns]
+        : [...paramExcludes, ...geminiIgnorePatterns];
 
     let excludeDesc = `Excluding: ${finalExclusionPatternsForDescription.length > 0 ? `patterns like \`${finalExclusionPatternsForDescription.slice(0, 2).join('`, `')}${finalExclusionPatternsForDescription.length > 2 ? '...`' : '`'}` : 'none specified'}`;
 
     // Add a note if .geminiignore patterns contributed to the final list of exclusions
-    if (this.geminiIgnorePatterns.length > 0) {
-      const geminiPatternsInEffect = this.geminiIgnorePatterns.filter((p) =>
+    if (geminiIgnorePatterns.length > 0) {
+      const geminiPatternsInEffect = geminiIgnorePatterns.filter((p) =>
         finalExclusionPatternsForDescription.includes(p),
       ).length;
       if (geminiPatternsInEffect > 0) {
@@ -317,29 +315,29 @@ Use this tool when the user's query implies needing the content of several files
 
       const gitFilteredEntries = fileFilteringOptions.respectGitIgnore
         ? fileDiscovery
-            .filterFiles(
-              entries.map((p) => path.relative(this.config.getTargetDir(), p)),
-              {
-                respectGitIgnore: true,
-                respectGeminiIgnore: false,
-              },
-            )
-            .map((p) => path.resolve(this.config.getTargetDir(), p))
+          .filterFiles(
+            entries.map((p) => path.relative(this.config.getTargetDir(), p)),
+            {
+              respectGitIgnore: true,
+              respectGeminiIgnore: false,
+            },
+          )
+          .map((p) => path.resolve(this.config.getTargetDir(), p))
         : entries;
 
       // Apply gemini ignore filtering if enabled
       const finalFilteredEntries = fileFilteringOptions.respectGeminiIgnore
         ? fileDiscovery
-            .filterFiles(
-              gitFilteredEntries.map((p) =>
-                path.relative(this.config.getTargetDir(), p),
-              ),
-              {
-                respectGitIgnore: false,
-                respectGeminiIgnore: true,
-              },
-            )
-            .map((p) => path.resolve(this.config.getTargetDir(), p))
+          .filterFiles(
+            gitFilteredEntries.map((p) =>
+              path.relative(this.config.getTargetDir(), p),
+            ),
+            {
+              respectGitIgnore: false,
+              respectGeminiIgnore: true,
+            },
+          )
+          .map((p) => path.resolve(this.config.getTargetDir(), p))
         : gitFilteredEntries;
 
       let gitIgnoredCount = 0;

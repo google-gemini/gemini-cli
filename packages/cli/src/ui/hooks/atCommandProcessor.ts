@@ -222,9 +222,9 @@ export async function handleAtCommand({
       const absolutePath = path.resolve(config.getTargetDir(), pathName);
       const stats = await fs.stat(absolutePath);
       if (stats.isDirectory()) {
-        currentPathSpec = pathName.endsWith('/')
+        currentPathSpec = pathName.endsWith(path.sep)
           ? `${pathName}**`
-          : `${pathName}/**`;
+          : `${pathName}${path.sep}**`;
         onDebugMessage(
           `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
         );

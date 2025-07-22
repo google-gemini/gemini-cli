@@ -44,7 +44,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs: lint
     permissions:
       contents: read
@@ -52,6 +52,7 @@ jobs:
       pull-requests: write
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest]
         node-version: [20.x, 22.x, 24.x]
     steps:
       - name: Checkout repository
@@ -70,7 +71,9 @@ jobs:
         run: npm ci # Install fresh dependencies using the downloaded package-lock.json
 
       - name: Run tests and generate reports
-        run: NO_COLOR=true npm run test:ci
+        run: npm run test:ci
+        env:
+          NO_COLOR: true
 
       - name: Publish Test Report (for non-forks)
         if: always() && (github.event.pull_request.head.repo.full_name == github.repository)
@@ -85,14 +88,14 @@ jobs:
         if: always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: test-results-fork-${{ matrix.node-version }}
+          name: test-results-fork-${{ matrix.node-version }}-${{ matrix.os }}
           path: packages/*/junit.xml
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: coverage-reports-${{ matrix.node-version }}
+          name: coverage-reports-${{ matrix.node-version }}-${{ matrix.os }}
           path: packages/*/coverage
 
   post_coverage_comment:
