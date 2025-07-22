@@ -97,8 +97,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const shouldShowCompletion = useCallback(
     () =>
-      (isAtCommand(buffer.text) || isSlashCommand(buffer.text)) &&
-      isCursorAfterCommandWithoutSpace(),
+      // For slash commands and @ file references, check cursor position
+      ((isAtCommand(buffer.text) || isSlashCommand(buffer.text)) &&
+        isCursorAfterCommandWithoutSpace()) ||
+      // For AI prompt completion, allow any text (will be filtered in useCompletion)
+      (!isAtCommand(buffer.text) && !isSlashCommand(buffer.text) && buffer.text.trim().length > 0),
     [buffer.text, isCursorAfterCommandWithoutSpace],
   );
 
@@ -109,6 +112,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     slashCommands,
     commandContext,
     config,
+    config.getGeminiClient(),
   );
 
   const resetCompletionState = completion.resetCompletionState;
@@ -211,7 +215,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         const newValue = `/${[...basePath, suggestion].join(' ')}`;
 
         buffer.setText(newValue);
-      } else {
+      } else if (query.includes('@')) {
+        // @ file reference autocompletion
         const atIndex = query.lastIndexOf('@');
         if (atIndex === -1) return;
         const pathPart = query.substring(atIndex + 1);
@@ -225,10 +230,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           buffer.text.length,
           suggestion,
         );
+      } else {
+        // AI prompt completion - replace entire text
+        buffer.setText(suggestion);
+        // Mark that user selected this suggestion to prevent immediate re-triggering
+        completion.markSuggestionSelected(suggestion);
       }
       resetCompletionState();
     },
-    [resetCompletionState, buffer, completionSuggestions, slashCommands],
+    [resetCompletionState, buffer, completionSuggestions, slashCommands, completion.markSuggestionSelected],
   );
 
   // Handle clipboard image pasting with Ctrl+V
