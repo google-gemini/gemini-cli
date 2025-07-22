@@ -33,8 +33,8 @@ export async function getPackageJson(): Promise<PackageJson | undefined> {
   }
 
   try {
-    const result = JSON.parse(await readFile(packagePath, 'utf8'));
-    return result;
+    packageJson = JSON.parse(await readFile(packagePath, 'utf8'));
+    return packageJson;
   } catch {
     return;
   }

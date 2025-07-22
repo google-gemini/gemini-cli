@@ -8,6 +8,6 @@ import { getPackageJson } from './package.js';
 
 export async function getCliVersion(): Promise<string> {
   const pkgJson = await getPackageJson();
-  const pkgJsonVersion = pkgJson?.version ? String(pkgJson.version) : undefined;
+  const pkgJsonVersion = typeof pkgJson?.version === 'string' ? pkgJson.version : '';
   return process.env.CLI_VERSION || pkgJsonVersion || 'unknown';
 }
