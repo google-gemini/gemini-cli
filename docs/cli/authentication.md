@@ -107,3 +107,24 @@ GOOGLE_CLOUD_PROJECT="your-project-id"
 GEMINI_API_KEY="your-gemini-api-key"
 EOF
 ```
+
+## Non-Interactive Mode / Headless Environments
+
+When running the Gemini CLI in a non-interactive environment, you cannot use the interactive login flow.
+Instead, you must configure authentication using environment variables.
+
+The CLI will automatically detect if it is running in a non-interactive terminal and will use one of the
+following authentication methods if available:
+
+1.  **Gemini API Key:**
+    - Set the `GEMINI_API_KEY` environment variable.
+    - The CLI will use this key to authenticate with the Gemini API.
+
+2.  **Vertex AI:**
+    - Set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
+    - **Using an API Key:** Set the `GOOGLE_API_KEY` environment variable.
+    - **Using Application Default Credentials (ADC):**
+      - Run `gcloud auth application-default login` in your environment to configure ADC.
+      - Ensure the `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` environment variables are set.
+
+If none of these environment variables are set in a non-interactive session, the CLI will exit with an error.
