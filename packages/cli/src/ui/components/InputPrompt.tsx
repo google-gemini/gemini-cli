@@ -254,7 +254,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           buffer.replaceRangeByOffset(offset, offset, textToInsert);
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Ignore clipboard image errors
     }
   }, [buffer, config]);
@@ -287,6 +287,29 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       onClearBuffer(clearBuffer);
     }
   }, [onClearBuffer, clearBuffer]);
+
+  // Effect to handle side effects of escPressCount
+  useEffect(() => {
+    if (escPressCount === 1) {
+      setShowEscapePrompt(true);
+      if (escapeTimerRef.current) {
+        clearTimeout(escapeTimerRef.current);
+      }
+      escapeTimerRef.current = setTimeout(() => {
+        resetEscapeState();
+      }, 3000);
+    } else if (escPressCount === 0 && !showEscapePrompt) {
+      // This condition handles the case where escPressCount is reset to 0
+      // and the prompt is hidden, ensuring cleanup.
+      if (escapeTimerRef.current) {
+        clearTimeout(escapeTimerRef.current);
+        escapeTimerRef.current = null;
+      }
+    } else if (escPressCount >= 2) {
+      onClearScreen();
+      resetEscapeState();
+    }
+  }, [escPressCount, showEscapePrompt, resetEscapeState, clearBuffer]);
 
   const handleInput = useCallback(
     (key: Key) => {
@@ -326,28 +349,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         // Handle double ESC for clearing input
-        setEscPressCount((prev) => {
-          const newCount = prev + 1;
-          if (newCount === 1) {
-            // First ESC press - show prompt
-            setShowEscapePrompt(true);
-            // Clear any existing timer
-            if (escapeTimerRef.current) {
-              clearTimeout(escapeTimerRef.current);
-            }
-            // Set timer to auto-hide prompt and reset count
-            escapeTimerRef.current = setTimeout(() => {
-              resetEscapeState();
-            }, 1000); // Show prompt for 1 seconds
-            return newCount;
-          } else if (newCount >= 2) {
-            // Second ESC press - clear input
-            clearBuffer();
-            resetEscapeState();
-            return 0; // Reset count
-          }
-          return newCount;
-        });
+        setEscPressCount((prev) => (prev + 1 >= 2 ? 0 : prev + 1));
         return;
       }
 
@@ -498,7 +500,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleSubmitAndClear,
       shellHistory,
       handleClipboardImage,
-      resetCompletionState,
       escPressCount,
       showEscapePrompt,
       resetEscapeState,

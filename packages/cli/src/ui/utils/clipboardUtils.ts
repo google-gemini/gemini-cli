@@ -36,7 +36,7 @@ export async function clipboardHasImage(): Promise<boolean> {
       // Other platforms not supported yet
       return false;
     }
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }
@@ -131,7 +131,7 @@ export async function saveClipboardImage(
           if (stats.size > 0) {
             return tempFilePath;
           }
-        } catch (statError) {
+        } catch (_statError) {
           // File doesn't exist
         }
       }
@@ -139,7 +139,7 @@ export async function saveClipboardImage(
       // Clean up failed attempt
       try {
         await fs.unlink(tempFilePath);
-      } catch (unlinkError) {
+      } catch (_unlinkError) {
         // Ignore cleanup errors
       }
     } else {
@@ -149,7 +149,7 @@ export async function saveClipboardImage(
 
     // No format worked
     return null;
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }
@@ -183,7 +183,7 @@ export async function cleanupOldClipboardImages(
         }
       }
     }
-  } catch {
+  } catch (_error) {
     // Ignore errors in cleanup
   }
 }
