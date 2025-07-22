@@ -1058,6 +1058,65 @@ describe('useGeminiStream', () => {
         expect(mockSendMessageStream).not.toHaveBeenCalled(); // No LLM call made
       });
     });
+
+    it('should call Gemini with prompt content when slash command returns a `submit_prompt` action', async () => {
+      const customCommandResult: SlashCommandProcessorResult = {
+        type: 'submit_prompt',
+        content: 'This is the actual prompt from the command file.',
+      };
+      mockHandleSlashCommand.mockResolvedValue(customCommandResult);
+
+      const { result, mockSendMessageStream: localMockSendMessageStream } =
+        renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('/my-custom-command');
+      });
+
+      await waitFor(() => {
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/my-custom-command',
+        );
+
+        expect(localMockSendMessageStream).not.toHaveBeenCalledWith(
+          '/my-custom-command',
+          expect.anything(),
+          expect.anything(),
+        );
+
+        expect(localMockSendMessageStream).toHaveBeenCalledWith(
+          'This is the actual prompt from the command file.',
+          expect.any(AbortSignal),
+          expect.any(String),
+        );
+
+        expect(mockScheduleToolCalls).not.toHaveBeenCalled();
+      });
+    });
+
+    it('should correctly handle a submit_prompt action with empty content', async () => {
+      const emptyPromptResult: SlashCommandProcessorResult = {
+        type: 'submit_prompt',
+        content: '',
+      };
+      mockHandleSlashCommand.mockResolvedValue(emptyPromptResult);
+
+      const { result, mockSendMessageStream: localMockSendMessageStream } =
+        renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('/emptycmd');
+      });
+
+      await waitFor(() => {
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith('/emptycmd');
+        expect(localMockSendMessageStream).toHaveBeenCalledWith(
+          '',
+          expect.any(AbortSignal),
+          expect.any(String),
+        );
+      });
+    });
   });
 
   describe('Memory Refresh on save_memory', () => {
