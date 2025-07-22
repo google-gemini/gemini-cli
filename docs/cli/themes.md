@@ -77,6 +77,21 @@ Add a `customThemes` block to your user, project, or system `settings.json` file
 - `Comment`
 - `Gray`
 
+**Required Properties:**
+- `name` (must match the key in the `customThemes` object and be a string)
+- `type` (must be the string `"custom"`)
+- `Background`
+- `Foreground`
+- `LightBlue`
+- `AccentBlue`
+- `AccentPurple`
+- `AccentCyan`
+- `AccentGreen`
+- `AccentYellow`
+- `AccentRed`
+- `Comment`
+- `Gray`
+
 You can use either hex codes (e.g., `#FF0000`) **or** standard CSS color names (e.g., `coral`, `teal`, `blue`) for any color value. See [CSS color names](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value#color_keywords) for a full list of supported names.
 
 You can define multiple custom themes by adding more entries to the `customThemes` object.
