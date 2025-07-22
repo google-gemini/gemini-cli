@@ -989,6 +989,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   userMessages={userMessages}
                   onClearScreen={handleClearScreen}
                   config={config}
+                  settings={settings.merged}
                   slashCommands={slashCommands}
                   commandContext={commandContext}
                   shellModeActive={shellModeActive}

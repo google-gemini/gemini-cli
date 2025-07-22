@@ -56,6 +56,12 @@ export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
 }
 
+export interface PromptCompletionSettings {
+  enabled?: boolean;
+  minLength?: number;
+  debounceMs?: number;
+}
+
 export interface Settings {
   theme?: string;
   customThemes?: Record<string, CustomTheme>;
@@ -85,6 +91,9 @@ export interface Settings {
     respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
   };
+
+  // Prompt completion settings
+  promptCompletion?: PromptCompletionSettings;
 
   hideWindowTitle?: boolean;
 
