@@ -19,10 +19,9 @@ import { parse } from 'shell-quote';
 import { MCPServerConfig } from '../config/config.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { FunctionDeclaration, mcpToTool } from '@google/genai';
-import { sanitizeParameters, ToolRegistry } from './tool-registry.js';
+import { ToolRegistry } from './tool-registry.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
-import { getErrorMessage } from '../utils/errors.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import {
   OpenFilesNotificationSchema,

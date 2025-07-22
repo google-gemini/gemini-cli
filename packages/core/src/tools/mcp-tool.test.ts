@@ -330,10 +330,9 @@ describe('DiscoveredMCPTool', () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
-        toolNameForModel,
+        serverToolName,
         baseDescription,
         inputSchema,
-        serverToolName,
       );
       const confirmation = await tool.shouldConfirmExecute(
         {},
@@ -367,10 +366,9 @@ describe('DiscoveredMCPTool', () => {
       const tool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
-        toolNameForModel,
+        serverToolName,
         baseDescription,
         inputSchema,
-        serverToolName,
       );
       const confirmation = await tool.shouldConfirmExecute(
         {},
