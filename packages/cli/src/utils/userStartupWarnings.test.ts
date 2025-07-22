@@ -99,7 +99,7 @@ describe('getUserStartupWarnings', () => {
       const warnings = await getUserStartupWarnings('C:\\');
 
       expect(warnings).toContainEqual(
-        expect.stringContaining('root directory'),
+        expect.stringContaining(path.normalize('root directory')),
       );
       expect(warnings).toContainEqual(
         expect.stringContaining('folder structure will be used'),

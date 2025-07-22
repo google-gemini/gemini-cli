@@ -15,6 +15,7 @@ import {
   Mock,
 } from 'vitest';
 import * as fs from 'fs/promises';
+import path from 'path';
 import { restoreCommand } from './restoreCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -96,7 +97,7 @@ describe('restoreCommand', () => {
         content: 'No restorable tool calls found.',
       });
       expect(mockFsPromises.mkdir).toHaveBeenCalledWith(
-        '/tmp/gemini/checkpoints',
+        path.normalize('/tmp/gemini/checkpoints'),
         {
           recursive: true,
         },

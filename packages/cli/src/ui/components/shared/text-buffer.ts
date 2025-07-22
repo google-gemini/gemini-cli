@@ -9,7 +9,14 @@ import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import pathMod from 'path';
-import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+} from 'react';
 import stringWidth from 'string-width';
 import { unescapePath } from '@google/gemini-cli-core';
 import { toCodePoints, cpLen, cpSlice } from '../../utils/textUtils.js';
@@ -1154,6 +1161,9 @@ export function useTextBuffer({
     [text, stdin, setRawMode],
   );
 
+  const [isPasting, setIsPasting] = useState(false);
+  const pasteBuffer = useRef('');
+
   const handleInput = useCallback(
     (key: {
       name: string;
@@ -1164,6 +1174,26 @@ export function useTextBuffer({
       sequence: string;
     }): void => {
       const { sequence: input } = key;
+
+      // Handle bracketed paste sequences
+      if (input.startsWith('\x1b[200~')) {
+        setIsPasting(true);
+        pasteBuffer.current = '';
+        return;
+      } else if (input.endsWith('\x1b[201~')) {
+        setIsPasting(false);
+        const pastedContent = pasteBuffer.current;
+        pasteBuffer.current = '';
+        if (pastedContent.length > 0) {
+          dispatch({ type: 'insert', payload: pastedContent });
+        }
+        return;
+      }
+
+      if (isPasting) {
+        pasteBuffer.current += input;
+        return;
+      }
 
       if (
         key.name === 'return' ||
@@ -1206,7 +1236,16 @@ export function useTextBuffer({
         insert(input);
       }
     },
-    [newline, move, deleteWordLeft, deleteWordRight, backspace, del, insert],
+    [
+      newline,
+      move,
+      deleteWordLeft,
+      deleteWordRight,
+      backspace,
+      del,
+      insert,
+      isPasting,
+    ],
   );
 
   const renderedVisualLines = useMemo(
@@ -1272,6 +1311,7 @@ export function useTextBuffer({
     killLineLeft,
     handleInput,
     openInExternalEditor,
+    isPasting,
   };
   return returnValue;
 }
@@ -1363,6 +1403,7 @@ export interface TextBuffer {
     paste: boolean;
     sequence: string;
   }) => void;
+  isPasting: boolean;
   /**
    * Opens the current buffer contents in the user's preferred terminal text
    * editor ($VISUAL or $EDITOR, falling back to "vi").  The method blocks
