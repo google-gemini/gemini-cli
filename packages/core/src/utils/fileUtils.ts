@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { PartUnion } from '@google/genai';
 import mime from 'mime-types';
 
@@ -56,22 +56,24 @@ export function isWithinRoot(
 /**
  * Determines if a file is likely binary based on content sampling.
  * @param filePath Path to the file.
- * @returns True if the file appears to be binary.
+ * @returns Promise that resolves to true if the file appears to be binary.
  */
-export function isBinaryFile(filePath: string): boolean {
+export async function isBinaryFile(filePath: string): Promise<boolean> {
+  let fileHandle: fs.promises.FileHandle | undefined;
   try {
-    const fd = fs.openSync(filePath, 'r');
+    fileHandle = await fs.promises.open(filePath, 'r');
+
     // Read up to 4KB or file size, whichever is smaller
-    const fileSize = fs.fstatSync(fd).size;
+    const stats = await fileHandle.stat();
+    const fileSize = stats.size;
     if (fileSize === 0) {
       // Empty file is not considered binary for content checking
-      fs.closeSync(fd);
       return false;
     }
     const bufferSize = Math.min(4096, fileSize);
     const buffer = Buffer.alloc(bufferSize);
-    const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, 0);
-    fs.closeSync(fd);
+    const result = await fileHandle.read(buffer, 0, buffer.length, 0);
+    const bytesRead = result.bytesRead;
 
     if (bytesRead === 0) return false;
 
@@ -84,21 +86,40 @@ export function isBinaryFile(filePath: string): boolean {
     }
     // If >30% non-printable characters, consider it binary
     return nonPrintableCount / bytesRead > 0.3;
-  } catch {
+  } catch (error) {
+    // Log error for debugging while maintaining existing behavior
+    console.warn(
+      `Failed to check if file is binary: ${filePath}`,
+      error instanceof Error ? error.message : String(error),
+    );
     // If any error occurs (e.g. file not found, permissions),
     // treat as not binary here; let higher-level functions handle existence/access errors.
     return false;
+  } finally {
+    // Safely close the file handle if it was successfully opened
+    if (fileHandle) {
+      try {
+        await fileHandle.close();
+      } catch (closeError) {
+        // Log close errors for debugging while continuing with cleanup
+        console.warn(
+          `Failed to close file handle for: ${filePath}`,
+          closeError instanceof Error ? closeError.message : String(closeError),
+        );
+        // The important thing is that we attempted to clean up
+      }
+    }
   }
 }
 
 /**
  * Detects the type of file based on extension and content.
  * @param filePath Path to the file.
- * @returns 'text', 'image', 'pdf', 'audio', 'video', or 'binary'.
+ * @returns Promise that resolves to 'text', 'image', 'pdf', 'audio', 'video', 'binary' or 'svg'.
  */
-export function detectFileType(
+export async function detectFileType(
   filePath: string,
-): 'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg' {
+): Promise<'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg'> {
   const ext = path.extname(filePath).toLowerCase();
 
   // The mimetype for "ts" is MPEG transport stream (a video format) but we want
@@ -164,9 +185,9 @@ export function detectFileType(
     return 'binary';
   }
 
-  // Fallback to content-based check if mime type wasn't conclusive for image/pdf
+  // Fall back to content-based check if mime type wasn't conclusive for image/pdf
   // and it's not a known binary extension.
-  if (isBinaryFile(filePath)) {
+  if (await isBinaryFile(filePath)) {
     return 'binary';
   }
 
@@ -227,7 +248,7 @@ export async function processSingleFileContent(
       );
     }
 
-    const fileType = detectFileType(filePath);
+    const fileType = await detectFileType(filePath);
     const relativePathForDisplay = path
       .relative(rootDirectory, filePath)
       .replace(/\\/g, '/');
