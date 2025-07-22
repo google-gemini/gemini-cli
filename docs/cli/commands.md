@@ -40,7 +40,7 @@ Slash commands provide meta-level control over the CLI itself.
   - **Description:** Lists all active extensions in the current Gemini CLI session. See [Gemini CLI Extensions](../extension.md).
 
 - **`/help`** (or **`/?`**)
-  - **Description:** Display help information about the Gemini CLI, including available commands and their usage.
+  - **Description:** Display help information about Gemini CLI, including available commands and their usage.
 
 - **`/mcp`**
   - **Description:** List configured Model Context Protocol (MCP) servers, their connection status, server details, and available tools.
@@ -97,7 +97,9 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### Custom Commands
 
-Custom commands allow you to save and reuse your favorite or most frequently used prompts as personal shortcuts within the Gemini CLI. You can create commands that are specific to a single project or commands that are available globally across all your projects, streamlining your workflow and ensuring consistency.
+For a quick start, see the [example](#example-a-pure-function-refactoring-command) below.
+
+Custom commands allow you to save and reuse your favorite or most frequently used prompts as personal shortcuts within Gemini CLI. You can create commands that are specific to a single project or commands that are available globally across all your projects, streamlining your workflow and ensuring consistency.
 
 #### File Locations & Precedence
 
@@ -172,8 +174,6 @@ That's it! You can now run your command in the CLI. First, you might add a file 
 ```
 
 Gemini CLI will then execute the multi-line prompt defined in your TOML file.
-
-#### What's Next?
 
 This initial version of custom commands is focused on static prompts. Future updates are planned to introduce more dynamic capabilities, including:
 

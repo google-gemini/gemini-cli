@@ -17,6 +17,8 @@ import { createMockCommandContext } from '../test-utils/mockCommandContext.js';
 const mockContext = createMockCommandContext();
 
 describe('FileCommandLoader', () => {
+  const signal: AbortSignal = new AbortController().signal;
+
   afterEach(() => {
     mock.restore();
   });
@@ -30,7 +32,7 @@ describe('FileCommandLoader', () => {
     });
 
     const loader = new FileCommandLoader(null as unknown as Config);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(signal);
 
     expect(commands).toHaveLength(1);
     const command = commands[0];
@@ -55,7 +57,7 @@ describe('FileCommandLoader', () => {
     });
 
     const loader = new FileCommandLoader(null as unknown as Config);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(signal);
 
     expect(commands).toHaveLength(2);
   });
@@ -75,7 +77,7 @@ describe('FileCommandLoader', () => {
     const loader = new FileCommandLoader({
       getProjectRoot: () => '/path/to/project',
     } as Config);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(signal);
     expect(commands).toHaveLength(1);
     expect(commands[0]!.name).toBe('gcp:pipelines:run');
   });
@@ -91,7 +93,7 @@ describe('FileCommandLoader', () => {
     });
 
     const loader = new FileCommandLoader(null as unknown as Config);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(signal);
 
     expect(commands).toHaveLength(1);
     const command = commands[0];
@@ -114,7 +116,7 @@ describe('FileCommandLoader', () => {
     const loader = new FileCommandLoader({
       getProjectRoot: () => process.cwd(),
     } as Config);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(signal);
 
     expect(commands).toHaveLength(1);
     const command = commands[0];
@@ -138,7 +140,7 @@ describe('FileCommandLoader', () => {
     });
 
     const loader = new FileCommandLoader(null as unknown as Config);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(signal);
 
     expect(commands).toHaveLength(1);
     expect(commands[0].name).toBe('good');
@@ -154,7 +156,7 @@ describe('FileCommandLoader', () => {
     });
 
     const loader = new FileCommandLoader(null as unknown as Config);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(signal);
 
     expect(commands).toHaveLength(1);
     expect(commands[0].name).toBe('good');
@@ -169,7 +171,7 @@ describe('FileCommandLoader', () => {
     });
 
     const loader = new FileCommandLoader(null as unknown as Config);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(signal);
     const command = commands[0];
     expect(command).toBeDefined();
     expect(command.name).toBe('test.v1');
@@ -178,7 +180,7 @@ describe('FileCommandLoader', () => {
   it('handles file system errors gracefully', async () => {
     mock({}); // Mock an empty file system
     const loader = new FileCommandLoader(null as unknown as Config);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(signal);
     expect(commands).toHaveLength(0);
   });
 
@@ -191,7 +193,7 @@ describe('FileCommandLoader', () => {
     });
 
     const loader = new FileCommandLoader(null as unknown as Config);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(signal);
     const command = commands[0];
     expect(command).toBeDefined();
     expect(command.description).toBe('Custom command from test.toml');
@@ -206,7 +208,7 @@ describe('FileCommandLoader', () => {
     });
 
     const loader = new FileCommandLoader(null as unknown as Config);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(signal);
     const command = commands[0];
     expect(command).toBeDefined();
     expect(command.description).toBe('My test command');
@@ -221,7 +223,7 @@ describe('FileCommandLoader', () => {
     });
 
     const loader = new FileCommandLoader(null as unknown as Config);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(signal);
 
     expect(commands).toHaveLength(1);
     const command = commands[0];
