@@ -11,7 +11,11 @@ import { useCompletion } from './useCompletion.js';
 import * as fs from 'fs/promises';
 import { glob } from 'glob';
 import * as path from 'path';
-import { CommandContext, SlashCommand } from '../commands/types.js';
+import {
+  CommandContext,
+  CommandKind,
+  SlashCommand,
+} from '../commands/types.js';
 import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
 
 interface MockConfig {
@@ -44,8 +48,18 @@ describe('useCompletion git-aware filtering integration', () => {
 
   const testCwd = '/test/project';
   const slashCommands = [
-    { name: 'help', description: 'Show help', action: vi.fn() },
-    { name: 'clear', description: 'Clear screen', action: vi.fn() },
+    {
+      name: 'help',
+      description: 'Show help',
+      kind: CommandKind.BUILT_IN,
+      action: vi.fn(),
+    },
+    {
+      name: 'clear',
+      description: 'Clear screen',
+      kind: CommandKind.BUILT_IN,
+      action: vi.fn(),
+    },
   ];
 
   // A minimal mock is sufficient for these tests.
@@ -57,31 +71,37 @@ describe('useCompletion git-aware filtering integration', () => {
       altNames: ['?'],
       description: 'Show help',
       action: vi.fn(),
+      kind: CommandKind.BUILT_IN,
     },
     {
       name: 'stats',
       altNames: ['usage'],
       description: 'check session stats. Usage: /stats [model|tools]',
       action: vi.fn(),
+      kind: CommandKind.BUILT_IN,
     },
     {
       name: 'clear',
       description: 'Clear the screen',
       action: vi.fn(),
+      kind: CommandKind.BUILT_IN,
     },
     {
       name: 'memory',
       description: 'Manage memory',
+      kind: CommandKind.BUILT_IN,
       // This command is a parent, no action.
       subCommands: [
         {
           name: 'show',
           description: 'Show memory',
+          kind: CommandKind.BUILT_IN,
           action: vi.fn(),
         },
         {
           name: 'add',
           description: 'Add to memory',
+          kind: CommandKind.BUILT_IN,
           action: vi.fn(),
         },
       ],
@@ -89,15 +109,18 @@ describe('useCompletion git-aware filtering integration', () => {
     {
       name: 'chat',
       description: 'Manage chat history',
+      kind: CommandKind.BUILT_IN,
       subCommands: [
         {
           name: 'save',
           description: 'Save chat',
+          kind: CommandKind.BUILT_IN,
           action: vi.fn(),
         },
         {
           name: 'resume',
           description: 'Resume a saved chat',
+          kind: CommandKind.BUILT_IN,
           action: vi.fn(),
           // This command provides its own argument completions
           completion: vi

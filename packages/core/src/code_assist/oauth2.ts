@@ -26,7 +26,6 @@ import {
   clearCachedGoogleAccount,
 } from '../utils/user_account.js';
 import { AuthType } from '../core/contentGenerator.js';
-import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import readline from 'node:readline';
 
 //  OAuth Client ID used to initiate OAuth2Client class.
@@ -122,7 +121,7 @@ export async function getOauthClient(
     }
   }
 
-  if (config.getNoBrowser() || !shouldAttemptBrowserLaunch()) {
+  if (config.isBrowserLaunchSuppressed()) {
     let success = false;
     const maxRetries = 2;
     for (let i = 0; !success && i < maxRetries; i++) {

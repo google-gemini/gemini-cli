@@ -12,7 +12,11 @@ import { renderHook, act } from '@testing-library/react';
 import { useCompletion } from './useCompletion.js';
 import * as fs from 'fs/promises';
 import { glob } from 'glob';
-import { CommandContext, SlashCommand } from '../commands/types.js';
+import {
+  CommandContext,
+  CommandKind,
+  SlashCommand,
+} from '../commands/types.js';
 import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
 
 // Mock dependencies
@@ -69,30 +73,36 @@ describe('useCompletion', () => {
         altNames: ['?'],
         description: 'Show help',
         action: vi.fn(),
+        kind: CommandKind.BUILT_IN,
       },
       {
         name: 'stats',
         altNames: ['usage'],
         description: 'check session stats. Usage: /stats [model|tools]',
         action: vi.fn(),
+        kind: CommandKind.BUILT_IN,
       },
       {
         name: 'clear',
         description: 'Clear the screen',
         action: vi.fn(),
+        kind: CommandKind.BUILT_IN,
       },
       {
         name: 'memory',
         description: 'Manage memory',
+        kind: CommandKind.BUILT_IN,
         subCommands: [
           {
             name: 'show',
             description: 'Show memory',
+            kind: CommandKind.BUILT_IN,
             action: vi.fn(),
           },
           {
             name: 'add',
             description: 'Add to memory',
+            kind: CommandKind.BUILT_IN,
             action: vi.fn(),
           },
         ],
@@ -100,15 +110,20 @@ describe('useCompletion', () => {
       {
         name: 'chat',
         description: 'Manage chat history',
+        kind: CommandKind.BUILT_IN,
         subCommands: [
           {
             name: 'save',
             description: 'Save chat',
+            kind: CommandKind.BUILT_IN,
+
             action: vi.fn(),
           },
           {
             name: 'resume',
             description: 'Resume a saved chat',
+            kind: CommandKind.BUILT_IN,
+
             action: vi.fn(),
             completion: vi.fn().mockResolvedValue(['chat1', 'chat2']),
           },
@@ -344,6 +359,7 @@ describe('useCompletion', () => {
       const largeMockCommands = Array.from({ length: 15 }, (_, i) => ({
         name: `command${i}`,
         description: `Command ${i}`,
+        kind: CommandKind.BUILT_IN,
         action: vi.fn(),
       }));
 
@@ -626,6 +642,88 @@ describe('useCompletion', () => {
 
       expect(result.current.suggestions).toHaveLength(0);
       expect(result.current.showSuggestions).toBe(false);
+    });
+  });
+
+  describe('Slash command completion with namespaced names', () => {
+    let commandsWithNamespaces: SlashCommand[];
+
+    beforeEach(() => {
+      commandsWithNamespaces = [
+        ...mockSlashCommands,
+        {
+          name: 'git:commit',
+          description: 'A namespaced git command',
+          kind: CommandKind.FILE,
+          action: vi.fn(),
+        },
+        {
+          name: 'git:push',
+          description: 'Another namespaced git command',
+          kind: CommandKind.FILE,
+          action: vi.fn(),
+        },
+        {
+          name: 'docker:build',
+          description: 'A docker command',
+          kind: CommandKind.FILE,
+          action: vi.fn(),
+        },
+      ];
+    });
+
+    it('should suggest a namespaced command based on a partial match', () => {
+      const { result } = renderHook(() =>
+        useCompletion(
+          '/git:co',
+          testCwd,
+          true,
+          commandsWithNamespaces,
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      expect(result.current.suggestions).toHaveLength(1);
+      expect(result.current.suggestions[0].label).toBe('git:commit');
+    });
+
+    it('should suggest all commands within a namespace when the namespace prefix is typed', () => {
+      const { result } = renderHook(() =>
+        useCompletion(
+          '/git:',
+          testCwd,
+          true,
+          commandsWithNamespaces,
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      expect(result.current.suggestions).toHaveLength(2);
+      expect(result.current.suggestions.map((s) => s.label)).toEqual(
+        expect.arrayContaining(['git:commit', 'git:push']),
+      );
+
+      expect(result.current.suggestions.map((s) => s.label)).not.toContain(
+        'docker:build',
+      );
+    });
+
+    it('should not provide suggestions if the namespaced command is a perfect leaf match', () => {
+      const { result } = renderHook(() =>
+        useCompletion(
+          '/git:commit',
+          testCwd,
+          true,
+          commandsWithNamespaces,
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      expect(result.current.showSuggestions).toBe(false);
+      expect(result.current.suggestions).toHaveLength(0);
     });
   });
 
