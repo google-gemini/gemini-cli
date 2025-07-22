@@ -305,8 +305,8 @@ export function useCompletion(
       signal: AbortSignal,
       currentRelativePath = '',
       depth = 0,
-      maxDepth = 8, // Reduced from 10 for better performance
-      maxResults = 30, // Reduced from 50 for better performance
+      maxDepth = 8,
+      maxResults = 30,
     ): Promise<Suggestion[]> => {
       // Check if operation was aborted
       if (signal.aborted) {
@@ -393,7 +393,7 @@ export function useCompletion(
         respectGeminiIgnore?: boolean;
       },
       signal: AbortSignal,
-      maxResults = 30, // Reduced from 50 for better performance
+      maxResults = 30,
     ): Promise<Suggestion[]> => {
       // Check if operation was aborted
       if (signal.aborted) {
@@ -593,7 +593,6 @@ export function useCompletion(
       }
     };
 
-    // Increased debounce time from 100ms to 300ms for better performance
     const debounceTimeout = setTimeout(fetchSuggestions, 300);
 
     return () => {
