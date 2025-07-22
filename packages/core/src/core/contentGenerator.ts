@@ -132,9 +132,10 @@ export async function createContentGenerator(
     config.authType === AuthType.USE_VERTEX_AI
   ) {
     const googleGenAI = new GoogleGenAI({
-      apiKey: config.apiKey === '' ? undefined : config.apiKey,
+      apiKey: gcConfig.getApiConfig()?.apiKey || (config.apiKey === '' ? undefined : config.apiKey),
       vertexai: config.vertexai,
       httpOptions,
+      baseURL: gcConfig.getApiConfig()?.baseUrl,
     });
 
     return googleGenAI.models;
