@@ -389,16 +389,11 @@ export function useCompletion(
       signal: AbortSignal,
       maxResults = 30,
     ): Promise<Suggestion[]> => {
-      // Check if operation was aborted
       if (signal.aborted) {
         return [];
       }
 
       const globPattern = `**/${searchPrefix}*`;
-      // Check abort signal before expensive glob operation
-      if (signal.aborted) {
-        return [];
-      }
       const files = await glob(globPattern, {
         cwd,
         dot: searchPrefix.startsWith('.'),
