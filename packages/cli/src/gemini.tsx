@@ -107,7 +107,7 @@ export async function main() {
   const argv = await parseArguments();
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(
-    settings.merged,
+    settings,
     extensions,
     sessionId,
     argv,

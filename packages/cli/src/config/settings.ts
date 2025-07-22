@@ -100,6 +100,7 @@ export interface Settings {
 
   // Add other settings here.
   ideMode?: boolean;
+  yolo?: boolean;
 }
 
 export interface SettingsError {

@@ -241,11 +241,12 @@ export async function loadHierarchicalGeminiMemory(
 }
 
 export async function loadCliConfig(
-  settings: Settings,
+  loadedSettings: LoadedSettings,
   extensions: Extension[],
   sessionId: string,
   argv: CliArgs,
 ): Promise<Config> {
+  const settings = loadedSettings.merged;
   const debugMode =
     argv.debug ||
     [process.env.DEBUG, process.env.DEBUG_MODE].some(
@@ -396,7 +397,7 @@ export async function loadCliConfig(
     mcpServers,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
-    approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
+    approvalMode: argv.yolo || loadedSettings.merged.yolo ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
     showMemoryUsage:
       argv.showMemoryUsage ||
       argv.show_memory_usage ||
