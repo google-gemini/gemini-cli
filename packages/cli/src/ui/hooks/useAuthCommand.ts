@@ -58,14 +58,15 @@ export const useAuthCommand = (
 
         settings.setValue(scope, 'selectedAuthType', authType);
         if (
-          authType === AuthType.LOGIN_WITH_GOOGLE &&
+          (authType === AuthType.LOGIN_WITH_GOOGLE ||
+            authType === AuthType.OPENAI_COMPATIBLE) &&
           config.isBrowserLaunchSuppressed()
         ) {
           runExitCleanup();
           console.log(
             `
 ----------------------------------------------------------------
-Logging in with Google... Please restart Gemini CLI to continue.
+Logging in... Please restart Gemini CLI to continue.
 ----------------------------------------------------------------
             `,
           );

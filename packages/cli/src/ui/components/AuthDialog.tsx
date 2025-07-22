@@ -81,6 +81,10 @@ export function AuthDialog({
       label: 'Use OpenAI compatible API',
       value: AuthType.OPENAI,
     },
+    {
+      label: 'Use OpenAI-compatible API (Settings)',
+      value: AuthType.OPENAI_COMPATIBLE,
+    },
   ];
 
   const initialAuthIndex = items.findIndex((item) => {

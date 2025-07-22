@@ -44,6 +44,7 @@ export enum AuthType {
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
   OPENAI = 'openai',
+  OPENAI_COMPATIBLE = 'openai-compatible',
 }
 
 export type ContentGeneratorConfig = {
@@ -138,7 +139,7 @@ export async function createContentGenerator(
       vertexai: config.vertexai,
       httpOptions,
       baseURL: gcConfig.getApiConfig()?.baseUrl,
-    });
+    } as any);
 
     return googleGenAI.models;
   }

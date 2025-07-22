@@ -23,24 +23,27 @@ You have two options to install Gemini CLI.
 
 ### With Node
 
-1. **Prerequisites:** Ensure you have [Node.js version 20](https://nodejs.org/en/download) or higher installed.
-2. **Run the CLI:** Execute the following command in your terminal:
-
-   ```bash
-   npx https://github.com/google-gemini/gemini-cli
-   ```
-
-   Or install it with:
-
-   ```bash
-   npm install -g @google/gemini-cli
-   ```
-
-   Then, run the CLI from anywhere:
-
-   ```bash
-   gemini
-   ```
+1.  **Prerequisites:** Ensure you have [Node.js version 20](https://nodejs.org/en/download) or higher installed.
+2.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/digduggog/gemini-cli-openai.git
+    ```
+3.  **Navigate to the project directory:**
+    ```bash
+    cd gemini-cli-openai
+    ```
+4.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+5.  **Install the CLI globally:**
+    ```bash
+    npm install -g .
+    ```
+6.  **Run the CLI:**
+    ```bash
+    gemini
+    ```
 
 ### With Homebrew
 
