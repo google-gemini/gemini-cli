@@ -36,7 +36,6 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
-  shouldAttemptBrowserLaunch,
   recordStartupPerformance,
   isPerformanceMonitoringActive,
   startGlobalMemoryMonitoring,
