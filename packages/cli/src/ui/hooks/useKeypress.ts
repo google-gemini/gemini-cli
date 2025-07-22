@@ -8,7 +8,7 @@ import { useEffect, useRef } from 'react';
 import { useStdin } from 'ink';
 import readline from 'readline';
 import { PassThrough } from 'stream';
-import { KITTY_CTRL_C, BACKSLASH_ENTER_DETECTION_WINDOW_MS } from '../utils/platformConstants.js';
+import { KITTY_CTRL_C, BACKSLASH_ENTER_DETECTION_WINDOW_MS, MAX_KITTY_SEQUENCE_LENGTH } from '../utils/platformConstants.js';
 
 export interface Key {
   name: string;
@@ -216,7 +216,7 @@ export function useKeypress(
           }
 
           // If buffer doesn't match expected pattern and is getting long, flush it
-          if (kittySequenceBuffer.length > 10) {
+          if (kittySequenceBuffer.length > MAX_KITTY_SEQUENCE_LENGTH) {
             // Not a Kitty sequence, treat as regular key
             kittySequenceBuffer = '';
           } else {

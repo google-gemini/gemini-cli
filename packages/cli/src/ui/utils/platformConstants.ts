@@ -45,3 +45,12 @@ export const VSCODE_SHIFT_ENTER_SEQUENCE = '\\\r\n';
  * is followed by Enter within this timeframe.
  */
 export const BACKSLASH_ENTER_DETECTION_WINDOW_MS = 5;
+
+/**
+ * Maximum expected length of a Kitty keyboard protocol sequence.
+ * Format: ESC [ <keycode> ; <modifiers> u/~
+ * Example: \x1b[13;2u (Shift+Enter) = 8 chars
+ * Longest reasonable: \x1b[127;15~ = 11 chars (Del with all modifiers)
+ * We use 12 to provide a small buffer.
+ */
+export const MAX_KITTY_SEQUENCE_LENGTH = 12;
