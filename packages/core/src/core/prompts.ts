@@ -212,7 +212,7 @@ ${(function () {
 
 <example>
 user: Delete the temp directory.
-model: I can run \`rm -rf /path/to/project/temp\`. This will permanently delete the directory and all its contents.
+model: I can run \`${process.platform === 'win32' ? 'rmdir /s /q "\\path\\to\\project\\temp"' : 'rm -rf /path/to/project/temp'}\`. This will permanently delete the directory and all its contents.
 </example>
 
 <example>
