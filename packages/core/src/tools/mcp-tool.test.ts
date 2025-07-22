@@ -325,5 +325,77 @@ describe('DiscoveredMCPTool', () => {
         );
       }
     });
+
+    it('should handle Cancel confirmation outcome', async () => {
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+      );
+      const confirmation = await tool.shouldConfirmExecute(
+        {},
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      if (
+        confirmation &&
+        typeof confirmation === 'object' &&
+        'onConfirm' in confirmation &&
+        typeof confirmation.onConfirm === 'function'
+      ) {
+        // Cancel should not add anything to allowlist
+        await confirmation.onConfirm(ToolConfirmationOutcome.Cancel);
+        expect((DiscoveredMCPTool as any).allowlist.has(serverName)).toBe(
+          false,
+        );
+        expect(
+          (DiscoveredMCPTool as any).allowlist.has(
+            `${serverName}.${serverToolName}`,
+          ),
+        ).toBe(false);
+      } else {
+        throw new Error(
+          'Confirmation details or onConfirm not in expected format',
+        );
+      }
+    });
+
+    it('should handle ProceedOnce confirmation outcome', async () => {
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+      );
+      const confirmation = await tool.shouldConfirmExecute(
+        {},
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      if (
+        confirmation &&
+        typeof confirmation === 'object' &&
+        'onConfirm' in confirmation &&
+        typeof confirmation.onConfirm === 'function'
+      ) {
+        // ProceedOnce should not add anything to allowlist
+        await confirmation.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+        expect((DiscoveredMCPTool as any).allowlist.has(serverName)).toBe(
+          false,
+        );
+        expect(
+          (DiscoveredMCPTool as any).allowlist.has(
+            `${serverName}.${serverToolName}`,
+          ),
+        ).toBe(false);
+      } else {
+        throw new Error(
+          'Confirmation details or onConfirm not in expected format',
+        );
+      }
+    });
   });
 });

@@ -173,6 +173,30 @@ export class ToolRegistry {
     );
   }
 
+  /**
+   * Discover or re-discover tools for a single MCP server.
+   * @param serverName - The name of the server to discover tools from.
+   */
+  async discoverToolsForServer(serverName: string): Promise<void> {
+    // Remove any previously discovered tools from this server
+    for (const [name, tool] of this.tools.entries()) {
+      if (tool instanceof DiscoveredMCPTool && tool.serverName === serverName) {
+        this.tools.delete(name);
+      }
+    }
+
+    const mcpServers = this.config.getMcpServers() ?? {};
+    const serverConfig = mcpServers[serverName];
+    if (serverConfig) {
+      await discoverMcpTools(
+        { [serverName]: serverConfig },
+        undefined,
+        this,
+        this.config.getDebugMode(),
+      );
+    }
+  }
+
   private async discoverAndRegisterToolsFromCommand(): Promise<void> {
     const discoveryCmd = this.config.getToolDiscoveryCommand();
     if (!discoveryCmd) {
@@ -386,6 +410,19 @@ function _sanitizeParameters(schema: Schema | undefined, visited: Set<Schema>) {
       }
     }
   }
+
+  // Handle enum values - Gemini API only allows enum for STRING type
+  if (schema.enum && Array.isArray(schema.enum)) {
+    if (schema.type !== Type.STRING) {
+      // If enum is present but type is not STRING, convert type to STRING
+      schema.type = Type.STRING;
+    }
+    // Filter out null and undefined values, then convert remaining values to strings for Gemini API compatibility
+    schema.enum = schema.enum
+      .filter((value: unknown) => value !== null && value !== undefined)
+      .map((value: unknown) => String(value));
+  }
+
   // Vertex AI only supports 'enum' and 'date-time' for STRING format.
   if (schema.type === Type.STRING) {
     if (
