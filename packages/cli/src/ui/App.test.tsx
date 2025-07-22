@@ -21,6 +21,8 @@ import process from 'node:process';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { StreamingState } from './types.js';
 import { Tips } from './components/Tips.js';
+import { checkForUpdates, UpdateInfo } from './utils/updateCheck.js';
+import { EventEmitter } from 'events';
 
 // Define a more complete mock server config based on actual Config
 interface MockServerConfig {
@@ -191,6 +193,13 @@ vi.mock('./components/Header.js', () => ({
   Header: vi.fn(() => null),
 }));
 
+vi.mock('./utils/updateCheck.js', () => ({
+  checkForUpdates: vi.fn(),
+}));
+const mockedCheckForUpdates = vi.mocked(checkForUpdates);
+
+vi.mock('node:child_process');
+
 describe('App UI', () => {
   let mockConfig: MockServerConfig;
   let mockSettings: LoadedSettings;
@@ -256,6 +265,164 @@ describe('App UI', () => {
       currentUnmount = undefined;
     }
     vi.clearAllMocks(); // Clear mocks after each test
+  });
+
+  describe('handleAutoUpdate', () => {
+    let spawnEmitter: EventEmitter;
+
+    beforeEach(async () => {
+      const { spawn } = await import('node:child_process');
+      spawnEmitter = new EventEmitter();
+      (spawn as vi.Mock).mockReturnValue(spawnEmitter);
+    });
+
+    afterEach(() => {
+      delete process.env.GEMINI_CLI_DISABLE_AUTOUPDATER;
+    });
+
+    it('should start the update process when an update is available', async () => {
+      const info: UpdateInfo = {
+        update: {
+          name: '@google/gemini-cli',
+          latest: '1.1.0',
+          current: '1.0.0',
+        },
+        message: 'Update available',
+      };
+      mockedCheckForUpdates.mockResolvedValue(info);
+      const { spawn } = await import('node:child_process');
+
+      const { unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(spawn).toHaveBeenCalledWith(
+        'npm',
+        ['i', '-g', '@google/gemini-cli@1.1.0'],
+        { stdio: 'pipe' },
+      );
+    });
+
+    it('should show a success message when update succeeds', async () => {
+      const info: UpdateInfo = {
+        update: {
+          name: '@google/gemini-cli',
+          latest: '1.1.0',
+          current: '1.0.0',
+        },
+        message: 'Update available',
+      };
+      mockedCheckForUpdates.mockResolvedValue(info);
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      spawnEmitter.emit('close', 0);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(lastFrame()).toContain('Update successful!');
+    });
+
+    it('should show an error message when update fails', async () => {
+      const info: UpdateInfo = {
+        update: {
+          name: '@google/gemini-cli',
+          latest: '1.1.0',
+          current: '1.0.0',
+        },
+        message: 'Update available',
+      };
+      mockedCheckForUpdates.mockResolvedValue(info);
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      spawnEmitter.emit('close', 1);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(lastFrame()).toContain('Automatic update failed.');
+    });
+
+    it('should show an error message when spawn fails', async () => {
+      const info: UpdateInfo = {
+        update: {
+          name: '@google/gemini-cli',
+          latest: '1.1.0',
+          current: '1.0.0',
+        },
+        message: 'Update available',
+      };
+      mockedCheckForUpdates.mockResolvedValue(info);
+      const testError = new Error('NPM not found');
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      spawnEmitter.emit('error', testError);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(lastFrame()).toContain(
+        `Failed to start the update process: ${testError.message}`,
+      );
+    });
+
+    it('should not auto-update if GEMINI_CLI_DISABLE_AUTOUPDATER is true', async () => {
+      process.env.GEMINI_CLI_DISABLE_AUTOUPDATER = 'true';
+      const info: UpdateInfo = {
+        update: {
+          name: '@google/gemini-cli',
+          latest: '1.1.0',
+          current: '1.0.0',
+        },
+        message: 'Update available',
+      };
+      mockedCheckForUpdates.mockResolvedValue(info);
+      const { spawn } = await import('node:child_process');
+
+      const { unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(spawn).not.toHaveBeenCalled();
+    });
   });
 
   it('should display default "GEMINI.md" in footer when contextFileName is not set and count is 1', async () => {
