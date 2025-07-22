@@ -104,7 +104,7 @@ export const useSessionPersistence = ({
     const saveSession = () => {
       // The surrounding useEffect ensures this only runs when persistence is enabled.
       try {
-        const geminiDir = path.join(process.cwd(), '.gemini');
+        const geminiDir = USER_SETTINGS_DIR;
         if (!fs.existsSync(geminiDir)) {
           fs.mkdirSync(geminiDir, { recursive: true });
         }
