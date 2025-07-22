@@ -593,7 +593,7 @@ export function useCompletion(
       }
     };
 
-    const debounceTimeout = setTimeout(fetchSuggestions, 300);
+    const debounceTimeout = setTimeout(fetchSuggestions, 200);
 
     return () => {
       isMounted = false;
