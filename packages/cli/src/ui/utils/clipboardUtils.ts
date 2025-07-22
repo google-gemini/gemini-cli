@@ -68,14 +68,14 @@ export async function saveClipboardImage(
         { class: 'GIFf', extension: 'gif' },
       ];
 
-    for (const format of formats) {
-      const tempFilePath = path.join(
-        tempDir,
-        `clipboard-${timestamp}.${format.extension}`,
-      );
+      for (const format of formats) {
+        const tempFilePath = path.join(
+          tempDir,
+          `clipboard-${timestamp}.${format.extension}`,
+        );
 
-      // Try to save clipboard as this format
-      const script = `
+        // Try to save clipboard as this format
+        const script = `
         try
           set imageData to the clipboard as «class ${format.class}»
           set fileRef to open for access POSIX file "${tempFilePath}" with write permission
@@ -90,7 +90,7 @@ export async function saveClipboardImage(
         end try
       `;
 
-      const { stdout } = await execAsync(`osascript -e '${script}'`);
+        const { stdout } = await execAsync(`osascript -e '${script}'`);
 
         if (stdout.trim() === 'success') {
           // Verify the file was created and has content
@@ -114,10 +114,12 @@ export async function saveClipboardImage(
     } else if (process.platform === 'win32') {
       // Windows: Use PowerShell to save clipboard image
       const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
-      
+
       // Use a different approach to avoid quote escaping issues
-      const escapedPath = tempFilePath.replace(/\\/g, '\\\\').replace(/"/g, '`"');
-      
+      const escapedPath = tempFilePath
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '`"');
+
       const { stdout } = await execAsync(
         `powershell -command "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; if ([System.Windows.Forms.Clipboard]::ContainsImage()) { $image = [System.Windows.Forms.Clipboard]::GetImage(); $image.Save('${escapedPath}', [System.Drawing.Imaging.ImageFormat]::Png); Write-Output 'success' } else { Write-Output 'error' }"`,
       );

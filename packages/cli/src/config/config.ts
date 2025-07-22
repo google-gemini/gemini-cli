@@ -397,7 +397,10 @@ export async function loadCliConfig(
     mcpServers,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
-    approvalMode: argv.yolo || loadedSettings.merged.yolo ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
+    approvalMode:
+      argv.yolo || loadedSettings.merged.yolo
+        ? ApprovalMode.YOLO
+        : ApprovalMode.DEFAULT,
     showMemoryUsage:
       argv.showMemoryUsage ||
       argv.show_memory_usage ||

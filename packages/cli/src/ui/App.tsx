@@ -101,7 +101,7 @@ export const AppWrapper = (props: AppProps) => (
 );
 
 const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
-  const isFocused = useFocus();
+  const _isFocused = useFocus();
   useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
@@ -174,7 +174,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
   }, []);
-  
+
   const handleEscapePromptChange = useCallback((showPrompt: boolean) => {
     setShowEscapePrompt(showPrompt);
   }, []);
@@ -182,7 +182,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const handleClearBuffer = useCallback((clearFn: () => void) => {
     setClearBufferFn(() => clearFn);
   }, []);
-  
+
   const initialPromptSubmitted = useRef(false);
 
   const errorCount = useMemo(

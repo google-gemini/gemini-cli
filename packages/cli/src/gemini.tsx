@@ -105,12 +105,7 @@ export async function main() {
 
   const argv = await parseArguments();
   const extensions = loadExtensions(workspaceRoot);
-  const config = await loadCliConfig(
-    settings,
-    extensions,
-    sessionId,
-    argv,
-  );
+  const config = await loadCliConfig(settings, extensions, sessionId, argv);
 
   if (argv.promptInteractive && !process.stdin.isTTY) {
     console.error(
