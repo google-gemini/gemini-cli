@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@google/gemini-cli-core": "file:../core",
+    "@iarna/toml": "^2.2.5",
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
