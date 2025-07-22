@@ -10,7 +10,6 @@ import { z } from 'zod';
  * The reserved server name for the IDE's MCP server.
  */
 export const IDE_SERVER_NAME = '_ide_server';
-
 /**
  * Zod schema for validating a cursor position.
  */
@@ -23,8 +22,9 @@ export type Cursor = z.infer<typeof CursorSchema>;
 /**
  * Zod schema for validating an active file context from the IDE.
  */
-export const ActiveFileSchema = z.object({
-  filePath: z.string(),
+export const OpenFilesSchema = z.object({
+  activeFile: z.string(),
+  selectedText: z.string().optional(),
   cursor: CursorSchema.optional(),
   recentOpenFiles: z
     .array(
@@ -35,17 +35,17 @@ export const ActiveFileSchema = z.object({
     )
     .optional(),
 });
-export type ActiveFile = z.infer<typeof ActiveFileSchema>;
+export type OpenFiles = z.infer<typeof OpenFilesSchema>;
 
 /**
- * Zod schema for validating the 'ide/activeFileChanged' notification from the IDE.
+ * Zod schema for validating the 'ide/openFilesChanged' notification from the IDE.
  */
-export const ActiveFileNotificationSchema = z.object({
-  method: z.literal('ide/activeFileChanged'),
-  params: ActiveFileSchema,
+export const OpenFilesNotificationSchema = z.object({
+  method: z.literal('ide/openFilesChanged'),
+  params: OpenFilesSchema,
 });
 
-type ActiveFileSubscriber = (activeFile: ActiveFile | undefined) => void;
+type OpenFilesSubscriber = (openFiles: OpenFiles | undefined) => void;
 
 /**
  * Creates a new store for managing the IDE's active file context.
@@ -55,41 +55,41 @@ type ActiveFileSubscriber = (activeFile: ActiveFile | undefined) => void;
  * @returns An object with methods to interact with the active file context.
  */
 export function createIdeContextStore() {
-  let activeFileContext: ActiveFile | undefined = undefined;
-  const subscribers = new Set<ActiveFileSubscriber>();
+  let openFilesContext: OpenFiles | undefined = undefined;
+  const subscribers = new Set<OpenFilesSubscriber>();
 
   /**
    * Notifies all registered subscribers about the current active file context.
    */
   function notifySubscribers(): void {
     for (const subscriber of subscribers) {
-      subscriber(activeFileContext);
+      subscriber(openFilesContext);
     }
   }
 
   /**
    * Sets the active file context and notifies all registered subscribers of the change.
-   * @param newActiveFile The new active file context from the IDE.
+   * @param newOpenFiles The new active file context from the IDE.
    */
-  function setActiveFileContext(newActiveFile: ActiveFile): void {
-    activeFileContext = newActiveFile;
+  function setOpenFilesContext(newOpenFiles: OpenFiles): void {
+    openFilesContext = newOpenFiles;
     notifySubscribers();
   }
 
   /**
    * Clears the active file context and notifies all registered subscribers of the change.
    */
-  function clearActiveFileContext(): void {
-    activeFileContext = undefined;
+  function clearOpenFilesContext(): void {
+    openFilesContext = undefined;
     notifySubscribers();
   }
 
   /**
    * Retrieves the current active file context.
-   * @returns The `ActiveFile` object if a file is active, otherwise `undefined`.
+   * @returns The `OpenFiles` object if a file is active; otherwise, `undefined`.
    */
-  function getActiveFileContext(): ActiveFile | undefined {
-    return activeFileContext;
+  function getOpenFilesContext(): OpenFiles | undefined {
+    return openFilesContext;
   }
 
   /**
@@ -101,7 +101,7 @@ export function createIdeContextStore() {
    * @param subscriber The function to be called when the active file context changes.
    * @returns A function that, when called, will unsubscribe the provided subscriber.
    */
-  function subscribeToActiveFile(subscriber: ActiveFileSubscriber): () => void {
+  function subscribeToOpenFiles(subscriber: OpenFilesSubscriber): () => void {
     subscribers.add(subscriber);
     return () => {
       subscribers.delete(subscriber);
@@ -109,10 +109,10 @@ export function createIdeContextStore() {
   }
 
   return {
-    setActiveFileContext,
-    getActiveFileContext,
-    subscribeToActiveFile,
-    clearActiveFileContext,
+    setOpenFilesContext,
+    getOpenFilesContext,
+    subscribeToOpenFiles,
+    clearOpenFilesContext,
   };
 }
 
