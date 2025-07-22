@@ -73,12 +73,14 @@ export function useKeypress(
     let kittySequenceBuffer = '';
     let backslashTimeout: NodeJS.Timeout | null = null;
     let waitingForEnterAfterBackslash = false;
+    const ESC = '\u001B';
 
     // Parse Kitty protocol sequences
     const parseKittySequence = (sequence: string): Key | null => {
       // Match CSI <number> ; <modifiers> u or ~
-      // eslint-disable-next-line no-control-regex
-      const match = sequence.match(/^\x1b\[(\d+)(;(\d+))?([u~])$/);
+      // Format: ESC [ <keycode> ; <modifiers> u/~
+      const kittyPattern = new RegExp(`^${ESC}\\[(\\d+)(;(\\d+))?([u~])$`);
+      const match = sequence.match(kittyPattern);
       if (!match) return null;
 
       const keyCode = parseInt(match[1], 10);
@@ -181,11 +183,11 @@ export function useKeypress(
       // Check both standard format and Kitty protocol sequence
       if (
         (key.ctrl && key.name === 'c') ||
-        key.sequence === `\x1b${KITTY_CTRL_C}`
+        key.sequence === `${ESC}${KITTY_CTRL_C}`
       ) {
         kittySequenceBuffer = '';
         // If it's the Kitty sequence, create a proper key object
-        if (key.sequence === `\x1b${KITTY_CTRL_C}`) {
+        if (key.sequence === `${ESC}${KITTY_CTRL_C}`) {
           onKeypressRef.current({
             name: 'c',
             ctrl: true,
@@ -204,7 +206,7 @@ export function useKeypress(
       // If Kitty protocol is enabled, handle CSI sequences
       if (kittyProtocolEnabled) {
         // If we have a buffer or this starts a CSI sequence
-        if (kittySequenceBuffer || key.sequence.startsWith('\x1b[')) {
+        if (kittySequenceBuffer || key.sequence.startsWith(`${ESC}[`)) {
           kittySequenceBuffer += key.sequence;
 
           // Try to parse the buffer as a Kitty sequence
@@ -245,7 +247,7 @@ export function useKeypress(
           pasteBuffer = Buffer.concat([pasteBuffer, Buffer.from(key.sequence)]);
         } else {
           // Handle special keys
-          if (key.name === 'return' && key.sequence === '\x1B\r') {
+          if (key.name === 'return' && key.sequence === `${ESC}\r`) {
             key.meta = true;
           }
           onKeypressRef.current({ ...key, paste: isPaste });
@@ -254,8 +256,8 @@ export function useKeypress(
     };
 
     const handleRawKeypress = (data: Buffer) => {
-      const PASTE_MODE_PREFIX = Buffer.from('\x1B[200~');
-      const PASTE_MODE_SUFFIX = Buffer.from('\x1B[201~');
+      const PASTE_MODE_PREFIX = Buffer.from(`${ESC}[200~`);
+      const PASTE_MODE_SUFFIX = Buffer.from(`${ESC}[201~`);
 
       let pos = 0;
       while (pos < data.length) {
