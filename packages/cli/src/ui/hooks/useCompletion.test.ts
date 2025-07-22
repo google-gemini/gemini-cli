@@ -134,7 +134,8 @@ describe('useCompletion', () => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await fs.rm(testCwd, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
 
@@ -728,13 +729,29 @@ describe('useCompletion', () => {
   });
 
   describe('File path completion (@-syntax)', () => {
-    beforeEach(() => {
-      vi.mocked(fs.readdir).mockResolvedValue([
-        { name: 'file1.txt', isDirectory: () => false },
-        { name: 'file2.js', isDirectory: () => false },
-        { name: 'folder1', isDirectory: () => true },
-        { name: '.hidden', isDirectory: () => false },
-      ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
+    beforeEach(async () => {
+      await fs.mkdir(path.join(testCwd, 'path/to/fake/dir'), {
+        recursive: true,
+      });
+      await fs.writeFile(
+        path.join(testCwd, 'path/to/fake/dir', 'some-file.txt'),
+        'file content here',
+      );
+      await fs.mkdir(path.join(testCwd, 'path/to/fake/dir', 'empty-dir'), {
+        recursive: true,
+      });
+      await fs.mkdir(path.join(testCwd, 'some/other/path'), {
+        recursive: true,
+      });
+      await fs.writeFile(
+        path.join(testCwd, 'some/other/path', 'file-in-here.txt'),
+        'content',
+      );
+      await fs.writeFile(path.join(testCwd, '.gitignore'), 'ignored.log');
+      await fs.writeFile(
+        path.join(testCwd, '.geminiignore'),
+        'gemini-ignored.log',
+      );
     });
 
     it('should show file completions for @ prefix', async () => {
