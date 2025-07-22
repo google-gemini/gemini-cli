@@ -20,6 +20,7 @@ let mockProcessOff: Mock;
 describe('useSessionPersistence - Integration Test', () => {
   let mockHistory: HistoryItem[];
   let mockLoadHistory: Mock;
+  let mockOnLoadComplete: Mock;
   let tempDir = '';
   let originalCwd = '';
 
@@ -31,6 +32,11 @@ describe('useSessionPersistence - Integration Test', () => {
 
     mockHistory = [];
     mockLoadHistory = vi.fn();
+    mockOnLoadComplete = vi.fn();
+    mockOnLoadComplete = vi.fn();
+    mockOnLoadComplete = vi.fn();
+    mockOnLoadComplete = vi.fn();
+    mockOnLoadComplete = vi.fn();
 
     // Spy on process.on/off
     mockProcessOn = vi.spyOn(process, 'on');
@@ -52,6 +58,7 @@ describe('useSessionPersistence - Integration Test', () => {
         sessionPersistence: false,
         history: mockHistory,
         loadHistory: mockLoadHistory,
+        onLoadComplete: mockOnLoadComplete,
       }),
     );
 
@@ -73,6 +80,7 @@ describe('useSessionPersistence - Integration Test', () => {
         sessionPersistence: true,
         history: mockHistory,
         loadHistory: mockLoadHistory,
+        onLoadComplete: mockOnLoadComplete,
       }),
     );
 
@@ -122,6 +130,7 @@ describe('useSessionPersistence - Integration Test', () => {
         sessionPersistence: true,
         history: mockHistory,
         loadHistory: mockLoadHistory,
+        onLoadComplete: mockOnLoadComplete,
       }),
     );
 
@@ -172,6 +181,7 @@ describe('useSessionPersistence - Integration Test', () => {
         sessionPersistence: true,
         history: mockHistory,
         loadHistory: mockLoadHistory,
+        onLoadComplete: mockOnLoadComplete,
       }),
     );
 
@@ -202,6 +212,7 @@ describe('useSessionPersistence - Integration Test', () => {
         sessionPersistence: true,
         history: mockHistory,
         loadHistory: mockLoadHistory,
+        onLoadComplete: mockOnLoadComplete,
       }),
     );
 
@@ -224,6 +235,7 @@ describe('useSessionPersistence - Integration Test', () => {
         sessionPersistence: true,
         history: mockHistory,
         loadHistory: mockLoadHistory,
+        onLoadComplete: mockOnLoadComplete,
       }),
     );
 
@@ -243,6 +255,7 @@ describe('useSessionPersistence - Integration Test', () => {
         sessionPersistence: true,
         history: mockHistory,
         loadHistory: mockLoadHistory,
+        onLoadComplete: mockOnLoadComplete,
       }),
     );
 
@@ -272,6 +285,7 @@ describe('useSessionPersistence - Integration Test', () => {
         sessionPersistence: true,
         history: mockHistory,
         loadHistory: mockLoadHistory,
+        onLoadComplete: mockOnLoadComplete,
       }),
     );
 

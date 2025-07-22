@@ -39,3 +39,5 @@ packages/*/coverage/
 packages/cli/src/generated/
 .integration-tests/
 packages/vscode-ide-companion/*.vsix
+
+tmp_run_preflight_without_proxy.sh

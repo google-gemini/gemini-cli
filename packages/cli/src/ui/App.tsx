@@ -115,7 +115,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const { history, addItem, clearItems, loadHistory } = useHistory();
   const sessionPersistence = settings.merged['session.persistence'];
-  useSessionPersistence({ sessionPersistence, history, loadHistory });
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+  useSessionPersistence({
+    sessionPersistence,
+    history,
+    loadHistory,
+    onLoadComplete: () => setSessionLoaded(true),
+  });
   const {
     consoleMessages,
     handleNewMessage,
@@ -666,6 +672,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     if (
       initialPrompt &&
       !initialPromptSubmitted.current &&
+      sessionLoaded &&
       !isAuthenticating &&
       !isAuthDialogOpen &&
       !isThemeDialogOpen &&
@@ -679,6 +686,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, [
     initialPrompt,
     submitQuery,
+    sessionLoaded,
     isAuthenticating,
     isAuthDialogOpen,
     isThemeDialogOpen,

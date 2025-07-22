@@ -20,12 +20,14 @@ interface UseSessionPersistenceProps {
   sessionPersistence: boolean | undefined;
   history: HistoryItem[];
   loadHistory: (history: HistoryItem[]) => void;
+  onLoadComplete: () => void;
 }
 
 export const useSessionPersistence = ({
   sessionPersistence,
   history,
   loadHistory,
+  onLoadComplete,
 }: UseSessionPersistenceProps) => {
   const historyRef = useRef(history);
 
@@ -36,44 +38,54 @@ export const useSessionPersistence = ({
     let isMounted = true;
 
     const loadSession = async () => {
-      if (sessionPersistence) {
-        const sessionPath = path.join(process.cwd(), '.gemini', 'session.json');
-        try {
-          const sessionData = await fsp.readFile(sessionPath, 'utf-8');
-          const parsedHistory = JSON.parse(sessionData);
+      try {
+        if (sessionPersistence) {
+          const sessionPath = path.join(
+            process.cwd(),
+            '.gemini',
+            'session.json',
+          );
+          try {
+            const sessionData = await fsp.readFile(sessionPath, 'utf-8');
+            const parsedHistory = JSON.parse(sessionData);
 
-          if (!isMounted) return;
+            if (!isMounted) return;
 
-          if (Array.isArray(parsedHistory)) {
-            const historyWithIds: HistoryItem[] = parsedHistory
-              .filter(
-                (item: unknown): item is HistoryItemUser | HistoryItemGemini =>
-                  item !== null &&
-                  typeof item === 'object' &&
-                  'type' in item &&
-                  (item.type === MessageType.USER ||
-                    item.type === MessageType.GEMINI) &&
-                  'text' in item &&
-                  typeof (item as { text: unknown }).text === 'string',
-              )
-              .map((item, index) => ({
-                type: item.type,
-                text: item.text,
-                id: -(index + 1),
-              }));
-            if (historyWithIds.length > 0) {
-              loadHistory([...historyWithIds, ...historyRef.current]);
+            if (Array.isArray(parsedHistory)) {
+              const historyWithIds: HistoryItem[] = parsedHistory
+                .filter(
+                  (
+                    item: unknown,
+                  ): item is HistoryItemUser | HistoryItemGemini =>
+                    item !== null &&
+                    typeof item === 'object' &&
+                    'type' in item &&
+                    (item.type === MessageType.USER ||
+                      item.type === MessageType.GEMINI) &&
+                    'text' in item &&
+                    typeof (item as { text: unknown }).text === 'string',
+                )
+                .map((item, index) => ({
+                  type: item.type,
+                  text: item.text,
+                  id: -(index + 1),
+                }));
+              if (historyWithIds.length > 0) {
+                loadHistory([...historyWithIds, ...historyRef.current]);
+              }
             }
-          }
-        } catch (error) {
-          if (!isMounted) return;
+          } catch (error) {
+            if (!isMounted) return;
 
-          // Silently ignore if file doesn't exist.
-          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-            return;
+            // Silently ignore if file doesn't exist.
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+              return;
+            }
+            console.error('Error loading session history:', error);
           }
-          console.error('Error loading session history:', error);
         }
+      } finally {
+        onLoadComplete();
       }
     };
 
@@ -82,7 +94,7 @@ export const useSessionPersistence = ({
     return () => {
       isMounted = false;
     };
-  }, [sessionPersistence, loadHistory]);
+  }, [sessionPersistence, loadHistory, onLoadComplete]);
 
   useEffect(() => {
     if (!sessionPersistence) {
