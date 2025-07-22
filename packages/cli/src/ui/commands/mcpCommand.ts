@@ -450,7 +450,7 @@ const refreshCommand: SlashCommand = {
       Date.now(),
     );
 
-    await toolRegistry.discoverTools();
+    await toolRegistry.discoverMcpToolsOnly();
 
     // Update the client with the new tools
     const geminiClient = config.getGeminiClient();

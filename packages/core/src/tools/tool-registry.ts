@@ -174,6 +174,27 @@ export class ToolRegistry {
   }
 
   /**
+   * Discovers tools from project (if available and configured).
+   * Can be called multiple times to update discovered tools.
+   */
+  async discoverMcpToolsOnly(): Promise<void> {
+    // remove any previously discovered tools
+    for (const tool of this.tools.values()) {
+      if (tool instanceof DiscoveredMCPTool) {
+        this.tools.delete(tool.name);
+      }
+    }
+
+    // discover tools using MCP servers, if configured
+    await discoverMcpTools(
+      this.config.getMcpServers() ?? {},
+      this.config.getMcpServerCommand(),
+      this,
+      this.config.getDebugMode(),
+    );
+  }
+
+  /**
    * Discover or re-discover tools for a single MCP server.
    * @param serverName - The name of the server to discover tools from.
    */
