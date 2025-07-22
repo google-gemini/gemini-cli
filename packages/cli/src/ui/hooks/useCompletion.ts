@@ -217,8 +217,7 @@ export function useCompletion(
       // Argument Completion
       if (
         leafCommand?.completion &&
-        (hasTrailingSpace ||
-          (rawParts.length > depth && depth > 0 && partial !== ''))
+        (hasTrailingSpace || rawParts.length > depth)
       ) {
         const fetchAndSetSuggestions = async () => {
           setIsLoadingSuggestions(true);
