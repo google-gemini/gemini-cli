@@ -164,6 +164,7 @@ describe('oauth2', () => {
     const googleAccountPath = path.join(
       tempHomeDir,
       '.gemini',
+      'tmp',
       'google_accounts.json',
     );
     expect(fs.existsSync(googleAccountPath)).toBe(true);
@@ -290,7 +291,7 @@ describe('oauth2', () => {
       await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
 
       expect(fs.promises.readFile).toHaveBeenCalledWith(
-        '/user/home/.gemini/oauth_creds.json',
+        '/user/home/.gemini/tmp/oauth_creds.json',
         'utf-8',
       );
       expect(mockClient.setCredentials).toHaveBeenCalledWith(cachedCreds);

@@ -4,23 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as os from 'os';
 import * as fs from 'fs';
-import * as path from 'path';
 import { randomUUID } from 'crypto';
-import { GEMINI_DIR } from './paths.js';
-
-const homeDir = os.homedir() ?? '';
-const geminiDir = path.join(homeDir, GEMINI_DIR);
-const installationIdFile = path.join(geminiDir, 'installation_id');
-
-function ensureGeminiDirExists() {
-  if (!fs.existsSync(geminiDir)) {
-    fs.mkdirSync(geminiDir, { recursive: true });
-  }
-}
+import { ensureInternalDirExists, getInstallationIdPath } from './migration.js';
 
 function readInstallationIdFromFile(): string | null {
+  const installationIdFile = getInstallationIdPath();
   if (fs.existsSync(installationIdFile)) {
     const installationid = fs.readFileSync(installationIdFile, 'utf-8').trim();
     return installationid || null;
@@ -29,6 +18,8 @@ function readInstallationIdFromFile(): string | null {
 }
 
 function writeInstallationIdToFile(installationId: string) {
+  ensureInternalDirExists();
+  const installationIdFile = getInstallationIdPath();
   fs.writeFileSync(installationIdFile, installationId, 'utf-8');
 }
 
@@ -39,7 +30,6 @@ function writeInstallationIdToFile(installationId: string) {
  */
 export function getInstallationId(): string {
   try {
-    ensureGeminiDirExists();
     let installationId = readInstallationIdFromFile();
 
     if (!installationId) {
