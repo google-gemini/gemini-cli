@@ -9,6 +9,7 @@ import { useKeypress, Key } from './useKeypress.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
+import { BACKSLASH_ENTER_DETECTION_WINDOW_MS } from '../utils/platformConstants.js';
 
 // Mock the 'ink' module to control stdin
 vi.mock('ink', async (importOriginal) => {
@@ -462,6 +463,7 @@ describe('useKeypress', () => {
   describe('VS Code Terminal Support', () => {
     it('should convert backslash+return to Shift+Enter', () => {
       const onKeypress = vi.fn();
+      vi.useFakeTimers();
       renderHook(() => useKeypress(onKeypress, { isActive: true }));
 
       // First send backslash
@@ -475,10 +477,10 @@ describe('useKeypress', () => {
         });
       });
 
-      // Backslash should be buffered, not passed through
+      // Backslash should NOT be passed through immediately (held for detection)
       expect(onKeypress).not.toHaveBeenCalled();
 
-      // Then send return
+      // Then send return within the detection window
       act(() => {
         stdin.pressKey({
           name: 'return',
@@ -489,7 +491,8 @@ describe('useKeypress', () => {
         });
       });
 
-      // Should be converted to Shift+Enter
+      // Should be converted to Shift+Enter (only one call total)
+      expect(onKeypress).toHaveBeenCalledTimes(1);
       expect(onKeypress).toHaveBeenCalledWith({
         name: 'return',
         sequence: '\\\r',
@@ -498,6 +501,8 @@ describe('useKeypress', () => {
         shift: true,
         paste: false,
       });
+
+      vi.useRealTimers();
     });
 
     it('should not convert non-backslash+return sequences', () => {
@@ -540,6 +545,7 @@ describe('useKeypress', () => {
 
     it('should pass through backslash when not followed by return', () => {
       const onKeypress = vi.fn();
+      vi.useFakeTimers();
       renderHook(() =>
         useKeypress(onKeypress, { isActive: true }),
       );
@@ -555,10 +561,26 @@ describe('useKeypress', () => {
         });
       });
 
-      // Backslash should be buffered
+      // Backslash should NOT be passed through immediately (held for detection)
       expect(onKeypress).not.toHaveBeenCalled();
 
-      // Send 'a' after backslash
+      // Wait more than the detection window
+      act(() => {
+        vi.advanceTimersByTime(BACKSLASH_ENTER_DETECTION_WINDOW_MS + 5);
+      });
+
+      // After timeout, backslash should be passed through
+      expect(onKeypress).toHaveBeenCalledTimes(1);
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: undefined,
+        sequence: '\\',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
+
+      // Send 'a' after timeout
       act(() => {
         stdin.pressKey({
           name: 'a',
@@ -569,7 +591,240 @@ describe('useKeypress', () => {
         });
       });
 
-      // Now both backslash and 'a' should be passed through
+      // 'a' should be passed through normally
+      expect(onKeypress).toHaveBeenCalledTimes(2);
+      expect(onKeypress).toHaveBeenNthCalledWith(2, {
+        name: 'a',
+        sequence: 'a',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
+
+      vi.useRealTimers();
+    });
+
+    it('should handle backslash without follow-up character gracefully', () => {
+      const onKeypress = vi.fn();
+      vi.useFakeTimers();
+      renderHook(() =>
+        useKeypress(onKeypress, { isActive: true }),
+      );
+
+      // Send backslash
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          sequence: '\\',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // Backslash should NOT be passed through immediately (held for detection)
+      expect(onKeypress).not.toHaveBeenCalled();
+
+      // Simulate a delay longer than the detection window (timeout scenario)
+      act(() => {
+        vi.advanceTimersByTime(BACKSLASH_ENTER_DETECTION_WINDOW_MS + 5);
+      });
+
+      // After timeout, backslash should be passed through
+      expect(onKeypress).toHaveBeenCalledTimes(1);
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: undefined,
+        sequence: '\\',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
+      
+      // Send a different key after timeout
+      act(() => {
+        stdin.pressKey({
+          name: 'x',
+          sequence: 'x',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // 'x' should be passed through normally (not as Shift+Enter)
+      expect(onKeypress).toHaveBeenCalledTimes(2);
+      expect(onKeypress).toHaveBeenNthCalledWith(2, {
+        name: 'x',
+        sequence: 'x',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
+
+      vi.useRealTimers();
+    });
+
+    it('should handle multiple consecutive backslashes correctly', () => {
+      const onKeypress = vi.fn();
+      vi.useFakeTimers();
+      renderHook(() =>
+        useKeypress(onKeypress, { isActive: true }),
+      );
+
+      // Send first backslash
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          sequence: '\\',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // First backslash should be passed through immediately
+      expect(onKeypress).toHaveBeenCalledTimes(1);
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: undefined,
+        sequence: '\\',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
+
+      // Send second backslash
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          sequence: '\\',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // Second backslash should also be passed through immediately
+      expect(onKeypress).toHaveBeenCalledTimes(2);
+      expect(onKeypress).toHaveBeenNthCalledWith(2, {
+        name: undefined,
+        sequence: '\\',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
+
+      // Send a regular key
+      act(() => {
+        stdin.pressKey({
+          name: 'a',
+          sequence: 'a',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // 'a' should be passed through normally
+      expect(onKeypress).toHaveBeenCalledTimes(3);
+      expect(onKeypress).toHaveBeenNthCalledWith(3, {
+        name: 'a',
+        sequence: 'a',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
+
+      vi.useRealTimers();
+    });
+
+    it('should not convert backslash+return to Shift+Enter after timeout', () => {
+      const onKeypress = vi.fn();
+      vi.useFakeTimers();
+      renderHook(() => useKeypress(onKeypress, { isActive: true }));
+
+      // Send backslash
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          sequence: '\\',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // Backslash should NOT be passed through immediately (held for detection)
+      expect(onKeypress).not.toHaveBeenCalled();
+
+      // Wait more than the detection window
+      act(() => {
+        vi.advanceTimersByTime(BACKSLASH_ENTER_DETECTION_WINDOW_MS + 5);
+      });
+
+      // After timeout, backslash should be passed through
+      expect(onKeypress).toHaveBeenCalledTimes(1);
+
+      // Send return after timeout
+      act(() => {
+        stdin.pressKey({
+          name: 'return',
+          sequence: '\r',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // Return should NOT be converted to Shift+Enter
+      expect(onKeypress).toHaveBeenCalledTimes(2);
+      expect(onKeypress).toHaveBeenNthCalledWith(2, {
+        name: 'return',
+        sequence: '\r',
+        ctrl: false,
+        meta: false,
+        shift: false, // NOT shift: true
+        paste: false,
+      });
+
+      vi.useRealTimers();
+    });
+
+    it('should pass through backslash when followed immediately by non-Enter key', () => {
+      const onKeypress = vi.fn();
+      renderHook(() => useKeypress(onKeypress, { isActive: true }));
+
+      // Send backslash
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          sequence: '\\',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // Backslash should NOT be passed through immediately (held for detection)
+      expect(onKeypress).not.toHaveBeenCalled();
+
+      // Immediately send 'n' (not Enter)
+      act(() => {
+        stdin.pressKey({
+          name: 'n',
+          sequence: 'n',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // Both backslash and 'n' should be passed through
       expect(onKeypress).toHaveBeenCalledTimes(2);
       expect(onKeypress).toHaveBeenNthCalledWith(1, {
         name: '',
@@ -580,8 +835,8 @@ describe('useKeypress', () => {
         paste: false,
       });
       expect(onKeypress).toHaveBeenNthCalledWith(2, {
-        name: 'a',
-        sequence: 'a',
+        name: 'n',
+        sequence: 'n',
         ctrl: false,
         meta: false,
         shift: false,

@@ -8,7 +8,7 @@ import { useEffect, useRef } from 'react';
 import { useStdin } from 'ink';
 import readline from 'readline';
 import { PassThrough } from 'stream';
-import { KITTY_CTRL_C } from '../utils/platformConstants.js';
+import { KITTY_CTRL_C, BACKSLASH_ENTER_DETECTION_WINDOW_MS } from '../utils/platformConstants.js';
 
 export interface Key {
   name: string;
@@ -71,7 +71,8 @@ export function useKeypress(
     let isPaste = false;
     let pasteBuffer = Buffer.alloc(0);
     let kittySequenceBuffer = '';
-    let previousSequence = '';
+    let backslashTimeout: NodeJS.Timeout | null = null;
+    let waitingForEnterAfterBackslash = false;
 
     // Parse Kitty protocol sequences
     const parseKittySequence = (sequence: string): Key | null => {
@@ -121,39 +122,60 @@ export function useKeypress(
 
     const handleKeypress = (_: unknown, key: Key) => {
       // Handle VS Code's backslash+return pattern (Shift+Enter)
-      if (key.name === 'return' && previousSequence === '\\') {
+      if (key.name === 'return' && waitingForEnterAfterBackslash) {
+        // Cancel the timeout since we got the Enter
+        if (backslashTimeout) {
+          clearTimeout(backslashTimeout);
+          backslashTimeout = null;
+        }
+        waitingForEnterAfterBackslash = false;
+        
         // Convert to Shift+Enter
         onKeypressRef.current({
           ...key,
           shift: true,
           sequence: '\\\r', // VS Code's Shift+Enter representation
         });
-        previousSequence = '';
         return;
       }
       
-      // Don't pass through backslash if it might be part of VS Code's Shift+Enter
-      // We'll pass it through later if no return follows
+      // Handle backslash - hold it to see if Enter follows
       if (key.sequence === '\\' && !key.name) {
-        previousSequence = key.sequence;
-        // Don't pass through yet - wait to see if return follows
+        // Don't pass through the backslash yet - wait to see if Enter follows
+        waitingForEnterAfterBackslash = true;
+        
+        // Set up a timeout to pass through the backslash if no Enter follows
+        backslashTimeout = setTimeout(() => {
+          waitingForEnterAfterBackslash = false;
+          backslashTimeout = null;
+          // Pass through the backslash since no Enter followed
+          onKeypressRef.current(key);
+        }, BACKSLASH_ENTER_DETECTION_WINDOW_MS);
+        
         return;
       }
       
-      // If we had a pending backslash and this isn't return, pass through the backslash first
-      if (previousSequence === '\\' && key.name !== 'return') {
+      // If we're waiting for Enter after backslash but got something else, 
+      // pass through the backslash first, then the new key
+      if (waitingForEnterAfterBackslash && key.name !== 'return') {
+        if (backslashTimeout) {
+          clearTimeout(backslashTimeout);
+          backslashTimeout = null;
+        }
+        waitingForEnterAfterBackslash = false;
+        
+        // Pass through the backslash that was held
         onKeypressRef.current({
           name: '',
+          sequence: '\\',
           ctrl: false,
           meta: false,
           shift: false,
           paste: false,
-          sequence: '\\',
         });
+        
+        // Then continue processing the current key normally
       }
-
-      // Store current sequence for next check (before other processing)
-      previousSequence = key.sequence;
 
       // Always pass through Ctrl+C immediately, regardless of protocol state
       // Check both standard format and Kitty protocol sequence
@@ -305,6 +327,12 @@ export function useKeypress(
       }
       rl.close();
       setRawMode(false);
+
+      // Clean up any pending backslash timeout
+      if (backslashTimeout) {
+        clearTimeout(backslashTimeout);
+        backslashTimeout = null;
+      }
 
       // If we are in the middle of a paste, send what we have.
       if (isPaste) {
