@@ -5,7 +5,6 @@
  */
 
 import { execSync, spawn } from 'child_process';
-import * as shellQuote from 'shell-quote';
 
 export type EditorType =
   | 'vscode'
@@ -174,7 +173,6 @@ export async function openDiff(
         return new Promise((resolve, reject) => {
           const childProcess = spawn(diffCommand.command, diffCommand.args, {
             stdio: 'inherit',
-            shell: true,
           });
 
           childProcess.on('close', (code) => {
