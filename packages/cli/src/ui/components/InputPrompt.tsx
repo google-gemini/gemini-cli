@@ -52,7 +52,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   config,
   slashCommands,
   commandContext,
-  placeholder = '  Type your message or @path/to/file',
+  placeholder = process.platform === 'win32' 
+    ? '  Type your message or @path/to/file (Alt+V to paste image)'
+    : '  Type your message or @path/to/file',
   focus = true,
   inputWidth,
   suggestionsWidth,
@@ -209,7 +211,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     [resetCompletionState, buffer, completionSuggestions, slashCommands],
   );
 
-  // Handle clipboard image pasting with Ctrl+V
+  // Handle clipboard image pasting with Ctrl+V or Alt+V(Windows)
   const handleClipboardImage = useCallback(async () => {
     try {
       if (await clipboardHasImage()) {
@@ -253,7 +255,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
     } catch (error) {
-      console.error('Error handling clipboard image:', error);
+      // Ignore clipboard image errors
     }
   }, [buffer, config]);
 
@@ -481,7 +483,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Fall back to the text buffer's default input handling for all other keys
+      // Alt+V for clipboard image paste(Windows)      if (process.platform === 'win32' && key.meta && key.name === 'v') {        handleClipboardImage();        return;      }      // Fallback to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
     },
     [
