@@ -480,13 +480,14 @@ export function useCompletion(
             withFileTypes: true,
           });
 
+          // Check abort signal after async operation
+          if (abortController.signal.aborted) {
+            return;
+          }
+
           // Filter entries using git-aware filtering
           const filteredEntries = [];
           for (const entry of entries) {
-            // Check abort signal frequently during processing
-            if (abortController.signal.aborted) {
-              return;
-            }
 
             // Conditionally ignore dotfiles
             if (!prefix.startsWith('.') && entry.name.startsWith('.')) {
