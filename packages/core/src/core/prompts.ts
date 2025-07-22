@@ -6,6 +6,7 @@
 
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import { LSTool } from '../tools/ls.js';
 import { EditTool } from '../tools/edit.js';
 import { GlobTool } from '../tools/glob.js';
@@ -29,7 +30,13 @@ export function getCoreSystemPrompt(userMemory?: string): string {
     if (!['0', 'false'].includes(systemMdVarLower)) {
       systemMdEnabled = true; // enable system prompt override
       if (!['1', 'true'].includes(systemMdVarLower)) {
-        systemMdPath = path.resolve(systemMdVar); // use custom path from GEMINI_SYSTEM_MD
+        let customPath = systemMdVar;
+        if (customPath.startsWith('~/')) {
+          customPath = path.join(os.homedir(), customPath.slice(2));
+        } else if (customPath === '~') {
+          customPath = os.homedir();
+        }
+        systemMdPath = path.resolve(customPath); // use custom path from GEMINI_SYSTEM_MD
       }
       // require file to exist when override is enabled
       if (!fs.existsSync(systemMdPath)) {
@@ -264,9 +271,18 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
     const writeSystemMdVarLower = writeSystemMdVar.toLowerCase();
     if (!['0', 'false'].includes(writeSystemMdVarLower)) {
       if (['1', 'true'].includes(writeSystemMdVarLower)) {
+        fs.mkdirSync(path.dirname(systemMdPath), { recursive: true });
         fs.writeFileSync(systemMdPath, basePrompt); // write to default path, can be modified via GEMINI_SYSTEM_MD
       } else {
-        fs.writeFileSync(path.resolve(writeSystemMdVar), basePrompt); // write to custom path from GEMINI_WRITE_SYSTEM_MD
+        let customPath = writeSystemMdVar;
+        if (customPath.startsWith('~/')) {
+          customPath = path.join(os.homedir(), customPath.slice(2));
+        } else if (customPath === '~') {
+          customPath = os.homedir();
+        }
+        const resolvedPath = path.resolve(customPath);
+        fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
+        fs.writeFileSync(resolvedPath, basePrompt); // write to custom path from GEMINI_WRITE_SYSTEM_MD
       }
     }
   }
