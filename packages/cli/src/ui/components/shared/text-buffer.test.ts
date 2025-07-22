@@ -15,6 +15,7 @@ import {
   TextBufferState,
   TextBufferAction,
 } from './text-buffer.js';
+import { NEWLINE_INPUT_SEQUENCES } from '../../utils/platformConstants.js';
 
 const initialState: TextBufferState = {
   lines: [''],
@@ -973,6 +974,161 @@ describe('useTextBuffer', () => {
         }),
       ); // Simulates Shift+Enter in VSCode terminal
       expect(getBufferState(result).lines).toEqual(['', '']);
+    });
+
+    describe('NEWLINE_INPUT_SEQUENCES handling', () => {
+      it('should handle all sequences in NEWLINE_INPUT_SEQUENCES as newlines', () => {
+        NEWLINE_INPUT_SEQUENCES.forEach((sequence) => {
+          const { result } = renderHook(() =>
+            useTextBuffer({ viewport, isValidPath: () => false }),
+          );
+
+          // Insert some text first
+          act(() =>
+            result.current.handleInput({
+              name: undefined,
+              ctrl: false,
+              meta: false,
+              shift: false,
+              paste: false,
+              sequence: 'Hello',
+            }),
+          );
+
+          // Now test the newline sequence
+          act(() =>
+            result.current.handleInput({
+              name: undefined,
+              ctrl: false,
+              meta: false,
+              shift: false,
+              paste: false,
+              sequence,
+            }),
+          );
+
+          expect(getBufferState(result).lines).toEqual(['Hello', '']);
+          expect(getBufferState(result).cursor).toEqual([1, 0]);
+        });
+      });
+
+      it('should handle standard newline \\n', () => {
+        const { result } = renderHook(() =>
+          useTextBuffer({ viewport, isValidPath: () => false }),
+        );
+        act(() =>
+          result.current.handleInput({
+            name: undefined,
+            ctrl: false,
+            meta: false,
+            shift: false,
+            paste: false,
+            sequence: '\n',
+          }),
+        );
+        expect(getBufferState(result).lines).toEqual(['', '']);
+      });
+
+      it('should handle Windows-style newline \\r\\n', () => {
+        const { result } = renderHook(() =>
+          useTextBuffer({ viewport, isValidPath: () => false }),
+        );
+        act(() =>
+          result.current.handleInput({
+            name: undefined,
+            ctrl: false,
+            meta: false,
+            shift: false,
+            paste: false,
+            sequence: '\r\n',
+          }),
+        );
+        expect(getBufferState(result).lines).toEqual(['', '']);
+      });
+
+      it('should handle VSCode Shift+Enter sequence \\\\\\r', () => {
+        const { result } = renderHook(() =>
+          useTextBuffer({ viewport, isValidPath: () => false }),
+        );
+        act(() =>
+          result.current.handleInput({
+            name: undefined,
+            ctrl: false,
+            meta: false,
+            shift: false,
+            paste: false,
+            sequence: '\\\r',
+          }),
+        );
+        expect(getBufferState(result).lines).toEqual(['', '']);
+      });
+
+      it('should handle Kitty Protocol Shift+Enter \\x1b[13;2u', () => {
+        const { result } = renderHook(() =>
+          useTextBuffer({ viewport, isValidPath: () => false }),
+        );
+        act(() =>
+          result.current.handleInput({
+            name: undefined,
+            ctrl: false,
+            meta: false,
+            shift: false,
+            paste: false,
+            sequence: '\x1b[13;2u',
+          }),
+        );
+        expect(getBufferState(result).lines).toEqual(['', '']);
+      });
+
+      it('should handle Kitty Protocol Ctrl+Enter \\x1b[13;5u', () => {
+        const { result } = renderHook(() =>
+          useTextBuffer({ viewport, isValidPath: () => false }),
+        );
+        act(() =>
+          result.current.handleInput({
+            name: undefined,
+            ctrl: false,
+            meta: false,
+            shift: false,
+            paste: false,
+            sequence: '\x1b[13;5u',
+          }),
+        );
+        expect(getBufferState(result).lines).toEqual(['', '']);
+      });
+
+      it('should handle newlines in the middle of text', () => {
+        const { result } = renderHook(() =>
+          useTextBuffer({
+            initialText: 'HelloWorld',
+            viewport,
+            isValidPath: () => false,
+          }),
+        );
+
+        // Move cursor to middle of text
+        act(() => result.current.move('home'));
+        act(() => {
+          for (let i = 0; i < 5; i++) {
+            result.current.move('right');
+          }
+        });
+
+        // Insert a newline using one of our sequences
+        act(() =>
+          result.current.handleInput({
+            name: undefined,
+            ctrl: false,
+            meta: false,
+            shift: false,
+            paste: false,
+            sequence: '\x1b[13;2u', // Kitty Shift+Enter
+          }),
+        );
+
+        expect(getBufferState(result).lines).toEqual(['Hello', 'World']);
+        expect(getBufferState(result).cursor).toEqual([1, 0]);
+      });
     });
 
     it('should correctly handle repeated pasting of long text', () => {

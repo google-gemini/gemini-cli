@@ -91,7 +91,17 @@ class MockStdin extends EventEmitter {
     if (this.isLegacy) {
       this.emit('data', Buffer.from(key.sequence ?? ''));
     } else {
-      this.emit('keypress', null, key);
+      // Ensure all required Key properties are present
+      const fullKey: Key = {
+        name: key.name ?? '',
+        ctrl: key.ctrl ?? false,
+        meta: key.meta ?? false,
+        shift: key.shift ?? false,
+        paste: key.paste ?? false,
+        sequence: key.sequence ?? '',
+        ...key,
+      };
+      this.emit('keypress', null, fullKey);
     }
   }
 }
@@ -255,6 +265,327 @@ describe('useKeypress', () => {
         shift: false,
         paste: true,
         sequence: pasteText,
+      });
+    });
+  });
+
+  describe('Kitty Keyboard Protocol', () => {
+    it('should parse Kitty protocol Shift+Enter sequence', () => {
+      const onKeypress = vi.fn();
+      renderHook(() =>
+        useKeypress(onKeypress, { isActive: true, kittyProtocolEnabled: true }),
+      );
+
+      act(() => {
+        stdin.pressKey({ sequence: '\x1b[13;2u' });
+      });
+
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'return',
+        ctrl: false,
+        meta: false,
+        shift: true,
+        paste: false,
+        sequence: '\x1b[13;2u',
+        kittyProtocol: true,
+      });
+    });
+
+    it('should parse Kitty protocol Ctrl+Enter sequence', () => {
+      const onKeypress = vi.fn();
+      renderHook(() =>
+        useKeypress(onKeypress, { isActive: true, kittyProtocolEnabled: true }),
+      );
+
+      act(() => {
+        stdin.pressKey({ sequence: '\x1b[13;5u' });
+      });
+
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'return',
+        ctrl: true,
+        meta: false,
+        shift: false,
+        paste: false,
+        sequence: '\x1b[13;5u',
+        kittyProtocol: true,
+      });
+    });
+
+    it('should parse Kitty protocol Ctrl+C sequence', () => {
+      const onKeypress = vi.fn();
+      renderHook(() =>
+        useKeypress(onKeypress, { isActive: true, kittyProtocolEnabled: true }),
+      );
+
+      act(() => {
+        stdin.pressKey({ sequence: '\x1b[99;5u' });
+      });
+
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'c',
+        ctrl: true,
+        meta: false,
+        shift: false,
+        paste: false,
+        sequence: '\x1b[99;5u',
+        kittyProtocol: true,
+      });
+    });
+
+    it('should handle partial Kitty sequences by buffering', () => {
+      const onKeypress = vi.fn();
+      renderHook(() =>
+        useKeypress(onKeypress, { isActive: true, kittyProtocolEnabled: true }),
+      );
+
+      // Send partial sequence
+      act(() => {
+        stdin.pressKey({ sequence: '\x1b[13' });
+      });
+      expect(onKeypress).not.toHaveBeenCalled();
+
+      // Complete the sequence
+      act(() => {
+        stdin.pressKey({ sequence: ';2u' });
+      });
+
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'return',
+        ctrl: false,
+        meta: false,
+        shift: true,
+        paste: false,
+        sequence: '\x1b[13;2u',
+        kittyProtocol: true,
+      });
+    });
+
+    it('should pass through non-Kitty sequences when Kitty protocol is enabled', () => {
+      const onKeypress = vi.fn();
+      renderHook(() =>
+        useKeypress(onKeypress, { isActive: true, kittyProtocolEnabled: true }),
+      );
+
+      act(() => {
+        stdin.pressKey({
+          name: 'a',
+          sequence: 'a',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'a',
+        sequence: 'a',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
+    });
+
+    it('should not parse Kitty sequences when protocol is disabled', () => {
+      const onKeypress = vi.fn();
+      renderHook(() =>
+        useKeypress(onKeypress, {
+          isActive: true,
+          kittyProtocolEnabled: false,
+        }),
+      );
+
+      act(() => {
+        stdin.pressKey({ sequence: '\x1b[13;2u' });
+      });
+
+      // Should pass through as raw sequence
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sequence: '\x1b[13;2u',
+          paste: false,
+        }),
+      );
+      expect(onKeypress).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          kittyProtocol: true,
+        }),
+      );
+    });
+
+    it('should handle Ctrl+C immediately in both standard and Kitty format', () => {
+      const onKeypress = vi.fn();
+      renderHook(() =>
+        useKeypress(onKeypress, { isActive: true, kittyProtocolEnabled: true }),
+      );
+
+      // Standard Ctrl+C
+      act(() => {
+        stdin.pressKey({
+          name: 'c',
+          sequence: '\x03',
+          ctrl: true,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'c',
+        sequence: '\x03',
+        ctrl: true,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
+
+      onKeypress.mockClear();
+
+      // Kitty protocol Ctrl+C
+      act(() => {
+        stdin.pressKey({ sequence: '\x1b[99;5u' });
+      });
+
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'c',
+        ctrl: true,
+        meta: false,
+        shift: false,
+        paste: false,
+        sequence: '\x1b[99;5u',
+        kittyProtocol: true,
+      });
+    });
+  });
+
+  describe('VS Code Terminal Support', () => {
+    it('should convert backslash+return to Shift+Enter', () => {
+      const onKeypress = vi.fn();
+      renderHook(() => useKeypress(onKeypress, { isActive: true }));
+
+      // First send backslash
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          sequence: '\\',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // Backslash should be buffered, not passed through
+      expect(onKeypress).not.toHaveBeenCalled();
+
+      // Then send return
+      act(() => {
+        stdin.pressKey({
+          name: 'return',
+          sequence: '\r',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // Should be converted to Shift+Enter
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'return',
+        sequence: '\\\r',
+        ctrl: false,
+        meta: false,
+        shift: true,
+        paste: false,
+      });
+    });
+
+    it('should not convert non-backslash+return sequences', () => {
+      const onKeypress = vi.fn();
+      renderHook(() => useKeypress(onKeypress, { isActive: true }));
+
+      // Send 'a' then return
+      act(() => {
+        stdin.pressKey({
+          name: 'a',
+          sequence: 'a',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      onKeypress.mockClear();
+
+      act(() => {
+        stdin.pressKey({
+          name: 'return',
+          sequence: '\r',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // Should not be converted
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'return',
+        sequence: '\r',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
+    });
+
+    it('should pass through backslash when not followed by return', () => {
+      const onKeypress = vi.fn();
+      renderHook(() =>
+        useKeypress(onKeypress, { isActive: true }),
+      );
+
+      // Send backslash
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          sequence: '\\',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // Backslash should be buffered
+      expect(onKeypress).not.toHaveBeenCalled();
+
+      // Send 'a' after backslash
+      act(() => {
+        stdin.pressKey({
+          name: 'a',
+          sequence: 'a',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      // Now both backslash and 'a' should be passed through
+      expect(onKeypress).toHaveBeenCalledTimes(2);
+      expect(onKeypress).toHaveBeenNthCalledWith(1, {
+        name: '',
+        sequence: '\\',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
+      expect(onKeypress).toHaveBeenNthCalledWith(2, {
+        name: 'a',
+        sequence: 'a',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
       });
     });
   });

@@ -604,24 +604,6 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should add a newline on enter when the line ends with a backslash', async () => {
-    // This test simulates multi-line input, not submission
-    mockBuffer.text = 'first line\\';
-    mockBuffer.cursor = [0, 11];
-    mockBuffer.lines = ['first line\\'];
-
-    const { stdin, unmount } = render(<InputPrompt {...props} />);
-    await wait();
-
-    stdin.write('\r');
-    await wait();
-
-    expect(props.onSubmit).not.toHaveBeenCalled();
-    expect(props.buffer.backspace).toHaveBeenCalled();
-    expect(props.buffer.newline).toHaveBeenCalled();
-    unmount();
-  });
-
   it('should clear the buffer on Ctrl+C if it has text', async () => {
     props.buffer.setText('some text to clear');
     const { stdin, unmount } = render(<InputPrompt {...props} />);

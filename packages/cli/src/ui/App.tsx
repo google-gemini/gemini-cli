@@ -84,8 +84,10 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
-
-const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
+import {
+  CTRL_EXIT_PROMPT_DURATION_MS,
+  KITTY_CTRL_C,
+} from './utils/platformConstants.js';
 
 interface AppProps {
   config: Config;
@@ -466,7 +468,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       }
     } else if (
       (key.ctrl && (input === 'c' || input === 'C')) ||
-      input === '[99;5u'
+      input === KITTY_CTRL_C
     ) {
       handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
     } else if (key.ctrl && (input === 'd' || input === 'D')) {

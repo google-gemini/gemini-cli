@@ -8,6 +8,7 @@ import { useEffect, useRef } from 'react';
 import { useStdin } from 'ink';
 import readline from 'readline';
 import { PassThrough } from 'stream';
+import { KITTY_CTRL_C } from '../utils/platformConstants.js';
 
 export interface Key {
   name: string;
@@ -16,6 +17,7 @@ export interface Key {
   shift: boolean;
   paste: boolean;
   sequence: string;
+  kittyProtocol?: boolean;
 }
 
 /**
@@ -30,10 +32,14 @@ export interface Key {
  * @param onKeypress - The callback function to execute on each keypress.
  * @param options - Options to control the hook's behavior.
  * @param options.isActive - Whether the hook should be actively listening for input.
+ * @param options.kittyProtocolEnabled - Whether Kitty keyboard protocol is enabled.
  */
 export function useKeypress(
   onKeypress: (key: Key) => void,
-  { isActive }: { isActive: boolean },
+  {
+    isActive,
+    kittyProtocolEnabled = false,
+  }: { isActive: boolean; kittyProtocolEnabled?: boolean },
 ) {
   const { stdin, setRawMode } = useStdin();
   const onKeypressRef = useRef(onKeypress);
@@ -64,8 +70,141 @@ export function useKeypress(
 
     let isPaste = false;
     let pasteBuffer = Buffer.alloc(0);
+    let kittySequenceBuffer = '';
+    let previousSequence = '';
+
+    // Parse Kitty protocol sequences
+    const parseKittySequence = (sequence: string): Key | null => {
+      // Match CSI <number> ; <modifiers> u or ~
+      // eslint-disable-next-line no-control-regex
+      const match = sequence.match(/^\x1b\[(\d+)(;(\d+))?([u~])$/);
+      if (!match) return null;
+
+      const keyCode = parseInt(match[1], 10);
+      const modifiers = match[3] ? parseInt(match[3], 10) : 1;
+
+      // Decode modifiers (subtract 1 as per Kitty protocol spec)
+      const modifierBits = modifiers - 1;
+      const shift = (modifierBits & 1) === 1;
+      const alt = (modifierBits & 2) === 2;
+      const ctrl = (modifierBits & 4) === 4;
+
+      // Handle Enter key (code 13)
+      if (keyCode === 13) {
+        return {
+          name: 'return',
+          ctrl,
+          meta: alt,
+          shift,
+          paste: false,
+          sequence,
+          kittyProtocol: true,
+        };
+      }
+
+      // Handle Ctrl+C (code 99 for 'c')
+      if (keyCode === 99 && ctrl) {
+        return {
+          name: 'c',
+          ctrl: true,
+          meta: alt,
+          shift,
+          paste: false,
+          sequence,
+          kittyProtocol: true,
+        };
+      }
+
+      // Handle other keys as needed
+      return null;
+    };
 
     const handleKeypress = (_: unknown, key: Key) => {
+      // Handle VS Code's backslash+return pattern (Shift+Enter)
+      if (key.name === 'return' && previousSequence === '\\') {
+        // Convert to Shift+Enter
+        onKeypressRef.current({
+          ...key,
+          shift: true,
+          sequence: '\\\r', // VS Code's Shift+Enter representation
+        });
+        previousSequence = '';
+        return;
+      }
+      
+      // Don't pass through backslash if it might be part of VS Code's Shift+Enter
+      // We'll pass it through later if no return follows
+      if (key.sequence === '\\' && !key.name) {
+        previousSequence = key.sequence;
+        // Don't pass through yet - wait to see if return follows
+        return;
+      }
+      
+      // If we had a pending backslash and this isn't return, pass through the backslash first
+      if (previousSequence === '\\' && key.name !== 'return') {
+        onKeypressRef.current({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: '\\',
+        });
+      }
+
+      // Store current sequence for next check (before other processing)
+      previousSequence = key.sequence;
+
+      // Always pass through Ctrl+C immediately, regardless of protocol state
+      // Check both standard format and Kitty protocol sequence
+      if (
+        (key.ctrl && key.name === 'c') ||
+        key.sequence === `\x1b${KITTY_CTRL_C}`
+      ) {
+        kittySequenceBuffer = '';
+        // If it's the Kitty sequence, create a proper key object
+        if (key.sequence === `\x1b${KITTY_CTRL_C}`) {
+          onKeypressRef.current({
+            name: 'c',
+            ctrl: true,
+            meta: false,
+            shift: false,
+            paste: false,
+            sequence: key.sequence,
+            kittyProtocol: true,
+          });
+        } else {
+          onKeypressRef.current(key);
+        }
+        return;
+      }
+
+      // If Kitty protocol is enabled, handle CSI sequences
+      if (kittyProtocolEnabled) {
+        // If we have a buffer or this starts a CSI sequence
+        if (kittySequenceBuffer || key.sequence.startsWith('\x1b[')) {
+          kittySequenceBuffer += key.sequence;
+
+          // Try to parse the buffer as a Kitty sequence
+          const kittyKey = parseKittySequence(kittySequenceBuffer);
+          if (kittyKey) {
+            kittySequenceBuffer = '';
+            onKeypressRef.current(kittyKey);
+            return;
+          }
+
+          // If buffer doesn't match expected pattern and is getting long, flush it
+          if (kittySequenceBuffer.length > 10) {
+            // Not a Kitty sequence, treat as regular key
+            kittySequenceBuffer = '';
+          } else {
+            // Wait for more characters
+            return;
+          }
+        }
+      }
+
+      // Standard keypress handling
       if (key.name === 'paste-start') {
         isPaste = true;
       } else if (key.name === 'paste-end') {
@@ -180,5 +319,5 @@ export function useKeypress(
         pasteBuffer = Buffer.alloc(0);
       }
     };
-  }, [isActive, stdin, setRawMode]);
+  }, [isActive, stdin, setRawMode, kittyProtocolEnabled]);
 }

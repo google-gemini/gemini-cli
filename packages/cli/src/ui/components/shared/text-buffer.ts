@@ -13,15 +13,7 @@ import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
 import stringWidth from 'string-width';
 import { unescapePath } from '@google/gemini-cli-core';
 import { toCodePoints, cpLen, cpSlice } from '../../utils/textUtils.js';
-
-// Constants for newline input sequences
-export const NEWLINE_INPUT_SEQUENCES = [
-  '\n',
-  '\r\n',
-  '\\\r', // VSCode terminal represents shift + enter this way
-  '\x1b[13;2u', // Kitty Protocol
-  '\x1b[13;5u', // Kitty Protocol
-];
+import { NEWLINE_INPUT_SEQUENCES } from '../../utils/platformConstants.js';
 
 export type Direction =
   | 'left'
@@ -1176,7 +1168,8 @@ export function useTextBuffer({
 
       if (
         key.name === 'return' ||
-        (input && NEWLINE_INPUT_SEQUENCES.includes(input))
+        (input &&
+          (NEWLINE_INPUT_SEQUENCES as readonly string[]).includes(input))
       ) {
         newline();
       } else if (key.name === 'left' && !key.meta && !key.ctrl) {

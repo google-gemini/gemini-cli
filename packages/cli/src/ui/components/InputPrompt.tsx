@@ -4,19 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import { TextBuffer, NEWLINE_INPUT_SEQUENCES } from './shared/text-buffer.js';
+import { TextBuffer } from './shared/text-buffer.js';
+import { NEWLINE_INPUT_SEQUENCES } from '../utils/platformConstants.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
-import { Key } from '../hooks/useKeypress.js';
-import { useEnhancedKeypress } from '../hooks/useEnhancedKeypress.js';
+import { Key, useKeypress } from '../hooks/useKeypress.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
@@ -60,7 +60,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
-  const prevKeyRef = useRef<Key | null>(null);
   const kittyProtocolStatus = useKittyKeyboardProtocol();
 
   // Check if cursor is after @ or / without unescaped spaces
@@ -289,35 +288,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Check if this is the special backslash+return sequence
-      const isPrevBackslash =
-        prevKeyRef.current &&
-        prevKeyRef.current.sequence === '\\' &&
-        prevKeyRef.current.name === undefined &&
-        !prevKeyRef.current.ctrl &&
-        !prevKeyRef.current.meta &&
-        !prevKeyRef.current.shift &&
-        !prevKeyRef.current.paste;
-
-      const isCurrentReturn =
-        key.name === 'return' &&
-        key.sequence === '\r' &&
-        !key.ctrl &&
-        !key.meta &&
-        !key.paste;
-
-      // Handle the \+Enter sequence BEFORE it reaches the buffer
-      if (isPrevBackslash && isCurrentReturn) {
-        // Remove the backslash that was just inserted
-        buffer.backspace();
-        // Insert a newline instead of processing normally
-        buffer.newline();
-        prevKeyRef.current = null; // Reset
-        return;
-      }
-
-      // Store current key for next iteration
-      prevKeyRef.current = key;
       if (
         key.sequence === '!' &&
         buffer.text === '' &&
@@ -419,13 +389,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (key.name === 'return' && !key.ctrl && !key.meta && !key.paste) {
         if (buffer.text.trim()) {
-          const [row, col] = buffer.cursor;
-          const line = buffer.lines[row];
-          const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
-          if (charBefore === '\\') {
-            buffer.backspace();
-            buffer.newline();
-          } else if (NEWLINE_INPUT_SEQUENCES.includes(key.sequence)) {
+          if (
+            (NEWLINE_INPUT_SEQUENCES as readonly string[]).includes(
+              key.sequence,
+            )
+          ) {
             buffer.newline();
           } else {
             handleSubmitAndClear(buffer.text);
@@ -435,7 +403,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Newline insertion
-      if (key.name === 'return' && (key.ctrl || key.meta || key.paste)) {
+      if (
+        key.name === 'return' &&
+        (key.ctrl || key.meta || key.shift || key.paste)
+      ) {
         buffer.newline();
         return;
       }
@@ -502,8 +473,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
 
-  // Always use enhanced keypress - it will handle both Kitty protocol and standard input
-  useEnhancedKeypress(handleInput, {
+  // Use keypress hook - it now handles both Kitty protocol and standard input
+  useKeypress(handleInput, {
     isActive: focus,
     kittyProtocolEnabled: kittyProtocolStatus.enabled,
   });

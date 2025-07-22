@@ -29,6 +29,7 @@ import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { isKittyProtocolEnabled } from './kittyProtocolDetector.js';
+import { VSCODE_SHIFT_ENTER_SEQUENCE } from './platformConstants.js';
 
 const execAsync = promisify(exec);
 
@@ -180,14 +181,14 @@ async function configureVSCodeStyle(
       key: 'shift+enter',
       command: 'workbench.action.terminal.sendSequence',
       when: 'terminalFocus',
-      args: { text: '\\\r\n' },
+      args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
     };
 
     const ctrlEnterBinding = {
       key: 'ctrl+enter',
       command: 'workbench.action.terminal.sendSequence',
       when: 'terminalFocus',
-      args: { text: '\\\r\n' },
+      args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
     };
 
     // Check if ANY shift+enter or ctrl+enter bindings already exist
