@@ -178,9 +178,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const { stdout } = useStdout();
   const nightly = version.includes('nightly');
+  const { history, addItem, clearItems, loadHistory } = useHistory();
 
   useEffect(() => {
     checkForUpdates().then((info) => {
+     if (!info) {
+        return;
+      }
+
       if (process.env.GEMINI_CLI_DISABLE_AUTOUPDATER === 'true') {
         setUpdateInfo(info);
         setTimeout(() => {
@@ -198,9 +203,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
       handleAutoUpdate(info, setUpdateInfo, setIsUpdating, addItem);
     });
-  }, []);
+  }, [addItem]);
 
-  const { history, addItem, clearItems, loadHistory } = useHistory();
   const {
     consoleMessages,
     handleNewMessage,
