@@ -17,6 +17,7 @@ import {
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { parse } from 'shell-quote';
 import { MCPServerConfig } from '../config/config.js';
+export type { MCPServerConfig };
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { FunctionDeclaration, mcpToTool } from '@google/genai';
 import { ToolRegistry } from './tool-registry.js';
@@ -462,7 +463,7 @@ export async function discoverTools(
       throw Error('No enabled tools found');
     }
     return discoveredTools;
-  } catch (error) {
+  } catch (error: any) {
     throw new Error(`Error discovering tools: ${error}`);
   }
 }
