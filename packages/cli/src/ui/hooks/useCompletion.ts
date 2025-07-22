@@ -316,7 +316,6 @@ export function useCompletion(
       let foundSuggestions: Suggestion[] = [];
       try {
         const entries = await fs.readdir(startDir, { withFileTypes: true });
-        // Check abort signal after async operation
         if (signal.aborted) {
           return [];
         }
@@ -329,7 +328,6 @@ export function useCompletion(
             path.join(startDir, entry.name),
           );
 
-          // Conditionally ignore dotfiles
           if (!searchPrefix.startsWith('.') && entry.name.startsWith('.')) {
             continue;
           }
@@ -400,7 +398,6 @@ export function useCompletion(
         nocase: true,
       });
 
-      // Check abort signal after potentially expensive glob operation
       if (signal.aborted) {
         return [];
       }
@@ -468,10 +465,8 @@ export function useCompletion(
             );
           }
         } else {
-          // Original behavior: list files in the specific directory
           const lowerPrefix = prefix.toLowerCase();
 
-          // Check abort signal before expensive file operations
           if (abortController.signal.aborted) {
             return;
           }
@@ -480,16 +475,12 @@ export function useCompletion(
             withFileTypes: true,
           });
 
-          // Check abort signal after async operation
           if (abortController.signal.aborted) {
             return;
           }
 
-          // Filter entries using git-aware filtering
           const filteredEntries = [];
           for (const entry of entries) {
-
-            // Conditionally ignore dotfiles
             if (!prefix.startsWith('.') && entry.name.startsWith('.')) {
               continue;
             }
@@ -518,12 +509,10 @@ export function useCompletion(
           });
         }
 
-        // Check abort signal before sorting
         if (abortController.signal.aborted) {
           return;
         }
 
-        // Sort by depth, then directories first, then alphabetically
         fetchedSuggestions.sort((a, b) => {
           const depthA = (a.label.match(/\//g) || []).length;
           const depthB = (b.label.match(/\//g) || []).length;
