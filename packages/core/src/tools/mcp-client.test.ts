@@ -227,6 +227,9 @@ describe('mcp-client', () => {
         {
           httpUrl: 'http://test-server',
           authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+          oauth: {
+            scopes: ['scope1'],
+          },
         },
         false,
       );
@@ -243,6 +246,9 @@ describe('mcp-client', () => {
         {
           url: 'http://test-server',
           authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+          oauth: {
+            scopes: ['scope1'],
+          },
         },
         false,
       );
@@ -259,6 +265,9 @@ describe('mcp-client', () => {
           'test-server',
           {
             authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
           },
           false,
         ),
