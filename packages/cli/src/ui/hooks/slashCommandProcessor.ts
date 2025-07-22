@@ -21,6 +21,8 @@ import {
 import { LoadedSettings } from '../../config/settings.js';
 import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
+import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
+import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 
 /**
  * Hook to define and process slash commands (e.g., /help, /clear).
@@ -42,7 +44,7 @@ export const useSlashCommandProcessor = (
   openPrivacyNotice: () => void,
 ) => {
   const session = useSessionStats();
-  const [commands, setCommands] = useState<SlashCommand[]>([]);
+  const [commands, setCommands] = useState<readonly SlashCommand[]>([]);
   const gitService = useMemo(() => {
     if (!config?.getProjectRoot()) {
       return;
@@ -158,16 +160,26 @@ export const useSlashCommandProcessor = (
     ],
   );
 
-  const commandService = useMemo(() => new CommandService(config), [config]);
-
   useEffect(() => {
+    const controller = new AbortController();
     const load = async () => {
-      await commandService.loadCommands();
+      const loaders = [
+        new BuiltinCommandLoader(config),
+        new FileCommandLoader(config),
+      ];
+      const commandService = await CommandService.create(
+        loaders,
+        controller.signal,
+      );
       setCommands(commandService.getCommands());
     };
 
     load();
-  }, [commandService]);
+
+    return () => {
+      controller.abort();
+    };
+  }, [config]);
 
   const handleSlashCommand = useCallback(
     async (
@@ -183,12 +195,7 @@ export const useSlashCommandProcessor = (
       }
 
       const userMessageTimestamp = Date.now();
-      if (trimmed !== '/quit' && trimmed !== '/exit') {
-        addItem(
-          { type: MessageType.USER, text: trimmed },
-          userMessageTimestamp,
-        );
-      }
+      addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
 
       const parts = trimmed.substring(1).trim().split(/\s+/);
       const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
@@ -198,9 +205,21 @@ export const useSlashCommandProcessor = (
       let pathIndex = 0;
 
       for (const part of commandPath) {
-        const foundCommand = currentCommands.find(
-          (cmd) => cmd.name === part || cmd.altName === part,
-        );
+        // TODO: For better performance and architectural clarity, this two-pass
+        // search could be replaced. A more optimal approach would be to
+        // pre-compute a single lookup map in `CommandService.ts` that resolves
+        // all name and alias conflicts during the initial loading phase. The
+        // processor would then perform a single, fast lookup on that map.
+
+        // First pass: check for an exact match on the primary command name.
+        let foundCommand = currentCommands.find((cmd) => cmd.name === part);
+
+        // Second pass: if no primary name matches, check for an alias.
+        if (!foundCommand) {
+          foundCommand = currentCommands.find((cmd) =>
+            cmd.altNames?.includes(part),
+          );
+        }
 
         if (foundCommand) {
           commandToExecute = foundCommand;
@@ -281,6 +300,12 @@ export const useSlashCommandProcessor = (
                   process.exit(0);
                 }, 100);
                 return { type: 'handled' };
+
+              case 'submit_prompt':
+                return {
+                  type: 'submit_prompt',
+                  content: result.content,
+                };
               default: {
                 const unhandled: never = result;
                 throw new Error(`Unhandled slash command result: ${unhandled}`);
