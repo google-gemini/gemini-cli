@@ -6,37 +6,40 @@
 
 /** @vitest-environment jsdom */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Mocked } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCompletion } from './useCompletion.js';
-import * as fs from 'fs/promises';
-import { glob } from 'glob';
+
 import {
   CommandContext,
   CommandKind,
   SlashCommand,
 } from '../commands/types.js';
-import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
+import { Config, FileSearch, AbortError } from '@google/gemini-cli-core';
 
 // Mock dependencies
-vi.mock('fs/promises');
-vi.mock('glob');
-vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual('@google/gemini-cli-core');
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    FileDiscoveryService: vi.fn(),
-    isNodeError: vi.fn((error) => error.code === 'ENOENT'),
-    escapePath: vi.fn((path) => path),
-    unescapePath: vi.fn((path) => path),
-    getErrorMessage: vi.fn((error) => error.message),
+    FileSearch: vi.fn(),
+    AbortError: class AbortError extends Error {
+      constructor(message = 'Search aborted') {
+        super(message);
+        this.name = 'AbortError';
+      }
+    },
   };
 });
-vi.mock('glob');
+
+const mockFileSearchInstance = {
+  initialize: vi.fn(),
+  search: vi.fn(),
+};
 
 describe('useCompletion', () => {
-  let mockFileDiscoveryService: Mocked<FileDiscoveryService>;
   let mockConfig: Mocked<Config>;
   let mockCommandContext: CommandContext;
   let mockSlashCommands: SlashCommand[];
@@ -44,25 +47,16 @@ describe('useCompletion', () => {
   const testCwd = '/test/project';
 
   beforeEach(() => {
-    mockFileDiscoveryService = {
-      shouldGitIgnoreFile: vi.fn(),
-      shouldGeminiIgnoreFile: vi.fn(),
-      shouldIgnoreFile: vi.fn(),
-      filterFiles: vi.fn(),
-      getGeminiIgnorePatterns: vi.fn(),
-      projectRoot: '',
-      gitIgnoreFilter: null,
-      geminiIgnoreFilter: null,
-    } as unknown as Mocked<FileDiscoveryService>;
+    vi.clearAllMocks();
+    vi.mocked(FileSearch).mockImplementation(
+      () => mockFileSearchInstance as unknown as FileSearch,
+    );
+
+    mockFileSearchInstance.initialize.mockResolvedValue(undefined);
+    mockFileSearchInstance.search.mockResolvedValue([]);
 
     mockConfig = {
-      getFileFilteringRespectGitIgnore: vi.fn(() => true),
-      getFileService: vi.fn().mockReturnValue(mockFileDiscoveryService),
-      getEnableRecursiveFileSearch: vi.fn(() => true),
-      getFileFilteringOptions: vi.fn(() => ({
-        respectGitIgnore: true,
-        respectGeminiIgnore: true,
-      })),
+      getTargetDir: vi.fn(() => testCwd),
     } as unknown as Mocked<Config>;
 
     mockCommandContext = {} as CommandContext;
@@ -130,12 +124,6 @@ describe('useCompletion', () => {
         ],
       },
     ];
-
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   describe('Hook initialization and state', () => {
@@ -727,173 +715,6 @@ describe('useCompletion', () => {
     });
   });
 
-  describe('File path completion (@-syntax)', () => {
-    beforeEach(() => {
-      vi.mocked(fs.readdir).mockResolvedValue([
-        { name: 'file1.txt', isDirectory: () => false },
-        { name: 'file2.js', isDirectory: () => false },
-        { name: 'folder1', isDirectory: () => true },
-        { name: '.hidden', isDirectory: () => false },
-      ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
-    });
-
-    it('should show file completions for @ prefix', async () => {
-      const { result } = renderHook(() =>
-        useCompletion(
-          '@',
-          testCwd,
-          true,
-          mockSlashCommands,
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      });
-
-      expect(result.current.suggestions).toHaveLength(3);
-      expect(result.current.suggestions.map((s) => s.label)).toEqual(
-        expect.arrayContaining(['file1.txt', 'file2.js', 'folder1/']),
-      );
-    });
-
-    it('should filter files by prefix', async () => {
-      // Mock for recursive search since enableRecursiveFileSearch is true
-      vi.mocked(glob).mockResolvedValue([
-        `${testCwd}/file1.txt`,
-        `${testCwd}/file2.js`,
-      ]);
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          '@file',
-          testCwd,
-          true,
-          mockSlashCommands,
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      });
-
-      expect(result.current.suggestions).toHaveLength(2);
-      expect(result.current.suggestions.map((s) => s.label)).toEqual(
-        expect.arrayContaining(['file1.txt', 'file2.js']),
-      );
-    });
-
-    it('should include hidden files when prefix starts with dot', async () => {
-      // Mock for recursive search since enableRecursiveFileSearch is true
-      vi.mocked(glob).mockResolvedValue([`${testCwd}/.hidden`]);
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          '@.',
-          testCwd,
-          true,
-          mockSlashCommands,
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      });
-
-      expect(result.current.suggestions).toHaveLength(1);
-      expect(result.current.suggestions[0].label).toBe('.hidden');
-    });
-
-    it('should handle ENOENT error gracefully', async () => {
-      const enoentError = new Error('No such file or directory');
-      (enoentError as Error & { code: string }).code = 'ENOENT';
-      vi.mocked(fs.readdir).mockRejectedValue(enoentError);
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          '@nonexistent',
-          testCwd,
-          true,
-          mockSlashCommands,
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      });
-
-      expect(result.current.suggestions).toHaveLength(0);
-      expect(result.current.showSuggestions).toBe(false);
-    });
-
-    it('should handle other errors by resetting state', async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-      vi.mocked(fs.readdir).mockRejectedValue(new Error('Permission denied'));
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          '@',
-          testCwd,
-          true,
-          mockSlashCommands,
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      });
-
-      expect(consoleErrorSpy).toHaveBeenCalled();
-      expect(result.current.suggestions).toHaveLength(0);
-      expect(result.current.showSuggestions).toBe(false);
-      expect(result.current.isLoadingSuggestions).toBe(false);
-
-      consoleErrorSpy.mockRestore();
-    });
-  });
-
-  describe('Debouncing', () => {
-    it('should debounce file completion requests', async () => {
-      // Mock for recursive search since enableRecursiveFileSearch is true
-      vi.mocked(glob).mockResolvedValue([`${testCwd}/file1.txt`]);
-
-      const { rerender } = renderHook(
-        ({ query }) =>
-          useCompletion(
-            query,
-            testCwd,
-            true,
-            mockSlashCommands,
-            mockCommandContext,
-            mockConfig,
-          ),
-        { initialProps: { query: '@f' } },
-      );
-
-      rerender({ query: '@fi' });
-      rerender({ query: '@fil' });
-      rerender({ query: '@file' });
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      });
-
-      expect(glob).toHaveBeenCalledTimes(1);
-    });
-  });
-
   describe('Query handling edge cases', () => {
     it('should handle empty query', () => {
       const { result } = renderHook(() =>
@@ -942,10 +763,227 @@ describe('useCompletion', () => {
       expect(result.current.suggestions).toHaveLength(1);
       expect(result.current.suggestions[0].label).toBe('help');
     });
+  });
+
+  describe('File path completion (@-syntax)', () => {
+    let initializePromise: Promise<void>;
+    let initializeResolve: () => void;
+    let searchPromise: Promise<string[]>;
+    let searchResolve: (value: string[]) => void;
+    let searchReject: (reason?: unknown) => void;
+
+    beforeEach(() => {
+      // Reset the mock instance before each test
+      vi.mocked(mockFileSearchInstance.initialize).mockClear();
+      vi.mocked(mockFileSearchInstance.search).mockClear();
+
+      initializePromise = new Promise((resolve) => {
+        initializeResolve = resolve;
+      });
+      mockFileSearchInstance.initialize.mockReturnValue(initializePromise);
+
+      searchPromise = new Promise((resolve, reject) => {
+        searchResolve = resolve;
+        searchReject = reject;
+      });
+      mockFileSearchInstance.search.mockReturnValue(searchPromise);
+    });
+
+    it('should initialize FileSearch and show loading state', async () => {
+      const { result } = renderHook(() =>
+        useCompletion(
+          '@file',
+          testCwd,
+          true,
+          mockSlashCommands,
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      expect(FileSearch).toHaveBeenCalledWith({
+        projectRoot: testCwd,
+        ignoreDirs: [],
+        useGitignore: true,
+        useGeminiignore: true,
+        cache: true,
+        cacheTtl: 30,
+      });
+      expect(mockFileSearchInstance.initialize).toHaveBeenCalled();
+      // It's loading because the initialize promise hasn't resolved.
+      expect(result.current.isLoadingSuggestions).toBe(true);
+
+      await act(async () => {
+        initializeResolve();
+        await initializePromise;
+      });
+
+      // Now it's loading because the search promise hasn't resolved.
+      expect(mockFileSearchInstance.search).toHaveBeenCalledWith('file', {
+        signal: expect.any(AbortSignal),
+        maxResults: 8,
+      });
+      expect(result.current.isLoadingSuggestions).toBe(true);
+    });
+
+    it('should display suggestions after search completes', async () => {
+      const { result } = renderHook(() =>
+        useCompletion(
+          '@file',
+          testCwd,
+          true,
+          mockSlashCommands,
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        initializeResolve();
+        await initializePromise;
+        searchResolve(['file1.txt', 'file2.js']);
+        await searchPromise;
+      });
+
+      expect(result.current.isLoadingSuggestions).toBe(false);
+      expect(result.current.suggestions).toHaveLength(2);
+      expect(result.current.suggestions.map((s) => s.label)).toEqual([
+        'file1.txt',
+        'file2.js',
+      ]);
+      expect(result.current.showSuggestions).toBe(true);
+    });
+
+    it('should queue a search if the engine is still initializing', async () => {
+      const { rerender } = renderHook(
+        ({ query }) =>
+          useCompletion(
+            query,
+            testCwd,
+            true,
+            mockSlashCommands,
+            mockCommandContext,
+            mockConfig,
+          ),
+        { initialProps: { query: '@fi' } },
+      );
+
+      // Engine is still initializing, so search should not be called yet
+      expect(mockFileSearchInstance.search).not.toHaveBeenCalled();
+
+      // User types more characters
+      rerender({ query: '@file' });
+
+      expect(mockFileSearchInstance.search).not.toHaveBeenCalled();
+
+      // Now, let the initialization finish
+      await act(async () => {
+        initializeResolve();
+        await initializePromise;
+      });
+
+      // The hook should now execute the *latest* search query
+      expect(mockFileSearchInstance.search).toHaveBeenCalledTimes(1);
+      expect(mockFileSearchInstance.search).toHaveBeenCalledWith('file', {
+        signal: expect.any(AbortSignal),
+        maxResults: 8,
+      });
+    });
+
+    it('should abort the previous search when the query changes', async () => {
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+
+      const { rerender } = renderHook(
+        ({ query }) =>
+          useCompletion(
+            query,
+            testCwd,
+            true,
+            mockSlashCommands,
+            mockCommandContext,
+            mockConfig,
+          ),
+        { initialProps: { query: '@file' } },
+      );
+
+      await act(async () => {
+        initializeResolve();
+        await initializePromise;
+      });
+
+      expect(mockFileSearchInstance.search).toHaveBeenCalledTimes(1);
+
+      // Change the query, which should trigger a new search and abort the old one
+      rerender({ query: '@file-new' });
+
+      expect(abortSpy).toHaveBeenCalledTimes(1);
+      expect(mockFileSearchInstance.search).toHaveBeenCalledTimes(2);
+      expect(mockFileSearchInstance.search).toHaveBeenCalledWith('file-new', {
+        signal: expect.any(AbortSignal),
+        maxResults: 8,
+      });
+
+      abortSpy.mockRestore();
+    });
+
+    it('should handle AbortError gracefully', async () => {
+      const { result } = renderHook(() =>
+        useCompletion(
+          '@file',
+          testCwd,
+          true,
+          mockSlashCommands,
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        initializeResolve();
+        await initializePromise;
+        searchReject(new AbortError());
+        try {
+          await searchPromise;
+        } catch (_e) {
+          // ignore
+        }
+      });
+
+      // State should not have changed, no suggestions, loading is false
+      expect(result.current.isLoadingSuggestions).toBe(false);
+      expect(result.current.suggestions).toHaveLength(0);
+    });
+
+    it('should abort the search when the hook becomes inactive', async () => {
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+
+      const { unmount } = renderHook(() =>
+        useCompletion(
+          '@file',
+          testCwd,
+          true,
+          mockSlashCommands,
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        initializeResolve();
+        await initializePromise;
+      });
+
+      unmount();
+
+      expect(abortSpy).toHaveBeenCalledTimes(1);
+      abortSpy.mockRestore();
+    });
 
     it('should handle @ at the end of query', async () => {
-      // Mock for recursive search since enableRecursiveFileSearch is true
-      vi.mocked(glob).mockResolvedValue([`${testCwd}/file1.txt`]);
+      mockFileSearchInstance.search.mockResolvedValue([
+        'path/to/file.txt',
+        'another/file.js',
+      ]);
 
       const { result } = renderHook(() =>
         useCompletion(
@@ -958,115 +996,24 @@ describe('useCompletion', () => {
         ),
       );
 
-      // Wait for completion
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
+        initializeResolve();
+        await initializePromise;
+        searchResolve(['path/to/file.txt', 'another/file.js']);
+        await searchPromise;
       });
 
-      // Should process the @ query and get suggestions
+      expect(mockFileSearchInstance.search).toHaveBeenCalledWith('', {
+        signal: expect.any(AbortSignal),
+        maxResults: 8,
+      });
       expect(result.current.isLoadingSuggestions).toBe(false);
-      expect(result.current.suggestions.length).toBeGreaterThanOrEqual(0);
-    });
-  });
-
-  describe('File sorting behavior', () => {
-    it('should prioritize source files over test files with same base name', async () => {
-      // Mock glob to return files with same base name but different extensions
-      vi.mocked(glob).mockResolvedValue([
-        `${testCwd}/component.test.ts`,
-        `${testCwd}/component.ts`,
-        `${testCwd}/utils.spec.js`,
-        `${testCwd}/utils.js`,
-        `${testCwd}/api.test.tsx`,
-        `${testCwd}/api.tsx`,
+      expect(result.current.suggestions).toHaveLength(2);
+      expect(result.current.suggestions.map((s) => s.label)).toEqual([
+        'path/to/file.txt',
+        'another/file.js',
       ]);
-
-      mockFileDiscoveryService.shouldIgnoreFile.mockReturnValue(false);
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          '@comp',
-          testCwd,
-          true,
-          mockSlashCommands,
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      });
-
-      expect(result.current.suggestions).toHaveLength(6);
-
-      // Extract labels for easier testing
-      const labels = result.current.suggestions.map((s) => s.label);
-
-      // Verify the exact sorted order: source files should come before their test counterparts
-      expect(labels).toEqual([
-        'api.tsx',
-        'api.test.tsx',
-        'component.ts',
-        'component.test.ts',
-        'utils.js',
-        'utils.spec.js',
-      ]);
-    });
-  });
-
-  describe('Config and FileDiscoveryService integration', () => {
-    it('should work without config', async () => {
-      vi.mocked(fs.readdir).mockResolvedValue([
-        { name: 'file1.txt', isDirectory: () => false },
-      ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          '@',
-          testCwd,
-          true,
-          mockSlashCommands,
-          mockCommandContext,
-          undefined,
-        ),
-      );
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      });
-
-      expect(result.current.suggestions).toHaveLength(1);
-      expect(result.current.suggestions[0].label).toBe('file1.txt');
-    });
-
-    it('should respect file filtering when config is provided', async () => {
-      vi.mocked(fs.readdir).mockResolvedValue([
-        { name: 'file1.txt', isDirectory: () => false },
-        { name: 'ignored.log', isDirectory: () => false },
-      ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
-
-      mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
-        (path: string) => path.includes('.log'),
-      );
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          '@',
-          testCwd,
-          true,
-          mockSlashCommands,
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      });
-
-      expect(result.current.suggestions).toHaveLength(1);
-      expect(result.current.suggestions[0].label).toBe('file1.txt');
+      expect(result.current.showSuggestions).toBe(true);
     });
   });
 });
