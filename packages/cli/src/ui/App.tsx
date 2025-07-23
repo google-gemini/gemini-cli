@@ -22,7 +22,10 @@ import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './hooks/useAuthCommand.js';
-import { useSessionBrowser } from './hooks/useSessionBrowser.js';
+import {
+  convertSessionToHistoryFormats,
+  useSessionBrowser,
+} from './hooks/useSessionBrowser.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
@@ -58,6 +61,7 @@ import {
   isEditorAvailable,
   EditorType,
   FlashFallbackEvent,
+  ConversationRecord,
   logFlashFallback,
   AuthType,
   type ActiveFile,
@@ -87,7 +91,7 @@ import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import { useChatRecordingService } from './hooks/useChatRecording.js';
-import { appendFileSync } from 'node:fs';
+import { LoadHistoryActionReturn } from './commands/types.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -204,44 +208,56 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     cancelAuthentication,
   } = useAuthCommand(settings, setAuthError, config);
 
+  // ---------- Resume -----------
+
+  // Performs the actual resuming--loading the recorded conversation history into the UI and the
+  // Gemini client, in their respective formats.
+  const loadHistoryForResume = useCallback(
+    (history: LoadHistoryActionReturn) => {
+      // Wait for the client.
+      if (!config.getGeminiClient()?.isInitialized()) {
+        return;
+      }
+
+      // Now that we have the client, load the history into the UI and the client.
+      setQuittingMessages(null);
+      clearItems();
+      history.history.forEach((item, index) => {
+        addItem(item, index, true);
+      });
+      refreshStatic(); // Force Static component to re-render with the updated history.
+
+      // Give the history to the Gemini client.
+      config.getGeminiClient()?.setHistory(history.clientHistory);
+    },
+    [
+      clearItems,
+      addItem,
+      config,
+      refreshStatic,
+      config.getGeminiClient()?.isInitialized(),
+    ],
+  );
+
+  // Setup the interactive session browser--calls loadHistoryForResume when a session is selected.
   const {
     isSessionBrowserOpen,
     openSessionBrowser,
     closeSessionBrowser,
     handleResumeSession,
-  } = useSessionBrowser(config, chatRecordingService, (result) => {
-    // Handle the load history result
-    if (result.type === 'load_history') {
-      setQuittingMessages(null);
-      clearItems();
+  } = useSessionBrowser(config, chatRecordingService, loadHistoryForResume);
 
-      // Copy over the loaded history into the current session.
-      result.history.forEach((item, index) => {
-        addItem(item, index, true);
-      });
-
-      // Filter out slash commands from client history before setting it
-      const filteredClientHistory = result.clientHistory.filter(content => {
-        // Filter out user messages that are slash commands
-        if (content.role === 'user' && content.parts) {
-          return !content.parts.some(part => {
-            if ('text' in part && typeof part.text === 'string') {
-              const trimmed = part.text.trim();
-              return trimmed.startsWith('/') || trimmed.startsWith('?');
-            }
-            return false;
-          });
-        }
-        return true; // Keep all non-user messages and user messages without slash commands
-      });
-
-      // Set the filtered client history
-      config.getGeminiClient()?.setHistory(filteredClientHistory);
-
-      // Force Static component to re-render with the updated history
-      refreshStatic();
+  // Handle interactive resume from the command line (-r/--resume without -p/--prompt-interactive).
+  // Only if we're not authenticating, though.
+  useEffect(() => {
+    if (resumedSessionData && !isAuthenticating) {
+      loadHistoryForResume(
+        convertSessionToHistoryFormats(resumedSessionData.messages),
+      );
     }
-  });
+  }, [resumedSessionData, isAuthenticating, loadHistoryForResume]);
+
+  // ---------- Auth validation ----------
 
   useEffect(() => {
     if (settings.merged.selectedAuthType) {
