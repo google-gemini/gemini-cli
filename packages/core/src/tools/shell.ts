@@ -24,8 +24,9 @@ import stripAnsi from 'strip-ansi';
 
 export interface ShellToolParams {
   command: string;
-  description?: string;
+  _description?: string;
   directory?: string;
+  timeout?: number; // Timeout in milliseconds
 }
 import { spawn } from 'child_process';
 import { summarizeToolOutput } from '../utils/summarizer.js';
@@ -61,7 +62,7 @@ Process Group PGID: Process group started or \`(none)\``,
             type: Type.STRING,
             description: 'Exact bash command to execute as `bash -c <command>`',
           },
-          description: {
+          _description: {
             type: Type.STRING,
             description:
               'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
@@ -86,9 +87,9 @@ Process Group PGID: Process group started or \`(none)\``,
     if (params.directory) {
       description += ` [in ${params.directory}]`;
     }
-    // append optional (description), replacing any line breaks with spaces
-    if (params.description) {
-      description += ` (${params.description.replace(/\n/g, ' ')})`;
+    // append optional (_description), replacing any line breaks with spaces
+    if (params._description) {
+      description += ` (${params._description.replace(/\n/g, ' ')})`;
     }
     return description;
   }
@@ -300,6 +301,10 @@ Process Group PGID: Process group started or \`(none)\``,
       };
     }
 
+    const { command, _description, directory, timeout } = params;
+    const defaultTimeout = 300000; // 5 minutes in milliseconds
+    const actualTimeout = timeout ?? defaultTimeout;
+
     const isWindows = os.platform() === 'win32';
     const tempFileName = `shell_pgrep_${crypto
       .randomBytes(6)
@@ -307,26 +312,28 @@ Process Group PGID: Process group started or \`(none)\``,
     const tempFilePath = path.join(os.tmpdir(), tempFileName);
 
     // pgrep is not available on Windows, so we can't get background PIDs
-    const command = isWindows
-      ? params.command
+    const commandToExecute = isWindows
+      ? command
       : (() => {
           // wrap command to append subprocess pids (via pgrep) to temporary file
-          let command = params.command.trim();
-          if (!command.endsWith('&')) command += ';';
-          return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+          let cmd = command.trim();
+          if (!cmd.endsWith('&')) cmd += ';';
+          return `{ ${cmd} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
         })();
 
     // spawn command in specified directory (or project root if not specified)
     const shell = isWindows
-      ? spawn('cmd.exe', ['/c', command], {
+      ? spawn('cmd.exe', ['/c', commandToExecute], {
           stdio: ['ignore', 'pipe', 'pipe'],
           // detached: true, // ensure subprocess starts its own process group (esp. in Linux)
-          cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
+          cwd: path.resolve(this.config.getTargetDir(), directory || ''),
+          timeout: actualTimeout,
         })
-      : spawn('bash', ['-c', command], {
+      : spawn('bash', ['-c', commandToExecute], {
           stdio: ['ignore', 'pipe', 'pipe'],
           detached: true, // ensure subprocess starts its own process group (esp. in Linux)
-          cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
+          cwd: path.resolve(this.config.getTargetDir(), directory || ''),
+          timeout: actualTimeout,
         });
 
     let exited = false;
@@ -369,7 +376,7 @@ Process Group PGID: Process group started or \`(none)\``,
     shell.on('error', (err: Error) => {
       error = err;
       // remove wrapper from user's command in error message
-      error.message = error.message.replace(command, params.command);
+      error.message = error.message.replace(commandToExecute, command);
     });
 
     let code: number | null = null;
@@ -456,8 +463,8 @@ Process Group PGID: Process group started or \`(none)\``,
       }
     } else {
       llmContent = [
-        `Command: ${params.command}`,
-        `Directory: ${params.directory || '(root)'}`,
+        `Command: ${command}`,
+        `Directory: ${directory || '(root)'}`,
         `Stdout: ${stdout || '(empty)'}`,
         `Stderr: ${stderr || '(empty)'}`,
         `Error: ${error ?? '(none)'}`,

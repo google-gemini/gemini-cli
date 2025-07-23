@@ -13,6 +13,7 @@ Use `run_shell_command` to interact with the underlying system, run scripts, or 
 - `command` (string, required): The exact shell command to execute.
 - `description` (string, optional): A brief description of the command's purpose, which will be shown to the user.
 - `directory` (string, optional): The directory (relative to the project root) in which to execute the command. If not provided, the command runs in the project root.
+- `timeout` (number, optional): The maximum time in milliseconds to wait for the command to complete. If the command exceeds this time, it will be terminated. Defaults to 5 minutes (300000 milliseconds).
 
 ## How to use `run_shell_command` with the Gemini CLI
 

@@ -84,6 +84,7 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { usePromptCompletion } from './hooks/usePromptCompletion.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -101,7 +102,7 @@ export const AppWrapper = (props: AppProps) => (
 );
 
 const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
-  const isFocused = useFocus();
+  const _isFocused = useFocus();
   useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
@@ -160,7 +161,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
+  const [showEscapePrompt, setShowEscapePrompt] = useState(false);
+  const [clearBufferFn, setClearBufferFn] = useState<(() => void) | null>(null);
   const [openFiles, setOpenFiles] = useState<OpenFiles | undefined>();
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToOpenFiles(setOpenFiles);
@@ -172,6 +177,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
   }, []);
+
+  const handleEscapePromptChange = useCallback((showPrompt: boolean) => {
+    setShowEscapePrompt(showPrompt);
+  }, []);
+
+  const handleClearBuffer = useCallback((clearFn: () => void) => {
+    setClearBufferFn(() => clearFn);
+  }, []);
+
   const initialPromptSubmitted = useRef(false);
 
   const errorCount = useMemo(
@@ -420,6 +434,22 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     shellModeActive,
   });
 
+  const handleSuggestionsUpdate = useCallback((newSuggestions: string[]) => {
+    setSuggestions(newSuggestions);
+    setShowSuggestions(newSuggestions.length > 0);
+  }, []);
+
+  const geminiClient = config.getGeminiClient();
+
+  // Use the new prompt completion hook
+  usePromptCompletion(
+    geminiClient,
+    buffer.text,
+    500, // 500ms delay
+    handleSuggestionsUpdate,
+    buffer.text.length > 5,
+  );
+
   const handleExit = useCallback(
     (
       pressedOnce: boolean,
@@ -454,7 +484,24 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       setConstrainHeight(true);
     }
 
-    if (key.ctrl && input === 'o') {
+    if (key.escape) {
+      if (ctrlCPressedOnce) {
+        setCtrlCPressedOnce(false);
+        if (ctrlCTimerRef.current) {
+          clearTimeout(ctrlCTimerRef.current);
+          ctrlCTimerRef.current = null;
+        }
+        return;
+      }
+      if (ctrlDPressedOnce) {
+        setCtrlDPressedOnce(false);
+        if (ctrlDTimerRef.current) {
+          clearTimeout(ctrlDTimerRef.current);
+          ctrlDTimerRef.current = null;
+        }
+        return;
+      }
+    } else if (key.ctrl && input === 'o') {
       setShowErrorDetails((prev) => !prev);
     } else if (key.ctrl && input === 't') {
       const newValue = !showToolDescriptions;
@@ -465,7 +512,21 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
       }
     } else if (key.ctrl && (input === 'c' || input === 'C')) {
-      handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+      // Check if input buffer has content
+      if (buffer.text.length > 0) {
+        if (clearBufferFn) {
+          clearBufferFn();
+        } else {
+          buffer.setText('');
+        }
+        setCtrlCPressedOnce(true);
+        ctrlCTimerRef.current = setTimeout(() => {
+          setCtrlCPressedOnce(false);
+          ctrlCTimerRef.current = null;
+        }, CTRL_EXIT_PROMPT_DURATION_MS);
+      } else {
+        handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+      }
     } else if (key.ctrl && (input === 'd' || input === 'D')) {
       if (buffer.text.length > 0) {
         // Do nothing if there is text in the input.
@@ -474,6 +535,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
     } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
       setConstrainHeight(false);
+    } else if (key.shift && key.downArrow) {
+      if (suggestions.length > 0) {
+        buffer.setText(suggestions[0]);
+        setShowSuggestions(false);
+        setSuggestions([]);
+      }
     }
   });
 
@@ -526,6 +593,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
+      setShowSuggestions(false);
       const trimmedValue = submittedValue.trim();
       if (trimmedValue.length > 0) {
         submitQuery(trimmedValue);
@@ -641,7 +709,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, [settings.merged.contextFileName]);
 
   const initialPrompt = useMemo(() => config.getQuestion(), [config]);
-  const geminiClient = config.getGeminiClient();
 
   useEffect(() => {
     if (
@@ -878,6 +945,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     <Text color={Colors.AccentYellow}>
                       Press Ctrl+D again to exit.
                     </Text>
+                  ) : showEscapePrompt ? (
+                    <Text color={Colors.Gray}>
+                      Press Escape again to clear.
+                    </Text>
                   ) : (
                     <ContextSummaryDisplay
                       openFiles={openFiles}
@@ -928,8 +999,39 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   commandContext={commandContext}
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
-                  focus={isFocused}
+                  onEscapePromptChange={handleEscapePromptChange}
+                  onClearBuffer={handleClearBuffer}
                 />
+              )}
+              {showSuggestions && suggestions.length > 0 && (
+                <Box
+                  flexDirection="column"
+                  borderStyle="round"
+                  paddingX={1}
+                  marginTop={1}
+                  borderColor={Colors.AccentBlue}
+                >
+                  <Text color={Colors.AccentBlue} bold>
+                    💡 Prompt Suggestion:
+                  </Text>
+                  {suggestions.map((suggestion, index) => (
+                    <Box
+                      key={index}
+                      marginLeft={2}
+                      marginBottom={index === suggestions.length - 1 ? 0 : 1}
+                    >
+                      <Text color={Colors.Comment}>
+                        {index + 1}. {suggestion}
+                      </Text>
+                    </Box>
+                  ))}
+                  <Box marginTop={1}>
+                    <Text color={Colors.Comment}>
+                      Tips: You can copy the above suggestions as your prompt
+                      words. (Shift + Down Arrow)
+                    </Text>
+                  </Box>
+                </Box>
               )}
             </>
           )}

@@ -10,6 +10,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useCompletion } from './useCompletion.js';
 import * as fs from 'fs/promises';
 import { glob } from 'glob';
+import * as path from 'path';
 import {
   CommandContext,
   CommandKind,
@@ -380,7 +381,9 @@ describe('useCompletion git-aware filtering integration', () => {
     // `glob` should not be called because recursive search is disabled
     expect(glob).not.toHaveBeenCalled();
     // `fs.readdir` should be called for the top-level directory instead
-    expect(fs.readdir).toHaveBeenCalledWith(testCwd, { withFileTypes: true });
+    expect(fs.readdir).toHaveBeenCalledWith(path.normalize(testCwd), {
+      withFileTypes: true,
+    });
   });
 
   it('should work without config (fallback behavior)', async () => {
@@ -518,7 +521,10 @@ describe('useCompletion git-aware filtering integration', () => {
     expect(fs.readdir).not.toHaveBeenCalled(); // Ensure glob is used instead of readdir
     expect(result.current.suggestions).toEqual([
       { label: 'README.md', value: 'README.md' },
-      { label: 'src/index.ts', value: 'src/index.ts' },
+      {
+        label: path.normalize(`src${path.sep}index.ts`),
+        value: path.normalize(`src${path.sep}index.ts`),
+      },
     ]);
   });
 
@@ -554,7 +560,10 @@ describe('useCompletion git-aware filtering integration', () => {
     expect(result.current.suggestions).toEqual([
       { label: '.env', value: '.env' },
       { label: '.gitignore', value: '.gitignore' },
-      { label: 'src/index.ts', value: 'src/index.ts' },
+      {
+        label: path.normalize(`src${path.sep}index.ts`),
+        value: path.normalize(`src${path.sep}index.ts`),
+      },
     ]);
   });
 

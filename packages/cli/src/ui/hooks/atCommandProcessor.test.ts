@@ -12,6 +12,7 @@ import { ToolCallStatus } from '../types.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import * as fsPromises from 'fs/promises';
 import type { Stats } from 'fs';
+import * as path from 'path';
 
 const mockGetToolRegistry = vi.fn();
 const mockGetTargetDir = vi.fn();
@@ -445,7 +446,7 @@ describe('handleAtCommand', () => {
     const invalidFile = 'nonexistent.txt';
     const query = `Look at @${file1} then @${invalidFile} and also just @ symbol, then @valid2.glob`;
     const file2Glob = 'valid2.glob';
-    const resolvedFile2 = 'resolved/valid2.actual';
+    const resolvedFile2 = path.join('resolved', 'valid2.actual');
     const content2 = 'Globbed content';
 
     // Mock fs.stat for file1 (valid)
@@ -501,12 +502,14 @@ describe('handleAtCommand', () => {
     expect(result.processedQuery).toEqual([
       // Original query has @nonexistent.txt and @, but resolved has @resolved/valid2.actual
       {
-        text: `Look at @${file1} then @${invalidFile} and also just @ symbol, then @${resolvedFile2}`,
+        text: `Look at @${file1} then @${invalidFile} and also just @ symbol, then @${path.normalize(resolvedFile2).replace(/\\/g, '/')}`,
       },
       { text: '\n--- Content from referenced files ---' },
       { text: `\nContent from @${file1}:\n` },
       { text: content1 },
-      { text: `\nContent from @${resolvedFile2}:\n` },
+      {
+        text: `\nContent from @${path.normalize(resolvedFile2).replace(/\\/g, '/')}:\n`,
+      },
       { text: content2 },
       { text: '\n--- End of content ---' },
     ]);

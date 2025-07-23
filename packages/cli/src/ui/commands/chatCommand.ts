@@ -192,9 +192,10 @@ const resumeCommand: SlashCommand = {
   },
   completion: async (context, partialArg) => {
     const chatDetails = await getSavedChatTags(context, true);
-    return chatDetails
+    const suggestions = chatDetails
       .map((chat) => chat.name)
       .filter((name) => name.startsWith(partialArg));
+    return suggestions;
   },
 };
 

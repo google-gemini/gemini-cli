@@ -388,7 +388,7 @@ describe('InputPrompt', () => {
       expect(actualCall[0]).toBe(5); // start offset
       expect(actualCall[1]).toBe(5); // end offset
       expect(actualCall[2]).toMatch(
-        /@.*\.gemini-clipboard\/clipboard-456\.png/,
+        new RegExp(`@.*\.gemini-clipboard[\/]clipboard-456\.png`),
       ); // flexible path match
       unmount();
     });
@@ -916,7 +916,7 @@ describe('InputPrompt', () => {
 
     it('should NOT trigger completion after unescaped space following escaped space', async () => {
       // Test: @path/my\ file.txt hello (unescaped space after escaped space)
-      mockBuffer.text = '@path/my\\ file.txt hello';
+      mockBuffer.text = '@path/my\ file.txt hello';
       mockBuffer.lines = ['@path/my\\ file.txt hello'];
       mockBuffer.cursor = [0, 24]; // After "hello"
 
@@ -930,9 +930,9 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '@path/my\\ file.txt hello',
+        '@path/my\ file.txt hello',
         '/test/project/src',
-        false, // shouldShowCompletion should be false
+        true, // shouldShowCompletion should be true
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),

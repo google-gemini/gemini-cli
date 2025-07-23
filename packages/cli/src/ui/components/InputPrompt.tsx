@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { TextBuffer } from './shared/text-buffer.js';
-import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
+import { cpSlice, cpLen } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
@@ -40,6 +40,8 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  onEscapePromptChange?: (showPrompt: boolean) => void;
+  onClearBuffer?: (clearFn: () => void) => void;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -50,56 +52,25 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   config,
   slashCommands,
   commandContext,
-  placeholder = '  Type your message or @path/to/file',
+  placeholder = process.platform === 'win32'
+    ? '  Type your message or @path/to/file (Alt+V to paste image)'
+    : '  Type your message or @path/to/file',
   focus = true,
   inputWidth,
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  onEscapePromptChange,
+  onClearBuffer,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
-
-  // Check if cursor is after @ or / without unescaped spaces
-  const isCursorAfterCommandWithoutSpace = useCallback(() => {
-    const [row, col] = buffer.cursor;
-    const currentLine = buffer.lines[row] || '';
-
-    // Convert current line to code points for Unicode-aware processing
-    const codePoints = toCodePoints(currentLine);
-
-    // Search backwards from cursor position within the current line only
-    for (let i = col - 1; i >= 0; i--) {
-      const char = codePoints[i];
-
-      if (char === ' ') {
-        // Check if this space is escaped by counting backslashes before it
-        let backslashCount = 0;
-        for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
-          backslashCount++;
-        }
-
-        // If there's an odd number of backslashes, the space is escaped
-        const isEscaped = backslashCount % 2 === 1;
-
-        if (!isEscaped) {
-          // Found unescaped space before @ or /, return false
-          return false;
-        }
-        // If escaped, continue searching backwards
-      } else if (char === '@' || char === '/') {
-        // Found @ or / without unescaped space in between
-        return true;
-      }
-    }
-
-    return false;
-  }, [buffer.cursor, buffer.lines]);
+  const [escPressCount, setEscPressCount] = useState(0);
+  const [showEscapePrompt, setShowEscapePrompt] = useState(false);
+  const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const shouldShowCompletion = useCallback(
-    () =>
-      (isAtCommand(buffer.text) || isSlashCommand(buffer.text)) &&
-      isCursorAfterCommandWithoutSpace(),
-    [buffer.text, isCursorAfterCommandWithoutSpace],
+    () => isAtCommand(buffer.text) || isSlashCommand(buffer.text),
+    [buffer.text],
   );
 
   const completion = useCompletion(
@@ -113,6 +84,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const resetCompletionState = completion.resetCompletionState;
   const shellHistory = useShellHistory(config.getProjectRoot());
+
+  const resetEscapeState = useCallback(() => {
+    if (escapeTimerRef.current) {
+      clearTimeout(escapeTimerRef.current);
+      escapeTimerRef.current = null;
+    }
+    setEscPressCount(0);
+    setShowEscapePrompt(false);
+  }, []);
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
@@ -231,7 +211,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     [resetCompletionState, buffer, completionSuggestions, slashCommands],
   );
 
-  // Handle clipboard image pasting with Ctrl+V
+  // Handle clipboard image pasting with Ctrl+V or Alt+V(Windows)
   const handleClipboardImage = useCallback(async () => {
     try {
       if (await clipboardHasImage()) {
@@ -274,15 +254,74 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           buffer.replaceRangeByOffset(offset, offset, textToInsert);
         }
       }
-    } catch (error) {
-      console.error('Error handling clipboard image:', error);
+    } catch (_error) {
+      // Ignore clipboard image errors
     }
   }, [buffer, config]);
+
+  // Clear escape prompt timer on unmount
+  useEffect(() => {
+    return () => {
+      if (escapeTimerRef.current) {
+        clearTimeout(escapeTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Notify parent component about escape prompt state changes
+  useEffect(() => {
+    if (onEscapePromptChange) {
+      onEscapePromptChange(showEscapePrompt);
+    }
+  }, [showEscapePrompt, onEscapePromptChange]);
+
+  // Create clear buffer function for external use
+  const clearBuffer = useCallback(() => {
+    buffer.setText('');
+    resetCompletionState();
+  }, [buffer, resetCompletionState]);
+
+  // Handle external clear buffer requests
+  useEffect(() => {
+    if (onClearBuffer) {
+      onClearBuffer(clearBuffer);
+    }
+  }, [onClearBuffer, clearBuffer]);
+
+  // Effect to handle side effects of escPressCount
+  useEffect(() => {
+    if (escPressCount === 1) {
+      setShowEscapePrompt(true);
+      if (escapeTimerRef.current) {
+        clearTimeout(escapeTimerRef.current);
+      }
+      escapeTimerRef.current = setTimeout(() => {
+        resetEscapeState();
+      }, 3000);
+    } else if (escPressCount === 0 && !showEscapePrompt) {
+      // This condition handles the case where escPressCount is reset to 0
+      // and the prompt is hidden, ensuring cleanup.
+      if (escapeTimerRef.current) {
+        clearTimeout(escapeTimerRef.current);
+        escapeTimerRef.current = null;
+      }
+    } else if (escPressCount >= 2) {
+      onClearScreen();
+      resetEscapeState();
+    }
+  }, [escPressCount, showEscapePrompt, resetEscapeState, clearBuffer]);
 
   const handleInput = useCallback(
     (key: Key) => {
       if (!focus) {
         return;
+      }
+
+      // Reset ESC count and hide prompt on any non-ESC key
+      if (key.name !== 'escape') {
+        if (escPressCount > 0 || showEscapePrompt) {
+          resetEscapeState();
+        }
       }
 
       if (
@@ -296,15 +335,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.name === 'escape') {
+        // Handle existing ESC functionality first
         if (shellModeActive) {
           setShellModeActive(false);
+          resetEscapeState();
           return;
         }
 
         if (completion.showSuggestions) {
           completion.resetCompletionState();
+          resetEscapeState();
           return;
         }
+
+        // Handle double ESC for clearing input
+        setEscPressCount((prev) => (prev + 1 >= 2 ? 0 : prev + 1));
+        return;
       }
 
       if (key.ctrl && key.name === 'l') {
@@ -415,15 +461,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
-      // Ctrl+C (Clear input)
-      if (key.ctrl && key.name === 'c') {
-        if (buffer.text.length > 0) {
-          buffer.setText('');
-          resetCompletionState();
-          return;
-        }
-        return;
-      }
 
       // Kill line commands
       if (key.ctrl && key.name === 'k') {
@@ -448,7 +485,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Fall back to the text buffer's default input handling for all other keys
+      // Alt+V for clipboard image paste(Windows)      if (process.platform === 'win32' && key.meta && key.name === 'v') {        handleClipboardImage();        return;      }      // Fallback to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
     },
     [
@@ -463,7 +500,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleSubmitAndClear,
       shellHistory,
       handleClipboardImage,
-      resetCompletionState,
+      escPressCount,
+      showEscapePrompt,
+      resetEscapeState,
     ],
   );
 
