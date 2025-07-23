@@ -20,6 +20,8 @@ export interface ColorsTheme {
   AccentGreen: string;
   AccentYellow: string;
   AccentRed: string;
+  DiffAdded: string;
+  DiffRemoved: string;
   Comment: string;
   Gray: string;
   GradientColors?: string[];
@@ -41,8 +43,10 @@ export const lightTheme: ColorsTheme = {
   AccentGreen: '#3CA84B',
   AccentYellow: '#D5A40A',
   AccentRed: '#DD4C4C',
+  DiffAdded: '#C6EAD8',
+  DiffRemoved: '#FFCCCC',
   Comment: '#008000',
-  Gray: '#B7BECC',
+  Gray: '#97a0b0',
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
@@ -57,6 +61,8 @@ export const darkTheme: ColorsTheme = {
   AccentGreen: '#A6E3A1',
   AccentYellow: '#F9E2AF',
   AccentRed: '#F38BA8',
+  DiffAdded: '#28350B',
+  DiffRemoved: '#430000',
   Comment: '#6C7086',
   Gray: '#6C7086',
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
@@ -73,6 +79,8 @@ export const ansiTheme: ColorsTheme = {
   AccentGreen: 'green',
   AccentYellow: 'yellow',
   AccentRed: 'red',
+  DiffAdded: 'green',
+  DiffRemoved: 'red',
   Comment: 'gray',
   Gray: 'gray',
 };
@@ -328,6 +336,8 @@ export function validateCustomTheme(customTheme: Partial<CustomTheme>): {
     'AccentGreen',
     'AccentYellow',
     'AccentRed',
+    'DiffAdded',
+    'DiffRemoved',
     'Comment',
     'Gray',
   ];
@@ -352,6 +362,8 @@ export function validateCustomTheme(customTheme: Partial<CustomTheme>): {
     'AccentGreen',
     'AccentYellow',
     'AccentRed',
+    'DiffAdded',
+    'DiffRemoved',
     'Comment',
     'Gray',
   ];
