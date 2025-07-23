@@ -21,14 +21,21 @@ describe('useSessionPersistence - Integration Test', () => {
   let mockHistory: HistoryItem[];
   let mockLoadHistory: Mock;
   let mockOnLoadComplete: Mock;
-  let tempDir = '';
   let originalCwd = '';
+
+  vi.mock('os', async (importOriginal) => {
+    const actualOs = await importOriginal<typeof os>();
+    return {
+      ...actualOs,
+      homedir: vi.fn(() => 'home-user'),
+    };
+  });
 
   beforeEach(() => {
     // Store original CWD and create a temp directory
     originalCwd = process.cwd();
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-cli-test-'));
-    process.chdir(tempDir);
+    fs.mkdirSync(os.homedir());
+    process.chdir(os.homedir());
 
     mockHistory = [];
     mockLoadHistory = vi.fn();
@@ -46,7 +53,7 @@ describe('useSessionPersistence - Integration Test', () => {
   afterEach(() => {
     // Restore CWD and clean up the temp directory
     process.chdir(originalCwd);
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.rmSync(os.homedir(), { recursive: true, force: true });
 
     // Restore mocks
     vi.restoreAllMocks();
@@ -62,7 +69,7 @@ describe('useSessionPersistence - Integration Test', () => {
       }),
     );
 
-    const geminiDir = path.join(tempDir, '.gemini');
+    const geminiDir = path.join(os.homedir(), '.gemini');
     expect(fs.existsSync(geminiDir)).toBe(false);
     expect(mockProcessOn).not.toHaveBeenCalled();
   });
@@ -93,7 +100,7 @@ describe('useSessionPersistence - Integration Test', () => {
     // Manually trigger the exit handler to save the session
     exitHandler();
 
-    const sessionPath = path.join(tempDir, '.gemini', 'session.json');
+    const sessionPath = path.join(os.homedir(), '.gemini', 'session.json');
     expect(fs.existsSync(sessionPath)).toBe(true);
 
     const savedData = JSON.parse(fs.readFileSync(sessionPath, 'utf-8'));
@@ -110,7 +117,7 @@ describe('useSessionPersistence - Integration Test', () => {
   });
 
   it('should load session history on startup if file exists', async () => {
-    const geminiDir = path.join(tempDir, '.gemini');
+    const geminiDir = path.join(os.homedir(), '.gemini');
     fs.mkdirSync(geminiDir, { recursive: true });
 
     const sessionPath = path.join(geminiDir, 'session.json');
@@ -167,7 +174,7 @@ describe('useSessionPersistence - Integration Test', () => {
   });
 
   it('should not throw or call loadHistory if session file is empty or corrupt', async () => {
-    const geminiDir = path.join(tempDir, '.gemini');
+    const geminiDir = path.join(os.homedir(), '.gemini');
     fs.mkdirSync(geminiDir, { recursive: true });
     const sessionPath = path.join(geminiDir, 'session.json');
     fs.writeFileSync(sessionPath, 'corrupt data');
@@ -198,7 +205,7 @@ describe('useSessionPersistence - Integration Test', () => {
   });
 
   it('should not call loadHistory if session file contains valid JSON but not an array', async () => {
-    const geminiDir = path.join(tempDir, '.gemini');
+    const geminiDir = path.join(os.homedir(), '.gemini');
     fs.mkdirSync(geminiDir, { recursive: true });
     const sessionPath = path.join(geminiDir, 'session.json');
     fs.writeFileSync(sessionPath, '{"key": "value"}'); // Valid JSON, but not an array
@@ -225,7 +232,7 @@ describe('useSessionPersistence - Integration Test', () => {
   });
 
   it('should not call loadHistory if session file contains malformed history items', async () => {
-    const geminiDir = path.join(tempDir, '.gemini');
+    const geminiDir = path.join(os.homedir(), '.gemini');
     fs.mkdirSync(geminiDir, { recursive: true });
     const sessionPath = path.join(geminiDir, 'session.json');
     fs.writeFileSync(sessionPath, '[null, {"foo": "bar"}]'); // Malformed history items
@@ -273,7 +280,7 @@ describe('useSessionPersistence - Integration Test', () => {
       .mockImplementation(() => {});
 
     // Create a read-only directory to simulate permission error
-    const geminiDir = path.join(tempDir, '.gemini');
+    const geminiDir = path.join(os.homedir(), '.gemini');
     fs.mkdirSync(geminiDir, { recursive: true });
     fs.chmodSync(geminiDir, 0o444); // Set read-only permissions
 
