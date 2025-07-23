@@ -1,9 +1,3 @@
-/**
- * @license
- * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
@@ -123,15 +117,15 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        Alt+Left/Right
+        Ctrl+X / Meta+Enter
       </Text>{' '}
-      - Jump through words in the input
+      - Open input in external editor
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        Shift+Tab
+        Ctrl+L
       </Text>{' '}
-      - Toggle auto-accepting edits
+      - Clear the screen
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
@@ -150,6 +144,13 @@ export const Help: React.FC<Help> = ({ commands }) => (
         Ctrl+C
       </Text>{' '}
       - Quit application
+    </Text>
+    <Box height={1} />
+    <Text color={Colors.Foreground}>
+      For a full list of shortcuts, see{' '}
+      <Text bold color={Colors.AccentPurple}>
+        docs/keyboard-shortcuts.md
+      </Text>
     </Text>
   </Box>
 );
