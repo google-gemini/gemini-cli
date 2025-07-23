@@ -16,26 +16,7 @@ import { Colors } from '../colors.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import * as fs from 'fs/promises';
 import path from 'path';
-import { Config } from '@google/gemini-cli-core';
-
-/**
- * Raw conversation data structure as stored in session JSON files.
- */
-interface ConversationData {
-  /** ISO timestamp when the conversation started */
-  startTime: string;
-  /** ISO timestamp when the conversation was last updated */
-  lastUpdated: string;
-  /** Array of messages in the conversation */
-  messages: Array<{
-    /** Message type (typically 'user' or 'assistant') */
-    type: string;
-    /** Message content text */
-    content: string;
-    /** ISO timestamp when the message was created */
-    timestamp: string;
-  }>;
-}
+import { Config, ConversationRecord } from '@google/gemini-cli-core';
 
 /**
  * Processed session information used for display and interaction.
@@ -189,7 +170,7 @@ const cleanMessage = (message: string): string => {
  * @returns Cleaned first user message content, or empty string if none found
  */
 const extractFirstUserMessage = (
-  messages: ConversationData['messages'],
+  messages: ConversationRecord['messages'],
 ): string => {
   const firstUserMsg = messages.find((msg) => msg.type === 'user');
   return firstUserMsg ? cleanMessage(firstUserMsg.content) : '';
@@ -216,7 +197,7 @@ const getSessionFiles = async (
     const sessionPromises = sessionFiles.map(async (file, index) => {
       const filePath = path.join(chatsDir, file);
       try {
-        const content: ConversationData = JSON.parse(
+        const content: ConversationRecord = JSON.parse(
           await fs.readFile(filePath, 'utf8'),
         );
 

@@ -11,29 +11,8 @@ import { HistoryItemWithoutId, MessageType, ToolCallStatus } from '../types.js';
 import { ChatRecordingService } from '@google/gemini-cli-core';
 import * as fs from 'fs/promises';
 import path from 'path';
-import { randomUUID } from 'crypto';
-
-interface ConversationData {
-  startTime: string;
-  lastUpdated: string;
-  messages: Array<{
-    type: string;
-    content: string;
-    timestamp: string;
-    toolCalls?: Array<{
-      id: string;
-      name: string;
-      args: any;
-      result: any;
-      status: string;
-      timestamp: string;
-      displayName?: string;
-      description?: string;
-      resultDisplay?: string;
-      renderOutputAsMarkdown?: boolean;
-    }>;
-  }>;
-}
+import { ConversationRecord } from '@google/gemini-cli-core';
+import { MessageType, ToolCallStatus } from '../types.js';
 
 export const useSessionBrowser = (
   config: Config,
