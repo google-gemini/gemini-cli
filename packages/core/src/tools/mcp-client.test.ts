@@ -14,7 +14,7 @@ import {
 } from './mcp-client.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
-import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
+import type * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import * as GenAiLib from '@google/genai';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');

@@ -5,11 +5,14 @@
  */
 
 import { createHash } from 'crypto';
-import { GeminiEventType, ServerGeminiStreamEvent } from '../core/turn.js';
+import type { ServerGeminiStreamEvent } from '../core/turn.js';
+import { GeminiEventType } from '../core/turn.js';
 import { logLoopDetected } from '../telemetry/loggers.js';
 import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
-import { Config, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
-import { SchemaUnion, Type } from '@google/genai';
+import type { Config } from '../config/config.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
+import type { SchemaUnion } from '@google/genai';
+import { Type } from '@google/genai';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;

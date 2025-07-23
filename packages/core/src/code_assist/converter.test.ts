@@ -5,13 +5,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import type { CaGenerateContentResponse } from './converter.js';
 import {
   toGenerateContentRequest,
   fromGenerateContentResponse,
-  CaGenerateContentResponse,
 } from './converter.js';
+import type { GenerateContentParameters } from '@google/genai';
 import {
-  GenerateContentParameters,
   GenerateContentResponse,
   FinishReason,
   BlockedReason,

@@ -7,25 +7,24 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Diff from 'diff';
-import {
-  BaseTool,
-  Icon,
+import type {
   ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
   ToolEditConfirmationDetails,
   ToolLocation,
   ToolResult,
   ToolResultDisplay,
 } from './tools.js';
+import { BaseTool, Icon, ToolConfirmationOutcome } from './tools.js';
 import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
-import { Config, ApprovalMode } from '../config/config.js';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
-import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
+import type { ModifiableTool, ModifyContext } from './modifiable-tool.js';
 import { isWithinRoot } from '../utils/fileUtils.js';
 
 /**

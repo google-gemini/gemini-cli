@@ -7,16 +7,16 @@
 import fs from 'fs';
 import path from 'path';
 import * as Diff from 'diff';
-import { Config, ApprovalMode } from '../config/config.js';
-import {
-  BaseTool,
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
+import type {
   ToolResult,
   FileDiff,
   ToolEditConfirmationDetails,
-  ToolConfirmationOutcome,
   ToolCallConfirmationDetails,
-  Icon,
 } from './tools.js';
+import { Icon } from './tools.js';
+import { BaseTool, ToolConfirmationOutcome } from './tools.js';
 import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
@@ -26,7 +26,7 @@ import {
   ensureCorrectFileContent,
 } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
-import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
+import type { ModifiableTool, ModifyContext } from './modifiable-tool.js';
 import { getSpecificMimeType, isWithinRoot } from '../utils/fileUtils.js';
 import {
   recordFileOperationMetric,

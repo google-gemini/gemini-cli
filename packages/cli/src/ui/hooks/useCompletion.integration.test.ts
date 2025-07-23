@@ -10,12 +10,10 @@ import { renderHook, act } from '@testing-library/react';
 import { useCompletion } from './useCompletion.js';
 import * as fs from 'fs/promises';
 import { glob } from 'glob';
-import {
-  CommandContext,
-  CommandKind,
-  SlashCommand,
-} from '../commands/types.js';
-import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import { CommandKind } from '../commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
+import { FileDiscoveryService } from '@google/gemini-cli-core';
 
 interface MockConfig {
   getFileFilteringOptions: () => {

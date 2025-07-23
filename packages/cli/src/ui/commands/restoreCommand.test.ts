@@ -4,21 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  Mocked,
-  Mock,
-} from 'vitest';
+import type { Mocked, Mock } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs/promises';
 import { restoreCommand } from './restoreCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { Config, GitService } from '@google/gemini-cli-core';
+import type { Config, GitService } from '@google/gemini-cli-core';
 
 vi.mock('fs/promises', () => ({
   readdir: vi.fn(),

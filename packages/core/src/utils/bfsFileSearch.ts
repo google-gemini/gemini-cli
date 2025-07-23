@@ -6,9 +6,9 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Dirent } from 'fs';
-import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { FileFilteringOptions } from '../config/config.js';
+import type { Dirent } from 'fs';
+import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import type { FileFilteringOptions } from '../config/config.js';
 // Simple console logger for now.
 // TODO: Integrate with a more robust server-side logger.
 const logger = {

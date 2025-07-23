@@ -6,8 +6,8 @@
 
 /* ACP defines a schema for a simple (experimental) JSON-RPC protocol that allows GUI applications to interact with agents. */
 
-import { Icon } from '@google/gemini-cli-core';
-import { WritableStream, ReadableStream } from 'node:stream/web';
+import type { Icon } from '@google/gemini-cli-core';
+import type { WritableStream, ReadableStream } from 'node:stream/web';
 
 export class ClientConnection implements Client {
   #connection: Connection<Agent>;

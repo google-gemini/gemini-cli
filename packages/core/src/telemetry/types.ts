@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GenerateContentResponseUsageMetadata } from '@google/genai';
-import { Config } from '../config/config.js';
-import { CompletedToolCall } from '../core/coreToolScheduler.js';
+import type { GenerateContentResponseUsageMetadata } from '@google/genai';
+import type { Config } from '../config/config.js';
+import type { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { ToolConfirmationOutcome } from '../tools/tools.js';
 import { AuthType } from '../core/contentGenerator.js';
 

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Text } from 'ink';
 import Spinner from 'ink-spinner';
 import type { SpinnerName } from 'cli-spinners';

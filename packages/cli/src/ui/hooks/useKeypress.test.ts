@@ -5,7 +5,8 @@
  */
 
 import { renderHook, act } from '@testing-library/react';
-import { useKeypress, Key } from './useKeypress.js';
+import type { Key } from './useKeypress.js';
+import { useKeypress } from './useKeypress.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';

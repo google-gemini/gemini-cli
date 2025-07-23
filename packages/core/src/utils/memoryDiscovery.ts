@@ -13,12 +13,10 @@ import {
   GEMINI_CONFIG_DIR,
   getAllGeminiMdFilenames,
 } from '../tools/memoryTool.js';
-import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { processImports } from './memoryImportProcessor.js';
-import {
-  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
-  FileFilteringOptions,
-} from '../config/config.js';
+import type { FileFilteringOptions } from '../config/config.js';
+import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/config.js';
 
 // Simple console logger, similar to the one previously in CLI's config.ts
 // TODO: Integrate with a more robust server-side logger if available/appropriate.

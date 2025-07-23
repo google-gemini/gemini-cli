@@ -4,17 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { WritableStream, ReadableStream } from 'node:stream/web';
+import type { WritableStream, ReadableStream } from 'node:stream/web';
 
-import {
-  AuthType,
+import type {
   Config,
   GeminiChat,
   ToolRegistry,
-  logToolCall,
   ToolResult,
-  convertToFunctionResponse,
   ToolCallConfirmationDetails,
+} from '@google/gemini-cli-core';
+import {
+  AuthType,
+  logToolCall,
+  convertToFunctionResponse,
   ToolConfirmationOutcome,
   clearCachedCredentialFile,
   isNodeError,
@@ -23,10 +25,11 @@ import {
   getErrorStatus,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
-import { Agent } from './acp.js';
+import type { Agent } from './acp.js';
 import { Readable, Writable } from 'node:stream';
-import { Content, Part, FunctionCall, PartListUnion } from '@google/genai';
-import { LoadedSettings, SettingScope } from '../config/settings.js';
+import type { Content, Part, FunctionCall, PartListUnion } from '@google/genai';
+import type { LoadedSettings } from '../config/settings.js';
+import { SettingScope } from '../config/settings.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 

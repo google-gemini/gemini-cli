@@ -8,9 +8,8 @@ import { Buffer } from 'buffer';
 import * as https from 'https';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 
-import {
+import type {
   StartSessionEvent,
-  EndSessionEvent,
   UserPromptEvent,
   ToolCallEvent,
   ApiRequestEvent,
@@ -20,8 +19,9 @@ import {
   LoopDetectedEvent,
   FlashDecidedToContinueEvent,
 } from '../types.js';
+import { EndSessionEvent } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
-import { Config } from '../../config/config.js';
+import type { Config } from '../../config/config.js';
 import { getInstallationId } from '../../utils/user_id.js';
 import {
   getCachedGoogleAccount,

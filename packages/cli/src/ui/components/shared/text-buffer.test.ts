@@ -6,14 +6,16 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import {
-  useTextBuffer,
+import type {
   Viewport,
   TextBuffer,
-  offsetToLogicalPos,
-  textBufferReducer,
   TextBufferState,
   TextBufferAction,
+} from './text-buffer.js';
+import {
+  useTextBuffer,
+  offsetToLogicalPos,
+  textBufferReducer,
 } from './text-buffer.js';
 
 const initialState: TextBufferState = {

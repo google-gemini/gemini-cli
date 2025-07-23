@@ -7,13 +7,14 @@
 import * as vscode from 'vscode';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import express, { Request, Response } from 'express';
+import type { Request, Response } from 'express';
+import express from 'express';
 import { randomUUID } from 'node:crypto';
 import {
   isInitializeRequest,
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
-import { Server as HTTPServer } from 'node:http';
+import type { Server as HTTPServer } from 'node:http';
 import { RecentFilesManager } from './recent-files-manager.js';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';

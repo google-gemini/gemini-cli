@@ -6,19 +6,16 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { PartListUnion, PartUnion } from '@google/genai';
+import type { PartListUnion, PartUnion } from '@google/genai';
+import type { Config } from '@google/gemini-cli-core';
 import {
-  Config,
   getErrorMessage,
   isNodeError,
   unescapePath,
 } from '@google/gemini-cli-core';
-import {
-  HistoryItem,
-  IndividualToolCallDisplay,
-  ToolCallStatus,
-} from '../types.js';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import type { HistoryItem, IndividualToolCallDisplay } from '../types.js';
+import { ToolCallStatus } from '../types.js';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 interface HandleAtCommandParams {
   query: string;

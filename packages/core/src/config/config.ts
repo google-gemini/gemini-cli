@@ -6,11 +6,11 @@
 
 import * as path from 'node:path';
 import process from 'node:process';
-import {
+import type {
   AuthType,
   ContentGeneratorConfig,
-  createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import { createContentGeneratorConfig } from '../core/contentGenerator.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
@@ -32,11 +32,11 @@ import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 import { getProjectTempDir } from '../utils/paths.js';
+import type { TelemetryTarget } from '../telemetry/index.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
-  TelemetryTarget,
   StartSessionEvent,
 } from '../telemetry/index.js';
 import {
@@ -45,7 +45,7 @@ import {
 } from './models.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
-import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
+import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig };

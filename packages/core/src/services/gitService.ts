@@ -9,7 +9,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { isNodeError } from '../utils/errors.js';
 import { exec } from 'node:child_process';
-import { simpleGit, SimpleGit, CheckRepoActions } from 'simple-git';
+import type { SimpleGit } from 'simple-git';
+import { simpleGit, CheckRepoActions } from 'simple-git';
 import { getProjectHash, GEMINI_DIR } from '../utils/paths.js';
 
 export class GitService {

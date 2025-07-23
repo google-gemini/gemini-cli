@@ -6,21 +6,18 @@
 
 import { spawn } from 'child_process';
 import { TextDecoder } from 'util';
-import {
+import type {
   HistoryItemWithoutId,
   IndividualToolCallDisplay,
-  ToolCallStatus,
 } from '../types.js';
+import { ToolCallStatus } from '../types.js';
 import { useCallback } from 'react';
-import {
-  Config,
-  GeminiClient,
-  getCachedEncodingForBuffer,
-} from '@google/gemini-cli-core';
+import type { Config, GeminiClient } from '@google/gemini-cli-core';
+import { getCachedEncodingForBuffer } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import { isBinary } from '../utils/textUtils.js';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import crypto from 'crypto';
 import path from 'path';

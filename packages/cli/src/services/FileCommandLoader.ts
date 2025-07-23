@@ -9,13 +9,14 @@ import path from 'path';
 import toml from '@iarna/toml';
 import { glob } from 'glob';
 import { z } from 'zod';
+import type { Config } from '@google/gemini-cli-core';
 import {
-  Config,
   getProjectCommandsDir,
   getUserCommandsDir,
 } from '@google/gemini-cli-core';
-import { ICommandLoader } from './types.js';
-import { CommandKind, SlashCommand } from '../ui/commands/types.js';
+import type { ICommandLoader } from './types.js';
+import type { SlashCommand } from '../ui/commands/types.js';
+import { CommandKind } from '../ui/commands/types.js';
 
 /**
  * Defines the Zod schema for a command definition file. This serves as the

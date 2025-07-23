@@ -11,7 +11,7 @@ if (process.env.NO_COLOR !== undefined) {
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { themeManager, DEFAULT_THEME } from './theme-manager.js';
-import { CustomTheme } from './theme.js';
+import type { CustomTheme } from './theme.js';
 
 const validCustomTheme: CustomTheme = {
   type: 'custom',

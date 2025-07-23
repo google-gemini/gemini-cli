@@ -7,28 +7,27 @@
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
-import { loadCliConfig, parseArguments, CliArgs } from './config/config.js';
+import type { CliArgs } from './config/config.js';
+import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
 import v8 from 'node:v8';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
-import {
-  LoadedSettings,
-  loadSettings,
-  SettingScope,
-} from './config/settings.js';
+import type { LoadedSettings } from './config/settings.js';
+import { loadSettings, SettingScope } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { loadExtensions, Extension } from './config/extension.js';
+import type { Extension } from './config/extension.js';
+import { loadExtensions } from './config/extension.js';
 import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
+import type { Config } from '@google/gemini-cli-core';
 import {
   ApprovalMode,
-  Config,
   EditTool,
   ShellTool,
   WriteFileTool,

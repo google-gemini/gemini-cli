@@ -15,7 +15,7 @@ import type {
   RootContent,
 } from 'hast';
 import { themeManager } from '../themes/theme-manager.js';
-import { Theme } from '../themes/theme.js';
+import type { Theme } from '../themes/theme.js';
 import {
   MaxSizedBox,
   MINIMUM_MAX_HEIGHT,

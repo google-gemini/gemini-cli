@@ -5,11 +5,11 @@
  */
 
 import * as fs from 'fs/promises';
-import { Dirent } from 'fs';
+import type { Dirent } from 'fs';
 import * as path from 'path';
 import { getErrorMessage, isNodeError } from './errors.js';
-import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { FileFilteringOptions } from '../config/config.js';
+import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import type { FileFilteringOptions } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
 
 const MAX_ITEMS = 200;

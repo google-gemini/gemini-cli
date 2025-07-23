@@ -10,13 +10,14 @@ import path from 'path';
 import { EOL } from 'os';
 import { spawn } from 'child_process';
 import { globStream } from 'glob';
-import { BaseTool, Icon, ToolResult } from './tools.js';
+import type { ToolResult } from './tools.js';
+import { BaseTool, Icon } from './tools.js';
 import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 
 // --- Interfaces ---
 

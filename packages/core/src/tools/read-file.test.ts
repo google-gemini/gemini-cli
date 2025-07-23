@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
-import { ReadFileTool, ReadFileToolParams } from './read-file.js';
+import type { Mock } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type { ReadFileToolParams } from './read-file.js';
+import { ReadFileTool } from './read-file.js';
 import * as fileUtils from '../utils/fileUtils.js';
 import path from 'path';
 import os from 'os';
 import fs from 'fs'; // For actual fs operations in setup
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 // Mock fileUtils.processSingleFileContent

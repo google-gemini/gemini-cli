@@ -4,21 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  BaseTool,
+import type {
   ToolResult,
   ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
   ToolMcpConfirmationDetails,
-  Icon,
 } from './tools.js';
-import {
+import { BaseTool, ToolConfirmationOutcome, Icon } from './tools.js';
+import type {
   CallableTool,
   Part,
   FunctionCall,
   FunctionDeclaration,
-  Type,
 } from '@google/genai';
+import { Type } from '@google/genai';
 
 type ToolParams = Record<string, unknown>;
 

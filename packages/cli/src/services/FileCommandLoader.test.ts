@@ -5,8 +5,8 @@
  */
 
 import { FileCommandLoader } from './FileCommandLoader.js';
+import type { Config } from '@google/gemini-cli-core';
 import {
-  Config,
   getProjectCommandsDir,
   getUserCommandsDir,
 } from '@google/gemini-cli-core';

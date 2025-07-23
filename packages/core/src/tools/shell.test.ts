@@ -6,9 +6,9 @@
 
 import { expect, describe, it, vi, beforeEach } from 'vitest';
 import { ShellTool } from './shell.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import * as summarizer from '../utils/summarizer.js';
-import { GeminiClient } from '../core/client.js';
+import type { GeminiClient } from '../core/client.js';
 
 describe('ShellTool', () => {
   it('should allow a command if no restrictions are provided', async () => {

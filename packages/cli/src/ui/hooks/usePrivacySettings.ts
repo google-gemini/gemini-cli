@@ -5,7 +5,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Config, CodeAssistServer, UserTierId } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
+import { CodeAssistServer, UserTierId } from '@google/gemini-cli-core';
 
 export interface PrivacyState {
   isLoading: boolean;

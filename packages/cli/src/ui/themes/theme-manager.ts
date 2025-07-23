@@ -15,13 +15,8 @@ import { DefaultLight } from './default-light.js';
 import { DefaultDark } from './default.js';
 import { ShadesOfPurple } from './shades-of-purple.js';
 import { XCode } from './xcode.js';
-import {
-  Theme,
-  ThemeType,
-  CustomTheme,
-  createCustomTheme,
-  validateCustomTheme,
-} from './theme.js';
+import type { Theme, ThemeType, CustomTheme } from './theme.js';
+import { createCustomTheme, validateCustomTheme } from './theme.js';
 import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
 import { NoColorTheme } from './no-color.js';
