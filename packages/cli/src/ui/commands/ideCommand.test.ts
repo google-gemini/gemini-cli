@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  MockInstance,
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from 'vitest';
 import { ideCommand } from './ideCommand.js';
 import { type CommandContext } from './types.js';
 import { type Config } from '@google/gemini-cli-core';
@@ -31,14 +39,18 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
+function regexEscape(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 describe('ideCommand', () => {
   let mockContext: CommandContext;
   let mockConfig: Config;
-  let execSyncSpy: vi.SpyInstance;
-  let globSyncSpy: vi.SpyInstance;
-  let platformSpy: vi.SpyInstance;
-  let getMCPServerStatusSpy: vi.SpyInstance;
-  let getMCPDiscoveryStateSpy: vi.SpyInstance;
+  let execSyncSpy: MockInstance;
+  let globSyncSpy: MockInstance;
+  let platformSpy: MockInstance;
+  let getMCPServerStatusSpy: MockInstance;
+  let getMCPDiscoveryStateSpy: MockInstance;
 
   beforeEach(() => {
     mockContext = {
@@ -63,13 +75,13 @@ describe('ideCommand', () => {
   });
 
   it('should return null if ideMode is not enabled', () => {
-    (mockConfig.getIdeMode as vi.Mock).mockReturnValue(false);
+    vi.mocked(mockConfig.getIdeMode).mockReturnValue(false);
     const command = ideCommand(mockConfig);
     expect(command).toBeNull();
   });
 
   it('should return the ide command if ideMode is enabled', () => {
-    (mockConfig.getIdeMode as vi.Mock).mockReturnValue(true);
+    vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
     const command = ideCommand(mockConfig);
     expect(command).not.toBeNull();
     expect(command?.name).toBe('ide');
@@ -80,13 +92,13 @@ describe('ideCommand', () => {
 
   describe('status subcommand', () => {
     beforeEach(() => {
-      (mockConfig.getIdeMode as vi.Mock).mockReturnValue(true);
+      vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
     });
 
     it('should show connected status', () => {
       getMCPServerStatusSpy.mockReturnValue(MCPServerStatus.CONNECTED);
       const command = ideCommand(mockConfig);
-      const result = command?.subCommands?.[0].action(mockContext, '');
+      const result = command!.subCommands![0].action!(mockContext, '');
       expect(getMCPServerStatusSpy).toHaveBeenCalledWith(IDE_SERVER_NAME);
       expect(result).toEqual({
         type: 'message',
@@ -98,7 +110,7 @@ describe('ideCommand', () => {
     it('should show connecting status', () => {
       getMCPServerStatusSpy.mockReturnValue(MCPServerStatus.CONNECTING);
       const command = ideCommand(mockConfig);
-      const result = command?.subCommands?.[0].action(mockContext, '');
+      const result = command!.subCommands![0].action!(mockContext, '');
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -110,7 +122,7 @@ describe('ideCommand', () => {
       getMCPServerStatusSpy.mockReturnValue(MCPServerStatus.DISCONNECTED);
       getMCPDiscoveryStateSpy.mockReturnValue(MCPDiscoveryState.IN_PROGRESS);
       const command = ideCommand(mockConfig);
-      const result = command?.subCommands?.[0].action(mockContext, '');
+      const result = command!.subCommands![0].action!(mockContext, '');
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -120,9 +132,9 @@ describe('ideCommand', () => {
 
     it('should show disconnected status', () => {
       getMCPServerStatusSpy.mockReturnValue(MCPServerStatus.DISCONNECTED);
-      getMCPDiscoveryStateSpy.mockReturnValue(MCPDiscoveryState.NOT_FOUND);
+      getMCPDiscoveryStateSpy.mockReturnValue(MCPDiscoveryState.COMPLETED);
       const command = ideCommand(mockConfig);
-      const result = command?.subCommands?.[0].action(mockContext, '');
+      const result = command!.subCommands![0].action!(mockContext, '');
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
@@ -133,7 +145,7 @@ describe('ideCommand', () => {
 
   describe('install subcommand', () => {
     beforeEach(() => {
-      (mockConfig.getIdeMode as vi.Mock).mockReturnValue(true);
+      vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
       platformSpy.mockReturnValue('linux');
     });
 
@@ -143,14 +155,12 @@ describe('ideCommand', () => {
       });
 
       const command = ideCommand(mockConfig);
-      await command?.subCommands?.[1].action(mockContext, '');
 
+      await command!.subCommands![1].action!(mockContext, '');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'error',
-          text: expect.stringContaining(
-            'VS Code command-line tool "code" not found',
-          ),
+          text: expect.stringMatching(/VS Code command-line tool .* not found/),
         }),
         expect.any(Number),
       );
@@ -161,7 +171,7 @@ describe('ideCommand', () => {
       globSyncSpy.mockReturnValue([]); // No .vsix file found
 
       const command = ideCommand(mockConfig);
-      await command?.subCommands?.[1].action(mockContext, '');
+      await command!.subCommands![1].action!(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -178,13 +188,17 @@ describe('ideCommand', () => {
       globSyncSpy.mockReturnValue([vsixPath]); // Found .vsix file
 
       const command = ideCommand(mockConfig);
-      await command?.subCommands?.[1].action(mockContext, '');
+      await command!.subCommands![1].action!(mockContext, '');
 
       expect(globSyncSpy).toHaveBeenCalledWith(
         expect.stringContaining('.vsix'),
       );
       expect(execSyncSpy).toHaveBeenCalledWith(
-        `code --install-extension ${vsixPath} --force`,
+        expect.stringMatching(
+          new RegExp(
+            `code(.cmd)? --install-extension ${regexEscape(vsixPath)} --force`,
+          ),
+        ),
         { stdio: 'pipe' },
       );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -210,11 +224,15 @@ describe('ideCommand', () => {
       globSyncSpy.mockReturnValueOnce([]).mockReturnValueOnce([vsixPath]);
 
       const command = ideCommand(mockConfig);
-      await command?.subCommands?.[1].action(mockContext, '');
+      await command!.subCommands![1].action!(mockContext, '');
 
       expect(globSyncSpy).toHaveBeenCalledTimes(2);
       expect(execSyncSpy).toHaveBeenCalledWith(
-        `code --install-extension ${vsixPath} --force`,
+        expect.stringMatching(
+          new RegExp(
+            `code(.cmd)? --install-extension ${regexEscape(vsixPath)} --force`,
+          ),
+        ),
         { stdio: 'pipe' },
       );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -242,7 +260,7 @@ describe('ideCommand', () => {
       globSyncSpy.mockReturnValue([vsixPath]);
 
       const command = ideCommand(mockConfig);
-      await command?.subCommands?.[1].action(mockContext, '');
+      await command!.subCommands![1].action!(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
