@@ -28,7 +28,7 @@ import os from 'os';
 import fs from 'fs';
 import stripAnsi from 'strip-ansi';
 
-const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+const OUTPUT_UPDATE_INTERVAL_MS = 200;
 const MAX_OUTPUT_LENGTH = 10000;
 
 /**
@@ -68,6 +68,7 @@ function executeShellCommand(
       ? ['/c', commandToExecute]
       : ['-c', commandToExecute];
 
+    onDebugMessage(`Executing command: ${commandToExecute}`);
     const child = spawn(shell, shellArgs, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -121,8 +122,7 @@ function executeShellCommand(
 
       if (!exited && streamToUi) {
         // Send only the new chunk to avoid re-rendering the whole output.
-        const combinedOutput = stdout + (stderr ? `\n${stderr}` : '');
-        onOutputChunk(combinedOutput);
+        onOutputChunk(decodedChunk);
       } else if (!exited && !streamToUi) {
         // Send progress updates for the binary stream
         const totalBytes = outputChunks.reduce(
@@ -289,12 +289,12 @@ export const useShellCommandProcessor = (
           (streamedOutput) => {
             // Throttle pending UI updates to avoid excessive re-renders.
             if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-              setPendingHistoryItem({
+              setPendingHistoryItem((item) => ({
                 type: 'tool_group',
                 tools: [
-                  { ...initialToolDisplay, resultDisplay: streamedOutput },
+                  { ...initialToolDisplay, resultDisplay: (item?.tools[0]?.resultDisplay || '') + streamedOutput },
                 ],
-              });
+              }));
               lastUpdateTime = Date.now();
             }
           },

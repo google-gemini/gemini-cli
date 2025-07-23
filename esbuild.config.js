@@ -21,6 +21,8 @@ esbuild
     outfile: 'bundle/gemini.js',
     platform: 'node',
     format: 'esm',
+    
+    
     define: {
       'process.env.CLI_VERSION': JSON.stringify(pkg.version),
     },

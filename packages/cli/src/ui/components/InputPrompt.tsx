@@ -387,6 +387,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             }
           }
           return;
+        } else if (key.shift && key.name === 'down') {
+          // Shift + Down Arrow to accept current suggestion
+          if (completion.suggestions.length > 0) {
+            const targetIndex =
+              completion.activeSuggestionIndex === -1
+                ? 0 // Default to the first if none is active
+                : completion.activeSuggestionIndex;
+            if (targetIndex < completion.suggestions.length) {
+              buffer.setText(completion.suggestions[targetIndex].value);
+              resetCompletionState();
+            }
+          }
+          return;
         }
       }
 
