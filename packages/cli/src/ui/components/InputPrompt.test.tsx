@@ -131,6 +131,11 @@ describe('InputPrompt', () => {
         getProjectRoot: () => '/test/project',
         getTargetDir: () => '/test/project/src',
       } as unknown as Config,
+      settings: {
+        merged: {
+          ctrlBackspaceModeFix: false,
+        },
+      } as LoadedSettings,
       slashCommands: [],
       commandContext: mockCommandContext,
       shellModeActive: false,

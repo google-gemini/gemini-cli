@@ -9,6 +9,7 @@ import { useKeypress, Key } from './useKeypress.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
+import { LoadedSettings } from '../../config/settings.js';
 
 // Mock the 'ink' module to control stdin
 vi.mock('ink', async (importOriginal) => {
@@ -101,7 +102,6 @@ describe('useKeypress', () => {
   const mockSetRawMode = vi.fn();
   const onKeypress = vi.fn();
   let originalNodeVersion: string;
-  let originalGeminiCtrlBackspaceEnv: string | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -112,9 +112,7 @@ describe('useKeypress', () => {
     });
 
     originalNodeVersion = process.versions.node;
-    originalGeminiCtrlBackspaceEnv = process.env.GEMINI_CLI_CTRL_BACKSPACE_MODE;
     delete process.env['PASTE_WORKAROUND'];
-    delete process.env['GEMINI_CLI_CTRL_BACKSPACE_MODE'];
   });
 
   afterEach(() => {
@@ -124,12 +122,6 @@ describe('useKeypress', () => {
     });
 
     vi.restoreAllMocks();
-
-    delete process.env.GEMINI_CLI_CTRL_BACKSPACE_MODE;
-    if (originalGeminiCtrlBackspaceEnv !== undefined) {
-      process.env.GEMINI_CLI_CTRL_BACKSPACE_MODE =
-        originalGeminiCtrlBackspaceEnv;
-    }
   });
 
   const setNodeVersion = (version: string) => {
@@ -143,13 +135,12 @@ describe('useKeypress', () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue(platform);
   };
 
-  const setCtrlBackspaceMode = (value: string | undefined) => {
-    if (value === undefined) {
-      delete process.env.GEMINI_CLI_CTRL_BACKSPACE_MODE;
-    } else {
-      process.env.GEMINI_CLI_CTRL_BACKSPACE_MODE = value;
-    }
-  };
+  const createMockSettings = (ctrlBackspaceModeFix?: boolean): LoadedSettings =>
+    ({
+      merged: {
+        ctrlBackspaceModeFix,
+      },
+    }) as unknown as LoadedSettings;
 
   it('should not listen if isActive is false', () => {
     renderHook(() => useKeypress(onKeypress, { isActive: false }));
@@ -192,14 +183,16 @@ describe('useKeypress', () => {
   });
 
   describe('Ctrl+Backspace Detection', () => {
-    describe('when GEMINI_CLI_CTRL_BACKSPACE_MODE=true', () => {
-      beforeEach(() => {
-        setCtrlBackspaceMode('true');
-      });
-
+    describe('when ctrlBackspaceModeFix setting is true', () => {
       it('should recognize byte sequence \\x08 on linux as ctrl modifier', () => {
         setPlatform('linux');
-        renderHook(() => useKeypress(onKeypress, { isActive: true }));
+        const mockSettings = createMockSettings(true);
+        renderHook(() =>
+          useKeypress(onKeypress, {
+            isActive: true,
+            ctrlBackspaceModeFix: mockSettings.merged.ctrlBackspaceModeFix,
+          }),
+        );
 
         const key = { name: 'backspace', ctrl: false, sequence: '\x08' };
         act(() => stdin.pressKey(key));
@@ -215,7 +208,13 @@ describe('useKeypress', () => {
 
       it('should recognize byte sequence \\x7f on windows as ctrl modifier', () => {
         setPlatform('win32');
-        renderHook(() => useKeypress(onKeypress, { isActive: true }));
+        const mockSettings = createMockSettings(true);
+        renderHook(() =>
+          useKeypress(onKeypress, {
+            isActive: true,
+            ctrlBackspaceModeFix: mockSettings.merged.ctrlBackspaceModeFix,
+          }),
+        );
 
         const key = { name: 'backspace', ctrl: false, sequence: '\x7f' };
         act(() => stdin.pressKey(key));
@@ -231,7 +230,13 @@ describe('useKeypress', () => {
 
       it('should treat \\x08 as regular backspace on Windows', () => {
         setPlatform('win32');
-        renderHook(() => useKeypress(onKeypress, { isActive: true }));
+        const mockSettings = createMockSettings(true);
+        renderHook(() =>
+          useKeypress(onKeypress, {
+            isActive: true,
+            ctrlBackspaceModeFix: mockSettings.merged.ctrlBackspaceModeFix,
+          }),
+        );
 
         const key = { name: 'backspace', ctrl: false, sequence: '\x08' };
         act(() => stdin.pressKey(key));
@@ -247,7 +252,13 @@ describe('useKeypress', () => {
 
       it('should treat \\x7f as regular backspace on Linux', () => {
         setPlatform('linux');
-        renderHook(() => useKeypress(onKeypress, { isActive: true }));
+        const mockSettings = createMockSettings(true);
+        renderHook(() =>
+          useKeypress(onKeypress, {
+            isActive: true,
+            ctrlBackspaceModeFix: mockSettings.merged.ctrlBackspaceModeFix,
+          }),
+        );
 
         const key = { name: 'backspace', ctrl: false, sequence: '\x7f' };
         act(() => stdin.pressKey(key));
@@ -262,14 +273,16 @@ describe('useKeypress', () => {
       });
     });
 
-    describe('when GEMINI_CLI_CTRL_BACKSPACE_MODE=false', () => {
-      beforeEach(() => {
-        setCtrlBackspaceMode('false');
-      });
-
+    describe('when ctrlBackspaceModeFix setting is false', () => {
       it('should treat \\x7f as regular backspace on Windows', () => {
         setPlatform('win32');
-        renderHook(() => useKeypress(onKeypress, { isActive: true }));
+        const mockSettings = createMockSettings(false);
+        renderHook(() =>
+          useKeypress(onKeypress, {
+            isActive: true,
+            ctrlBackspaceModeFix: mockSettings.merged.ctrlBackspaceModeFix,
+          }),
+        );
 
         const key = { name: 'backspace', ctrl: false, sequence: '\x7f' };
         act(() => stdin.pressKey(key));
@@ -285,7 +298,13 @@ describe('useKeypress', () => {
 
       it('should treat \\x08 as regular backspace on Linux', () => {
         setPlatform('linux');
-        renderHook(() => useKeypress(onKeypress, { isActive: true }));
+        const mockSettings = createMockSettings(false);
+        renderHook(() =>
+          useKeypress(onKeypress, {
+            isActive: true,
+            ctrlBackspaceModeFix: mockSettings.merged.ctrlBackspaceModeFix,
+          }),
+        );
 
         const key = { name: 'backspace', ctrl: false, sequence: '\x08' };
         act(() => stdin.pressKey(key));
@@ -300,9 +319,14 @@ describe('useKeypress', () => {
       });
     });
 
-    it('should treat sequences as regular backspace when GEMINI_CLI_CTRL_BACKSPACE_MODE is not set', () => {
-      setCtrlBackspaceMode(undefined);
-      renderHook(() => useKeypress(onKeypress, { isActive: true }));
+    it('should treat sequences as regular backspace when ctrlBackspaceModeFix setting is not set', () => {
+      const mockSettings = createMockSettings(undefined);
+      renderHook(() =>
+        useKeypress(onKeypress, {
+          isActive: true,
+          ctrlBackspaceModeFix: mockSettings.merged.ctrlBackspaceModeFix,
+        }),
+      );
 
       const key1 = { name: 'backspace', ctrl: false, sequence: '\x08' };
       act(() => stdin.pressKey(key1));

@@ -19,6 +19,7 @@ import { useKeypress, Key } from '../hooks/useKeypress.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
+import { LoadedSettings } from '../../config/settings.js';
 import {
   clipboardHasImage,
   saveClipboardImage,
@@ -32,6 +33,7 @@ export interface InputPromptProps {
   userMessages: readonly string[];
   onClearScreen: () => void;
   config: Config;
+  settings: LoadedSettings;
   slashCommands: SlashCommand[];
   commandContext: CommandContext;
   placeholder?: string;
@@ -48,6 +50,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   userMessages,
   onClearScreen,
   config,
+  settings,
   slashCommands,
   commandContext,
   placeholder = '  Type your message or @path/to/file',
@@ -415,7 +418,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
 
-  useKeypress(handleInput, { isActive: focus });
+  useKeypress(handleInput, {
+    isActive: focus,
+    ctrlBackspaceModeFix: settings.merged.ctrlBackspaceModeFix,
+  });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =

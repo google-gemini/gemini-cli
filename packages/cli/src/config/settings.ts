@@ -95,6 +95,8 @@ export interface Settings {
 
   // Add other settings here.
   ideMode?: boolean;
+
+  ctrlBackspaceModeFix?: boolean;
 }
 
 export interface SettingsError {
