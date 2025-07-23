@@ -72,7 +72,7 @@ describe('BuiltinCommandLoader', () => {
 
   it('should correctly pass the config object to command factory functions', async () => {
     const loader = new BuiltinCommandLoader(mockConfig);
-    await loader.loadCommands();
+    await loader.loadCommands(new AbortController().signal);
 
     expect(ideCommandMock).toHaveBeenCalledTimes(1);
     expect(ideCommandMock).toHaveBeenCalledWith(mockConfig);
@@ -84,7 +84,7 @@ describe('BuiltinCommandLoader', () => {
     // Override the mock's behavior for this specific test.
     ideCommandMock.mockReturnValue(null);
     const loader = new BuiltinCommandLoader(mockConfig);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(new AbortController().signal);
 
     // The 'ide' command should be filtered out.
     const ideCmd = commands.find((c) => c.name === 'ide');
@@ -97,7 +97,7 @@ describe('BuiltinCommandLoader', () => {
 
   it('should handle a null config gracefully when calling factories', async () => {
     const loader = new BuiltinCommandLoader(null);
-    await loader.loadCommands();
+    await loader.loadCommands(new AbortController().signal);
     expect(ideCommandMock).toHaveBeenCalledTimes(1);
     expect(ideCommandMock).toHaveBeenCalledWith(null);
     expect(restoreCommandMock).toHaveBeenCalledTimes(1);
@@ -106,7 +106,7 @@ describe('BuiltinCommandLoader', () => {
 
   it('should return a list of all loaded commands', async () => {
     const loader = new BuiltinCommandLoader(mockConfig);
-    const commands = await loader.loadCommands();
+    const commands = await loader.loadCommands(new AbortController().signal);
 
     const aboutCmd = commands.find((c) => c.name === 'about');
     expect(aboutCmd).toBeDefined();

@@ -24,7 +24,7 @@ process_pr() {
         ISSUE_NUMBER=$(echo "$PR_BODY" | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
     fi
 
-    # Pattern 2: Closes/Fixes/Resolves patterns (case insensitive)
+    # Pattern 2: Closes/Fixes/Resolves patterns (case-insensitive)
     if [ -z "$ISSUE_NUMBER" ]; then
         ISSUE_NUMBER=$(echo "$PR_BODY" | grep -iE '(closes?|fixes?|resolves?) #[0-9]+' | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
     fi

@@ -38,6 +38,7 @@ vi.mock('../utils/browser.js', () => ({
 const mockConfig = {
   getNoBrowser: () => false,
   getProxy: () => 'http://test.proxy.com:8080',
+  isBrowserLaunchSuppressed: () => false,
 } as unknown as Config;
 
 // Mock fetch globally
@@ -180,6 +181,7 @@ describe('oauth2', () => {
     const mockConfigWithNoBrowser = {
       getNoBrowser: () => true,
       getProxy: () => 'http://test.proxy.com:8080',
+      isBrowserLaunchSuppressed: () => true,
     } as unknown as Config;
 
     const mockCodeVerifier = {
