@@ -49,7 +49,8 @@
     "clean": "node scripts/clean.js"
   },
   "bin": {
-    "gemini": "bundle/gemini.js"
+    "gemini": "bundle/gemini.js",
+    "gemini-ssh": "bundle/gemini.js"
   },
   "files": [
     "bundle/",
@@ -62,6 +63,7 @@
     "@types/minimatch": "^5.1.2",
     "@types/mock-fs": "^4.13.4",
     "@types/shell-quote": "^1.7.5",
+    "@types/ssh2": "^1.15.0",
     "@vitest/coverage-v8": "^3.1.1",
     "concurrently": "^9.2.0",
     "cross-env": "^7.0.3",

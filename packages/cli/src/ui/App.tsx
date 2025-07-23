@@ -84,6 +84,8 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { PasswordPrompt } from './components/PasswordPrompt.js';
+import { PasswordRequester } from '../gemini.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -92,6 +94,7 @@ interface AppProps {
   settings: LoadedSettings;
   startupWarnings?: string[];
   version: string;
+  passwordRequester: PasswordRequester;
 }
 
 export const AppWrapper = (props: AppProps) => (
@@ -100,7 +103,7 @@ export const AppWrapper = (props: AppProps) => (
   </SessionStatsProvider>
 );
 
-const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
+const App = ({ config, settings, startupWarnings = [], version, passwordRequester }: AppProps) => {
   const isFocused = useFocus();
   useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
@@ -161,6 +164,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     useState<boolean>(false);
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
   const [openFiles, setOpenFiles] = useState<OpenFiles | undefined>();
+  const [passwordRequest, setPasswordRequest] = useState<{ prompt: string; resolve: (password: string | null) => void; } | null>(null);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToOpenFiles(setOpenFiles);
@@ -168,6 +172,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setOpenFiles(ideContext.getOpenFilesContext());
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    passwordRequester.request = (prompt: string) => {
+      return new Promise((resolve) => {
+        setPasswordRequest({ prompt, resolve });
+      });
+    };
+  }, [passwordRequester, setPasswordRequest]);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -843,6 +855,18 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             <PrivacyNotice
               onExit={() => setShowPrivacyNotice(false)}
               config={config}
+            />
+          ) : passwordRequest ? (
+            <PasswordPrompt
+              prompt={passwordRequest.prompt}
+              onSubmit={(password) => {
+                passwordRequest.resolve(password);
+                setPasswordRequest(null);
+              }}
+              onCancel={() => {
+                passwordRequest.resolve(null);
+                setPasswordRequest(null);
+              }}
             />
           ) : (
             <>
