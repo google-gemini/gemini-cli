@@ -4,42 +4,37 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fsPromises from 'fs/promises';
 import * as nodePath from 'path';
 import * as os from 'os';
 import { getFolderStructure } from './getFolderStructure.js';
-import * as gitUtils from './gitUtils.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'path';
-
-vi.mock('./gitUtils.js');
 
 describe('getFolderStructure', () => {
   let testRootDir: string;
 
-  const createEmptyDir = async (...pathSegments: string[]) => {
+  async function createEmptyDir(...pathSegments: string[]) {
     const fullPath = path.join(testRootDir, ...pathSegments);
     await fsPromises.mkdir(fullPath, { recursive: true });
-  };
+  }
 
-  const createTestFile = async (...pathSegments: string[]) => {
+  async function createTestFile(...pathSegments: string[]) {
     const fullPath = path.join(testRootDir, ...pathSegments);
     await fsPromises.mkdir(path.dirname(fullPath), { recursive: true });
     await fsPromises.writeFile(fullPath, '');
     return fullPath;
-  };
+  }
 
   beforeEach(async () => {
     testRootDir = await fsPromises.mkdtemp(
       path.join(os.tmpdir(), 'folder-structure-test-'),
     );
-    vi.resetAllMocks();
   });
 
   afterEach(async () => {
     await fsPromises.rm(testRootDir, { recursive: true, force: true });
-    vi.restoreAllMocks();
   });
 
   it('should return basic folder structure', async () => {
@@ -246,8 +241,10 @@ ${testRootDir}${path.sep}
   });
 
   describe('with gitignore', () => {
-    beforeEach(() => {
-      vi.mocked(gitUtils.isGitRepository).mockReturnValue(true);
+    beforeEach(async () => {
+      await fsPromises.mkdir(path.join(testRootDir, '.git'), {
+        recursive: true,
+      });
     });
 
     it('should ignore files and folders specified in .gitignore', async () => {
