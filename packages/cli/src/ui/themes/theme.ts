@@ -43,10 +43,10 @@ export const lightTheme: ColorsTheme = {
   AccentGreen: '#3CA84B',
   AccentYellow: '#D5A40A',
   AccentRed: '#DD4C4C',
-  DiffAdded: '#dcfce7',
-  DiffRemoved: '#fee2e2',
+  DiffAdded: '#C6EAD8',
+  DiffRemoved: '#FFCCCC',
   Comment: '#008000',
-  Gray: '#B7BECC',
+  Gray: '#97a0b0',
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
