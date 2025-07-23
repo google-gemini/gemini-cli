@@ -17,6 +17,8 @@ const googleCodeColors: ColorsTheme = {
   AccentGreen: '#080',
   AccentYellow: '#660',
   AccentRed: '#800',
+  DiffAdded: '#C6EAD8',
+  DiffRemoved: '#FEDEDE',
   Comment: '#5f6368',
   Gray: lightTheme.Gray,
   GradientColors: ['#066', '#606'],
