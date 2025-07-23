@@ -84,6 +84,62 @@ describe('loadExtensions', () => {
       path.join(workspaceExtensionsDir, 'ext1', 'my-context-file.md'),
     ]);
   });
+
+  it('should ignore .DS_Store and other system files', () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+
+    createExtension(workspaceExtensionsDir, 'valid-ext', '1.0.0');
+
+    fs.writeFileSync(
+      path.join(workspaceExtensionsDir, '.DS_Store'),
+      'system file',
+    );
+    fs.writeFileSync(
+      path.join(workspaceExtensionsDir, 'Thumbs.db'),
+      'system file',
+    );
+    fs.writeFileSync(
+      path.join(workspaceExtensionsDir, 'Desktop.ini'),
+      'system file',
+    );
+    fs.writeFileSync(
+      path.join(workspaceExtensionsDir, '.hidden'),
+      'hidden file',
+    );
+
+    const extensions = loadExtensions(tempWorkspaceDir);
+
+    expect(extensions).toHaveLength(1);
+    expect(extensions[0].config.name).toBe('valid-ext');
+  });
+
+  it('should not log warnings for system files', () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(workspaceExtensionsDir, '.DS_Store'),
+      'system file',
+    );
+    fs.writeFileSync(
+      path.join(workspaceExtensionsDir, 'Thumbs.db'),
+      'system file',
+    );
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    loadExtensions(tempWorkspaceDir);
+
+    expect(consoleSpy).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
 });
 
 describe('annotateActiveExtensions', () => {
