@@ -309,7 +309,7 @@ ${testRootDir}${path.sep}
         fileService,
       });
       expect(structure).not.toContain('ignored.txt');
-      expect(structure).toContain('node_modules/...');
+      expect(structure).toContain(`node_modules${path.sep}...`);
       expect(structure).not.toContain('logs.json');
     });
 
@@ -334,7 +334,7 @@ ${testRootDir}${path.sep}
       });
       expect(structure).toContain('ignored.txt');
       // node_modules is still ignored by default
-      expect(structure).toContain('node_modules/...');
+      expect(structure).toContain(`node_modules${path.sep}...`);
     });
   });
 });
