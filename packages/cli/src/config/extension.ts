@@ -40,7 +40,7 @@ function isSystemFile(filename: string): boolean {
     return true;
   }
 
-  return (SYSTEM_FILES as readonly string[]).includes(filename);
+  return SYSTEM_FILES.has(filename.toLowerCase());
 }
 
 export function loadExtensions(workspaceDir: string): Extension[] {
