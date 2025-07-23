@@ -246,6 +246,36 @@ export class FlashFallbackEvent {
   }
 }
 
+export enum LoopType {
+  CONSECUTIVE_IDENTICAL_TOOL_CALLS = 'consecutive_identical_tool_calls',
+  CHANTING_IDENTICAL_SENTENCES = 'chanting_identical_sentences',
+  LLM_DETECTED_LOOP = 'llm_detected_loop',
+}
+
+export class LoopDetectedEvent {
+  'event.name': 'loop_detected';
+  'event.timestamp': string; // ISO 8601
+  loop_type: LoopType;
+
+  constructor(loop_type: LoopType) {
+    this['event.name'] = 'loop_detected';
+    this['event.timestamp'] = new Date().toISOString();
+    this.loop_type = loop_type;
+  }
+}
+
+export class FlashDecidedToContinueEvent {
+  'event.name': 'flash_decided_to_continue';
+  'event.timestamp': string; // ISO 8601
+  prompt_id: string;
+
+  constructor(prompt_id: string) {
+    this['event.name'] = 'flash_decided_to_continue';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -254,4 +284,6 @@ export type TelemetryEvent =
   | ApiRequestEvent
   | ApiErrorEvent
   | ApiResponseEvent
-  | FlashFallbackEvent;
+  | FlashFallbackEvent
+  | LoopDetectedEvent
+  | FlashDecidedToContinueEvent;

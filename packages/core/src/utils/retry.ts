@@ -196,7 +196,7 @@ export async function retryWithBackoff<T>(
         // Reset currentDelay for next potential non-429 error, or if Retry-After is not present next time
         currentDelay = initialDelayMs;
       } else {
-        // Fallback to exponential backoff with jitter
+        // Fall back to exponential backoff with jitter
         logRetryAttempt(attempt, error, errorStatus);
         // Add jitter: +/- 30% of currentDelay
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
@@ -216,7 +216,7 @@ export async function retryWithBackoff<T>(
  * @param error The error object.
  * @returns The HTTP status code, or undefined if not found.
  */
-function getErrorStatus(error: unknown): number | undefined {
+export function getErrorStatus(error: unknown): number | undefined {
   if (typeof error === 'object' && error !== null) {
     if ('status' in error && typeof error.status === 'number') {
       return error.status;
