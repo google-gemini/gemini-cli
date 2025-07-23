@@ -319,17 +319,34 @@ My code memory
     });
   });
 
-  it('should respect MAX_DIRECTORIES_TO_SCAN_FOR_MEMORY during downward scan', async () => {
-    // the max depth is 200 so it will give up before searching all these.
-    for (let i = 0; i < 250; i++) {
+  it('should respect the maxDirs parameter during downward scan', async () => {
+    const consoleDebugSpy = vi
+      .spyOn(console, 'debug')
+      .mockImplementation(() => {});
+
+    for (let i = 0; i < 100; i++) {
       await createEmptyDir(path.join(cwd, `deep_dir_${i}`));
     }
 
-    // "much_deeper" is alphabetically after "deep_dir_*" so it won't be loaded
-    await createTestFile(
-      path.join(cwd, 'much_deeper', DEFAULT_CONTEXT_FILENAME),
-      'Ignored memory',
+    // Pass the custom limit directly to the function
+    await loadServerHierarchicalMemory(
+      cwd,
+      true,
+      new FileDiscoveryService(projectRoot),
+      [],
+      {
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      },
+      50, // maxDirs
     );
+
+    expect(consoleDebugSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[DEBUG] [BfsFileSearch]'),
+      expect.stringContaining('Scanning [50/50]:'),
+    );
+
+    vi.mocked(console.debug).mockRestore();
 
     const result = await loadServerHierarchicalMemory(
       cwd,
