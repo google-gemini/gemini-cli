@@ -149,19 +149,21 @@ prompt = "Please analyze the staged git changes and provide a code fix for the i
 
 The model will receive the final prompt: `Please analyze the staged git changes and provide a code fix for the issue described here: "Button is misaligned on mobile".`
 
-##### 2. Model-led Interpretation
+##### 2. Default Argument Handling
 
-If your `prompt` does **not** contain `{{args}}`, the CLI assumes the model is smart enough to parse the arguments itself. It will prepend the _entire command the user typed_ to the top of your prompt, separated by a Markdown horizontal rule (`---`), providing the model with the full context to execute.
+If your `prompt` does **not** contain the special placeholder `{{args}}`, the CLI uses a default behavior for handling arguments.
 
-This method is ideal for creating complex, agentic commands where the prompt itself acts as documentation for a "mini-API" that you teach the model to use.
+If you provide arguments to the command (e.g., `/mycommand arg1`), the CLI will append the full command you typed to the end of the prompt, separated by two newlines. This allows the model to see both the original instructions and the specific arguments you just provided.
+
+If you do **not** provide any arguments (e.g., `/mycommand`), the prompt is sent to the model exactly as it is, with nothing appended.
 
 **Example (`changelog.toml`):**
 
-This example shows how to create a robust model-led command by defining a role for the model, explaining where to find the user's input, and specifying the expected format and behavior.
+This example shows how to create a robust command by defining a role for the model, explaining where to find the user's input, and specifying the expected format and behavior.
 
 ```toml
 # In: <project>/.gemini/commands/changelog.toml
-# Invoked via: /changelog 1.2.0 added "Support for model-led argument parsing."
+# Invoked via: /changelog 1.2.0 added "Support for default argument parsing."
 
 description = "Adds a new entry to the project's CHANGELOG.md file."
 prompt = """
@@ -169,7 +171,7 @@ prompt = """
 
 You are an expert maintainer of this software project. A user has invoked a command to add a new entry to the changelog.
 
-**The user's raw command is provided above the `---` separator.**
+**The user's raw command is appended below your instructions.**
 
 Your task is to parse the `<version>`, `<change_type>`, and `<message>` from their input and use the `write_file` tool to correctly update the `CHANGELOG.md` file.
 
@@ -186,7 +188,7 @@ The command follows this format: `/changelog <version> <type> <message>`
 """
 ```
 
-The `---` separator clearly distinguishes the user's raw input from your instructions to the model, allowing you to build powerful, structured commands.
+When you run `/changelog 1.2.0 added "New feature"`, the final text sent to the model will be the original prompt followed by two newlines and the command you typed.
 
 ---
 

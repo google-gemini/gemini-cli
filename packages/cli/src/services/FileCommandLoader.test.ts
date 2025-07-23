@@ -41,7 +41,7 @@ describe('FileCommandLoader', () => {
 
     const result = await command.action?.(mockContext, '');
     if (result?.type === 'submit_prompt') {
-      expect(result.content).toBe('/test\n\n---\n\nThis is a test prompt');
+      expect(result.content).toBe('This is a test prompt');
     } else {
       assert.fail('Incorrect action type');
     }
@@ -124,7 +124,7 @@ describe('FileCommandLoader', () => {
 
     const result = await command.action?.(mockContext, '');
     if (result?.type === 'submit_prompt') {
-      expect(result.content).toBe('/test\n\n---\n\nProject prompt');
+      expect(result.content).toBe('Project prompt');
     } else {
       assert.fail('Incorrect action type');
     }
@@ -256,13 +256,13 @@ describe('FileCommandLoader', () => {
     });
   });
 
-  describe('Model-led Argument Processor Integration', () => {
+  describe('Default Argument Processor Integration', () => {
     it('correctly processes a command without {{args}}', async () => {
       const userCommandsDir = getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'model_led.toml':
-            'prompt = "This is the instruction."\ndescription = "Model-led test"',
+            'prompt = "This is the instruction."\ndescription = "Default processor test"',
         },
       });
 
@@ -278,7 +278,7 @@ describe('FileCommandLoader', () => {
       expect(result?.type).toBe('submit_prompt');
       if (result?.type === 'submit_prompt') {
         const expectedContent =
-          '/model_led 1.2.0 added "a feature"\n\n---\n\nThis is the instruction.';
+          'This is the instruction.\n\n/model_led 1.2.0 added "a feature"';
         expect(result.content).toBe(expectedContent);
       }
     });

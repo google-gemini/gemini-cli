@@ -22,7 +22,7 @@ import {
   SubmitPromptActionReturn,
 } from '../ui/commands/types.js';
 import {
-  ModelLedArgumentProcessor,
+  DefaultArgumentProcessor,
   ShorthandArgumentProcessor,
 } from './prompt-processors/argumentProcessor.js';
 import {
@@ -175,7 +175,7 @@ export class FileCommandLoader implements ICommandLoader {
     if (validDef.prompt.includes(SHORTHAND_ARGS_PLACEHOLDER)) {
       processors.push(new ShorthandArgumentProcessor());
     } else {
-      processors.push(new ModelLedArgumentProcessor());
+      processors.push(new DefaultArgumentProcessor());
     }
 
     return {

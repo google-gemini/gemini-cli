@@ -5,7 +5,7 @@
  */
 
 import {
-  ModelLedArgumentProcessor,
+  DefaultArgumentProcessor,
   ShorthandArgumentProcessor,
 } from './argumentProcessor.js';
 
@@ -43,25 +43,23 @@ describe('Argument Processors', () => {
     });
   });
 
-  describe('ModelLedArgumentProcessor', () => {
-    const processor = new ModelLedArgumentProcessor();
+  describe('DefaultArgumentProcessor', () => {
+    const processor = new DefaultArgumentProcessor();
 
-    it('should prepend the full command and separator', async () => {
+    it('should append the full command if args are provided', async () => {
       const prompt = 'Parse the command.';
       const args = 'arg1 "arg two"';
       const fullCommand = '/mycommand arg1 "arg two"';
       const result = await processor.process(prompt, args, fullCommand);
-      expect(result).toBe(
-        '/mycommand arg1 "arg two"\n\n---\n\nParse the command.',
-      );
+      expect(result).toBe('Parse the command.\n\n/mycommand arg1 "arg two"');
     });
 
-    it('should handle commands with no arguments', async () => {
+    it('should NOT append the full command if no args are provided', async () => {
       const prompt = 'Parse the command.';
       const args = '';
       const fullCommand = '/mycommand';
       const result = await processor.process(prompt, args, fullCommand);
-      expect(result).toBe('/mycommand\n\n---\n\nParse the command.');
+      expect(result).toBe('Parse the command.');
     });
   });
 });

@@ -21,16 +21,18 @@ export class ShorthandArgumentProcessor implements IPromptProcessor {
 }
 
 /**
- * Prepends the user's full command invocation to the prompt, separated by a
- * Markdown horizontal rule. This provides a clean, structured context for
- * the model to perform its own argument parsing based on the user's instructions.
+ * Appends the user's full command invocation to the prompt if arguments are
+ * provided, allowing the model to perform its own argument parsing.
  */
-export class ModelLedArgumentProcessor implements IPromptProcessor {
+export class DefaultArgumentProcessor implements IPromptProcessor {
   async process(
     prompt: string,
-    _args: string,
+    args: string,
     fullCommand: string,
   ): Promise<string> {
-    return `${fullCommand}\n\n---\n\n${prompt}`;
+    if (args) {
+      return `${prompt}\n\n${fullCommand}`;
+    }
+    return prompt;
   }
 }
