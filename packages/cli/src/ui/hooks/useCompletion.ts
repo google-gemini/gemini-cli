@@ -460,7 +460,11 @@ export function useCompletion(
 
       try {
         // If there's no slash, or it's the root, do a recursive search from cwd
-        if (partialPath.indexOf('/') === -1 && enableRecursiveSearch) {
+        if (
+          partialPath.indexOf('/') === -1 &&
+          prefix &&
+          enableRecursiveSearch
+        ) {
           if (fileDiscoveryService) {
             fetchedSuggestions = await findFilesWithGlob(
               prefix,

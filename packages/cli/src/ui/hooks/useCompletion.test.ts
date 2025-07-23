@@ -755,15 +755,6 @@ describe('useCompletion', () => {
     });
 
     it('should show file completions for @ prefix', async () => {
-      // Since recursive search is enabled by default, we need to mock glob instead of fs.readdir
-      vi.mocked(glob).mockResolvedValue([
-        `${testCwd}/file1.txt`,
-        `${testCwd}/file2.js`,
-        `${testCwd}/folder1`,
-      ]);
-
-      mockFileDiscoveryService.shouldIgnoreFile.mockReturnValue(false);
-
       const { result } = renderHook(() =>
         useCompletion(
           createMockBuffer('@'),
@@ -780,7 +771,7 @@ describe('useCompletion', () => {
 
       expect(result.current.suggestions).toHaveLength(3);
       expect(result.current.suggestions.map((s) => s.label)).toEqual(
-        expect.arrayContaining(['file1.txt', 'file2.js', 'folder1']),
+        expect.arrayContaining(['file1.txt', 'file2.js', 'folder1/']),
       );
     });
 
@@ -986,43 +977,6 @@ describe('useCompletion', () => {
   });
 
   describe('File sorting behavior', () => {
-    it('should sort files by depth, then directories, then alphabetically', async () => {
-      vi.mocked(glob).mockResolvedValue([
-        `${testCwd}/b/c/file3.ts`,
-        `${testCwd}/a/file2.ts`,
-        `${testCwd}/a/dir1`,
-        `${testCwd}/file1.ts`,
-        `${testCwd}/a/file1.ts`,
-        `${testCwd}/b/c/file2.ts`,
-      ]);
-
-      mockFileDiscoveryService.shouldIgnoreFile.mockReturnValue(false);
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          createMockBuffer('@'),
-          testCwd,
-          mockSlashCommands,
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      });
-
-      const labels = result.current.suggestions.map((s) => s.label);
-      expect(labels).toEqual([
-        'file1.ts',
-        'a/dir1',
-        'a/file1.ts',
-        'a/file2.ts',
-        'b/c/file2.ts',
-        'b/c/file3.ts',
-      ]);
-    });
-
     it('should prioritize source files over test files with same base name', async () => {
       // Mock glob to return files with same base name but different extensions
       vi.mocked(glob).mockResolvedValue([
@@ -1195,11 +1149,10 @@ describe('useCompletion', () => {
     });
 
     it('should respect file filtering when config is provided', async () => {
-      // Since recursive search is enabled, mock glob instead of fs.readdir
-      vi.mocked(glob).mockResolvedValue([
-        `${testCwd}/file1.txt`,
-        `${testCwd}/ignored.log`,
-      ]);
+      vi.mocked(fs.readdir).mockResolvedValue([
+        { name: 'file1.txt', isDirectory: () => false },
+        { name: 'ignored.log', isDirectory: () => false },
+      ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
       mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
         (path: string) => path.includes('.log'),

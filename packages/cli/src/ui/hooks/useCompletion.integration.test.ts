@@ -258,11 +258,14 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it('should filter git-ignored directories from @ completions', async () => {
-    // Since recursive search is enabled by default, mock glob instead
-    vi.mocked(glob).mockResolvedValue([
-      `${testCwd}/src`,
-      `${testCwd}/README.md`,
-    ]);
+    // Mock fs.readdir to return both regular and git-ignored directories
+    vi.mocked(fs.readdir).mockResolvedValue([
+      { name: 'src', isDirectory: () => true },
+      { name: 'node_modules', isDirectory: () => true },
+      { name: 'dist', isDirectory: () => true },
+      { name: 'README.md', isDirectory: () => false },
+      { name: '.env', isDirectory: () => false },
+    ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
     // Mock ignore service to ignore certain files
     mockFileDiscoveryService.shouldGitIgnoreFile.mockImplementation(
@@ -307,7 +310,7 @@ describe('useCompletion git-aware filtering integration', () => {
     expect(result.current.suggestions).toHaveLength(2);
     expect(result.current.suggestions).toEqual(
       expect.arrayContaining([
-        { label: 'src', value: 'src' },
+        { label: 'src/', value: 'src/' },
         { label: 'README.md', value: 'README.md' },
       ]),
     );
@@ -471,14 +474,10 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it('should handle git discovery service initialization failure gracefully', async () => {
-    // Mock glob to return some results
-    vi.mocked(glob).mockResolvedValue([
-      `${testCwd}/src`,
-      `${testCwd}/README.md`,
-    ]);
-
-    // Mock the file discovery service to not filter anything
-    mockFileDiscoveryService.shouldIgnoreFile.mockReturnValue(false);
+    vi.mocked(fs.readdir).mockResolvedValue([
+      { name: 'src', isDirectory: () => true },
+      { name: 'README.md', isDirectory: () => false },
+    ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
