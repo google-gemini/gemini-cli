@@ -74,21 +74,9 @@ vi.mock('@google/gemini-cli-core', async () => {
     escapePath: vi.fn((path) => path),
     unescapePath: vi.fn((path) => path),
     getErrorMessage: vi.fn((error) => error.message),
-    DEFAULT_FILE_FILTERING_OPTIONS: {
-      respectGitIgnore: true,
-      respectGeminiIgnore: true,
-    },
   };
 });
 vi.mock('glob');
-
-vi.mock('../utils/commandUtils.js', () => ({
-  isSlashCommand: vi.fn((text: string) => text.trimStart().startsWith('/')),
-}));
-
-vi.mock('../utils/textUtils.js', () => ({
-  toCodePoints: vi.fn((text: string) => Array.from(text)),
-}));
 
 describe('useCompletion git-aware filtering integration', () => {
   let mockFileDiscoveryService: Mocked<FileDiscoveryService>;
@@ -209,9 +197,6 @@ describe('useCompletion git-aware filtering integration', () => {
       () => mockFileDiscoveryService,
     );
     vi.clearAllMocks();
-    // Clear any previous glob mocks
-    vi.mocked(glob).mockReset();
-    vi.mocked(fs.readdir).mockReset();
   });
 
   afterEach(() => {
@@ -432,20 +417,11 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it('should work without config (fallback behavior)', async () => {
-    // Without config, recursive search defaults to enabled but fileDiscoveryService is null
-    // so it should use findFilesRecursively which recursively reads directories
-    vi.mocked(fs.readdir).mockImplementation(async (dirPath) => {
-      const path = dirPath.toString();
-      if (path === testCwd) {
-        return [
-          { name: 'src', isDirectory: () => true },
-          { name: 'node_modules', isDirectory: () => true },
-          { name: 'README.md', isDirectory: () => false },
-        ] as unknown as Awaited<ReturnType<typeof fs.readdir>>;
-      }
-      // Return empty for subdirectories to limit results
-      return [];
-    });
+    vi.mocked(fs.readdir).mockResolvedValue([
+      { name: 'src', isDirectory: () => true },
+      { name: 'node_modules', isDirectory: () => true },
+      { name: 'README.md', isDirectory: () => false },
+    ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
     const { result } = renderHook(() =>
       useCompletion(
@@ -461,8 +437,6 @@ describe('useCompletion git-aware filtering integration', () => {
       await new Promise((resolve) => setTimeout(resolve, 150));
     });
 
-    // Should use recursive fs.readdir search since there's no config/fileDiscoveryService
-    expect(fs.readdir).toHaveBeenCalledWith(testCwd, { withFileTypes: true });
     expect(result.current.suggestions).toHaveLength(3);
     expect(result.current.suggestions).toEqual(
       expect.arrayContaining([

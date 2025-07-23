@@ -68,10 +68,6 @@ vi.mock('@google/gemini-cli-core', async () => {
     escapePath: vi.fn((path) => path),
     unescapePath: vi.fn((path) => path),
     getErrorMessage: vi.fn((error) => error.message),
-    DEFAULT_FILE_FILTERING_OPTIONS: {
-      respectGitIgnore: true,
-      respectGeminiIgnore: true,
-    },
   };
 });
 vi.mock('glob');
