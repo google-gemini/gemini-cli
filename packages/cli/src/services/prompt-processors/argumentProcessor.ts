@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { IPromptProcessor } from './types.js';
+import { IPromptProcessor, SHORTHAND_ARGS_PLACEHOLDER } from './types.js';
 
 /**
  * Replaces all instances of `{{args}}` in a prompt with the user-provided
@@ -16,7 +16,7 @@ export class ShorthandArgumentProcessor implements IPromptProcessor {
     args: string,
     _fullCommand: string,
   ): Promise<string> {
-    return prompt.replaceAll('{{args}}', args);
+    return prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, args);
   }
 }
 

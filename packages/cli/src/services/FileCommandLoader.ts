@@ -25,7 +25,10 @@ import {
   ModelLedArgumentProcessor,
   ShorthandArgumentProcessor,
 } from './prompt-processors/argumentProcessor.js';
-import { IPromptProcessor } from './prompt-processors/types.js';
+import {
+  IPromptProcessor,
+  SHORTHAND_ARGS_PLACEHOLDER,
+} from './prompt-processors/types.js';
 
 /**
  * Defines the Zod schema for a command definition file. This serves as the
@@ -169,7 +172,7 @@ export class FileCommandLoader implements ICommandLoader {
     const processors: IPromptProcessor[] = [];
 
     // The presence of '{{args}}' is the switch that determines the behavior.
-    if (validDef.prompt.includes('{{args}}')) {
+    if (validDef.prompt.includes(SHORTHAND_ARGS_PLACEHOLDER)) {
       processors.push(new ShorthandArgumentProcessor());
     } else {
       processors.push(new ModelLedArgumentProcessor());

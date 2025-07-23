@@ -23,3 +23,8 @@ export interface IPromptProcessor {
    */
   process(prompt: string, args: string, fullCommand: string): Promise<string>;
 }
+
+/**
+ * The placeholder string for shorthand argument injection in custom commands.
+ */
+export const SHORTHAND_ARGS_PLACEHOLDER = '{{args}}';
