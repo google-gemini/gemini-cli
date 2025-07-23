@@ -1,7 +1,0 @@
-# By default, require reviews from the release approvers for all files.
-* @google-gemini/gemini-cli-askmode-approvers
-
-# The following files don't need reviews from the release approvers.
-# These patterns override the rule above.
-**/*.md
-/docs/
