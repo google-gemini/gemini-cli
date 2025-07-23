@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import { promises as fsp } from 'fs';
 import * as path from 'path';
 import process from 'node:process';
+import { USER_SETTINGS_DIR } from '../../config/settings.js';
 import {
   HistoryItem,
   MessageType,
@@ -40,11 +41,7 @@ export const useSessionPersistence = ({
     const loadSession = async () => {
       try {
         if (sessionPersistence) {
-          const sessionPath = path.join(
-            process.cwd(),
-            '.gemini',
-            'session.json',
-          );
+          const sessionPath = path.join(USER_SETTINGS_DIR, 'session.json');
           try {
             const sessionData = await fsp.readFile(sessionPath, 'utf-8');
             const parsedHistory = JSON.parse(sessionData);
