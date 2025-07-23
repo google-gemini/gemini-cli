@@ -277,9 +277,9 @@ index 123..789 100644
         terminalWidth: 30,
         height: 6,
         expected: `... first 10 lines hidden ...
-     ;
+   ;
 21 + const anotherNew = 'test'
-     ;
+   ;
 22   console.log('end of
      second hunk');`,
       },
