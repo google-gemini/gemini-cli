@@ -12,14 +12,14 @@ import * as os from 'os';
 export const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 
-const SYSTEM_FILES = [
-  'Thumbs.db', // Windows thumbnail cache
-  'Desktop.ini', // Windows folder config
+const SYSTEM_FILES = new Set([
+  'thumbs.db', // Windows thumbnail cache
+  'desktop.ini', // Windows folder config
   'ehthumbs.db', // Windows XP/Vista thumbnails
   'ehthumbs_vista.db',
-  '$RECYCLE.BIN', // Windows recycle bin
-  'System Volume Information', // Windows system folder
-] as const;
+  '$recycle.bin', // Windows recycle bin
+  'system volume information', // Windows system folder
+]);
 
 export interface Extension {
   config: ExtensionConfig;
