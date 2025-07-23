@@ -116,11 +116,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { history, addItem, clearItems, loadHistory } = useHistory();
   const sessionPersistence = settings.merged['session.persistence'];
   const [sessionLoaded, setSessionLoaded] = useState(false);
+  const onLoadComplete = useCallback(() => setSessionLoaded(true), []);
   useSessionPersistence({
     sessionPersistence,
     history,
     loadHistory,
-    onLoadComplete: () => setSessionLoaded(true),
+    onLoadComplete,
   });
   const {
     consoleMessages,
