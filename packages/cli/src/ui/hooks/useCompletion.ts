@@ -295,6 +295,8 @@ export function useCompletion(
 
     const baseDirAbsolute = path.resolve(cwd, baseDirRelative);
 
+    // Create an AbortController to cancel previous operations
+    const abortController = new AbortController();
     let isMounted = true;
 
     const findFilesRecursively = async (
@@ -305,12 +307,13 @@ export function useCompletion(
         respectGitIgnore?: boolean;
         respectGeminiIgnore?: boolean;
       },
+      signal: AbortSignal,
       currentRelativePath = '',
       depth = 0,
-      maxDepth = 10, // Limit recursion depth
-      maxResults = 50, // Limit number of results
+      maxDepth = 8,
+      maxResults = 30,
     ): Promise<Suggestion[]> => {
-      if (depth > maxDepth) {
+      if (depth > maxDepth || signal.aborted) {
         return [];
       }
 
@@ -318,6 +321,9 @@ export function useCompletion(
       let foundSuggestions: Suggestion[] = [];
       try {
         const entries = await fs.readdir(startDir, { withFileTypes: true });
+        if (signal.aborted) {
+          return [];
+        }
         for (const entry of entries) {
           if (foundSuggestions.length >= maxResults) break;
 
@@ -327,7 +333,6 @@ export function useCompletion(
             path.join(startDir, entry.name),
           );
 
-          // Conditionally ignore dotfiles
           if (!searchPrefix.startsWith('.') && entry.name.startsWith('.')) {
             continue;
           }
@@ -351,7 +356,8 @@ export function useCompletion(
           if (
             entry.isDirectory() &&
             entry.name !== 'node_modules' &&
-            !entry.name.startsWith('.')
+            !entry.name.startsWith('.') &&
+            !signal.aborted
           ) {
             if (foundSuggestions.length < maxResults) {
               foundSuggestions = foundSuggestions.concat(
@@ -360,6 +366,7 @@ export function useCompletion(
                   searchPrefix, // Pass original searchPrefix for recursive calls
                   fileDiscovery,
                   filterOptions,
+                  signal,
                   entryPathRelative,
                   depth + 1,
                   maxDepth,
@@ -382,14 +389,23 @@ export function useCompletion(
         respectGitIgnore?: boolean;
         respectGeminiIgnore?: boolean;
       },
-      maxResults = 50,
+      signal: AbortSignal,
+      maxResults = 30,
     ): Promise<Suggestion[]> => {
+      if (signal.aborted) {
+        return [];
+      }
+
       const globPattern = `**/${searchPrefix}*`;
       const files = await glob(globPattern, {
         cwd,
         dot: searchPrefix.startsWith('.'),
         nocase: true,
       });
+
+      if (signal.aborted) {
+        return [];
+      }
 
       const suggestions: Suggestion[] = files
         .map((file: string) => {
@@ -414,6 +430,11 @@ export function useCompletion(
     };
 
     const fetchSuggestions = async () => {
+      // Check if operation was aborted before starting
+      if (abortController.signal.aborted) {
+        return;
+      }
+
       setIsLoadingSuggestions(true);
       let fetchedSuggestions: Suggestion[] = [];
 
@@ -435,6 +456,7 @@ export function useCompletion(
               prefix,
               fileDiscoveryService,
               filterOptions,
+              abortController.signal,
             );
           } else {
             fetchedSuggestions = await findFilesRecursively(
@@ -442,19 +464,26 @@ export function useCompletion(
               prefix,
               fileDiscoveryService,
               filterOptions,
+              abortController.signal,
             );
           }
         } else {
-          // Original behavior: list files in the specific directory
           const lowerPrefix = prefix.toLowerCase();
+
+          if (abortController.signal.aborted) {
+            return;
+          }
+
           const entries = await fs.readdir(baseDirAbsolute, {
             withFileTypes: true,
           });
 
-          // Filter entries using git-aware filtering
+          if (abortController.signal.aborted) {
+            return;
+          }
+
           const filteredEntries = [];
           for (const entry of entries) {
-            // Conditionally ignore dotfiles
             if (!prefix.startsWith('.') && entry.name.startsWith('.')) {
               continue;
             }
@@ -483,7 +512,10 @@ export function useCompletion(
           });
         }
 
-        // Sort by depth, then directories first, then alphabetically
+        if (abortController.signal.aborted) {
+          return;
+        }
+
         fetchedSuggestions.sort((a, b) => {
           const depthA = (a.label.match(/\//g) || []).length;
           const depthB = (b.label.match(/\//g) || []).length;
@@ -512,13 +544,18 @@ export function useCompletion(
           );
         });
 
-        if (isMounted) {
+        if (isMounted && !abortController.signal.aborted) {
           setSuggestions(fetchedSuggestions);
           setShowSuggestions(fetchedSuggestions.length > 0);
           setActiveSuggestionIndex(fetchedSuggestions.length > 0 ? 0 : -1);
           setVisibleStartIndex(0);
         }
       } catch (error: unknown) {
+        // Don't process errors if operation was aborted
+        if (abortController.signal.aborted) {
+          return;
+        }
+
         if (isNodeError(error) && error.code === 'ENOENT') {
           if (isMounted) {
             setSuggestions([]);
@@ -533,15 +570,16 @@ export function useCompletion(
           }
         }
       }
-      if (isMounted) {
+      if (isMounted && !abortController.signal.aborted) {
         setIsLoadingSuggestions(false);
       }
     };
 
-    const debounceTimeout = setTimeout(fetchSuggestions, 100);
+    const debounceTimeout = setTimeout(fetchSuggestions, 200);
 
     return () => {
       isMounted = false;
+      abortController.abort(); // Cancel any ongoing operations
       clearTimeout(debounceTimeout);
     };
   }, [
