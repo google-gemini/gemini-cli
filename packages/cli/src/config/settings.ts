@@ -100,6 +100,11 @@ export interface Settings {
 
   // Add other settings here.
   ideMode?: boolean;
+
+  api?: {
+    baseUrl?: string;
+    apiKey?: string;
+  };
 }
 
 export interface SettingsError {

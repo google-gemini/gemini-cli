@@ -43,6 +43,7 @@ export enum AuthType {
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
+  OPENAI = 'openai',
 }
 
 export type ContentGeneratorConfig = {
@@ -129,13 +130,15 @@ export async function createContentGenerator(
 
   if (
     config.authType === AuthType.USE_GEMINI ||
-    config.authType === AuthType.USE_VERTEX_AI
+    config.authType === AuthType.USE_VERTEX_AI ||
+    config.authType === AuthType.OPENAI
   ) {
     const googleGenAI = new GoogleGenAI({
-      apiKey: config.apiKey === '' ? undefined : config.apiKey,
+      apiKey: gcConfig.getApiConfig()?.apiKey || (config.apiKey === '' ? undefined : config.apiKey),
       vertexai: config.vertexai,
       httpOptions,
-    });
+      baseURL: gcConfig.getApiConfig()?.baseUrl,
+    } as any);
 
     return googleGenAI.models;
   }

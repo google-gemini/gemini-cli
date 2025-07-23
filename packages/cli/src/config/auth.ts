@@ -5,7 +5,7 @@
  */
 
 import { AuthType } from '@google/gemini-cli-core';
-import { loadEnvironment } from './settings.js';
+import { loadEnvironment, loadSettings } from './settings.js';
 
 export const validateAuthMethod = (authMethod: string): string | null => {
   loadEnvironment();
@@ -13,6 +13,14 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.CLOUD_SHELL
   ) {
+    return null;
+  }
+
+  if (authMethod === AuthType.OPENAI) {
+    const settings = loadSettings(process.cwd());
+    if (!settings.merged.api?.baseUrl || !settings.merged.api?.apiKey) {
+      return 'When using an OpenAI-compatible API, you must specify `api.baseUrl` and `api.apiKey` in your settings file.';
+    }
     return null;
   }
 

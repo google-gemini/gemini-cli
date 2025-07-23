@@ -201,6 +201,10 @@ describe('Gemini Client (client.ts)', () => {
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
       getIdeMode: vi.fn().mockReturnValue(false),
       getGeminiClient: vi.fn(),
+      getApiConfig: vi.fn().mockReturnValue({
+        baseUrl: 'https://example.com',
+        apiKey: 'test-api-key',
+      }),
     };
     const MockedConfig = vi.mocked(Config, true);
     MockedConfig.mockImplementation(

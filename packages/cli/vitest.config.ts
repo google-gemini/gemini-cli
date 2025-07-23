@@ -7,6 +7,8 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vitest/config';
 
+import { resolve } from 'path';
+
 export default defineConfig({
   test: {
     include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)', 'config.test.ts'],
@@ -31,6 +33,11 @@ export default defineConfig({
         'cobertura',
         ['json-summary', { outputFile: 'coverage-summary.json' }],
       ],
+    },
+  },
+  resolve: {
+    alias: {
+      '@google/gemini-cli-core': resolve(__dirname, '../core/src/index.ts'),
     },
   },
 });
