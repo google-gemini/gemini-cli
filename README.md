@@ -20,14 +20,9 @@
 
 ## 📸 效果演示 (Demo)
 
-> [!TIP]
-> 强烈建议在此处插入一个 GIF 或截图，演示从启动、输入连接命令、弹出认证到连接成功的全过程。这能非常直观地展示您项目最大的亮点！
-
-*(示例截图位置)*
 <img width="330" height="169" alt="image" src="https://github.com/user-attachments/assets/f79f2d6b-ca21-48ea-ba8a-bb728d63ac30" />
 
 <img width="878" height="305" alt="image" src="https://github.com/user-attachments/assets/a7a1c788-1cef-4d1a-aefd-466618064207" />
-
 
 
 ## 🔧 开始使用 (Getting Started)
