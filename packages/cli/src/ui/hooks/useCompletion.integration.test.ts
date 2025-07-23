@@ -10,7 +10,11 @@ import { renderHook, act } from '@testing-library/react';
 import { useCompletion } from './useCompletion.js';
 import * as fs from 'fs/promises';
 import { glob } from 'glob';
-import { CommandContext, SlashCommand } from '../commands/types.js';
+import {
+  CommandContext,
+  CommandKind,
+  SlashCommand,
+} from '../commands/types.js';
 import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
 
 interface MockConfig {
@@ -43,8 +47,18 @@ describe('useCompletion git-aware filtering integration', () => {
 
   const testCwd = '/test/project';
   const slashCommands = [
-    { name: 'help', description: 'Show help', action: vi.fn() },
-    { name: 'clear', description: 'Clear screen', action: vi.fn() },
+    {
+      name: 'help',
+      description: 'Show help',
+      kind: CommandKind.BUILT_IN,
+      action: vi.fn(),
+    },
+    {
+      name: 'clear',
+      description: 'Clear screen',
+      kind: CommandKind.BUILT_IN,
+      action: vi.fn(),
+    },
   ];
 
   // A minimal mock is sufficient for these tests.
@@ -53,34 +67,40 @@ describe('useCompletion git-aware filtering integration', () => {
   const mockSlashCommands: SlashCommand[] = [
     {
       name: 'help',
-      altName: '?',
+      altNames: ['?'],
       description: 'Show help',
       action: vi.fn(),
+      kind: CommandKind.BUILT_IN,
     },
     {
       name: 'stats',
-      altName: 'usage',
+      altNames: ['usage'],
       description: 'check session stats. Usage: /stats [model|tools]',
       action: vi.fn(),
+      kind: CommandKind.BUILT_IN,
     },
     {
       name: 'clear',
       description: 'Clear the screen',
       action: vi.fn(),
+      kind: CommandKind.BUILT_IN,
     },
     {
       name: 'memory',
       description: 'Manage memory',
+      kind: CommandKind.BUILT_IN,
       // This command is a parent, no action.
       subCommands: [
         {
           name: 'show',
           description: 'Show memory',
+          kind: CommandKind.BUILT_IN,
           action: vi.fn(),
         },
         {
           name: 'add',
           description: 'Add to memory',
+          kind: CommandKind.BUILT_IN,
           action: vi.fn(),
         },
       ],
@@ -88,15 +108,18 @@ describe('useCompletion git-aware filtering integration', () => {
     {
       name: 'chat',
       description: 'Manage chat history',
+      kind: CommandKind.BUILT_IN,
       subCommands: [
         {
           name: 'save',
           description: 'Save chat',
+          kind: CommandKind.BUILT_IN,
           action: vi.fn(),
         },
         {
           name: 'resume',
           description: 'Resume a saved chat',
+          kind: CommandKind.BUILT_IN,
           action: vi.fn(),
           // This command provides its own argument completions
           completion: vi
@@ -553,7 +576,7 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it.each([['/?'], ['/usage']])(
-    'should not suggest commands when altName is fully typed',
+    'should not suggest commands when altNames is fully typed',
     async (altName) => {
       const { result } = renderHook(() =>
         useCompletion(
@@ -569,7 +592,7 @@ describe('useCompletion git-aware filtering integration', () => {
     },
   );
 
-  it('should suggest commands based on partial altName matches', async () => {
+  it('should suggest commands based on partial altNames matches', async () => {
     const { result } = renderHook(() =>
       useCompletion(
         '/usag', // part of the word "usage"

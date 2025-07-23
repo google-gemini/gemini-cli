@@ -42,7 +42,7 @@ describe('fileUtils', () => {
   let testImageFilePath: string;
   let testPdfFilePath: string;
   let testBinaryFilePath: string;
-  let nonExistentFilePath: string;
+  let nonexistentFilePath: string;
   let directoryPath: string;
 
   beforeEach(() => {
@@ -57,7 +57,7 @@ describe('fileUtils', () => {
     testImageFilePath = path.join(tempRootDir, 'image.png');
     testPdfFilePath = path.join(tempRootDir, 'document.pdf');
     testBinaryFilePath = path.join(tempRootDir, 'app.exe');
-    nonExistentFilePath = path.join(tempRootDir, 'notfound.txt');
+    nonexistentFilePath = path.join(tempRootDir, 'nonexistent.txt');
     directoryPath = path.join(tempRootDir, 'subdir');
 
     actualNodeFs.mkdirSync(directoryPath, { recursive: true }); // Ensure subdir exists
@@ -142,41 +142,41 @@ describe('fileUtils', () => {
       }
     });
 
-    it('should return false for an empty file', () => {
+    it('should return false for an empty file', async () => {
       actualNodeFs.writeFileSync(filePathForBinaryTest, '');
-      expect(isBinaryFile(filePathForBinaryTest)).toBe(false);
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(false);
     });
 
-    it('should return false for a typical text file', () => {
+    it('should return false for a typical text file', async () => {
       actualNodeFs.writeFileSync(
         filePathForBinaryTest,
         'Hello, world!\nThis is a test file with normal text content.',
       );
-      expect(isBinaryFile(filePathForBinaryTest)).toBe(false);
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(false);
     });
 
-    it('should return true for a file with many null bytes', () => {
+    it('should return true for a file with many null bytes', async () => {
       const binaryContent = Buffer.from([
         0x48, 0x65, 0x00, 0x6c, 0x6f, 0x00, 0x00, 0x00, 0x00, 0x00,
       ]); // "He\0llo\0\0\0\0\0"
       actualNodeFs.writeFileSync(filePathForBinaryTest, binaryContent);
-      expect(isBinaryFile(filePathForBinaryTest)).toBe(true);
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(true);
     });
 
-    it('should return true for a file with high percentage of non-printable ASCII', () => {
+    it('should return true for a file with high percentage of non-printable ASCII', async () => {
       const binaryContent = Buffer.from([
         0x41, 0x42, 0x01, 0x02, 0x03, 0x04, 0x05, 0x43, 0x44, 0x06,
       ]); // AB\x01\x02\x03\x04\x05CD\x06
       actualNodeFs.writeFileSync(filePathForBinaryTest, binaryContent);
-      expect(isBinaryFile(filePathForBinaryTest)).toBe(true);
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(true);
     });
 
-    it('should return false if file access fails (e.g., ENOENT)', () => {
+    it('should return false if file access fails (e.g., ENOENT)', async () => {
       // Ensure the file does not exist
       if (actualNodeFs.existsSync(filePathForBinaryTest)) {
         actualNodeFs.unlinkSync(filePathForBinaryTest);
       }
-      expect(isBinaryFile(filePathForBinaryTest)).toBe(false);
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(false);
     });
   });
 
@@ -196,64 +196,64 @@ describe('fileUtils', () => {
       vi.restoreAllMocks(); // Restore spies on actualNodeFs
     });
 
-    it('should detect typescript type by extension (ts)', () => {
-      expect(detectFileType('file.ts')).toBe('text');
-      expect(detectFileType('file.test.ts')).toBe('text');
+    it('should detect typescript type by extension (ts)', async () => {
+      expect(await detectFileType('file.ts')).toBe('text');
+      expect(await detectFileType('file.test.ts')).toBe('text');
     });
 
-    it('should detect image type by extension (png)', () => {
+    it('should detect image type by extension (png)', async () => {
       mockMimeLookup.mockReturnValueOnce('image/png');
-      expect(detectFileType('file.png')).toBe('image');
+      expect(await detectFileType('file.png')).toBe('image');
     });
 
-    it('should detect image type by extension (jpeg)', () => {
+    it('should detect image type by extension (jpeg)', async () => {
       mockMimeLookup.mockReturnValueOnce('image/jpeg');
-      expect(detectFileType('file.jpg')).toBe('image');
+      expect(await detectFileType('file.jpg')).toBe('image');
     });
 
-    it('should detect svg type by extension', () => {
-      expect(detectFileType('image.svg')).toBe('svg');
-      expect(detectFileType('image.icon.svg')).toBe('svg');
+    it('should detect svg type by extension', async () => {
+      expect(await detectFileType('image.svg')).toBe('svg');
+      expect(await detectFileType('image.icon.svg')).toBe('svg');
     });
 
-    it('should detect pdf type by extension', () => {
+    it('should detect pdf type by extension', async () => {
       mockMimeLookup.mockReturnValueOnce('application/pdf');
-      expect(detectFileType('file.pdf')).toBe('pdf');
+      expect(await detectFileType('file.pdf')).toBe('pdf');
     });
 
-    it('should detect audio type by extension', () => {
+    it('should detect audio type by extension', async () => {
       mockMimeLookup.mockReturnValueOnce('audio/mpeg');
-      expect(detectFileType('song.mp3')).toBe('audio');
+      expect(await detectFileType('song.mp3')).toBe('audio');
     });
 
-    it('should detect video type by extension', () => {
+    it('should detect video type by extension', async () => {
       mockMimeLookup.mockReturnValueOnce('video/mp4');
-      expect(detectFileType('movie.mp4')).toBe('video');
+      expect(await detectFileType('movie.mp4')).toBe('video');
     });
 
-    it('should detect known binary extensions as binary (e.g. .zip)', () => {
+    it('should detect known binary extensions as binary (e.g. .zip)', async () => {
       mockMimeLookup.mockReturnValueOnce('application/zip');
-      expect(detectFileType('archive.zip')).toBe('binary');
+      expect(await detectFileType('archive.zip')).toBe('binary');
     });
-    it('should detect known binary extensions as binary (e.g. .exe)', () => {
+    it('should detect known binary extensions as binary (e.g. .exe)', async () => {
       mockMimeLookup.mockReturnValueOnce('application/octet-stream'); // Common for .exe
-      expect(detectFileType('app.exe')).toBe('binary');
+      expect(await detectFileType('app.exe')).toBe('binary');
     });
 
-    it('should use isBinaryFile for unknown extensions and detect as binary', () => {
+    it('should use isBinaryFile for unknown extensions and detect as binary', async () => {
       mockMimeLookup.mockReturnValueOnce(false); // Unknown mime type
       // Create a file that isBinaryFile will identify as binary
       const binaryContent = Buffer.from([
         0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
       ]);
       actualNodeFs.writeFileSync(filePathForDetectTest, binaryContent);
-      expect(detectFileType(filePathForDetectTest)).toBe('binary');
+      expect(await detectFileType(filePathForDetectTest)).toBe('binary');
     });
 
-    it('should default to text if mime type is unknown and content is not binary', () => {
+    it('should default to text if mime type is unknown and content is not binary', async () => {
       mockMimeLookup.mockReturnValueOnce(false); // Unknown mime type
       // filePathForDetectTest is already a text file by default from beforeEach
-      expect(detectFileType(filePathForDetectTest)).toBe('text');
+      expect(await detectFileType(filePathForDetectTest)).toBe('text');
     });
   });
 
@@ -284,7 +284,7 @@ describe('fileUtils', () => {
 
     it('should handle file not found', async () => {
       const result = await processSingleFileContent(
-        nonExistentFilePath,
+        nonexistentFilePath,
         tempRootDir,
       );
       expect(result.error).toContain('File not found');

@@ -17,7 +17,6 @@ import { start_sandbox } from './utils/sandbox.js';
 import {
   LoadedSettings,
   loadSettings,
-  USER_SETTINGS_PATH,
   SettingScope,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
@@ -37,10 +36,10 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
-  shouldAttemptBrowserLaunch,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -188,7 +187,7 @@ export async function main() {
 
   if (
     settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
-    (config.getNoBrowser() || !shouldAttemptBrowserLaunch())
+    config.isBrowserLaunchSuppressed()
   ) {
     // Do oauth before app renders to make copying the link possible.
     await getOauthClient(settings.merged.selectedAuthType, config);
@@ -321,33 +320,8 @@ async function loadNonInteractiveConfig(
     await finalConfig.initialize();
   }
 
-  return await validateNonInterActiveAuth(
+  return await validateNonInteractiveAuth(
     settings.merged.selectedAuthType,
     finalConfig,
   );
-}
-
-async function validateNonInterActiveAuth(
-  selectedAuthType: AuthType | undefined,
-  nonInteractiveConfig: Config,
-) {
-  // making a special case for the cli. many headless environments might not have a settings.json set
-  // so if GEMINI_API_KEY is set, we'll use that. However since the oauth things are interactive anyway, we'll
-  // still expect that exists
-  if (!selectedAuthType && !process.env.GEMINI_API_KEY) {
-    console.error(
-      `Please set an Auth method in your ${USER_SETTINGS_PATH} OR specify GEMINI_API_KEY env variable file before running`,
-    );
-    process.exit(1);
-  }
-
-  selectedAuthType = selectedAuthType || AuthType.USE_GEMINI;
-  const err = validateAuthMethod(selectedAuthType);
-  if (err != null) {
-    console.error(err);
-    process.exit(1);
-  }
-
-  await nonInteractiveConfig.refreshAuth(selectedAuthType);
-  return nonInteractiveConfig;
 }
