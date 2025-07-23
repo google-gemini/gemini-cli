@@ -43,6 +43,8 @@ import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ideContext } from '../services/ideContext.js';
+import { logFlashDecidedToContinue } from '../telemetry/loggers.js';
+import { FlashDecidedToContinueEvent } from '../telemetry/types.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -386,6 +388,10 @@ export class GeminiClient {
         signal,
       );
       if (nextSpeakerCheck?.next_speaker === 'model') {
+        logFlashDecidedToContinue(
+          this.config,
+          new FlashDecidedToContinueEvent(prompt_id),
+        );
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
