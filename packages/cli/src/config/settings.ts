@@ -102,6 +102,8 @@ export interface Settings {
   // Add other settings here.
   ideMode?: boolean;
   memoryDiscoveryMaxDirs?: number;
+
+  ctrlBackspaceModeFix?: boolean;
 }
 
 export interface SettingsError {

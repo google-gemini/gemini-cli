@@ -174,6 +174,11 @@ describe('InputPrompt', () => {
         getVimMode: () => false,
       } as unknown as Config,
       slashCommands: mockSlashCommands,
+      settings: {
+        merged: {
+          ctrlBackspaceModeFix: false,
+        },
+      } as LoadedSettings,
       commandContext: mockCommandContext,
       shellModeActive: false,
       setShellModeActive: vi.fn(),

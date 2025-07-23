@@ -339,12 +339,6 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 - **`CODE_ASSIST_ENDPOINT`**:
   - Specifies the endpoint for the code assist server.
   - This is useful for development and testing.
-- **`GEMINI_CLI_CTRL_BACKSPACE_MODE`**:
-  - Enables Ctrl+Backspace word deletion in text input fields.
-  - When set to `true`, pressing Ctrl+Backspace will delete the word to the left of the cursor.
-  - Platform-specific behavior: On Linux, detects `\x08` sequence as Ctrl+Backspace. On Windows, detects `\x7f` sequence as Ctrl+Backspace.
-  - **Default:** Not set (word deletion disabled)
-  - **Example:** `export GEMINI_CLI_CTRL_BACKSPACE_MODE="true"`
 
 ## Command-Line Arguments
 
