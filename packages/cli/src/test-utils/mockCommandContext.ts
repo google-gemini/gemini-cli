@@ -28,6 +28,11 @@ export const createMockCommandContext = (
   overrides: DeepPartial<CommandContext> = {},
 ): CommandContext => {
   const defaultMocks: CommandContext = {
+    invocation: {
+      raw: '',
+      name: '',
+      args: '',
+    },
     services: {
       config: null,
       settings: { merged: {} } as LoadedSettings,
