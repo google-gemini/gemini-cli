@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { glob } from 'glob';
@@ -22,6 +22,9 @@ import {
   Suggestion,
 } from '../components/SuggestionsDisplay.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
+import { TextBuffer } from '../components/shared/text-buffer.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
+import { toCodePoints } from '../utils/textUtils.js';
 
 export interface UseCompletionReturn {
   suggestions: Suggestion[];
@@ -38,9 +41,8 @@ export interface UseCompletionReturn {
 }
 
 export function useCompletion(
-  query: string,
+  buffer: TextBuffer,
   cwd: string,
-  isActive: boolean,
   slashCommands: readonly SlashCommand[],
   commandContext: CommandContext,
   config?: Config,
@@ -122,13 +124,45 @@ export function useCompletion(
     });
   }, [suggestions.length]);
 
+  // Check if cursor is after @ or / without unescaped spaces
+  const isActive = useMemo(() => {
+    if (isSlashCommand(buffer.text.trim())) {
+      return true;
+    }
+
+    // For other completions like '@', we search backwards from the cursor.
+    const [row, col] = buffer.cursor;
+    const currentLine = buffer.lines[row] || '';
+    const codePoints = toCodePoints(currentLine);
+
+    for (let i = col - 1; i >= 0; i--) {
+      const char = codePoints[i];
+
+      if (char === ' ') {
+        // Check for unescaped spaces.
+        let backslashCount = 0;
+        for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+          backslashCount++;
+        }
+        if (backslashCount % 2 === 0) {
+          return false; // Inactive on unescaped space.
+        }
+      } else if (char === '@') {
+        // Active if we find an '@' before any unescaped space.
+        return true;
+      }
+    }
+
+    return false;
+  }, [buffer.text, buffer.cursor, buffer.lines]);
+
   useEffect(() => {
     if (!isActive) {
       resetCompletionState();
       return;
     }
 
-    const trimmedQuery = query.trimStart();
+    const trimmedQuery = buffer.text.trimStart();
 
     if (trimmedQuery.startsWith('/')) {
       // Always reset perfect match at the beginning of processing.
@@ -275,13 +309,13 @@ export function useCompletion(
     }
 
     // Handle At Command Completion
-    const atIndex = query.lastIndexOf('@');
+    const atIndex = buffer.text.lastIndexOf('@');
     if (atIndex === -1) {
       resetCompletionState();
       return;
     }
 
-    const partialPath = query.substring(atIndex + 1);
+    const partialPath = buffer.text.substring(atIndex + 1);
     const lastSlashIndex = partialPath.lastIndexOf('/');
     const baseDirRelative =
       lastSlashIndex === -1
@@ -425,11 +459,7 @@ export function useCompletion(
 
       try {
         // If there's no slash, or it's the root, do a recursive search from cwd
-        if (
-          partialPath.indexOf('/') === -1 &&
-          prefix &&
-          enableRecursiveSearch
-        ) {
+        if (partialPath.indexOf('/') === -1 && enableRecursiveSearch) {
           if (fileDiscoveryService) {
             fetchedSuggestions = await findFilesWithGlob(
               prefix,
@@ -545,7 +575,7 @@ export function useCompletion(
       clearTimeout(debounceTimeout);
     };
   }, [
-    query,
+    buffer.text,
     cwd,
     isActive,
     resetCompletionState,

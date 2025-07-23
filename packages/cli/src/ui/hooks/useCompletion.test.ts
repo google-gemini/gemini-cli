@@ -18,6 +18,43 @@ import {
   SlashCommand,
 } from '../commands/types.js';
 import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
+import { TextBuffer } from '../components/shared/text-buffer.js';
+
+// Helper to create mock TextBuffer objects.
+const createMockBuffer = (text: string): TextBuffer => {
+  const lines = text.split('\n');
+  const lastLine = lines[lines.length - 1];
+  return {
+    text,
+    lines,
+    cursor: [lines.length - 1, lastLine.length],
+    // Add other required TextBuffer properties as minimal mocks
+    preferredCol: null,
+    selectionAnchor: null,
+    allVisualLines: lines,
+    viewportVisualLines: lines,
+    visualCursor: [lines.length - 1, lastLine.length],
+    visualScrollRow: 0,
+    // Mock methods
+    setText: vi.fn(),
+    insert: vi.fn(),
+    newline: vi.fn(),
+    backspace: vi.fn(),
+    del: vi.fn(),
+    move: vi.fn(),
+    undo: vi.fn(),
+    redo: vi.fn(),
+    replaceRange: vi.fn(),
+    replaceRangeByOffset: vi.fn(),
+    moveToOffset: vi.fn(),
+    deleteWordLeft: vi.fn(),
+    deleteWordRight: vi.fn(),
+    killLineRight: vi.fn(),
+    killLineLeft: vi.fn(),
+    handleInput: vi.fn(),
+    openInExternalEditor: vi.fn(),
+  };
+};
 
 // Mock dependencies
 vi.mock('fs/promises');
@@ -31,6 +68,10 @@ vi.mock('@google/gemini-cli-core', async () => {
     escapePath: vi.fn((path) => path),
     unescapePath: vi.fn((path) => path),
     getErrorMessage: vi.fn((error) => error.message),
+    DEFAULT_FILE_FILTERING_OPTIONS: {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    },
   };
 });
 vi.mock('glob');
@@ -142,9 +183,8 @@ describe('useCompletion', () => {
     it('should initialize with default state', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '',
+          createMockBuffer(''),
           testCwd,
-          false,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -158,21 +198,21 @@ describe('useCompletion', () => {
       expect(result.current.isLoadingSuggestions).toBe(false);
     });
 
-    it('should reset state when isActive becomes false', () => {
+    it('should reset state when query becomes inactive', () => {
       const { result, rerender } = renderHook(
-        ({ isActive }) =>
+        ({ buffer }) =>
           useCompletion(
-            '/help',
+            buffer,
             testCwd,
-            isActive,
             mockSlashCommands,
             mockCommandContext,
             mockConfig,
           ),
-        { initialProps: { isActive: true } },
+        { initialProps: { buffer: createMockBuffer('/help') } },
       );
 
-      rerender({ isActive: false });
+      // Inactive because of the leading space
+      rerender({ buffer: createMockBuffer(' /help') });
 
       expect(result.current.suggestions).toEqual([]);
       expect(result.current.activeSuggestionIndex).toBe(-1);
@@ -184,9 +224,8 @@ describe('useCompletion', () => {
     it('should provide required functions', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '',
+          createMockBuffer(''),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -205,9 +244,8 @@ describe('useCompletion', () => {
     it('should reset all state to default values', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/help',
+          createMockBuffer('/help'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -235,9 +273,8 @@ describe('useCompletion', () => {
     it('should handle navigateUp with no suggestions', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '',
+          createMockBuffer(''),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -254,9 +291,8 @@ describe('useCompletion', () => {
     it('should handle navigateDown with no suggestions', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '',
+          createMockBuffer(''),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -273,9 +309,8 @@ describe('useCompletion', () => {
     it('should navigate up through suggestions with wrap-around', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/h',
+          createMockBuffer('/h'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -295,9 +330,8 @@ describe('useCompletion', () => {
     it('should navigate down through suggestions with wrap-around', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/h',
+          createMockBuffer('/h'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -317,9 +351,8 @@ describe('useCompletion', () => {
     it('should handle navigation with multiple suggestions', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/',
+          createMockBuffer('/'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -365,9 +398,8 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() =>
         useCompletion(
-          '/command',
+          createMockBuffer('/command'),
           testCwd,
-          true,
           largeMockCommands,
           mockCommandContext,
           mockConfig,
@@ -391,9 +423,8 @@ describe('useCompletion', () => {
     it('should show all commands for root slash', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/',
+          createMockBuffer('/'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -411,9 +442,8 @@ describe('useCompletion', () => {
     it('should filter commands by prefix', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/h',
+          createMockBuffer('/h'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -430,9 +460,8 @@ describe('useCompletion', () => {
       (altName) => {
         const { result } = renderHook(() =>
           useCompletion(
-            altName,
+            createMockBuffer(altName),
             testCwd,
-            true,
             mockSlashCommands,
             mockCommandContext,
             mockConfig,
@@ -446,9 +475,8 @@ describe('useCompletion', () => {
     it('should suggest commands based on partial altNames matches', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/usag', // part of the word "usage"
+          createMockBuffer('/usag'), // part of the word "usage"
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -462,9 +490,8 @@ describe('useCompletion', () => {
     it('should not show suggestions for exact leaf command match', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/clear',
+          createMockBuffer('/clear'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -478,9 +505,8 @@ describe('useCompletion', () => {
     it('should show sub-commands for parent commands', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/memory',
+          createMockBuffer('/memory'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -496,9 +522,8 @@ describe('useCompletion', () => {
     it('should show all sub-commands after parent command with space', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/memory ',
+          createMockBuffer('/memory '),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -514,9 +539,8 @@ describe('useCompletion', () => {
     it('should filter sub-commands by prefix', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/memory a',
+          createMockBuffer('/memory a'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -530,9 +554,8 @@ describe('useCompletion', () => {
     it('should handle unknown command gracefully', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/unknown',
+          createMockBuffer('/unknown'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -560,9 +583,8 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() =>
         useCompletion(
-          '/chat resume ',
+          createMockBuffer('/chat resume '),
           testCwd,
-          true,
           commandsWithCompletion,
           mockCommandContext,
           mockConfig,
@@ -596,9 +618,8 @@ describe('useCompletion', () => {
 
       renderHook(() =>
         useCompletion(
-          '/chat resume ar',
+          createMockBuffer('/chat resume ar'),
           testCwd,
-          true,
           commandsWithCompletion,
           mockCommandContext,
           mockConfig,
@@ -627,9 +648,8 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() =>
         useCompletion(
-          '/chat resume ',
+          createMockBuffer('/chat resume '),
           testCwd,
-          true,
           commandsWithCompletion,
           mockCommandContext,
           mockConfig,
@@ -675,9 +695,8 @@ describe('useCompletion', () => {
     it('should suggest a namespaced command based on a partial match', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/git:co',
+          createMockBuffer('/git:co'),
           testCwd,
-          true,
           commandsWithNamespaces,
           mockCommandContext,
           mockConfig,
@@ -691,9 +710,8 @@ describe('useCompletion', () => {
     it('should suggest all commands within a namespace when the namespace prefix is typed', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/git:',
+          createMockBuffer('/git:'),
           testCwd,
-          true,
           commandsWithNamespaces,
           mockCommandContext,
           mockConfig,
@@ -713,9 +731,8 @@ describe('useCompletion', () => {
     it('should not provide suggestions if the namespaced command is a perfect leaf match', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '/git:commit',
+          createMockBuffer('/git:commit'),
           testCwd,
-          true,
           commandsWithNamespaces,
           mockCommandContext,
           mockConfig,
@@ -738,11 +755,19 @@ describe('useCompletion', () => {
     });
 
     it('should show file completions for @ prefix', async () => {
+      // Since recursive search is enabled by default, we need to mock glob instead of fs.readdir
+      vi.mocked(glob).mockResolvedValue([
+        `${testCwd}/file1.txt`,
+        `${testCwd}/file2.js`,
+        `${testCwd}/folder1`,
+      ]);
+
+      mockFileDiscoveryService.shouldIgnoreFile.mockReturnValue(false);
+
       const { result } = renderHook(() =>
         useCompletion(
-          '@',
+          createMockBuffer('@'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -755,7 +780,7 @@ describe('useCompletion', () => {
 
       expect(result.current.suggestions).toHaveLength(3);
       expect(result.current.suggestions.map((s) => s.label)).toEqual(
-        expect.arrayContaining(['file1.txt', 'file2.js', 'folder1/']),
+        expect.arrayContaining(['file1.txt', 'file2.js', 'folder1']),
       );
     });
 
@@ -768,9 +793,8 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() =>
         useCompletion(
-          '@file',
+          createMockBuffer('@file'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -793,9 +817,8 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() =>
         useCompletion(
-          '@.',
+          createMockBuffer('@.'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -817,9 +840,8 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() =>
         useCompletion(
-          '@nonexistent',
+          createMockBuffer('@nonexistent'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -842,9 +864,8 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() =>
         useCompletion(
-          '@',
+          createMockBuffer('@'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -870,21 +891,20 @@ describe('useCompletion', () => {
       vi.mocked(glob).mockResolvedValue([`${testCwd}/file1.txt`]);
 
       const { rerender } = renderHook(
-        ({ query }) =>
+        ({ buffer }) =>
           useCompletion(
-            query,
+            buffer,
             testCwd,
-            true,
             mockSlashCommands,
             mockCommandContext,
             mockConfig,
           ),
-        { initialProps: { query: '@f' } },
+        { initialProps: { buffer: createMockBuffer('@f') } },
       );
 
-      rerender({ query: '@fi' });
-      rerender({ query: '@fil' });
-      rerender({ query: '@file' });
+      rerender({ buffer: createMockBuffer('@fi') });
+      rerender({ buffer: createMockBuffer('@fil') });
+      rerender({ buffer: createMockBuffer('@file') });
 
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 150));
@@ -898,9 +918,8 @@ describe('useCompletion', () => {
     it('should handle empty query', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '',
+          createMockBuffer(''),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -914,9 +933,8 @@ describe('useCompletion', () => {
     it('should handle query without slash or @', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          'regular text',
+          createMockBuffer('regular text'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -930,9 +948,8 @@ describe('useCompletion', () => {
     it('should handle query with whitespace', () => {
       const { result } = renderHook(() =>
         useCompletion(
-          '   /hel',
+          createMockBuffer('   /hel'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -949,9 +966,8 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() =>
         useCompletion(
-          'some text @',
+          createMockBuffer('some text @'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -970,6 +986,43 @@ describe('useCompletion', () => {
   });
 
   describe('File sorting behavior', () => {
+    it('should sort files by depth, then directories, then alphabetically', async () => {
+      vi.mocked(glob).mockResolvedValue([
+        `${testCwd}/b/c/file3.ts`,
+        `${testCwd}/a/file2.ts`,
+        `${testCwd}/a/dir1`,
+        `${testCwd}/file1.ts`,
+        `${testCwd}/a/file1.ts`,
+        `${testCwd}/b/c/file2.ts`,
+      ]);
+
+      mockFileDiscoveryService.shouldIgnoreFile.mockReturnValue(false);
+
+      const { result } = renderHook(() =>
+        useCompletion(
+          createMockBuffer('@'),
+          testCwd,
+          mockSlashCommands,
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const labels = result.current.suggestions.map((s) => s.label);
+      expect(labels).toEqual([
+        'file1.ts',
+        'a/dir1',
+        'a/file1.ts',
+        'a/file2.ts',
+        'b/c/file2.ts',
+        'b/c/file3.ts',
+      ]);
+    });
+
     it('should prioritize source files over test files with same base name', async () => {
       // Mock glob to return files with same base name but different extensions
       vi.mocked(glob).mockResolvedValue([
@@ -985,9 +1038,8 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() =>
         useCompletion(
-          '@comp',
+          createMockBuffer('@comp'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,
@@ -1023,9 +1075,8 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() =>
         useCompletion(
-          '@',
+          createMockBuffer('@'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           undefined,
@@ -1041,10 +1092,11 @@ describe('useCompletion', () => {
     });
 
     it('should respect file filtering when config is provided', async () => {
-      vi.mocked(fs.readdir).mockResolvedValue([
-        { name: 'file1.txt', isDirectory: () => false },
-        { name: 'ignored.log', isDirectory: () => false },
-      ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
+      // Since recursive search is enabled, mock glob instead of fs.readdir
+      vi.mocked(glob).mockResolvedValue([
+        `${testCwd}/file1.txt`,
+        `${testCwd}/ignored.log`,
+      ]);
 
       mockFileDiscoveryService.shouldIgnoreFile.mockImplementation(
         (path: string) => path.includes('.log'),
@@ -1052,9 +1104,8 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() =>
         useCompletion(
-          '@',
+          createMockBuffer('@'),
           testCwd,
-          true,
           mockSlashCommands,
           mockCommandContext,
           mockConfig,

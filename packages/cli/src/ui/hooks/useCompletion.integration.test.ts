@@ -16,6 +16,7 @@ import {
   SlashCommand,
 } from '../commands/types.js';
 import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
+import { TextBuffer } from '../components/shared/text-buffer.js';
 
 interface MockConfig {
   getFileFilteringOptions: () => {
@@ -25,6 +26,42 @@ interface MockConfig {
   getEnableRecursiveFileSearch: () => boolean;
   getFileService: () => FileDiscoveryService | null;
 }
+
+// Helper to create mock TextBuffer objects
+const createMockBuffer = (text: string): TextBuffer => {
+  const lines = text.split('\n');
+  const lastLine = lines[lines.length - 1];
+  return {
+    text,
+    lines,
+    cursor: [lines.length - 1, lastLine.length],
+    // Add other required TextBuffer properties as minimal mocks
+    preferredCol: null,
+    selectionAnchor: null,
+    allVisualLines: lines,
+    viewportVisualLines: lines,
+    visualCursor: [lines.length - 1, lastLine.length],
+    visualScrollRow: 0,
+    // Mock methods
+    setText: vi.fn(),
+    insert: vi.fn(),
+    newline: vi.fn(),
+    backspace: vi.fn(),
+    del: vi.fn(),
+    move: vi.fn(),
+    undo: vi.fn(),
+    redo: vi.fn(),
+    replaceRange: vi.fn(),
+    replaceRangeByOffset: vi.fn(),
+    moveToOffset: vi.fn(),
+    deleteWordLeft: vi.fn(),
+    deleteWordRight: vi.fn(),
+    killLineRight: vi.fn(),
+    killLineLeft: vi.fn(),
+    handleInput: vi.fn(),
+    openInExternalEditor: vi.fn(),
+  };
+};
 
 // Mock dependencies
 vi.mock('fs/promises');
@@ -37,9 +74,21 @@ vi.mock('@google/gemini-cli-core', async () => {
     escapePath: vi.fn((path) => path),
     unescapePath: vi.fn((path) => path),
     getErrorMessage: vi.fn((error) => error.message),
+    DEFAULT_FILE_FILTERING_OPTIONS: {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    },
   };
 });
 vi.mock('glob');
+
+vi.mock('../utils/commandUtils.js', () => ({
+  isSlashCommand: vi.fn((text: string) => text.trimStart().startsWith('/')),
+}));
+
+vi.mock('../utils/textUtils.js', () => ({
+  toCodePoints: vi.fn((text: string) => Array.from(text)),
+}));
 
 describe('useCompletion git-aware filtering integration', () => {
   let mockFileDiscoveryService: Mocked<FileDiscoveryService>;
@@ -160,6 +209,9 @@ describe('useCompletion git-aware filtering integration', () => {
       () => mockFileDiscoveryService,
     );
     vi.clearAllMocks();
+    // Clear any previous glob mocks
+    vi.mocked(glob).mockReset();
+    vi.mocked(fs.readdir).mockReset();
   });
 
   afterEach(() => {
@@ -185,9 +237,8 @@ describe('useCompletion git-aware filtering integration', () => {
 
     const { result } = renderHook(() =>
       useCompletion(
-        '@d',
+        createMockBuffer('@d'),
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
@@ -207,14 +258,11 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it('should filter git-ignored directories from @ completions', async () => {
-    // Mock fs.readdir to return both regular and git-ignored directories
-    vi.mocked(fs.readdir).mockResolvedValue([
-      { name: 'src', isDirectory: () => true },
-      { name: 'node_modules', isDirectory: () => true },
-      { name: 'dist', isDirectory: () => true },
-      { name: 'README.md', isDirectory: () => false },
-      { name: '.env', isDirectory: () => false },
-    ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
+    // Since recursive search is enabled by default, mock glob instead
+    vi.mocked(glob).mockResolvedValue([
+      `${testCwd}/src`,
+      `${testCwd}/README.md`,
+    ]);
 
     // Mock ignore service to ignore certain files
     mockFileDiscoveryService.shouldGitIgnoreFile.mockImplementation(
@@ -243,9 +291,8 @@ describe('useCompletion git-aware filtering integration', () => {
 
     const { result } = renderHook(() =>
       useCompletion(
-        '@',
+        createMockBuffer('@'),
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
@@ -260,7 +307,7 @@ describe('useCompletion git-aware filtering integration', () => {
     expect(result.current.suggestions).toHaveLength(2);
     expect(result.current.suggestions).toEqual(
       expect.arrayContaining([
-        { label: 'src/', value: 'src/' },
+        { label: 'src', value: 'src' },
         { label: 'README.md', value: 'README.md' },
       ]),
     );
@@ -325,9 +372,8 @@ describe('useCompletion git-aware filtering integration', () => {
 
     const { result } = renderHook(() =>
       useCompletion(
-        '@t',
+        createMockBuffer('@t'),
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
@@ -364,9 +410,8 @@ describe('useCompletion git-aware filtering integration', () => {
 
     renderHook(() =>
       useCompletion(
-        '@d',
+        createMockBuffer('@d'),
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfigNoRecursive,
@@ -384,17 +429,25 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it('should work without config (fallback behavior)', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue([
-      { name: 'src', isDirectory: () => true },
-      { name: 'node_modules', isDirectory: () => true },
-      { name: 'README.md', isDirectory: () => false },
-    ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
+    // Without config, recursive search defaults to enabled but fileDiscoveryService is null
+    // so it should use findFilesRecursively which recursively reads directories
+    vi.mocked(fs.readdir).mockImplementation(async (dirPath) => {
+      const path = dirPath.toString();
+      if (path === testCwd) {
+        return [
+          { name: 'src', isDirectory: () => true },
+          { name: 'node_modules', isDirectory: () => true },
+          { name: 'README.md', isDirectory: () => false },
+        ] as unknown as Awaited<ReturnType<typeof fs.readdir>>;
+      }
+      // Return empty for subdirectories to limit results
+      return [];
+    });
 
     const { result } = renderHook(() =>
       useCompletion(
-        '@',
+        createMockBuffer('@'),
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         undefined,
@@ -405,7 +458,8 @@ describe('useCompletion git-aware filtering integration', () => {
       await new Promise((resolve) => setTimeout(resolve, 150));
     });
 
-    // Without config, should include all files
+    // Should use recursive fs.readdir search since there's no config/fileDiscoveryService
+    expect(fs.readdir).toHaveBeenCalledWith(testCwd, { withFileTypes: true });
     expect(result.current.suggestions).toHaveLength(3);
     expect(result.current.suggestions).toEqual(
       expect.arrayContaining([
@@ -417,18 +471,21 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it('should handle git discovery service initialization failure gracefully', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue([
-      { name: 'src', isDirectory: () => true },
-      { name: 'README.md', isDirectory: () => false },
-    ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
+    // Mock glob to return some results
+    vi.mocked(glob).mockResolvedValue([
+      `${testCwd}/src`,
+      `${testCwd}/README.md`,
+    ]);
+
+    // Mock the file discovery service to not filter anything
+    mockFileDiscoveryService.shouldIgnoreFile.mockReturnValue(false);
 
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const { result } = renderHook(() =>
       useCompletion(
-        '@',
+        createMockBuffer('@'),
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
@@ -472,9 +529,8 @@ describe('useCompletion git-aware filtering integration', () => {
 
     const { result } = renderHook(() =>
       useCompletion(
-        '@src/comp',
+        createMockBuffer('@src/comp'),
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
@@ -497,9 +553,8 @@ describe('useCompletion git-aware filtering integration', () => {
 
     const { result } = renderHook(() =>
       useCompletion(
-        '@s',
+        createMockBuffer('@s'),
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
@@ -532,9 +587,8 @@ describe('useCompletion git-aware filtering integration', () => {
 
     const { result } = renderHook(() =>
       useCompletion(
-        '@.',
+        createMockBuffer('@.'),
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
@@ -561,9 +615,8 @@ describe('useCompletion git-aware filtering integration', () => {
   it('should suggest top-level command names based on partial input', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/mem',
+        createMockBuffer('/mem'),
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
       ),
@@ -580,9 +633,8 @@ describe('useCompletion git-aware filtering integration', () => {
     async (altName) => {
       const { result } = renderHook(() =>
         useCompletion(
-          altName,
+          createMockBuffer(altName),
           '/test/cwd',
-          true,
           mockSlashCommands,
           mockCommandContext,
         ),
@@ -595,9 +647,8 @@ describe('useCompletion git-aware filtering integration', () => {
   it('should suggest commands based on partial altNames matches', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/usag', // part of the word "usage"
+        createMockBuffer('/usag'), // part of the word "usage"
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
       ),
@@ -615,9 +666,8 @@ describe('useCompletion git-aware filtering integration', () => {
   it('should suggest sub-command names for a parent command', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/memory a',
+        createMockBuffer('/memory a'),
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
       ),
@@ -631,9 +681,8 @@ describe('useCompletion git-aware filtering integration', () => {
   it('should suggest all sub-commands when the query ends with the parent command and a space', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/memory ',
+        createMockBuffer('/memory '),
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
       ),
@@ -652,8 +701,9 @@ describe('useCompletion git-aware filtering integration', () => {
     const availableTags = ['my-chat-tag-1', 'my-chat-tag-2', 'another-channel'];
     const mockCompletionFn = vi
       .fn()
-      .mockImplementation(async (context: CommandContext, partialArg: string) =>
-        availableTags.filter((tag) => tag.startsWith(partialArg)),
+      .mockImplementation(
+        async (_context: CommandContext, partialArg: string) =>
+          availableTags.filter((tag) => tag.startsWith(partialArg)),
       );
 
     const mockCommandsWithFiltering = JSON.parse(
@@ -680,9 +730,8 @@ describe('useCompletion git-aware filtering integration', () => {
 
     const { result } = renderHook(() =>
       useCompletion(
-        '/chat resume my-ch',
+        createMockBuffer('/chat resume my-ch'),
         '/test/cwd',
-        true,
         mockCommandsWithFiltering,
         mockCommandContext,
       ),
@@ -703,9 +752,8 @@ describe('useCompletion git-aware filtering integration', () => {
   it('should not provide suggestions for a fully typed command that has no sub-commands or argument completion', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/clear ',
+        createMockBuffer('/clear '),
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
       ),
@@ -718,9 +766,8 @@ describe('useCompletion git-aware filtering integration', () => {
   it('should not provide suggestions for an unknown command', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/unknown-command',
+        createMockBuffer('/unknown-command'),
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
       ),
@@ -733,9 +780,8 @@ describe('useCompletion git-aware filtering integration', () => {
   it('should suggest sub-commands for a fully typed parent command without a trailing space', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/memory', // Note: no trailing space
+        createMockBuffer('/memory'), // Note: no trailing space
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
       ),
@@ -755,9 +801,8 @@ describe('useCompletion git-aware filtering integration', () => {
   it('should NOT provide suggestions for a perfectly typed command that is a leaf node', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/clear', // No trailing space
+        createMockBuffer('/clear'), // No trailing space
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
       ),
@@ -789,9 +834,8 @@ describe('useCompletion git-aware filtering integration', () => {
 
     const { result } = renderHook(() =>
       useCompletion(
-        '/chat resume ', // Trailing space, no partial argument
+        createMockBuffer('/chat resume '), // Trailing space, no partial argument
         '/test/cwd',
-        true,
         isolatedMockCommands,
         mockCommandContext,
       ),
@@ -809,9 +853,8 @@ describe('useCompletion git-aware filtering integration', () => {
   it('should suggest all top-level commands for the root slash', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/',
+        createMockBuffer('/'),
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
       ),
@@ -826,9 +869,8 @@ describe('useCompletion git-aware filtering integration', () => {
   it('should provide no suggestions for an invalid sub-command', async () => {
     const { result } = renderHook(() =>
       useCompletion(
-        '/memory dothisnow',
+        createMockBuffer('/memory dothisnow'),
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
       ),
