@@ -447,7 +447,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     buffer.text,
     500, // 500ms delay
     handleSuggestionsUpdate,
-    buffer.text.length > 5
+    buffer.text.length > 5,
   );
 
   const handleExit = useCallback(
@@ -535,6 +535,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
     } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
       setConstrainHeight(false);
+    } else if (key.shift && key.downArrow) {
+      if (suggestions.length > 0) {
+        buffer.setText(suggestions[0]);
+        setShowSuggestions(false);
+        setSuggestions([]);
+      }
     }
   });
 
@@ -998,30 +1004,31 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 />
               )}
               {showSuggestions && suggestions.length > 0 && (
-                <Box 
-                  flexDirection="column" 
-                  borderStyle="round" 
-                  paddingX={1} 
+                <Box
+                  flexDirection="column"
+                  borderStyle="round"
+                  paddingX={1}
                   marginTop={1}
                   borderColor={Colors.AccentBlue}
                 >
                   <Text color={Colors.AccentBlue} bold>
                     💡 Prompt Suggestion:
                   </Text>
-                    {suggestions.map((suggestion, index) => (
-                      <Box
-                        key={index}
-                        marginLeft={2}
-                        marginBottom={index === suggestions.length - 1 ? 0 : 1}
-                      >
-                        <Text color={Colors.Comment}>
-                          {index + 1}. {suggestion}
-                        </Text>
-                      </Box>
-                    ))}
+                  {suggestions.map((suggestion, index) => (
+                    <Box
+                      key={index}
+                      marginLeft={2}
+                      marginBottom={index === suggestions.length - 1 ? 0 : 1}
+                    >
+                      <Text color={Colors.Comment}>
+                        {index + 1}. {suggestion}
+                      </Text>
+                    </Box>
+                  ))}
                   <Box marginTop={1}>
                     <Text color={Colors.Comment}>
-                      Tips: You can copy the above suggestions as your prompt words.
+                      Tips: You can copy the above suggestions as your prompt
+                      words. (Shift + Down Arrow)
                     </Text>
                   </Box>
                 </Box>

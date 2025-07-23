@@ -5,7 +5,10 @@
  */
 
 import { useEffect, useCallback, useRef } from 'react';
-import { DEFAULT_GEMINI_FLASH_MODEL, GeminiClient  } from '@google/gemini-cli-core';
+import {
+  DEFAULT_GEMINI_FLASH_MODEL,
+  GeminiClient,
+} from '@google/gemini-cli-core';
 import { Content, GenerateContentConfig } from '@google/genai';
 
 // Import getResponseText from core package utils
@@ -38,7 +41,6 @@ const getResponseText = (response: ApiResponse): string | undefined => {
   return textSegments.join('');
 };
 
-
 /**
  * A custom hook that provides AI-powered prompt completion suggestions
  * using a debounced effect to avoid excessive API calls.
@@ -58,71 +60,78 @@ export const usePromptCompletion = (
 ) => {
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const generateSuggestions = useCallback(async (text: string) => {
-    // This is the only place that should clear suggestions.
-    if (text.trim().length === 0) {
-      onSuggestionsUpdate([]);
-      return;
-    }
+  const generateSuggestions = useCallback(
+    async (text: string) => {
+      // This is the only place that should clear suggestions.
+      if (text.trim().length === 0) {
+        onSuggestionsUpdate([]);
+        return;
+      }
 
-    // If not enabled, or client not ready, do nothing. Don't clear.
-    if (!geminiClient || !enabled) {
-      return;
-    }
+      // If not enabled, or client not ready, do nothing. Don't clear.
+      if (!geminiClient || !enabled) {
+        return;
+      }
 
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
 
-    try {
-      const contents: Content[] = [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: `Act as an intelligent prompt co-pilot. Your goal is to take the user’s initial thought and seamlessly continue it, building it out into 1-2 fully-formed, insightful prompts that unlock greater potential.\nUser’s initial thought: \n'''\n${text}\n'''\n\nYour task is to continue their sentence. Start your response with the user’s exact text (${text}) and then add the necessary detail, context, and creative direction to transform it from a fragment into a complete, high-impact prompt.\n\nFormatting:\nPlain text only.\nOne complete prompt suggestion per line.\nMatch the user’s language.`,
-            },
-          ],
-        },
-      ];
+      try {
+        const contents: Content[] = [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: `Act as an intelligent prompt co-pilot. Your goal is to take the user’s initial thought and seamlessly continue it, building it out into 1-2 fully-formed, insightful prompts that unlock greater potential.\nUser’s initial thought: \n'''\n${text}\n'''\n\nYour task is to continue their sentence. Start your response with the user’s exact text (${text}) and then add the necessary detail, context, and creative direction to transform it from a fragment into a complete, high-impact prompt.\n\nFormatting:\nPlain text only.\nOne complete prompt suggestion per line.\nMatch the user’s language.`,
+              },
+            ],
+          },
+        ];
 
-      const generationConfig: GenerateContentConfig = {
-        temperature: 1,
-        maxOutputTokens: 16000,
-        thinkingConfig: {
-          thinkingBudget: 0,
-        }
-      };
+        const generationConfig: GenerateContentConfig = {
+          temperature: 1,
+          maxOutputTokens: 16000,
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+        };
 
-      const response = await geminiClient.generateContent(
-        contents,
-        generationConfig,
-        signal,
-        DEFAULT_GEMINI_FLASH_MODEL,
-      );
+        const response = await geminiClient.generateContent(
+          contents,
+          generationConfig,
+          signal,
+          DEFAULT_GEMINI_FLASH_MODEL,
+        );
 
-      if (response && !signal.aborted) {
-        const responseText = getResponseText(response);
-        if (responseText) {
-          const suggestions = responseText
-            .split('\n')
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0)
-            .slice(0, 3);
+        if (response && !signal.aborted) {
+          const responseText = getResponseText(response);
+          if (responseText) {
+            const suggestions = responseText
+              .split('\n')
+              .map((line) => line.trim())
+              .filter((line) => line.length > 0)
+              .slice(0, 3);
 
-          if (suggestions.length > 0) {
-            onSuggestionsUpdate(suggestions);
+            if (suggestions.length > 0) {
+              onSuggestionsUpdate(suggestions);
+            }
+            // If suggestions are empty, do nothing to prevent clearing existing ones.
           }
-          // If suggestions are empty, do nothing to prevent clearing existing ones.
+        }
+      } catch (error) {
+        // Do not clear suggestions on error, just log it.
+        if (
+          !(
+            error instanceof Error &&
+            error.message === 'The user aborted a request.'
+          )
+        ) {
+          console.error('Error generating suggestions:', error);
         }
       }
-    } catch (error) {
-      // Do not clear suggestions on error, just log it.
-      if (!(error instanceof Error && error.message === 'The user aborted a request.')) {
-        console.error('Error generating suggestions:', error);
-      }
-    }
-  }, [geminiClient, enabled, onSuggestionsUpdate]);
-
+    },
+    [geminiClient, enabled, onSuggestionsUpdate],
+  );
 
   // Debounced effect to generate suggestions
   useEffect(() => {
@@ -133,7 +142,12 @@ export const usePromptCompletion = (
 
     const handler = setTimeout(() => {
       generateSuggestions(inputText).catch((error) => {
-        if (!(error instanceof Error && error.message === 'The user aborted a request.')) {
+        if (
+          !(
+            error instanceof Error &&
+            error.message === 'The user aborted a request.'
+          )
+        ) {
           console.error('Failed to generate suggestions:', error);
         }
       });
@@ -145,9 +159,12 @@ export const usePromptCompletion = (
   }, [inputText, delay, generateSuggestions]);
 
   // Cleanup function to abort any ongoing request on unmount
-  useEffect(() => () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    },
+    [],
+  );
 };
