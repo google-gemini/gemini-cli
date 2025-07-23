@@ -7,7 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../../colors.js';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import { colorizeCode } from '../../utils/CodeColorizer.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 

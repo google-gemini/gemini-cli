@@ -8,7 +8,7 @@ import React from 'react';
 import { Text } from 'ink';
 import { Colors } from '../colors.js';
 import { type OpenFiles, type MCPServerConfig } from '@google/gemini-cli-core';
-import path from 'path';
+import path from 'node:path';
 
 interface ContextSummaryDisplayProps {
   geminiMdFileCount: number;

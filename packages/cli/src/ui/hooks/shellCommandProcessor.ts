@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn } from 'child_process';
-import { TextDecoder } from 'util';
+import { spawn } from 'node:child_process';
+import { TextDecoder } from 'node:util';
 import {
   HistoryItemWithoutId,
   IndividualToolCallDisplay,
@@ -22,10 +22,10 @@ import { formatMemoryUsage } from '../utils/formatters.js';
 import { isBinary } from '../utils/textUtils.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
-import crypto from 'crypto';
-import path from 'path';
-import os from 'os';
-import fs from 'fs';
+import crypto from 'node:crypto';
+import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
 import stripAnsi from 'strip-ansi';
 
 const OUTPUT_UPDATE_INTERVAL_MS = 1000;

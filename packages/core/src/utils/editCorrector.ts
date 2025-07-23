@@ -22,7 +22,7 @@ import {
   isFunctionResponse,
   isFunctionCall,
 } from '../utils/messageInspectors.js';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 
 const EditModel = DEFAULT_GEMINI_FLASH_MODEL;
 const EditConfig: GenerateContentConfig = {

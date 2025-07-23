@@ -27,8 +27,8 @@ import { Agent } from './acp.js';
 import { Readable, Writable } from 'node:stream';
 import { Content, Part, FunctionCall, PartListUnion } from '@google/genai';
 import { LoadedSettings, SettingScope } from '../config/settings.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 
 export async function runAcpPeer(config: Config, settings: LoadedSettings) {
   const stdout = Writable.toWeb(process.stdout) as WritableStream;

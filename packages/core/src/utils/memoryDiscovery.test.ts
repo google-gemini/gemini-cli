@@ -5,11 +5,11 @@
  */
 
 import { vi, describe, it, expect, beforeEach, Mocked } from 'vitest';
-import * as fsPromises from 'fs/promises';
-import * as fsSync from 'fs';
-import { Stats, Dirent } from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import * as fsPromises from 'node:fs/promises';
+import * as fsSync from 'node:fs';
+import { Stats, Dirent } from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { loadServerHierarchicalMemory } from './memoryDiscovery.js';
 import {
   GEMINI_CONFIG_DIR,

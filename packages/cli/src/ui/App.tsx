@@ -72,7 +72,7 @@ import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
 import {
   isProQuotaExceededError,

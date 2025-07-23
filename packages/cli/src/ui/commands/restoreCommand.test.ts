@@ -14,7 +14,7 @@ import {
   Mocked,
   Mock,
 } from 'vitest';
-import * as fs from 'fs/promises';
+import * as fs from 'node:fs/promises';
 import { restoreCommand } from './restoreCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';

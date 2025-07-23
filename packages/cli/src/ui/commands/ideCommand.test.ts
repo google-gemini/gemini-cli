@@ -8,7 +8,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ideCommand } from './ideCommand.js';
 import { type CommandContext } from './types.js';
 import { type Config } from '@google/gemini-cli-core';
-import * as child_process from 'child_process';
+import * as child_process from 'node:child_process';
 import { glob } from 'glob';
 
 import {

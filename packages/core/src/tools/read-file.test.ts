@@ -7,9 +7,9 @@
 import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
 import { ReadFileTool, ReadFileToolParams } from './read-file.js';
 import * as fileUtils from '../utils/fileUtils.js';
-import path from 'path';
-import os from 'os';
-import fs from 'fs'; // For actual fs operations in setup
+import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs'; // For actual fs operations in setup
 import { Config } from '../config/config.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 

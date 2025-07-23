@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fileURLToPath } from 'url';
+import { fileURLToPath } from 'node:url';
 import {
   Config,
   getMCPDiscoveryState,
@@ -19,10 +19,10 @@ import {
   SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
-import * as child_process from 'child_process';
-import * as process from 'process';
+import * as child_process from 'node:child_process';
+import * as process from 'node:process';
 import { glob } from 'glob';
-import * as path from 'path';
+import * as path from 'node:path';
 
 const VSCODE_COMMAND = process.platform === 'win32' ? 'code.cmd' : 'code';
 const VSCODE_COMPANION_EXTENSION_FOLDER = 'vscode-ide-companion';

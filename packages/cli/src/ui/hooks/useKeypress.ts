@@ -6,8 +6,8 @@
 
 import { useEffect, useRef } from 'react';
 import { useStdin } from 'ink';
-import readline from 'readline';
-import { PassThrough } from 'stream';
+import readline from 'node:readline';
+import { PassThrough } from 'node:stream';
 
 export interface Key {
   name: string;

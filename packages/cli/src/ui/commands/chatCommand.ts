@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fsPromises from 'fs/promises';
+import * as fsPromises from 'node:fs/promises';
 import {
   CommandContext,
   SlashCommand,
   MessageActionReturn,
   CommandKind,
 } from './types.js';
-import path from 'path';
+import path from 'node:path';
 import { HistoryItemWithoutId, MessageType } from '../types.js';
 
 interface ChatDetail {

@@ -17,9 +17,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { copyFileSync, existsSync, mkdirSync } from 'fs';
-import { dirname, join, basename } from 'path';
-import { fileURLToPath } from 'url';
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { dirname, join, basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

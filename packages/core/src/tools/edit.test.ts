@@ -27,9 +27,9 @@ vi.mock('../utils/editor.js', () => ({
 import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 import { EditTool, EditToolParams } from './edit.js';
 import { FileDiff } from './tools.js';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
 import { ApprovalMode, Config } from '../config/config.js';
 import { Content, Part, SchemaUnion } from '@google/genai';
 
