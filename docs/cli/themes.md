@@ -65,6 +65,7 @@ Add a `customThemes` block to your user, project, or system `settings.json` file
 ```
 
 **Color keys:**
+
 - `Background`
 - `Foreground`
 - `LightBlue`
@@ -78,6 +79,7 @@ Add a `customThemes` block to your user, project, or system `settings.json` file
 - `Gray`
 
 **Required Properties:**
+
 - `name` (must match the key in the `customThemes` object and be a string)
 - `type` (must be the string `"custom"`)
 - `Background`
