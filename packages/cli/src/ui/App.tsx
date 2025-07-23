@@ -47,7 +47,9 @@ import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
+import { useSessionPersistence } from './hooks/useSessionPersistence.js';
 import process from 'node:process';
+
 import {
   getErrorMessage,
   type Config,
@@ -112,6 +114,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, []);
 
   const { history, addItem, clearItems, loadHistory } = useHistory();
+  const sessionPersistence = settings.merged['session.persistence'];
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+  const onLoadComplete = useCallback(() => setSessionLoaded(true), []);
+  useSessionPersistence({
+    sessionPersistence,
+    history,
+    loadHistory,
+    onLoadComplete,
+  });
   const {
     consoleMessages,
     handleNewMessage,
@@ -647,6 +658,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     if (
       initialPrompt &&
       !initialPromptSubmitted.current &&
+      sessionLoaded &&
       !isAuthenticating &&
       !isAuthDialogOpen &&
       !isThemeDialogOpen &&
@@ -660,6 +672,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, [
     initialPrompt,
     submitQuery,
+    sessionLoaded,
     isAuthenticating,
     isAuthDialogOpen,
     isThemeDialogOpen,
@@ -671,7 +684,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   if (quittingMessages) {
     return (
       <Box flexDirection="column" marginBottom={1}>
-        {quittingMessages.map((item) => (
+        {quittingMessages.map((item: HistoryItem) => (
           <HistoryItemDisplay
             key={item.id}
             availableTerminalHeight={
@@ -721,7 +734,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               )}
               {!settings.merged.hideTips && <Tips config={config} />}
             </Box>,
-            ...history.map((h) => (
+            ...history.map((h: HistoryItem) => (
               <HistoryItemDisplay
                 terminalWidth={mainAreaWidth}
                 availableTerminalHeight={staticAreaMaxItemHeight}
@@ -733,7 +746,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             )),
           ]}
         >
-          {(item) => item}
+          {(item: React.ReactNode) => item}
         </Static>
         <OverflowProvider>
           <Box ref={pendingHistoryItemRef} flexDirection="column">
