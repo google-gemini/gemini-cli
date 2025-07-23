@@ -129,6 +129,65 @@ Your command definition files must be written in the TOML format and use the `.t
 
 - `description` (String): A brief, one-line description of what the command does. This text will be displayed next to your command in the `/help` menu. **If you omit this field, a generic description will be generated from the filename.**
 
+#### Handling Arguments
+
+Custom commands support two powerful, low-friction methods for handling arguments. The CLI automatically chooses the correct method based on the content of your command's `prompt`.
+
+##### 1. Shorthand Injection with `{{args}}`
+
+If your `prompt` contains the special placeholder `{{args}}`, the CLI will replace that exact placeholder with all the text the user typed after the command name. This is perfect for simple, deterministic commands where you need to inject user input into a specific place in a larger prompt template.
+
+**Example (`git/fix.toml`):**
+
+```toml
+# In: ~/.gemini/commands/git/fix.toml
+# Invoked via: /git:fix "Button is misaligned on mobile"
+
+description = "Generates a fix for a given GitHub issue."
+prompt = "Please analyze the staged git changes and provide a code fix for the issue described here: {{args}}."
+```
+
+The model will receive the final prompt: `Please analyze the staged git changes and provide a code fix for the issue described here: "Button is misaligned on mobile".`
+
+##### 2. Model-led Interpretation
+
+If your `prompt` does **not** contain `{{args}}`, the CLI assumes the model is smart enough to parse the arguments itself. It will prepend the _entire command the user typed_ to the top of your prompt, separated by a Markdown horizontal rule (`---`), providing the model with the full context to execute.
+
+This method is ideal for creating complex, agentic commands where the prompt itself acts as documentation for a "mini-API" that you teach the model to use.
+
+**Example (`changelog.toml`):**
+
+This example shows how to create a robust model-led command by defining a role for the model, explaining where to find the user's input, and specifying the expected format and behavior.
+
+```toml
+# In: <project>/.gemini/commands/changelog.toml
+# Invoked via: /changelog 1.2.0 added "Support for model-led argument parsing."
+
+description = "Adds a new entry to the project's CHANGELOG.md file."
+prompt = """
+# Task: Update Changelog
+
+You are an expert maintainer of this software project. A user has invoked a command to add a new entry to the changelog.
+
+**The user's raw command is provided above the `---` separator.**
+
+Your task is to parse the `<version>`, `<change_type>`, and `<message>` from their input and use the `write_file` tool to correctly update the `CHANGELOG.md` file.
+
+## Expected Format
+The command follows this format: `/changelog <version> <type> <message>`
+- `<type>` must be one of: "added", "changed", "fixed", "removed".
+
+## Behavior
+1. Read the `CHANGELOG.md` file.
+2. Find the section for the specified `<version>`.
+3. Add the `<message>` under the correct `<type>` heading.
+4. If the version or type section doesn't exist, create it.
+5. Adhere strictly to the "Keep a Changelog" format.
+"""
+```
+
+The `---` separator clearly distinguishes the user's raw input from your instructions to the model, allowing you to build powerful, structured commands.
+
 ---
 
 #### Example: A "Pure Function" Refactoring Command
@@ -174,11 +233,6 @@ That's it! You can now run your command in the CLI. First, you might add a file 
 ```
 
 Gemini CLI will then execute the multi-line prompt defined in your TOML file.
-
-This initial version of custom commands is focused on static prompts. Future updates are planned to introduce more dynamic capabilities, including:
-
-- **Argument Support:** Passing arguments from the command line directly into your `prompt` template.
-- **Shell Execution:** Creating commands that can run local shell scripts to gather context before running the prompt.
 
 ## At commands (`@`)
 

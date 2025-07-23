@@ -41,7 +41,7 @@ describe('FileCommandLoader', () => {
 
     const result = await command.action?.(mockContext, '');
     if (result?.type === 'submit_prompt') {
-      expect(result.content).toBe('This is a test prompt');
+      expect(result.content).toBe('/test\n\n---\n\nThis is a test prompt');
     } else {
       assert.fail('Incorrect action type');
     }
@@ -124,7 +124,7 @@ describe('FileCommandLoader', () => {
 
     const result = await command.action?.(mockContext, '');
     if (result?.type === 'submit_prompt') {
-      expect(result.content).toBe('Project prompt');
+      expect(result.content).toBe('/test\n\n---\n\nProject prompt');
     } else {
       assert.fail('Incorrect action type');
     }
@@ -231,5 +231,56 @@ describe('FileCommandLoader', () => {
 
     // Verify that the ':' in the filename was replaced with an '_'
     expect(command.name).toBe('legacy_command');
+  });
+
+  describe('Shorthand Argument Processor Integration', () => {
+    it('correctly processes a command with {{args}}', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'shorthand.toml':
+            'prompt = "The user wants to: {{args}}"\ndescription = "Shorthand test"',
+        },
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+      const command = commands.find((c) => c.name === 'shorthand');
+      expect(command).toBeDefined();
+
+      const result = await command!.action?.(mockContext, 'do something cool');
+      expect(result?.type).toBe('submit_prompt');
+      if (result?.type === 'submit_prompt') {
+        expect(result.content).toBe('The user wants to: do something cool');
+      }
+    });
+  });
+
+  describe('Model-led Argument Processor Integration', () => {
+    it('correctly processes a command without {{args}}', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'model_led.toml':
+            'prompt = "This is the instruction."\ndescription = "Model-led test"',
+        },
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+      const command = commands.find((c) => c.name === 'model_led');
+      expect(command).toBeDefined();
+
+      const result = await command!.action?.(
+        mockContext,
+        '1.2.0 added "a feature"',
+      );
+      expect(result?.type).toBe('submit_prompt');
+      if (result?.type === 'submit_prompt') {
+        const expectedContent =
+          '/model_led 1.2.0 added "a feature"\n\n---\n\nThis is the instruction.';
+        expect(result.content).toBe(expectedContent);
+      }
+    });
   });
 });

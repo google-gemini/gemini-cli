@@ -15,7 +15,17 @@ import {
   getUserCommandsDir,
 } from '@google/gemini-cli-core';
 import { ICommandLoader } from './types.js';
-import { CommandKind, SlashCommand } from '../ui/commands/types.js';
+import {
+  CommandContext,
+  CommandKind,
+  SlashCommand,
+  SubmitPromptActionReturn,
+} from '../ui/commands/types.js';
+import {
+  ModelLedArgumentProcessor,
+  ShorthandArgumentProcessor,
+} from './prompt-processors/argumentProcessor.js';
+import { IPromptProcessor } from './prompt-processors/types.js';
 
 /**
  * Defines the Zod schema for a command definition file. This serves as the
@@ -156,16 +166,41 @@ export class FileCommandLoader implements ICommandLoader {
       .map((segment) => segment.replaceAll(':', '_'))
       .join(':');
 
+    const processors: IPromptProcessor[] = [];
+
+    // The presence of '{{args}}' is the switch that determines the behavior.
+    if (validDef.prompt.includes('{{args}}')) {
+      processors.push(new ShorthandArgumentProcessor());
+    } else {
+      processors.push(new ModelLedArgumentProcessor());
+    }
+
     return {
       name: commandName,
       description:
         validDef.description ||
         `Custom command from ${path.basename(filePath)}`,
       kind: CommandKind.FILE,
-      action: async () => ({
-        type: 'submit_prompt',
-        content: validDef.prompt,
-      }),
+      action: async (
+        _context: CommandContext,
+        args: string,
+      ): Promise<SubmitPromptActionReturn> => {
+        let processedPrompt = validDef.prompt;
+        const fullCommand = `/${commandName} ${args}`.trim();
+
+        for (const processor of processors) {
+          processedPrompt = await processor.process(
+            processedPrompt,
+            args,
+            fullCommand,
+          );
+        }
+
+        return {
+          type: 'submit_prompt',
+          content: processedPrompt,
+        };
+      },
     };
   }
 }
