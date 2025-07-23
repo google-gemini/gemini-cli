@@ -189,6 +189,13 @@ const renderDiffContent = (
     );
   }
 
+  const maxLineNumber = Math.max(
+    0,
+    ...displayableLines.map((l) => l.oldLine ?? 0),
+    ...displayableLines.map((l) => l.newLine ?? 0),
+  );
+  const gutterWidth = Math.max(1, maxLineNumber.toString().length);
+
   const fileExtension = filename?.split('.').pop() || null;
   const language = fileExtension
     ? getLanguageFromExtension(fileExtension)
@@ -280,7 +287,9 @@ const renderDiffContent = (
 
         acc.push(
           <Box key={lineKey} flexDirection="row">
-            <Text color={Colors.Gray}>{gutterNumStr.padEnd(4)} </Text>
+            <Text color={Colors.Gray}>
+              {gutterNumStr.padStart(gutterWidth)}{' '}
+            </Text>
             {line.type === 'context' ? (
               <>
                 <Text>{prefixSymbol} </Text>
