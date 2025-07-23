@@ -323,7 +323,6 @@ export function logFlashDecidedToContinue(
     ...getCommonAttributes(config),
     ...event,
     'event.name': EVENT_FLASH_DECIDED_TO_CONTINUE,
-    'event.timestamp': new Date().toISOString(),
   };
 
   const logger = logs.getLogger(SERVICE_NAME);
