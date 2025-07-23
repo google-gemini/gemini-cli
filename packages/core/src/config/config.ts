@@ -711,10 +711,10 @@ export class Config {
       }
     };
 
-    registerCoreTool(LSTool, targetDir, this);
-    registerCoreTool(ReadFileTool, targetDir, this);
-    registerCoreTool(GrepTool, targetDir);
-    registerCoreTool(GlobTool, targetDir, this);
+    registerCoreTool(LSTool, this);
+    registerCoreTool(ReadFileTool, this);
+    registerCoreTool(GrepTool, this);
+    registerCoreTool(GlobTool, this);
     registerCoreTool(EditTool, this);
     registerCoreTool(WriteFileTool, this);
     registerCoreTool(WebFetchTool, this);

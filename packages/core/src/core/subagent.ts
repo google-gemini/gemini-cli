@@ -499,6 +499,8 @@ export class SubAgentScope {
 
       const contentGenerator = await createContentGenerator(
         this.runtimeContext.getContentGeneratorConfig(),
+        this.runtimeContext,
+        this.runtimeContext.getSessionId(),
       );
 
       this.runtimeContext.setModel(this.modelConfig.model);
