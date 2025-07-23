@@ -122,11 +122,6 @@ export async function parseArguments(): Promise<CliArgs> {
       description: 'Show memory usage in status bar',
       default: false,
     })
-    .option('show_memory_usage', {
-      type: 'boolean',
-      description: 'Show memory usage in status bar',
-      default: false,
-    })
     .deprecateOption(
       'show_memory_usage',
       'Use --show-memory-usage instead. We will be removing --show_memory_usage in the coming weeks.',
