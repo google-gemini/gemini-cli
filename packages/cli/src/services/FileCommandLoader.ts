@@ -185,18 +185,22 @@ export class FileCommandLoader implements ICommandLoader {
         `Custom command from ${path.basename(filePath)}`,
       kind: CommandKind.FILE,
       action: async (
-        _context: CommandContext,
-        args: string,
+        context: CommandContext,
+        _args: string,
       ): Promise<SubmitPromptActionReturn> => {
-        let processedPrompt = validDef.prompt;
-        const fullCommand = `/${commandName} ${args}`.trim();
-
-        for (const processor of processors) {
-          processedPrompt = await processor.process(
-            processedPrompt,
-            args,
-            fullCommand,
+        if (!context.invocation) {
+          console.error(
+            `[FileCommandLoader] Critical error: Command '${commandName}' was executed without invocation context.`,
           );
+          return {
+            type: 'submit_prompt',
+            content: validDef.prompt, // Fallback to unprocessed prompt
+          };
+        }
+
+        let processedPrompt = validDef.prompt;
+        for (const processor of processors) {
+          processedPrompt = await processor.process(processedPrompt, context);
         }
 
         return {

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { CommandContext } from '../../ui/commands/types.js';
+
 /**
  * Defines the interface for a prompt processor, a module that can transform
  * a prompt string before it is sent to the model. Processors are chained
@@ -11,17 +13,22 @@
  */
 export interface IPromptProcessor {
   /**
-   * Processes a prompt string, applying a specific transformation.
+   * Processes a prompt string, applying a specific transformation as part of a pipeline.
    *
-   * @param prompt The current state of the prompt string.
-   * @param args The raw argument string from the user's command invocation.
-   * @param fullCommand The full command the user typed (e.g., /git:commit foo).
-   * @returns The transformed prompt string as a Promise.
+   * Each processor in a command's pipeline receives the output of the previous
+   * processor. This method provides the full command context, allowing for
+   * complex transformations that may require access to invocation details,
+   * application services, or UI state.
    *
-   * @todo Add `context: CommandContext` back when more complex processors
-   * that require access to services or UI are needed.
+   * @param prompt The current state of the prompt string. This may have been
+   *   modified by previous processors in the pipeline.
+   * @param context The full command context, providing access to invocation
+   *   details (like `context.invocation.raw` and `context.invocation.args`),
+   *   application services, and UI handlers.
+   * @returns A promise that resolves to the transformed prompt string, which
+   *   will be passed to the next processor or, if it's the last one, sent to the model.
    */
-  process(prompt: string, args: string, fullCommand: string): Promise<string>;
+  process(prompt: string, context: CommandContext): Promise<string>;
 }
 
 /**
