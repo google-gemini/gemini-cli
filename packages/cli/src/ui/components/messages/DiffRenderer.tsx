@@ -291,30 +291,21 @@ const renderDiffContent = (
               {gutterNumStr.padStart(gutterWidth)}{' '}
             </Text>
             {line.type === 'context' ? (
-              <>
+              <Text>
                 <Text>{prefixSymbol} </Text>
                 <Text wrap="wrap">
                   {colorizeLine(displayContent, language)}
                 </Text>
-              </>
+              </Text>
             ) : (
-              <>
-                <Text
-                  backgroundColor={
-                    line.type === 'add' ? Colors.DiffAdded : Colors.DiffRemoved
-                  }
-                >
-                  {prefixSymbol}{' '}
-                </Text>
-                <Text
-                  backgroundColor={
-                    line.type === 'add' ? Colors.DiffAdded : Colors.DiffRemoved
-                  }
-                  wrap="wrap"
-                >
-                  {colorizeLine(displayContent, language)}
-                </Text>
-              </>
+              <Text
+                backgroundColor={
+                  line.type === 'add' ? Colors.DiffAdded : Colors.DiffRemoved
+                }
+                wrap="wrap"
+              >
+                {prefixSymbol} {colorizeLine(displayContent, language)}
+              </Text>
             )}
           </Box>,
         );
