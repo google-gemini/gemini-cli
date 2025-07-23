@@ -471,10 +471,10 @@ describe('ReadManyFilesTool', () => {
         `Processing time: ${processingTime}ms for ${fileCount} files`,
       );
 
-      // FAIL: Require parallel processing performance
+      // Verify parallel processing performance improvement
       // Parallel processing should complete in ~100ms (single file time)
       // Sequential would take ~400ms (4 files × 100ms each)
-      expect(processingTime).toBeLessThan(200); // This will FAIL with current sequential implementation
+      expect(processingTime).toBeLessThan(200); // Should PASS with parallel implementation
 
       // Verify all files were processed
       const content = result.llmContent as string[];
@@ -540,7 +540,7 @@ describe('ReadManyFilesTool', () => {
 
       console.log('Execution order:', executionOrder);
 
-      // FAIL: Require concurrent execution pattern
+      // Verify concurrent execution pattern
       // In parallel execution: all "start:" events should come before all "end:" events
       // In sequential execution: "start:file1", "end:file1", "start:file2", "end:file2", etc.
 
@@ -555,7 +555,7 @@ describe('ReadManyFilesTool', () => {
         .filter((e) => e.startsWith('start:')).length;
 
       // For parallel processing, ALL start events should happen before the first end event
-      expect(startsBeforeFirstEnd).toBe(startEvents); // This will FAIL with sequential processing
+      expect(startsBeforeFirstEnd).toBe(startEvents); // Should PASS with parallel implementation
 
       detectFileTypeSpy.mockRestore();
     });
