@@ -99,11 +99,11 @@ describe('loadExtensions', () => {
       'system file',
     );
     fs.writeFileSync(
-      path.join(workspaceExtensionsDir, 'Thumbs.db'),
+      path.join(workspaceExtensionsDir, 'thumbs.db'), // Test case-insensitivity
       'system file',
     );
     fs.writeFileSync(
-      path.join(workspaceExtensionsDir, 'Desktop.ini'),
+      path.join(workspaceExtensionsDir, 'desktop.ini'), // Test case-insensitivity
       'system file',
     );
     fs.writeFileSync(
@@ -129,7 +129,7 @@ describe('loadExtensions', () => {
       'system file',
     );
     fs.writeFileSync(
-      path.join(workspaceExtensionsDir, 'Thumbs.db'),
+      path.join(workspaceExtensionsDir, 'thumbs.db'), // Lowercase to test case-insensitivity
       'system file',
     );
 
