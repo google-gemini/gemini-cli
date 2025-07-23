@@ -1,183 +1,115 @@
-# Gemini CLI
+好的，这是一个非常棒的功能增强！一个清晰、专业的 `README.md` 文件对于吸引用户和贡献者至关重要。
 
-[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
+根据您的描述，我为您草拟了一份合适的 `README.md`。它结构清晰，包含了项目介绍、特性、安装步骤和使用方法，并进行了一些美化。
 
-![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
+您可以直接复制下面的全部内容，并粘贴到您的 `README.md` 文件中。
 
-This repository contains the Gemini CLI, a command-line AI workflow tool that connects to your
-tools, understands your code and accelerates your workflows.
+---
 
-With the Gemini CLI you can:
+# Gemini CLI with Remote Control (gemini-cli 远程增强版)
 
-- Query and edit large codebases in and beyond Gemini's 1M token context window.
-- Generate new apps from PDFs or sketches, using Gemini's multimodal capabilities.
-- Automate operational tasks, like querying pull requests or handling complex rebases.
-- Use tools and MCP servers to connect new capabilities, including [media generation with Imagen,
-  Veo or Lyria](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia)
-- Ground your queries with the [Google Search](https://ai.google.dev/gemini-api/docs/grounding)
-  tool, built into Gemini.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-green.svg)
 
-## Quickstart
+这是一个 `gemini-cli` 的非官方增强版本。在原项目的基础上，我们**增加了通过命令行远程连接和操作远端服务器的核心功能**。现在，您不仅可以与 Google Gemini Pro 交互，还可以将它作为一个强大的远程控制终端。
 
-You have two options to install Gemini CLI.
+---
 
-### With Node
+## ✨ 主要特性 (Key Features)
 
-1. **Prerequisites:** Ensure you have [Node.js version 20](https://nodejs.org/en/download) or higher installed.
-2. **Run the CLI:** Execute the following command in your terminal:
+*   **与 Google Gemini Pro 交互**: 具备 `gemini-cli` 的所有基础对话功能。
+*   **支持多轮对话**: 能够记忆上下文，进行连续的、有逻辑的对话。
+*   **跨平台**: 兼容 Windows, macOS, 和 Linux。
+*   🚀 **新增：远程服务器连接**: 只需一条命令，即可安全连接到您的远程服务器。
+*   🛡️ **新增：认证保护**: 连接过程包含认证步骤，确保只有授权用户才能访问。
+*   💻 **新增：远程执行**: 连接成功后，所有操作都将在远端服务器上执行，实现真正的远程管理。
 
-   ```bash
-   npx https://github.com/google-gemini/gemini-cli
-   ```
+## 📸 效果演示 (Demo)
 
-   Or install it with:
+> [!TIP]
+> 强烈建议在此处插入一个 GIF 或截图，演示从启动、输入连接命令、弹出认证到连接成功的全过程。这能非常直观地展示您项目最大的亮点！
 
-   ```bash
-   npm install -g @google/gemini-cli
-   ```
+*(示例截图位置)*
+<img width="330" height="169" alt="image" src="https://github.com/user-attachments/assets/f79f2d6b-ca21-48ea-ba8a-bb728d63ac30" />
 
-   Then, run the CLI from anywhere:
+<img width="878" height="305" alt="image" src="https://github.com/user-attachments/assets/a7a1c788-1cef-4d1a-aefd-466618064207" />
 
-   ```bash
-   gemini
-   ```
 
-### With Homebrew
 
-1. **Prerequisites:** Ensure you have [Homebrew](https://brew.sh/) installed.
-2. **Install the CLI** Execute the following command in your terminal:
+## 🔧 开始使用 (Getting Started)
 
-   ```bash
-   brew install gemini-cli
-   ```
+请按照以下步骤在您的本地环境中安装和运行本项目。
 
-   Then, run the CLI from anywhere:
+### 1. 先决条件 (Prerequisites)
 
-   ```bash
-   gemini
-   ```
+确保您的系统中已经安装了以下软件：
+*   [Node.js](https://nodejs.org/) (建议版本 >= 18.0.0)
+*   [npm](https://www.npmjs.com/) (通常随 Node.js 一起安装)
+*   [Git](https://git-scm.com/)
 
-### Common Configuration steps
+### 2. 安装步骤 (Installation)
 
-3. **Pick a color theme**
-4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
+1.  **克隆本项目到本地**
+    ```bash
+    git clone git@github.com:LeslieLai1999/gemini-ssh.git
+    ```
 
-You are now ready to use the Gemini CLI!
+2.  **进入项目目录**
+    ```bash
+    cd your-repo-name
+    ```
 
-### Use a Gemini API key:
+3.  **安装项目依赖**
+    ```bash
+    npm install
+    ```
 
-The Gemini API provides a free tier with [100 requests per day](https://ai.google.dev/gemini-api/docs/rate-limits#free-tier) using Gemini 2.5 Pro, control over which model you use, and access to higher rate limits (with a paid plan):
+## 🚀 如何使用 (Usage)
 
-1. Generate a key from [Google AI Studio](https://aistudio.google.com/apikey).
-2. Set it as an environment variable in your terminal. Replace `YOUR_API_KEY` with your generated key.
+1.  **启动应用程序**
+    在项目根目录下，运行以下命令来启动命令行界面：
+    ```bash
+    npm run start
+    ```
 
-   ```bash
-   export GEMINI_API_KEY="YOUR_API_KEY"
-   ```
+2.  **连接到远程服务器**
+    应用启动后，您会看到一个命令行提示符。直接输入连接命令和您的服务器地址。
+    
+    *(您可以根据您的实际命令进行修改，这里是一个示例)*
+    ```
+    > connect your-server-address:port
+    ```
 
-3. (Optionally) Upgrade your Gemini API project to a paid plan on the API key page (will automatically unlock [Tier 1 rate limits](https://ai.google.dev/gemini-api/docs/rate-limits#tier-1))
+3.  **通过认证**
+    输入连接命令后，终端会提示您进行认证（例如，输入密码或令牌）。
+    ```
+    Authentication required for your-server-address:port
+    Enter password: ****
+    ```
 
-### Use a Vertex AI API key:
+4.  **连接成功并开始操作**
+    认证通过后，您将看到连接成功的提示。现在，您输入的任何命令都将发送到远程服务器执行。
+    ```
+    ✅ Successfully connected to your-server-address:port!
+    remote-server:~$ ls -l
+    # ... (远程服务器的输出) ...
+    ```
 
-The Vertex AI API provides a [free tier](https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview) using express mode for Gemini 2.5 Pro, control over which model you use, and access to higher rate limits with a billing account:
+## 🙏 致谢 (Acknowledgements)
 
-1. Generate a key from [Google Cloud](https://cloud.google.com/vertex-ai/generative-ai/docs/start/api-keys).
-2. Set it as an environment variable in your terminal. Replace `YOUR_API_KEY` with your generated key and set GOOGLE_GENAI_USE_VERTEXAI to true
+*   本项目基于原版 `gemini-cli` 进行修改，感谢原作者的杰出工作。
+*   *(在此处可以链接到原项目的 GitHub 地址)*
 
-   ```bash
-   export GOOGLE_API_KEY="YOUR_API_KEY"
-   export GOOGLE_GENAI_USE_VERTEXAI=true
-   ```
+## 🤝 贡献 (Contributing)
 
-3. (Optionally) Add a billing account on your project to get access to [higher usage limits](https://cloud.google.com/vertex-ai/generative-ai/docs/quotas)
+欢迎任何形式的贡献！如果您有好的想法或发现了 Bug，请随时提交 Pull Request 或创建 Issue。
 
-For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
+1.  Fork 本项目
+2.  创建您的特性分支 (`git checkout -b feature/AmazingFeature`)
+3.  提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
+4.  推送到分支 (`git push origin feature/AmazingFeature`)
+5.  打开一个 Pull Request
 
-## Examples
+## 📄 许可证 (License)
 
-Once the CLI is running, you can start interacting with Gemini from your shell.
-
-You can start a project from a new directory:
-
-```sh
-cd new-project/
-gemini
-> Write me a Gemini Discord bot that answers questions using a FAQ.md file I will provide
-```
-
-Or work with an existing project:
-
-```sh
-git clone https://github.com/google-gemini/gemini-cli
-cd gemini-cli
-gemini
-> Give me a summary of all of the changes that went in yesterday
-```
-
-### Next steps
-
-- Learn how to [contribute to or build from the source](./CONTRIBUTING.md).
-- Explore the available **[CLI Commands](./docs/cli/commands.md)**.
-- If you encounter any issues, review the **[troubleshooting guide](./docs/troubleshooting.md)**.
-- For more comprehensive documentation, see the [full documentation](./docs/index.md).
-- Take a look at some [popular tasks](#popular-tasks) for more inspiration.
-- Check out our **[Official Roadmap](./ROADMAP.md)**
-
-### Troubleshooting
-
-Head over to the [troubleshooting guide](docs/troubleshooting.md) if you're
-having issues.
-
-## Popular tasks
-
-### Explore a new codebase
-
-Start by `cd`ing into an existing or newly-cloned repository and running `gemini`.
-
-```text
-> Describe the main pieces of this system's architecture.
-```
-
-```text
-> What security mechanisms are in place?
-```
-
-### Work with your existing code
-
-```text
-> Implement a first draft for GitHub issue #123.
-```
-
-```text
-> Help me migrate this codebase to the latest version of Java. Start with a plan.
-```
-
-### Automate your workflows
-
-Use MCP servers to integrate your local system tools with your enterprise collaboration suite.
-
-```text
-> Make me a slide deck showing the git history from the last 7 days, grouped by feature and team member.
-```
-
-```text
-> Make a full-screen web app for a wall display to show our most interacted-with GitHub issues.
-```
-
-### Interact with your system
-
-```text
-> Convert all the images in this directory to png, and rename them to use dates from the exif data.
-```
-
-```text
-> Organize my PDF invoices by month of expenditure.
-```
-
-### Uninstall
-
-Head over to the [Uninstall](docs/Uninstall.md) guide for uninstallation instructions.
-
-## Terms of Service and Privacy Notice
-
-For details on the terms of service and privacy notice applicable to your use of Gemini CLI, see the [Terms of Service and Privacy Notice](./docs/tos-privacy.md).
+本项目采用 MIT 许可证。详情请见 `LICENSE` 文件。****
