@@ -15,6 +15,7 @@ import {
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
+  EVENT_FLASH_DECIDED_TO_CONTINUE,
   SERVICE_NAME,
 } from './constants.js';
 import {
@@ -25,6 +26,7 @@ import {
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  FlashDecidedToContinueEvent,
   LoopDetectedEvent,
 } from './types.js';
 import {
@@ -305,6 +307,27 @@ export function logLoopDetected(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Loop detected. Type: ${event.loop_type}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logFlashDecidedToContinue(
+  config: Config,
+  event: FlashDecidedToContinueEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logFlashDecidedToContinueEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_FLASH_DECIDED_TO_CONTINUE,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Flash decided to continue.`,
     attributes,
   };
   logger.emit(logRecord);

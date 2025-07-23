@@ -36,7 +36,7 @@ export class SchemaValidator {
 
   /**
    * Converts @google/genai's Schema to an object compatible with avj.
-   * This is necessry because it represents Types as an Enum (with
+   * This is necessary because it represents Types as an Enum (with
    * UPPERCASE values) and minItems and minLength as strings, when they should be numbers.
    */
   private static toObjectSchema(schema: Schema): object {

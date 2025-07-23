@@ -68,10 +68,6 @@ export function isProQuotaExceededError(error: unknown): boolean {
       };
     };
     if (gaxiosError.response && gaxiosError.response.data) {
-      console.log(
-        '[DEBUG] isProQuotaExceededError - checking response data:',
-        gaxiosError.response.data,
-      );
       if (typeof gaxiosError.response.data === 'string') {
         return checkMessage(gaxiosError.response.data);
       }
@@ -87,11 +83,6 @@ export function isProQuotaExceededError(error: unknown): boolean {
       }
     }
   }
-
-  console.log(
-    '[DEBUG] isProQuotaExceededError - no matching error format for:',
-    error,
-  );
   return false;
 }
 

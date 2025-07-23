@@ -12,7 +12,7 @@ import {
 } from '@google/genai';
 import { GeminiClient } from '../core/client.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
-import { PartListUnion } from '@google/genai';
+import { getResponseText, partToString } from './partUtils.js';
 
 /**
  * A function that summarizes the result of a tool execution.
@@ -39,40 +39,6 @@ export const defaultSummarizer: Summarizer = (
   _geminiClient: GeminiClient,
   _abortSignal: AbortSignal,
 ) => Promise.resolve(JSON.stringify(result.llmContent));
-
-// TODO: Move both these functions to utils
-function partToString(part: PartListUnion): string {
-  if (!part) {
-    return '';
-  }
-  if (typeof part === 'string') {
-    return part;
-  }
-  if (Array.isArray(part)) {
-    return part.map(partToString).join('');
-  }
-  if ('text' in part) {
-    return part.text ?? '';
-  }
-  return '';
-}
-
-function getResponseText(response: GenerateContentResponse): string | null {
-  if (response.candidates && response.candidates.length > 0) {
-    const candidate = response.candidates[0];
-    if (
-      candidate.content &&
-      candidate.content.parts &&
-      candidate.content.parts.length > 0
-    ) {
-      return candidate.content.parts
-        .filter((part) => part.text)
-        .map((part) => part.text)
-        .join('');
-    }
-  }
-  return null;
-}
 
 const SUMMARIZE_TOOL_OUTPUT_PROMPT = `Summarize the following tool output to be a maximum of {maxOutputTokens} tokens. The summary should be concise and capture the main points of the tool output.
 

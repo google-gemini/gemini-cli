@@ -117,7 +117,7 @@ class ThemeManager {
     if (process.env.NO_COLOR) {
       return NoColorTheme;
     }
-    // Ensure the active theme is always valid (fallback to default if not)
+    // Ensure the active theme is always valid (fall back to default if not)
     if (!this.activeTheme || !this.findThemeByName(this.activeTheme.name)) {
       this.activeTheme = DEFAULT_THEME;
     }

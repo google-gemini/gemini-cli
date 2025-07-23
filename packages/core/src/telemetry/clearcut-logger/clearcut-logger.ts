@@ -18,6 +18,7 @@ import {
   ApiErrorEvent,
   FlashFallbackEvent,
   LoopDetectedEvent,
+  FlashDecidedToContinueEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
@@ -37,6 +38,7 @@ const api_error_event_name = 'api_error';
 const end_session_event_name = 'end_session';
 const flash_fallback_event_name = 'flash_fallback';
 const loop_detected_event_name = 'loop_detected';
+const flash_decided_to_continue_event_name = 'flash_decided_to_continue';
 
 export interface LogResponse {
   nextRequestWaitMs?: number;
@@ -489,6 +491,24 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(loop_detected_event_name, data));
+    this.flushIfNeeded();
+  }
+
+  logFlashDecidedToContinueEvent(event: FlashDecidedToContinueEvent): void {
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: JSON.stringify(event.prompt_id),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(flash_decided_to_continue_event_name, data),
+    );
     this.flushIfNeeded();
   }
 

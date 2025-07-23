@@ -151,7 +151,7 @@ export class Theme {
           inkTheme[key] = resolvedColor;
         }
         // If color is not resolvable, it's omitted from the map,
-        // allowing fallback to the default foreground color.
+        // this enables falling back to the default foreground color.
       }
       // We currently only care about the 'color' property for Ink rendering.
       // Other properties like background, fontStyle, etc., are ignored.

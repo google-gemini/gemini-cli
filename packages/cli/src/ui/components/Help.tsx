@@ -10,7 +10,7 @@ import { Colors } from '../colors.js';
 import { SlashCommand } from '../commands/types.js';
 
 interface Help {
-  commands: SlashCommand[];
+  commands: readonly SlashCommand[];
 }
 
 export const Help: React.FC<Help> = ({ commands }) => (

@@ -341,7 +341,7 @@ describe('useReactToolScheduler', () => {
     const schedule = result.current[1];
     const request: ToolCallRequestInfo = {
       callId: 'call1',
-      name: 'nonExistentTool',
+      name: 'nonexistentTool',
       args: {},
     };
 
@@ -361,7 +361,7 @@ describe('useReactToolScheduler', () => {
         request,
         response: expect.objectContaining({
           error: expect.objectContaining({
-            message: 'Tool "nonExistentTool" not found in registry.',
+            message: 'Tool "nonexistentTool" not found in registry.',
           }),
         }),
       }),

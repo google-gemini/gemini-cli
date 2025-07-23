@@ -21,8 +21,14 @@ export async function createCodeAssistContentGenerator(
     authType === AuthType.CLOUD_SHELL
   ) {
     const authClient = await getOauthClient(authType, config);
-    const projectId = await setupUser(authClient);
-    return new CodeAssistServer(authClient, projectId, httpOptions, sessionId);
+    const userData = await setupUser(authClient);
+    return new CodeAssistServer(
+      authClient,
+      userData.projectId,
+      httpOptions,
+      sessionId,
+      userData.userTier,
+    );
   }
 
   throw new Error(`Unsupported authType: ${authType}`);

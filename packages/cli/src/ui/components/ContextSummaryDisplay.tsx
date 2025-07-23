@@ -7,7 +7,7 @@
 import React from 'react';
 import { Text } from 'ink';
 import { Colors } from '../colors.js';
-import { type ActiveFile, type MCPServerConfig } from '@google/gemini-cli-core';
+import { type OpenFiles, type MCPServerConfig } from '@google/gemini-cli-core';
 import path from 'path';
 
 interface ContextSummaryDisplayProps {
@@ -16,7 +16,7 @@ interface ContextSummaryDisplayProps {
   mcpServers?: Record<string, MCPServerConfig>;
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   showToolDescriptions?: boolean;
-  activeFile?: ActiveFile;
+  openFiles?: OpenFiles;
 }
 
 export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
@@ -25,7 +25,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   mcpServers,
   blockedMcpServers,
   showToolDescriptions,
-  activeFile,
+  openFiles,
 }) => {
   const mcpServerCount = Object.keys(mcpServers || {}).length;
   const blockedMcpServerCount = blockedMcpServers?.length || 0;
@@ -34,16 +34,16 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     geminiMdFileCount === 0 &&
     mcpServerCount === 0 &&
     blockedMcpServerCount === 0 &&
-    !activeFile?.filePath
+    !openFiles?.activeFile
   ) {
     return <Text> </Text>; // Render an empty space to reserve height
   }
 
   const activeFileText = (() => {
-    if (!activeFile?.filePath) {
+    if (!openFiles?.activeFile) {
       return '';
     }
-    return `Open File (${path.basename(activeFile.filePath)})`;
+    return `Open File (${path.basename(openFiles.activeFile)})`;
   })();
 
   const geminiMdText = (() => {

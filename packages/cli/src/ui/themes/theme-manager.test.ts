@@ -85,7 +85,7 @@ describe('ThemeManager', () => {
     expect(themeManager.getTheme('MyCustomTheme')).toBeDefined();
   });
 
-  it('should fallback to default theme if active theme is invalid', () => {
+  it('should fall back to default theme if active theme is invalid', () => {
     (themeManager as unknown as { activeTheme: unknown }).activeTheme = {
       name: 'NonExistent',
       type: 'custom',

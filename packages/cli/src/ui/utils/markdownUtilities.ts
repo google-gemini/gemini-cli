@@ -29,7 +29,7 @@ This function aims to find an *intelligent* or "safe" index within the provided 
         * **Single Line Breaks:** If no double newline is found in a suitable range, it will look for a single newline (`\n`).
     * Any newline chosen as a split point must also not be inside a code block.
 
-4.  **Fallback to `idealMaxLength`:**
+4.  **Fall back to `idealMaxLength`:**
     * If no "safer" split point (respecting code blocks or finding suitable newlines) is identified before or at `idealMaxLength`, and `idealMaxLength` itself is not determined to be an unsafe split point (e.g., inside a code block), the function may return a length larger than `idealMaxLength`, again it CANNOT break markdown formatting. This could happen with very long lines of text without Markdown block structures or newlines.
 
 **In essence, `findSafeSplitPoint` tries to be a good Markdown citizen when forced to divide content, preferring structural boundaries over arbitrary character limits, with a strong emphasis on not corrupting code blocks.**
