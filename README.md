@@ -87,8 +87,7 @@
 ## 🙏 致谢 (Acknowledgements)
 
 *   本项目基于原版 `gemini-cli` 进行修改，感谢原作者的杰出工作。
-*   *(在此处可以链接到原项目的 GitHub 地址)*
-
+*   
 ## 🤝 贡献 (Contributing)
 
 欢迎任何形式的贡献！如果您有好的想法或发现了 Bug，请随时提交 Pull Request 或创建 Issue。
