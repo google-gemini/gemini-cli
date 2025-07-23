@@ -240,7 +240,9 @@ const renderDiffContent = (
         ) {
           acc.push(
             <Box key={`gap-${index}`}>
-              <Text wrap="truncate">{'═'.repeat(terminalWidth)}</Text>
+              <Text wrap="truncate" color={Colors.Gray}>
+                {'═'.repeat(terminalWidth)}
+              </Text>
             </Box>,
           );
         }
