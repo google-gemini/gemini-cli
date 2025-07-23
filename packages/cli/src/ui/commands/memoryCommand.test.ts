@@ -9,6 +9,7 @@ import { memoryCommand } from './memoryCommand.js';
 import { type CommandContext, SlashCommand } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
+import { LoadedSettings } from '../../config/settings.js';
 import {
   getErrorMessage,
   loadServerHierarchicalMemory,
@@ -153,16 +154,27 @@ describe('memoryCommand', () => {
       refreshCommand = getSubCommand('refresh');
       mockSetUserMemory = vi.fn();
       mockSetGeminiMdFileCount = vi.fn();
+      const mockConfig = {
+        setUserMemory: mockSetUserMemory,
+        setGeminiMdFileCount: mockSetGeminiMdFileCount,
+        getWorkingDir: () => '/test/dir',
+        getDebugMode: () => false,
+        getFileService: () => ({}) as FileDiscoveryService,
+        getExtensionContextFilePaths: () => [],
+        getFileFilteringOptions: () => ({
+          ignore: [],
+          include: [],
+        }),
+      };
+
       mockContext = createMockCommandContext({
         services: {
-          config: {
-            setUserMemory: mockSetUserMemory,
-            setGeminiMdFileCount: mockSetGeminiMdFileCount,
-            getWorkingDir: () => '/test/dir',
-            getDebugMode: () => false,
-            getFileService: () => ({}) as FileDiscoveryService,
-            getExtensionContextFilePaths: () => [],
-          },
+          config: Promise.resolve(mockConfig),
+          settings: {
+            merged: {
+              memoryDiscoveryMaxDirs: 1000,
+            },
+          } as LoadedSettings,
         },
       });
       mockLoadServerHierarchicalMemory.mockClear();
