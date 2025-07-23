@@ -31,7 +31,7 @@ describe('AuthDialog', () => {
 
     const settings: LoadedSettings = new LoadedSettings(
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       {
@@ -41,7 +41,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       [],
@@ -68,11 +68,17 @@ describe('AuthDialog', () => {
         {
           settings: {
             selectedAuthType: undefined,
+            customThemes: {},
+            mcpServers: {},
           },
           path: '',
         },
         {
-          settings: {},
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
         [],
@@ -95,11 +101,17 @@ describe('AuthDialog', () => {
         {
           settings: {
             selectedAuthType: undefined,
+            customThemes: {},
+            mcpServers: {},
           },
           path: '',
         },
         {
-          settings: {},
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
         [],
@@ -122,11 +134,17 @@ describe('AuthDialog', () => {
         {
           settings: {
             selectedAuthType: undefined,
+            customThemes: {},
+            mcpServers: {},
           },
           path: '',
         },
         {
-          settings: {},
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
         [],
@@ -150,11 +168,17 @@ describe('AuthDialog', () => {
         {
           settings: {
             selectedAuthType: undefined,
+            customThemes: {},
+            mcpServers: {},
           },
           path: '',
         },
         {
-          settings: {},
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
         [],
@@ -165,7 +189,7 @@ describe('AuthDialog', () => {
       );
 
       // This is a bit brittle, but it's the best way to check which item is selected.
-      expect(lastFrame()).toContain('● Login with Google');
+      expect(lastFrame()).toContain('● 1. Login with Google');
     });
 
     it('should fall back to default if GEMINI_DEFAULT_AUTH_TYPE is not set', () => {
@@ -173,11 +197,17 @@ describe('AuthDialog', () => {
         {
           settings: {
             selectedAuthType: undefined,
+            customThemes: {},
+            mcpServers: {},
           },
           path: '',
         },
         {
-          settings: {},
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
         [],
@@ -188,7 +218,7 @@ describe('AuthDialog', () => {
       );
 
       // Default is LOGIN_WITH_GOOGLE
-      expect(lastFrame()).toContain('● Login with Google');
+      expect(lastFrame()).toContain('● 1. Login with Google');
     });
 
     it('should show an error and fall back to default if GEMINI_DEFAULT_AUTH_TYPE is invalid', () => {
@@ -198,11 +228,17 @@ describe('AuthDialog', () => {
         {
           settings: {
             selectedAuthType: undefined,
+            customThemes: {},
+            mcpServers: {},
           },
           path: '',
         },
         {
-          settings: {},
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
         [],
@@ -217,7 +253,7 @@ describe('AuthDialog', () => {
       );
 
       // Default is LOGIN_WITH_GOOGLE
-      expect(lastFrame()).toContain('● Login with Google');
+      expect(lastFrame()).toContain('● 1. Login with Google');
     });
   });
 
@@ -225,17 +261,19 @@ describe('AuthDialog', () => {
     const onSelect = vi.fn();
     const settings: LoadedSettings = new LoadedSettings(
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       {
         settings: {
           selectedAuthType: undefined,
+          customThemes: {},
+          mcpServers: {},
         },
         path: '',
       },
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       [],
@@ -262,11 +300,19 @@ describe('AuthDialog', () => {
     const onSelect = vi.fn();
     const settings: LoadedSettings = new LoadedSettings(
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       {
-        settings: {},
+        settings: {
+          selectedAuthType: undefined,
+          customThemes: {},
+          mcpServers: {},
+        },
+        path: '',
+      },
+      {
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       [],
@@ -296,17 +342,19 @@ describe('AuthDialog', () => {
     const onSelect = vi.fn();
     const settings: LoadedSettings = new LoadedSettings(
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       {
         settings: {
           selectedAuthType: AuthType.USE_GEMINI,
+          customThemes: {},
+          mcpServers: {},
         },
         path: '',
       },
       {
-        settings: {},
+        settings: { customThemes: {}, mcpServers: {} },
         path: '',
       },
       [],

@@ -249,6 +249,7 @@ export class FlashFallbackEvent {
 export enum LoopType {
   CONSECUTIVE_IDENTICAL_TOOL_CALLS = 'consecutive_identical_tool_calls',
   CHANTING_IDENTICAL_SENTENCES = 'chanting_identical_sentences',
+  LLM_DETECTED_LOOP = 'llm_detected_loop',
 }
 
 export class LoopDetectedEvent {
@@ -263,6 +264,18 @@ export class LoopDetectedEvent {
   }
 }
 
+export class FlashDecidedToContinueEvent {
+  'event.name': 'flash_decided_to_continue';
+  'event.timestamp': string; // ISO 8601
+  prompt_id: string;
+
+  constructor(prompt_id: string) {
+    this['event.name'] = 'flash_decided_to_continue';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -272,4 +285,5 @@ export type TelemetryEvent =
   | ApiErrorEvent
   | ApiResponseEvent
   | FlashFallbackEvent
-  | LoopDetectedEvent;
+  | LoopDetectedEvent
+  | FlashDecidedToContinueEvent;

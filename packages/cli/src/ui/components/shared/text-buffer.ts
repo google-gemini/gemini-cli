@@ -40,7 +40,7 @@ function isWordChar(ch: string | undefined): boolean {
  */
 function stripUnsafeCharacters(str: string): string {
   const stripped = stripAnsi(str);
-  return toCodePoints(stripAnsi(stripped))
+  return toCodePoints(stripped)
     .filter((char) => {
       if (char.length > 1) return false;
       const code = char.codePointAt(0);

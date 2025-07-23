@@ -12,7 +12,7 @@ import {
 } from '@google/genai';
 import { GeminiClient } from '../core/client.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
-import { PartListUnion } from '@google/genai';
+import { getResponseText, partToString } from './partUtils.js';
 
 /**
  * A function that summarizes the result of a tool execution.
@@ -40,46 +40,7 @@ export const defaultSummarizer: Summarizer = (
   _abortSignal: AbortSignal,
 ) => Promise.resolve(JSON.stringify(result.llmContent));
 
-// TODO: Move both these functions to utils
-function partToString(part: PartListUnion): string {
-  if (!part) {
-    return '';
-  }
-  if (typeof part === 'string') {
-    return part;
-  }
-  if (Array.isArray(part)) {
-    return part.map(partToString).join('');
-  }
-  if ('text' in part) {
-    return part.text ?? '';
-  }
-  return '';
-}
-
-function getResponseText(response: GenerateContentResponse): string | null {
-  if (response.candidates && response.candidates.length > 0) {
-    const candidate = response.candidates[0];
-    if (
-      candidate.content &&
-      candidate.content.parts &&
-      candidate.content.parts.length > 0
-    ) {
-      return candidate.content.parts
-        .filter((part) => part.text)
-        .map((part) => part.text)
-        .join('');
-    }
-  }
-  return null;
-}
-
-const toolOutputSummarizerModel = DEFAULT_GEMINI_FLASH_MODEL;
-const toolOutputSummarizerConfig: GenerateContentConfig = {
-  maxOutputTokens: 2000,
-};
-
-const SUMMARIZE_TOOL_OUTPUT_PROMPT = `Summarize the following tool output to be a maximum of {maxLength} characters. The summary should be concise and capture the main points of the tool output.
+const SUMMARIZE_TOOL_OUTPUT_PROMPT = `Summarize the following tool output to be a maximum of {maxOutputTokens} tokens. The summary should be concise and capture the main points of the tool output.
 
 The summarization should be done based on the content that is provided. Here are the basic rules to follow:
 1. If the text is a directory listing or any output that is structural, use the history of the conversation to understand the context. Using this context try to understand what information we need from the tool output and return that as a response.
@@ -104,24 +65,28 @@ export async function summarizeToolOutput(
   textToSummarize: string,
   geminiClient: GeminiClient,
   abortSignal: AbortSignal,
-  maxLength: number = 2000,
+  maxOutputTokens: number = 2000,
 ): Promise<string> {
-  if (!textToSummarize || textToSummarize.length < maxLength) {
+  // There is going to be a slight difference here since we are comparing length of string with maxOutputTokens.
+  // This is meant to be a ballpark estimation of if we need to summarize the tool output.
+  if (!textToSummarize || textToSummarize.length < maxOutputTokens) {
     return textToSummarize;
   }
   const prompt = SUMMARIZE_TOOL_OUTPUT_PROMPT.replace(
-    '{maxLength}',
-    String(maxLength),
+    '{maxOutputTokens}',
+    String(maxOutputTokens),
   ).replace('{textToSummarize}', textToSummarize);
 
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
-
+  const toolOutputSummarizerConfig: GenerateContentConfig = {
+    maxOutputTokens,
+  };
   try {
     const parsedResponse = (await geminiClient.generateContent(
       contents,
       toolOutputSummarizerConfig,
       abortSignal,
-      toolOutputSummarizerModel,
+      DEFAULT_GEMINI_FLASH_MODEL,
     )) as unknown as GenerateContentResponse;
     return getResponseText(parsedResponse) || textToSummarize;
   } catch (error) {

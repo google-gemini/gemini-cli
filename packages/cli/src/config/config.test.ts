@@ -43,6 +43,14 @@ vi.mock('@google/gemini-cli-core', async () => {
           fileCount: extensionPaths?.length || 0,
         }),
     ),
+    DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: {
+      respectGitIgnore: false,
+      respectGeminiIgnore: true,
+    },
+    DEFAULT_FILE_FILTERING_OPTIONS: {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    },
   };
 });
 
@@ -186,6 +194,73 @@ describe('loadCliConfig', () => {
     const settings: Settings = { showMemoryUsage: false };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getShowMemoryUsage()).toBe(true);
+  });
+
+  it(`should leave proxy to empty by default`, async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getProxy()).toBeFalsy();
+  });
+
+  const proxy_url = 'http://localhost:7890';
+  const testCases = [
+    {
+      input: {
+        env_name: 'https_proxy',
+        proxy_url,
+      },
+      expected: proxy_url,
+    },
+    {
+      input: {
+        env_name: 'http_proxy',
+        proxy_url,
+      },
+      expected: proxy_url,
+    },
+    {
+      input: {
+        env_name: 'HTTPS_PROXY',
+        proxy_url,
+      },
+      expected: proxy_url,
+    },
+    {
+      input: {
+        env_name: 'HTTP_PROXY',
+        proxy_url,
+      },
+      expected: proxy_url,
+    },
+  ];
+  testCases.forEach(({ input, expected }) => {
+    it(`should set proxy to ${expected} according to environment variable [${input.env_name}]`, async () => {
+      process.env[input.env_name] = input.proxy_url;
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments();
+      const settings: Settings = {};
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(config.getProxy()).toBe(expected);
+    });
+  });
+
+  it('should set proxy when --proxy flag is present', async () => {
+    process.argv = ['node', 'script.js', '--proxy', 'http://localhost:7890'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getProxy()).toBe('http://localhost:7890');
+  });
+
+  it('should prioritize CLI flag over environment variable for proxy (CLI http://localhost:7890, environment variable http://localhost:7891)', async () => {
+    process.env['http_proxy'] = 'http://localhost:7891';
+    process.argv = ['node', 'script.js', '--proxy', 'http://localhost:7890'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getProxy()).toBe('http://localhost:7890');
   });
 });
 
@@ -412,6 +487,10 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         '/path/to/ext3/context1.md',
         '/path/to/ext3/context2.md',
       ],
+      {
+        respectGitIgnore: false,
+        respectGeminiIgnore: true,
+      },
     );
   });
 
@@ -725,6 +804,66 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(baseSettings, [], 'test-session', argv);
     expect(config.getMcpServers()).toEqual({});
   });
+
+  it('should read allowMCPServers from settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      ...baseSettings,
+      allowMCPServers: ['server1', 'server2'],
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getMcpServers()).toEqual({
+      server1: { url: 'http://localhost:8080' },
+      server2: { url: 'http://localhost:8081' },
+    });
+  });
+
+  it('should read excludeMCPServers from settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      ...baseSettings,
+      excludeMCPServers: ['server1', 'server2'],
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getMcpServers()).toEqual({
+      server3: { url: 'http://localhost:8082' },
+    });
+  });
+
+  it('should override allowMCPServers with excludeMCPServers if overlapping ', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      ...baseSettings,
+      excludeMCPServers: ['server1'],
+      allowMCPServers: ['server1', 'server2'],
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getMcpServers()).toEqual({
+      server2: { url: 'http://localhost:8081' },
+    });
+  });
+
+  it('should prioritize mcp server flag if set ', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed-mcp-server-names',
+      'server1',
+    ];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      ...baseSettings,
+      excludeMCPServers: ['server1'],
+      allowMCPServers: ['server2'],
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getMcpServers()).toEqual({
+      server1: { url: 'http://localhost:8080' },
+    });
+  });
 });
 
 describe('loadCliConfig extensions', () => {
@@ -780,6 +919,7 @@ describe('loadCliConfig ideMode', () => {
     // Explicitly delete TERM_PROGRAM and SANDBOX before each test
     delete process.env.TERM_PROGRAM;
     delete process.env.SANDBOX;
+    delete process.env.GEMINI_CLI_IDE_SERVER_PORT;
   });
 
   afterEach(() => {
@@ -816,6 +956,7 @@ describe('loadCliConfig ideMode', () => {
     process.argv = ['node', 'script.js', '--ide-mode'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(true);
@@ -825,6 +966,7 @@ describe('loadCliConfig ideMode', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
     const settings: Settings = { ideMode: true };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(true);
@@ -834,6 +976,7 @@ describe('loadCliConfig ideMode', () => {
     process.argv = ['node', 'script.js', '--ide-mode'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
     const settings: Settings = { ideMode: false };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(true);
@@ -868,10 +1011,11 @@ describe('loadCliConfig ideMode', () => {
     expect(config.getIdeMode()).toBe(false);
   });
 
-  it('should add __ide_server when ideMode is true', async () => {
+  it('should add _ide_server when ideMode is true', async () => {
     process.argv = ['node', 'script.js', '--ide-mode'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(true);
@@ -880,5 +1024,86 @@ describe('loadCliConfig ideMode', () => {
     expect(mcpServers['_ide_server'].httpUrl).toBe('http://localhost:3000/mcp');
     expect(mcpServers['_ide_server'].description).toBe('IDE connection');
     expect(mcpServers['_ide_server'].trust).toBe(false);
+  });
+
+  it('should warn if ideMode is true and no port is set', async () => {
+    const consoleWarnSpy = vi
+      .spyOn(console, 'warn')
+      .mockImplementation(() => {});
+    process.argv = ['node', 'script.js', '--ide-mode'];
+    const argv = await parseArguments();
+    process.env.TERM_PROGRAM = 'vscode';
+    const settings: Settings = {};
+    await loadCliConfig(settings, [], 'test-session', argv);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[WARN]',
+      'Could not connect to IDE. Make sure you have the companion VS Code extension installed from the marketplace or via /ide install.',
+    );
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('should warn and overwrite if settings contain the reserved _ide_server name and ideMode is active', async () => {
+    const consoleWarnSpy = vi
+      .spyOn(console, 'warn')
+      .mockImplementation(() => {});
+
+    process.argv = ['node', 'script.js', '--ide-mode'];
+    const argv = await parseArguments();
+    process.env.TERM_PROGRAM = 'vscode';
+    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
+    const settings: Settings = {
+      mcpServers: {
+        _ide_server: new ServerConfig.MCPServerConfig(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'http://malicious:1234',
+        ),
+      },
+    };
+
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[WARN]',
+      'Ignoring user-defined MCP server config for "_ide_server" as it is a reserved name.',
+    );
+
+    const mcpServers = config.getMcpServers();
+    expect(mcpServers['_ide_server']).toBeDefined();
+    expect(mcpServers['_ide_server'].httpUrl).toBe('http://localhost:3000/mcp');
+
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('should NOT warn if settings contain the reserved _ide_server name and ideMode is NOT active', async () => {
+    const consoleWarnSpy = vi
+      .spyOn(console, 'warn')
+      .mockImplementation(() => {});
+
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      mcpServers: {
+        _ide_server: new ServerConfig.MCPServerConfig(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'http://malicious:1234',
+        ),
+      },
+    };
+
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+    expect(consoleWarnSpy).not.toHaveBeenCalled();
+
+    const mcpServers = config.getMcpServers();
+    expect(mcpServers['_ide_server']).toBeDefined();
+    expect(mcpServers['_ide_server'].url).toBe('http://malicious:1234');
+
+    consoleWarnSpy.mockRestore();
   });
 });

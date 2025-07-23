@@ -4,9 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Content } from '@google/genai';
+import { HistoryItemWithoutId } from '../types.js';
 import { Config, GitService, Logger } from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
 import { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+import type { HistoryItem } from '../types.js';
 import { SessionStatsState } from '../contexts/SessionContext.js';
 
 // Grouped dependencies for clarity and easier mocking
@@ -21,11 +24,6 @@ export interface CommandContext {
   };
   // UI state and history management
   ui: {
-    // TODO - As more commands are add some additions may be needed or reworked using this new context.
-    // Ex.
-    // history: HistoryItem[];
-    // pendingHistoryItems: HistoryItemWithoutId[];
-
     /** Adds a new item to the history display. */
     addItem: UseHistoryManagerReturn['addItem'];
     /** Clears all history items and the console screen. */
@@ -34,6 +32,23 @@ export interface CommandContext {
      * Sets the transient debug message displayed in the application footer in debug mode.
      */
     setDebugMessage: (message: string) => void;
+    /** The currently pending history item, if any. */
+    pendingItem: HistoryItemWithoutId | null;
+    /**
+     * Sets a pending item in the history, which is useful for indicating
+     * that a long-running operation is in progress.
+     *
+     * @param item The history item to display as pending, or `null` to clear.
+     */
+    setPendingItem: (item: HistoryItemWithoutId | null) => void;
+    /**
+     * Loads a new set of history items, replacing the current history.
+     *
+     * @param history The array of history items to load.
+     */
+    loadHistory: UseHistoryManagerReturn['loadHistory'];
+    /** Toggles a special display mode. */
+    toggleCorgiMode: () => void;
   };
   // Session-specific data
   session: {
@@ -48,6 +63,12 @@ export interface ToolActionReturn {
   type: 'tool';
   toolName: string;
   toolArgs: Record<string, unknown>;
+}
+
+/** The return type for a command action that results in the app quitting. */
+export interface QuitActionReturn {
+  type: 'quit';
+  messages: HistoryItem[];
 }
 
 /**
@@ -65,19 +86,48 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  // TODO: Add 'theme' | 'auth' | 'editor' | 'privacy' as migration happens.
-  dialog: 'help' | 'auth' | 'theme' | 'privacy';
+  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy';
+}
+
+/**
+ * The return type for a command action that results in replacing
+ * the entire conversation history.
+ */
+export interface LoadHistoryActionReturn {
+  type: 'load_history';
+  history: HistoryItemWithoutId[];
+  clientHistory: Content[]; // The history for the generative client
+}
+
+/**
+ * The return type for a command action that should immediately submit
+ * content as a prompt to the Gemini model.
+ */
+export interface SubmitPromptActionReturn {
+  type: 'submit_prompt';
+  content: string;
 }
 
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
-  | OpenDialogActionReturn;
+  | QuitActionReturn
+  | OpenDialogActionReturn
+  | LoadHistoryActionReturn
+  | SubmitPromptActionReturn;
+
+export enum CommandKind {
+  BUILT_IN = 'built-in',
+  FILE = 'file',
+}
+
 // The standardized contract for any command in the system.
 export interface SlashCommand {
   name: string;
-  altName?: string;
-  description?: string;
+  altNames?: string[];
+  description: string;
+
+  kind: CommandKind;
 
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (

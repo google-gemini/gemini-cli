@@ -4,135 +4,177 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CommandService } from './CommandService.js';
-import { type SlashCommand } from '../ui/commands/types.js';
-import { memoryCommand } from '../ui/commands/memoryCommand.js';
-import { helpCommand } from '../ui/commands/helpCommand.js';
-import { clearCommand } from '../ui/commands/clearCommand.js';
-import { authCommand } from '../ui/commands/authCommand.js';
-import { themeCommand } from '../ui/commands/themeCommand.js';
-import { privacyCommand } from '../ui/commands/privacyCommand.js';
-import { aboutCommand } from '../ui/commands/aboutCommand.js';
+import { type ICommandLoader } from './types.js';
+import { CommandKind, type SlashCommand } from '../ui/commands/types.js';
 
-// Mock the command modules to isolate the service from the command implementations.
-vi.mock('../ui/commands/memoryCommand.js', () => ({
-  memoryCommand: { name: 'memory', description: 'Mock Memory' },
-}));
-vi.mock('../ui/commands/helpCommand.js', () => ({
-  helpCommand: { name: 'help', description: 'Mock Help' },
-}));
-vi.mock('../ui/commands/clearCommand.js', () => ({
-  clearCommand: { name: 'clear', description: 'Mock Clear' },
-}));
-vi.mock('../ui/commands/authCommand.js', () => ({
-  authCommand: { name: 'auth', description: 'Mock Auth' },
-}));
-vi.mock('../ui/commands/themeCommand.js', () => ({
-  themeCommand: { name: 'theme', description: 'Mock Theme' },
-}));
-vi.mock('../ui/commands/privacyCommand.js', () => ({
-  privacyCommand: { name: 'privacy', description: 'Mock Privacy' },
-}));
-vi.mock('../ui/commands/aboutCommand.js', () => ({
-  aboutCommand: { name: 'about', description: 'Mock About' },
-}));
+const createMockCommand = (name: string, kind: CommandKind): SlashCommand => ({
+  name,
+  description: `Description for ${name}`,
+  kind,
+  action: vi.fn(),
+});
+
+const mockCommandA = createMockCommand('command-a', CommandKind.BUILT_IN);
+const mockCommandB = createMockCommand('command-b', CommandKind.BUILT_IN);
+const mockCommandC = createMockCommand('command-c', CommandKind.FILE);
+const mockCommandB_Override = createMockCommand('command-b', CommandKind.FILE);
+
+class MockCommandLoader implements ICommandLoader {
+  private commandsToLoad: SlashCommand[];
+
+  constructor(commandsToLoad: SlashCommand[]) {
+    this.commandsToLoad = commandsToLoad;
+  }
+
+  loadCommands = vi.fn(
+    async (): Promise<SlashCommand[]> => Promise.resolve(this.commandsToLoad),
+  );
+}
 
 describe('CommandService', () => {
-  describe('when using default production loader', () => {
-    let commandService: CommandService;
-
-    beforeEach(() => {
-      commandService = new CommandService();
-    });
-
-    it('should initialize with an empty command tree', () => {
-      const tree = commandService.getCommands();
-      expect(tree).toBeInstanceOf(Array);
-      expect(tree.length).toBe(0);
-    });
-
-    describe('loadCommands', () => {
-      it('should load the built-in commands into the command tree', async () => {
-        // Pre-condition check
-        expect(commandService.getCommands().length).toBe(0);
-
-        // Action
-        await commandService.loadCommands();
-        const tree = commandService.getCommands();
-
-        // Post-condition assertions
-        expect(tree.length).toBe(7);
-
-        const commandNames = tree.map((cmd) => cmd.name);
-        expect(commandNames).toContain('auth');
-        expect(commandNames).toContain('memory');
-        expect(commandNames).toContain('help');
-        expect(commandNames).toContain('clear');
-        expect(commandNames).toContain('theme');
-        expect(commandNames).toContain('privacy');
-        expect(commandNames).toContain('about');
-      });
-
-      it('should overwrite any existing commands when called again', async () => {
-        // Load once
-        await commandService.loadCommands();
-        expect(commandService.getCommands().length).toBe(7);
-
-        // Load again
-        await commandService.loadCommands();
-        const tree = commandService.getCommands();
-
-        // Should not append, but overwrite
-        expect(tree.length).toBe(7);
-      });
-    });
-
-    describe('getCommandTree', () => {
-      it('should return the current command tree', async () => {
-        const initialTree = commandService.getCommands();
-        expect(initialTree).toEqual([]);
-
-        await commandService.loadCommands();
-
-        const loadedTree = commandService.getCommands();
-        expect(loadedTree.length).toBe(7);
-        expect(loadedTree).toEqual([
-          aboutCommand,
-          authCommand,
-          clearCommand,
-          helpCommand,
-          memoryCommand,
-          privacyCommand,
-          themeCommand,
-        ]);
-      });
-    });
+  beforeEach(() => {
+    vi.spyOn(console, 'debug').mockImplementation(() => {});
   });
 
-  describe('when initialized with an injected loader function', () => {
-    it('should use the provided loader instead of the built-in one', async () => {
-      // Arrange: Create a set of mock commands.
-      const mockCommands: SlashCommand[] = [
-        { name: 'injected-test-1', description: 'injected 1' },
-        { name: 'injected-test-2', description: 'injected 2' },
-      ];
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-      // Arrange: Create a mock loader FUNCTION that resolves with our mock commands.
-      const mockLoader = vi.fn().mockResolvedValue(mockCommands);
+  it('should load commands from a single loader', async () => {
+    const mockLoader = new MockCommandLoader([mockCommandA, mockCommandB]);
+    const service = await CommandService.create(
+      [mockLoader],
+      new AbortController().signal,
+    );
 
-      // Act: Instantiate the service WITH the injected loader function.
-      const commandService = new CommandService(mockLoader);
-      await commandService.loadCommands();
-      const tree = commandService.getCommands();
+    const commands = service.getCommands();
 
-      // Assert: The tree should contain ONLY our injected commands.
-      expect(mockLoader).toHaveBeenCalled(); // Verify our mock loader was actually called.
-      expect(tree.length).toBe(2);
-      expect(tree).toEqual(mockCommands);
+    expect(mockLoader.loadCommands).toHaveBeenCalledTimes(1);
+    expect(commands).toHaveLength(2);
+    expect(commands).toEqual(
+      expect.arrayContaining([mockCommandA, mockCommandB]),
+    );
+  });
 
-      const commandNames = tree.map((cmd) => cmd.name);
-      expect(commandNames).not.toContain('memory'); // Verify it didn't load production commands.
-    });
+  it('should aggregate commands from multiple loaders', async () => {
+    const loader1 = new MockCommandLoader([mockCommandA]);
+    const loader2 = new MockCommandLoader([mockCommandC]);
+    const service = await CommandService.create(
+      [loader1, loader2],
+      new AbortController().signal,
+    );
+
+    const commands = service.getCommands();
+
+    expect(loader1.loadCommands).toHaveBeenCalledTimes(1);
+    expect(loader2.loadCommands).toHaveBeenCalledTimes(1);
+    expect(commands).toHaveLength(2);
+    expect(commands).toEqual(
+      expect.arrayContaining([mockCommandA, mockCommandC]),
+    );
+  });
+
+  it('should override commands from earlier loaders with those from later loaders', async () => {
+    const loader1 = new MockCommandLoader([mockCommandA, mockCommandB]);
+    const loader2 = new MockCommandLoader([
+      mockCommandB_Override,
+      mockCommandC,
+    ]);
+    const service = await CommandService.create(
+      [loader1, loader2],
+      new AbortController().signal,
+    );
+
+    const commands = service.getCommands();
+
+    expect(commands).toHaveLength(3); // Should be A, C, and the overridden B.
+
+    // The final list should contain the override from the *last* loader.
+    const commandB = commands.find((cmd) => cmd.name === 'command-b');
+    expect(commandB).toBeDefined();
+    expect(commandB?.kind).toBe(CommandKind.FILE); // Verify it's the overridden version.
+    expect(commandB).toEqual(mockCommandB_Override);
+
+    // Ensure the other commands are still present.
+    expect(commands).toEqual(
+      expect.arrayContaining([
+        mockCommandA,
+        mockCommandC,
+        mockCommandB_Override,
+      ]),
+    );
+  });
+
+  it('should handle loaders that return an empty array of commands gracefully', async () => {
+    const loader1 = new MockCommandLoader([mockCommandA]);
+    const emptyLoader = new MockCommandLoader([]);
+    const loader3 = new MockCommandLoader([mockCommandB]);
+    const service = await CommandService.create(
+      [loader1, emptyLoader, loader3],
+      new AbortController().signal,
+    );
+
+    const commands = service.getCommands();
+
+    expect(emptyLoader.loadCommands).toHaveBeenCalledTimes(1);
+    expect(commands).toHaveLength(2);
+    expect(commands).toEqual(
+      expect.arrayContaining([mockCommandA, mockCommandB]),
+    );
+  });
+
+  it('should load commands from successful loaders even if one fails', async () => {
+    const successfulLoader = new MockCommandLoader([mockCommandA]);
+    const failingLoader = new MockCommandLoader([]);
+    const error = new Error('Loader failed');
+    vi.spyOn(failingLoader, 'loadCommands').mockRejectedValue(error);
+
+    const service = await CommandService.create(
+      [successfulLoader, failingLoader],
+      new AbortController().signal,
+    );
+
+    const commands = service.getCommands();
+    expect(commands).toHaveLength(1);
+    expect(commands).toEqual([mockCommandA]);
+    expect(console.debug).toHaveBeenCalledWith(
+      'A command loader failed:',
+      error,
+    );
+  });
+
+  it('getCommands should return a readonly array that cannot be mutated', async () => {
+    const service = await CommandService.create(
+      [new MockCommandLoader([mockCommandA])],
+      new AbortController().signal,
+    );
+
+    const commands = service.getCommands();
+
+    // Expect it to throw a TypeError at runtime because the array is frozen.
+    expect(() => {
+      // @ts-expect-error - Testing immutability is intentional here.
+      commands.push(mockCommandB);
+    }).toThrow();
+
+    // Verify the original array was not mutated.
+    expect(service.getCommands()).toHaveLength(1);
+  });
+
+  it('should pass the abort signal to all loaders', async () => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    const loader1 = new MockCommandLoader([mockCommandA]);
+    const loader2 = new MockCommandLoader([mockCommandB]);
+
+    await CommandService.create([loader1, loader2], signal);
+
+    expect(loader1.loadCommands).toHaveBeenCalledTimes(1);
+    expect(loader1.loadCommands).toHaveBeenCalledWith(signal);
+    expect(loader2.loadCommands).toHaveBeenCalledTimes(1);
+    expect(loader2.loadCommands).toHaveBeenCalledWith(signal);
   });
 });

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BaseTool, ToolResult } from './tools.js';
+import { BaseTool, Icon, ToolResult } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as path from 'node:path';
@@ -17,7 +17,7 @@ import {
   getSpecificMimeType,
 } from '../utils/fileUtils.js';
 import { PartListUnion, Schema, Type } from '@google/genai';
-import { Config } from '../config/config.js';
+import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
 import {
   recordFileOperationMetric,
   FileOperation,
@@ -62,9 +62,12 @@ export interface ReadManyFilesParams {
   useDefaultExcludes?: boolean;
 
   /**
-   * Optional. Whether to respect .gitignore patterns. Defaults to true.
+   * Whether to respect .gitignore and .geminiignore patterns (optional, defaults to true)
    */
-  respect_git_ignore?: boolean;
+  file_filtering_options?: {
+    respect_git_ignore?: boolean;
+    respect_gemini_ignore?: boolean;
+  };
 }
 
 /**
@@ -125,8 +128,6 @@ export class ReadManyFilesTool extends BaseTool<
 > {
   static readonly Name: string = 'read_many_files';
 
-  private readonly geminiIgnorePatterns: string[] = [];
-
   constructor(private config: Config) {
     const parameterSchema: Schema = {
       type: Type.OBJECT,
@@ -173,11 +174,22 @@ export class ReadManyFilesTool extends BaseTool<
             'Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.',
           default: true,
         },
-        respect_git_ignore: {
-          type: Type.BOOLEAN,
+        file_filtering_options: {
           description:
-            'Optional. Whether to respect .gitignore patterns when discovering files. Only available in git repositories. Defaults to true.',
-          default: true,
+            'Whether to respect ignore patterns from .gitignore or .geminiignore',
+          type: Type.OBJECT,
+          properties: {
+            respect_git_ignore: {
+              description:
+                'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
+              type: Type.BOOLEAN,
+            },
+            respect_gemini_ignore: {
+              description:
+                'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
+              type: Type.BOOLEAN,
+            },
+          },
         },
       },
       required: ['paths'],
@@ -196,11 +208,9 @@ This tool is useful when you need to understand or analyze a collection of files
 - When the user asks to "read all files in X directory" or "show me the content of all Y files".
 
 Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. Ensure paths are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
+      Icon.FileSearch,
       parameterSchema,
     );
-    this.geminiIgnorePatterns = config
-      .getFileService()
-      .getGeminiIgnorePatterns();
   }
 
   validateParams(params: ReadManyFilesParams): string | null {
@@ -218,17 +228,19 @@ Use this tool when the user's query implies needing the content of several files
     // Determine the final list of exclusion patterns exactly as in execute method
     const paramExcludes = params.exclude || [];
     const paramUseDefaultExcludes = params.useDefaultExcludes !== false;
-
+    const geminiIgnorePatterns = this.config
+      .getFileService()
+      .getGeminiIgnorePatterns();
     const finalExclusionPatternsForDescription: string[] =
       paramUseDefaultExcludes
-        ? [...DEFAULT_EXCLUDES, ...paramExcludes, ...this.geminiIgnorePatterns]
-        : [...paramExcludes, ...this.geminiIgnorePatterns];
+        ? [...DEFAULT_EXCLUDES, ...paramExcludes, ...geminiIgnorePatterns]
+        : [...paramExcludes, ...geminiIgnorePatterns];
 
     let excludeDesc = `Excluding: ${finalExclusionPatternsForDescription.length > 0 ? `patterns like \`${finalExclusionPatternsForDescription.slice(0, 2).join('`, `')}${finalExclusionPatternsForDescription.length > 2 ? '...`' : '`'}` : 'none specified'}`;
 
     // Add a note if .geminiignore patterns contributed to the final list of exclusions
-    if (this.geminiIgnorePatterns.length > 0) {
-      const geminiPatternsInEffect = this.geminiIgnorePatterns.filter((p) =>
+    if (geminiIgnorePatterns.length > 0) {
+      const geminiPatternsInEffect = geminiIgnorePatterns.filter((p) =>
         finalExclusionPatternsForDescription.includes(p),
       ).length;
       if (geminiPatternsInEffect > 0) {
@@ -256,12 +268,19 @@ Use this tool when the user's query implies needing the content of several files
       include = [],
       exclude = [],
       useDefaultExcludes = true,
-      respect_git_ignore = true,
     } = params;
 
-    const respectGitIgnore =
-      respect_git_ignore ?? this.config.getFileFilteringRespectGitIgnore();
+    const defaultFileIgnores =
+      this.config.getFileFilteringOptions() ?? DEFAULT_FILE_FILTERING_OPTIONS;
 
+    const fileFilteringOptions = {
+      respectGitIgnore:
+        params.file_filtering_options?.respect_git_ignore ??
+        defaultFileIgnores.respectGitIgnore, // Use the property from the returned object
+      respectGeminiIgnore:
+        params.file_filtering_options?.respect_gemini_ignore ??
+        defaultFileIgnores.respectGeminiIgnore, // Use the property from the returned object
+    };
     // Get centralized file discovery service
     const fileDiscovery = this.config.getFileService();
 
@@ -271,8 +290,8 @@ Use this tool when the user's query implies needing the content of several files
     const contentParts: PartListUnion = [];
 
     const effectiveExcludes = useDefaultExcludes
-      ? [...DEFAULT_EXCLUDES, ...exclude, ...this.geminiIgnorePatterns]
-      : [...exclude, ...this.geminiIgnorePatterns];
+      ? [...DEFAULT_EXCLUDES, ...exclude]
+      : [...exclude];
 
     const searchPatterns = [...inputPatterns, ...include];
     if (searchPatterns.length === 0) {
@@ -283,28 +302,49 @@ Use this tool when the user's query implies needing the content of several files
     }
 
     try {
-      const entries = await glob(searchPatterns, {
-        cwd: this.config.getTargetDir(),
-        ignore: effectiveExcludes,
-        nodir: true,
-        dot: true,
-        absolute: true,
-        nocase: true,
-        signal,
-      });
+      const entries = await glob(
+        searchPatterns.map((p) => p.replace(/\\/g, '/')),
+        {
+          cwd: this.config.getTargetDir(),
+          ignore: effectiveExcludes,
+          nodir: true,
+          dot: true,
+          absolute: true,
+          nocase: true,
+          signal,
+        },
+      );
 
-      const filteredEntries = respectGitIgnore
+      const gitFilteredEntries = fileFilteringOptions.respectGitIgnore
         ? fileDiscovery
             .filterFiles(
               entries.map((p) => path.relative(this.config.getTargetDir(), p)),
               {
-                respectGitIgnore,
+                respectGitIgnore: true,
+                respectGeminiIgnore: false,
               },
             )
             .map((p) => path.resolve(this.config.getTargetDir(), p))
         : entries;
 
+      // Apply gemini ignore filtering if enabled
+      const finalFilteredEntries = fileFilteringOptions.respectGeminiIgnore
+        ? fileDiscovery
+            .filterFiles(
+              gitFilteredEntries.map((p) =>
+                path.relative(this.config.getTargetDir(), p),
+              ),
+              {
+                respectGitIgnore: false,
+                respectGeminiIgnore: true,
+              },
+            )
+            .map((p) => path.resolve(this.config.getTargetDir(), p))
+        : gitFilteredEntries;
+
       let gitIgnoredCount = 0;
+      let geminiIgnoredCount = 0;
+
       for (const absoluteFilePath of entries) {
         // Security check: ensure the glob library didn't return something outside targetDir.
         if (!absoluteFilePath.startsWith(this.config.getTargetDir())) {
@@ -316,8 +356,20 @@ Use this tool when the user's query implies needing the content of several files
         }
 
         // Check if this file was filtered out by git ignore
-        if (respectGitIgnore && !filteredEntries.includes(absoluteFilePath)) {
+        if (
+          fileFilteringOptions.respectGitIgnore &&
+          !gitFilteredEntries.includes(absoluteFilePath)
+        ) {
           gitIgnoredCount++;
+          continue;
+        }
+
+        // Check if this file was filtered out by gemini ignore
+        if (
+          fileFilteringOptions.respectGeminiIgnore &&
+          !finalFilteredEntries.includes(absoluteFilePath)
+        ) {
+          geminiIgnoredCount++;
           continue;
         }
 
@@ -328,7 +380,15 @@ Use this tool when the user's query implies needing the content of several files
       if (gitIgnoredCount > 0) {
         skippedFiles.push({
           path: `${gitIgnoredCount} file(s)`,
-          reason: 'ignored',
+          reason: 'git ignored',
+        });
+      }
+
+      // Add info about gemini-ignored files if any were filtered
+      if (geminiIgnoredCount > 0) {
+        skippedFiles.push({
+          path: `${geminiIgnoredCount} file(s)`,
+          reason: 'gemini ignored',
         });
       }
     } catch (error) {
@@ -345,7 +405,7 @@ Use this tool when the user's query implies needing the content of several files
         .relative(this.config.getTargetDir(), filePath)
         .replace(/\\/g, '/');
 
-      const fileType = detectFileType(filePath);
+      const fileType = await detectFileType(filePath);
 
       if (fileType === 'image' || fileType === 'pdf') {
         const fileExtension = path.extname(filePath).toLowerCase();

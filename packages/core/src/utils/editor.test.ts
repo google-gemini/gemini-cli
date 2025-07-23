@@ -52,56 +52,99 @@ describe('editor utils', () => {
   describe('checkHasEditorType', () => {
     const testCases: Array<{
       editor: EditorType;
-      command: string;
-      win32Command: string;
+      commands: string[];
+      win32Commands: string[];
     }> = [
-      { editor: 'vscode', command: 'code', win32Command: 'code.cmd' },
-      { editor: 'vscodium', command: 'codium', win32Command: 'codium.cmd' },
-      { editor: 'windsurf', command: 'windsurf', win32Command: 'windsurf' },
-      { editor: 'cursor', command: 'cursor', win32Command: 'cursor' },
-      { editor: 'vim', command: 'vim', win32Command: 'vim' },
-      { editor: 'neovim', command: 'nvim', win32Command: 'nvim' },
-      { editor: 'zed', command: 'zed', win32Command: 'zed' },
+      { editor: 'vscode', commands: ['code'], win32Commands: ['code.cmd'] },
+      {
+        editor: 'vscodium',
+        commands: ['codium'],
+        win32Commands: ['codium.cmd'],
+      },
+      {
+        editor: 'windsurf',
+        commands: ['windsurf'],
+        win32Commands: ['windsurf'],
+      },
+      { editor: 'cursor', commands: ['cursor'], win32Commands: ['cursor'] },
+      { editor: 'vim', commands: ['vim'], win32Commands: ['vim'] },
+      { editor: 'neovim', commands: ['nvim'], win32Commands: ['nvim'] },
+      { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
     ];
 
-    for (const { editor, command, win32Command } of testCases) {
+    for (const { editor, commands, win32Commands } of testCases) {
       describe(`${editor}`, () => {
-        it(`should return true if "${command}" command exists on non-windows`, () => {
+        // Non-windows tests
+        it(`should return true if first command "${commands[0]}" exists on non-windows`, () => {
           Object.defineProperty(process, 'platform', { value: 'linux' });
           (execSync as Mock).mockReturnValue(
-            Buffer.from(`/usr/bin/${command}`),
+            Buffer.from(`/usr/bin/${commands[0]}`),
           );
           expect(checkHasEditorType(editor)).toBe(true);
-          expect(execSync).toHaveBeenCalledWith(`command -v ${command}`, {
+          expect(execSync).toHaveBeenCalledWith(`command -v ${commands[0]}`, {
             stdio: 'ignore',
           });
         });
 
-        it(`should return false if "${command}" command does not exist on non-windows`, () => {
+        if (commands.length > 1) {
+          it(`should return true if first command doesn't exist but second command "${commands[1]}" exists on non-windows`, () => {
+            Object.defineProperty(process, 'platform', { value: 'linux' });
+            (execSync as Mock)
+              .mockImplementationOnce(() => {
+                throw new Error(); // first command not found
+              })
+              .mockReturnValueOnce(Buffer.from(`/usr/bin/${commands[1]}`)); // second command found
+            expect(checkHasEditorType(editor)).toBe(true);
+            expect(execSync).toHaveBeenCalledTimes(2);
+          });
+        }
+
+        it(`should return false if none of the commands exist on non-windows`, () => {
           Object.defineProperty(process, 'platform', { value: 'linux' });
           (execSync as Mock).mockImplementation(() => {
-            throw new Error();
+            throw new Error(); // all commands not found
           });
           expect(checkHasEditorType(editor)).toBe(false);
+          expect(execSync).toHaveBeenCalledTimes(commands.length);
         });
 
-        it(`should return true if "${win32Command}" command exists on windows`, () => {
+        // Windows tests
+        it(`should return true if first command "${win32Commands[0]}" exists on windows`, () => {
           Object.defineProperty(process, 'platform', { value: 'win32' });
           (execSync as Mock).mockReturnValue(
-            Buffer.from(`C:\\Program Files\\...\\${win32Command}`),
+            Buffer.from(`C:\\Program Files\\...\\${win32Commands[0]}`),
           );
           expect(checkHasEditorType(editor)).toBe(true);
-          expect(execSync).toHaveBeenCalledWith(`where.exe ${win32Command}`, {
-            stdio: 'ignore',
-          });
+          expect(execSync).toHaveBeenCalledWith(
+            `where.exe ${win32Commands[0]}`,
+            {
+              stdio: 'ignore',
+            },
+          );
         });
 
-        it(`should return false if "${win32Command}" command does not exist on windows`, () => {
+        if (win32Commands.length > 1) {
+          it(`should return true if first command doesn't exist but second command "${win32Commands[1]}" exists on windows`, () => {
+            Object.defineProperty(process, 'platform', { value: 'win32' });
+            (execSync as Mock)
+              .mockImplementationOnce(() => {
+                throw new Error(); // first command not found
+              })
+              .mockReturnValueOnce(
+                Buffer.from(`C:\\Program Files\\...\\${win32Commands[1]}`),
+              ); // second command found
+            expect(checkHasEditorType(editor)).toBe(true);
+            expect(execSync).toHaveBeenCalledTimes(2);
+          });
+        }
+
+        it(`should return false if none of the commands exist on windows`, () => {
           Object.defineProperty(process, 'platform', { value: 'win32' });
           (execSync as Mock).mockImplementation(() => {
-            throw new Error();
+            throw new Error(); // all commands not found
           });
           expect(checkHasEditorType(editor)).toBe(false);
+          expect(execSync).toHaveBeenCalledTimes(win32Commands.length);
         });
       });
     }
@@ -110,31 +153,109 @@ describe('editor utils', () => {
   describe('getDiffCommand', () => {
     const guiEditors: Array<{
       editor: EditorType;
-      command: string;
-      win32Command: string;
+      commands: string[];
+      win32Commands: string[];
     }> = [
-      { editor: 'vscode', command: 'code', win32Command: 'code.cmd' },
-      { editor: 'vscodium', command: 'codium', win32Command: 'codium.cmd' },
-      { editor: 'windsurf', command: 'windsurf', win32Command: 'windsurf' },
-      { editor: 'cursor', command: 'cursor', win32Command: 'cursor' },
-      { editor: 'zed', command: 'zed', win32Command: 'zed' },
+      { editor: 'vscode', commands: ['code'], win32Commands: ['code.cmd'] },
+      {
+        editor: 'vscodium',
+        commands: ['codium'],
+        win32Commands: ['codium.cmd'],
+      },
+      {
+        editor: 'windsurf',
+        commands: ['windsurf'],
+        win32Commands: ['windsurf'],
+      },
+      { editor: 'cursor', commands: ['cursor'], win32Commands: ['cursor'] },
+      { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
     ];
 
-    for (const { editor, command, win32Command } of guiEditors) {
-      it(`should return the correct command for ${editor} on non-windows`, () => {
+    for (const { editor, commands, win32Commands } of guiEditors) {
+      // Non-windows tests
+      it(`should use first command "${commands[0]}" when it exists on non-windows`, () => {
         Object.defineProperty(process, 'platform', { value: 'linux' });
+        (execSync as Mock).mockReturnValue(
+          Buffer.from(`/usr/bin/${commands[0]}`),
+        );
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({
-          command,
+          command: commands[0],
           args: ['--wait', '--diff', 'old.txt', 'new.txt'],
         });
       });
 
-      it(`should return the correct command for ${editor} on windows`, () => {
-        Object.defineProperty(process, 'platform', { value: 'win32' });
+      if (commands.length > 1) {
+        it(`should use second command "${commands[1]}" when first doesn't exist on non-windows`, () => {
+          Object.defineProperty(process, 'platform', { value: 'linux' });
+          (execSync as Mock)
+            .mockImplementationOnce(() => {
+              throw new Error(); // first command not found
+            })
+            .mockReturnValueOnce(Buffer.from(`/usr/bin/${commands[1]}`)); // second command found
+
+          const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+          expect(diffCommand).toEqual({
+            command: commands[1],
+            args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          });
+        });
+      }
+
+      it(`should fall back to last command "${commands[commands.length - 1]}" when none exist on non-windows`, () => {
+        Object.defineProperty(process, 'platform', { value: 'linux' });
+        (execSync as Mock).mockImplementation(() => {
+          throw new Error(); // all commands not found
+        });
+
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({
-          command: win32Command,
+          command: commands[commands.length - 1],
+          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+        });
+      });
+
+      // Windows tests
+      it(`should use first command "${win32Commands[0]}" when it exists on windows`, () => {
+        Object.defineProperty(process, 'platform', { value: 'win32' });
+        (execSync as Mock).mockReturnValue(
+          Buffer.from(`C:\\Program Files\\...\\${win32Commands[0]}`),
+        );
+        const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+        expect(diffCommand).toEqual({
+          command: win32Commands[0],
+          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+        });
+      });
+
+      if (win32Commands.length > 1) {
+        it(`should use second command "${win32Commands[1]}" when first doesn't exist on windows`, () => {
+          Object.defineProperty(process, 'platform', { value: 'win32' });
+          (execSync as Mock)
+            .mockImplementationOnce(() => {
+              throw new Error(); // first command not found
+            })
+            .mockReturnValueOnce(
+              Buffer.from(`C:\\Program Files\\...\\${win32Commands[1]}`),
+            ); // second command found
+
+          const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+          expect(diffCommand).toEqual({
+            command: win32Commands[1],
+            args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          });
+        });
+      }
+
+      it(`should fall back to last command "${win32Commands[win32Commands.length - 1]}" when none exist on windows`, () => {
+        Object.defineProperty(process, 'platform', { value: 'win32' });
+        (execSync as Mock).mockImplementation(() => {
+          throw new Error(); // all commands not found
+        });
+
+        const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+        expect(diffCommand).toEqual({
+          command: win32Commands[win32Commands.length - 1],
           args: ['--wait', '--diff', 'old.txt', 'new.txt'],
         });
       });

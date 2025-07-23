@@ -10,7 +10,7 @@ import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { TextBuffer } from './shared/text-buffer.js';
-import { cpSlice, cpLen } from '../utils/textUtils.js';
+import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
@@ -32,7 +32,7 @@ export interface InputPromptProps {
   userMessages: readonly string[];
   onClearScreen: () => void;
   config: Config;
-  slashCommands: SlashCommand[];
+  slashCommands: readonly SlashCommand[];
   commandContext: CommandContext;
   placeholder?: string;
   focus?: boolean;
@@ -58,10 +58,54 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+
+  // Check if cursor is after @ or / without unescaped spaces
+  const isCursorAfterCommandWithoutSpace = useCallback(() => {
+    const [row, col] = buffer.cursor;
+    const currentLine = buffer.lines[row] || '';
+
+    // Convert current line to code points for Unicode-aware processing
+    const codePoints = toCodePoints(currentLine);
+
+    // Search backwards from cursor position within the current line only
+    for (let i = col - 1; i >= 0; i--) {
+      const char = codePoints[i];
+
+      if (char === ' ') {
+        // Check if this space is escaped by counting backslashes before it
+        let backslashCount = 0;
+        for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+          backslashCount++;
+        }
+
+        // If there's an odd number of backslashes, the space is escaped
+        const isEscaped = backslashCount % 2 === 1;
+
+        if (!isEscaped) {
+          // Found unescaped space before @ or /, return false
+          return false;
+        }
+        // If escaped, continue searching backwards
+      } else if (char === '@' || char === '/') {
+        // Found @ or / without unescaped space in between
+        return true;
+      }
+    }
+
+    return false;
+  }, [buffer.cursor, buffer.lines]);
+
+  const shouldShowCompletion = useCallback(
+    () =>
+      (isAtCommand(buffer.text) || isSlashCommand(buffer.text)) &&
+      isCursorAfterCommandWithoutSpace(),
+    [buffer.text, isCursorAfterCommandWithoutSpace],
+  );
+
   const completion = useCompletion(
     buffer.text,
     config.getTargetDir(),
-    isAtCommand(buffer.text) || isSlashCommand(buffer.text),
+    shouldShowCompletion(),
     slashCommands,
     commandContext,
     config,
@@ -95,7 +139,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const inputHistory = useInputHistory({
     userMessages,
     onSubmit: handleSubmitAndClear,
-    isActive: !completion.showSuggestions && !shellModeActive,
+    isActive:
+      (!completion.showSuggestions || completion.suggestions.length === 1) &&
+      !shellModeActive,
     currentQuery: buffer.text,
     onChange: customSetTextAndResetCompletionSignal,
   });
@@ -134,18 +180,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         // If there's no trailing space, we need to check if the current query
         // is already a complete path to a parent command.
         if (!hasTrailingSpace) {
-          let currentLevel: SlashCommand[] | undefined = slashCommands;
+          let currentLevel: readonly SlashCommand[] | undefined = slashCommands;
           for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
             const found: SlashCommand | undefined = currentLevel?.find(
-              (cmd) => cmd.name === part || cmd.altName === part,
+              (cmd) => cmd.name === part || cmd.altNames?.includes(part),
             );
 
             if (found) {
               if (i === parts.length - 1 && found.subCommands) {
                 isParentPath = true;
               }
-              currentLevel = found.subCommands;
+              currentLevel = found.subCommands as
+                | readonly SlashCommand[]
+                | undefined;
             } else {
               // Path is invalid, so it can't be a parent path.
               currentLevel = undefined;
@@ -160,7 +208,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         // - Otherwise, the base is everything EXCEPT the last partial part.
         const basePath =
           hasTrailingSpace || isParentPath ? parts : parts.slice(0, -1);
-        const newValue = `/${[...basePath, suggestion].join(' ')} `;
+        const newValue = `/${[...basePath, suggestion].join(' ')}`;
 
         buffer.setText(newValue);
       } else {
@@ -264,14 +312,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // If the command is a perfect match, pressing enter should execute it.
+      if (completion.isPerfectMatch && key.name === 'return') {
+        handleSubmitAndClear(buffer.text);
+        return;
+      }
+
       if (completion.showSuggestions) {
-        if (key.name === 'up') {
-          completion.navigateUp();
-          return;
-        }
-        if (key.name === 'down') {
-          completion.navigateDown();
-          return;
+        if (completion.suggestions.length > 1) {
+          if (key.name === 'up' || (key.ctrl && key.name === 'p')) {
+            completion.navigateUp();
+            return;
+          }
+          if (key.name === 'down' || (key.ctrl && key.name === 'n')) {
+            completion.navigateDown();
+            return;
+          }
         }
 
         if (key.name === 'tab' || (key.name === 'return' && !key.ctrl)) {
@@ -286,61 +342,61 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
           return;
         }
-      } else {
-        if (!shellModeActive) {
-          if (key.ctrl && key.name === 'p') {
-            inputHistory.navigateUp();
-            return;
-          }
-          if (key.ctrl && key.name === 'n') {
-            inputHistory.navigateDown();
-            return;
-          }
-          // Handle arrow-up/down for history on single-line or at edges
-          if (
-            key.name === 'up' &&
-            (buffer.allVisualLines.length === 1 ||
-              (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
-          ) {
-            inputHistory.navigateUp();
-            return;
-          }
-          if (
-            key.name === 'down' &&
-            (buffer.allVisualLines.length === 1 ||
-              buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
-          ) {
-            inputHistory.navigateDown();
-            return;
-          }
-        } else {
-          // Shell History Navigation
-          if (key.name === 'up') {
-            const prevCommand = shellHistory.getPreviousCommand();
-            if (prevCommand !== null) buffer.setText(prevCommand);
-            return;
-          }
-          if (key.name === 'down') {
-            const nextCommand = shellHistory.getNextCommand();
-            if (nextCommand !== null) buffer.setText(nextCommand);
-            return;
-          }
-        }
+      }
 
-        if (key.name === 'return' && !key.ctrl && !key.meta && !key.paste) {
-          if (buffer.text.trim()) {
-            const [row, col] = buffer.cursor;
-            const line = buffer.lines[row];
-            const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
-            if (charBefore === '\\') {
-              buffer.backspace();
-              buffer.newline();
-            } else {
-              handleSubmitAndClear(buffer.text);
-            }
-          }
+      if (!shellModeActive) {
+        if (key.ctrl && key.name === 'p') {
+          inputHistory.navigateUp();
           return;
         }
+        if (key.ctrl && key.name === 'n') {
+          inputHistory.navigateDown();
+          return;
+        }
+        // Handle arrow-up/down for history on single-line or at edges
+        if (
+          key.name === 'up' &&
+          (buffer.allVisualLines.length === 1 ||
+            (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
+        ) {
+          inputHistory.navigateUp();
+          return;
+        }
+        if (
+          key.name === 'down' &&
+          (buffer.allVisualLines.length === 1 ||
+            buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
+        ) {
+          inputHistory.navigateDown();
+          return;
+        }
+      } else {
+        // Shell History Navigation
+        if (key.name === 'up') {
+          const prevCommand = shellHistory.getPreviousCommand();
+          if (prevCommand !== null) buffer.setText(prevCommand);
+          return;
+        }
+        if (key.name === 'down') {
+          const nextCommand = shellHistory.getNextCommand();
+          if (nextCommand !== null) buffer.setText(nextCommand);
+          return;
+        }
+      }
+
+      if (key.name === 'return' && !key.ctrl && !key.meta && !key.paste) {
+        if (buffer.text.trim()) {
+          const [row, col] = buffer.cursor;
+          const line = buffer.lines[row];
+          const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
+          if (charBefore === '\\') {
+            buffer.backspace();
+            buffer.newline();
+          } else {
+            handleSubmitAndClear(buffer.text);
+          }
+        }
+        return;
       }
 
       // Newline insertion
@@ -356,6 +412,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       if (key.ctrl && key.name === 'e') {
         buffer.move('end');
+        buffer.moveToOffset(cpLen(buffer.text));
+        return;
+      }
+      // Ctrl+C (Clear input)
+      if (key.ctrl && key.name === 'c') {
+        if (buffer.text.length > 0) {
+          buffer.setText('');
+          resetCompletionState();
+          return;
+        }
         return;
       }
 
@@ -382,7 +448,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Fallback to the text buffer's default input handling for all other keys
+      // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
     },
     [
@@ -397,6 +463,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleSubmitAndClear,
       shellHistory,
       handleClipboardImage,
+      resetCompletionState,
     ],
   );
 
@@ -438,7 +505,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 display = display + ' '.repeat(inputWidth - currentVisualWidth);
               }
 
-              if (visualIdxInRenderedSet === cursorVisualRow) {
+              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
                 const relativeVisualColForHighlight = cursorVisualColAbsolute;
 
                 if (relativeVisualColForHighlight >= 0) {
