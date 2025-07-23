@@ -400,13 +400,15 @@ Use this tool when the user's query implies needing the content of several files
 
     const sortedFiles = Array.from(filesToConsider).sort();
 
-    for (const filePath of sortedFiles) {
+    // Process files in parallel using Promise.allSettled
+    const fileProcessingPromises = sortedFiles.map(async (filePath) => {
       const relativePathForDisplay = path
         .relative(this.config.getTargetDir(), filePath)
         .replace(/\\/g, '/');
 
       const fileType = await detectFileType(filePath);
 
+      // Check if image/pdf files are explicitly requested
       if (fileType === 'image' || fileType === 'pdf') {
         const fileExtension = path.extname(filePath).toLowerCase();
         const fileNameWithoutExtension = path.basename(filePath, fileExtension);
@@ -417,12 +419,13 @@ Use this tool when the user's query implies needing the content of several files
         );
 
         if (!requestedExplicitly) {
-          skippedFiles.push({
-            path: relativePathForDisplay,
+          return {
+            success: false,
+            filePath,
+            relativePathForDisplay,
             reason:
               'asset file (image/pdf) was not explicitly requested by name or extension',
-          });
-          continue;
+          };
         }
       }
 
@@ -432,34 +435,69 @@ Use this tool when the user's query implies needing the content of several files
         this.config.getTargetDir(),
       );
 
-      if (fileReadResult.error) {
-        skippedFiles.push({
-          path: relativePathForDisplay,
-          reason: `Read error: ${fileReadResult.error}`,
-        });
-      } else {
-        if (typeof fileReadResult.llmContent === 'string') {
-          const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
-            '{filePath}',
-            filePath,
-          );
-          contentParts.push(`${separator}\n\n${fileReadResult.llmContent}\n\n`);
+      return {
+        success: !fileReadResult.error,
+        filePath,
+        relativePathForDisplay,
+        fileReadResult,
+        reason: fileReadResult.error
+          ? `Read error: ${fileReadResult.error}`
+          : undefined,
+      };
+    });
+
+    // Wait for all file processing to complete
+    const results = await Promise.allSettled(fileProcessingPromises);
+
+    // Process results
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const fileResult = result.value;
+
+        if (!fileResult.success) {
+          // Handle skipped files (images/PDFs not requested or read errors)
+          skippedFiles.push({
+            path: fileResult.relativePathForDisplay,
+            reason: fileResult.reason!,
+          });
         } else {
-          contentParts.push(fileReadResult.llmContent); // This is a Part for image/pdf
+          // Handle successfully processed files
+          const { filePath, relativePathForDisplay, fileReadResult } =
+            fileResult;
+
+          if (typeof fileReadResult!.llmContent === 'string') {
+            const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
+              '{filePath}',
+              filePath,
+            );
+            contentParts.push(
+              `${separator}\n\n${fileReadResult!.llmContent}\n\n`,
+            );
+          } else {
+            contentParts.push(fileReadResult!.llmContent); // This is a Part for image/pdf
+          }
+
+          processedFilesRelativePaths.push(relativePathForDisplay);
+
+          const lines =
+            typeof fileReadResult!.llmContent === 'string'
+              ? fileReadResult!.llmContent.split('\n').length
+              : undefined;
+          const mimetype = getSpecificMimeType(filePath);
+          recordFileOperationMetric(
+            this.config,
+            FileOperation.READ,
+            lines,
+            mimetype,
+            path.extname(filePath),
+          );
         }
-        processedFilesRelativePaths.push(relativePathForDisplay);
-        const lines =
-          typeof fileReadResult.llmContent === 'string'
-            ? fileReadResult.llmContent.split('\n').length
-            : undefined;
-        const mimetype = getSpecificMimeType(filePath);
-        recordFileOperationMetric(
-          this.config,
-          FileOperation.READ,
-          lines,
-          mimetype,
-          path.extname(filePath),
-        );
+      } else {
+        // Handle Promise rejection (unexpected errors)
+        skippedFiles.push({
+          path: 'unknown',
+          reason: `Unexpected error: ${result.reason}`,
+        });
       }
     }
 
