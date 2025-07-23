@@ -14,6 +14,7 @@
     "module": "NodeNext",
     "moduleResolution": "nodenext",
     "target": "es2022",
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    "jsx": "react-jsx"
   }
 }
