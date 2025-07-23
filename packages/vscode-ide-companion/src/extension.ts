@@ -23,13 +23,21 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
+  if (!logger) {
+    return;
+  }
+
   if (ideServer) {
     logger.appendLine('Deactivating Gemini CLI IDE Companion...');
     return ideServer.stop().finally(() => {
+      logger.appendLine('Gemini CLI IDE Companion extension deactivated.');
       logger.dispose();
     });
   }
-  if (logger) {
-    logger.dispose();
-  }
+
+  logger.appendLine(
+    'Deactivating Gemini CLI IDE Companion (no server was started).',
+  );
+  logger.appendLine('Gemini CLI IDE Companion extension deactivated.');
+  logger.dispose();
 }

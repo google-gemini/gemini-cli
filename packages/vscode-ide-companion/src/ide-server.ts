@@ -21,20 +21,28 @@ const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 
 function sendOpenFilesChangedNotification(
   transport: StreamableHTTPServerTransport,
-  logger: vscode.OutputChannel,
+  log: (message: string) => void,
   recentFilesManager: RecentFilesManager,
 ) {
   const editor = vscode.window.activeTextEditor;
   const filePath = editor ? editor.document.uri.fsPath : '';
-  logger.appendLine(`Sending active file changed notification: ${filePath}`);
   const notification: JSONRPCNotification = {
     jsonrpc: '2.0',
     method: 'ide/openFilesChanged',
     params: {
       activeFile: filePath,
-      recentOpenFiles: recentFilesManager.recentFiles,
+      recentOpenFiles: recentFilesManager.recentFiles.filter(
+        (file) => file.filePath !== filePath,
+      ),
     },
   };
+  log(
+    `Sending active file changed notification: ${JSON.stringify(
+      notification,
+      null,
+      2,
+    )}`,
+  );
   transport.send(notification);
 }
 
@@ -45,6 +53,12 @@ export class IDEServer {
 
   constructor(logger: vscode.OutputChannel) {
     this.logger = logger;
+  }
+
+  private log(message: string) {
+    if (this.context?.extensionMode === vscode.ExtensionMode.Development) {
+      this.logger.appendLine(message);
+    }
   }
 
   async start(context: vscode.ExtensionContext) {
@@ -62,7 +76,7 @@ export class IDEServer {
       for (const transport of Object.values(transports)) {
         sendOpenFilesChangedNotification(
           transport,
-          this.logger,
+          this.log.bind(this),
           recentFilesManager,
         );
       }
@@ -81,7 +95,7 @@ export class IDEServer {
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (newSessionId) => {
-            this.logger.appendLine(`New session initialized: ${newSessionId}`);
+            this.log(`New session initialized: ${newSessionId}`);
             transports[newSessionId] = transport;
           },
         });
@@ -92,7 +106,7 @@ export class IDEServer {
           } catch (e) {
             // If sending a ping fails, the connection is likely broken.
             // Log the error and clear the interval to prevent further attempts.
-            this.logger.append(
+            this.log(
               'Failed to send keep-alive ping, cleaning up interval.' + e,
             );
             clearInterval(keepAlive);
@@ -102,14 +116,14 @@ export class IDEServer {
         transport.onclose = () => {
           clearInterval(keepAlive);
           if (transport.sessionId) {
-            this.logger.appendLine(`Session closed: ${transport.sessionId}`);
+            this.log(`Session closed: ${transport.sessionId}`);
             sessionsWithInitialNotification.delete(transport.sessionId);
             delete transports[transport.sessionId];
           }
         };
         mcpServer.connect(transport);
       } else {
-        this.logger.appendLine(
+        this.log(
           'Bad Request: No valid session ID provided for non-initialize request.',
         );
         res.status(400).json({
@@ -129,7 +143,7 @@ export class IDEServer {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
-        this.logger.appendLine(`Error handling MCP request: ${errorMessage}`);
+        this.log(`Error handling MCP request: ${errorMessage}`);
         if (!res.headersSent) {
           res.status(500).json({
             jsonrpc: '2.0' as const,
@@ -148,7 +162,7 @@ export class IDEServer {
         | string
         | undefined;
       if (!sessionId || !transports[sessionId]) {
-        this.logger.appendLine('Invalid or missing session ID');
+        this.log('Invalid or missing session ID');
         res.status(400).send('Invalid or missing session ID');
         return;
       }
@@ -159,9 +173,7 @@ export class IDEServer {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
-        this.logger.appendLine(
-          `Error handling session request: ${errorMessage}`,
-        );
+        this.log(`Error handling session request: ${errorMessage}`);
         if (!res.headersSent) {
           res.status(400).send('Bad Request');
         }
@@ -170,7 +182,7 @@ export class IDEServer {
       if (!sessionsWithInitialNotification.has(sessionId)) {
         sendOpenFilesChangedNotification(
           transport,
-          this.logger,
+          this.log.bind(this),
           recentFilesManager,
         );
         sessionsWithInitialNotification.add(sessionId);
@@ -187,7 +199,7 @@ export class IDEServer {
           IDE_SERVER_PORT_ENV_VAR,
           port.toString(),
         );
-        this.logger.appendLine(`IDE server listening on port ${port}`);
+        this.log(`IDE server listening on port ${port}`);
       }
     });
   }
@@ -197,12 +209,10 @@ export class IDEServer {
       await new Promise<void>((resolve, reject) => {
         this.server!.close((err?: Error) => {
           if (err) {
-            this.logger.appendLine(
-              `Error shutting down IDE server: ${err.message}`,
-            );
+            this.log(`Error shutting down IDE server: ${err.message}`);
             return reject(err);
           }
-          this.logger.appendLine(`IDE server shut down`);
+          this.log(`IDE server shut down`);
           resolve();
         });
       });
