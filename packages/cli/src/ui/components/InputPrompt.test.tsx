@@ -123,6 +123,7 @@ describe('InputPrompt', () => {
       resetCompletionState: vi.fn(),
       setActiveSuggestionIndex: vi.fn(),
       setShowSuggestions: vi.fn(),
+      handleAutocomplete: vi.fn(),
     };
     mockedUseCompletion.mockReturnValue(mockCompletion);
 
@@ -445,7 +446,7 @@ describe('InputPrompt', () => {
     stdin.write('\t'); // Press Tab
     await wait();
 
-    expect(props.buffer.setText).toHaveBeenCalledWith('/memory');
+    expect(mockCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
     unmount();
   });
 
@@ -468,7 +469,7 @@ describe('InputPrompt', () => {
     stdin.write('\t'); // Press Tab
     await wait();
 
-    expect(props.buffer.setText).toHaveBeenCalledWith('/memory add');
+    expect(mockCompletion.handleAutocomplete).toHaveBeenCalledWith(1);
     unmount();
   });
 
@@ -493,7 +494,7 @@ describe('InputPrompt', () => {
     await wait();
 
     // It should NOT become '/show'. It should correctly become '/memory show'.
-    expect(props.buffer.setText).toHaveBeenCalledWith('/memory show');
+    expect(mockCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
     unmount();
   });
 
@@ -513,7 +514,7 @@ describe('InputPrompt', () => {
     stdin.write('\t'); // Press Tab
     await wait();
 
-    expect(props.buffer.setText).toHaveBeenCalledWith('/chat resume fix-foo');
+    expect(mockCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
     unmount();
   });
 
@@ -533,7 +534,7 @@ describe('InputPrompt', () => {
     await wait();
 
     // The app should autocomplete the text, NOT submit.
-    expect(props.buffer.setText).toHaveBeenCalledWith('/memory');
+    expect(mockCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
 
     expect(props.onSubmit).not.toHaveBeenCalled();
     unmount();
@@ -561,7 +562,7 @@ describe('InputPrompt', () => {
     stdin.write('\t'); // Press Tab for autocomplete
     await wait();
 
-    expect(props.buffer.setText).toHaveBeenCalledWith('/help');
+    expect(mockCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
     unmount();
   });
 
@@ -629,7 +630,7 @@ describe('InputPrompt', () => {
     stdin.write('\r');
     await wait();
 
-    expect(props.buffer.replaceRangeByOffset).toHaveBeenCalled();
+    expect(mockCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
     expect(props.onSubmit).not.toHaveBeenCalled();
     unmount();
   });

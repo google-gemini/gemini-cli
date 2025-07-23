@@ -1067,6 +1067,109 @@ describe('useCompletion', () => {
     });
   });
 
+  describe('handleAutocomplete', () => {
+    it('should complete a partial command', () => {
+      const buffer = createMockBuffer('/mem');
+      const { result } = renderHook(() =>
+        useCompletion(
+          buffer,
+          testCwd,
+          mockSlashCommands,
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      expect(result.current.suggestions.map((s) => s.value)).toEqual([
+        'memory',
+      ]);
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(buffer.setText).toHaveBeenCalledWith('/memory');
+    });
+
+    it('should append a sub-command when the parent is complete', () => {
+      const buffer = createMockBuffer('/memory ');
+      const { result } = renderHook(() =>
+        useCompletion(
+          buffer,
+          testCwd,
+          mockSlashCommands,
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      // Suggestions are populated by useEffect
+      expect(result.current.suggestions.map((s) => s.value)).toEqual([
+        'show',
+        'add',
+      ]);
+
+      act(() => {
+        result.current.handleAutocomplete(1); // index 1 is 'add'
+      });
+
+      expect(buffer.setText).toHaveBeenCalledWith('/memory add');
+    });
+
+    it('should complete a command with an alternative name', () => {
+      const buffer = createMockBuffer('/?');
+      const { result } = renderHook(() =>
+        useCompletion(
+          buffer,
+          testCwd,
+          mockSlashCommands,
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      result.current.suggestions.push({
+        label: 'help',
+        value: 'help',
+        description: 'Show help',
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(buffer.setText).toHaveBeenCalledWith('/help');
+    });
+
+    it('should complete a file path', async () => {
+      const buffer = createMockBuffer('@src/fi');
+      const { result } = renderHook(() =>
+        useCompletion(
+          buffer,
+          testCwd,
+          mockSlashCommands,
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      result.current.suggestions.push({
+        label: 'file1.txt',
+        value: 'file1.txt',
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(buffer.replaceRangeByOffset).toHaveBeenCalledWith(
+        5, // after '@src/'
+        buffer.text.length,
+        'file1.txt',
+      );
+    });
+  });
+
   describe('Config and FileDiscoveryService integration', () => {
     it('should work without config', async () => {
       vi.mocked(fs.readdir).mockResolvedValue([

@@ -38,6 +38,7 @@ export interface UseCompletionReturn {
   resetCompletionState: () => void;
   navigateUp: () => void;
   navigateDown: () => void;
+  handleAutocomplete: (indexToUse: number) => void;
 }
 
 export function useCompletion(
@@ -584,6 +585,77 @@ export function useCompletion(
     config,
   ]);
 
+  const handleAutocomplete = useCallback(
+    (indexToUse: number) => {
+      if (indexToUse < 0 || indexToUse >= suggestions.length) {
+        return;
+      }
+      const query = buffer.text;
+      const suggestion = suggestions[indexToUse].value;
+
+      if (query.trimStart().startsWith('/')) {
+        const hasTrailingSpace = query.endsWith(' ');
+        const parts = query
+          .trimStart()
+          .substring(1)
+          .split(/\s+/)
+          .filter(Boolean);
+
+        let isParentPath = false;
+        // If there's no trailing space, we need to check if the current query
+        // is already a complete path to a parent command.
+        if (!hasTrailingSpace) {
+          let currentLevel: readonly SlashCommand[] | undefined = slashCommands;
+          for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            const found: SlashCommand | undefined = currentLevel?.find(
+              (cmd) => cmd.name === part || cmd.altNames?.includes(part),
+            );
+
+            if (found) {
+              if (i === parts.length - 1 && found.subCommands) {
+                isParentPath = true;
+              }
+              currentLevel = found.subCommands as
+                | readonly SlashCommand[]
+                | undefined;
+            } else {
+              // Path is invalid, so it can't be a parent path.
+              currentLevel = undefined;
+              break;
+            }
+          }
+        }
+
+        // Determine the base path of the command.
+        // - If there's a trailing space, the whole command is the base.
+        // - If it's a known parent path, the whole command is the base.
+        // - Otherwise, the base is everything EXCEPT the last partial part.
+        const basePath =
+          hasTrailingSpace || isParentPath ? parts : parts.slice(0, -1);
+        const newValue = `/${[...basePath, suggestion].join(' ')}`;
+
+        buffer.setText(newValue);
+      } else {
+        const atIndex = query.lastIndexOf('@');
+        if (atIndex === -1) return;
+        const pathPart = query.substring(atIndex + 1);
+        const lastSlashIndexInPath = pathPart.lastIndexOf('/');
+        let autoCompleteStartIndex = atIndex + 1;
+        if (lastSlashIndexInPath !== -1) {
+          autoCompleteStartIndex += lastSlashIndexInPath + 1;
+        }
+        buffer.replaceRangeByOffset(
+          autoCompleteStartIndex,
+          buffer.text.length,
+          suggestion,
+        );
+      }
+      resetCompletionState();
+    },
+    [resetCompletionState, buffer, suggestions, slashCommands],
+  );
+
   return {
     suggestions,
     activeSuggestionIndex,
@@ -596,5 +668,6 @@ export function useCompletion(
     resetCompletionState,
     navigateUp,
     navigateDown,
+    handleAutocomplete,
   };
 }
