@@ -12,6 +12,15 @@ import * as os from 'os';
 export const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 
+const SYSTEM_FILES = [
+  'Thumbs.db', // Windows thumbnail cache
+  'Desktop.ini', // Windows folder config
+  'ehthumbs.db', // Windows XP/Vista thumbnails
+  'ehthumbs_vista.db',
+  '$RECYCLE.BIN', // Windows recycle bin
+  'System Volume Information', // Windows system folder
+] as const;
+
 export interface Extension {
   config: ExtensionConfig;
   contextFiles: string[];
@@ -23,6 +32,15 @@ export interface ExtensionConfig {
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
+}
+
+function isSystemFile(filename: string): boolean {
+  // Skip files starting with dot (hidden files like .DS_Store)
+  if (filename.startsWith('.')) {
+    return true;
+  }
+
+  return (SYSTEM_FILES as readonly string[]).includes(filename);
 }
 
 export function loadExtensions(workspaceDir: string): Extension[] {
@@ -49,6 +67,10 @@ function loadExtensionsFromDir(dir: string): Extension[] {
 
   const extensions: Extension[] = [];
   for (const subdir of fs.readdirSync(extensionsDir)) {
+    if (isSystemFile(subdir)) {
+      continue;
+    }
+
     const extensionDir = path.join(extensionsDir, subdir);
 
     const extension = loadExtension(extensionDir);
