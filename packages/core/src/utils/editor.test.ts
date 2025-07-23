@@ -202,7 +202,7 @@ describe('editor utils', () => {
         });
       }
 
-      it(`should fallback to last command "${commands[commands.length - 1]}" when none exist on non-windows`, () => {
+      it(`should fall back to last command "${commands[commands.length - 1]}" when none exist on non-windows`, () => {
         Object.defineProperty(process, 'platform', { value: 'linux' });
         (execSync as Mock).mockImplementation(() => {
           throw new Error(); // all commands not found
@@ -247,7 +247,7 @@ describe('editor utils', () => {
         });
       }
 
-      it(`should fallback to last command "${win32Commands[win32Commands.length - 1]}" when none exist on windows`, () => {
+      it(`should fall back to last command "${win32Commands[win32Commands.length - 1]}" when none exist on windows`, () => {
         Object.defineProperty(process, 'platform', { value: 'win32' });
         (execSync as Mock).mockImplementation(() => {
           throw new Error(); // all commands not found

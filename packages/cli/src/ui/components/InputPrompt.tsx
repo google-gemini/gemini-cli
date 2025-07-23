@@ -320,11 +320,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (completion.showSuggestions) {
         if (completion.suggestions.length > 1) {
-          if (key.name === 'up') {
+          if (key.name === 'up' || (key.ctrl && key.name === 'p')) {
             completion.navigateUp();
             return;
           }
-          if (key.name === 'down') {
+          if (key.name === 'down' || (key.ctrl && key.name === 'n')) {
             completion.navigateDown();
             return;
           }
@@ -448,7 +448,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Fallback to the text buffer's default input handling for all other keys
+      // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
     },
     [
