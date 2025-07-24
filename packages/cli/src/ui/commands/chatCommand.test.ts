@@ -131,10 +131,33 @@ describe('chatCommand', () => {
       const content = result?.content ?? '';
       expect(result?.type).toBe('message');
       expect(content).toContain('List of saved conversations:');
+      const isoDate = date
+        .toISOString()
+        .match(/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
+      const formattedDate = isoDate ? `${isoDate[1]} ${isoDate[2]}` : '';
+      expect(content).toContain(formattedDate);
       const index1 = content.indexOf('- \u001b[36mtest1\u001b[0m');
       const index2 = content.indexOf('- \u001b[36mtest2\u001b[0m');
       expect(index1).toBeGreaterThanOrEqual(0);
       expect(index2).toBeGreaterThan(index1);
+    });
+
+    it('should handle invalid date formats gracefully', async () => {
+      const fakeFiles = ['checkpoint-baddate.json'];
+      const badDate = {
+        toISOString: () => 'an-invalid-date-string',
+      } as Date;
+
+      mockFs.readdir.mockResolvedValue(fakeFiles);
+      mockFs.stat.mockResolvedValue({ mtime: badDate } as Stats);
+
+      const result = (await listCommand?.action?.(
+        mockContext,
+        '',
+      )) as MessageActionReturn;
+
+      const content = result?.content ?? '';
+      expect(content).toContain('(saved on Invalid Date)');
     });
   });
   describe('save subcommand', () => {
