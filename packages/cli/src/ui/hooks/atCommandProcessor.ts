@@ -222,14 +222,13 @@ export async function handleAtCommand({
       const absolutePath = path.resolve(config.getTargetDir(), pathName);
       const stats = await fs.stat(absolutePath);
       if (stats.isDirectory()) {
-        currentPathSpec = pathName.endsWith('/')
-          ? `${pathName}**`
-          : `${pathName}/**`;
+        currentPathSpec =
+          pathName + (pathName.endsWith(path.sep) ? `**` : `/**`);
         onDebugMessage(
           `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
         );
       } else {
-        onDebugMessage(`Path ${pathName} resolved to file: ${currentPathSpec}`);
+        onDebugMessage(`Path ${pathName} resolved to file: ${absolutePath}`);
       }
       resolvedSuccessfully = true;
     } catch (error) {
@@ -240,7 +239,10 @@ export async function handleAtCommand({
           );
           try {
             const globResult = await globTool.execute(
-              { pattern: `**/*${pathName}*`, path: config.getTargetDir() },
+              {
+                pattern: `**/*${pathName}*`,
+                path: config.getTargetDir(),
+              },
               signal,
             );
             if (
