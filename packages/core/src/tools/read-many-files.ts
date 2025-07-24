@@ -402,47 +402,63 @@ Use this tool when the user's query implies needing the content of several files
 
     // Process files in parallel using Promise.allSettled
     const fileProcessingPromises = sortedFiles.map(async (filePath) => {
-      const relativePathForDisplay = path
-        .relative(this.config.getTargetDir(), filePath)
-        .replace(/\\/g, '/');
+      try {
+        const relativePathForDisplay = path
+          .relative(this.config.getTargetDir(), filePath)
+          .replace(/\\/g, '/');
 
-      const fileType = await detectFileType(filePath);
+        const fileType = await detectFileType(filePath);
 
-      if (fileType === 'image' || fileType === 'pdf') {
-        const fileExtension = path.extname(filePath).toLowerCase();
-        const fileNameWithoutExtension = path.basename(filePath, fileExtension);
-        const requestedExplicitly = inputPatterns.some(
-          (pattern: string) =>
-            pattern.toLowerCase().includes(fileExtension) ||
-            pattern.includes(fileNameWithoutExtension),
+        if (fileType === 'image' || fileType === 'pdf') {
+          const fileExtension = path.extname(filePath).toLowerCase();
+          const fileNameWithoutExtension = path.basename(
+            filePath,
+            fileExtension,
+          );
+          const requestedExplicitly = inputPatterns.some(
+            (pattern: string) =>
+              pattern.toLowerCase().includes(fileExtension) ||
+              pattern.includes(fileNameWithoutExtension),
+          );
+
+          if (!requestedExplicitly) {
+            return {
+              success: false,
+              filePath,
+              relativePathForDisplay,
+              reason:
+                'asset file (image/pdf) was not explicitly requested by name or extension',
+            };
+          }
+        }
+
+        // Use processSingleFileContent for all file types now
+        const fileReadResult = await processSingleFileContent(
+          filePath,
+          this.config.getTargetDir(),
         );
 
-        if (!requestedExplicitly) {
-          return {
-            success: false,
-            filePath,
-            relativePathForDisplay,
-            reason:
-              'asset file (image/pdf) was not explicitly requested by name or extension',
-          };
-        }
+        return {
+          success: !fileReadResult.error,
+          filePath,
+          relativePathForDisplay,
+          fileReadResult,
+          reason: fileReadResult.error
+            ? `Read error: ${fileReadResult.error}`
+            : undefined,
+        };
+      } catch (error) {
+        const relativePathForDisplay = path
+          .relative(this.config.getTargetDir(), filePath)
+          .replace(/\\/g, '/');
+
+        return {
+          success: false,
+          filePath,
+          relativePathForDisplay,
+          reason: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+        };
       }
-
-      // Use processSingleFileContent for all file types now
-      const fileReadResult = await processSingleFileContent(
-        filePath,
-        this.config.getTargetDir(),
-      );
-
-      return {
-        success: !fileReadResult.error,
-        filePath,
-        relativePathForDisplay,
-        fileReadResult,
-        reason: fileReadResult.error
-          ? `Read error: ${fileReadResult.error}`
-          : undefined,
-      };
     });
 
     // Wait for all file processing to complete
