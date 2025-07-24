@@ -292,8 +292,6 @@ export class Logger {
         'Logger not initialized or checkpoint file path not set. Cannot delete a checkpoint.'
       );
     }
-      return;
-    }
     const path = this._checkpointPath(tag);
     await fs.unlink(path);
   }
