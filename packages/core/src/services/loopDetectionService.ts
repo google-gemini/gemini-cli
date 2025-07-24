@@ -50,7 +50,7 @@ const SENTENCE_ENDING_PUNCTUATION_REGEX = /[.!?]+(?=\s|$)/;
  */
 export class LoopDetectionService {
   private readonly config: Config;
-  private prompt_id = '';
+  private promptId = '';
 
   // Tool call tracking
   private lastToolCallKey: string | null = null;
