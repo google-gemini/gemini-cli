@@ -70,9 +70,17 @@ const listCommand: SlashCommand = {
       };
     }
 
+    const maxNameLength = Math.max(
+      ...chatDetails.map((chat) => chat.name.length),
+    );
+
     let message = 'List of saved conversations:\n\n';
     for (const chat of chatDetails) {
-      message += `  - \u001b[36m${chat.name}\u001b[0m\n`;
+      const paddedName = chat.name.padEnd(maxNameLength, ' ');
+      const isoString = chat.mtime.toISOString();
+      const match = isoString.match(/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
+      const formattedDate = match ? `${match[1]} ${match[2]}` : 'Invalid Date';
+      message += `  - \u001b[36m${paddedName}\u001b[0m  \u001b[90m(saved on ${formattedDate})\u001b[0m\n`;
     }
     message += `\n\u001b[90mNote: Newest last, oldest first\u001b[0m`;
     return {
