@@ -18,6 +18,7 @@ import { RecentFilesManager } from './recent-files-manager.js';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
+const MAX_SELECTED_TEXT_LENGTH = 16384; // 16 KiB limit
 
 function sendOpenFilesChangedNotification(
   transport: StreamableHTTPServerTransport,
@@ -34,14 +35,16 @@ function sendOpenFilesChangedNotification(
       ? editor.document.uri.fsPath
       : '';
   const selection = editor.selection;
-  const cursor = selection.active;
-  const MAX_SELECTED_TEXT_LENGTH = 16384; // 16 KiB limit
+  const cursor = {
+    // This value is a zero-based index, but the vscode IDE is one-based.
+    line: selection.active.line + 1,
+    character: selection.active.character,
+  };
   let selectedText = editor.document.getText(selection);
   if (selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
     selectedText =
       selectedText.substring(0, MAX_SELECTED_TEXT_LENGTH) + '... [TRUNCATED]';
   }
-  logger.appendLine(`Sending active file changed notification: ${filePath}`);
   const notification: JSONRPCNotification = {
     jsonrpc: '2.0',
     method: 'ide/openFilesChanged',
@@ -57,6 +60,8 @@ function sendOpenFilesChangedNotification(
       selectedText,
     },
   };
+  log('cursor: ' + JSON.stringify(cursor));
+  log('selectedText: ' + selection);
   log(
     `Sending active file changed notification: ${JSON.stringify(
       notification,
@@ -98,24 +103,6 @@ export class IDEServer {
     });
     let selectionChangeDebounceTimer: NodeJS.Timeout | undefined;
     context.subscriptions.push(onDidChangeSubscription);
-
-    const onDidChangeTextEditorSelectionSubscription =
-      vscode.window.onDidChangeTextEditorSelection(() => {
-        if (selectionChangeDebounceTimer) {
-          clearTimeout(selectionChangeDebounceTimer);
-        }
-        selectionChangeDebounceTimer = setTimeout(() => {
-          for (const transport of Object.values(transports)) {
-            sendOpenFilesChangedNotification(
-              transport,
-              this.logger,
-              recentFilesManager,
-            );
-          }
-        }, 500); // 500ms
-      });
-
-    context.subscriptions.push(onDidChangeTextEditorSelectionSubscription);
 
     app.post('/mcp', async (req: Request, res: Response) => {
       const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
