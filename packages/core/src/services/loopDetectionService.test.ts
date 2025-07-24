@@ -168,21 +168,21 @@ describe('LoopDetectionService', () => {
         );
       }
 
-      service.reset();
+      service.reset('');
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 2; i++) {
         expect(service.addAndCheck(createContentEvent('obj.method()'))).toBe(
           false,
         );
       }
 
-      service.reset();
+      service.reset('');
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 2; i++) {
         expect(
           service.addAndCheck(createContentEvent('arr.filter().map()')),
         ).toBe(false);
       }
 
-      service.reset();
+      service.reset('');
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 2; i++) {
         expect(
           service.addAndCheck(
@@ -203,7 +203,7 @@ describe('LoopDetectionService', () => {
         service.addAndCheck(createContentEvent('This is a sentence.')),
       ).toBe(true);
 
-      service.reset();
+      service.reset('');
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
         expect(
           service.addAndCheck(createContentEvent('Is this a question? ')),
@@ -213,7 +213,7 @@ describe('LoopDetectionService', () => {
         service.addAndCheck(createContentEvent('Is this a question? ')),
       ).toBe(true);
 
-      service.reset();
+      service.reset('');
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
         expect(
           service.addAndCheck(createContentEvent('What excitement!\n')),
