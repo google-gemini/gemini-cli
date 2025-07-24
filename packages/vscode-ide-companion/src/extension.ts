@@ -24,6 +24,15 @@ export async function activate(context: vscode.ExtensionContext) {
     const message = err instanceof Error ? err.message : String(err);
     log(`Failed to start IDE server: ${message}`);
   }
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('gemini-cli.runGeminiCLI', () => {
+      const geminiCmd = 'gemini';
+      const terminal = vscode.window.createTerminal(`Gemini CLI`);
+      terminal.sendText(geminiCmd);
+      terminal.show();
+    }),
+  );
 }
 
 export async function deactivate(): Promise<void> {
