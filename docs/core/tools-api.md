@@ -21,6 +21,7 @@ The Gemini CLI core (`packages/core`) features a robust system for defining, reg
 - **Tool Registry (`tool-registry.ts`):** A class (`ToolRegistry`) responsible for:
   - **Registering Tools:** Holding a collection of all available built-in tools (e.g., `ReadFileTool`, `ShellTool`).
   - **Discovering Tools:** It can also discover tools dynamically:
+    - **Virtual Tools Discovery:** Automatically scans `GEMINI.md` files for tool definitions using the `### Tools` section and registers them as `VirtualShellTool` instances.
     - **Command-based Discovery:** If `toolDiscoveryCommand` is configured in settings, this command is executed. It's expected to output JSON describing custom tools, which are then registered as `DiscoveredTool` instances.
     - **MCP-based Discovery:** If `mcpServerCommand` is configured, the registry can connect to a Model Context Protocol (MCP) server to list and register tools (`DiscoveredMCPTool`).
   - **Providing Schemas:** Exposing the `FunctionDeclaration` schemas of all registered tools to the Gemini model, so it knows what tools are available and how to use them.
@@ -45,6 +46,8 @@ The core comes with a suite of pre-defined tools, typically found in `packages/c
   - `WebSearchTool` (`web-search.ts`): Performs a web search.
 - **Memory Tools:**
   - `MemoryTool` (`memoryTool.ts`): Interacts with the AI's memory.
+- **Virtual Tools:**
+  - `VirtualShellTool` (`virtual-shell-tool.ts`): Executes user-defined shell scripts from `GEMINI.md` tool definitions.
 
 Each of these tools extends `BaseTool` and implements the required methods for its specific functionality.
 
@@ -65,8 +68,9 @@ Each of these tools extends `BaseTool` and implements the required methods for i
 
 ## Extending with Custom Tools
 
-While direct programmatic registration of new tools by users isn't explicitly detailed as a primary workflow in the provided files for typical end-users, the architecture supports extension through:
+The architecture supports multiple ways to extend the CLI with custom tools:
 
+- **Virtual Tools (Recommended):** The simplest way to add custom functionality. Define tools directly in `GEMINI.md` files using shell scripts and JSON schemas. These are automatically discovered and registered on startup. See the [Virtual Tools documentation](../tools/virtual-tools.md) for details.
 - **Command-based Discovery:** Advanced users or project administrators can define a `toolDiscoveryCommand` in `settings.json`. This command, when run by the Gemini CLI core, should output a JSON array of `FunctionDeclaration` objects. The core will then make these available as `DiscoveredTool` instances. The corresponding `toolCallCommand` would then be responsible for actually executing these custom tools.
 - **MCP Server(s):** For more complex scenarios, one or more MCP servers can be set up and configured via the `mcpServers` setting in `settings.json`. The Gemini CLI core can then discover and use tools exposed by these servers. As mentioned, if you have multiple MCP servers, the tool names will be prefixed with the server name from your configuration (e.g., `serverAlias__actualToolName`).
 
