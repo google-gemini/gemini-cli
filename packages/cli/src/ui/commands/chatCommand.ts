@@ -198,9 +198,58 @@ const resumeCommand: SlashCommand = {
   },
 };
 
+const deleteCommand: SlashCommand = {
+  name: 'delete',
+  description:
+    'Delete a conversation checkpoint. Usage: /chat delete <tag>',
+  kind: CommandKind.BUILT_IN,
+  action: async (context, args): Promise<MessageActionReturn> => {
+    const tag = args.trim();
+    if (!tag) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /chat delete <tag>',
+      };
+    }
+
+    const { logger } = context.services;
+    await logger.initialize();
+    try {
+      await logger.deleteCheckpoint(tag);
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `Conversation checkpoint deleted: ${tag}.`,
+      };
+    } catch (e) {
+      const err = e as NodeJS.ErrnoException;
+      if (err.code === 'ENOENT') {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `No saved checkpoint found with tag: ${tag}.`,
+        };
+      } else {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `Error deleting checkpoint: ${err.message}`,
+        };
+      }
+    }
+  },
+  completion: async (context, partialArg) => {
+    const chatDetails = await getSavedChatTags(context, true);
+    return chatDetails
+      .map((chat) => chat.name)
+      .filter((name) => name.startsWith(partialArg));
+  },
+};
+
 export const chatCommand: SlashCommand = {
   name: 'chat',
   description: 'Manage conversation history.',
   kind: CommandKind.BUILT_IN,
-  subCommands: [listCommand, saveCommand, resumeCommand],
+  subCommands: [listCommand, saveCommand, resumeCommand, deleteCommand],
 };
