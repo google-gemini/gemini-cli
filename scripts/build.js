@@ -7,7 +7,6 @@
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
-// You may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
@@ -34,6 +33,10 @@ if (!existsSync(join(root, 'node_modules'))) {
 // build all workspaces/packages
 execSync('npm run generate', { stdio: 'inherit', cwd: root });
 execSync('npm run build --workspaces', { stdio: 'inherit', cwd: root });
+execSync('npx --yes @vscode/vsce package --no-dependencies', {
+  stdio: 'inherit',
+  cwd: join(root, 'packages', 'vscode-ide-companion'),
+});
 
 // also build container image if sandboxing is enabled
 // skip (-s) npm install + build since we did that above

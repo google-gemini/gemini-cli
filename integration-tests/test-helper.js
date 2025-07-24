@@ -42,16 +42,37 @@ export class TestRig {
     mkdirSync(join(this.testDir, dir));
   }
 
-  run(prompt, ...args) {
-    const output = execSync(
-      `node ${this.bundlePath} --yolo --prompt "${prompt}" ${args.join(' ')}`,
-      {
-        cwd: this.testDir,
-        encoding: 'utf-8',
-      },
-    );
+  sync() {
+    // ensure file system is done before spawning
+    execSync('sync', { cwd: this.testDir });
+  }
 
-    if (env.KEEP_OUTPUT === 'true') {
+  run(promptOrOptions, ...args) {
+    let command = `node ${this.bundlePath} --yolo`;
+    const execOptions = {
+      cwd: this.testDir,
+      encoding: 'utf-8',
+    };
+
+    if (typeof promptOrOptions === 'string') {
+      command += ` --prompt "${promptOrOptions}"`;
+    } else if (
+      typeof promptOrOptions === 'object' &&
+      promptOrOptions !== null
+    ) {
+      if (promptOrOptions.prompt) {
+        command += ` --prompt "${promptOrOptions.prompt}"`;
+      }
+      if (promptOrOptions.stdin) {
+        execOptions.input = promptOrOptions.stdin;
+      }
+    }
+
+    command += ` ${args.join(' ')}`;
+
+    const output = execSync(command, execOptions);
+
+    if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
       const testId = `${env.TEST_FILE_NAME.replace(
         '.test.js',
         '',
@@ -66,7 +87,7 @@ export class TestRig {
 
   readFile(fileName) {
     const content = readFileSync(join(this.testDir, fileName), 'utf-8');
-    if (env.KEEP_OUTPUT === 'true') {
+    if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
       const testId = `${env.TEST_FILE_NAME.replace(
         '.test.js',
         '',

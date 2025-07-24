@@ -5,14 +5,23 @@
  */
 
 import { spawn } from 'child_process';
-import { StringDecoder } from 'string_decoder';
-import type { HistoryItemWithoutId } from '../types.js';
+import { TextDecoder } from 'util';
+import {
+  HistoryItemWithoutId,
+  IndividualToolCallDisplay,
+  ToolCallStatus,
+} from '../types.js';
 import { useCallback } from 'react';
-import { Config, GeminiClient } from '@google/gemini-cli-core';
+import {
+  Config,
+  GeminiClient,
+  getCachedEncodingForBuffer,
+} from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import { isBinary } from '../utils/textUtils.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { SHELL_COMMAND_NAME } from '../constants.js';
 import crypto from 'crypto';
 import path from 'path';
 import os from 'os';
@@ -63,11 +72,15 @@ function executeShellCommand(
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: !isWindows, // Use process groups on non-Windows for robust killing
+      env: {
+        ...process.env,
+        GEMINI_CLI: '1',
+      },
     });
 
     // Use decoders to handle multi-byte characters safely (for streaming output).
-    const stdoutDecoder = new StringDecoder('utf8');
-    const stderrDecoder = new StringDecoder('utf8');
+    let stdoutDecoder: TextDecoder | null = null;
+    let stderrDecoder: TextDecoder | null = null;
 
     let stdout = '';
     let stderr = '';
@@ -80,6 +93,12 @@ function executeShellCommand(
     let sniffedBytes = 0;
 
     const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
+      if (!stdoutDecoder || !stderrDecoder) {
+        const encoding = getCachedEncodingForBuffer(data);
+        stdoutDecoder = new TextDecoder(encoding);
+        stderrDecoder = new TextDecoder(encoding);
+      }
+
       outputChunks.push(data);
 
       if (streamToUi && sniffedBytes < MAX_SNIFF_SIZE) {
@@ -96,8 +115,8 @@ function executeShellCommand(
 
       const decodedChunk =
         stream === 'stdout'
-          ? stdoutDecoder.write(data)
-          : stderrDecoder.write(data);
+          ? stdoutDecoder.decode(data, { stream: true })
+          : stderrDecoder.decode(data, { stream: true });
       if (stream === 'stdout') {
         stdout += stripAnsi(decodedChunk);
       } else {
@@ -141,7 +160,7 @@ function executeShellCommand(
               process.kill(-child.pid, 'SIGKILL');
             }
           } catch (_e) {
-            // Fallback to killing just the main process if group kill fails.
+            // Fall back to killing just the main process if group kill fails.
             if (!exited) child.kill('SIGKILL');
           }
         }
@@ -155,8 +174,12 @@ function executeShellCommand(
       abortSignal.removeEventListener('abort', abortHandler);
 
       // Handle any final bytes lingering in the decoders
-      stdout += stdoutDecoder.end();
-      stderr += stderrDecoder.end();
+      if (stdoutDecoder) {
+        stdout += stdoutDecoder.decode();
+      }
+      if (stderrDecoder) {
+        stderr += stderrDecoder.decode();
+      }
 
       const finalBuffer = Buffer.concat(outputChunks);
 
@@ -204,6 +227,7 @@ ${modelContent}
  * Hook to process shell commands.
  * Orchestrates command execution and updates history and agent context.
  */
+
 export const useShellCommandProcessor = (
   addItemToHistory: UseHistoryManagerReturn['addItem'],
   setPendingHistoryItem: React.Dispatch<
@@ -221,6 +245,7 @@ export const useShellCommandProcessor = (
       }
 
       const userMessageTimestamp = Date.now();
+      const callId = `shell-${userMessageTimestamp}`;
       addItemToHistory(
         { type: 'user_shell', text: rawQuery },
         userMessageTimestamp,
@@ -246,6 +271,20 @@ export const useShellCommandProcessor = (
       const execPromise = new Promise<void>((resolve) => {
         let lastUpdateTime = 0;
 
+        const initialToolDisplay: IndividualToolCallDisplay = {
+          callId,
+          name: SHELL_COMMAND_NAME,
+          description: rawQuery,
+          status: ToolCallStatus.Executing,
+          resultDisplay: '',
+          confirmationDetails: undefined,
+        };
+
+        setPendingHistoryItem({
+          type: 'tool_group',
+          tools: [initialToolDisplay],
+        });
+
         onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
         executeShellCommand(
           commandToExecute,
@@ -254,23 +293,22 @@ export const useShellCommandProcessor = (
           (streamedOutput) => {
             // Throttle pending UI updates to avoid excessive re-renders.
             if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-              setPendingHistoryItem({ type: 'info', text: streamedOutput });
+              setPendingHistoryItem({
+                type: 'tool_group',
+                tools: [
+                  { ...initialToolDisplay, resultDisplay: streamedOutput },
+                ],
+              });
               lastUpdateTime = Date.now();
             }
           },
           onDebugMessage,
         )
           .then((result) => {
-            // TODO(abhipatel12) - Consider updating pending item and using timeout to ensure
-            // there is no jump where intermediate output is skipped.
             setPendingHistoryItem(null);
 
-            let historyItemType: HistoryItemWithoutId['type'] = 'info';
             let mainContent: string;
 
-            // The context sent to the model utilizes a text tokenizer which means raw binary data is
-            // cannot be parsed and understood and thus would only pollute the context window and waste
-            // tokens.
             if (isBinary(result.rawOutput)) {
               mainContent =
                 '[Command produced binary output, which is not shown.]';
@@ -280,17 +318,19 @@ export const useShellCommandProcessor = (
             }
 
             let finalOutput = mainContent;
+            let finalStatus = ToolCallStatus.Success;
 
             if (result.error) {
-              historyItemType = 'error';
+              finalStatus = ToolCallStatus.Error;
               finalOutput = `${result.error.message}\n${finalOutput}`;
             } else if (result.aborted) {
+              finalStatus = ToolCallStatus.Canceled;
               finalOutput = `Command was cancelled.\n${finalOutput}`;
             } else if (result.signal) {
-              historyItemType = 'error';
+              finalStatus = ToolCallStatus.Error;
               finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;
             } else if (result.exitCode !== 0) {
-              historyItemType = 'error';
+              finalStatus = ToolCallStatus.Error;
               finalOutput = `Command exited with code ${result.exitCode}.\n${finalOutput}`;
             }
 
@@ -302,9 +342,18 @@ export const useShellCommandProcessor = (
               }
             }
 
+            const finalToolDisplay: IndividualToolCallDisplay = {
+              ...initialToolDisplay,
+              status: finalStatus,
+              resultDisplay: finalOutput,
+            };
+
             // Add the complete, contextual result to the local UI history.
             addItemToHistory(
-              { type: historyItemType, text: finalOutput },
+              {
+                type: 'tool_group',
+                tools: [finalToolDisplay],
+              } as HistoryItemWithoutId,
               userMessageTimestamp,
             );
 
