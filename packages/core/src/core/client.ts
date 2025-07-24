@@ -8,7 +8,6 @@ import {
   EmbedContentParameters,
   GenerateContentConfig,
   Part,
-  SchemaUnion,
   PartListUnion,
   Content,
   Tool,
@@ -417,7 +416,7 @@ export class GeminiClient {
 
   async generateJson(
     contents: Content[],
-    schema: SchemaUnion,
+    schema: Record<string, unknown>,
     abortSignal: AbortSignal,
     model?: string,
     config: GenerateContentConfig = {},
@@ -440,7 +439,7 @@ export class GeminiClient {
           config: {
             ...requestConfig,
             systemInstruction,
-            responseSchema: schema,
+            responseJsonSchema: schema,
             responseMimeType: 'application/json',
           },
           contents,
