@@ -21,6 +21,8 @@ import {
   METRIC_TOKEN_USAGE,
   METRIC_SESSION_COUNT,
   METRIC_FILE_OPERATION_COUNT,
+  METRIC_MEMORY_COMPRESSION_COUNT,
+  METRIC_MEMORY_COMPRESSION_SIZE,
 } from './constants.js';
 import { Config } from '../config/config.js';
 
@@ -37,6 +39,8 @@ let apiRequestCounter: Counter | undefined;
 let apiRequestLatencyHistogram: Histogram | undefined;
 let tokenUsageCounter: Counter | undefined;
 let fileOperationCounter: Counter | undefined;
+let memoryCompressionCounter: Counter | undefined;
+let memoryCompressionTokenCountHistogram: Histogram | undefined;
 let isMetricsInitialized = false;
 
 function getCommonAttributes(config: Config): Attributes {
@@ -91,6 +95,20 @@ export function initializeMetrics(config: Config): void {
     description: 'Count of CLI sessions started.',
     valueType: ValueType.INT,
   });
+  memoryCompressionCounter = meter.createCounter(
+    METRIC_MEMORY_COMPRESSION_COUNT,
+    {
+      description: 'Counts number of memory compressions.',
+      valueType: ValueType.INT,
+    },
+  );
+  memoryCompressionTokenCountHistogram = meter.createHistogram(
+    METRIC_MEMORY_COMPRESSION_SIZE,
+    {
+      description: 'Token count of memory compressions.',
+      valueType: ValueType.INT,
+    },
+  );
   sessionCounter.add(1, getCommonAttributes(config));
   isMetricsInitialized = true;
 }
@@ -199,4 +217,30 @@ export function recordFileOperationMetric(
   if (mimetype !== undefined) attributes.mimetype = mimetype;
   if (extension !== undefined) attributes.extension = extension;
   fileOperationCounter.add(1, attributes);
+}
+
+export function recordMemoryCompressionMetrics(
+  config: Config,
+  originalSize: number,
+  compressedSize: number,
+): void {
+  if (
+    !memoryCompressionCounter ||
+    !memoryCompressionTokenCountHistogram ||
+    !isMetricsInitialized
+  )
+    return;
+
+  const metricAttributes: Attributes = {
+    ...getCommonAttributes(config),
+  };
+  memoryCompressionCounter.add(1, metricAttributes);
+  memoryCompressionTokenCountHistogram.record(originalSize, {
+    ...metricAttributes,
+    type: 'original',
+  });
+  memoryCompressionTokenCountHistogram.record(compressedSize, {
+    ...metricAttributes,
+    type: 'compressed',
+  });
 }

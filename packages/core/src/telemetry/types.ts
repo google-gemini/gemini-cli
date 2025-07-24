@@ -276,6 +276,26 @@ export class FlashDecidedToContinueEvent {
   }
 }
 
+export class MemoryCompressionEvent {
+  'event.name': 'memory_compression';
+  'event.timestamp': string; // ISO 8601
+  prompt_id: string;
+  original_token_count: number;
+  compressed_token_count: number;
+
+  constructor(
+    prompt_id: string,
+    original_token_count: number,
+    compressed_token_count: number,
+  ) {
+    this['event.name'] = 'memory_compression';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
+    this.original_token_count = original_token_count;
+    this.compressed_token_count = compressed_token_count;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -286,4 +306,5 @@ export type TelemetryEvent =
   | ApiResponseEvent
   | FlashFallbackEvent
   | LoopDetectedEvent
-  | FlashDecidedToContinueEvent;
+  | FlashDecidedToContinueEvent
+  | MemoryCompressionEvent;
