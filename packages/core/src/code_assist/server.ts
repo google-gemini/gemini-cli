@@ -140,7 +140,7 @@ export class CodeAssistServer implements ContentGenerator {
     const res = await this.client.request({
       url: this.getMethodUrl(method),
       method: 'POST',
-      headers: headers,
+      headers,
       responseType: 'json',
       body: JSON.stringify(req),
       signal,
@@ -160,7 +160,7 @@ export class CodeAssistServer implements ContentGenerator {
     const res = await this.client.request({
       url: this.getMethodUrl(method),
       method: 'GET',
-      headers: headers,
+      headers,
       responseType: 'json',
       signal,
     });
@@ -186,7 +186,7 @@ export class CodeAssistServer implements ContentGenerator {
       params: {
         alt: 'sse',
       },
-      headers: headers,
+      headers,
       responseType: 'stream',
       body: JSON.stringify(req),
       signal,
