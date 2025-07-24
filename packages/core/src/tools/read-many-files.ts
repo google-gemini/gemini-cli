@@ -408,7 +408,6 @@ Use this tool when the user's query implies needing the content of several files
 
       const fileType = await detectFileType(filePath);
 
-      // Check if image/pdf files are explicitly requested
       if (fileType === 'image' || fileType === 'pdf') {
         const fileExtension = path.extname(filePath).toLowerCase();
         const fileNameWithoutExtension = path.basename(filePath, fileExtension);
