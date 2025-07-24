@@ -48,17 +48,18 @@ export class RecentFilesManager {
       }
     });
 
-    const onDidChangeTextEditorSelectionSubscription =
-      vscode.window.onDidChangeTextEditorSelection(() => {
+    const selectionWatcher = vscode.window.onDidChangeTextEditorSelection(
+      () => {
         this.fireWithDebounce();
-      });
+      },
+    );
 
     context.subscriptions.push(
       editorWatcher,
       deleteWatcher,
       closeWatcher,
       renameWatcher,
-      onDidChangeTextEditorSelectionSubscription,
+      selectionWatcher,
     );
   }
 

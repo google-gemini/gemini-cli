@@ -26,22 +26,20 @@ function sendOpenFilesChangedNotification(
   recentFilesManager: RecentFilesManager,
 ) {
   const editor = vscode.window.activeTextEditor;
-  if (!editor) {
-    return;
-  }
-
   const filePath =
     editor && editor.document.uri.scheme === 'file'
       ? editor.document.uri.fsPath
       : '';
-  const selection = editor.selection;
-  const cursor = {
-    // This value is a zero-based index, but the vscode IDE is one-based.
-    line: selection.active.line + 1,
-    character: selection.active.character,
-  };
-  let selectedText = editor.document.getText(selection);
-  if (selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
+  const selection = editor?.selection;
+  const cursor = selection
+    ? {
+        // This value is a zero-based index, but the vscode IDE is one-based.
+        line: selection.active.line + 1,
+        character: selection.active.character,
+      }
+    : undefined;
+  let selectedText = editor?.document.getText(selection) ?? undefined;
+  if (selectedText && selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
     selectedText =
       selectedText.substring(0, MAX_SELECTED_TEXT_LENGTH) + '... [TRUNCATED]';
   }
@@ -53,10 +51,7 @@ function sendOpenFilesChangedNotification(
       recentOpenFiles: recentFilesManager.recentFiles.filter(
         (file) => file.filePath !== filePath,
       ),
-      cursor: {
-        line: cursor.line,
-        character: cursor.character,
-      },
+      cursor,
       selectedText,
     },
   };
