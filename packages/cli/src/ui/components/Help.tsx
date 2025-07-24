@@ -97,9 +97,15 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        Enter
+        Alt+Left/Right
       </Text>{' '}
-      - Send message
+      - Jump through words in the input
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Ctrl+C
+      </Text>{' '}
+      - Quit application
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
@@ -111,21 +117,17 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        Up/Down
-      </Text>{' '}
-      - Cycle through your prompt history
-    </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Ctrl+X / Meta+Enter
-      </Text>{' '}
-      - Open input in external editor
-    </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
         Ctrl+L
       </Text>{' '}
       - Clear the screen
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        {process.platform === 'darwin'
+          ? 'Ctrl+X / Meta+Enter'
+          : 'Ctrl+X'}
+      </Text>{' '}
+      - Open input in external editor
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
@@ -135,15 +137,27 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
+        Enter
+      </Text>{' '}
+      - Send message
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
         Esc
       </Text>{' '}
       - Cancel operation
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        Ctrl+C
+        Shift+Tab
       </Text>{' '}
-      - Quit application
+      - Toggle auto-accepting edits
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Up/Down
+      </Text>{' '}
+      - Cycle through your prompt history
     </Text>
     <Box height={1} />
     <Text color={Colors.Foreground}>
