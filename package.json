@@ -83,6 +83,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "@google/gemini-cli": "^0.1.1"
+    "@google/gemini-cli": "^0.1.1",
+    "bresenham-js": "^0.0.0"
   }
 }

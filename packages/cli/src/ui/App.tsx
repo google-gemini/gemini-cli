@@ -70,6 +70,7 @@ import { checkForUpdates } from './utils/updateCheck.js';
 import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
+import ComfyUI from './components/ComfyUI.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -128,6 +129,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [ctrlDPressedOnce, setCtrlDPressedOnce] = useState(false);
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
+  const [showComfyUI, setShowComfyUI] = useState<boolean>(false);
 
   const errorCount = useMemo(
     () => consoleMessages.filter((msg) => msg.type === 'error').length,
@@ -375,6 +377,8 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
     } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
       setConstrainHeight(false);
+    } else if (key.ctrl && input === 'u') {
+      setShowComfyUI((prev) => !prev);
     }
   });
 
@@ -584,6 +588,9 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   // Arbitrary threshold to ensure that items in the static area are large
   // enough but not too large to make the terminal hard to use.
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
+  if (showComfyUI) {
+    return <ComfyUI />;
+  }
   return (
     <StreamingContext.Provider value={streamingState}>
       <Box flexDirection="column" marginBottom={1} width="90%">
