@@ -64,6 +64,28 @@ const env = {
   DEV: 'true',
 };
 
+// Fix for issue #1563.
+// The `ink` library uses `is-in-ci` to detect if the process is running in a
+// CI environment. `is-in-ci` checks for the existence of `CI`,
+// `CONTINUOUS_INTEGRATION`, or any variable starting with `CI_`.
+// If any of these are set, `ink` will not render the UI.
+// By unsetting these variables, we force `ink` to render the UI,
+// which is the desired behavior for the Gemini CLI.
+if (env.CI) {
+  console.error('Unsetting CI environment variable: CI');
+  delete env.CI;
+}
+if (env.CONTINUOUS_INTEGRATION) {
+  console.error('Unsetting CI environment variable: CONTINUOUS_INTEGRATION');
+  delete env.CONTINUOUS_INTEGRATION;
+}
+for (const key in env) {
+  if (key.startsWith('CI_')) {
+    console.error(`Unsetting CI environment variable: ${key}`);
+    delete env[key];
+  }
+}
+
 if (process.env.DEBUG) {
   // If this is not set, the debugger will pause on the outer process rather
   // than the relaunched process making it harder to debug.
