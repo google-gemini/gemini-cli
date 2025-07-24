@@ -61,7 +61,7 @@ export class RecentFilesManager {
     }
     this.debounceTimer = setTimeout(() => {
       this.onDidChangeEmitter.fire();
-    }, 50); // 50ms debounce
+    }, 50); // 50ms
   }
 
   private remove(uri: vscode.Uri, fireEvent = true) {
@@ -81,9 +81,7 @@ export class RecentFilesManager {
       return;
     }
 
-    // Remove if it already exists to avoid duplicates and move it to the top.
     this.remove(uri, false);
-
     this.files.unshift({ uri, timestamp: Date.now() });
 
     if (this.files.length > MAX_FILES) {
