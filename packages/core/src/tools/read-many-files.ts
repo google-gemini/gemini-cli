@@ -71,6 +71,27 @@ export interface ReadManyFilesParams {
 }
 
 /**
+ * Result type for file processing operations
+ */
+type FileProcessingResult =
+  | {
+      success: true;
+      filePath: string;
+      relativePathForDisplay: string;
+      fileReadResult: NonNullable<
+        Awaited<ReturnType<typeof processSingleFileContent>>
+      >;
+      reason?: undefined;
+    }
+  | {
+      success: false;
+      filePath: string;
+      relativePathForDisplay: string;
+      fileReadResult?: undefined;
+      reason: string;
+    };
+
+/**
  * Default exclusion patterns for commonly ignored directories and binary file types.
  * These are compatible with glob ignore patterns.
  * TODO(adh): Consider making this configurable or extendable through a command line argument.
@@ -400,71 +421,76 @@ Use this tool when the user's query implies needing the content of several files
 
     const sortedFiles = Array.from(filesToConsider).sort();
 
-    // Process files in parallel using Promise.allSettled
-    const fileProcessingPromises = sortedFiles.map(async (filePath) => {
-      try {
-        const relativePathForDisplay = path
-          .relative(this.config.getTargetDir(), filePath)
-          .replace(/\\/g, '/');
+    const fileProcessingPromises = sortedFiles.map(
+      async (filePath): Promise<FileProcessingResult> => {
+        try {
+          const relativePathForDisplay = path
+            .relative(this.config.getTargetDir(), filePath)
+            .replace(/\\/g, '/');
 
-        const fileType = await detectFileType(filePath);
+          const fileType = await detectFileType(filePath);
 
-        if (fileType === 'image' || fileType === 'pdf') {
-          const fileExtension = path.extname(filePath).toLowerCase();
-          const fileNameWithoutExtension = path.basename(
+          if (fileType === 'image' || fileType === 'pdf') {
+            const fileExtension = path.extname(filePath).toLowerCase();
+            const fileNameWithoutExtension = path.basename(
+              filePath,
+              fileExtension,
+            );
+            const requestedExplicitly = inputPatterns.some(
+              (pattern: string) =>
+                pattern.toLowerCase().includes(fileExtension) ||
+                pattern.includes(fileNameWithoutExtension),
+            );
+
+            if (!requestedExplicitly) {
+              return {
+                success: false,
+                filePath,
+                relativePathForDisplay,
+                reason:
+                  'asset file (image/pdf) was not explicitly requested by name or extension',
+              };
+            }
+          }
+
+          // Use processSingleFileContent for all file types now
+          const fileReadResult = await processSingleFileContent(
             filePath,
-            fileExtension,
-          );
-          const requestedExplicitly = inputPatterns.some(
-            (pattern: string) =>
-              pattern.toLowerCase().includes(fileExtension) ||
-              pattern.includes(fileNameWithoutExtension),
+            this.config.getTargetDir(),
           );
 
-          if (!requestedExplicitly) {
+          if (fileReadResult.error) {
             return {
               success: false,
               filePath,
               relativePathForDisplay,
-              reason:
-                'asset file (image/pdf) was not explicitly requested by name or extension',
+              reason: `Read error: ${fileReadResult.error}`,
             };
           }
+
+          return {
+            success: true,
+            filePath,
+            relativePathForDisplay,
+            fileReadResult,
+          };
+        } catch (error) {
+          const relativePathForDisplay = path
+            .relative(this.config.getTargetDir(), filePath)
+            .replace(/\\/g, '/');
+
+          return {
+            success: false,
+            filePath,
+            relativePathForDisplay,
+            reason: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+          };
         }
+      },
+    );
 
-        // Use processSingleFileContent for all file types now
-        const fileReadResult = await processSingleFileContent(
-          filePath,
-          this.config.getTargetDir(),
-        );
-
-        return {
-          success: !fileReadResult.error,
-          filePath,
-          relativePathForDisplay,
-          fileReadResult,
-          reason: fileReadResult.error
-            ? `Read error: ${fileReadResult.error}`
-            : undefined,
-        };
-      } catch (error) {
-        const relativePathForDisplay = path
-          .relative(this.config.getTargetDir(), filePath)
-          .replace(/\\/g, '/');
-
-        return {
-          success: false,
-          filePath,
-          relativePathForDisplay,
-          reason: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
-        };
-      }
-    });
-
-    // Wait for all file processing to complete
     const results = await Promise.allSettled(fileProcessingPromises);
 
-    // Process results
     for (const result of results) {
       if (result.status === 'fulfilled') {
         const fileResult = result.value;
@@ -473,30 +499,30 @@ Use this tool when the user's query implies needing the content of several files
           // Handle skipped files (images/PDFs not requested or read errors)
           skippedFiles.push({
             path: fileResult.relativePathForDisplay,
-            reason: fileResult.reason!,
+            reason: fileResult.reason,
           });
         } else {
           // Handle successfully processed files
           const { filePath, relativePathForDisplay, fileReadResult } =
             fileResult;
 
-          if (typeof fileReadResult!.llmContent === 'string') {
+          if (typeof fileReadResult.llmContent === 'string') {
             const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
               '{filePath}',
               filePath,
             );
             contentParts.push(
-              `${separator}\n\n${fileReadResult!.llmContent}\n\n`,
+              `${separator}\n\n${fileReadResult.llmContent}\n\n`,
             );
           } else {
-            contentParts.push(fileReadResult!.llmContent); // This is a Part for image/pdf
+            contentParts.push(fileReadResult.llmContent); // This is a Part for image/pdf
           }
 
           processedFilesRelativePaths.push(relativePathForDisplay);
 
           const lines =
-            typeof fileReadResult!.llmContent === 'string'
-              ? fileReadResult!.llmContent.split('\n').length
+            typeof fileReadResult.llmContent === 'string'
+              ? fileReadResult.llmContent.split('\n').length
               : undefined;
           const mimetype = getSpecificMimeType(filePath);
           recordFileOperationMetric(
