@@ -514,4 +514,24 @@ describe('ShellTool Bug Reproduction', () => {
       undefined,
     );
   });
+
+  it('should pass GEMINI_CLI environment variable to executed commands', async () => {
+    config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getDebugMode: () => false,
+      getGeminiClient: () => ({}) as GeminiClient,
+      getTargetDir: () => '.',
+      getSummarizeToolOutputConfig: () => ({}),
+    } as unknown as Config;
+    shellTool = new ShellTool(config);
+
+    const abortSignal = new AbortController().signal;
+    const result = await shellTool.execute(
+      { command: 'echo "$GEMINI_CLI"' },
+      abortSignal,
+    );
+
+    expect(result.returnDisplay).toBe('1\n');
+  });
 });

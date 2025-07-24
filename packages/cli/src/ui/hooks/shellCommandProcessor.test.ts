@@ -6,6 +6,8 @@
 
 import { act, renderHook } from '@testing-library/react';
 import { vi } from 'vitest';
+import { spawn } from 'child_process';
+import type { ChildProcessWithoutNullStreams } from 'child_process';
 import { useShellCommandProcessor } from './shellCommandProcessor';
 import { Config, GeminiClient } from '@google/gemini-cli-core';
 import * as fs from 'fs';
@@ -39,12 +41,13 @@ describe('useShellCommandProcessor', () => {
   let configMock: Config;
   let geminiClientMock: GeminiClient;
 
-  beforeEach(async () => {
-    const { spawn } = await import('child_process');
+  beforeEach(() => {
     spawnEmitter = new EventEmitter();
     spawnEmitter.stdout = new EventEmitter();
     spawnEmitter.stderr = new EventEmitter();
-    (spawn as vi.Mock).mockReturnValue(spawnEmitter);
+    vi.mocked(spawn).mockReturnValue(
+      spawnEmitter as ChildProcessWithoutNullStreams,
+    );
 
     vi.spyOn(fs, 'existsSync').mockReturnValue(false);
     vi.spyOn(fs, 'readFileSync').mockReturnValue('');
@@ -87,6 +90,16 @@ describe('useShellCommandProcessor', () => {
     act(() => {
       result.current.handleShellCommand('ls -l', abortController.signal);
     });
+
+    expect(spawn).toHaveBeenCalledWith(
+      'bash',
+      ['-c', expect.any(String)],
+      expect.objectContaining({
+        env: expect.objectContaining({
+          GEMINI_CLI: '1',
+        }),
+      }),
+    );
 
     expect(onExecMock).toHaveBeenCalledTimes(1);
     const execPromise = onExecMock.mock.calls[0][0];
