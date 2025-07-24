@@ -7,7 +7,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { vi } from 'vitest';
 import { spawn } from 'child_process';
-import type { ChildProcess } from 'child_process';
+import type { ChildProcessWithoutNullStreams } from 'child_process';
 import { useShellCommandProcessor } from './shellCommandProcessor';
 import { Config, GeminiClient } from '@google/gemini-cli-core';
 import * as fs from 'fs';
@@ -45,7 +45,9 @@ describe('useShellCommandProcessor', () => {
     spawnEmitter = new EventEmitter();
     spawnEmitter.stdout = new EventEmitter();
     spawnEmitter.stderr = new EventEmitter();
-    vi.mocked(spawn).mockReturnValue(spawnEmitter as any);
+    vi.mocked(spawn).mockReturnValue(
+      spawnEmitter as ChildProcessWithoutNullStreams,
+    );
 
     vi.spyOn(fs, 'existsSync').mockReturnValue(false);
     vi.spyOn(fs, 'readFileSync').mockReturnValue('');
