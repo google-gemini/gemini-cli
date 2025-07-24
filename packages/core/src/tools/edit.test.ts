@@ -38,21 +38,19 @@ describe('EditTool', () => {
   let tempDir: string;
   let rootDir: string;
   let mockConfig: Config;
+  let geminiClient: any;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
 
-    // The client instance that EditTool will use
-    const mockClientInstanceWithGenerateJson = {
+    geminiClient = {
       generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
     };
 
     mockConfig = {
-      getGeminiClient: vi
-        .fn()
-        .mockReturnValue(mockClientInstanceWithGenerateJson),
+      getGeminiClient: vi.fn().mockReturnValue(geminiClient),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
@@ -84,20 +82,22 @@ describe('EditTool', () => {
 
     // Reset mocks and set default implementation for ensureCorrectEdit
     mockEnsureCorrectEdit.mockReset();
-    mockEnsureCorrectEdit.mockImplementation(async (currentContent, params) => {
-      let occurrences = 0;
-      if (params.old_string && currentContent) {
-        // Simple string counting for the mock
-        let index = currentContent.indexOf(params.old_string);
-        while (index !== -1) {
-          occurrences++;
-          index = currentContent.indexOf(params.old_string, index + 1);
+    mockEnsureCorrectEdit.mockImplementation(
+      async (_, currentContent, params) => {
+        let occurrences = 0;
+        if (params.old_string && currentContent) {
+          // Simple string counting for the mock
+          let index = currentContent.indexOf(params.old_string);
+          while (index !== -1) {
+            occurrences++;
+            index = currentContent.indexOf(params.old_string, index + 1);
+          }
+        } else if (params.old_string === '') {
+          occurrences = 0; // Creating a new file
         }
-      } else if (params.old_string === '') {
-        occurrences = 0; // Creating a new file
-      }
-      return Promise.resolve({ params, occurrences });
-    });
+        return Promise.resolve({ params, occurrences });
+      },
+    );
 
     // Default mock for generateJson to return the snippet unchanged
     mockGenerateJson.mockReset();
@@ -333,11 +333,11 @@ describe('EditTool', () => {
       // Set a specific mock for this test case
       let mockCalled = false;
       mockEnsureCorrectEdit.mockImplementationOnce(
-        async (content, p, client) => {
+        async (_, content, p, client) => {
           mockCalled = true;
           expect(content).toBe(originalContent);
           expect(p).toBe(params);
-          expect(client).toBe((tool as any).client);
+          expect(client).toBe(geminiClient);
           return {
             params: {
               file_path: filePath,
@@ -383,7 +383,7 @@ describe('EditTool', () => {
     beforeEach(() => {
       filePath = path.join(rootDir, testFile);
       // Default for execute tests, can be overridden
-      mockEnsureCorrectEdit.mockImplementation(async (content, params) => {
+      mockEnsureCorrectEdit.mockImplementation(async (_, content, params) => {
         let occurrences = 0;
         if (params.old_string && content) {
           let index = content.indexOf(params.old_string);
@@ -486,10 +486,10 @@ describe('EditTool', () => {
       // The default mockEnsureCorrectEdit will return 2 occurrences for 'old'
       const result = await tool.execute(params, new AbortController().signal);
       expect(result.llmContent).toMatch(
-        /Expected 1 occurrences but found 2 for old_string in file/,
+        /Expected 1 occurrence but found 2 for old_string in file/,
       );
       expect(result.returnDisplay).toMatch(
-        /Failed to edit, expected 1 occurrence\(s\) but found 2/,
+        /Failed to edit, expected 1 occurrence but found 2/,
       );
     });
 
@@ -532,7 +532,7 @@ describe('EditTool', () => {
         /Expected 3 occurrences but found 2 for old_string in file/,
       );
       expect(result.returnDisplay).toMatch(
-        /Failed to edit, expected 3 occurrence\(s\) but found 2/,
+        /Failed to edit, expected 3 occurrences but found 2/,
       );
     });
 
@@ -548,6 +548,78 @@ describe('EditTool', () => {
       expect(result.returnDisplay).toMatch(
         /Attempted to create a file that already exists/,
       );
+    });
+
+    it('should include modification message when proposed content is modified', async () => {
+      const initialContent = 'This is some old text.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+        modified_by_user: true,
+      };
+
+      (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(
+        ApprovalMode.AUTO_EDIT,
+      );
+      const result = await tool.execute(params, new AbortController().signal);
+
+      expect(result.llmContent).toMatch(
+        /User modified the `new_string` content/,
+      );
+    });
+
+    it('should not include modification message when proposed content is not modified', async () => {
+      const initialContent = 'This is some old text.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+        modified_by_user: false,
+      };
+
+      (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(
+        ApprovalMode.AUTO_EDIT,
+      );
+      const result = await tool.execute(params, new AbortController().signal);
+
+      expect(result.llmContent).not.toMatch(
+        /User modified the `new_string` content/,
+      );
+    });
+
+    it('should not include modification message when modified_by_user is not provided', async () => {
+      const initialContent = 'This is some old text.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(
+        ApprovalMode.AUTO_EDIT,
+      );
+      const result = await tool.execute(params, new AbortController().signal);
+
+      expect(result.llmContent).not.toMatch(
+        /User modified the `new_string` content/,
+      );
+    });
+
+    it('should return error if old_string and new_string are identical', async () => {
+      const initialContent = 'This is some identical text.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'identical',
+        new_string: 'identical',
+      };
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.llmContent).toMatch(/No changes to apply/);
+      expect(result.returnDisplay).toMatch(/No changes to apply/);
     });
   });
 

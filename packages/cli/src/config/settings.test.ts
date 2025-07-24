@@ -13,6 +13,7 @@ vi.mock('os', async (importOriginal) => {
   return {
     ...actualOs,
     homedir: vi.fn(() => '/mock/home/user'),
+    platform: vi.fn(() => 'linux'),
   };
 });
 
@@ -43,9 +44,9 @@ import stripJsonComments from 'strip-json-comments'; // Will be mocked separatel
 
 // These imports will get the versions from the vi.mock('./settings.js', ...) factory.
 import {
-  LoadedSettings,
   loadSettings,
   USER_SETTINGS_PATH, // This IS the mocked path.
+  getSystemSettingsPath,
   SETTINGS_DIRECTORY_NAME, // This is from the original module, but used by the mock.
   SettingScope,
 } from './settings.js';
@@ -91,10 +92,46 @@ describe('Settings Loading and Merging', () => {
   describe('loadSettings', () => {
     it('should load empty settings if no files exist', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.system.settings).toEqual({});
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual({});
+      expect(settings.merged).toEqual({
+        customThemes: {},
+        mcpServers: {},
+      });
       expect(settings.errors.length).toBe(0);
+    });
+
+    it('should load system settings if only system file exists', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === getSystemSettingsPath(),
+      );
+      const systemSettingsContent = {
+        theme: 'system-default',
+        sandbox: false,
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(fs.readFileSync).toHaveBeenCalledWith(
+        getSystemSettingsPath(),
+        'utf-8',
+      );
+      expect(settings.system.settings).toEqual(systemSettingsContent);
+      expect(settings.user.settings).toEqual({});
+      expect(settings.workspace.settings).toEqual({});
+      expect(settings.merged).toEqual({
+        ...systemSettingsContent,
+        customThemes: {},
+        mcpServers: {},
+      });
     });
 
     it('should load user settings if only user file exists', () => {
@@ -123,7 +160,11 @@ describe('Settings Loading and Merging', () => {
       );
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual(userSettingsContent);
+      expect(settings.merged).toEqual({
+        ...userSettingsContent,
+        customThemes: {},
+        mcpServers: {},
+      });
     });
 
     it('should load workspace settings if only workspace file exists', () => {
@@ -150,7 +191,11 @@ describe('Settings Loading and Merging', () => {
       );
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
-      expect(settings.merged).toEqual(workspaceSettingsContent);
+      expect(settings.merged).toEqual({
+        ...workspaceSettingsContent,
+        customThemes: {},
+        mcpServers: {},
+      });
     });
 
     it('should merge user and workspace settings, with workspace taking precedence', () => {
@@ -185,6 +230,57 @@ describe('Settings Loading and Merging', () => {
         sandbox: true,
         coreTools: ['tool1'],
         contextFileName: 'WORKSPACE_CONTEXT.md',
+        customThemes: {},
+        mcpServers: {},
+      });
+    });
+
+    it('should merge system, user and workspace settings, with system taking precedence over workspace, and workspace over user', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const systemSettingsContent = {
+        theme: 'system-theme',
+        sandbox: false,
+        allowMCPServers: ['server1', 'server2'],
+        telemetry: { enabled: false },
+      };
+      const userSettingsContent = {
+        theme: 'dark',
+        sandbox: true,
+        contextFileName: 'USER_CONTEXT.md',
+      };
+      const workspaceSettingsContent = {
+        sandbox: false,
+        coreTools: ['tool1'],
+        contextFileName: 'WORKSPACE_CONTEXT.md',
+        allowMCPServers: ['server1', 'server2', 'server3'],
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.system.settings).toEqual(systemSettingsContent);
+      expect(settings.user.settings).toEqual(userSettingsContent);
+      expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
+      expect(settings.merged).toEqual({
+        theme: 'system-theme',
+        sandbox: false,
+        telemetry: { enabled: false },
+        coreTools: ['tool1'],
+        contextFileName: 'WORKSPACE_CONTEXT.md',
+        allowMCPServers: ['server1', 'server2'],
+        customThemes: {},
+        mcpServers: {},
       });
     });
 
@@ -296,6 +392,134 @@ describe('Settings Loading and Merging', () => {
       (fs.readFileSync as Mock).mockReturnValue('{}');
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.merged.telemetry).toBeUndefined();
+      expect(settings.merged.customThemes).toEqual({});
+      expect(settings.merged.mcpServers).toEqual({});
+    });
+
+    it('should merge MCP servers correctly, with workspace taking precedence', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        mcpServers: {
+          'user-server': {
+            command: 'user-command',
+            args: ['--user-arg'],
+            description: 'User MCP server',
+          },
+          'shared-server': {
+            command: 'user-shared-command',
+            description: 'User shared server config',
+          },
+        },
+      };
+      const workspaceSettingsContent = {
+        mcpServers: {
+          'workspace-server': {
+            command: 'workspace-command',
+            args: ['--workspace-arg'],
+            description: 'Workspace MCP server',
+          },
+          'shared-server': {
+            command: 'workspace-shared-command',
+            description: 'Workspace shared server config',
+          },
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.user.settings).toEqual(userSettingsContent);
+      expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
+      expect(settings.merged.mcpServers).toEqual({
+        'user-server': {
+          command: 'user-command',
+          args: ['--user-arg'],
+          description: 'User MCP server',
+        },
+        'workspace-server': {
+          command: 'workspace-command',
+          args: ['--workspace-arg'],
+          description: 'Workspace MCP server',
+        },
+        'shared-server': {
+          command: 'workspace-shared-command',
+          description: 'Workspace shared server config',
+        },
+      });
+    });
+
+    it('should handle MCP servers when only in user settings', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const userSettingsContent = {
+        mcpServers: {
+          'user-only-server': {
+            command: 'user-only-command',
+            description: 'User only server',
+          },
+        },
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.mcpServers).toEqual({
+        'user-only-server': {
+          command: 'user-only-command',
+          description: 'User only server',
+        },
+      });
+    });
+
+    it('should handle MCP servers when only in workspace settings', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+      const workspaceSettingsContent = {
+        mcpServers: {
+          'workspace-only-server': {
+            command: 'workspace-only-command',
+            description: 'Workspace only server',
+          },
+        },
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.mcpServers).toEqual({
+        'workspace-only-server': {
+          command: 'workspace-only-command',
+          description: 'Workspace only server',
+        },
+      });
+    });
+
+    it('should have mcpServers as empty object if not in any settings file', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(false); // No settings files exist
+      (fs.readFileSync as Mock).mockReturnValue('{}');
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.mcpServers).toEqual({});
     });
 
     it('should handle JSON parsing errors gracefully', () => {
@@ -333,7 +557,10 @@ describe('Settings Loading and Merging', () => {
       // Check that settings are empty due to parsing errors
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual({});
+      expect(settings.merged).toEqual({
+        customThemes: {},
+        mcpServers: {},
+      });
 
       // Check that error objects are populated in settings.errors
       expect(settings.errors).toBeDefined();
@@ -374,10 +601,13 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      // @ts-expect-error: dynamic property for test
       expect(settings.user.settings.apiKey).toBe('user_api_key_from_env');
+      // @ts-expect-error: dynamic property for test
       expect(settings.user.settings.someUrl).toBe(
         'https://test.com/user_api_key_from_env',
       );
+      // @ts-expect-error: dynamic property for test
       expect(settings.merged.apiKey).toBe('user_api_key_from_env');
       delete process.env.TEST_API_KEY;
     });
@@ -406,8 +636,56 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings.nested.value).toBe(
         'workspace_endpoint_from_env',
       );
+      // @ts-expect-error: dynamic property for test
       expect(settings.merged.endpoint).toBe('workspace_endpoint_from_env/api');
       delete process.env.WORKSPACE_ENDPOINT;
+    });
+
+    it('should prioritize user env variables over workspace env variables if keys clash after resolution', () => {
+      const userSettingsContent = { configValue: '$SHARED_VAR' };
+      const workspaceSettingsContent = { configValue: '$SHARED_VAR' };
+
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const originalSharedVar = process.env.SHARED_VAR;
+      // Temporarily delete to ensure a clean slate for the test's specific manipulations
+      delete process.env.SHARED_VAR;
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH) {
+            process.env.SHARED_VAR = 'user_value_for_user_read'; // Set for user settings read
+            return JSON.stringify(userSettingsContent);
+          }
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
+            process.env.SHARED_VAR = 'workspace_value_for_workspace_read'; // Set for workspace settings read
+            return JSON.stringify(workspaceSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // @ts-expect-error: dynamic property for test
+      expect(settings.user.settings.configValue).toBe(
+        'user_value_for_user_read',
+      );
+      // @ts-expect-error: dynamic property for test
+      expect(settings.workspace.settings.configValue).toBe(
+        'workspace_value_for_workspace_read',
+      );
+      // Merged should take workspace's resolved value
+      // @ts-expect-error: dynamic property for test
+      expect(settings.merged.configValue).toBe(
+        'workspace_value_for_workspace_read',
+      );
+
+      // Restore original environment variable state
+      if (originalSharedVar !== undefined) {
+        process.env.SHARED_VAR = originalSharedVar;
+      } else {
+        delete process.env.SHARED_VAR; // Ensure it's deleted if it wasn't there before
+      }
     });
 
     it('should prioritize workspace env variables over user env variables if keys clash after resolution', () => {
@@ -445,6 +723,51 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.configValue).toBe(
         'workspace_value_for_workspace_read',
       );
+
+      // Restore original environment variable state
+      if (originalSharedVar !== undefined) {
+        process.env.SHARED_VAR = originalSharedVar;
+      } else {
+        delete process.env.SHARED_VAR; // Ensure it's deleted if it wasn't there before
+      }
+    });
+
+    it('should prioritize system env variables over workspace env variables if keys clash after resolution', () => {
+      const workspaceSettingsContent = { configValue: '$SHARED_VAR' };
+      const systemSettingsContent = { configValue: '$SHARED_VAR' };
+
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const originalSharedVar = process.env.SHARED_VAR;
+      // Temporarily delete to ensure a clean slate for the test's specific manipulations
+      delete process.env.SHARED_VAR;
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath()) {
+            process.env.SHARED_VAR = 'system_value_for_system_read'; // Set for system settings read
+            return JSON.stringify(systemSettingsContent);
+          }
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
+            process.env.SHARED_VAR = 'workspace_value_for_workspace_read'; // Set for workspace settings read
+            return JSON.stringify(workspaceSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // @ts-expect-error: dynamic property for test
+      expect(settings.system.settings.configValue).toBe(
+        'system_value_for_system_read',
+      );
+      // @ts-expect-error: dynamic property for test
+      expect(settings.workspace.settings.configValue).toBe(
+        'workspace_value_for_workspace_read',
+      );
+      // Merged should take system's resolved value
+      // @ts-expect-error: dynamic property for test
+      expect(settings.merged.configValue).toBe('system_value_for_system_read');
 
       // Restore original environment variable state
       if (originalSharedVar !== undefined) {
@@ -590,12 +913,56 @@ describe('Settings Loading and Merging', () => {
       delete process.env.TEST_HOST;
       delete process.env.TEST_PORT;
     });
+
+    describe('when GEMINI_CLI_SYSTEM_SETTINGS_PATH is set', () => {
+      const MOCK_ENV_SYSTEM_SETTINGS_PATH = '/mock/env/system/settings.json';
+
+      beforeEach(() => {
+        process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH =
+          MOCK_ENV_SYSTEM_SETTINGS_PATH;
+      });
+
+      afterEach(() => {
+        delete process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
+      });
+
+      it('should load system settings from the path specified in the environment variable', () => {
+        (mockFsExistsSync as Mock).mockImplementation(
+          (p: fs.PathLike) => p === MOCK_ENV_SYSTEM_SETTINGS_PATH,
+        );
+        const systemSettingsContent = {
+          theme: 'env-var-theme',
+          sandbox: true,
+        };
+        (fs.readFileSync as Mock).mockImplementation(
+          (p: fs.PathOrFileDescriptor) => {
+            if (p === MOCK_ENV_SYSTEM_SETTINGS_PATH)
+              return JSON.stringify(systemSettingsContent);
+            return '{}';
+          },
+        );
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(fs.readFileSync).toHaveBeenCalledWith(
+          MOCK_ENV_SYSTEM_SETTINGS_PATH,
+          'utf-8',
+        );
+        expect(settings.system.path).toBe(MOCK_ENV_SYSTEM_SETTINGS_PATH);
+        expect(settings.system.settings).toEqual(systemSettingsContent);
+        expect(settings.merged).toEqual({
+          ...systemSettingsContent,
+          customThemes: {},
+          mcpServers: {},
+        });
+      });
+    });
   });
 
   describe('LoadedSettings class', () => {
     it('setValue should update the correct scope and recompute merged settings', () => {
       (mockFsExistsSync as Mock).mockReturnValue(false);
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR) as LoadedSettings;
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
 
       vi.mocked(fs.writeFileSync).mockImplementation(() => {});
       // mkdirSync is mocked in beforeEach to return undefined, which is fine for void usage
@@ -625,10 +992,10 @@ describe('Settings Loading and Merging', () => {
         'utf-8',
       );
 
-      // Workspace theme overrides user theme
-      loadedSettings.setValue(SettingScope.Workspace, 'theme', 'ocean');
+      // System theme overrides user and workspace themes
+      loadedSettings.setValue(SettingScope.System, 'theme', 'ocean');
 
-      expect(loadedSettings.workspace.settings.theme).toBe('ocean');
+      expect(loadedSettings.system.settings.theme).toBe('ocean');
       expect(loadedSettings.merged.theme).toBe('ocean');
     });
   });

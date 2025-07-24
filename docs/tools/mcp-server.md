@@ -87,10 +87,119 @@ Each server configuration supports the following properties:
 #### Optional
 
 - **`args`** (string[]): Command-line arguments for Stdio transport
+- **`headers`** (object): Custom HTTP headers when using `url` or `httpUrl`
 - **`env`** (object): Environment variables for the server process. Values can reference environment variables using `$VAR_NAME` or `${VAR_NAME}` syntax
 - **`cwd`** (string): Working directory for Stdio transport
 - **`timeout`** (number): Request timeout in milliseconds (default: 600,000ms = 10 minutes)
 - **`trust`** (boolean): When `true`, bypasses all tool call confirmations for this server (default: `false`)
+- **`includeTools`** (string[]): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (whitelist behavior). If not specified, all tools from the server are enabled by default.
+- **`excludeTools`** (string[]): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
+
+### OAuth Support for Remote MCP Servers
+
+The Gemini CLI supports OAuth 2.0 authentication for remote MCP servers using SSE or HTTP transports. This enables secure access to MCP servers that require authentication.
+
+#### Automatic OAuth Discovery
+
+For servers that support OAuth discovery, you can omit the OAuth configuration and let the CLI discover it automatically:
+
+```json
+{
+  "mcpServers": {
+    "discoveredServer": {
+      "url": "https://api.example.com/sse"
+    }
+  }
+}
+```
+
+The CLI will automatically:
+
+- Detect when a server requires OAuth authentication (401 responses)
+- Discover OAuth endpoints from server metadata
+- Perform dynamic client registration if supported
+- Handle the OAuth flow and token management
+
+#### Authentication Flow
+
+When connecting to an OAuth-enabled server:
+
+1. **Initial connection attempt** fails with 401 Unauthorized
+2. **OAuth discovery** finds authorization and token endpoints
+3. **Browser opens** for user authentication (requires local browser access)
+4. **Authorization code** is exchanged for access tokens
+5. **Tokens are stored** securely for future use
+6. **Connection retry** succeeds with valid tokens
+
+#### Browser Redirect Requirements
+
+**Important:** OAuth authentication requires that your local machine can:
+
+- Open a web browser for authentication
+- Receive redirects on `http://localhost:7777/oauth/callback`
+
+This feature will not work in:
+
+- Headless environments without browser access
+- Remote SSH sessions without X11 forwarding
+- Containerized environments without browser support
+
+#### Managing OAuth Authentication
+
+Use the `/mcp auth` command to manage OAuth authentication:
+
+```bash
+# List servers requiring authentication
+/mcp auth
+
+# Authenticate with a specific server
+/mcp auth serverName
+
+# Re-authenticate if tokens expire
+/mcp auth serverName
+```
+
+#### OAuth Configuration Properties
+
+- **`enabled`** (boolean): Enable OAuth for this server
+- **`clientId`** (string): OAuth client identifier (optional with dynamic registration)
+- **`clientSecret`** (string): OAuth client secret (optional for public clients)
+- **`authorizationUrl`** (string): OAuth authorization endpoint (auto-discovered if omitted)
+- **`tokenUrl`** (string): OAuth token endpoint (auto-discovered if omitted)
+- **`scopes`** (string[]): Required OAuth scopes
+- **`redirectUri`** (string): Custom redirect URI (defaults to `http://localhost:7777/oauth/callback`)
+- **`tokenParamName`** (string): Query parameter name for tokens in SSE URLs
+
+#### Token Management
+
+OAuth tokens are automatically:
+
+- **Stored securely** in `~/.gemini/mcp-oauth-tokens.json`
+- **Refreshed** when expired (if refresh tokens are available)
+- **Validated** before each connection attempt
+- **Cleaned up** when invalid or expired
+
+#### Authentication Provider Type
+
+You can specify the authentication provider type using the `authProviderType` property:
+
+- **`authProviderType`** (string): Specifies the authentication provider. Can be one of the following:
+  - **`dynamic_discovery`** (default): The CLI will automatically discover the OAuth configuration from the server.
+  - **`google_credentials`**: The CLI will use the Google Application Default Credentials (ADC) to authenticate with the server. When using this provider, you must specify the required scopes.
+
+```json
+{
+  "mcpServers": {
+    "googleCloudServer": {
+      "httpUrl": "https://my-gcp-service.run.app/mcp",
+      "authProviderType": "google_credentials",
+      "oauth": {
+        "scopes": ["https://www.googleapis.com/auth/userinfo.email"]
+      }
+    }
+  }
+}
+```
 
 ### Example Configurations
 
@@ -166,6 +275,40 @@ Each server configuration supports the following properties:
 }
 ```
 
+#### HTTP-based MCP Server with Custom Headers
+
+```json
+{
+  "mcpServers": {
+    "httpServerWithAuth": {
+      "httpUrl": "http://localhost:3000/mcp",
+      "headers": {
+        "Authorization": "Bearer your-api-token",
+        "X-Custom-Header": "custom-value",
+        "Content-Type": "application/json"
+      },
+      "timeout": 5000
+    }
+  }
+}
+```
+
+#### MCP Server with Tool Filtering
+
+```json
+{
+  "mcpServers": {
+    "filteredServer": {
+      "command": "python",
+      "args": ["-m", "my_mcp_server"],
+      "includeTools": ["safe_tool", "file_reader", "data_processor"],
+      // "excludeTools": ["dangerous_tool", "file_deleter"],
+      "timeout": 30000
+    }
+  }
+}
+```
+
 ## Discovery Process Deep Dive
 
 When the Gemini CLI starts, it performs MCP server discovery through the following detailed process:
@@ -188,7 +331,8 @@ Upon successful connection:
 
 1. **Tool listing:** The client calls the MCP server's tool listing endpoint
 2. **Schema validation:** Each tool's function declaration is validated
-3. **Name sanitization:** Tool names are cleaned to meet Gemini API requirements:
+3. **Tool filtering:** Tools are filtered based on `includeTools` and `excludeTools` configuration
+4. **Name sanitization:** Tool names are cleaned to meet Gemini API requirements:
    - Invalid characters (non-alphanumeric, underscore, dot, hyphen) are replaced with underscores
    - Names longer than 63 characters are truncated with middle replacement (`___`)
 
@@ -397,7 +541,7 @@ The MCP integration tracks several states:
 
 ### Debugging Tips
 
-1. **Enable debug mode:** Run the CLI with `--debug_mode` for verbose output
+1. **Enable debug mode:** Run the CLI with `--debug` for verbose output
 2. **Check stderr:** MCP server stderr is captured and logged (INFO messages filtered)
 3. **Test isolation:** Test your MCP server independently before integrating
 4. **Incremental setup:** Start with simple tools before adding complex functionality

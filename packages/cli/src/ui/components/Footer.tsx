@@ -10,6 +10,7 @@ import { Colors } from '../colors.js';
 import { shortenPath, tildeifyPath, tokenLimit } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
+import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 
 interface FooterProps {
@@ -23,8 +24,7 @@ interface FooterProps {
   showErrorDetails: boolean;
   showMemoryUsage?: boolean;
   promptTokenCount: number;
-  candidatesTokenCount: number;
-  totalTokenCount: number;
+  nightly: boolean;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -37,18 +37,28 @@ export const Footer: React.FC<FooterProps> = ({
   errorCount,
   showErrorDetails,
   showMemoryUsage,
-  totalTokenCount,
+  promptTokenCount,
+  nightly,
 }) => {
   const limit = tokenLimit(model);
-  const percentage = totalTokenCount / limit;
+  const percentage = promptTokenCount / limit;
 
   return (
     <Box marginTop={1} justifyContent="space-between" width="100%">
       <Box>
-        <Text color={Colors.LightBlue}>
-          {shortenPath(tildeifyPath(targetDir), 70)}
-          {branchName && <Text color={Colors.Gray}> ({branchName}*)</Text>}
-        </Text>
+        {nightly ? (
+          <Gradient colors={Colors.GradientColors}>
+            <Text>
+              {shortenPath(tildeifyPath(targetDir), 70)}
+              {branchName && <Text> ({branchName}*)</Text>}
+            </Text>
+          </Gradient>
+        ) : (
+          <Text color={Colors.LightBlue}>
+            {shortenPath(tildeifyPath(targetDir), 70)}
+            {branchName && <Text color={Colors.Gray}> ({branchName}*)</Text>}
+          </Text>
+        )}
         {debugMode && (
           <Text color={Colors.AccentRed}>
             {' ' + (debugMessage || '--debug')}
@@ -69,7 +79,7 @@ export const Footer: React.FC<FooterProps> = ({
           </Text>
         ) : process.env.SANDBOX === 'sandbox-exec' ? (
           <Text color={Colors.AccentYellow}>
-            MacOS Seatbelt{' '}
+            macOS Seatbelt{' '}
             <Text color={Colors.Gray}>({process.env.SEATBELT_PROFILE})</Text>
           </Text>
         ) : (

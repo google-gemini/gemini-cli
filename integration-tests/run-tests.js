@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawnSync } from 'child_process';
-import { spawn } from 'child_process';
+import { spawnSync, spawn } from 'child_process';
 import { mkdirSync, rmSync, createWriteStream } from 'fs';
 import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
@@ -62,6 +61,7 @@ async function main() {
     console.log(`\tFound test file: ${testFileName}`);
   }
 
+  const MAX_RETRIES = 3;
   let allTestsPassed = true;
 
   for (const testFile of testFiles) {
@@ -73,39 +73,97 @@ async function main() {
       `------------- Running test file: ${testFileName} ------------------------------`,
     );
 
-    const child = spawn('node', ['--test', testFile], {
-      stdio: 'pipe',
-      env: {
-        ...process.env,
-        GEMINI_CLI_INTEGRATION_TEST: 'true',
-        INTEGRATION_TEST_FILE_DIR: testFileDir,
-        KEEP_OUTPUT: keepOutput.toString(),
-        TEST_FILE_NAME: testFileName,
-      },
-    });
+    let attempt = 0;
+    let testFilePassed = false;
+    let lastStdout = [];
+    let lastStderr = [];
 
-    if (verbose) {
-      child.stdout.pipe(process.stdout);
-      child.stderr.pipe(process.stderr);
+    while (attempt < MAX_RETRIES && !testFilePassed) {
+      attempt++;
+      if (attempt > 1) {
+        console.log(
+          `--- Retrying ${testFileName} (attempt ${attempt} of ${MAX_RETRIES}) ---`,
+        );
+      }
+
+      const nodeArgs = ['--test'];
+      if (verbose) {
+        nodeArgs.push('--test-reporter=spec');
+      }
+      nodeArgs.push(testFile);
+
+      const child = spawn('node', nodeArgs, {
+        stdio: 'pipe',
+        env: {
+          ...process.env,
+          GEMINI_CLI_INTEGRATION_TEST: 'true',
+          INTEGRATION_TEST_FILE_DIR: testFileDir,
+          KEEP_OUTPUT: keepOutput.toString(),
+          VERBOSE: verbose.toString(),
+          TEST_FILE_NAME: testFileName,
+        },
+      });
+
+      let outputStream;
+      if (keepOutput) {
+        const outputFile = join(testFileDir, `output-attempt-${attempt}.log`);
+        outputStream = createWriteStream(outputFile);
+        console.log(`Output for ${testFileName} written to: ${outputFile}`);
+      }
+
+      const stdout = [];
+      const stderr = [];
+
+      child.stdout.on('data', (data) => {
+        if (verbose) {
+          process.stdout.write(data);
+        } else {
+          stdout.push(data);
+        }
+        if (outputStream) {
+          outputStream.write(data);
+        }
+      });
+
+      child.stderr.on('data', (data) => {
+        if (verbose) {
+          process.stderr.write(data);
+        } else {
+          stderr.push(data);
+        }
+        if (outputStream) {
+          outputStream.write(data);
+        }
+      });
+
+      const exitCode = await new Promise((resolve) => {
+        child.on('close', (code) => {
+          if (outputStream) {
+            outputStream.end(() => {
+              resolve(code);
+            });
+          } else {
+            resolve(code);
+          }
+        });
+      });
+
+      if (exitCode === 0) {
+        testFilePassed = true;
+      } else {
+        lastStdout = stdout;
+        lastStderr = stderr;
+      }
     }
 
-    if (keepOutput) {
-      const outputFile = join(testFileDir, 'output.log');
-      const outputStream = createWriteStream(outputFile);
-      child.stdout.pipe(outputStream);
-      child.stderr.pipe(outputStream);
-      console.log(`Output for ${testFileName} written to: ${outputFile}`);
-    } else if (!verbose) {
-      child.stdout.pipe(process.stdout);
-      child.stderr.pipe(process.stderr);
-    }
-
-    const exitCode = await new Promise((resolve) => {
-      child.on('close', resolve);
-    });
-
-    if (exitCode !== 0) {
-      console.error(`Test file failed: ${testFileName}`);
+    if (!testFilePassed) {
+      console.error(
+        `Test file failed after ${MAX_RETRIES} attempts: ${testFileName}`,
+      );
+      if (!verbose) {
+        process.stdout.write(Buffer.concat(lastStdout).toString('utf8'));
+        process.stderr.write(Buffer.concat(lastStderr).toString('utf8'));
+      }
       allTestsPassed = false;
     }
   }

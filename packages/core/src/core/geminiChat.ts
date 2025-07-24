@@ -15,6 +15,7 @@ import {
   createUserContent,
   Part,
   GenerateContentResponseUsageMetadata,
+  Tool,
 } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
@@ -25,10 +26,6 @@ import {
   logApiResponse,
   logApiError,
 } from '../telemetry/loggers.js';
-import {
-  getStructuredResponse,
-  getStructuredResponseFromParts,
-} from '../utils/generateContentResponseUtilities.js';
 import {
   ApiErrorEvent,
   ApiRequestEvent,
@@ -72,10 +69,6 @@ function isValidContent(content: Content): boolean {
  * @throws Error if the history contains an invalid role.
  */
 function validateHistory(history: Content[]) {
-  // Empty history is valid.
-  if (history.length === 0) {
-    return;
-  }
   for (const content of history) {
     if (content.role !== 'user' && content.role !== 'model') {
       throw new Error(`Role must be user or model, but got ${content.role}.`);
@@ -145,23 +138,24 @@ export class GeminiChat {
   }
 
   private _getRequestTextFromContents(contents: Content[]): string {
-    return contents
-      .flatMap((content) => content.parts ?? [])
-      .map((part) => part.text)
-      .filter(Boolean)
-      .join('');
+    return JSON.stringify(contents);
   }
 
   private async _logApiRequest(
     contents: Content[],
     model: string,
+    prompt_id: string,
   ): Promise<void> {
     const requestText = this._getRequestTextFromContents(contents);
-    logApiRequest(this.config, new ApiRequestEvent(model, requestText));
+    logApiRequest(
+      this.config,
+      new ApiRequestEvent(model, prompt_id, requestText),
+    );
   }
 
   private async _logApiResponse(
     durationMs: number,
+    prompt_id: string,
     usageMetadata?: GenerateContentResponseUsageMetadata,
     responseText?: string,
   ): Promise<void> {
@@ -170,13 +164,19 @@ export class GeminiChat {
       new ApiResponseEvent(
         this.config.getModel(),
         durationMs,
+        prompt_id,
+        this.config.getContentGeneratorConfig()?.authType,
         usageMetadata,
         responseText,
       ),
     );
   }
 
-  private _logApiError(durationMs: number, error: unknown): void {
+  private _logApiError(
+    durationMs: number,
+    error: unknown,
+    prompt_id: string,
+  ): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorType = error instanceof Error ? error.name : 'unknown';
 
@@ -186,18 +186,23 @@ export class GeminiChat {
         this.config.getModel(),
         errorMessage,
         durationMs,
+        prompt_id,
+        this.config.getContentGeneratorConfig()?.authType,
         errorType,
       ),
     );
   }
 
   /**
-   * Handles fallback to Flash model when persistent 429 errors occur for OAuth users.
-   * Uses a fallback handler if provided by the config, otherwise returns null.
+   * Handles falling back to Flash model when persistent 429 errors occur for OAuth users.
+   * Uses a fallback handler if provided by the config; otherwise, returns null.
    */
-  private async handleFlashFallback(authType?: string): Promise<string | null> {
+  private async handleFlashFallback(
+    authType?: string,
+    error?: unknown,
+  ): Promise<string | null> {
     // Only handle fallback for OAuth users
-    if (authType !== AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
+    if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
       return null;
     }
 
@@ -213,10 +218,18 @@ export class GeminiChat {
     const fallbackHandler = this.config.flashFallbackHandler;
     if (typeof fallbackHandler === 'function') {
       try {
-        const accepted = await fallbackHandler(currentModel, fallbackModel);
-        if (accepted) {
+        const accepted = await fallbackHandler(
+          currentModel,
+          fallbackModel,
+          error,
+        );
+        if (accepted !== false && accepted !== null) {
           this.config.setModel(fallbackModel);
           return fallbackModel;
+        }
+        // Check if the model was switched manually in the handler
+        if (this.config.getModel() === fallbackModel) {
+          return null; // Model was switched but don't continue with current prompt
         }
       } catch (error) {
         console.warn('Flash fallback handler failed:', error);
@@ -248,23 +261,37 @@ export class GeminiChat {
    */
   async sendMessage(
     params: SendMessageParameters,
+    prompt_id: string,
   ): Promise<GenerateContentResponse> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
 
-    this._logApiRequest(requestContents, this.config.getModel());
+    this._logApiRequest(requestContents, this.config.getModel(), prompt_id);
 
     const startTime = Date.now();
     let response: GenerateContentResponse;
 
     try {
-      const apiCall = () =>
-        this.contentGenerator.generateContent({
-          model: this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL,
+      const apiCall = () => {
+        const modelToUse = this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
+
+        // Prevent Flash model calls immediately after quota error
+        if (
+          this.config.getQuotaErrorOccurred() &&
+          modelToUse === DEFAULT_GEMINI_FLASH_MODEL
+        ) {
+          throw new Error(
+            'Please submit a new query to continue with the Flash model.',
+          );
+        }
+
+        return this.contentGenerator.generateContent({
+          model: modelToUse,
           contents: requestContents,
           config: { ...this.generationConfig, ...params.config },
         });
+      };
 
       response = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
@@ -274,15 +301,16 @@ export class GeminiChat {
           }
           return false;
         },
-        onPersistent429: async (authType?: string) =>
-          await this.handleFlashFallback(authType),
+        onPersistent429: async (authType?: string, error?: unknown) =>
+          await this.handleFlashFallback(authType, error),
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
       const durationMs = Date.now() - startTime;
       await this._logApiResponse(
         durationMs,
+        prompt_id,
         response.usageMetadata,
-        getStructuredResponse(response),
+        JSON.stringify(response),
       );
 
       this.sendPromise = (async () => {
@@ -312,7 +340,7 @@ export class GeminiChat {
       return response;
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error);
+      this._logApiError(durationMs, error, prompt_id);
       this.sendPromise = Promise.resolve();
       throw error;
     }
@@ -342,21 +370,35 @@ export class GeminiChat {
    */
   async sendMessageStream(
     params: SendMessageParameters,
+    prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
-    this._logApiRequest(requestContents, this.config.getModel());
+    this._logApiRequest(requestContents, this.config.getModel(), prompt_id);
 
     const startTime = Date.now();
 
     try {
-      const apiCall = () =>
-        this.contentGenerator.generateContentStream({
-          model: this.config.getModel(),
+      const apiCall = () => {
+        const modelToUse = this.config.getModel();
+
+        // Prevent Flash model calls immediately after quota error
+        if (
+          this.config.getQuotaErrorOccurred() &&
+          modelToUse === DEFAULT_GEMINI_FLASH_MODEL
+        ) {
+          throw new Error(
+            'Please submit a new query to continue with the Flash model.',
+          );
+        }
+
+        return this.contentGenerator.generateContentStream({
+          model: modelToUse,
           contents: requestContents,
           config: { ...this.generationConfig, ...params.config },
         });
+      };
 
       // Note: Retrying streams can be complex. If generateContentStream itself doesn't handle retries
       // for transient issues internally before yielding the async generator, this retry will re-initiate
@@ -371,8 +413,8 @@ export class GeminiChat {
           }
           return false; // Don't retry other errors by default
         },
-        onPersistent429: async (authType?: string) =>
-          await this.handleFlashFallback(authType),
+        onPersistent429: async (authType?: string, error?: unknown) =>
+          await this.handleFlashFallback(authType, error),
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
 
@@ -387,11 +429,12 @@ export class GeminiChat {
         streamResponse,
         userContent,
         startTime,
+        prompt_id,
       );
       return result;
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error);
+      this._logApiError(durationMs, error, prompt_id);
       this.sendPromise = Promise.resolve();
       throw error;
     }
@@ -448,6 +491,10 @@ export class GeminiChat {
     this.history = history;
   }
 
+  setTools(tools: Tool[]): void {
+    this.generationConfig.tools = tools;
+  }
+
   getFinalUsageMetadata(
     chunks: GenerateContentResponse[],
   ): GenerateContentResponseUsageMetadata | undefined {
@@ -463,6 +510,7 @@ export class GeminiChat {
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     inputContent: Content,
     startTime: number,
+    prompt_id: string,
   ) {
     const outputContent: Content[] = [];
     const chunks: GenerateContentResponse[] = [];
@@ -486,7 +534,7 @@ export class GeminiChat {
     } catch (error) {
       errorOccurred = true;
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error);
+      this._logApiError(durationMs, error, prompt_id);
       throw error;
     }
 
@@ -498,11 +546,11 @@ export class GeminiChat {
           allParts.push(...content.parts);
         }
       }
-      const fullText = getStructuredResponseFromParts(allParts);
       await this._logApiResponse(
         durationMs,
+        prompt_id,
         this.getFinalUsageMetadata(chunks),
-        fullText,
+        JSON.stringify(chunks),
       );
     }
     this.recordHistory(inputContent, outputContent);
@@ -542,7 +590,7 @@ export class GeminiChat {
       automaticFunctionCallingHistory.length > 0
     ) {
       this.history.push(
-        ...extractCuratedHistory(automaticFunctionCallingHistory!),
+        ...extractCuratedHistory(automaticFunctionCallingHistory),
       );
     } else {
       this.history.push(userInput);

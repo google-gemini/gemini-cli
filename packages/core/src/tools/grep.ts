@@ -10,11 +10,13 @@ import path from 'path';
 import { EOL } from 'os';
 import { spawn } from 'child_process';
 import { globStream } from 'glob';
-import { BaseTool, ToolResult } from './tools.js';
+import { BaseTool, Icon, ToolResult } from './tools.js';
+import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
+import { Config } from '../config/config.js';
 
 // --- Interfaces ---
 
@@ -55,39 +57,34 @@ interface GrepMatch {
 export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
   static readonly Name = 'search_file_content'; // Keep static name
 
-  /**
-   * Creates a new instance of the GrepLogic
-   * @param rootDirectory Root directory to ground this tool in. All operations will be restricted to this directory.
-   */
-  constructor(private rootDirectory: string) {
+  constructor(private readonly config: Config) {
     super(
       GrepTool.Name,
       'SearchText',
       'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.',
+      Icon.Regex,
       {
         properties: {
           pattern: {
             description:
               "The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').",
-            type: 'string',
+            type: Type.STRING,
           },
           path: {
             description:
               'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
-            type: 'string',
+            type: Type.STRING,
           },
           include: {
             description:
               "Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).",
-            type: 'string',
+            type: Type.STRING,
           },
         },
         required: ['pattern'],
-        type: 'object',
+        type: Type.OBJECT,
       },
     );
-    // Ensure rootDirectory is absolute and normalized
-    this.rootDirectory = path.resolve(rootDirectory);
   }
 
   // --- Validation Methods ---
@@ -99,15 +96,18 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
    * @throws {Error} If path is outside root, doesn't exist, or isn't a directory.
    */
   private resolveAndValidatePath(relativePath?: string): string {
-    const targetPath = path.resolve(this.rootDirectory, relativePath || '.');
+    const targetPath = path.resolve(
+      this.config.getTargetDir(),
+      relativePath || '.',
+    );
 
     // Security Check: Ensure the resolved path is still within the root directory.
     if (
-      !targetPath.startsWith(this.rootDirectory) &&
-      targetPath !== this.rootDirectory
+      !targetPath.startsWith(this.config.getTargetDir()) &&
+      targetPath !== this.config.getTargetDir()
     ) {
       throw new Error(
-        `Path validation failed: Attempted path "${relativePath || '.'}" resolves outside the allowed root directory "${this.rootDirectory}".`,
+        `Path validation failed: Attempted path "${relativePath || '.'}" resolves outside the allowed root directory "${this.config.getTargetDir()}".`,
       );
     }
 
@@ -135,14 +135,9 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
    * @returns An error message string if invalid, null otherwise
    */
   validateToolParams(params: GrepToolParams): string | null {
-    if (
-      this.schema.parameters &&
-      !SchemaValidator.validate(
-        this.schema.parameters as Record<string, unknown>,
-        params,
-      )
-    ) {
-      return 'Parameters failed schema validation.';
+    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    if (errors) {
+      return errors;
     }
 
     try {
@@ -213,7 +208,10 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         {} as Record<string, GrepMatch[]>,
       );
 
-      let llmContent = `Found ${matches.length} match(es) for pattern "${params.pattern}" in path "${searchDirDisplay}"${params.include ? ` (filter: "${params.include}")` : ''}:\n---\n`;
+      const matchCount = matches.length;
+      const matchTerm = matchCount === 1 ? 'match' : 'matches';
+
+      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${params.pattern}" in path "${searchDirDisplay}"${params.include ? ` (filter: "${params.include}")` : ''}:\n---\n`;
 
       for (const filePath in matchesByFile) {
         llmContent += `File: ${filePath}\n`;
@@ -226,7 +224,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
 
       return {
         llmContent: llmContent.trim(),
-        returnDisplay: `Found ${matches.length} matche(s)`,
+        returnDisplay: `Found ${matchCount} ${matchTerm}`,
       };
     } catch (error) {
       console.error(`Error during GrepLogic execution: ${error}`);
@@ -323,11 +321,17 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
       description += ` in ${params.include}`;
     }
     if (params.path) {
-      const resolvedPath = path.resolve(this.rootDirectory, params.path);
-      if (resolvedPath === this.rootDirectory || params.path === '.') {
+      const resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        params.path,
+      );
+      if (resolvedPath === this.config.getTargetDir() || params.path === '.') {
         description += ` within ./`;
       } else {
-        const relativePath = makeRelative(resolvedPath, this.rootDirectory);
+        const relativePath = makeRelative(
+          resolvedPath,
+          this.config.getTargetDir(),
+        );
         description += ` within ${shortenPath(relativePath)}`;
       }
     }

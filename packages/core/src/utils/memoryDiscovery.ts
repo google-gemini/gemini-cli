@@ -14,6 +14,11 @@ import {
   getAllGeminiMdFilenames,
 } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { processImports } from './memoryImportProcessor.js';
+import {
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  FileFilteringOptions,
+} from '../config/config.js';
 
 // Simple console logger, similar to the one previously in CLI's config.ts
 // TODO: Integrate with a more robust server-side logger if available/appropriate.
@@ -27,8 +32,6 @@ const logger = {
   error: (...args: any[]) =>
     console.error('[ERROR] [MemoryDiscovery]', ...args),
 };
-
-const MAX_DIRECTORIES_TO_SCAN_FOR_MEMORY = 200;
 
 interface GeminiFileContent {
   filePath: string;
@@ -84,6 +87,8 @@ async function getGeminiMdFilePathsInternal(
   debugMode: boolean,
   fileService: FileDiscoveryService,
   extensionContextFilePaths: string[] = [],
+  fileFilteringOptions: FileFilteringOptions,
+  maxDirs: number,
 ): Promise<string[]> {
   const allPaths = new Set<string>();
   const geminiMdFilenames = getAllGeminiMdFilenames();
@@ -180,11 +185,18 @@ async function getGeminiMdFilePathsInternal(
     }
     upwardPaths.forEach((p) => allPaths.add(p));
 
+    // Merge options with memory defaults, with options taking precedence
+    const mergedOptions = {
+      ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+      ...fileFilteringOptions,
+    };
+
     const downwardPaths = await bfsFileSearch(resolvedCwd, {
       fileName: geminiMdFilename,
-      maxDirs: MAX_DIRECTORIES_TO_SCAN_FOR_MEMORY,
+      maxDirs,
       debug: debugMode,
       fileService,
+      fileFilteringOptions: mergedOptions, // Pass merged options as fileFilter
     });
     downwardPaths.sort(); // Sort for consistent ordering, though hierarchy might be more complex
     if (debugMode && downwardPaths.length > 0)
@@ -223,10 +235,18 @@ async function readGeminiMdFiles(
   for (const filePath of filePaths) {
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      results.push({ filePath, content });
+
+      // Process imports in the content
+      const processedContent = await processImports(
+        content,
+        path.dirname(filePath),
+        debugMode,
+      );
+
+      results.push({ filePath, content: processedContent });
       if (debugMode)
         logger.debug(
-          `Successfully read: ${filePath} (Length: ${content.length})`,
+          `Successfully read and processed imports: ${filePath} (Length: ${processedContent.length})`,
         );
     } catch (error: unknown) {
       const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
@@ -273,11 +293,14 @@ export async function loadServerHierarchicalMemory(
   debugMode: boolean,
   fileService: FileDiscoveryService,
   extensionContextFilePaths: string[] = [],
+  fileFilteringOptions?: FileFilteringOptions,
+  maxDirs: number = 200,
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode)
     logger.debug(
       `Loading server hierarchical memory for CWD: ${currentWorkingDirectory}`,
     );
+
   // For the server, homedir() refers to the server process's home.
   // This is consistent with how MemoryTool already finds the global path.
   const userHomePath = homedir();
@@ -287,6 +310,8 @@ export async function loadServerHierarchicalMemory(
     debugMode,
     fileService,
     extensionContextFilePaths,
+    fileFilteringOptions || DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+    maxDirs,
   );
   if (filePaths.length === 0) {
     if (debugMode) logger.debug('No GEMINI.md files found in hierarchy.');

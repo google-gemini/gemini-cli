@@ -5,7 +5,17 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { vi, describe, it, expect, beforeEach, type Mocked } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  Mock,
+  type Mocked,
+} from 'vitest';
+import * as fs from 'fs';
+import { EditTool } from '../tools/edit.js';
 
 // MOCKS
 let callCount = 0;
@@ -14,6 +24,10 @@ const mockResponses: any[] = [];
 let mockGenerateJson: any;
 let mockStartChat: any;
 let mockSendMessageStream: any;
+
+vi.mock('fs', () => ({
+  statSync: vi.fn(),
+}));
 
 vi.mock('../core/client.js', () => ({
   GeminiClient: vi.fn().mockImplementation(function (
@@ -67,7 +81,7 @@ describe('editCorrector', () => {
     it('should correctly count occurrences when substring is longer', () => {
       expect(countOccurrences('abc', 'abcdef')).toBe(0);
     });
-    it('should be case sensitive', () => {
+    it('should be case-sensitive', () => {
       expect(countOccurrences('abcABC', 'a')).toBe(1);
       expect(countOccurrences('abcABC', 'A')).toBe(1);
     });
@@ -200,6 +214,8 @@ describe('editCorrector', () => {
         setAlwaysSkipModificationConfirmation: vi.fn((skip: boolean) => {
           configParams.alwaysSkipModificationConfirmation = skip;
         }),
+        getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
+        setQuotaErrorOccurred: vi.fn(),
       } as unknown as Config;
 
       callCount = 0;
@@ -222,6 +238,7 @@ describe('editCorrector', () => {
       mockGeminiClientInstance = new GeminiClient(
         mockConfigInstance,
       ) as Mocked<GeminiClient>;
+      mockGeminiClientInstance.getHistory = vi.fn().mockResolvedValue([]);
       resetEditCorrectorCaches_TEST_ONLY();
     });
 
@@ -237,6 +254,7 @@ describe('editCorrector', () => {
           corrected_new_string_escaping: 'replace with "this"',
         });
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -255,6 +273,7 @@ describe('editCorrector', () => {
           new_string: 'replace with this',
         };
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -276,6 +295,7 @@ describe('editCorrector', () => {
           corrected_new_string_escaping: 'replace with "this"',
         });
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -294,6 +314,7 @@ describe('editCorrector', () => {
           new_string: 'replace with this',
         };
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -316,6 +337,7 @@ describe('editCorrector', () => {
         };
         mockResponses.push({ corrected_new_string: 'replace with "this"' });
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -334,6 +356,7 @@ describe('editCorrector', () => {
           new_string: 'replace with this',
         };
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -352,6 +375,7 @@ describe('editCorrector', () => {
           new_string: 'replace with foobar',
         };
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -375,6 +399,7 @@ describe('editCorrector', () => {
         const llmNewString = 'LLM says replace with "that"';
         mockResponses.push({ corrected_new_string_escaping: llmNewString });
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -397,6 +422,7 @@ describe('editCorrector', () => {
         mockResponses.push({ corrected_target_snippet: llmCorrectedOldString });
         mockResponses.push({ corrected_new_string: llmNewString });
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -417,6 +443,7 @@ describe('editCorrector', () => {
         const llmCorrectedOldString = 'to be corrected';
         mockResponses.push({ corrected_target_snippet: llmCorrectedOldString });
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -439,6 +466,7 @@ describe('editCorrector', () => {
           corrected_new_string_escaping: newStringForLLMAndReturnedByLLM,
         });
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -460,6 +488,7 @@ describe('editCorrector', () => {
         };
         mockResponses.push({ corrected_target_snippet: 'still nonexistent' });
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -478,6 +507,7 @@ describe('editCorrector', () => {
           new_string: 'some new string',
         };
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -491,16 +521,17 @@ describe('editCorrector', () => {
 
     describe('Scenario Group 5: Specific unescapeStringForGeminiBug checks (integrated into ensureCorrectEdit)', () => {
       it('Test 5.1: old_string needs LLM to become currentContent, new_string also needs correction', async () => {
-        const currentContent = 'const x = "a\\nbc\\\\"def\\\\"';
+        const currentContent = 'const x = "a\nbc\\"def\\"';
         const originalParams = {
           file_path: '/test/file.txt',
-          old_string: 'const x = \\\\"a\\\\nbc\\\\\\\\"def\\\\\\\\"',
-          new_string: 'const y = \\\\"new\\\\nval\\\\\\\\"content\\\\\\\\"',
+          old_string: 'const x = \\"a\\nbc\\\\"def\\\\"',
+          new_string: 'const y = \\"new\\nval\\\\"content\\\\"',
         };
-        const expectedFinalNewString = 'const y = "new\\nval\\\\"content\\\\"';
+        const expectedFinalNewString = 'const y = "new\nval\\"content\\"';
         mockResponses.push({ corrected_target_snippet: currentContent });
         mockResponses.push({ corrected_new_string: expectedFinalNewString });
         const result = await ensureCorrectEdit(
+          '/test/file.txt',
           currentContent,
           originalParams,
           mockGeminiClientInstance,
@@ -510,6 +541,61 @@ describe('editCorrector', () => {
         expect(result.params.old_string).toBe(currentContent);
         expect(result.params.new_string).toBe(expectedFinalNewString);
         expect(result.occurrences).toBe(1);
+      });
+    });
+
+    describe('Scenario Group 6: Concurrent Edits', () => {
+      it('Test 6.1: should return early if file was modified by another process', async () => {
+        const filePath = '/test/file.txt';
+        const currentContent =
+          'This content has been modified by someone else.';
+        const originalParams = {
+          file_path: filePath,
+          old_string: 'nonexistent string',
+          new_string: 'some new string',
+        };
+
+        const now = Date.now();
+        const lastEditTime = now - 5000; // 5 seconds ago
+
+        // Mock the file's modification time to be recent
+        vi.spyOn(fs, 'statSync').mockReturnValue({
+          mtimeMs: now,
+        } as fs.Stats);
+
+        // Mock the last edit timestamp from our history to be in the past
+        const history = [
+          {
+            role: 'model',
+            parts: [
+              {
+                functionResponse: {
+                  name: EditTool.Name,
+                  id: `${EditTool.Name}-${lastEditTime}-123`,
+                  response: {
+                    output: {
+                      llmContent: `Successfully modified file: ${filePath}`,
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        ];
+        (mockGeminiClientInstance.getHistory as Mock).mockResolvedValue(
+          history,
+        );
+
+        const result = await ensureCorrectEdit(
+          filePath,
+          currentContent,
+          originalParams,
+          mockGeminiClientInstance,
+          abortSignal,
+        );
+
+        expect(result.occurrences).toBe(0);
+        expect(result.params).toEqual(originalParams);
       });
     });
   });
@@ -570,6 +656,8 @@ describe('editCorrector', () => {
         setAlwaysSkipModificationConfirmation: vi.fn((skip: boolean) => {
           configParams.alwaysSkipModificationConfirmation = skip;
         }),
+        getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
+        setQuotaErrorOccurred: vi.fn(),
       } as unknown as Config;
 
       callCount = 0;
