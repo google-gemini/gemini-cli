@@ -404,6 +404,42 @@ describe('Logger', () => {
       expect(JSON.parse(fileContent)).toEqual(conversation);
     });
 
+    it('should save a checkpoint with a sanitized tag', async () => {
+      const tag = 'invalid/tag?*!';
+      const sanitizedTag = 'invalidtag';
+      await logger.saveCheckpoint(conversation, tag);
+      const taggedFilePath = path.join(
+        TEST_GEMINI_DIR,
+        `checkpoint-${sanitizedTag}.json`,
+      );
+      const fileContent = await fs.readFile(taggedFilePath, 'utf-8');
+      expect(JSON.parse(fileContent)).toEqual(conversation);
+    });
+
+    it('should save a checkpoint with "default" tag if sanitized tag is empty', async () => {
+      const tag = '/?*!';
+      const defaultTag = 'default';
+      await logger.saveCheckpoint(conversation, tag);
+      const taggedFilePath = path.join(
+        TEST_GEMINI_DIR,
+        `checkpoint-${defaultTag}.json`,
+      );
+      const fileContent = await fs.readFile(taggedFilePath, 'utf-8');
+      expect(JSON.parse(fileContent)).toEqual(conversation);
+    });
+
+    it('should save a checkpoint with a sanitized tag to prevent directory traversal', async () => {
+      const tag = '../../secret';
+      const sanitizedTag = 'secret';
+      await logger.saveCheckpoint(conversation, tag);
+      const taggedFilePath = path.join(
+        TEST_GEMINI_DIR,
+        `checkpoint-${sanitizedTag}.json`,
+      );
+      const fileContent = await fs.readFile(taggedFilePath, 'utf-8');
+      expect(JSON.parse(fileContent)).toEqual(conversation);
+    });
+
     it('should not throw if logger is not initialized', async () => {
       const uninitializedLogger = new Logger(testSessionId);
       uninitializedLogger.close();
@@ -442,6 +478,66 @@ describe('Logger', () => {
       const taggedFilePath = path.join(
         TEST_GEMINI_DIR,
         `${CHECKPOINT_FILE_NAME.replace('.json', '')}-${tag}.json`,
+      );
+      await fs.writeFile(
+        taggedFilePath,
+        JSON.stringify(taggedConversation, null, 2),
+      );
+
+      const loaded = await logger.loadCheckpoint(tag);
+      expect(loaded).toEqual(taggedConversation);
+    });
+
+    it('should load from a sanitized tagged checkpoint file', async () => {
+      const tag = 'invalid/load?*!';
+      const sanitizedTag = 'invalidload';
+      const taggedConversation = [
+        ...conversation,
+        { role: 'user', parts: [{ text: 'Sanitized load' }] },
+      ];
+      const taggedFilePath = path.join(
+        TEST_GEMINI_DIR,
+        `checkpoint-${sanitizedTag}.json`,
+      );
+      await fs.writeFile(
+        taggedFilePath,
+        JSON.stringify(taggedConversation, null, 2),
+      );
+
+      const loaded = await logger.loadCheckpoint(tag);
+      expect(loaded).toEqual(taggedConversation);
+    });
+
+    it('should load from a "default" tagged checkpoint file if sanitized tag is empty', async () => {
+      const tag = '/?*!';
+      const defaultTag = 'default';
+      const taggedConversation = [
+        ...conversation,
+        { role: 'user', parts: [{ text: 'Default load' }] },
+      ];
+      const taggedFilePath = path.join(
+        TEST_GEMINI_DIR,
+        `checkpoint-${defaultTag}.json`,
+      );
+      await fs.writeFile(
+        taggedFilePath,
+        JSON.stringify(taggedConversation, null, 2),
+      );
+
+      const loaded = await logger.loadCheckpoint(tag);
+      expect(loaded).toEqual(taggedConversation);
+    });
+
+    it('should load from a sanitized tagged checkpoint file to prevent directory traversal', async () => {
+      const tag = '../../secret-load';
+      const sanitizedTag = 'secret-load';
+      const taggedConversation = [
+        ...conversation,
+        { role: 'user', parts: [{ text: 'Sanitized traversal load' }] },
+      ];
+      const taggedFilePath = path.join(
+        TEST_GEMINI_DIR,
+        `checkpoint-${sanitizedTag}.json`,
       );
       await fs.writeFile(
         taggedFilePath,
