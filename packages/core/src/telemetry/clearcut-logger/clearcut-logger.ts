@@ -19,6 +19,7 @@ import {
   FlashFallbackEvent,
   LoopDetectedEvent,
   FlashDecidedToContinueEvent,
+  MemoryCompressionEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
@@ -39,6 +40,7 @@ const end_session_event_name = 'end_session';
 const flash_fallback_event_name = 'flash_fallback';
 const loop_detected_event_name = 'loop_detected';
 const flash_decided_to_continue_event_name = 'flash_decided_to_continue';
+const memory_compression_event_name = 'memory_compression';
 
 export interface LogResponse {
   nextRequestWaitMs?: number;
@@ -508,6 +510,34 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(flash_decided_to_continue_event_name, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logMemoryCompressionEvent(event: MemoryCompressionEvent): void {
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: JSON.stringify(event.prompt_id),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_MEMORY_COMPRESSION_ORIGINAL_SIZE,
+        value: JSON.stringify(event.original_token_count),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_MEMORY_COMPRESSION_COMPRESSED_SIZE,
+        value: JSON.stringify(event.compressed_token_count),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(memory_compression_event_name, data),
     );
     this.flushIfNeeded();
   }
