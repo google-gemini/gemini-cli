@@ -32,6 +32,7 @@ import fs from 'fs';
 import os from 'os';
 import { ApprovalMode, Config } from '../config/config.js';
 import { Content, Part, SchemaUnion } from '@google/genai';
+import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 
 describe('EditTool', () => {
   let tool: EditTool;
@@ -54,6 +55,7 @@ describe('EditTool', () => {
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
+      getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
       // Add other properties/methods of Config if EditTool uses them
       // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
@@ -215,8 +217,9 @@ describe('EditTool', () => {
         old_string: 'old',
         new_string: 'new',
       };
-      expect(tool.validateToolParams(params)).toMatch(
-        /File path must be within the root directory/,
+      const error = tool.validateToolParams(params);
+      expect(error).toContain(
+        'File path must be within one of the workspace directories',
       );
     });
   });

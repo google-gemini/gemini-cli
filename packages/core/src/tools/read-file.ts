@@ -10,7 +10,6 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { BaseTool, Icon, ToolLocation, ToolResult } from './tools.js';
 import { Type } from '@google/genai';
 import {
-  isWithinRoot,
   processSingleFileContent,
   getSpecificMimeType,
 } from '../utils/fileUtils.js';
@@ -86,8 +85,11 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute, but was relative: ${filePath}. You must provide an absolute path.`;
     }
-    if (!isWithinRoot(filePath, this.config.getTargetDir())) {
-      return `File path must be within the root directory (${this.config.getTargetDir()}): ${filePath}`;
+
+    const workspaceContext = this.config.getWorkspaceContext();
+    if (!workspaceContext.isPathWithinWorkspace(filePath)) {
+      const directories = workspaceContext.getDirectories();
+      return `File path must be within one of the workspace directories: ${directories.join(', ')}`;
     }
     if (params.offset !== undefined && params.offset < 0) {
       return 'Offset must be a non-negative number';
@@ -145,7 +147,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     if (result.error) {
       return {
         llmContent: result.error, // The detailed error for LLM
-        returnDisplay: result.returnDisplay, // User-friendly error
+        returnDisplay: result.returnDisplay || 'Error reading file', // User-friendly error
       };
     }
 
@@ -163,8 +165,8 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     );
 
     return {
-      llmContent: result.llmContent,
-      returnDisplay: result.returnDisplay,
+      llmContent: result.llmContent || '',
+      returnDisplay: result.returnDisplay || '',
     };
   }
 }

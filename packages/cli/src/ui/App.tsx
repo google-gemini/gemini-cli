@@ -252,6 +252,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         },
         Date.now(),
       );
+
       if (config.getDebugMode()) {
         console.log(
           `[DEBUG] Refreshed memory content in config: ${memoryContent.substring(0, 200)}...`,

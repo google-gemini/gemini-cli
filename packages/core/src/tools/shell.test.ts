@@ -4,17 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, describe, it, vi, beforeEach } from 'vitest';
-import { ShellTool } from './shell.js';
-import { Config } from '../config/config.js';
+import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
+import { type GeminiClient } from '../core/client.js';
+import { type Config } from '../config/config.js';
 import * as summarizer from '../utils/summarizer.js';
-import { GeminiClient } from '../core/client.js';
+import { ShellTool } from './shell.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 describe('ShellTool', () => {
   it('should allow a command if no restrictions are provided', async () => {
     const config = {
       getCoreTools: () => undefined,
       getExcludeTools: () => undefined,
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as Config;
     const shellTool = new ShellTool(config);
     const result = shellTool.isCommandAllowed('ls -l');
@@ -25,6 +28,8 @@ describe('ShellTool', () => {
     const config = {
       getCoreTools: () => ['ShellTool(ls -l)'],
       getExcludeTools: () => undefined,
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     const result = shellTool.isCommandAllowed('ls -l');
@@ -35,6 +40,8 @@ describe('ShellTool', () => {
     const config = {
       getCoreTools: () => ['ShellTool(ls -l)'],
       getExcludeTools: () => undefined,
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     const result = shellTool.isCommandAllowed('rm -rf /');
@@ -48,6 +55,8 @@ describe('ShellTool', () => {
     const config = {
       getCoreTools: () => undefined,
       getExcludeTools: () => ['ShellTool(rm -rf /)'],
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     const result = shellTool.isCommandAllowed('rm -rf /');
@@ -61,6 +70,8 @@ describe('ShellTool', () => {
     const config = {
       getCoreTools: () => undefined,
       getExcludeTools: () => ['ShellTool(rm -rf /)'],
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     const result = shellTool.isCommandAllowed('ls -l');
@@ -71,6 +82,8 @@ describe('ShellTool', () => {
     const config = {
       getCoreTools: () => ['ShellTool(rm -rf /)'],
       getExcludeTools: () => ['ShellTool(rm -rf /)'],
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     const result = shellTool.isCommandAllowed('rm -rf /');
@@ -84,6 +97,8 @@ describe('ShellTool', () => {
     const config = {
       getCoreTools: () => ['ShellTool'],
       getExcludeTools: () => [],
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     const result = shellTool.isCommandAllowed('any command');
@@ -94,6 +109,8 @@ describe('ShellTool', () => {
     const config = {
       getCoreTools: () => [],
       getExcludeTools: () => ['ShellTool'],
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     const result = shellTool.isCommandAllowed('any command');
@@ -107,6 +124,8 @@ describe('ShellTool', () => {
     const config = {
       getCoreTools: () => ['run_shell_command(ls -l)'],
       getExcludeTools: () => undefined,
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     const result = shellTool.isCommandAllowed('ls -l');
@@ -117,6 +136,8 @@ describe('ShellTool', () => {
     const config = {
       getCoreTools: () => undefined,
       getExcludeTools: () => ['run_shell_command(rm -rf /)'],
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     const result = shellTool.isCommandAllowed('rm -rf /');
@@ -169,6 +190,8 @@ describe('ShellTool', () => {
     const config = {
       getCoreTools: () => undefined,
       getExcludeTools: () => ['ShellTool(rm -rf /)'],
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     const result = shellTool.isCommandAllowed(' rm  -rf  / ');
@@ -192,6 +215,7 @@ describe('ShellTool', () => {
     const config = {
       getCoreTools: () => ['ShellTool'],
       getExcludeTools: () => ['ShellTool(rm -rf /)'],
+      getCwd: () => '.',
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     const result = shellTool.isCommandAllowed('rm -rf /');
@@ -410,6 +434,8 @@ describe('ShellTool Bug Reproduction', () => {
       getDebugMode: () => false,
       getGeminiClient: () => ({}) as GeminiClient,
       getTargetDir: () => '.',
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
       getSummarizeToolOutputConfig: () => ({
         [shellTool.name]: {},
       }),
@@ -441,6 +467,8 @@ describe('ShellTool Bug Reproduction', () => {
       getGeminiClient: () => ({}) as GeminiClient,
       getTargetDir: () => '.',
       getSummarizeToolOutputConfig: () => ({}),
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as unknown as Config;
     shellTool = new ShellTool(config);
 
@@ -469,6 +497,8 @@ describe('ShellTool Bug Reproduction', () => {
       getSummarizeToolOutputConfig: () => ({
         [shellTool.name]: { tokenBudget: 1000 },
       }),
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as unknown as Config;
     shellTool = new ShellTool(config);
 
@@ -497,6 +527,8 @@ describe('ShellTool Bug Reproduction', () => {
       getSummarizeToolOutputConfig: () => ({
         [shellTool.name]: {},
       }),
+      getCwd: () => '.',
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
     } as unknown as Config;
     shellTool = new ShellTool(config);
 
@@ -513,5 +545,39 @@ describe('ShellTool Bug Reproduction', () => {
       expect.any(Object),
       undefined,
     );
+  });
+});
+
+describe('validateToolParams', () => {
+  it('should return null for valid directory', () => {
+    const config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getTargetDir: () => '/root',
+      getWorkspaceContext: () =>
+        createMockWorkspaceContext('/root', ['/users/test']),
+    } as unknown as Config;
+    const shellTool = new ShellTool(config);
+    const result = shellTool.validateToolParams({
+      command: 'ls',
+      directory: 'test',
+    });
+    expect(result).toBeNull();
+  });
+
+  it('should return error for directory outside workspace', () => {
+    const config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getTargetDir: () => '/root',
+      getWorkspaceContext: () =>
+        createMockWorkspaceContext('/root', ['/users/test']),
+    } as unknown as Config;
+    const shellTool = new ShellTool(config);
+    const result = shellTool.validateToolParams({
+      command: 'ls',
+      directory: 'test2',
+    });
+    expect(result).toContain('is not a registered workspace directory');
   });
 });

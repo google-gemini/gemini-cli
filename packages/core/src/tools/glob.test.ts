@@ -12,6 +12,7 @@ import os from 'os';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'; // Removed vi
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { Config } from '../config/config.js';
+import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 
 describe('GlobTool', () => {
   let tempRootDir: string; // This will be the rootDirectory for the GlobTool instance
@@ -23,6 +24,7 @@ describe('GlobTool', () => {
     getFileService: () => new FileDiscoveryService(tempRootDir),
     getFileFilteringRespectGitIgnore: () => true,
     getTargetDir: () => tempRootDir,
+    getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
   } as unknown as Config;
 
   beforeEach(async () => {
@@ -235,7 +237,7 @@ describe('GlobTool', () => {
         path: '../../../../../../../../../../tmp',
       }; // Definitely outside
       expect(specificGlobTool.validateToolParams(paramsOutside)).toContain(
-        "resolves outside the tool's root directory",
+        'resolves outside the allowed workspace directories',
       );
     });
 

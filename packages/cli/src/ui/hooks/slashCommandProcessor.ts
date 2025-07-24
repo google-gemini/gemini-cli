@@ -317,6 +317,15 @@ export const useSlashCommandProcessor = (
                   type: 'submit_prompt',
                   content: result.content,
                 };
+              case 'update_context':
+                addItem(
+                  {
+                    type: MessageType.INFO,
+                    text: result.message,
+                  },
+                  Date.now(),
+                );
+                return { type: 'handled' };
               default: {
                 const unhandled: never = result;
                 throw new Error(`Unhandled slash command result: ${unhandled}`);

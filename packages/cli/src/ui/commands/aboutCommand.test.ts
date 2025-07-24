@@ -45,6 +45,8 @@ describe('aboutCommand', () => {
     Object.defineProperty(process, 'platform', {
       value: 'test-os',
     });
+    delete process.env.SANDBOX;
+    delete process.env.SEATBELT_PROFILE;
   });
 
   afterEach(() => {

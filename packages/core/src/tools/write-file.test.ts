@@ -31,6 +31,7 @@ import {
   ensureCorrectFileContent,
   CorrectedEditResult,
 } from '../utils/editCorrector.js';
+import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 
 const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
 
@@ -54,6 +55,7 @@ const mockConfigInternal = {
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
   setApprovalMode: vi.fn(),
   getGeminiClient: vi.fn(), // Initialize as a plain mock function
+  getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
   getApiKey: () => 'test-key',
   getModel: () => 'test-model',
   getSandbox: () => false,
@@ -177,8 +179,9 @@ describe('WriteFileTool', () => {
         file_path: outsidePath,
         content: 'hello',
       };
-      expect(tool.validateToolParams(params)).toMatch(
-        /File path must be within the root directory/,
+      const error = tool.validateToolParams(params);
+      expect(error).toContain(
+        'File path must be within one of the workspace directories',
       );
     });
 
@@ -427,8 +430,8 @@ describe('WriteFileTool', () => {
       const params = { file_path: outsidePath, content: 'test' };
       const result = await tool.execute(params, abortSignal);
       expect(result.llmContent).toMatch(/Error: Invalid parameters provided/);
-      expect(result.returnDisplay).toMatch(
-        /Error: File path must be within the root directory/,
+      expect(result.returnDisplay).toContain(
+        'Error: File path must be within one of the workspace directories',
       );
     });
 

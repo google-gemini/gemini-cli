@@ -188,6 +188,14 @@ export async function handleAtCommand({
 
     // Check if path should be ignored based on filtering options
 
+    const workspaceContext = config.getWorkspaceContext();
+    if (!workspaceContext.isPathWithinWorkspace(pathName)) {
+      onDebugMessage(
+        `Path ${pathName} is not in the workspace and will be skipped.`,
+      );
+      continue;
+    }
+
     const gitIgnored =
       respectFileIgnore.respectGitIgnore &&
       fileDiscovery.shouldIgnoreFile(pathName, {

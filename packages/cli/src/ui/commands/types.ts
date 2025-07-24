@@ -117,13 +117,19 @@ export interface SubmitPromptActionReturn {
   content: string;
 }
 
+export interface UpdateContextActionReturn {
+  type: 'update_context';
+  message: string;
+}
+
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
   | QuitActionReturn
   | OpenDialogActionReturn
   | LoadHistoryActionReturn
-  | SubmitPromptActionReturn;
+  | SubmitPromptActionReturn
+  | UpdateContextActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
