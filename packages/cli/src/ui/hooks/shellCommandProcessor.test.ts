@@ -6,6 +6,8 @@
 
 import { act, renderHook } from '@testing-library/react';
 import { vi } from 'vitest';
+import { spawn } from 'child_process';
+import type { ChildProcess } from 'child_process';
 import { useShellCommandProcessor } from './shellCommandProcessor';
 import { Config, GeminiClient } from '@google/gemini-cli-core';
 import * as fs from 'fs';
@@ -39,12 +41,11 @@ describe('useShellCommandProcessor', () => {
   let configMock: Config;
   let geminiClientMock: GeminiClient;
 
-  beforeEach(async () => {
-    const { spawn } = await import('child_process');
+  beforeEach(() => {
     spawnEmitter = new EventEmitter();
     spawnEmitter.stdout = new EventEmitter();
     spawnEmitter.stderr = new EventEmitter();
-    (spawn as vi.Mock).mockReturnValue(spawnEmitter);
+    vi.mocked(spawn).mockReturnValue(spawnEmitter as any);
 
     vi.spyOn(fs, 'existsSync').mockReturnValue(false);
     vi.spyOn(fs, 'readFileSync').mockReturnValue('');
@@ -81,7 +82,6 @@ describe('useShellCommandProcessor', () => {
     );
 
   it('should execute a command and update history on success', async () => {
-    const { spawn } = await import('child_process');
     const { result } = renderProcessorHook();
     const abortController = new AbortController();
 
