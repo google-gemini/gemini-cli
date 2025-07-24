@@ -25,7 +25,10 @@ function sendOpenFilesChangedNotification(
   recentFilesManager: RecentFilesManager,
 ) {
   const editor = vscode.window.activeTextEditor;
-  const filePath = editor ? editor.document.uri.fsPath : '';
+  const filePath =
+    editor && editor.document.uri.scheme === 'file'
+      ? editor.document.uri.fsPath
+      : '';
   const notification: JSONRPCNotification = {
     jsonrpc: '2.0',
     method: 'ide/openFilesChanged',

@@ -10,7 +10,7 @@ import { createLogger } from './utils/logger';
 
 let ideServer: IDEServer;
 let logger: vscode.OutputChannel;
-let log: (message: string) => void;
+let log: (message: string) => void = () => {};
 
 export async function activate(context: vscode.ExtensionContext) {
   logger = vscode.window.createOutputChannel('Gemini CLI IDE Companion');
