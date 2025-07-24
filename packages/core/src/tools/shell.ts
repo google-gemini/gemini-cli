@@ -322,11 +322,19 @@ Process Group PGID: Process group started or \`(none)\``,
           stdio: ['ignore', 'pipe', 'pipe'],
           // detached: true, // ensure subprocess starts its own process group (esp. in Linux)
           cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
+          env: {
+            ...process.env,
+            GEMINI_CLI: '1',
+          },
         })
       : spawn('bash', ['-c', command], {
           stdio: ['ignore', 'pipe', 'pipe'],
           detached: true, // ensure subprocess starts its own process group (esp. in Linux)
           cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
+          env: {
+            ...process.env,
+            GEMINI_CLI: '1',
+          },
         });
 
     let exited = false;
