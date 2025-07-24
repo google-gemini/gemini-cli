@@ -86,6 +86,8 @@ import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import { usePromptCompletion } from './hooks/usePromptCompletion.js';
 import { spawn } from 'node:child_process';
+import { PasswordPrompt } from './components/PasswordPrompt.js';
+import { PasswordRequester } from '../gemini.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -94,6 +96,7 @@ interface AppProps {
   settings: LoadedSettings;
   startupWarnings?: string[];
   version: string;
+  passwordRequester: PasswordRequester;
 }
 
 function handleAutoUpdate(
@@ -171,8 +174,8 @@ export const AppWrapper = (props: AppProps) => (
   </SessionStatsProvider>
 );
 
-const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
-  const _isFocused = useFocus();
+const App = ({ config, settings, startupWarnings = [], version, passwordRequester }: AppProps) => {
+  const isFocused = useFocus();
   useBracketedPaste();
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -258,6 +261,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [openFiles, setOpenFiles] = useState<OpenFiles | undefined>();
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [passwordRequest, setPasswordRequest] = useState<{ prompt: string; resolve: (password: string | null) => void; } | null>(null);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToOpenFiles(setOpenFiles);
@@ -265,6 +269,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setOpenFiles(ideContext.getOpenFilesContext());
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    passwordRequester.request = (prompt: string) => new Promise((resolve) => {
+        setPasswordRequest({ prompt, resolve });
+      });
+  }, [passwordRequester, setPasswordRequest]);
 
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
@@ -1009,6 +1019,18 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             <PrivacyNotice
               onExit={() => setShowPrivacyNotice(false)}
               config={config}
+            />
+          ) : passwordRequest ? (
+            <PasswordPrompt
+              prompt={passwordRequest.prompt}
+              onSubmit={(password) => {
+                passwordRequest.resolve(password);
+                setPasswordRequest(null);
+              }}
+              onCancel={() => {
+                passwordRequest.resolve(null);
+                setPasswordRequest(null);
+              }}
             />
           ) : (
             <>

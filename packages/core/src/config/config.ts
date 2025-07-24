@@ -18,6 +18,7 @@ import { GrepTool } from '../tools/grep.js';
 import { GlobTool } from '../tools/glob.js';
 import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
+import { SshConnectTool, SshDisconnectTool, SshExecuteTool } from '../tools/ssh.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
@@ -132,6 +133,10 @@ export type FlashFallbackHandler = (
   error?: unknown,
 ) => Promise<boolean | string | null>;
 
+export interface PasswordRequester {
+  request: (prompt: string) => Promise<string | null>;
+}
+
 export interface ConfigParameters {
   sessionId: string;
   embeddingModel?: string;
@@ -174,6 +179,7 @@ export interface ConfigParameters {
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideMode?: boolean;
+  passwordRequester?: PasswordRequester;
 }
 
 export class Config {
@@ -229,6 +235,7 @@ export class Config {
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
   private readonly experimentalAcp: boolean = false;
+  readonly passwordRequester?: PasswordRequester;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -279,6 +286,7 @@ export class Config {
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.ideMode = params.ideMode ?? false;
+    this.passwordRequester = params.passwordRequester;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -631,6 +639,9 @@ export class Config {
     registerCoreTool(WebFetchTool, this);
     registerCoreTool(ReadManyFilesTool, this);
     registerCoreTool(ShellTool, this);
+    registerCoreTool(SshConnectTool, this);
+    registerCoreTool(SshExecuteTool, this);
+    registerCoreTool(SshDisconnectTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
 

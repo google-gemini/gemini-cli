@@ -86,7 +86,15 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
 }
 import { runAcpPeer } from './acp/acpPeer.js';
 
+export interface PasswordRequester {
+  request: (prompt: string) => Promise<string | null>;
+}
+
 export async function main() {
+  const passwordRequester: PasswordRequester = {
+    request: () => Promise.reject(new Error('Password requester not implemented yet.')),
+  };
+
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
 
@@ -105,7 +113,13 @@ export async function main() {
 
   const argv = await parseArguments();
   const extensions = loadExtensions(workspaceRoot);
-  const config = await loadCliConfig(settings, extensions, sessionId, argv);
+  const config = await loadCliConfig(
+    settings,
+    extensions,
+    sessionId,
+    argv,
+    passwordRequester,
+  );
 
   if (argv.promptInteractive && !process.stdin.isTTY) {
     console.error(
@@ -212,6 +226,7 @@ export async function main() {
           settings={settings}
           startupWarnings={startupWarnings}
           version={version}
+          passwordRequester={passwordRequester}
         />
       </React.StrictMode>,
       { exitOnCtrlC: false },
