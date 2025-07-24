@@ -29,8 +29,8 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('gemini-cli.runGeminiCLI', () => {
       const geminiCmd = 'gemini';
       const terminal = vscode.window.createTerminal(`Gemini CLI`);
-      terminal.sendText(geminiCmd);
       terminal.show();
+      terminal.sendText(geminiCmd);
     }),
   );
 }
