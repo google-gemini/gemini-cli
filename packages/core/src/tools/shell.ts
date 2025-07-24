@@ -324,8 +324,8 @@ Process Group PGID: Process group started or \`(none)\``,
           cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
           env: {
             ...process.env,
-            GEMINI_CLI: '1'
-          }
+            GEMINI_CLI: '1',
+          },
         })
       : spawn('bash', ['-c', command], {
           stdio: ['ignore', 'pipe', 'pipe'],
@@ -333,8 +333,8 @@ Process Group PGID: Process group started or \`(none)\``,
           cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
           env: {
             ...process.env,
-            GEMINI_CLI: '1'
-          }
+            GEMINI_CLI: '1',
+          },
         });
 
     let exited = false;

@@ -74,8 +74,8 @@ function executeShellCommand(
       detached: !isWindows, // Use process groups on non-Windows for robust killing
       env: {
         ...process.env,
-        GEMINI_CLI: '1'
-      }
+        GEMINI_CLI: '1',
+      },
     });
 
     // Use decoders to handle multi-byte characters safely (for streaming output).
