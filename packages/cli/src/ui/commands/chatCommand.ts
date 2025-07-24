@@ -231,7 +231,7 @@ const deleteCommand: SlashCommand = {
         content: `Conversation checkpoint deleted: ${tag}.`,
       };
     } catch (e) {
-      const err = e as NodeJS.ErrnoException;
+      const err = e as Error & { code?: string };
       if (err.code === 'ENOENT') {
         return {
           type: 'message',
@@ -242,7 +242,7 @@ const deleteCommand: SlashCommand = {
         return {
           type: 'message',
           messageType: 'error',
-          content: `Error deleting checkpoint: ${err.message}`,
+          content: `Error deleting checkpoint: ${err.message ?? String(e)}`,
         };
       }
     }
