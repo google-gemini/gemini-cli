@@ -50,6 +50,7 @@ const SENTENCE_ENDING_PUNCTUATION_REGEX = /[.!?]+(?=\s|$)/;
  */
 export class LoopDetectionService {
   private readonly config: Config;
+  private promptId = '';
 
   // Tool call tracking
   private lastToolCallKey: string | null = null;
@@ -129,7 +130,10 @@ export class LoopDetectionService {
     if (this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD) {
       logLoopDetected(
         this.config,
-        new LoopDetectedEvent(LoopType.CONSECUTIVE_IDENTICAL_TOOL_CALLS),
+        new LoopDetectedEvent(
+          LoopType.CONSECUTIVE_IDENTICAL_TOOL_CALLS,
+          this.promptId,
+        ),
       );
       return true;
     }
@@ -170,7 +174,10 @@ export class LoopDetectionService {
       if (this.sentenceRepetitionCount >= CONTENT_LOOP_THRESHOLD) {
         logLoopDetected(
           this.config,
-          new LoopDetectedEvent(LoopType.CHANTING_IDENTICAL_SENTENCES),
+          new LoopDetectedEvent(
+            LoopType.CHANTING_IDENTICAL_SENTENCES,
+            this.promptId,
+          ),
         );
         return true;
       }
@@ -234,7 +241,7 @@ Please analyze the conversation history to determine the possibility that the co
         }
         logLoopDetected(
           this.config,
-          new LoopDetectedEvent(LoopType.LLM_DETECTED_LOOP),
+          new LoopDetectedEvent(LoopType.LLM_DETECTED_LOOP, this.promptId),
         );
         return true;
       } else {
@@ -251,7 +258,8 @@ Please analyze the conversation history to determine the possibility that the co
   /**
    * Resets all loop detection state.
    */
-  reset(): void {
+  reset(promptId: string): void {
+    this.promptId = promptId;
     this.resetToolCallCount();
     this.resetSentenceCount();
     this.resetLlmCheckTracking();
