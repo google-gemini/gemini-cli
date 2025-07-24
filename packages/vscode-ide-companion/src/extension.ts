@@ -12,32 +12,23 @@ let logger: vscode.OutputChannel;
 
 export async function activate(context: vscode.ExtensionContext) {
   logger = vscode.window.createOutputChannel('Gemini CLI IDE Companion');
-  logger.appendLine('Starting Gemini CLI IDE Companion server...');
   ideServer = new IDEServer(logger);
   try {
     await ideServer.start(context);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logger.appendLine(`Failed to start IDE server: ${message}`);
   }
 }
 
 export function deactivate() {
-  if (!logger) {
-    return;
-  }
-
   if (ideServer) {
-    logger.appendLine('Deactivating Gemini CLI IDE Companion...');
     return ideServer.stop().finally(() => {
-      logger.appendLine('Gemini CLI IDE Companion extension deactivated.');
-      logger.dispose();
+      if (logger) {
+        logger.dispose();
+      }
     });
   }
-
-  logger.appendLine(
-    'Deactivating Gemini CLI IDE Companion (no server was started).',
-  );
-  logger.appendLine('Gemini CLI IDE Companion extension deactivated.');
-  logger.dispose();
+  if (logger) {
+    logger.dispose();
+  }
 }
