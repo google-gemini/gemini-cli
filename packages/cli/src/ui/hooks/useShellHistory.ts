@@ -13,6 +13,7 @@ const HISTORY_FILE = 'shell_history';
 const MAX_HISTORY_LENGTH = 100;
 
 export interface UseShellHistoryReturn {
+  history: string[];
   addCommandToHistory: (command: string) => void;
   getPreviousCommand: () => string | null;
   getNextCommand: () => string | null;
@@ -37,7 +38,7 @@ async function readHistoryFile(filePath: string): Promise<string[]> {
       const m = cur.match(/(\\+)$/);
       if (m && m[1].length % 2) {
         // odd number of trailing '\'
-        cur = cur.slice(0, -1).trimEnd() + ' ' + line;
+        cur = cur.slice(0, -1) + ' ' + line;
       } else {
         if (cur) result.push(cur);
         cur = line;

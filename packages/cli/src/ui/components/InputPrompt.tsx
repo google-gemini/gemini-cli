@@ -101,8 +101,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const shouldShowCompletion = useCallback(
     () =>
       (isAtCommand(buffer.text) || isSlashCommand(buffer.text)) &&
-      isCursorAfterCommandWithoutSpace(),
-    [buffer.text, isCursorAfterCommandWithoutSpace],
+      isCursorAfterCommandWithoutSpace() &&
+      !reverseSearchActive,
+    [buffer.text, isCursorAfterCommandWithoutSpace, reverseSearchActive],
   );
 
   const completion = useCompletion(
@@ -362,34 +363,42 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Handle Reverse Search first (prioritize over regular completions)
       if (reverseSearchActive) {
-        if (reverseSearchCompletion.showSuggestions) {
-          if (reverseSearchCompletion.suggestions.length > 1) {
-            if (key.name === 'up') {
-              reverseSearchCompletion.navigateUp();
-              return;
-            }
-            if (key.name === 'down') {
-              reverseSearchCompletion.navigateDown();
-              return;
-            }
-          }
+        const {
+          activeSuggestionIndex,
+          navigateUp,
+          navigateDown,
+          showSuggestions,
+          suggestions,
+        } = reverseSearchCompletion;
 
-          if (key.name === 'tab') {
-            handleReverseSearchAutoComplete(
-              reverseSearchCompletion.activeSuggestionIndex,
-            );
+        if (showSuggestions) {
+          if (key.name === 'up') {
+            navigateUp();
             return;
           }
-          if (key.name === 'return' && !key.ctrl) {
-            handleSubmitAndClear(buffer.text);
-            reverseSearchCompletion.resetCompletionState();
-            setReverseSearchActive(false);
+          if (key.name === 'down') {
+            navigateDown();
+            return;
+          }
+          if (key.name === 'tab') {
+            handleReverseSearchAutoComplete(activeSuggestionIndex);
             return;
           }
         }
-        // When in reverse search mode but no suggestions, don't fall through to regular completions
+
+        if (key.name === 'return' && !key.ctrl) {
+          const textToSubmit =
+            showSuggestions && activeSuggestionIndex > -1
+              ? suggestions[activeSuggestionIndex].value
+              : buffer.text;
+          handleSubmitAndClear(textToSubmit);
+          reverseSearchCompletion.resetCompletionState();
+          setReverseSearchActive(false);
+          return;
+        }
+
+        // Prevent up/down from falling through to regular history navigation
         if (key.name === 'up' || key.name === 'down') {
           return;
         }

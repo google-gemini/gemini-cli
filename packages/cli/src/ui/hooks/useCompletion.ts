@@ -130,14 +130,19 @@ export function useCompletion(
     }
 
     if (shellHistory?.length) {
-      const matches = shellHistory.filter((cmd) =>
-        cmd.toLowerCase().includes(query.toLowerCase()),
-      );
+      const matches = shellHistory.reduce<Suggestion[]>((acc, cmd) => {
+        const lowerCmd = cmd.toLowerCase();
+        const lowerQuery = query.toLowerCase();
+        const idx = lowerCmd.indexOf(lowerQuery);
+        if (idx !== -1) {
+          acc.push({ label: cmd, value: cmd, matchedIndex: idx });
+        }
+        return acc;
+      }, []);
 
-      const matchedHistory = matches.map((s) => ({ label: s, value: s }));
-      setSuggestions(matchedHistory);
-      setShowSuggestions(matchedHistory.length > 0);
-      setActiveSuggestionIndex(matchedHistory.length > 0 ? 0 : -1);
+      setSuggestions(matches);
+      setShowSuggestions(matches.length > 0);
+      setActiveSuggestionIndex(matches.length > 0 ? 0 : -1);
       return;
     }
 

@@ -683,52 +683,57 @@ describe('InputPrompt', () => {
   });
 
   describe('reverse shell search', () => {
-    beforeEach(() => {
-      props.shellModeActive = true;
-      mockShellHistory.history = [
-        'git status',
-        'npm install',
-        'git commit -m "test"',
-        'ls -la',
-      ];
-    });
-
     it('should activate reverse search on Ctrl+R in shell mode', async () => {
-      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      props.shellModeActive = true;
+      const mockRegularCompletion = {
+        ...mockCompletion,
+        showSuggestions: false,
+        suggestions: [],
+      };
+      const mockReverseSearchCompletion = {
+        ...mockCompletion,
+        showSuggestions: false,
+        suggestions: [],
+      };
+      mockedUseCompletion
+        .mockReturnValueOnce(mockRegularCompletion)
+        .mockReturnValueOnce(mockReverseSearchCompletion);
+
+      const { stdin, lastFrame, unmount } = render(<InputPrompt {...props} />);
       await wait();
 
-      stdin.write('\x12');
+      stdin.write('\x12'); // Ctrl+R
       await wait();
 
-      expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '',
-        '/test/project/src',
-        true,
-        mockSlashCommands,
-        mockCommandContext,
-        expect.any(Object),
-        mockShellHistory.history,
-      );
+      // Check for the (r:) prompt in the output
+      expect(lastFrame()).toContain('(r:)');
       unmount();
     });
 
     it('should not activate reverse search on Ctrl+R when not in shell mode', async () => {
       props.shellModeActive = false;
-      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      const mockRegularCompletion = {
+        ...mockCompletion,
+        showSuggestions: false,
+        suggestions: [],
+      };
+      const mockReverseSearchCompletion = {
+        ...mockCompletion,
+        showSuggestions: false,
+        suggestions: [],
+      };
+      mockedUseCompletion
+        .mockReturnValueOnce(mockRegularCompletion)
+        .mockReturnValueOnce(mockReverseSearchCompletion);
+
+      const { stdin, lastFrame, unmount } = render(<InputPrompt {...props} />);
       await wait();
 
-      stdin.write('\x12');
+      stdin.write('\x12'); // Ctrl+R
       await wait();
 
-      expect(mockedUseCompletion).not.toHaveBeenCalledWith(
-        expect.anything(),
-        expect.anything(),
-        true,
-        expect.anything(),
-        expect.anything(),
-        expect.anything(),
-        mockShellHistory.history,
-      );
+      // Check for the (r:) prompt in the output
+      expect(lastFrame()).not.toContain('(r:)');
       unmount();
     });
   });
