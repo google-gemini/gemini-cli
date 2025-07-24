@@ -13,6 +13,7 @@ import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
 import stringWidth from 'string-width';
 import { unescapePath } from '@google/gemini-cli-core';
 import { toCodePoints, cpLen, cpSlice } from '../../utils/textUtils.js';
+import { NEWLINE_INPUT_SEQUENCES } from '../../utils/platformConstants.js';
 
 export type Direction =
   | 'left'
@@ -1167,42 +1168,56 @@ export function useTextBuffer({
 
       if (
         key.name === 'return' ||
-        input === '\r' ||
-        input === '\n' ||
-        input === '\\\r' // VSCode terminal represents shift + enter this way
-      )
+        (input &&
+          (NEWLINE_INPUT_SEQUENCES as readonly string[]).includes(input))
+      ) {
         newline();
-      else if (key.name === 'left' && !key.meta && !key.ctrl) move('left');
-      else if (key.ctrl && key.name === 'b') move('left');
-      else if (key.name === 'right' && !key.meta && !key.ctrl) move('right');
-      else if (key.ctrl && key.name === 'f') move('right');
-      else if (key.name === 'up') move('up');
-      else if (key.name === 'down') move('down');
-      else if ((key.ctrl || key.meta) && key.name === 'left') move('wordLeft');
-      else if (key.meta && key.name === 'b') move('wordLeft');
-      else if ((key.ctrl || key.meta) && key.name === 'right')
+      } else if (key.name === 'left' && !key.meta && !key.ctrl) {
+        move('left');
+      } else if (key.ctrl && key.name === 'b') {
+        move('left');
+      } else if (key.name === 'right' && !key.meta && !key.ctrl) {
+        move('right');
+      } else if (key.ctrl && key.name === 'f') {
+        move('right');
+      } else if (key.name === 'up') {
+        move('up');
+      } else if (key.name === 'down') {
+        move('down');
+      } else if ((key.ctrl || key.meta) && key.name === 'left') {
+        move('wordLeft');
+      } else if (key.meta && key.name === 'b') {
+        move('wordLeft');
+      } else if ((key.ctrl || key.meta) && key.name === 'right') {
         move('wordRight');
-      else if (key.meta && key.name === 'f') move('wordRight');
-      else if (key.name === 'home') move('home');
-      else if (key.ctrl && key.name === 'a') move('home');
-      else if (key.name === 'end') move('end');
-      else if (key.ctrl && key.name === 'e') move('end');
-      else if (key.ctrl && key.name === 'w') deleteWordLeft();
-      else if (
+      } else if (key.meta && key.name === 'f') {
+        move('wordRight');
+      } else if (key.name === 'home') {
+        move('home');
+      } else if (key.ctrl && key.name === 'a') {
+        move('home');
+      } else if (key.name === 'end') {
+        move('end');
+      } else if (key.ctrl && key.name === 'e') {
+        move('end');
+      } else if (key.ctrl && key.name === 'w') {
+        deleteWordLeft();
+      } else if (
         (key.meta || key.ctrl) &&
         (key.name === 'backspace' || input === '\x7f')
-      )
+      ) {
         deleteWordLeft();
-      else if ((key.meta || key.ctrl) && key.name === 'delete')
+      } else if ((key.meta || key.ctrl) && key.name === 'delete') {
         deleteWordRight();
-      else if (
+      } else if (
         key.name === 'backspace' ||
         input === '\x7f' ||
         (key.ctrl && key.name === 'h')
-      )
+      ) {
         backspace();
-      else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
-      else if (input && !key.ctrl && !key.meta) {
+      } else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) {
+        del();
+      } else if (input && !key.ctrl && !key.meta) {
         insert(input);
       }
     },

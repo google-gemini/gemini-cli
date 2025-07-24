@@ -10,12 +10,14 @@ import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { TextBuffer } from './shared/text-buffer.js';
+import { NEWLINE_INPUT_SEQUENCES } from '../utils/platformConstants.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
-import { useKeypress, Key } from '../hooks/useKeypress.js';
+import { Key, useKeypress } from '../hooks/useKeypress.js';
+import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
@@ -58,6 +60,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const kittyProtocolStatus = useKittyKeyboardProtocol();
 
   // Check if cursor is after @ or / without unescaped spaces
   const isCursorAfterCommandWithoutSpace = useCallback(() => {
@@ -386,11 +389,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (key.name === 'return' && !key.ctrl && !key.meta && !key.paste) {
         if (buffer.text.trim()) {
-          const [row, col] = buffer.cursor;
-          const line = buffer.lines[row];
-          const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
-          if (charBefore === '\\') {
-            buffer.backspace();
+          if (
+            (NEWLINE_INPUT_SEQUENCES as readonly string[]).includes(
+              key.sequence,
+            )
+          ) {
             buffer.newline();
           } else {
             handleSubmitAndClear(buffer.text);
@@ -400,7 +403,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Newline insertion
-      if (key.name === 'return' && (key.ctrl || key.meta || key.paste)) {
+      if (
+        key.name === 'return' &&
+        (key.ctrl || key.meta || key.shift || key.paste)
+      ) {
         buffer.newline();
         return;
       }
@@ -467,7 +473,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
 
-  useKeypress(handleInput, { isActive: focus });
+  // Use keypress hook - it now handles both Kitty protocol and standard input
+  useKeypress(handleInput, {
+    isActive: focus,
+    kittyProtocolEnabled: kittyProtocolStatus.enabled,
+  });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
