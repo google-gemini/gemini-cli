@@ -14,7 +14,7 @@ interface UseInputHistoryProps {
   onChange: (value: string) => void;
 }
 
-interface UseInputHistoryReturn {
+export interface UseInputHistoryReturn {
   handleSubmit: (value: string) => void;
   navigateUp: () => boolean;
   navigateDown: () => boolean;
