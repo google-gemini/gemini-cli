@@ -49,16 +49,10 @@ function sendOpenFilesChangedNotification(
 export class IDEServer {
   private server: HTTPServer | undefined;
   private context: vscode.ExtensionContext | undefined;
-  private logger: vscode.OutputChannel;
+  private log: (message: string) => void;
 
-  constructor(logger: vscode.OutputChannel) {
-    this.logger = logger;
-  }
-
-  private log(message: string) {
-    if (this.context?.extensionMode === vscode.ExtensionMode.Development) {
-      this.logger.appendLine(message);
-    }
+  constructor(log: (message: string) => void) {
+    this.log = log;
   }
 
   async start(context: vscode.ExtensionContext) {
@@ -104,14 +98,12 @@ export class IDEServer {
           try {
             transport.send({ jsonrpc: '2.0', method: 'ping' });
           } catch (e) {
-            // If sending a ping fails, the connection is likely broken.
-            // Log the error and clear the interval to prevent further attempts.
             this.log(
               'Failed to send keep-alive ping, cleaning up interval.' + e,
             );
             clearInterval(keepAlive);
           }
-        }, 60000); // Send ping every 60 seconds
+        }, 60000); // 60 sec
 
         transport.onclose = () => {
           clearInterval(keepAlive);
