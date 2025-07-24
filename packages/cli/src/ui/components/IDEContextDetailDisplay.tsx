@@ -18,8 +18,8 @@ export function IDEContextDetailDisplay({
 }: IDEContextDetailDisplayProps) {
   if (
     !openFiles ||
-    (!openFiles.activeFile &&
-      (!openFiles.recentOpenFiles || openFiles.recentOpenFiles.length === 0))
+    !openFiles.recentOpenFiles ||
+    openFiles.recentOpenFiles.length === 0
   ) {
     return null;
   }
@@ -34,19 +34,16 @@ export function IDEContextDetailDisplay({
       paddingX={1}
     >
       <Text color={Colors.AccentCyan} bold>
-        File Context (ctrl+e to close)
+        IDE Context (ctrl+e to toggle)
       </Text>
-      {openFiles.activeFile && (
-        <Box>
-          <Text bold>Active File: </Text>
-          <Text>{path.basename(openFiles.activeFile)}</Text>
-        </Box>
-      )}
       {recentFiles.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
-          <Text bold>Recent Files:</Text>
-          {recentFiles.map((file, _) => (
-            <Text key={file.filePath}>- {path.basename(file.filePath)}</Text>
+          <Text bold>Recent files:</Text>
+          {recentFiles.map((file) => (
+            <Text key={file.filePath}>
+              - {path.basename(file.filePath)}
+              {file.filePath === openFiles.activeFile ? ' (active)' : ''}
+            </Text>
           ))}
         </Box>
       )}
