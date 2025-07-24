@@ -293,7 +293,7 @@ export class GeminiClient {
     originalModel?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (this.lastPromptId !== prompt_id) {
-      this.loopDetector.reset();
+      this.loopDetector.reset(prompt_id);
       this.lastPromptId = prompt_id;
     }
     this.sessionTurnCount++;
