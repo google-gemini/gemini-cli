@@ -514,4 +514,63 @@ describe('ShellTool Bug Reproduction', () => {
       undefined,
     );
   });
+
+  it('should allow absolute directory paths', async () => {
+    const config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getDebugMode: () => false,
+      getGeminiClient: () => ({}) as GeminiClient,
+      getTargetDir: () => '.',
+      getSummarizeToolOutputConfig: () => ({}),
+    } as unknown as Config;
+    const shellTool = new ShellTool(config);
+
+    // Test with absolute path that exists (current directory)
+    const absolutePath = process.cwd();
+    const result = shellTool.validateToolParams({
+      command: 'ls',
+      directory: absolutePath,
+    });
+
+    expect(result).toBeNull(); // Should be valid
+  });
+
+  it('should reject absolute directory paths that do not exist', async () => {
+    const config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getDebugMode: () => false,
+      getGeminiClient: () => ({}) as GeminiClient,
+      getTargetDir: () => '.',
+      getSummarizeToolOutputConfig: () => ({}),
+    } as unknown as Config;
+    const shellTool = new ShellTool(config);
+
+    const result = shellTool.validateToolParams({
+      command: 'ls',
+      directory: '/this/path/does/not/exist',
+    });
+
+    expect(result).toBe('Directory must exist.');
+  });
+
+  it('should still allow relative directory paths', async () => {
+    const config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getDebugMode: () => false,
+      getGeminiClient: () => ({}) as GeminiClient,
+      getTargetDir: () => process.cwd(), // Use current directory as target
+      getSummarizeToolOutputConfig: () => ({}),
+    } as unknown as Config;
+    const shellTool = new ShellTool(config);
+
+    const result = shellTool.validateToolParams({
+      command: 'ls',
+      directory: '.', // relative path to current directory
+    });
+
+    expect(result).toBeNull(); // Should be valid
+  });
 });
