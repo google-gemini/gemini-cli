@@ -101,6 +101,9 @@ export interface Settings {
   // Add other settings here.
   ideMode?: boolean;
   yolo?: boolean;
+
+  // Setting for disabling auto update.
+  disableAutoUpdate?: boolean;
 }
 
 export interface SettingsError {

@@ -64,7 +64,8 @@ describe('checkForUpdates', () => {
       update: { current: '1.0.0', latest: '1.1.0' },
     });
     const result = await checkForUpdates();
-    expect(result).toContain('1.0.0 → 1.1.0');
+    expect(result?.message).toContain('1.0.0 → 1.1.0');
+    expect(result?.update).toEqual({ current: '1.0.0', latest: '1.1.0' });
   });
 
   it('should return null if the latest version is the same as the current version', async () => {
