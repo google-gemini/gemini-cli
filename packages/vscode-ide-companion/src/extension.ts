@@ -15,7 +15,6 @@ let log: (message: string) => void = () => {};
 export async function activate(context: vscode.ExtensionContext) {
   logger = vscode.window.createOutputChannel('Gemini CLI IDE Companion');
   log = createLogger(context, logger);
-
   log('Extension activated');
   ideServer = new IDEServer(log);
   try {
