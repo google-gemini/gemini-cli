@@ -132,7 +132,7 @@ export class LoopDetectionService {
         this.config,
         new LoopDetectedEvent(
           LoopType.CONSECUTIVE_IDENTICAL_TOOL_CALLS,
-          this.prompt_id,
+          this.promptId,
         ),
       );
       return true;
@@ -176,7 +176,7 @@ export class LoopDetectionService {
           this.config,
           new LoopDetectedEvent(
             LoopType.CHANTING_IDENTICAL_SENTENCES,
-            this.prompt_id,
+            this.promptId,
           ),
         );
         return true;
@@ -241,7 +241,7 @@ Please analyze the conversation history to determine the possibility that the co
         }
         logLoopDetected(
           this.config,
-          new LoopDetectedEvent(LoopType.LLM_DETECTED_LOOP, this.prompt_id),
+          new LoopDetectedEvent(LoopType.LLM_DETECTED_LOOP, this.promptId),
         );
         return true;
       } else {
@@ -258,8 +258,8 @@ Please analyze the conversation history to determine the possibility that the co
   /**
    * Resets all loop detection state.
    */
-  reset(prompt_id: string): void {
-    this.prompt_id = prompt_id;
+  reset(promptId: string): void {
+    this.promptId = promptId;
     this.resetToolCallCount();
     this.resetSentenceCount();
     this.resetLlmCheckTracking();
