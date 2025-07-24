@@ -124,6 +124,18 @@ export class CodeAssistServer implements ContentGenerator {
     throw Error();
   }
 
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...this.httpOptions.headers,
+    };
+    const quotaProject = process.env.CODE_ASSIST_QUOTA_PROJECT;
+    if (quotaProject) {
+      headers['x-goog-user-project'] = quotaProject;
+    }
+    return headers;
+  }
+
   async requestPost<T>(
     method: string,
     req: object,
@@ -132,10 +144,7 @@ export class CodeAssistServer implements ContentGenerator {
     const res = await this.client.request({
       url: this.getMethodUrl(method),
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.httpOptions.headers,
-      },
+      headers: this.getHeaders(),
       responseType: 'json',
       body: JSON.stringify(req),
       signal,
@@ -147,10 +156,7 @@ export class CodeAssistServer implements ContentGenerator {
     const res = await this.client.request({
       url: this.getMethodUrl(method),
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.httpOptions.headers,
-      },
+      headers: this.getHeaders(),
       responseType: 'json',
       signal,
     });
@@ -168,10 +174,7 @@ export class CodeAssistServer implements ContentGenerator {
       params: {
         alt: 'sse',
       },
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.httpOptions.headers,
-      },
+      headers: this.getHeaders(),
       responseType: 'stream',
       body: JSON.stringify(req),
       signal,
