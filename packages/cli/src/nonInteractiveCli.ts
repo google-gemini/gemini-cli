@@ -11,6 +11,9 @@ import {
   ToolRegistry,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
+  ConversationRecord,
+  ChatRecordingService,
+  ToolCallRecord,
 } from '@google/gemini-cli-core';
 import {
   Content,
@@ -99,19 +102,39 @@ export async function runNonInteractive(
         const textPart = getResponseText(resp);
         if (textPart) {
           process.stdout.write(textPart);
+          fullResponseText += textPart;
         }
         if (resp.functionCalls) {
           functionCalls.push(...resp.functionCalls);
         }
       }
 
+      // Record the Gemini response if there was text content
+      if (fullResponseText.trim()) {
+        chatRecordingService.recordMessage({
+          type: 'gemini',
+          content: fullResponseText,
+        });
+      }
+
       if (functionCalls.length > 0) {
+        // Record the initial tool calls before execution.
+        const toolCallRecords: ToolCallRecord[] = functionCalls.map((fc) => ({
+          id: fc.id ?? `${fc.name}-${Date.now()}`,
+          name: fc.name as string,
+          args: fc.args ?? {},
+          status: 'executing',
+          timestamp: new Date().toISOString(),
+          displayName: fc.name as string,
+        }));
+        chatRecordingService.recordToolCalls(toolCallRecords);
+
         const toolResponseParts: Part[] = [];
 
-        for (const fc of functionCalls) {
-          const callId = fc.id ?? `${fc.name}-${Date.now()}`;
+        for (let i = 0; i < functionCalls.length; i++) {
+          const fc = functionCalls[i];
           const requestInfo: ToolCallRequestInfo = {
-            callId,
+            callId: toolCallRecords[i].id,
             name: fc.name as string,
             args: (fc.args ?? {}) as Record<string, unknown>,
             isClientInitiated: false,
@@ -125,6 +148,17 @@ export async function runNonInteractive(
             abortController.signal,
           );
 
+          // Update the saved tool call record's status and other properties.
+          toolCallRecords[i].status = toolResponse.error ? 'error' : 'success';
+          toolCallRecords[i].result = toolResponse.error
+            ? undefined
+            : toolResponse.responseParts;
+          toolCallRecords[i].resultDisplay =
+            typeof toolResponse.resultDisplay === 'string'
+              ? toolResponse.resultDisplay
+              : undefined;
+
+          // Tool call error handling.
           if (toolResponse.error) {
             const isToolNotFound = toolResponse.error.message.includes(
               'not found in registry',
@@ -150,6 +184,9 @@ export async function runNonInteractive(
             }
           }
         }
+
+        // Update the session with final tool call results
+        chatRecordingService.recordToolCalls(toolCallRecords);
         currentMessages = [{ role: 'user', parts: toolResponseParts }];
       } else {
         process.stdout.write('\n'); // Ensure a final newline
