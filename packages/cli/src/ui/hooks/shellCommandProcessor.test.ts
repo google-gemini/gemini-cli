@@ -81,12 +81,23 @@ describe('useShellCommandProcessor', () => {
     );
 
   it('should execute a command and update history on success', async () => {
+    const { spawn } = await import('child_process');
     const { result } = renderProcessorHook();
     const abortController = new AbortController();
 
     act(() => {
       result.current.handleShellCommand('ls -l', abortController.signal);
     });
+
+    expect(spawn).toHaveBeenCalledWith(
+      'bash',
+      ['-c', expect.any(String)],
+      expect.objectContaining({
+        env: expect.objectContaining({
+          GEMINI_CLI: '1',
+        }),
+      }),
+    );
 
     expect(onExecMock).toHaveBeenCalledTimes(1);
     const execPromise = onExecMock.mock.calls[0][0];
