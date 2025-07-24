@@ -331,16 +331,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Undo/Redo
-      if (key.ctrl && key.name === 'z') {
-        buffer.undo();
-        return;
-      }
-      if (key.ctrl && key.name === 'r') {
-        buffer.redo();
-        return;
-      }
-
       // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
     },

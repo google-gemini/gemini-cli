@@ -1202,11 +1202,13 @@ export function useTextBuffer({
       )
         backspace();
       else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
+      else if (key.ctrl && key.name === 'z') undo();
+      else if (key.ctrl && key.name === 'r') redo();
       else if (input && !key.ctrl && !key.meta) {
         insert(input);
       }
     },
-    [newline, move, deleteWordLeft, deleteWordRight, backspace, del, insert],
+    [newline, move, deleteWordLeft, deleteWordRight, backspace, del, insert, undo, redo],
   );
 
   const renderedVisualLines = useMemo(
