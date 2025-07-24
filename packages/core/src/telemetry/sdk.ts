@@ -29,6 +29,11 @@ import { Config } from '../config/config.js';
 import { SERVICE_NAME } from './constants.js';
 import { initializeMetrics } from './metrics.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
+import {
+  FileLogExporter,
+  FileMetricExporter,
+  FileSpanExporter,
+} from './file-exporters.js';
 
 // For troubleshooting, set the log level to DiagLogLevel.DEBUG
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
@@ -74,19 +79,24 @@ export function initializeTelemetry(config: Config): void {
   const otlpEndpoint = config.getTelemetryOtlpEndpoint();
   const grpcParsedEndpoint = parseGrpcEndpoint(otlpEndpoint);
   const useOtlp = !!grpcParsedEndpoint;
+  const telemetryOutfile = config.getTelemetryOutfile();
 
   const spanExporter = useOtlp
     ? new OTLPTraceExporter({
         url: grpcParsedEndpoint,
         compression: CompressionAlgorithm.GZIP,
       })
-    : new ConsoleSpanExporter();
+    : telemetryOutfile
+      ? new FileSpanExporter(telemetryOutfile)
+      : new ConsoleSpanExporter();
   const logExporter = useOtlp
     ? new OTLPLogExporter({
         url: grpcParsedEndpoint,
         compression: CompressionAlgorithm.GZIP,
       })
-    : new ConsoleLogRecordExporter();
+    : telemetryOutfile
+      ? new FileLogExporter(telemetryOutfile)
+      : new ConsoleLogRecordExporter();
   const metricReader = useOtlp
     ? new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporter({
@@ -95,10 +105,15 @@ export function initializeTelemetry(config: Config): void {
         }),
         exportIntervalMillis: 10000,
       })
-    : new PeriodicExportingMetricReader({
-        exporter: new ConsoleMetricExporter(),
-        exportIntervalMillis: 10000,
-      });
+    : telemetryOutfile
+      ? new PeriodicExportingMetricReader({
+          exporter: new FileMetricExporter(telemetryOutfile),
+          exportIntervalMillis: 10000,
+        })
+      : new PeriodicExportingMetricReader({
+          exporter: new ConsoleMetricExporter(),
+          exportIntervalMillis: 10000,
+        });
 
   sdk = new NodeSDK({
     resource,
