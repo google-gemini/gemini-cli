@@ -238,7 +238,18 @@ export const useSlashCommandProcessor = (
         const args = parts.slice(pathIndex).join(' ');
 
         if (commandToExecute.action) {
-          const result = await commandToExecute.action(commandContext, args);
+          const fullCommandContext: CommandContext = {
+            ...commandContext,
+            invocation: {
+              raw: trimmed,
+              name: commandToExecute.name,
+              args,
+            },
+          };
+          const result = await commandToExecute.action(
+            fullCommandContext,
+            args,
+          );
 
           if (result) {
             switch (result.type) {
@@ -288,9 +299,9 @@ export const useSlashCommandProcessor = (
                 await config
                   ?.getGeminiClient()
                   ?.setHistory(result.clientHistory);
-                commandContext.ui.clear();
+                fullCommandContext.ui.clear();
                 result.history.forEach((item, index) => {
-                  commandContext.ui.addItem(item, index);
+                  fullCommandContext.ui.addItem(item, index);
                 });
                 return { type: 'handled' };
               }
