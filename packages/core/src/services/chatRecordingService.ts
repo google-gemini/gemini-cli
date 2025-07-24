@@ -13,6 +13,7 @@ import {
 import path from 'node:path';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { PartListUnion } from '@google/genai';
 
 export interface TokensSummary {
   input: number; // promptTokenCount
@@ -30,11 +31,11 @@ export interface BaseMessageRecord {
   content: string;
 }
 
-interface ToolCallRecord {
+export interface ToolCallRecord {
   id: string;
   name: string;
   args: Record<string, unknown>;
-  result?: unknown;
+  result?: PartListUnion | null;
   status: Status;
   timestamp: string;
   // UI-specific fields for display purposes
@@ -272,18 +273,7 @@ export class ChatRecordingService {
   /**
    * Adds tool calls to the last message in the conversation (which should be by Gemini). */
   recordToolCalls(
-    toolCalls: Array<{
-      id: string;
-      name: string;
-      args: Record<string, unknown>;
-      result?: unknown;
-      status: Status;
-      timestamp: string;
-      displayName?: string;
-      description?: string;
-      resultDisplay?: string;
-      renderOutputAsMarkdown?: boolean;
-    }>,
+    toolCalls: Array<ToolCallRecord>,
   ): void {
     if (!this.conversationFile) return;
 

@@ -115,7 +115,7 @@ export function convertSessionToHistoryFormats(
           callId: tool.id,
           name: tool.displayName || tool.name,
           description: tool.description || '',
-          renderOutputAsMarkdown: tool.renderOutputAsMarkdown || true,
+          renderOutputAsMarkdown: tool.renderOutputAsMarkdown ?? true,
           status:
             tool.status === 'success'
               ? ToolCallStatus.Success

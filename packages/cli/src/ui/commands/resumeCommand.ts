@@ -16,8 +16,8 @@ export const resumeCommand: SlashCommand = {
   description: 'Browse and resume auto-saved conversations',
   kind: CommandKind.BUILT_IN,
   action: async (
-    context: CommandContext,
-    args: string,
+    _context: CommandContext,
+    _args: string,
   ): Promise<OpenDialogActionReturn> => {
     return {
       type: 'dialog',
