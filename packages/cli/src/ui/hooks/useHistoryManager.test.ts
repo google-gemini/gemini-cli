@@ -92,7 +92,7 @@ describe('useHistoryManager', () => {
     });
   });
 
-  it('should not change history if updateHistoryItem is called with a non-existent ID', () => {
+  it('should not change history if updateHistoryItem is called with a nonexistent ID', () => {
     const { result } = renderHook(() => useHistory());
     const timestamp = Date.now();
     const itemData: Omit<HistoryItem, 'id'> = {
@@ -107,7 +107,7 @@ describe('useHistoryManager', () => {
     const originalHistory = [...result.current.history]; // Clone before update attempt
 
     act(() => {
-      result.current.updateItem(99999, { text: 'Should not apply' }); // Non-existent ID
+      result.current.updateItem(99999, { text: 'Should not apply' }); // Nonexistent ID
     });
 
     expect(result.current.history).toEqual(originalHistory);

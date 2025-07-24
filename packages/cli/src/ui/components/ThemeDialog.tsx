@@ -73,7 +73,7 @@ export function ThemeDialog({
   const initialThemeIndex = themeItems.findIndex(
     (item) => item.value === selectedThemeName,
   );
-  // If not found, fallback to the first theme
+  // If not found, fall back to the first theme
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
 
   const scopeItems = [
@@ -185,7 +185,7 @@ export function ThemeDialog({
   }
 
   // Don't focus the scope selection if it is hidden due to height constraints.
-  const currenFocusedSection = !showScopeSelection ? 'theme' : focusedSection;
+  const currentFocusedSection = !showScopeSelection ? 'theme' : focusedSection;
 
   // Vertical space taken by elements other than the two code blocks in the preview pane.
   // Includes "Preview" title, borders, and margin between blocks.
@@ -224,8 +224,8 @@ export function ThemeDialog({
       <Box flexDirection="row">
         {/* Left Column: Selection */}
         <Box flexDirection="column" width="45%" paddingRight={2}>
-          <Text bold={currenFocusedSection === 'theme'} wrap="truncate">
-            {currenFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
+          <Text bold={currentFocusedSection === 'theme'} wrap="truncate">
+            {currentFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
             <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
           </Text>
           <RadioButtonSelect
@@ -234,25 +234,25 @@ export function ThemeDialog({
             initialIndex={safeInitialThemeIndex}
             onSelect={handleThemeSelect}
             onHighlight={handleThemeHighlight}
-            isFocused={currenFocusedSection === 'theme'}
+            isFocused={currentFocusedSection === 'theme'}
             maxItemsToShow={8}
             showScrollArrows={true}
-            showNumbers={currenFocusedSection === 'theme'}
+            showNumbers={currentFocusedSection === 'theme'}
           />
 
           {/* Scope Selection */}
           {showScopeSelection && (
             <Box marginTop={1} flexDirection="column">
-              <Text bold={currenFocusedSection === 'scope'} wrap="truncate">
-                {currenFocusedSection === 'scope' ? '> ' : '  '}Apply To
+              <Text bold={currentFocusedSection === 'scope'} wrap="truncate">
+                {currentFocusedSection === 'scope' ? '> ' : '  '}Apply To
               </Text>
               <RadioButtonSelect
                 items={scopeItems}
                 initialIndex={0} // Default to User Settings
                 onSelect={handleScopeSelect}
                 onHighlight={handleScopeHighlight}
-                isFocused={currenFocusedSection === 'scope'}
-                showNumbers={currenFocusedSection === 'scope'}
+                isFocused={currentFocusedSection === 'scope'}
+                showNumbers={currentFocusedSection === 'scope'}
               />
             </Box>
           )}
@@ -261,7 +261,7 @@ export function ThemeDialog({
         {/* Right Column: Preview */}
         <Box flexDirection="column" width="55%" paddingLeft={2}>
           <Text bold>Preview</Text>
-          {/* Get the Theme object for the highlighted theme, fallback to default if not found */}
+          {/* Get the Theme object for the highlighted theme, fall back to default if not found */}
           {(() => {
             const previewTheme =
               themeManager.getTheme(
@@ -279,18 +279,23 @@ export function ThemeDialog({
               >
                 {colorizeCode(
                   `# function
--def fibonacci(n):
--    a, b = 0, 1
--    for _ in range(n):
--        a, b = b, a + b
--    return a`,
+def fibonacci(n):
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a`,
                   'python',
                   codeBlockHeight,
                   colorizeCodeWidth,
                 )}
                 <Box marginTop={1} />
                 <DiffRenderer
-                  diffContent={`--- a/old_file.txt\n+++ b/new_file.txt\n@@ -1,6 +1,7 @@\n # function\n-def fibonacci(n):\n-    a, b = 0, 1\n-    for _ in range(n):\n-        a, b = b, a + b\n-    return a\n+def fibonacci(n):\n+    a, b = 0, 1\n+    for _ in range(n):\n+        a, b = b, a + b\n+    return a\n+\n+print(fibonacci(10))\n`}
+                  diffContent={`--- a/util.py
++++ b/util.py
+@@ -1,2 +1,2 @@
+- print("Hello, " + name)
++ print(f"Hello, {name}!")
+`}
                   availableTerminalHeight={diffHeight}
                   terminalWidth={colorizeCodeWidth}
                   theme={previewTheme}

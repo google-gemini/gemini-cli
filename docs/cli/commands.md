@@ -6,6 +6,8 @@ Gemini CLI supports several built-in commands to help you manage your session, c
 
 Slash commands provide meta-level control over the CLI itself.
 
+### Built-in Commands
+
 - **`/bug`**
   - **Description:** File an issue about Gemini CLI. By default, the issue is filed within the GitHub repository for Gemini CLI. The string you enter after `/bug` will become the headline for the bug being filed. The default `/bug` behavior can be modified using the `bugCommand` setting in your `.gemini/settings.json` files.
 
@@ -38,7 +40,7 @@ Slash commands provide meta-level control over the CLI itself.
   - **Description:** Lists all active extensions in the current Gemini CLI session. See [Gemini CLI Extensions](../extension.md).
 
 - **`/help`** (or **`/?`**)
-  - **Description:** Display help information about the Gemini CLI, including available commands and their usage.
+  - **Description:** Display help information about Gemini CLI, including available commands and their usage.
 
 - **`/mcp`**
   - **Description:** List configured Model Context Protocol (MCP) servers, their connection status, server details, and available tools.
@@ -92,6 +94,147 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **`/quit`** (or **`/exit`**)
   - **Description:** Exit Gemini CLI.
+
+### Custom Commands
+
+For a quick start, see the [example](#example-a-pure-function-refactoring-command) below.
+
+Custom commands allow you to save and reuse your favorite or most frequently used prompts as personal shortcuts within Gemini CLI. You can create commands that are specific to a single project or commands that are available globally across all your projects, streamlining your workflow and ensuring consistency.
+
+#### File Locations & Precedence
+
+Gemini CLI discovers commands from two locations, loaded in a specific order:
+
+1.  **User Commands (Global):** Located in `~/.gemini/commands/`. These commands are available in any project you are working on.
+2.  **Project Commands (Local):** Located in `<your-project-root>/.gemini/commands/`. These commands are specific to the current project and can be checked into version control to be shared with your team.
+
+If a command in the project directory has the same name as a command in the user directory, the **project command will always be used.** This allows projects to override global commands with project-specific versions.
+
+#### Naming and Namespacing
+
+The name of a command is determined by its file path relative to its `commands` directory. Subdirectories are used to create namespaced commands, with the path separator (`/` or `\`) being converted to a colon (`:`).
+
+- A file at `~/.gemini/commands/test.toml` becomes the command `/test`.
+- A file at `<project>/.gemini/commands/git/commit.toml` becomes the namespaced command `/git:commit`.
+
+#### TOML File Format (v1)
+
+Your command definition files must be written in the TOML format and use the `.toml` file extension.
+
+##### Required Fields
+
+- `prompt` (String): The prompt that will be sent to the Gemini model when the command is executed. This can be a single-line or multi-line string.
+
+##### Optional Fields
+
+- `description` (String): A brief, one-line description of what the command does. This text will be displayed next to your command in the `/help` menu. **If you omit this field, a generic description will be generated from the filename.**
+
+#### Handling Arguments
+
+Custom commands support two powerful, low-friction methods for handling arguments. The CLI automatically chooses the correct method based on the content of your command's `prompt`.
+
+##### 1. Shorthand Injection with `{{args}}`
+
+If your `prompt` contains the special placeholder `{{args}}`, the CLI will replace that exact placeholder with all the text the user typed after the command name. This is perfect for simple, deterministic commands where you need to inject user input into a specific place in a larger prompt template.
+
+**Example (`git/fix.toml`):**
+
+```toml
+# In: ~/.gemini/commands/git/fix.toml
+# Invoked via: /git:fix "Button is misaligned on mobile"
+
+description = "Generates a fix for a given GitHub issue."
+prompt = "Please analyze the staged git changes and provide a code fix for the issue described here: {{args}}."
+```
+
+The model will receive the final prompt: `Please analyze the staged git changes and provide a code fix for the issue described here: "Button is misaligned on mobile".`
+
+##### 2. Default Argument Handling
+
+If your `prompt` does **not** contain the special placeholder `{{args}}`, the CLI uses a default behavior for handling arguments.
+
+If you provide arguments to the command (e.g., `/mycommand arg1`), the CLI will append the full command you typed to the end of the prompt, separated by two newlines. This allows the model to see both the original instructions and the specific arguments you just provided.
+
+If you do **not** provide any arguments (e.g., `/mycommand`), the prompt is sent to the model exactly as it is, with nothing appended.
+
+**Example (`changelog.toml`):**
+
+This example shows how to create a robust command by defining a role for the model, explaining where to find the user's input, and specifying the expected format and behavior.
+
+```toml
+# In: <project>/.gemini/commands/changelog.toml
+# Invoked via: /changelog 1.2.0 added "Support for default argument parsing."
+
+description = "Adds a new entry to the project's CHANGELOG.md file."
+prompt = """
+# Task: Update Changelog
+
+You are an expert maintainer of this software project. A user has invoked a command to add a new entry to the changelog.
+
+**The user's raw command is appended below your instructions.**
+
+Your task is to parse the `<version>`, `<change_type>`, and `<message>` from their input and use the `write_file` tool to correctly update the `CHANGELOG.md` file.
+
+## Expected Format
+The command follows this format: `/changelog <version> <type> <message>`
+- `<type>` must be one of: "added", "changed", "fixed", "removed".
+
+## Behavior
+1. Read the `CHANGELOG.md` file.
+2. Find the section for the specified `<version>`.
+3. Add the `<message>` under the correct `<type>` heading.
+4. If the version or type section doesn't exist, create it.
+5. Adhere strictly to the "Keep a Changelog" format.
+"""
+```
+
+When you run `/changelog 1.2.0 added "New feature"`, the final text sent to the model will be the original prompt followed by two newlines and the command you typed.
+
+---
+
+#### Example: A "Pure Function" Refactoring Command
+
+Let's create a global command that asks the model to refactor a piece of code.
+
+**1. Create the file and directories:**
+
+First, ensure the user commands directory exists, then create a `refactor` subdirectory for organization and the final TOML file.
+
+```bash
+mkdir -p ~/.gemini/commands/refactor
+touch ~/.gemini/commands/refactor/pure.toml
+```
+
+**2. Add the content to the file:**
+
+Open `~/.gemini/commands/refactor/pure.toml` in your editor and add the following content. We are including the optional `description` for best practice.
+
+```toml
+# In: ~/.gemini/commands/refactor/pure.toml
+# This command will be invoked via: /refactor:pure
+
+description = "Asks the model to refactor the current context into a pure function."
+
+prompt = """
+Please analyze the code I've provided in the current context.
+Refactor it into a pure function.
+
+Your response should include:
+1. The refactored, pure function code block.
+2. A brief explanation of the key changes you made and why they contribute to purity.
+"""
+```
+
+**3. Run the Command:**
+
+That's it! You can now run your command in the CLI. First, you might add a file to the context, and then invoke your command:
+
+```
+> @my-messy-function.js
+> /refactor:pure
+```
+
+Gemini CLI will then execute the multi-line prompt defined in your TOML file.
 
 ## At commands (`@`)
 
