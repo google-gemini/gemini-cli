@@ -11,6 +11,15 @@
       "problemMatcher": [],
       "label": "npm: build",
       "detail": "scripts/build.sh"
+    },
+    {
+      "type": "npm",
+      "script": "build",
+      "path": "packages/vscode-ide-companion",
+      "group": "build",
+      "problemMatcher": [],
+      "label": "npm: build: vscode-ide-companion",
+      "detail": "npm run build -w packages/vscode-ide-companion"
     }
   ]
 }
