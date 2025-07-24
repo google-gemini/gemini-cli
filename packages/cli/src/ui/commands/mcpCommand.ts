@@ -158,31 +158,6 @@ const getMcpStatus = async (
       }
     }
 
-    let needsAuthHint = mcpServerRequiresOAuth.get(serverName) || false;
-    // Add OAuth status if applicable
-    if (server?.oauth?.enabled) {
-      needsAuthHint = true;
-      try {
-        const { MCPOAuthTokenStorage } = await import(
-          '@google/gemini-cli-core'
-        );
-        const hasToken = await MCPOAuthTokenStorage.getToken(serverName);
-        if (hasToken) {
-          const isExpired = MCPOAuthTokenStorage.isTokenExpired(hasToken.token);
-          if (isExpired) {
-            message += ` ${COLOR_YELLOW}(OAuth token expired)${RESET_COLOR}`;
-          } else {
-            message += ` ${COLOR_GREEN}(OAuth authenticated)${RESET_COLOR}`;
-            needsAuthHint = false;
-          }
-        } else {
-          message += ` ${COLOR_RED}(OAuth not authenticated)${RESET_COLOR}`;
-        }
-      } catch (_err) {
-        // If we can't check OAuth status, just continue
-      }
-    }
-
     // Add tool count with conditional messaging
     if (status === MCPServerStatus.CONNECTED) {
       message += ` (${serverTools.length} tools)`;
