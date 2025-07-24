@@ -59,6 +59,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
+  const [textBeforeReverseSearch, setTextBeforeReverseSearch] = useState('');
   // Check if cursor is after @ or / without unescaped spaces
   const isCursorAfterCommandWithoutSpace = useCallback(() => {
     const [row, col] = buffer.cursor;
@@ -338,7 +339,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (reverseSearchActive) {
           setReverseSearchActive(false);
           reverseSearchCompletion.resetCompletionState();
-          buffer.setText('');
+          buffer.setText(textBeforeReverseSearch);
           return;
         }
 
@@ -355,6 +356,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (shellModeActive && key.ctrl && key.name === 'r') {
         setReverseSearchActive(true);
+        setTextBeforeReverseSearch(buffer.text);
         return;
       }
 
@@ -558,6 +560,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       resetCompletionState,
       reverseSearchActive,
       setReverseSearchActive,
+      textBeforeReverseSearch,
     ],
   );
 
