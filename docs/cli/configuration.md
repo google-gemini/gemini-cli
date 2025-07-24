@@ -231,6 +231,14 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     }
     ```
 
+- **`ctrlBackspaceModeFix`** (boolean):
+  - **Description:** Enables a fix for `Ctrl+Backspace` functionality in the CLI prompt. This is useful if you are experiencing issues with word deletion in your terminal.
+  - **Default:** `false`
+  - **Example:**
+    ```json
+    "ctrlBackspaceModeFix": true
+    ```
+
 ### Example `settings.json`:
 
 ```json
