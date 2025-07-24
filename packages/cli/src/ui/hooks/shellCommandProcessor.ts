@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn } from 'child_process';
-import { TextDecoder } from 'util';
 import {
   HistoryItemWithoutId,
   IndividualToolCallDisplay,
@@ -15,185 +13,21 @@ import { useCallback } from 'react';
 import {
   Config,
   GeminiClient,
-  getCachedEncodingForBuffer,
+  ShellExecutionResult,
+  ShellExecutionService,
 } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
-import { formatMemoryUsage } from '../utils/formatters.js';
 import { isBinary } from '../utils/textUtils.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
+import { formatMemoryUsage } from '../utils/formatters.js';
 import crypto from 'crypto';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
-import stripAnsi from 'strip-ansi';
 
-const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const MAX_OUTPUT_LENGTH = 10000;
-
-/**
- * A structured result from a shell command execution.
- */
-interface ShellExecutionResult {
-  rawOutput: Buffer;
-  output: string;
-  exitCode: number | null;
-  signal: NodeJS.Signals | null;
-  error: Error | null;
-  aborted: boolean;
-}
-
-/**
- * Executes a shell command using `spawn`, capturing all output and lifecycle events.
- * This is the single, unified implementation for shell execution.
- *
- * @param commandToExecute The exact command string to run.
- * @param cwd The working directory to execute the command in.
- * @param abortSignal An AbortSignal to terminate the process.
- * @param onOutputChunk A callback for streaming real-time output.
- * @param onDebugMessage A callback for logging debug information.
- * @returns A promise that resolves with the complete execution result.
- */
-function executeShellCommand(
-  commandToExecute: string,
-  cwd: string,
-  abortSignal: AbortSignal,
-  onOutputChunk: (chunk: string) => void,
-  onDebugMessage: (message: string) => void,
-): Promise<ShellExecutionResult> {
-  return new Promise((resolve) => {
-    const isWindows = os.platform() === 'win32';
-    const shell = isWindows ? 'cmd.exe' : 'bash';
-    const shellArgs = isWindows
-      ? ['/c', commandToExecute]
-      : ['-c', commandToExecute];
-
-    const child = spawn(shell, shellArgs, {
-      cwd,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: !isWindows, // Use process groups on non-Windows for robust killing
-      env: {
-        ...process.env,
-        GEMINI_CLI: '1',
-      },
-    });
-
-    // Use decoders to handle multi-byte characters safely (for streaming output).
-    let stdoutDecoder: TextDecoder | null = null;
-    let stderrDecoder: TextDecoder | null = null;
-
-    let stdout = '';
-    let stderr = '';
-    const outputChunks: Buffer[] = [];
-    let error: Error | null = null;
-    let exited = false;
-
-    let streamToUi = true;
-    const MAX_SNIFF_SIZE = 4096;
-    let sniffedBytes = 0;
-
-    const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
-      if (!stdoutDecoder || !stderrDecoder) {
-        const encoding = getCachedEncodingForBuffer(data);
-        stdoutDecoder = new TextDecoder(encoding);
-        stderrDecoder = new TextDecoder(encoding);
-      }
-
-      outputChunks.push(data);
-
-      if (streamToUi && sniffedBytes < MAX_SNIFF_SIZE) {
-        // Use a limited-size buffer for the check to avoid performance issues.
-        const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
-        sniffedBytes = sniffBuffer.length;
-
-        if (isBinary(sniffBuffer)) {
-          streamToUi = false;
-          // Overwrite any garbled text that may have streamed with a clear message.
-          onOutputChunk('[Binary output detected. Halting stream...]');
-        }
-      }
-
-      const decodedChunk =
-        stream === 'stdout'
-          ? stdoutDecoder.decode(data, { stream: true })
-          : stderrDecoder.decode(data, { stream: true });
-      if (stream === 'stdout') {
-        stdout += stripAnsi(decodedChunk);
-      } else {
-        stderr += stripAnsi(decodedChunk);
-      }
-
-      if (!exited && streamToUi) {
-        // Send only the new chunk to avoid re-rendering the whole output.
-        const combinedOutput = stdout + (stderr ? `\n${stderr}` : '');
-        onOutputChunk(combinedOutput);
-      } else if (!exited && !streamToUi) {
-        // Send progress updates for the binary stream
-        const totalBytes = outputChunks.reduce(
-          (sum, chunk) => sum + chunk.length,
-          0,
-        );
-        onOutputChunk(
-          `[Receiving binary output... ${formatMemoryUsage(totalBytes)} received]`,
-        );
-      }
-    };
-
-    child.stdout.on('data', (data) => handleOutput(data, 'stdout'));
-    child.stderr.on('data', (data) => handleOutput(data, 'stderr'));
-    child.on('error', (err) => {
-      error = err;
-    });
-
-    const abortHandler = async () => {
-      if (child.pid && !exited) {
-        onDebugMessage(`Aborting shell command (PID: ${child.pid})`);
-        if (isWindows) {
-          spawn('taskkill', ['/pid', child.pid.toString(), '/f', '/t']);
-        } else {
-          try {
-            // Kill the entire process group (negative PID).
-            // SIGTERM first, then SIGKILL if it doesn't die.
-            process.kill(-child.pid, 'SIGTERM');
-            await new Promise((res) => setTimeout(res, 200));
-            if (!exited) {
-              process.kill(-child.pid, 'SIGKILL');
-            }
-          } catch (_e) {
-            // Fall back to killing just the main process if group kill fails.
-            if (!exited) child.kill('SIGKILL');
-          }
-        }
-      }
-    };
-
-    abortSignal.addEventListener('abort', abortHandler, { once: true });
-
-    child.on('exit', (code, signal) => {
-      exited = true;
-      abortSignal.removeEventListener('abort', abortHandler);
-
-      // Handle any final bytes lingering in the decoders
-      if (stdoutDecoder) {
-        stdout += stdoutDecoder.decode();
-      }
-      if (stderrDecoder) {
-        stderr += stderrDecoder.decode();
-      }
-
-      const finalBuffer = Buffer.concat(outputChunks);
-
-      resolve({
-        rawOutput: finalBuffer,
-        output: stdout + (stderr ? `\n${stderr}` : ''),
-        exitCode: code,
-        signal,
-        error,
-        aborted: abortSignal.aborted,
-      });
-    });
-  });
-}
 
 function addShellCommandToGeminiHistory(
   geminiClient: GeminiClient,
@@ -227,7 +61,6 @@ ${modelContent}
  * Hook to process shell commands.
  * Orchestrates command execution and updates history and agent context.
  */
-
 export const useShellCommandProcessor = (
   addItemToHistory: UseHistoryManagerReturn['addItem'],
   setPendingHistoryItem: React.Dispatch<
@@ -269,7 +102,11 @@ export const useShellCommandProcessor = (
       }
 
       const execPromise = new Promise<void>((resolve) => {
-        let lastUpdateTime = 0;
+        let lastUpdateTime = Date.now();
+        let cumulativeStdout = '';
+        let cumulativeStderr = '';
+        let isBinaryStream = false;
+        let binaryBytesReceived = 0;
 
         const initialToolDisplay: IndividualToolCallDisplay = {
           callId,
@@ -285,26 +122,82 @@ export const useShellCommandProcessor = (
           tools: [initialToolDisplay],
         });
 
+        // eslint-disable-next-line prefer-const
+        let executionPid: number | undefined;
+
+        const abortHandler = () => {
+          onDebugMessage(
+            `Aborting shell command (PID: ${executionPid ?? 'unknown'})`,
+          );
+        };
+        abortSignal.addEventListener('abort', abortHandler, { once: true });
+
         onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
-        executeShellCommand(
+
+        const { pid, result } = ShellExecutionService.execute(
           commandToExecute,
           targetDir,
-          abortSignal,
-          (streamedOutput) => {
+          (event) => {
+            switch (event.type) {
+              case 'data':
+                // Do not process text data if we've already switched to binary mode.
+                if (isBinaryStream) break;
+                if (event.stream === 'stdout') {
+                  cumulativeStdout += event.chunk;
+                } else {
+                  cumulativeStderr += event.chunk;
+                }
+                break;
+              case 'binary_detected':
+                isBinaryStream = true;
+                break;
+              case 'binary_progress':
+                isBinaryStream = true;
+                binaryBytesReceived = event.bytesReceived;
+                break;
+              default: {
+                throw new Error('An unhandled ShellOutputEvent was found.');
+              }
+            }
+
+            // Compute the display string based on the *current* state.
+            let currentDisplayOutput: string;
+            if (isBinaryStream) {
+              if (binaryBytesReceived > 0) {
+                currentDisplayOutput = `[Receiving binary output... ${formatMemoryUsage(
+                  binaryBytesReceived,
+                )} received]`;
+              } else {
+                currentDisplayOutput =
+                  '[Binary output detected. Halting stream...]';
+              }
+            } else {
+              currentDisplayOutput =
+                cumulativeStdout +
+                (cumulativeStderr ? `\n${cumulativeStderr}` : '');
+            }
+
             // Throttle pending UI updates to avoid excessive re-renders.
             if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
               setPendingHistoryItem({
                 type: 'tool_group',
                 tools: [
-                  { ...initialToolDisplay, resultDisplay: streamedOutput },
+                  {
+                    ...initialToolDisplay,
+                    resultDisplay: currentDisplayOutput,
+                  },
                 ],
               });
               lastUpdateTime = Date.now();
             }
           },
-          onDebugMessage,
-        )
-          .then((result) => {
+          abortSignal,
+        );
+
+        executionPid = pid;
+
+        result
+          .then((result: ShellExecutionResult) => {
             setPendingHistoryItem(null);
 
             let mainContent: string;
@@ -373,6 +266,7 @@ export const useShellCommandProcessor = (
             );
           })
           .finally(() => {
+            abortSignal.removeEventListener('abort', abortHandler);
             if (pwdFilePath && fs.existsSync(pwdFilePath)) {
               fs.unlinkSync(pwdFilePath);
             }
@@ -381,7 +275,7 @@ export const useShellCommandProcessor = (
       });
 
       onExec(execPromise);
-      return true; // Command was initiated
+      return true;
     },
     [
       config,
