@@ -67,12 +67,6 @@ describe('getUserStartupWarnings', () => {
     });
   });
 
-  // // Example of how to add a new check:
-  // describe('node version check', () => {
-  //   // Tests for node version check would go here
-  //   // This shows how easy it is to add new test sections
-  // });
-
   describe('root directory check', () => {
     it('should return a warning when running in root directory on Unix', async () => {
       vi.mocked(fs.realpath)
