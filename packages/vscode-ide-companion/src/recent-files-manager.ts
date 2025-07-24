@@ -47,11 +47,19 @@ export class RecentFilesManager {
         this.add(newUri);
       }
     });
+
+    const selectionWatcher = vscode.window.onDidChangeTextEditorSelection(
+      () => {
+        this.fireWithDebounce();
+      },
+    );
+
     context.subscriptions.push(
       editorWatcher,
       deleteWatcher,
       closeWatcher,
       renameWatcher,
+      selectionWatcher,
     );
   }
 
