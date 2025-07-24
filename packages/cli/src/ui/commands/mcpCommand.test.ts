@@ -980,7 +980,7 @@ describe('mcpCommand', () => {
   describe('refresh subcommand', () => {
     it('should refresh the list of tools and display the status', async () => {
       const mockToolRegistry = {
-        discoverMcpToolsOnly: vi.fn(),
+        discoverMcpTools: vi.fn(),
         getAllTools: vi.fn().mockReturnValue([]),
       };
       const mockGeminiClient = {
@@ -1012,7 +1012,7 @@ describe('mcpCommand', () => {
         },
         expect.any(Number),
       );
-      expect(mockToolRegistry.discoverMcpToolsOnly).toHaveBeenCalled();
+      expect(mockToolRegistry.discoverMcpTools).toHaveBeenCalled();
       expect(mockGeminiClient.setTools).toHaveBeenCalled();
 
       expect(isMessageAction(result)).toBe(true);

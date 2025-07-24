@@ -153,8 +153,9 @@ export class ToolRegistry {
   /**
    * Discovers tools from project (if available and configured).
    * Can be called multiple times to update discovered tools.
+   * This will discover tools from the command line and from MCP servers.
    */
-  async discoverTools(): Promise<void> {
+  async discoverAllTools(): Promise<void> {
     // remove any previously discovered tools
     for (const tool of this.tools.values()) {
       if (tool instanceof DiscoveredTool || tool instanceof DiscoveredMCPTool) {
@@ -176,8 +177,9 @@ export class ToolRegistry {
   /**
    * Discovers tools from project (if available and configured).
    * Can be called multiple times to update discovered tools.
+   * This will NOT discover tools from the command line, only from MCP servers.
    */
-  async discoverMcpToolsOnly(): Promise<void> {
+  async discoverMcpTools(): Promise<void> {
     // remove any previously discovered tools
     for (const tool of this.tools.values()) {
       if (tool instanceof DiscoveredMCPTool) {
