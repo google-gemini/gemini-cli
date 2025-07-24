@@ -99,7 +99,6 @@ export class IDEServer {
         );
       }
     });
-    let selectionChangeDebounceTimer: NodeJS.Timeout | undefined;
     context.subscriptions.push(onDidChangeSubscription);
 
     app.post('/mcp', async (req: Request, res: Response) => {
