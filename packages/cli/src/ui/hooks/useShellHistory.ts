@@ -33,8 +33,8 @@ async function readHistoryFile(filePath: string): Promise<string[]> {
     let cur = '';
 
     for (const raw of text.split(/\r?\n/)) {
-      const line = raw.trim();
-      if (!line) continue;
+      if (!raw.trim()) continue;
+      const line = raw;
 
       const m = cur.match(/(\\+)$/);
       if (m && m[1].length % 2) {

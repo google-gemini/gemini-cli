@@ -267,8 +267,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       const suggestion = reverseSearchCompletion.suggestions[indexToUse].value;
       buffer.setText(suggestion);
+      setReverseSearchActive(false);
+      resetReverseSearchCompletionState();
     },
-    [buffer, reverseSearchCompletion.suggestions],
+    [
+      buffer,
+      reverseSearchCompletion.suggestions,
+      setReverseSearchActive,
+      resetReverseSearchCompletionState,
+    ],
   );
 
   // Handle clipboard image pasting with Ctrl+V
