@@ -459,7 +459,7 @@ describe('useCompletion', () => {
       expect(result.current.suggestions[0].label).toBe('stats');
     });
 
-    it('should not show suggestions for exact leaf command match', () => {
+    it('should show suggestions for exact leaf command match', () => {
       const { result } = renderHook(() =>
         useCompletion(
           '/clear',
@@ -471,8 +471,12 @@ describe('useCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toHaveLength(0);
-      expect(result.current.showSuggestions).toBe(false);
+      expect(result.current.suggestions).toHaveLength(1);
+      expect(result.current.suggestions[0].label).toBe('clear');
+      expect(result.current.suggestions[0].description).toBe(
+        'Clear the screen',
+      );
+      expect(result.current.showSuggestions).toBe(true);
     });
 
     it('should show sub-commands for parent commands', () => {
