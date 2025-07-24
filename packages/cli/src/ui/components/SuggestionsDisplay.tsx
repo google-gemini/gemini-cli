@@ -88,7 +88,7 @@ export function SuggestionsDisplay({
           return <Text color={textColor}>{suggestion.label}</Text>;
         };
         return (
-          <Box key={`${suggestion}-${originalIndex}`} width={width}>
+          <Box key={`${suggestion.value}-${originalIndex}`} width={width}>
             <Box flexDirection="row">
               {userInput.startsWith('/') ? (
                 // only use box model for (/) command mode

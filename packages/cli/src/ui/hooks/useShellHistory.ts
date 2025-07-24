@@ -25,6 +25,7 @@ async function getHistoryFilePath(projectRoot: string): Promise<string> {
   return path.join(historyDir, HISTORY_FILE);
 }
 
+// Handle multiline commands
 async function readHistoryFile(filePath: string): Promise<string[]> {
   try {
     const text = await fs.readFile(filePath, 'utf-8');
