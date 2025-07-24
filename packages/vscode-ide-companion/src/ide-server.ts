@@ -60,8 +60,6 @@ function sendOpenFilesChangedNotification(
       selectedText,
     },
   };
-  log('cursor: ' + JSON.stringify(cursor));
-  log('selectedText: ' + selection);
   log(
     `Sending active file changed notification: ${JSON.stringify(
       notification,
