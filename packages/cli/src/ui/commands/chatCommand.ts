@@ -176,7 +176,7 @@ const resumeCommand: SlashCommand = {
       i += 1;
       const text =
         item.parts
-          ?.filter((m: any) => !!m.text)
+          ?.filter((m): m is { text: string } => !!m.text)
           .map((m: any) => m.text)
           .join('') || '';
       if (!text) {
