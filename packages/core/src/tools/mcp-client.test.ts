@@ -11,6 +11,7 @@ import {
   createTransport,
   isEnabled,
   discoverTools,
+  discoverPrompts,
 } from './mcp-client.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -47,6 +48,84 @@ describe('mcp-client', () => {
 
       expect(tools.length).toBe(1);
       expect(mockedMcpToTool).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('discoverPrompts', () => {
+    it('should discover and log prompts', async () => {
+      const mockRequest = vi.fn().mockResolvedValue({
+        prompts: [
+          { name: 'prompt1', description: 'desc1' },
+          { name: 'prompt2' },
+        ],
+      });
+      const mockedClient = {
+        request: mockRequest,
+      } as unknown as ClientLib.Client;
+
+      const consoleLogSpy = vi
+        .spyOn(console, 'debug')
+        .mockImplementation(() => {
+          // no-op
+        });
+
+      await discoverPrompts('test-server', mockedClient);
+
+      expect(mockRequest).toHaveBeenCalledWith(
+        { method: 'prompts/list', params: {} },
+        expect.anything(),
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        'Discovered prompts from test-server: prompt1, prompt2',
+      );
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should do nothing if no prompts are discovered', async () => {
+      const mockRequest = vi.fn().mockResolvedValue({
+        prompts: [],
+      });
+      const mockedClient = {
+        request: mockRequest,
+      } as unknown as ClientLib.Client;
+
+      const consoleLogSpy = vi
+        .spyOn(console, 'debug')
+        .mockImplementation(() => {
+          // no-op
+        });
+
+      await discoverPrompts('test-server', mockedClient);
+
+      expect(mockRequest).toHaveBeenCalledOnce();
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should log an error if discovery fails', async () => {
+      const testError = new Error('test error');
+      testError.message = 'test error';
+      const mockRequest = vi.fn().mockRejectedValue(testError);
+      const mockedClient = {
+        request: mockRequest,
+      } as unknown as ClientLib.Client;
+
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {
+          // no-op
+        });
+
+      await discoverPrompts('test-server', mockedClient);
+
+      expect(mockRequest).toHaveBeenCalledOnce();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        `Error discovering prompts from test-server: ${testError.message}`,
+      );
+
+      consoleErrorSpy.mockRestore();
     });
   });
 

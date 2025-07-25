@@ -15,10 +15,12 @@ import {
   StreamableHTTPClientTransport,
   StreamableHTTPClientTransportOptions,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { ListPromptsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
 import { AuthProviderType, MCPServerConfig } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
+
 import { FunctionDeclaration, mcpToTool } from '@google/genai';
 import { ToolRegistry } from './tool-registry.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
@@ -32,6 +34,11 @@ import {
 import { getErrorMessage } from '../utils/errors.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
+
+export interface DiscoveredMCPPrompt {
+  name: string;
+  description?: string;
+}
 
 /**
  * Enum representing the connection status of an MCP server
@@ -61,6 +68,11 @@ export enum MCPDiscoveryState {
  * Map to track the status of each MCP server within the core package
  */
 const mcpServerStatusesInternal: Map<string, MCPServerStatus> = new Map();
+
+/**
+ * Map to track discovered prompts for each MCP server
+ */
+const mcpServerPromptsInternal: Map<string, DiscoveredMCPPrompt[]> = new Map();
 
 /**
  * Track the overall MCP discovery state
@@ -123,6 +135,15 @@ export function getMCPServerStatus(serverName: string): MCPServerStatus {
   return (
     mcpServerStatusesInternal.get(serverName) || MCPServerStatus.DISCONNECTED
   );
+}
+
+/**
+ * Get the discovered prompts for an MCP server
+ */
+export function getMCPServerPrompts(
+  serverName: string,
+): DiscoveredMCPPrompt[] | undefined {
+  return mcpServerPromptsInternal.get(serverName);
 }
 
 /**
@@ -383,6 +404,7 @@ export async function connectAndDiscover(
       mcpClient.onerror = (error) => {
         console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
         updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+        mcpServerPromptsInternal.delete(mcpServerName);
         if (mcpServerName === IDE_SERVER_NAME) {
           ideContext.clearOpenFilesContext();
         }
@@ -396,6 +418,8 @@ export async function connectAndDiscover(
           },
         );
       }
+
+      await discoverPrompts(mcpServerName, mcpClient);
 
       const tools = await discoverTools(
         mcpServerName,
@@ -411,7 +435,9 @@ export async function connectAndDiscover(
     }
   } catch (error) {
     console.error(
-      `Error connecting to MCP server '${mcpServerName}': ${getErrorMessage(error)}`,
+      `Error connecting to MCP server '${mcpServerName}': ${getErrorMessage(
+        error,
+      )}`,
     );
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   }
@@ -458,6 +484,7 @@ export async function discoverTools(
           mcpServerConfig.trust,
         ),
       );
+      console.debug(`Discovered tool: ${funcDecl.name}`);
     }
     if (discoveredTools.length === 0) {
       throw Error('No enabled tools found');
@@ -465,6 +492,50 @@ export async function discoverTools(
     return discoveredTools;
   } catch (error) {
     throw new Error(`Error discovering tools: ${error}`);
+  }
+}
+
+/**
+ * Discovers and logs prompts from a connected MCP client.
+ * It retrieves prompt declarations from the client and logs their names.
+ *
+ * @param mcpServerName The name of the MCP server.
+ * @param mcpClient The active MCP client instance.
+ */
+export async function discoverPrompts(
+  mcpServerName: string,
+  mcpClient: Client,
+): Promise<void> {
+  try {
+    const response = await mcpClient.request(
+      { method: 'prompts/list', params: {} },
+      ListPromptsResultSchema,
+    );
+
+    const prompts = response.prompts;
+    mcpServerPromptsInternal.set(mcpServerName, prompts);
+
+    const promptNames = prompts.map((p) => p.name);
+
+    if (promptNames.length > 0) {
+      console.debug(
+        `Discovered prompts from ${mcpServerName}: ${promptNames.join(', ')}`,
+      );
+    }
+  } catch (error) {
+    mcpServerPromptsInternal.delete(mcpServerName);
+    // It's okay if this fails, not all servers will have prompts.
+    // Don't log an error if the method is not found, which is a common case.
+    if (
+      error instanceof Error &&
+      !error.message?.includes('Method not found')
+    ) {
+      console.error(
+        `Error discovering prompts from ${mcpServerName}: ${getErrorMessage(
+          error,
+        )}`,
+      );
+    }
   }
 }
 
