@@ -128,6 +128,7 @@ export type SlashCommandActionReturn =
 export enum CommandKind {
   BUILT_IN = 'built-in',
   FILE = 'file',
+  MCP_PROMPT = 'mcp-prompt',
 }
 
 // The standardized contract for any command in the system.

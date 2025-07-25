@@ -125,6 +125,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getToolCallCommand: vi.fn(() => opts.toolCallCommand),
         getMcpServerCommand: vi.fn(() => opts.mcpServerCommand),
         getMcpServers: vi.fn(() => opts.mcpServers),
+        getPromptRegistry: vi.fn(),
         getExtensions: vi.fn(() => []),
         getBlockedMcpServers: vi.fn(() => []),
         getUserAgent: vi.fn(() => opts.userAgent || 'test-agent'),

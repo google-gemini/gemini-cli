@@ -40,13 +40,19 @@ vi.mock('../ui/commands/extensionsCommand.js', () => ({
   extensionsCommand: {},
 }));
 vi.mock('../ui/commands/helpCommand.js', () => ({ helpCommand: {} }));
-vi.mock('../ui/commands/mcpCommand.js', () => ({ mcpCommand: {} }));
 vi.mock('../ui/commands/memoryCommand.js', () => ({ memoryCommand: {} }));
 vi.mock('../ui/commands/privacyCommand.js', () => ({ privacyCommand: {} }));
 vi.mock('../ui/commands/quitCommand.js', () => ({ quitCommand: {} }));
 vi.mock('../ui/commands/statsCommand.js', () => ({ statsCommand: {} }));
 vi.mock('../ui/commands/themeCommand.js', () => ({ themeCommand: {} }));
 vi.mock('../ui/commands/toolsCommand.js', () => ({ toolsCommand: {} }));
+vi.mock('../ui/commands/mcpCommand.js', () => ({
+  mcpCommand: {
+    name: 'mcp',
+    description: 'MCP command',
+    kind: 'BUILT_IN',
+  },
+}));
 
 describe('BuiltinCommandLoader', () => {
   let mockConfig: Config;
@@ -114,5 +120,8 @@ describe('BuiltinCommandLoader', () => {
 
     const ideCmd = commands.find((c) => c.name === 'ide');
     expect(ideCmd).toBeDefined();
+
+    const mcpCmd = commands.find((c) => c.name === 'mcp');
+    expect(mcpCmd).toBeDefined();
   });
 });
