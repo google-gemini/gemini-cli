@@ -42,12 +42,24 @@ vi.mock('./config/config.js', () => ({
   }),
 }));
 
-vi.mock('read-package-up', () => ({
-  readPackageUp: vi.fn().mockResolvedValue({
-    packageJson: { name: 'test-pkg', version: 'test-version' },
-    path: '/fake/path/package.json',
-  }),
+vi.mock('empathic/package', () => ({
+  up: vi.fn().mockResolvedValue('/fake/path/package.json'),
 }));
+
+vi.mock('fs/promises', async (importOriginal) => {
+  const actualFs = await importOriginal<typeof import('fs/promises')>();
+  return {
+    ...actualFs,
+    readFile: (path: string, encoding: BufferEncoding) => {
+      if (path.includes('package.json')) {
+        return Promise.resolve(
+          '{"name": "test-pkg", "version": "test-version"}',
+        );
+      }
+      return actualFs.readFile(path, encoding);
+    },
+  };
+});
 
 vi.mock('update-notifier', () => ({
   default: vi.fn(() => ({
