@@ -6,10 +6,12 @@
 
 import fs from 'fs';
 import path from 'path';
-import { BaseTool, ToolResult } from './tools.js';
+import { BaseTool, Icon, ToolResult } from './tools.js';
+import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import { Config } from '../config/config.js';
+import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
+import { isWithinRoot } from '../utils/fileUtils.js';
 
 /**
  * Parameters for the LS tool
@@ -26,9 +28,12 @@ export interface LSToolParams {
   ignore?: string[];
 
   /**
-   * Whether to respect .gitignore patterns (optional, defaults to true)
+   * Whether to respect .gitignore and .geminiignore patterns (optional, defaults to true)
    */
-  respect_git_ignore?: boolean;
+  file_filtering_options?: {
+    respect_git_ignore?: boolean;
+    respect_gemini_ignore?: boolean;
+  };
 }
 
 /**
@@ -67,62 +72,47 @@ export interface FileEntry {
 export class LSTool extends BaseTool<LSToolParams, ToolResult> {
   static readonly Name = 'list_directory';
 
-  /**
-   * Creates a new instance of the LSLogic
-   * @param rootDirectory Root directory to ground this tool in. All operations will be restricted to this directory.
-   */
-  constructor(
-    private rootDirectory: string,
-    private config: Config,
-  ) {
+  constructor(private config: Config) {
     super(
       LSTool.Name,
       'ReadFolder',
       'Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.',
+      Icon.Folder,
       {
         properties: {
           path: {
             description:
               'The absolute path to the directory to list (must be absolute, not relative)',
-            type: 'string',
+            type: Type.STRING,
           },
           ignore: {
             description: 'List of glob patterns to ignore',
             items: {
-              type: 'string',
+              type: Type.STRING,
             },
-            type: 'array',
+            type: Type.ARRAY,
           },
-          respect_git_ignore: {
+          file_filtering_options: {
             description:
-              'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
-            type: 'boolean',
+              'Optional: Whether to respect ignore patterns from .gitignore or .geminiignore',
+            type: Type.OBJECT,
+            properties: {
+              respect_git_ignore: {
+                description:
+                  'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
+                type: Type.BOOLEAN,
+              },
+              respect_gemini_ignore: {
+                description:
+                  'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
+                type: Type.BOOLEAN,
+              },
+            },
           },
         },
         required: ['path'],
-        type: 'object',
+        type: Type.OBJECT,
       },
-    );
-
-    // Set the root directory
-    this.rootDirectory = path.resolve(rootDirectory);
-  }
-
-  /**
-   * Checks if a path is within the root directory
-   * @param dirpath The path to check
-   * @returns True if the path is within the root directory, false otherwise
-   */
-  private isWithinRoot(dirpath: string): boolean {
-    const normalizedPath = path.normalize(dirpath);
-    const normalizedRoot = path.normalize(this.rootDirectory);
-    // Ensure the normalizedRoot ends with a path separator for proper path comparison
-    const rootWithSep = normalizedRoot.endsWith(path.sep)
-      ? normalizedRoot
-      : normalizedRoot + path.sep;
-    return (
-      normalizedPath === normalizedRoot ||
-      normalizedPath.startsWith(rootWithSep)
     );
   }
 
@@ -132,20 +122,15 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
    * @returns An error message string if invalid, null otherwise
    */
   validateToolParams(params: LSToolParams): string | null {
-    if (
-      this.schema.parameters &&
-      !SchemaValidator.validate(
-        this.schema.parameters as Record<string, unknown>,
-        params,
-      )
-    ) {
-      return 'Parameters failed schema validation.';
+    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    if (errors) {
+      return errors;
     }
     if (!path.isAbsolute(params.path)) {
       return `Path must be absolute: ${params.path}`;
     }
-    if (!this.isWithinRoot(params.path)) {
-      return `Path must be within the root directory (${this.rootDirectory}): ${params.path}`;
+    if (!isWithinRoot(params.path, this.config.getTargetDir())) {
+      return `Path must be within the root directory (${this.config.getTargetDir()}): ${params.path}`;
     }
     return null;
   }
@@ -180,7 +165,7 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
    * @returns A string describing the file being read
    */
   getDescription(params: LSToolParams): string {
-    const relativePath = makeRelative(params.path, this.rootDirectory);
+    const relativePath = makeRelative(params.path, this.config.getTargetDir());
     return shortenPath(relativePath);
   }
 
@@ -229,14 +214,25 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
 
       const files = fs.readdirSync(params.path);
 
+      const defaultFileIgnores =
+        this.config.getFileFilteringOptions() ?? DEFAULT_FILE_FILTERING_OPTIONS;
+
+      const fileFilteringOptions = {
+        respectGitIgnore:
+          params.file_filtering_options?.respect_git_ignore ??
+          defaultFileIgnores.respectGitIgnore,
+        respectGeminiIgnore:
+          params.file_filtering_options?.respect_gemini_ignore ??
+          defaultFileIgnores.respectGeminiIgnore,
+      };
+
       // Get centralized file discovery service
-      const respectGitIgnore =
-        params.respect_git_ignore ??
-        this.config.getFileFilteringRespectGitIgnore();
+
       const fileDiscovery = this.config.getFileService();
 
       const entries: FileEntry[] = [];
       let gitIgnoredCount = 0;
+      let geminiIgnoredCount = 0;
 
       if (files.length === 0) {
         // Changed error message to be more neutral for LLM
@@ -252,14 +248,24 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
         }
 
         const fullPath = path.join(params.path, file);
-        const relativePath = path.relative(this.rootDirectory, fullPath);
+        const relativePath = path.relative(
+          this.config.getTargetDir(),
+          fullPath,
+        );
 
-        // Check if this file should be git-ignored (only in git repositories)
+        // Check if this file should be ignored based on git or gemini ignore rules
         if (
-          respectGitIgnore &&
+          fileFilteringOptions.respectGitIgnore &&
           fileDiscovery.shouldGitIgnoreFile(relativePath)
         ) {
           gitIgnoredCount++;
+          continue;
+        }
+        if (
+          fileFilteringOptions.respectGeminiIgnore &&
+          fileDiscovery.shouldGeminiIgnoreFile(relativePath)
+        ) {
+          geminiIgnoredCount++;
           continue;
         }
 
@@ -292,13 +298,21 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
         .join('\n');
 
       let resultMessage = `Directory listing for ${params.path}:\n${directoryContent}`;
+      const ignoredMessages = [];
       if (gitIgnoredCount > 0) {
-        resultMessage += `\n\n(${gitIgnoredCount} items were git-ignored)`;
+        ignoredMessages.push(`${gitIgnoredCount} git-ignored`);
+      }
+      if (geminiIgnoredCount > 0) {
+        ignoredMessages.push(`${geminiIgnoredCount} gemini-ignored`);
+      }
+
+      if (ignoredMessages.length > 0) {
+        resultMessage += `\n\n(${ignoredMessages.join(', ')})`;
       }
 
       let displayMessage = `Listed ${entries.length} item(s).`;
-      if (gitIgnoredCount > 0) {
-        displayMessage += ` (${gitIgnoredCount} git-ignored)`;
+      if (ignoredMessages.length > 0) {
+        displayMessage += ` (${ignoredMessages.join(', ')})`;
       }
 
       return {
