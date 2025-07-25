@@ -10,8 +10,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) =>
-    console.debug('[DEBUG] [IDEClient]', ...args),
+  debug: (...args: any[]) => console.debug('[DEBUG] [IDEClient]', ...args),
 };
 
 export type IDEConnectionState = {
