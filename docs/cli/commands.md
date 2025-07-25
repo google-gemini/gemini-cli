@@ -129,6 +129,67 @@ Your command definition files must be written in the TOML format and use the `.t
 
 - `description` (String): A brief, one-line description of what the command does. This text will be displayed next to your command in the `/help` menu. **If you omit this field, a generic description will be generated from the filename.**
 
+#### Handling Arguments
+
+Custom commands support two powerful, low-friction methods for handling arguments. The CLI automatically chooses the correct method based on the content of your command's `prompt`.
+
+##### 1. Shorthand Injection with `{{args}}`
+
+If your `prompt` contains the special placeholder `{{args}}`, the CLI will replace that exact placeholder with all the text the user typed after the command name. This is perfect for simple, deterministic commands where you need to inject user input into a specific place in a larger prompt template.
+
+**Example (`git/fix.toml`):**
+
+```toml
+# In: ~/.gemini/commands/git/fix.toml
+# Invoked via: /git:fix "Button is misaligned on mobile"
+
+description = "Generates a fix for a given GitHub issue."
+prompt = "Please analyze the staged git changes and provide a code fix for the issue described here: {{args}}."
+```
+
+The model will receive the final prompt: `Please analyze the staged git changes and provide a code fix for the issue described here: "Button is misaligned on mobile".`
+
+##### 2. Default Argument Handling
+
+If your `prompt` does **not** contain the special placeholder `{{args}}`, the CLI uses a default behavior for handling arguments.
+
+If you provide arguments to the command (e.g., `/mycommand arg1`), the CLI will append the full command you typed to the end of the prompt, separated by two newlines. This allows the model to see both the original instructions and the specific arguments you just provided.
+
+If you do **not** provide any arguments (e.g., `/mycommand`), the prompt is sent to the model exactly as it is, with nothing appended.
+
+**Example (`changelog.toml`):**
+
+This example shows how to create a robust command by defining a role for the model, explaining where to find the user's input, and specifying the expected format and behavior.
+
+```toml
+# In: <project>/.gemini/commands/changelog.toml
+# Invoked via: /changelog 1.2.0 added "Support for default argument parsing."
+
+description = "Adds a new entry to the project's CHANGELOG.md file."
+prompt = """
+# Task: Update Changelog
+
+You are an expert maintainer of this software project. A user has invoked a command to add a new entry to the changelog.
+
+**The user's raw command is appended below your instructions.**
+
+Your task is to parse the `<version>`, `<change_type>`, and `<message>` from their input and use the `write_file` tool to correctly update the `CHANGELOG.md` file.
+
+## Expected Format
+The command follows this format: `/changelog <version> <type> <message>`
+- `<type>` must be one of: "added", "changed", "fixed", "removed".
+
+## Behavior
+1. Read the `CHANGELOG.md` file.
+2. Find the section for the specified `<version>`.
+3. Add the `<message>` under the correct `<type>` heading.
+4. If the version or type section doesn't exist, create it.
+5. Adhere strictly to the "Keep a Changelog" format.
+"""
+```
+
+When you run `/changelog 1.2.0 added "New feature"`, the final text sent to the model will be the original prompt followed by two newlines and the command you typed.
+
 ---
 
 #### Example: A "Pure Function" Refactoring Command
@@ -175,11 +236,6 @@ That's it! You can now run your command in the CLI. First, you might add a file 
 
 Gemini CLI will then execute the multi-line prompt defined in your TOML file.
 
-This initial version of custom commands is focused on static prompts. Future updates are planned to introduce more dynamic capabilities, including:
-
-- **Argument Support:** Passing arguments from the command line directly into your `prompt` template.
-- **Shell Execution:** Creating commands that can run local shell scripts to gather context before running the prompt.
-
 ## At commands (`@`)
 
 At commands are used to include the content of files or directories as part of your prompt to Gemini. These commands include git-aware filtering.
@@ -212,7 +268,7 @@ At commands are used to include the content of files or directories as part of y
 The `!` prefix lets you interact with your system's shell directly from within Gemini CLI.
 
 - **`!<shell_command>`**
-  - **Description:** Execute the given `<shell_command>` in your system's default shell. Any output or errors from the command are displayed in the terminal.
+  - **Description:** Execute the given `<shell_command>` using `bash` on Linux/macOS or `cmd.exe` on Windows. Any output or errors from the command are displayed in the terminal.
   - **Examples:**
     - `!ls -la` (executes `ls -la` and returns to Gemini CLI)
     - `!git status` (executes `git status` and returns to Gemini CLI)
@@ -226,3 +282,5 @@ The `!` prefix lets you interact with your system's shell directly from within G
       - When exited, the UI reverts to its standard appearance and normal Gemini CLI behavior resumes.
 
 - **Caution for all `!` usage:** Commands you execute in shell mode have the same permissions and impact as if you ran them directly in your terminal.
+
+- **Environment Variable:** When a command is executed via `!` or in shell mode, the `GEMINI_CLI=1` environment variable is set in the subprocess's environment. This allows scripts or tools to detect if they are being run from within the Gemini CLI.

@@ -13,13 +13,22 @@ import {
 } from './recent-files-manager.js';
 
 vi.mock('vscode', () => ({
-  EventEmitter: vi.fn(() => ({
-    event: vi.fn(),
-    fire: vi.fn(),
-    dispose: vi.fn(),
-  })),
+  EventEmitter: vi.fn(() => {
+    const listeners: Array<(e: void) => unknown> = [];
+    return {
+      event: vi.fn((listener) => {
+        listeners.push(listener);
+        return { dispose: vi.fn() };
+      }),
+      fire: vi.fn(() => {
+        listeners.forEach((listener) => listener(undefined));
+      }),
+      dispose: vi.fn(),
+    };
+  }),
   window: {
     onDidChangeActiveTextEditor: vi.fn(),
+    onDidChangeTextEditorSelection: vi.fn(),
   },
   workspace: {
     onDidDeleteFiles: vi.fn(),
@@ -29,14 +38,48 @@ vi.mock('vscode', () => ({
   Uri: {
     file: (path: string) => ({
       fsPath: path,
+      scheme: 'file',
     }),
   },
 }));
 
 describe('RecentFilesManager', () => {
   let context: vscode.ExtensionContext;
+  let onDidChangeActiveTextEditorListener: (
+    editor: vscode.TextEditor | undefined,
+  ) => void;
+  let onDidDeleteFilesListener: (e: vscode.FileDeleteEvent) => void;
+  let onDidCloseTextDocumentListener: (doc: vscode.TextDocument) => void;
+  let onDidRenameFilesListener: (e: vscode.FileRenameEvent) => void;
 
   beforeEach(() => {
+    vi.useFakeTimers();
+
+    vi.mocked(vscode.window.onDidChangeActiveTextEditor).mockImplementation(
+      (listener) => {
+        onDidChangeActiveTextEditorListener = listener;
+        return { dispose: vi.fn() };
+      },
+    );
+    vi.mocked(vscode.workspace.onDidDeleteFiles).mockImplementation(
+      (listener) => {
+        onDidDeleteFilesListener = listener;
+        return { dispose: vi.fn() };
+      },
+    );
+    vi.mocked(vscode.workspace.onDidCloseTextDocument).mockImplementation(
+      (listener) => {
+        onDidCloseTextDocumentListener = listener;
+        return { dispose: vi.fn() };
+      },
+    );
+    vi.mocked(vscode.workspace.onDidRenameFiles).mockImplementation(
+      (listener) => {
+        onDidRenameFilesListener = listener;
+        return { dispose: vi.fn() };
+      },
+    );
+
     context = {
       subscriptions: [],
     } as unknown as vscode.ExtensionContext;
@@ -44,33 +87,40 @@ describe('RecentFilesManager', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
-  it('adds a file to the list', () => {
+  const getUri = (path: string) =>
+    vscode.Uri.file(path) as unknown as vscode.Uri;
+
+  it('adds a file to the list', async () => {
     const manager = new RecentFilesManager(context);
-    const uri = vscode.Uri.file('/test/file1.txt');
+    const uri = getUri('/test/file1.txt');
     manager.add(uri);
+    await vi.advanceTimersByTimeAsync(100);
     expect(manager.recentFiles).toHaveLength(1);
     expect(manager.recentFiles[0].filePath).toBe('/test/file1.txt');
   });
 
-  it('moves an existing file to the top', () => {
+  it('moves an existing file to the top', async () => {
     const manager = new RecentFilesManager(context);
-    const uri1 = vscode.Uri.file('/test/file1.txt');
-    const uri2 = vscode.Uri.file('/test/file2.txt');
+    const uri1 = getUri('/test/file1.txt');
+    const uri2 = getUri('/test/file2.txt');
     manager.add(uri1);
     manager.add(uri2);
     manager.add(uri1);
+    await vi.advanceTimersByTimeAsync(100);
     expect(manager.recentFiles).toHaveLength(2);
     expect(manager.recentFiles[0].filePath).toBe('/test/file1.txt');
   });
 
-  it('does not exceed the max number of files', () => {
+  it('does not exceed the max number of files', async () => {
     const manager = new RecentFilesManager(context);
     for (let i = 0; i < MAX_FILES + 5; i++) {
-      const uri = vscode.Uri.file(`/test/file${i}.txt`);
+      const uri = getUri(`/test/file${i}.txt`);
       manager.add(uri);
     }
+    await vi.advanceTimersByTimeAsync(100);
     expect(manager.recentFiles).toHaveLength(MAX_FILES);
     expect(manager.recentFiles[0].filePath).toBe(
       `/test/file${MAX_FILES + 4}.txt`,
@@ -78,134 +128,151 @@ describe('RecentFilesManager', () => {
     expect(manager.recentFiles[MAX_FILES - 1].filePath).toBe(`/test/file5.txt`);
   });
 
-  it('fires onDidChange when a file is added', () => {
+  it('fires onDidChange when a file is added', async () => {
     const manager = new RecentFilesManager(context);
-    const spy = vi.spyOn(manager['onDidChangeEmitter'], 'fire');
-    const uri = vscode.Uri.file('/test/file1.txt');
+    const onDidChangeSpy = vi.fn();
+    manager.onDidChange(onDidChangeSpy);
+
+    const uri = getUri('/test/file1.txt');
     manager.add(uri);
-    expect(spy).toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(onDidChangeSpy).toHaveBeenCalled();
   });
 
-  it('removes a file when it is closed', () => {
+  it('removes a file when it is closed', async () => {
     const manager = new RecentFilesManager(context);
-    const uri = vscode.Uri.file('/test/file1.txt');
+    const uri = getUri('/test/file1.txt');
     manager.add(uri);
+    await vi.advanceTimersByTimeAsync(100);
     expect(manager.recentFiles).toHaveLength(1);
 
-    // Simulate closing the file
-    const closeHandler = vi.mocked(vscode.workspace.onDidCloseTextDocument).mock
-      .calls[0][0];
-    closeHandler({ uri } as vscode.TextDocument);
+    onDidCloseTextDocumentListener({ uri } as vscode.TextDocument);
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(manager.recentFiles).toHaveLength(0);
   });
 
-  it('fires onDidChange when a file is removed', () => {
+  it('fires onDidChange when a file is removed', async () => {
     const manager = new RecentFilesManager(context);
-    const uri = vscode.Uri.file('/test/file1.txt');
+    const uri = getUri('/test/file1.txt');
     manager.add(uri);
+    await vi.advanceTimersByTimeAsync(100);
 
-    const spy = vi.spyOn(manager['onDidChangeEmitter'], 'fire');
-    const closeHandler = vi.mocked(vscode.workspace.onDidCloseTextDocument).mock
-      .calls[0][0];
-    closeHandler({ uri } as vscode.TextDocument);
+    const onDidChangeSpy = vi.fn();
+    manager.onDidChange(onDidChangeSpy);
 
-    expect(spy).toHaveBeenCalled();
+    onDidCloseTextDocumentListener({ uri } as vscode.TextDocument);
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(onDidChangeSpy).toHaveBeenCalled();
   });
 
-  it('removes a file when it is deleted', () => {
+  it('removes a file when it is deleted', async () => {
     const manager = new RecentFilesManager(context);
-    const uri1 = vscode.Uri.file('/test/file1.txt');
-    const uri2 = vscode.Uri.file('/test/file2.txt');
+    const uri1 = getUri('/test/file1.txt');
+    const uri2 = getUri('/test/file2.txt');
     manager.add(uri1);
     manager.add(uri2);
+    await vi.advanceTimersByTimeAsync(100);
     expect(manager.recentFiles).toHaveLength(2);
 
-    // Simulate deleting a file
-    const deleteHandler = vi.mocked(vscode.workspace.onDidDeleteFiles).mock
-      .calls[0][0];
-    deleteHandler({ files: [uri1] });
+    onDidDeleteFilesListener({ files: [uri1] });
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(manager.recentFiles).toHaveLength(1);
     expect(manager.recentFiles[0].filePath).toBe('/test/file2.txt');
   });
 
-  it('fires onDidChange when a file is deleted', () => {
+  it('fires onDidChange when a file is deleted', async () => {
     const manager = new RecentFilesManager(context);
-    const uri = vscode.Uri.file('/test/file1.txt');
+    const uri = getUri('/test/file1.txt');
     manager.add(uri);
+    await vi.advanceTimersByTimeAsync(100);
 
-    const spy = vi.spyOn(manager['onDidChangeEmitter'], 'fire');
-    const deleteHandler = vi.mocked(vscode.workspace.onDidDeleteFiles).mock
-      .calls[0][0];
-    deleteHandler({ files: [uri] });
+    const onDidChangeSpy = vi.fn();
+    manager.onDidChange(onDidChangeSpy);
 
-    expect(spy).toHaveBeenCalled();
+    onDidDeleteFilesListener({ files: [uri] });
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(onDidChangeSpy).toHaveBeenCalled();
   });
 
-  it('removes multiple files when they are deleted', () => {
+  it('removes multiple files when they are deleted', async () => {
     const manager = new RecentFilesManager(context);
-    const uri1 = vscode.Uri.file('/test/file1.txt');
-    const uri2 = vscode.Uri.file('/test/file2.txt');
-    const uri3 = vscode.Uri.file('/test/file3.txt');
+    const uri1 = getUri('/test/file1.txt');
+    const uri2 = getUri('/test/file2.txt');
+    const uri3 = getUri('/test/file3.txt');
     manager.add(uri1);
     manager.add(uri2);
     manager.add(uri3);
+    await vi.advanceTimersByTimeAsync(100);
     expect(manager.recentFiles).toHaveLength(3);
 
-    // Simulate deleting multiple files
-    const deleteHandler = vi.mocked(vscode.workspace.onDidDeleteFiles).mock
-      .calls[0][0];
-    deleteHandler({ files: [uri1, uri3] });
+    onDidDeleteFilesListener({ files: [uri1, uri3] });
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(manager.recentFiles).toHaveLength(1);
     expect(manager.recentFiles[0].filePath).toBe('/test/file2.txt');
   });
 
   it('prunes files older than the max age', () => {
-    vi.useFakeTimers();
-
     const manager = new RecentFilesManager(context);
-    const uri1 = vscode.Uri.file('/test/file1.txt');
+    const uri1 = getUri('/test/file1.txt');
     manager.add(uri1);
 
     // Advance time by more than the max age
     const twoMinutesMs = (MAX_FILE_AGE_MINUTES + 1) * 60 * 1000;
     vi.advanceTimersByTime(twoMinutesMs);
 
-    const uri2 = vscode.Uri.file('/test/file2.txt');
+    const uri2 = getUri('/test/file2.txt');
     manager.add(uri2);
 
     expect(manager.recentFiles).toHaveLength(1);
     expect(manager.recentFiles[0].filePath).toBe('/test/file2.txt');
-
-    vi.useRealTimers();
   });
 
-  it('fires onDidChange only once when adding an existing file', () => {
+  it('fires onDidChange only once when adding an existing file', async () => {
     const manager = new RecentFilesManager(context);
-    const uri = vscode.Uri.file('/test/file1.txt');
+    const uri = getUri('/test/file1.txt');
     manager.add(uri);
+    await vi.advanceTimersByTimeAsync(100);
 
-    const spy = vi.spyOn(manager['onDidChangeEmitter'], 'fire');
+    const onDidChangeSpy = vi.fn();
+    manager.onDidChange(onDidChangeSpy);
+
     manager.add(uri);
-    expect(spy).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(onDidChangeSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('updates the file when it is renamed', () => {
+  it('updates the file when it is renamed', async () => {
     const manager = new RecentFilesManager(context);
-    const oldUri = vscode.Uri.file('/test/file1.txt');
-    const newUri = vscode.Uri.file('/test/file2.txt');
+    const oldUri = getUri('/test/file1.txt');
+    const newUri = getUri('/test/file2.txt');
     manager.add(oldUri);
+    await vi.advanceTimersByTimeAsync(100);
     expect(manager.recentFiles).toHaveLength(1);
     expect(manager.recentFiles[0].filePath).toBe('/test/file1.txt');
 
-    // Simulate renaming the file
-    const renameHandler = vi.mocked(vscode.workspace.onDidRenameFiles).mock
-      .calls[0][0];
-    renameHandler({ files: [{ oldUri, newUri }] });
+    onDidRenameFilesListener({ files: [{ oldUri, newUri }] });
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(manager.recentFiles).toHaveLength(1);
     expect(manager.recentFiles[0].filePath).toBe('/test/file2.txt');
+  });
+
+  it('adds a file when the active editor changes', async () => {
+    const manager = new RecentFilesManager(context);
+    const uri = getUri('/test/file1.txt');
+
+    onDidChangeActiveTextEditorListener({
+      document: { uri },
+    } as vscode.TextEditor);
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(manager.recentFiles).toHaveLength(1);
+    expect(manager.recentFiles[0].filePath).toBe('/test/file1.txt');
   });
 });
