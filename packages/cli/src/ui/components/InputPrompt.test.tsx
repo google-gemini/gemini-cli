@@ -121,7 +121,6 @@ describe('InputPrompt', () => {
       openInExternalEditor: vi.fn(),
       newline: vi.fn(),
       backspace: vi.fn(),
-      // Add missing TextBuffer properties
       preferredCol: null,
       selectionAnchor: null,
       insert: vi.fn(),
@@ -730,9 +729,8 @@ describe('InputPrompt', () => {
 
       // Verify useCompletion was called with correct signature
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '@src/components',
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        true, // shouldShowCompletion should be true
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
@@ -756,9 +754,8 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '/memory',
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        true, // shouldShowCompletion should be true
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
@@ -782,9 +779,8 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '@src/file.ts hello',
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        false, // shouldShowCompletion should be false
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
@@ -808,9 +804,8 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '/memory add',
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        false, // shouldShowCompletion should be false
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
@@ -834,9 +829,8 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        'hello world',
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        false, // shouldShowCompletion should be false
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
@@ -861,9 +855,8 @@ describe('InputPrompt', () => {
 
       // Verify useCompletion was called with the buffer
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        'first line\n/memory',
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        false, // shouldShowCompletion should be false (isSlashCommand returns false because text doesn't start with /)
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
@@ -887,9 +880,8 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '/memory',
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        true, // shouldShowCompletion should be true (isSlashCommand returns true AND cursor is after / without space)
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
@@ -914,9 +906,8 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '@src/file👍.txt',
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        true, // shouldShowCompletion should be true
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
@@ -941,9 +932,8 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '@src/file👍.txt hello',
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        false, // shouldShowCompletion should be false
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
@@ -968,9 +958,8 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '@src/my\\ file.txt',
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        true, // shouldShowCompletion should be true
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
@@ -995,9 +984,8 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '@path/my\\ file.txt hello',
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        false, // shouldShowCompletion should be false
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
@@ -1024,9 +1012,8 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '@docs/my\\ long\\ file\\ name.md',
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        true, // shouldShowCompletion should be true
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
@@ -1051,9 +1038,8 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '/memory\\ test',
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        true, // shouldShowCompletion should be true
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
@@ -1080,9 +1066,8 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
-        '@' + path.join('files', 'emoji\\ 👍\\ test.txt'),
+        mockBuffer,
         path.join('test', 'project', 'src'),
-        true, // shouldShowCompletion should be true
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
