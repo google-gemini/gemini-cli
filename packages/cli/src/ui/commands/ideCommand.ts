@@ -5,14 +5,7 @@
  */
 
 import { fileURLToPath } from 'url';
-import {
-  Config,
-  getMCPDiscoveryState,
-  getMCPServerStatus,
-  IDE_SERVER_NAME,
-  MCPDiscoveryState,
-  MCPServerStatus,
-} from '@google/gemini-cli-core';
+import { Config, IDEConnectionStatus } from '@google/gemini-cli-core';
 import {
   CommandContext,
   SlashCommand,
@@ -56,36 +49,31 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         description: 'check status of IDE integration',
         kind: CommandKind.BUILT_IN,
         action: (_context: CommandContext): SlashCommandActionReturn => {
-          const status = getMCPServerStatus(IDE_SERVER_NAME);
-          const discoveryState = getMCPDiscoveryState();
-          switch (status) {
-            case MCPServerStatus.CONNECTED:
+          const connection = config.getIdeClient()?.getConnectionStatus();
+          switch (connection?.status) {
+            case IDEConnectionStatus.Connected:
               return {
                 type: 'message',
                 messageType: 'info',
                 content: `🟢 Connected`,
-              };
-            case MCPServerStatus.CONNECTING:
+              } as const;
+            case IDEConnectionStatus.Connecting:
               return {
                 type: 'message',
                 messageType: 'info',
-                content: `🔄 Initializing...`,
-              };
-            case MCPServerStatus.DISCONNECTED:
-            default:
-              if (discoveryState === MCPDiscoveryState.IN_PROGRESS) {
-                return {
-                  type: 'message',
-                  messageType: 'info',
-                  content: `🔄 Initializing...`,
-                };
-              } else {
-                return {
-                  type: 'message',
-                  messageType: 'error',
-                  content: `🔴 Disconnected`,
-                };
+                content: `🟡 Connecting...`,
+              } as const;
+            default: {
+              let content = `🔴 Disconnected`;
+              if (connection?.details) {
+                content += `: ${connection.details}`;
               }
+              return {
+                type: 'message',
+                messageType: 'error',
+                content,
+              } as const;
+            }
           }
         },
       },
