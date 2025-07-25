@@ -127,8 +127,6 @@ describe('InputPrompt', () => {
       selectionAnchor: null,
       insert: vi.fn(),
       del: vi.fn(),
-      undo: vi.fn(),
-      redo: vi.fn(),
       replaceRange: vi.fn(),
       deleteWordLeft: vi.fn(),
       deleteWordRight: vi.fn(),

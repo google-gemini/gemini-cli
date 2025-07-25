@@ -1208,7 +1208,17 @@ export function useTextBuffer({
         insert(input);
       }
     },
-    [newline, move, deleteWordLeft, deleteWordRight, backspace, del, insert, undo, redo],
+    [
+      newline,
+      move,
+      deleteWordLeft,
+      deleteWordRight,
+      backspace,
+      del,
+      insert,
+      undo,
+      redo,
+    ],
   );
 
   const renderedVisualLines = useMemo(
