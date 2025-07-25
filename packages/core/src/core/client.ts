@@ -40,13 +40,22 @@ import {
   createContentGenerator,
 } from './contentGenerator.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import {
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_THINKING_MODE,
+} from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ideContext } from '../services/ideContext.js';
 import { logFlashDecidedToContinue } from '../telemetry/loggers.js';
 import { FlashDecidedToContinueEvent } from '../telemetry/types.js';
 
 function isThinkingSupported(model: string) {
+  if (model.startsWith('gemini-2.5')) return true;
+  return false;
+}
+
+function isThinkingDefault(model: string) {
+  if (model.startsWith('gemini-2.5-flash-lite')) return false;
   if (model.startsWith('gemini-2.5')) return true;
   return false;
 }
@@ -254,13 +263,15 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
-      const generateContentConfigWithThinking = isThinkingSupported(
-        this.config.getModel(),
-      )
+      const model = this.config.getModel();
+      const generateContentConfigWithThinking = isThinkingSupported(model)
         ? {
             ...this.generateContentConfig,
             thinkingConfig: {
               includeThoughts: true,
+              ...(!isThinkingDefault(model)
+                ? { thinkingBudget: DEFAULT_THINKING_MODE }
+                : {}),
             },
           }
         : this.generateContentConfig;
