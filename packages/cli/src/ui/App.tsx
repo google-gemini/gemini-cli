@@ -85,6 +85,8 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { useSettingsCommand } from './hooks/useSettingsCommand.js';
+import { SettingsDialog } from './components/SettingsDialog.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -374,6 +376,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     config.setFlashFallbackHandler(flashFallbackHandler);
   }, [config, addItem, userTier]);
 
+  const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
+    useSettingsCommand();
+
   const {
     handleSlashCommand,
     slashCommands,
@@ -394,6 +399,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     toggleCorgiMode,
     setQuittingMessages,
     openPrivacyNotice,
+    openSettingsDialog,
   );
   const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
 
@@ -781,7 +787,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             </Box>
           )}
 
-          {isThemeDialogOpen ? (
+          {isSettingsDialogOpen ? (
+            <Box flexDirection="column">
+              <SettingsDialog
+                settings={settings}
+                onSelect={() => closeSettingsDialog()}
+                onRestartRequest={() => process.exit(0)}
+              />
+            </Box>
+          ) : isThemeDialogOpen ? (
             <Box flexDirection="column">
               {themeError && (
                 <Box marginBottom={1}>
