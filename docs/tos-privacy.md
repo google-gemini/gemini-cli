@@ -88,6 +88,6 @@ The data it collects depends on your account and authentication type:
   **Paid services**: This setting only controls the collection of anonymous telemetry. Google logs prompts and responses for a limited period of time, solely for the purpose of detecting violations of the Prohibited Use Policy and any required legal or regulatory disclosures.
 - **Gemini API key via the Vertex AI GenAI API:** This setting only controls the collection of anonymous telemetry. Your prompts and answers, including code, are never collected, regardless of this setting.
 
-Please refer to the Privacy Notice that applies to your authentication method for more information about what data is collected and how this data is used. 
+Please refer to the Privacy Notice that applies to your authentication method for more information about what data is collected and how this data is used.
 
 You can disable Usage Statistics for any account type by following the instructions in the [Usage Statistics Configuration](./cli/configuration.md#usage-statistics) documentation.
