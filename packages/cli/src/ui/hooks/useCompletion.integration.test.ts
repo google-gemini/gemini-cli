@@ -16,6 +16,7 @@ import {
   SlashCommand,
 } from '../commands/types.js';
 import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
+import { useTextBuffer } from '../components/shared/text-buffer.js';
 
 interface MockConfig {
   getFileFilteringOptions: () => {
@@ -25,6 +26,19 @@ interface MockConfig {
   getEnableRecursiveFileSearch: () => boolean;
   getFileService: () => FileDiscoveryService | null;
 }
+
+// Helper to create real TextBuffer objects within renderHook
+const useTextBufferForTest = (text: string) => {
+  const cursorOffset = text.length;
+
+  return useTextBuffer({
+    initialText: text,
+    initialCursorOffset: cursorOffset,
+    viewport: { width: 80, height: 20 },
+    isValidPath: () => false,
+    onChange: () => {},
+  });
+};
 
 // Mock dependencies
 vi.mock('fs/promises');
@@ -183,16 +197,16 @@ describe('useCompletion git-aware filtering integration', () => {
       },
     );
 
-    const { result } = renderHook(() =>
-      useCompletion(
-        '@d',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('@d');
+      return useCompletion(
+        textBuffer,
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
-      ),
-    );
+      );
+    });
 
     // Wait for async operations to complete
     await act(async () => {
@@ -241,16 +255,16 @@ describe('useCompletion git-aware filtering integration', () => {
       },
     );
 
-    const { result } = renderHook(() =>
-      useCompletion(
-        '@',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('@');
+      return useCompletion(
+        textBuffer,
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
-      ),
-    );
+      );
+    });
 
     // Wait for async operations to complete
     await act(async () => {
@@ -323,16 +337,16 @@ describe('useCompletion git-aware filtering integration', () => {
       },
     );
 
-    const { result } = renderHook(() =>
-      useCompletion(
-        '@t',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('@t');
+      return useCompletion(
+        textBuffer,
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
-      ),
-    );
+      );
+    });
 
     // Wait for async operations to complete
     await act(async () => {
@@ -362,16 +376,16 @@ describe('useCompletion git-aware filtering integration', () => {
       { name: 'dist', isDirectory: () => true },
     ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
-    renderHook(() =>
-      useCompletion(
-        '@d',
+    renderHook(() => {
+      const textBuffer = useTextBufferForTest('@d');
+      return useCompletion(
+        textBuffer,
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfigNoRecursive,
-      ),
-    );
+      );
+    });
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -390,22 +404,21 @@ describe('useCompletion git-aware filtering integration', () => {
       { name: 'README.md', isDirectory: () => false },
     ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
-    const { result } = renderHook(() =>
-      useCompletion(
-        '@',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('@');
+      return useCompletion(
+        textBuffer,
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         undefined,
-      ),
-    );
+      );
+    });
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 150));
     });
 
-    // Without config, should include all files
     expect(result.current.suggestions).toHaveLength(3);
     expect(result.current.suggestions).toEqual(
       expect.arrayContaining([
@@ -424,16 +437,16 @@ describe('useCompletion git-aware filtering integration', () => {
 
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const { result } = renderHook(() =>
-      useCompletion(
-        '@',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('@');
+      return useCompletion(
+        textBuffer,
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
-      ),
-    );
+      );
+    });
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -470,16 +483,16 @@ describe('useCompletion git-aware filtering integration', () => {
       },
     );
 
-    const { result } = renderHook(() =>
-      useCompletion(
-        '@src/comp',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('@src/comp');
+      return useCompletion(
+        textBuffer,
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
-      ),
-    );
+      );
+    });
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -495,16 +508,16 @@ describe('useCompletion git-aware filtering integration', () => {
     const globResults = [`${testCwd}/src/index.ts`, `${testCwd}/README.md`];
     vi.mocked(glob).mockResolvedValue(globResults);
 
-    const { result } = renderHook(() =>
-      useCompletion(
-        '@s',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('@s');
+      return useCompletion(
+        textBuffer,
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
-      ),
-    );
+      );
+    });
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -530,16 +543,16 @@ describe('useCompletion git-aware filtering integration', () => {
     ];
     vi.mocked(glob).mockResolvedValue(globResults);
 
-    const { result } = renderHook(() =>
-      useCompletion(
-        '@.',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('@.');
+      return useCompletion(
+        textBuffer,
         testCwd,
-        true,
         slashCommands,
         mockCommandContext,
         mockConfig as Config,
-      ),
-    );
+      );
+    });
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -559,15 +572,15 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it('should suggest top-level command names based on partial input', async () => {
-    const { result } = renderHook(() =>
-      useCompletion(
-        '/mem',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('/mem');
+      return useCompletion(
+        textBuffer,
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
-      ),
-    );
+      );
+    });
 
     expect(result.current.suggestions).toEqual([
       { label: 'memory', value: 'memory', description: 'Manage memory' },
@@ -578,30 +591,30 @@ describe('useCompletion git-aware filtering integration', () => {
   it.each([['/?'], ['/usage']])(
     'should not suggest commands when altNames is fully typed',
     async (altName) => {
-      const { result } = renderHook(() =>
-        useCompletion(
-          altName,
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest(altName);
+        return useCompletion(
+          textBuffer,
           '/test/cwd',
-          true,
           mockSlashCommands,
           mockCommandContext,
-        ),
-      );
+        );
+      });
 
       expect(result.current.suggestions).toHaveLength(0);
     },
   );
 
   it('should suggest commands based on partial altNames matches', async () => {
-    const { result } = renderHook(() =>
-      useCompletion(
-        '/usag', // part of the word "usage"
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('/usag'); // part of the word "usage"
+      return useCompletion(
+        textBuffer,
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
-      ),
-    );
+      );
+    });
 
     expect(result.current.suggestions).toEqual([
       {
@@ -613,15 +626,15 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it('should suggest sub-command names for a parent command', async () => {
-    const { result } = renderHook(() =>
-      useCompletion(
-        '/memory a',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('/memory a');
+      return useCompletion(
+        textBuffer,
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
-      ),
-    );
+      );
+    });
 
     expect(result.current.suggestions).toEqual([
       { label: 'add', value: 'add', description: 'Add to memory' },
@@ -629,15 +642,15 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it('should suggest all sub-commands when the query ends with the parent command and a space', async () => {
-    const { result } = renderHook(() =>
-      useCompletion(
-        '/memory ',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('/memory ');
+      return useCompletion(
+        textBuffer,
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
-      ),
-    );
+      );
+    });
 
     expect(result.current.suggestions).toHaveLength(2);
     expect(result.current.suggestions).toEqual(
@@ -652,8 +665,9 @@ describe('useCompletion git-aware filtering integration', () => {
     const availableTags = ['my-chat-tag-1', 'my-chat-tag-2', 'another-channel'];
     const mockCompletionFn = vi
       .fn()
-      .mockImplementation(async (context: CommandContext, partialArg: string) =>
-        availableTags.filter((tag) => tag.startsWith(partialArg)),
+      .mockImplementation(
+        async (_context: CommandContext, partialArg: string) =>
+          availableTags.filter((tag) => tag.startsWith(partialArg)),
       );
 
     const mockCommandsWithFiltering = JSON.parse(
@@ -678,15 +692,15 @@ describe('useCompletion git-aware filtering integration', () => {
 
     resumeCmd.completion = mockCompletionFn;
 
-    const { result } = renderHook(() =>
-      useCompletion(
-        '/chat resume my-ch',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('/chat resume my-ch');
+      return useCompletion(
+        textBuffer,
         '/test/cwd',
-        true,
         mockCommandsWithFiltering,
         mockCommandContext,
-      ),
-    );
+      );
+    });
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -701,45 +715,45 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it('should not provide suggestions for a fully typed command that has no sub-commands or argument completion', async () => {
-    const { result } = renderHook(() =>
-      useCompletion(
-        '/clear ',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('/clear ');
+      return useCompletion(
+        textBuffer,
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
-      ),
-    );
+      );
+    });
 
     expect(result.current.suggestions).toHaveLength(0);
     expect(result.current.showSuggestions).toBe(false);
   });
 
   it('should not provide suggestions for an unknown command', async () => {
-    const { result } = renderHook(() =>
-      useCompletion(
-        '/unknown-command',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('/unknown-command');
+      return useCompletion(
+        textBuffer,
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
-      ),
-    );
+      );
+    });
 
     expect(result.current.suggestions).toHaveLength(0);
     expect(result.current.showSuggestions).toBe(false);
   });
 
   it('should suggest sub-commands for a fully typed parent command without a trailing space', async () => {
-    const { result } = renderHook(() =>
-      useCompletion(
-        '/memory', // Note: no trailing space
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('/memory'); // Note: no trailing space
+      return useCompletion(
+        textBuffer,
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
-      ),
-    );
+      );
+    });
 
     // Assert that suggestions for sub-commands are shown immediately
     expect(result.current.suggestions).toHaveLength(2);
@@ -753,15 +767,15 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it('should NOT provide suggestions for a perfectly typed command that is a leaf node', async () => {
-    const { result } = renderHook(() =>
-      useCompletion(
-        '/clear', // No trailing space
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('/clear'); // No trailing space
+      return useCompletion(
+        textBuffer,
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
-      ),
-    );
+      );
+    });
 
     expect(result.current.suggestions).toHaveLength(0);
     expect(result.current.showSuggestions).toBe(false);
@@ -787,15 +801,15 @@ describe('useCompletion git-aware filtering integration', () => {
     }
     resumeCommand.completion = mockCompletionFn;
 
-    const { result } = renderHook(() =>
-      useCompletion(
-        '/chat resume ', // Trailing space, no partial argument
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('/chat resume '); // Trailing space, no partial argument
+      return useCompletion(
+        textBuffer,
         '/test/cwd',
-        true,
         isolatedMockCommands,
         mockCommandContext,
-      ),
-    );
+      );
+    });
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -807,15 +821,15 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it('should suggest all top-level commands for the root slash', async () => {
-    const { result } = renderHook(() =>
-      useCompletion(
-        '/',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('/');
+      return useCompletion(
+        textBuffer,
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
-      ),
-    );
+      );
+    });
 
     expect(result.current.suggestions.length).toBe(mockSlashCommands.length);
     expect(result.current.suggestions.map((s) => s.label)).toEqual(
@@ -824,15 +838,15 @@ describe('useCompletion git-aware filtering integration', () => {
   });
 
   it('should provide no suggestions for an invalid sub-command', async () => {
-    const { result } = renderHook(() =>
-      useCompletion(
-        '/memory dothisnow',
+    const { result } = renderHook(() => {
+      const textBuffer = useTextBufferForTest('/memory dothisnow');
+      return useCompletion(
+        textBuffer,
         '/test/cwd',
-        true,
         mockSlashCommands,
         mockCommandContext,
-      ),
-    );
+      );
+    });
 
     expect(result.current.suggestions).toHaveLength(0);
     expect(result.current.showSuggestions).toBe(false);
