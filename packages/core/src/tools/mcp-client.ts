@@ -15,6 +15,7 @@ import {
   StreamableHTTPClientTransport,
   StreamableHTTPClientTransportOptions,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
 import { AuthProviderType, MCPServerConfig } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
@@ -370,6 +371,7 @@ export async function connectAndDiscover(
     const mcpClient = await connectToMcpServer(
       mcpServerName,
       mcpServerConfig,
+      toolRegistry,
       debugMode,
     );
     try {
@@ -396,6 +398,42 @@ export async function connectAndDiscover(
       `Error connecting to MCP server '${mcpServerName}': ${getErrorMessage(error)}`,
     );
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+  }
+}
+/**
+ * Reloads tools from a specific MCP server.
+ *
+ * @param mcpServerName The name of the MCP server.
+ * @param mcpServerConfig The configuration for the MCP server.
+ * @param mcpClient The active MCP client instance.
+ * @param toolRegistry The tool registry to update.
+ */
+async function reloadToolsForServer(
+  mcpServerName: string,
+  mcpServerConfig: MCPServerConfig,
+  mcpClient: Client,
+  toolRegistry: ToolRegistry,
+): Promise<void> {
+  console.log(`Tool list changed for '${mcpServerName}'. Reloading tools...`);
+
+  // Unregister existing tools for this server
+  toolRegistry.unregisterToolsByServer(mcpServerName);
+
+  try {
+    // Rediscover and register tools
+    const tools = await discoverTools(
+      mcpServerName,
+      mcpServerConfig,
+      mcpClient,
+    );
+    for (const tool of tools) {
+      toolRegistry.registerTool(tool);
+    }
+    console.log(`Successfully reloaded tools for '${mcpServerName}'.`);
+  } catch (error) {
+    console.error(
+      `Error reloading tools for '${mcpServerName}': ${getErrorMessage(error)}`,
+    );
   }
 }
 
@@ -463,12 +501,25 @@ export async function discoverTools(
 export async function connectToMcpServer(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
+  toolRegistry: ToolRegistry,
   debugMode: boolean,
 ): Promise<Client> {
   const mcpClient = new Client({
     name: 'gemini-cli-mcp-client',
     version: '0.0.1',
   });
+
+  mcpClient.setNotificationHandler(
+    ToolListChangedNotificationSchema,
+    async () => {
+      await reloadToolsForServer(
+        mcpServerName,
+        mcpServerConfig,
+        mcpClient,
+        toolRegistry,
+      );
+    },
+  );
 
   // patch Client.callTool to use request timeout as genai McpCallTool.callTool does not do it
   // TODO: remove this hack once GenAI SDK does callTool with request options

@@ -379,6 +379,18 @@ export class ToolRegistry {
   }
 
   /**
+   * Unregisters all tools associated with a specific MCP server.
+   * @param serverName The name of the server whose tools should be unregistered.
+   */
+  unregisterToolsByServer(serverName: string): void {
+    for (const [name, tool] of this.tools.entries()) {
+      if (tool instanceof DiscoveredMCPTool && tool.serverName === serverName) {
+        this.tools.delete(name);
+      }
+    }
+  }
+
+  /**
    * Get the definition of a specific tool.
    */
   getTool(name: string): Tool | undefined {

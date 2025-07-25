@@ -20,19 +20,13 @@ echo "This script will add the following alias to your shell configuration file 
 echo "  $ALIAS_COMMAND"
 echo ""
 
-# Check if the alias already exists
+# Check if the alias already exists and remove it
 if grep -q "alias gemini=" "$CONFIG_FILE"; then
-    echo "A 'gemini' alias already exists in $CONFIG_FILE. No changes were made."
-    exit 0
+    sed -i '/^alias gemini=/d' "$CONFIG_FILE"
+    echo "Removed existing 'gemini' alias."
 fi
 
-read -p "Do you want to proceed? (y/n) " -n 1 -r
+echo "$ALIAS_COMMAND" >> "$CONFIG_FILE"
 echo ""
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "$ALIAS_COMMAND" >> "$CONFIG_FILE"
-    echo ""
-    echo "Alias added to $CONFIG_FILE."
-    echo "Please run 'source $CONFIG_FILE' or open a new terminal to use the 'gemini' command."
-else
-    echo "Aborted. No changes were made."
-fi
+echo "Alias updated in $CONFIG_FILE."
+echo "Please run 'source $CONFIG_FILE' or open a new terminal to use the 'gemini' command."
