@@ -23,6 +23,7 @@ import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
+import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 
 /**
  * Hook to define and process slash commands (e.g., /help, /clear).
@@ -164,6 +165,7 @@ export const useSlashCommandProcessor = (
     const controller = new AbortController();
     const load = async () => {
       const loaders = [
+        new McpPromptLoader(config),
         new BuiltinCommandLoader(config),
         new FileCommandLoader(config),
       ];
@@ -246,82 +248,95 @@ export const useSlashCommandProcessor = (
               args,
             },
           };
-          const result = await commandToExecute.action(
-            fullCommandContext,
-            args,
-          );
+          try {
+            const result = await commandToExecute.action(
+              fullCommandContext,
+              args,
+            );
 
-          if (result) {
-            switch (result.type) {
-              case 'tool':
-                return {
-                  type: 'schedule_tool',
-                  toolName: result.toolName,
-                  toolArgs: result.toolArgs,
-                };
-              case 'message':
-                addItem(
-                  {
-                    type:
-                      result.messageType === 'error'
-                        ? MessageType.ERROR
-                        : MessageType.INFO,
-                    text: result.content,
-                  },
-                  Date.now(),
-                );
-                return { type: 'handled' };
-              case 'dialog':
-                switch (result.dialog) {
-                  case 'help':
-                    setShowHelp(true);
-                    return { type: 'handled' };
-                  case 'auth':
-                    openAuthDialog();
-                    return { type: 'handled' };
-                  case 'theme':
-                    openThemeDialog();
-                    return { type: 'handled' };
-                  case 'editor':
-                    openEditorDialog();
-                    return { type: 'handled' };
-                  case 'privacy':
-                    openPrivacyNotice();
-                    return { type: 'handled' };
-                  default: {
-                    const unhandled: never = result.dialog;
-                    throw new Error(
-                      `Unhandled slash command result: ${unhandled}`,
-                    );
+            if (result) {
+              switch (result.type) {
+                case 'tool':
+                  return {
+                    type: 'schedule_tool',
+                    toolName: result.toolName,
+                    toolArgs: result.toolArgs,
+                  };
+                case 'message':
+                  addItem(
+                    {
+                      type:
+                        result.messageType === 'error'
+                          ? MessageType.ERROR
+                          : MessageType.INFO,
+                      text: result.content,
+                    },
+                    Date.now(),
+                  );
+                  return { type: 'handled' };
+                case 'dialog':
+                  switch (result.dialog) {
+                    case 'help':
+                      setShowHelp(true);
+                      return { type: 'handled' };
+                    case 'auth':
+                      openAuthDialog();
+                      return { type: 'handled' };
+                    case 'theme':
+                      openThemeDialog();
+                      return { type: 'handled' };
+                    case 'editor':
+                      openEditorDialog();
+                      return { type: 'handled' };
+                    case 'privacy':
+                      openPrivacyNotice();
+                      return { type: 'handled' };
+                    default: {
+                      const unhandled: never = result.dialog;
+                      throw new Error(
+                        `Unhandled slash command result: ${unhandled}`,
+                      );
+                    }
                   }
+                case 'load_history': {
+                  await config
+                    ?.getGeminiClient()
+                    ?.setHistory(result.clientHistory);
+                  fullCommandContext.ui.clear();
+                  result.history.forEach((item, index) => {
+                    fullCommandContext.ui.addItem(item, index);
+                  });
+                  return { type: 'handled' };
                 }
-              case 'load_history': {
-                await config
-                  ?.getGeminiClient()
-                  ?.setHistory(result.clientHistory);
-                fullCommandContext.ui.clear();
-                result.history.forEach((item, index) => {
-                  fullCommandContext.ui.addItem(item, index);
-                });
-                return { type: 'handled' };
-              }
-              case 'quit':
-                setQuittingMessages(result.messages);
-                setTimeout(() => {
-                  process.exit(0);
-                }, 100);
-                return { type: 'handled' };
+                case 'quit':
+                  setQuittingMessages(result.messages);
+                  setTimeout(() => {
+                    process.exit(0);
+                  }, 100);
+                  return { type: 'handled' };
 
-              case 'submit_prompt':
-                return {
-                  type: 'submit_prompt',
-                  content: result.content,
-                };
-              default: {
-                const unhandled: never = result;
-                throw new Error(`Unhandled slash command result: ${unhandled}`);
+                case 'submit_prompt':
+                  return {
+                    type: 'submit_prompt',
+                    content: result.content,
+                  };
+                default: {
+                  const unhandled: never = result;
+                  throw new Error(
+                    `Unhandled slash command result: ${unhandled}`,
+                  );
+                }
               }
             }
+          } catch (e) {
+            addItem(
+              {
+                type: MessageType.ERROR,
+                text: e instanceof Error ? e.message : String(e),
+              },
+              Date.now(),
+            );
+            return { type: 'handled' };
           }
 
           return { type: 'handled' };

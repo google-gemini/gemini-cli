@@ -638,10 +638,17 @@ export function useCompletion(
         // Determine the base path of the command.
         // - If there's a trailing space, the whole command is the base.
         // - If it's a known parent path, the whole command is the base.
+        // - If the last part is a complete argument, the whole command is the base.
         // - Otherwise, the base is everything EXCEPT the last partial part.
+        const lastPart = parts.length > 0 ? parts[parts.length - 1] : '';
+        const isLastPartACompleteArg =
+          lastPart.startsWith('--') && lastPart.includes('=');
+
         const basePath =
-          hasTrailingSpace || isParentPath ? parts : parts.slice(0, -1);
-        const newValue = `/${[...basePath, suggestion].join(' ')}`;
+          hasTrailingSpace || isParentPath || isLastPartACompleteArg
+            ? parts
+            : parts.slice(0, -1);
+        const newValue = `/${[...basePath, suggestion].join(' ')} `;
 
         buffer.setText(newValue);
       } else {
