@@ -118,7 +118,13 @@ export class MCPServerConfig {
     readonly extensionName?: string,
     // OAuth configuration
     readonly oauth?: MCPOAuthConfig,
+    readonly authProviderType?: AuthProviderType,
   ) {}
+}
+
+export enum AuthProviderType {
+  DYNAMIC_DISCOVERY = 'dynamic_discovery',
+  GOOGLE_CREDENTIALS = 'google_credentials',
 }
 
 export interface SandboxConfig {
@@ -624,7 +630,7 @@ export class Config {
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
 
-    await registry.discoverTools();
+    await registry.discoverAllTools();
     return registry;
   }
 }
