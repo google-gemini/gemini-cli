@@ -252,8 +252,11 @@ const createMcpServer = () => {
       inputSchema: {},
     },
     async () => {
-      const activeEditor = vscode.window.activeTextEditor;
-      const filePath = activeEditor ? activeEditor.document.uri.fsPath : '';
+      const editor = vscode.window.activeTextEditor;
+      const filePath =
+        editor && editor.document.uri.scheme === 'file'
+          ? editor.document.uri.fsPath
+          : '';
       if (filePath) {
         return {
           content: [{ type: 'text', text: `Active file: ${filePath}` }],
