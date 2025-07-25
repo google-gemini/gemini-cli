@@ -119,7 +119,7 @@ export class GeminiClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
+          'x-goog-api-key': this.apiKey
         },
         body: JSON.stringify(requestBody)
       });
