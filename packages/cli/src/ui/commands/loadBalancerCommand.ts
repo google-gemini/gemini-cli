@@ -15,8 +15,8 @@ import {
   resetLoadBalancerConfig,
   createDefaultEndpoint,
   validateLoadBalancerConfig
-} from '../../../../core/src/config/loadBalancer.js';
-import { LoadBalancerService } from '../../../../core/src/services/loadBalancerService.js';
+} from '@google/gemini-cli-core';
+import { LoadBalancerService } from '@google/gemini-cli-core';
 
 /**
  * ロードバランサーコマンドのメイン処理
