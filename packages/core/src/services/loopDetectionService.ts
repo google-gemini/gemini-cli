@@ -13,6 +13,8 @@ import { SchemaUnion, Type } from '@google/genai';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
+const CONTENT_CHUNK_SIZE = 50;
+const MAX_HISTORY_LENGTH = 1000;
 
 /**
  * The number of recent conversation turns to include in the history when asking the LLM to check for a loop.
@@ -42,8 +44,6 @@ const MIN_LLM_CHECK_INTERVAL = 5;
  */
 const MAX_LLM_CHECK_INTERVAL = 15;
 
-const SENTENCE_ENDING_PUNCTUATION_REGEX = /[.!?]+(?=\s|$)/;
-
 /**
  * Service for detecting and preventing infinite loops in AI responses.
  * Monitors tool call repetitions and content sentence repetitions.
@@ -57,9 +57,10 @@ export class LoopDetectionService {
   private toolCallRepetitionCount: number = 0;
 
   // Content streaming tracking
-  private lastRepeatedSentence: string = '';
-  private sentenceRepetitionCount: number = 0;
-  private partialContent: string = '';
+  private streamContentHistory = '';
+  private contentStats = new Map<string, number[]>();
+  private lastContentIndex = 0;
+  private loopDetected = false;
 
   // LLM loop track tracking
   private turnsInCurrentPrompt = 0;
@@ -82,17 +83,24 @@ export class LoopDetectionService {
    * @returns true if a loop is detected, false otherwise
    */
   addAndCheck(event: ServerGeminiStreamEvent): boolean {
+    if (this.loopDetected) {
+      return true;
+    }
+
     switch (event.type) {
       case GeminiEventType.ToolCallRequest:
         // content chanting only happens in one single stream, reset if there
         // is a tool call in between
-        this.resetSentenceCount();
-        return this.checkToolCallLoop(event.value);
+        this.resetContentTracking();
+        this.loopDetected = this.checkToolCallLoop(event.value);
+        break;
       case GeminiEventType.Content:
-        return this.checkContentLoop(event.value);
+        this.loopDetected = this.checkContentLoop(event.value);
+        break;
       default:
-        return false;
+        break;
     }
+    return this.loopDetected;
   }
 
   /**
@@ -140,38 +148,74 @@ export class LoopDetectionService {
     return false;
   }
 
+  /**
+   * Detects content loops by analyzing streaming text for repetitive patterns.
+   *
+   * The algorithm works by:
+   * 1. Appending new content to the streaming history
+   * 2. Truncating history if it exceeds the maximum length
+   * 3. Analyzing content chunks for repetitive patterns using hashing
+   * 4. Detecting loops when identical chunks appear frequently within a short distance
+   */
   private checkContentLoop(content: string): boolean {
-    this.partialContent += content;
+    this.streamContentHistory += content;
 
-    if (!SENTENCE_ENDING_PUNCTUATION_REGEX.test(this.partialContent)) {
-      return false;
+    this.truncateAndUpdate();
+    return this.analyzeContentChunksForLoop();
+  }
+
+  /**
+   * Truncates the content history to prevent unbounded memory growth.
+   * When truncating, adjusts all stored indices to maintain their relative positions.
+   */
+  private truncateAndUpdate(): void {
+    if (this.streamContentHistory.length <= MAX_HISTORY_LENGTH) {
+      return;
     }
 
-    const completeSentences =
-      this.partialContent.match(/[^.!?]+[.!?]+(?=\s|$)/g) || [];
-    if (completeSentences.length === 0) {
-      return false;
-    }
+    // Calculate how much content to remove from the beginning
+    const truncationAmount =
+      this.streamContentHistory.length - MAX_HISTORY_LENGTH;
+    this.streamContentHistory =
+      this.streamContentHistory.slice(truncationAmount);
+    this.lastContentIndex = Math.max(
+      0,
+      this.lastContentIndex - truncationAmount,
+    );
 
-    const lastSentence = completeSentences[completeSentences.length - 1];
-    const lastCompleteIndex = this.partialContent.lastIndexOf(lastSentence);
-    const endOfLastSentence = lastCompleteIndex + lastSentence.length;
-    this.partialContent = this.partialContent.slice(endOfLastSentence);
+    // Update all stored chunk indices to account for the truncation
+    for (const [hash, oldIndices] of this.contentStats.entries()) {
+      const adjustedIndices = oldIndices
+        .map((index) => index - truncationAmount)
+        .filter((index) => index >= 0);
 
-    for (const sentence of completeSentences) {
-      const trimmedSentence = sentence.trim();
-      if (trimmedSentence === '') {
-        continue;
-      }
-
-      if (this.lastRepeatedSentence === trimmedSentence) {
-        this.sentenceRepetitionCount++;
+      if (adjustedIndices.length > 0) {
+        this.contentStats.set(hash, adjustedIndices);
       } else {
-        this.lastRepeatedSentence = trimmedSentence;
-        this.sentenceRepetitionCount = 1;
+        this.contentStats.delete(hash);
       }
+    }
+  }
 
-      if (this.sentenceRepetitionCount >= CONTENT_LOOP_THRESHOLD) {
+  /**
+   * Analyzes content in fixed-size chunks to detect repetitive patterns.
+   *
+   * Uses a sliding window approach:
+   * 1. Extract chunks of fixed size (CONTENT_CHUNK_SIZE)
+   * 2. Hash each chunk for efficient comparison
+   * 3. Track positions where identical chunks appear
+   * 4. Detect loops when chunks repeat frequently within a short distance
+   */
+  private analyzeContentChunksForLoop(): boolean {
+    while (this.hasMoreChunksToProcess()) {
+      // Extract current chunk of text
+      const currentChunk = this.streamContentHistory.substring(
+        this.lastContentIndex,
+        this.lastContentIndex + CONTENT_CHUNK_SIZE,
+      );
+      const chunkHash = createHash('sha256').update(currentChunk).digest('hex');
+
+      if (this.isLoopDetectedForChunk(currentChunk, chunkHash)) {
         logLoopDetected(
           this.config,
           new LoopDetectedEvent(
@@ -181,8 +225,72 @@ export class LoopDetectionService {
         );
         return true;
       }
+
+      // Move to next position in the sliding window
+      this.lastContentIndex++;
     }
+
     return false;
+  }
+
+  private hasMoreChunksToProcess(): boolean {
+    return (
+      this.lastContentIndex + CONTENT_CHUNK_SIZE <=
+      this.streamContentHistory.length
+    );
+  }
+
+  /**
+   * Determines if a content chunk indicates a loop pattern.
+   *
+   * Loop detection logic:
+   * 1. Check if we've seen this hash before (new chunks are stored for future comparison)
+   * 2. Verify actual content matches to prevent hash collisions
+   * 3. Track all positions where this chunk appears
+   * 4. A loop is detected when the same chunk appears CONTENT_LOOP_THRESHOLD times
+   *    within a small average distance (≤ 1.5 * chunk size)
+   */
+  private isLoopDetectedForChunk(chunk: string, hash: string): boolean {
+    const existingIndices = this.contentStats.get(hash);
+
+    if (!existingIndices) {
+      this.contentStats.set(hash, [this.lastContentIndex]);
+      return false;
+    }
+
+    if (!this.isActualContentMatch(chunk, existingIndices[0])) {
+      return false;
+    }
+
+    existingIndices.push(this.lastContentIndex);
+
+    if (existingIndices.length < CONTENT_LOOP_THRESHOLD) {
+      return false;
+    }
+
+    // Analyze the most recent occurrences to see if they're clustered closely together
+    const recentIndices = existingIndices.slice(-CONTENT_LOOP_THRESHOLD);
+    const totalDistance =
+      recentIndices[recentIndices.length - 1] - recentIndices[0];
+    const averageDistance = totalDistance / (CONTENT_LOOP_THRESHOLD - 1);
+    const maxAllowedDistance = CONTENT_CHUNK_SIZE * 1.5;
+
+    return averageDistance <= maxAllowedDistance;
+  }
+
+  /**
+   * Verifies that two chunks with the same hash actually contain identical content.
+   * This prevents false positives from hash collisions.
+   */
+  private isActualContentMatch(
+    currentChunk: string,
+    originalIndex: number,
+  ): boolean {
+    const originalChunk = this.streamContentHistory.substring(
+      originalIndex,
+      originalIndex + CONTENT_CHUNK_SIZE,
+    );
+    return originalChunk === currentChunk;
   }
 
   private async checkForLoopWithLLM(signal: AbortSignal) {
@@ -261,8 +369,9 @@ Please analyze the conversation history to determine the possibility that the co
   reset(promptId: string): void {
     this.promptId = promptId;
     this.resetToolCallCount();
-    this.resetSentenceCount();
+    this.resetContentTracking();
     this.resetLlmCheckTracking();
+    this.loopDetected = false;
   }
 
   private resetToolCallCount(): void {
@@ -270,10 +379,12 @@ Please analyze the conversation history to determine the possibility that the co
     this.toolCallRepetitionCount = 0;
   }
 
-  private resetSentenceCount(): void {
-    this.lastRepeatedSentence = '';
-    this.sentenceRepetitionCount = 0;
-    this.partialContent = '';
+  private resetContentTracking(resetHistory = true): void {
+    if (resetHistory) {
+      this.streamContentHistory = '';
+    }
+    this.contentStats.clear();
+    this.lastContentIndex = 0;
   }
 
   private resetLlmCheckTracking(): void {
