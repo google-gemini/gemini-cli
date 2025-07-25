@@ -235,12 +235,20 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     }
     ```
 
+- **`temperature`** (number):
+  - **Description:** Controls the randomness of the model's responses. Lower values (closer to 0.0) make responses more deterministic and focused, while higher values (closer to 2.0) make responses more creative and varied. This parameter affects how the model selects tokens during generation.
+  - **Range:** 0.0 to 2.0
+  - **Default:** 0.0 (most deterministic)
+  - **Example:** `"temperature": 0.7`
+  - **Note:** This setting can be overridden by the `--temperature` command-line argument.
+
 ### Example `settings.json`:
 
 ```json
 {
   "theme": "GitHub",
   "sandbox": "docker",
+  "temperature": 0.7,
   "toolDiscoveryCommand": "bin/get_tools",
   "toolCallCommand": "bin/call_tool",
   "mcpServers": {
@@ -342,6 +350,10 @@ Arguments passed directly when running the CLI can override other configurations
 - **`--model <model_name>`** (**`-m <model_name>`**):
   - Specifies the Gemini model to use for this session.
   - Example: `npm start -- --model gemini-1.5-pro-latest`
+- **`--temperature <value>`** (**`-t <value>`**):
+  - Sets the temperature parameter for this session, controlling response randomness.
+  - Range: 0.0 to 2.0 (lower values = more deterministic, higher values = more creative)
+  - Example: `npm start -- --temperature 0.7`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a non-interactive mode.
 - **`--sandbox`** (**`-s`**):

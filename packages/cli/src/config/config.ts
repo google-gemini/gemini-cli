@@ -38,6 +38,21 @@ const logger = {
   error: (...args: any[]) => console.error('[ERROR]', ...args),
 };
 
+/**
+ * Validates temperature parameter for Gemini API
+ * @param temperature - The temperature value to validate
+ * @returns true if valid, throws error if invalid
+ */
+function validateTemperature(temperature: number): boolean {
+  if (typeof temperature !== 'number' || isNaN(temperature)) {
+    throw new Error('Temperature must be a valid number');
+  }
+  if (temperature < 0.0 || temperature > 2.0) {
+    throw new Error('Temperature must be between 0.0 and 2.0 (inclusive)');
+  }
+  return true;
+}
+
 export interface CliArgs {
   model: string | undefined;
   sandbox: boolean | string | undefined;
@@ -62,6 +77,7 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   ideMode: boolean | undefined;
   proxy: string | undefined;
+  temperature?: number | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -199,6 +215,17 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'string',
       description:
         'Proxy for gemini client, like schema://user:password@host:port',
+    })
+    .option('temperature', {
+      alias: 't',
+      type: 'number',
+      description: 'Temperature for model generation (0.0-2.0, lower is more deterministic)',
+      coerce: (value: number) => {
+        if (value !== undefined) {
+          validateTemperature(value);
+        }
+        return value;
+      },
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
@@ -450,6 +477,7 @@ export async function loadCliConfig(
     noBrowser: !!process.env.NO_BROWSER,
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
+    temperature: argv.temperature ?? settings.temperature,
   });
 }
 

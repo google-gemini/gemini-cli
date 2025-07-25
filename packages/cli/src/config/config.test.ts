@@ -146,6 +146,83 @@ describe('parseArguments', () => {
     expect(argv.promptInteractive).toBe('interactive prompt');
     expect(argv.prompt).toBeUndefined();
   });
+
+  it('should parse temperature argument correctly', async () => {
+    process.argv = ['node', 'script.js', '--temperature', '0.5'];
+    const argv = await parseArguments();
+    expect(argv.temperature).toBe(0.5);
+  });
+
+  it('should parse temperature argument with -t alias', async () => {
+    process.argv = ['node', 'script.js', '-t', '1.2'];
+    const argv = await parseArguments();
+    expect(argv.temperature).toBe(1.2);
+  });
+
+  it('should leave temperature undefined when not provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    expect(argv.temperature).toBeUndefined();
+  });
+
+  it('should throw error for temperature below 0.0', async () => {
+    process.argv = ['node', 'script.js', '--temperature', '-0.1'];
+    
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments()).rejects.toThrow('process.exit called');
+    
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('Temperature must be between 0.0 and 2.0'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should throw error for temperature above 2.0', async () => {
+    process.argv = ['node', 'script.js', '--temperature', '2.1'];
+    
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments()).rejects.toThrow('process.exit called');
+    
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('Temperature must be between 0.0 and 2.0'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should throw error for non-numeric temperature', async () => {
+    process.argv = ['node', 'script.js', '--temperature', 'invalid'];
+    
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments()).rejects.toThrow('process.exit called');
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
 });
 
 describe('loadCliConfig', () => {
@@ -261,6 +338,38 @@ describe('loadCliConfig', () => {
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getProxy()).toBe('http://localhost:7890');
+  });
+
+  it('should set temperature from CLI argument', async () => {
+    process.argv = ['node', 'script.js', '--temperature', '1.5'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getTemperature()).toBe(1.5);
+  });
+
+  it('should set temperature from settings when CLI argument not provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = { temperature: 0.8 };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getTemperature()).toBe(0.8);
+  });
+
+  it('should prioritize CLI temperature over settings temperature', async () => {
+    process.argv = ['node', 'script.js', '--temperature', '1.2'];
+    const argv = await parseArguments();
+    const settings: Settings = { temperature: 0.3 };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getTemperature()).toBe(1.2);
+  });
+
+  it('should use default temperature (0.0) when neither CLI nor settings provide it', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getTemperature()).toBe(0.0);
   });
 });
 

@@ -101,6 +101,9 @@ export interface Settings {
   // Add other settings here.
   ideMode?: boolean;
   memoryDiscoveryMaxDirs?: number;
+  
+  // Temperature for model generation (0.0-2.0, lower is more deterministic)
+  temperature?: number;
 }
 
 export interface SettingsError {
