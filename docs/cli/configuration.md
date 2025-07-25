@@ -358,6 +358,8 @@ Arguments passed directly when running the CLI can override other configurations
   - Displays the current memory usage.
 - **`--yolo`**:
   - Enables YOLO mode, which automatically approves all tool calls.
+- **`--show-status`**:
+  - **Description:** Dynamically updates the terminal window's title to show the CLI's current operational status (e.g., "Thinking...", "Analyzing files..."). When idle, the title reverts to "GEMINI CLI".
 - **`--telemetry`**:
   - Enables [telemetry](../telemetry.md).
 - **`--telemetry-target`**:
