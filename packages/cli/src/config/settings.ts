@@ -56,6 +56,10 @@ export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
 }
 
+export interface DisplaySettings {
+  footer?: boolean;
+}
+
 export interface Settings {
   theme?: string;
   customThemes?: Record<string, CustomTheme>;
@@ -72,6 +76,7 @@ export interface Settings {
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
+  display?: DisplaySettings;
   telemetry?: TelemetrySettings;
   usageStatisticsEnabled?: boolean;
   preferredEditor?: string;
