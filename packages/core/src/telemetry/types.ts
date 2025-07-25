@@ -256,11 +256,25 @@ export class LoopDetectedEvent {
   'event.name': 'loop_detected';
   'event.timestamp': string; // ISO 8601
   loop_type: LoopType;
+  prompt_id: string;
 
-  constructor(loop_type: LoopType) {
+  constructor(loop_type: LoopType, prompt_id: string) {
     this['event.name'] = 'loop_detected';
     this['event.timestamp'] = new Date().toISOString();
     this.loop_type = loop_type;
+    this.prompt_id = prompt_id;
+  }
+}
+
+export class FlashDecidedToContinueEvent {
+  'event.name': 'flash_decided_to_continue';
+  'event.timestamp': string; // ISO 8601
+  prompt_id: string;
+
+  constructor(prompt_id: string) {
+    this['event.name'] = 'flash_decided_to_continue';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
   }
 }
 
@@ -273,4 +287,5 @@ export type TelemetryEvent =
   | ApiErrorEvent
   | ApiResponseEvent
   | FlashFallbackEvent
-  | LoopDetectedEvent;
+  | LoopDetectedEvent
+  | FlashDecidedToContinueEvent;

@@ -236,7 +236,7 @@ function formatStructure(
   // Ignored root nodes ARE printed with a connector.
   if (!isProcessingRootNode || node.isIgnored) {
     builder.push(
-      `${currentIndent}${connector}${node.name}/${node.isIgnored ? TRUNCATION_INDICATOR : ''}`,
+      `${currentIndent}${connector}${node.name}${path.sep}${node.isIgnored ? TRUNCATION_INDICATOR : ''}`,
     );
   }
 
@@ -322,34 +322,25 @@ export async function getFolderStructure(
     formatStructure(structureRoot, '', true, true, structureLines);
 
     // 3. Build the final output string
-    const displayPath = resolvedPath.replace(/\\/g, '/');
-
-    let disclaimer = '';
-    // Check if truncation occurred anywhere or if ignored folders are present.
-    // A simple check: if any node indicates more files/subfolders, or is ignored.
-    let truncationOccurred = false;
-    function checkForTruncation(node: FullFolderInfo) {
+    function isTruncated(node: FullFolderInfo): boolean {
       if (node.hasMoreFiles || node.hasMoreSubfolders || node.isIgnored) {
-        truncationOccurred = true;
+        return true;
       }
-      if (!truncationOccurred) {
-        for (const sub of node.subFolders) {
-          checkForTruncation(sub);
-          if (truncationOccurred) break;
+      for (const sub of node.subFolders) {
+        if (isTruncated(sub)) {
+          return true;
         }
       }
-    }
-    checkForTruncation(structureRoot);
-
-    if (truncationOccurred) {
-      disclaimer = `Folders or files indicated with ${TRUNCATION_INDICATOR} contain more items not shown, were ignored, or the display limit (${mergedOptions.maxItems} items) was reached.`;
+      return false;
     }
 
-    const summary =
-      `Showing up to ${mergedOptions.maxItems} items (files + folders). ${disclaimer}`.trim();
+    let summary = `Showing up to ${mergedOptions.maxItems} items (files + folders).`;
 
-    const output = `${summary}\n\n${displayPath}/\n${structureLines.join('\n')}`;
-    return output;
+    if (isTruncated(structureRoot)) {
+      summary += ` Folders or files indicated with ${TRUNCATION_INDICATOR} contain more items not shown, were ignored, or the display limit (${mergedOptions.maxItems} items) was reached.`;
+    }
+
+    return `${summary}\n\n${resolvedPath}${path.sep}\n${structureLines.join('\n')}`;
   } catch (error: unknown) {
     console.error(`Error getting folder structure for ${resolvedPath}:`, error);
     return `Error processing directory "${resolvedPath}": ${getErrorMessage(error)}`;
