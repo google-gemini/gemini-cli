@@ -1100,7 +1100,7 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(mockBuffer.setText).toHaveBeenCalledWith('/memory');
+      expect(mockBuffer.setText).toHaveBeenCalledWith('/memory ');
     });
 
     it('should append a sub-command when the parent is complete', () => {
@@ -1145,7 +1145,7 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(1); // index 1 is 'add'
       });
 
-      expect(mockBuffer.setText).toHaveBeenCalledWith('/memory add');
+      expect(mockBuffer.setText).toHaveBeenCalledWith('/memory add ');
     });
 
     it('should complete a command with an alternative name', () => {
@@ -1190,7 +1190,7 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(mockBuffer.setText).toHaveBeenCalledWith('/help');
+      expect(mockBuffer.setText).toHaveBeenCalledWith('/help ');
     });
 
     it('should complete a file path', async () => {
