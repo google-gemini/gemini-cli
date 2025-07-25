@@ -142,11 +142,9 @@ describe('ShellTool Bug Reproduction', () => {
     shellTool = new ShellTool(config);
 
     const abortSignal = new AbortController().signal;
-    const result = await shellTool.execute(
-      { command: 'echo "$GEMINI_CLI"' },
-      abortSignal,
-      () => {},
-    );
+    const command =
+      os.platform() === 'win32' ? 'echo %GEMINI_CLI%' : 'echo "$GEMINI_CLI"';
+    const result = await shellTool.execute({ command }, abortSignal, () => {});
 
     expect(result.returnDisplay).toBe('1' + os.EOL);
   });
