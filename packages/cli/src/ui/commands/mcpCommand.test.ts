@@ -976,4 +976,84 @@ describe('mcpCommand', () => {
       }
     });
   });
+
+  describe('refresh subcommand', () => {
+    it('should refresh the list of tools and display the status', async () => {
+      const mockToolRegistry = {
+        discoverMcpTools: vi.fn(),
+        getAllTools: vi.fn().mockReturnValue([]),
+      };
+      const mockGeminiClient = {
+        setTools: vi.fn(),
+      };
+
+      const context = createMockCommandContext({
+        services: {
+          config: {
+            getMcpServers: vi.fn().mockReturnValue({ server1: {} }),
+            getBlockedMcpServers: vi.fn().mockReturnValue([]),
+            getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
+            getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+          },
+        },
+      });
+
+      const refreshCommand = mcpCommand.subCommands?.find(
+        (cmd) => cmd.name === 'refresh',
+      );
+      expect(refreshCommand).toBeDefined();
+
+      const result = await refreshCommand!.action!(context, '');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: 'info',
+          text: 'Refreshing MCP servers and tools...',
+        },
+        expect.any(Number),
+      );
+      expect(mockToolRegistry.discoverMcpTools).toHaveBeenCalled();
+      expect(mockGeminiClient.setTools).toHaveBeenCalled();
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        expect(result.messageType).toBe('info');
+        expect(result.content).toContain('Configured MCP servers:');
+      }
+    });
+
+    it('should show an error if config is not available', async () => {
+      const contextWithoutConfig = createMockCommandContext({
+        services: {
+          config: null,
+        },
+      });
+
+      const refreshCommand = mcpCommand.subCommands?.find(
+        (cmd) => cmd.name === 'refresh',
+      );
+      const result = await refreshCommand!.action!(contextWithoutConfig, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Config not loaded.',
+      });
+    });
+
+    it('should show an error if tool registry is not available', async () => {
+      mockConfig.getToolRegistry = vi.fn().mockResolvedValue(undefined);
+
+      const refreshCommand = mcpCommand.subCommands?.find(
+        (cmd) => cmd.name === 'refresh',
+      );
+      const result = await refreshCommand!.action!(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Could not retrieve tool registry.',
+      });
+    });
+  });
 });
