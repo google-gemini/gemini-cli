@@ -79,7 +79,7 @@ export async function getOauthClient(
   });
 
   if (
-    process.env.GOOGLE_GENAI_USE_GCP &&
+    process.env.GOOGLE_GENAI_USE_GCA &&
     process.env.GOOGLE_CLOUD_ACCESS_TOKEN
   ) {
     client.setCredentials({

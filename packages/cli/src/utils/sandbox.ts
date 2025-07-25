@@ -525,11 +525,11 @@ export async function start_sandbox(
     );
   }
 
-  // copy GOOGLE_GENAI_USE_GCP
-  if (process.env.GOOGLE_GENAI_USE_GCP) {
+  // copy GOOGLE_GENAI_USE_GCA
+  if (process.env.GOOGLE_GENAI_USE_GCA) {
     args.push(
       '--env',
-      `GOOGLE_GENAI_USE_GCP=${process.env.GOOGLE_GENAI_USE_GCP}`,
+      `GOOGLE_GENAI_USE_GCA=${process.env.GOOGLE_GENAI_USE_GCA}`,
     );
   }
 
