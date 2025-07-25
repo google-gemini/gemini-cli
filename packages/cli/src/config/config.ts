@@ -307,6 +307,31 @@ export async function loadCliConfig(
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
   const excludeTools = mergeExcludeTools(settings, activeExtensions);
+
+  if (settings.openRouter?.apiKey) {
+    mcpServers['openrouter'] = new MCPServerConfig(
+      undefined, // command
+      undefined, // args
+      undefined, // env
+      undefined, // cwd
+      'https://openrouter.ai/api/v1', // url
+      'https://openrouter.ai/api/v1', // httpUrl
+      {
+        'HTTP-Referer': 'https://github.com/google/gemini-cli',
+        'X-Title': 'Gemini CLI',
+      }, // headers
+      undefined, // tcp
+      undefined, // timeout
+      false, // trust
+      'OpenRouter', // description
+      undefined, // includeTools
+      undefined, // excludeTools
+      undefined, // extensionName
+      undefined, // oauth
+      'open_router' as never, // authProviderType
+      settings.openRouter.apiKey, // apiKey
+    );
+  }
   const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
 
   if (!argv.allowedMcpServerNames) {

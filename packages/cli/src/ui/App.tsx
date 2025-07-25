@@ -34,6 +34,7 @@ import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
 import { AuthDialog } from './components/AuthDialog.js';
+import { ProviderDialog } from './components/ProviderDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { Colors } from './colors.js';
@@ -141,6 +142,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [themeError, setThemeError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
+  const [isProviderDialogOpen, setIsProviderDialogOpen] = useState(false);
   const [footerHeight, setFooterHeight] = useState<number>(0);
   const [corgiMode, setCorgiMode] = useState(false);
   const [currentModel, setCurrentModel] = useState(config.getModel());
@@ -218,6 +220,26 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     handleEditorSelect,
     exitEditorDialog,
   } = useEditorSettings(settings, setEditorError, addItem);
+
+  const handleProviderSelect = useCallback(
+    (provider: string | undefined, scope: SettingScope) => {
+      if (provider) {
+        settings.setValue(scope, 'mcpServers', {
+          ...settings.merged.mcpServers,
+          openrouter: {
+            ...settings.merged.mcpServers?.['openrouter'],
+            description: provider,
+          },
+        });
+      }
+      setIsProviderDialogOpen(false);
+    },
+    [settings, setIsProviderDialogOpen],
+  );
+
+  const openProviderDialog = useCallback(() => {
+    setIsProviderDialogOpen(true);
+  }, [setIsProviderDialogOpen]);
 
   const toggleCorgiMode = useCallback(() => {
     setCorgiMode((prev) => !prev);
@@ -388,6 +410,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
+    openProviderDialog,
     toggleCorgiMode,
     setQuittingMessages,
     openPrivacyNotice,
@@ -839,6 +862,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 settings={settings}
                 onExit={exitEditorDialog}
               />
+            </Box>
+          ) : isProviderDialogOpen ? (
+            <Box flexDirection="column">
+              <ProviderDialog onSelect={handleProviderSelect} settings={settings} />
             </Box>
           ) : showPrivacyNotice ? (
             <PrivacyNotice

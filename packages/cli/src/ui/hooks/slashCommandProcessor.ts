@@ -39,6 +39,7 @@ export const useSlashCommandProcessor = (
   openThemeDialog: () => void,
   openAuthDialog: () => void,
   openEditorDialog: () => void,
+  openProviderDialog: () => void,
   toggleCorgiMode: () => void,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
@@ -284,6 +285,9 @@ export const useSlashCommandProcessor = (
                     return { type: 'handled' };
                   case 'editor':
                     openEditorDialog();
+                    return { type: 'handled' };
+                  case 'provider':
+                    openProviderDialog();
                     return { type: 'handled' };
                   case 'privacy':
                     openPrivacyNotice();

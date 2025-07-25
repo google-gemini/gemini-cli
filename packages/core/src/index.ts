@@ -62,6 +62,7 @@ export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 
 // MCP OAuth
+export { OpenRouterProvider } from './mcp/open-router-provider.js';
 export { MCPOAuthProvider } from './mcp/oauth-provider.js';
 export {
   MCPOAuthToken,

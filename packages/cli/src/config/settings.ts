@@ -56,7 +56,12 @@ export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
 }
 
+export interface OpenRouterSettings {
+  apiKey?: string;
+}
+
 export interface Settings {
+  openRouter?: OpenRouterSettings;
   theme?: string;
   customThemes?: Record<string, CustomTheme>;
   selectedAuthType?: AuthType;
