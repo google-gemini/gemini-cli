@@ -97,6 +97,7 @@ describe('useSlashCommandProcessor', () => {
         vi.fn(), // openThemeDialog
         mockOpenAuthDialog,
         vi.fn(), // openEditorDialog
+        vi.fn(), // openModelDialog
         vi.fn(), // toggleCorgiMode
         mockSetQuittingMessages,
         vi.fn(), // openPrivacyNotice
@@ -319,22 +320,11 @@ describe('useSlashCommandProcessor', () => {
           expect(result.current.slashCommands).toHaveLength(1),
         );
 
-        vi.useFakeTimers();
+        await act(async () => {
+          await result.current.handleSlashCommand('/exit');
+        });
 
-        try {
-          await act(async () => {
-            await result.current.handleSlashCommand('/exit');
-          });
-
-          await act(async () => {
-            await vi.advanceTimersByTimeAsync(200);
-          });
-
-          expect(mockSetQuittingMessages).toHaveBeenCalledWith([]);
-          expect(mockProcessExit).toHaveBeenCalledWith(0);
-        } finally {
-          vi.useRealTimers();
-        }
+        expect(quitAction).toHaveBeenCalled();
       });
     });
 
