@@ -147,12 +147,15 @@ export function useKeypress(
 
     let rl: readline.Interface;
     if (usePassthrough) {
-      rl = readline.createInterface({ input: keypressStream });
+      rl = readline.createInterface({
+        input: keypressStream,
+        escapeCodeTimeout: 0,
+      });
       readline.emitKeypressEvents(keypressStream, rl);
       keypressStream.on('keypress', handleKeypress);
       stdin.on('data', handleRawKeypress);
     } else {
-      rl = readline.createInterface({ input: stdin });
+      rl = readline.createInterface({ input: stdin, escapeCodeTimeout: 0 });
       readline.emitKeypressEvents(stdin, rl);
       stdin.on('keypress', handleKeypress);
     }
