@@ -11,7 +11,7 @@ import {
   IndividualToolCallDisplay,
   ToolCallStatus,
 } from '../types.js';
-import { useCallback } from 'react';
+import React, { useCallback } from 'react';
 import {
   Config,
   GeminiClient,

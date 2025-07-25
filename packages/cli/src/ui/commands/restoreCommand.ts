@@ -16,7 +16,6 @@ import { Config } from '@google/gemini-cli-core';
 
 async function restoreAction(
   context: CommandContext,
-  args: string,
 ): Promise<void | SlashCommandActionReturn> {
   const { services, ui } = context;
   const { config, git: gitService } = services;
@@ -40,7 +39,7 @@ async function restoreAction(
     const files = await fs.readdir(checkpointDir);
     const jsonFiles = files.filter((file) => file.endsWith('.json'));
 
-    if (!args) {
+    if (!context.invocation?.args) {
       if (jsonFiles.length === 0) {
         return {
           type: 'message',
@@ -64,7 +63,7 @@ async function restoreAction(
       };
     }
 
-    const selectedFile = args.endsWith('.json') ? args : `${args}.json`;
+    const selectedFile = context.invocation.args.endsWith('.json') ? context.invocation.args : `${context.invocation.args}.json`;
 
     if (!jsonFiles.includes(selectedFile)) {
       return {
@@ -91,7 +90,7 @@ async function restoreAction(
     }
 
     if (toolCallData.clientHistory) {
-      await config?.getGeminiClient()?.setHistory(toolCallData.clientHistory);
+      config?.getGeminiClient()?.setHistory(toolCallData.clientHistory);
     }
 
     if (toolCallData.commitHash) {

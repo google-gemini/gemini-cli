@@ -4,20 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import { Config, GitService, Logger } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
-import {
-  Message,
-  MessageType,
-  HistoryItemWithoutId,
-  HistoryItem,
-  SlashCommandProcessorResult,
-} from '../types.js';
+import { HistoryItem, HistoryItemWithoutId, Message, MessageType, SlashCommandProcessorResult } from '../types.js';
 import { LoadedSettings } from '../../config/settings.js';
 import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
@@ -52,12 +46,11 @@ export const useSlashCommandProcessor = (
     return new GitService(config.getProjectRoot());
   }, [config]);
 
-  const logger = useMemo(() => {
-    const l = new Logger(config?.getSessionId() || '');
+  const logger = useMemo(() =>
     // The logger's initialize is async, but we can create the instance
     // synchronously. Commands that use it will await its initialization.
-    return l;
-  }, [config]);
+     new Logger(config?.getSessionId() || '')
+  , [config]);
 
   const [pendingCompressionItemRef, setPendingCompressionItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
@@ -174,7 +167,7 @@ export const useSlashCommandProcessor = (
       setCommands(commandService.getCommands());
     };
 
-    load();
+    void load();
 
     return () => {
       controller.abort();
@@ -248,7 +241,6 @@ export const useSlashCommandProcessor = (
           };
           const result = await commandToExecute.action(
             fullCommandContext,
-            args,
           );
 
           if (result) {
@@ -296,9 +288,7 @@ export const useSlashCommandProcessor = (
                   }
                 }
               case 'load_history': {
-                await config
-                  ?.getGeminiClient()
-                  ?.setHistory(result.clientHistory);
+                config?.getGeminiClient()?.setHistory(result.clientHistory);
                 fullCommandContext.ui.clear();
                 result.history.forEach((item, index) => {
                   fullCommandContext.ui.addItem(item, index);

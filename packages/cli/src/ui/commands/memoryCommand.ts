@@ -46,19 +46,19 @@ export const memoryCommand: SlashCommand = {
       name: 'add',
       description: 'Add content to the memory.',
       kind: CommandKind.BUILT_IN,
-      action: (context, args): SlashCommandActionReturn | void => {
-        if (!args || args.trim() === '') {
+      action: (context): SlashCommandActionReturn | void => {
+        if (!context.invocation?.args || context.invocation?.args.trim() === '') {
           return {
             type: 'message',
             messageType: 'error',
-            content: 'Usage: /memory add <text to remember>',
+            content: 'Usage: /memory add "text to remember"',
           };
         }
 
         context.ui.addItem(
           {
             type: MessageType.INFO,
-            text: `Attempting to save to memory: "${args.trim()}"`,
+            text: `Attempting to save to memory: "${context.invocation.args.trim()}"`,
           },
           Date.now(),
         );
@@ -66,7 +66,7 @@ export const memoryCommand: SlashCommand = {
         return {
           type: 'tool',
           toolName: 'save_memory',
-          toolArgs: { fact: args.trim() },
+          toolArgs: { fact: context.invocation.args.trim() },
         };
       },
     },
@@ -84,7 +84,7 @@ export const memoryCommand: SlashCommand = {
         );
 
         try {
-          const config = await context.services.config;
+          const config = context.services.config;
           if (config) {
             const { memoryContent, fileCount } =
               await loadServerHierarchicalMemory(

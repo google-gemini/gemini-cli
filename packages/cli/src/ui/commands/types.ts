@@ -141,7 +141,6 @@ export interface SlashCommand {
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (
     context: CommandContext,
-    args: string, // TODO: Remove args. CommandContext now contains the complete invocation.
   ) =>
     | void
     | SlashCommandActionReturn
