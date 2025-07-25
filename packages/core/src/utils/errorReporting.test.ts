@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+<<<<<<< HEAD
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 
 // Use a type alias for SpyInstance as it's not directly exported
@@ -34,6 +35,38 @@ describe('reportError', () => {
 
   const getExpectedReportPath = (type: string) =>
     `${MOCK_TMP_DIR}/gemini-client-error-${type}-${MOCK_TIMESTAMP}.json`;
+=======
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { reportError } from './errorReporting.js';
+
+// Use a type alias for SpyInstance as it's not directly exported
+type SpyInstance = ReturnType<typeof vi.spyOn>;
+
+describe('reportError', () => {
+  let consoleErrorSpy: SpyInstance;
+  let testDir: string;
+  const MOCK_TIMESTAMP = '2025-01-01T00-00-00-000Z';
+
+  beforeEach(async () => {
+    // Create a temporary directory for logs
+    testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-report-test-'));
+    vi.resetAllMocks();
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(Date.prototype, 'toISOString').mockReturnValue(MOCK_TIMESTAMP);
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    // Clean up the temporary directory
+    await fs.rm(testDir, { recursive: true, force: true });
+  });
+
+  const getExpectedReportPath = (type: string) =>
+    path.join(testDir, `gemini-client-error-${type}-${MOCK_TIMESTAMP}.json`);
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 
   it('should generate a report and log the path', async () => {
     const error = new Error('Test error');
@@ -43,6 +76,7 @@ describe('reportError', () => {
     const type = 'test-type';
     const expectedReportPath = getExpectedReportPath(type);
 
+<<<<<<< HEAD
     (fs.writeFile as Mock).mockResolvedValue(undefined);
 
     await reportError(error, baseMessage, context, type);
@@ -59,6 +93,20 @@ describe('reportError', () => {
         2,
       ),
     );
+=======
+    await reportError(error, baseMessage, context, type, testDir);
+
+    // Verify the file was written
+    const reportContent = await fs.readFile(expectedReportPath, 'utf-8');
+    const parsedReport = JSON.parse(reportContent);
+
+    expect(parsedReport).toEqual({
+      error: { message: 'Test error', stack: 'Test stack' },
+      context,
+    });
+
+    // Verify the console log
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Full report available at: ${expectedReportPath}`,
     );
@@ -70,6 +118,7 @@ describe('reportError', () => {
     const type = 'general';
     const expectedReportPath = getExpectedReportPath(type);
 
+<<<<<<< HEAD
     (fs.writeFile as Mock).mockResolvedValue(undefined);
     await reportError(error, baseMessage);
 
@@ -83,6 +132,17 @@ describe('reportError', () => {
         2,
       ),
     );
+=======
+    await reportError(error, baseMessage, undefined, type, testDir);
+
+    const reportContent = await fs.readFile(expectedReportPath, 'utf-8');
+    const parsedReport = JSON.parse(reportContent);
+
+    expect(parsedReport).toEqual({
+      error: { message: 'Test plain object error' },
+    });
+
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Full report available at: ${expectedReportPath}`,
     );
@@ -94,6 +154,7 @@ describe('reportError', () => {
     const type = 'general';
     const expectedReportPath = getExpectedReportPath(type);
 
+<<<<<<< HEAD
     (fs.writeFile as Mock).mockResolvedValue(undefined);
     await reportError(error, baseMessage);
 
@@ -107,6 +168,17 @@ describe('reportError', () => {
         2,
       ),
     );
+=======
+    await reportError(error, baseMessage, undefined, type, testDir);
+
+    const reportContent = await fs.readFile(expectedReportPath, 'utf-8');
+    const parsedReport = JSON.parse(reportContent);
+
+    expect(parsedReport).toEqual({
+      error: { message: 'Just a string error' },
+    });
+
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Full report available at: ${expectedReportPath}`,
     );
@@ -115,6 +187,7 @@ describe('reportError', () => {
   it('should log fallback message if writing report fails', async () => {
     const error = new Error('Main error');
     const baseMessage = 'Failed operation.';
+<<<<<<< HEAD
     const writeError = new Error('Failed to write file');
     const context = ['some context'];
     const type = 'general';
@@ -131,6 +204,17 @@ describe('reportError', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Additionally, failed to write detailed error report:`,
       writeError,
+=======
+    const context = ['some context'];
+    const type = 'general';
+    const nonExistentDir = path.join(testDir, 'non-existent-dir');
+
+    await reportError(error, baseMessage, context, type, nonExistentDir);
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      `${baseMessage} Additionally, failed to write detailed error report:`,
+      expect.any(Error), // The actual write error
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
     );
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Original error that triggered report generation:',
@@ -163,9 +247,13 @@ describe('reportError', () => {
       return originalJsonStringify(value, replacer, space);
     });
 
+<<<<<<< HEAD
     (fs.writeFile as Mock).mockResolvedValue(undefined); // Mock for the minimal report write
 
     await reportError(error, baseMessage, context, type);
+=======
+    await reportError(error, baseMessage, context, type, testDir);
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Could not stringify report content (likely due to context):`,
@@ -178,6 +266,7 @@ describe('reportError', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Original context could not be stringified or included in report.',
     );
+<<<<<<< HEAD
     // Check that it attempts to write a minimal report
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedMinimalReportPath,
@@ -187,6 +276,16 @@ describe('reportError', () => {
         2,
       ),
     );
+=======
+
+    // Check that it writes a minimal report
+    const reportContent = await fs.readFile(expectedMinimalReportPath, 'utf-8');
+    const parsedReport = JSON.parse(reportContent);
+    expect(parsedReport).toEqual({
+      error: { message: error.message, stack: error.stack },
+    });
+
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Partial report (excluding context) available at: ${expectedMinimalReportPath}`,
     );
@@ -199,6 +298,7 @@ describe('reportError', () => {
     const type = 'general';
     const expectedReportPath = getExpectedReportPath(type);
 
+<<<<<<< HEAD
     (fs.writeFile as Mock).mockResolvedValue(undefined);
     await reportError(error, baseMessage, undefined, type);
 
@@ -212,6 +312,17 @@ describe('reportError', () => {
         2,
       ),
     );
+=======
+    await reportError(error, baseMessage, undefined, type, testDir);
+
+    const reportContent = await fs.readFile(expectedReportPath, 'utf-8');
+    const parsedReport = JSON.parse(reportContent);
+
+    expect(parsedReport).toEqual({
+      error: { message: 'Error without context', stack: 'No context stack' },
+    });
+
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Full report available at: ${expectedReportPath}`,
     );

@@ -1011,6 +1011,7 @@ describe('loadCliConfig ideMode', () => {
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(false);
   });
+<<<<<<< HEAD
 
   it('should add _ide_server when ideMode is true', async () => {
     process.argv = ['node', 'script.js', '--ide-mode'];
@@ -1107,4 +1108,6 @@ describe('loadCliConfig ideMode', () => {
 
     consoleWarnSpy.mockRestore();
   });
+=======
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 });

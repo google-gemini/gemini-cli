@@ -213,7 +213,6 @@ gemini --checkpointing --show-memory-usage
 # Emergency saves on interruption
 # Session recovery on restart
 ```
-
 ### Next steps
 
 - Learn how to [contribute to or build from the source](./CONTRIBUTING.md).

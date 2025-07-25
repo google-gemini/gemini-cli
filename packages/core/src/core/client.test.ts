@@ -23,7 +23,11 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { tokenLimit } from './tokenLimits.js';
+<<<<<<< HEAD
 import { ideContext } from '../services/ideContext.js';
+=======
+import { ideContext } from '../ide/ideContext.js';
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
@@ -72,7 +76,11 @@ vi.mock('../telemetry/index.js', () => ({
   logApiResponse: vi.fn(),
   logApiError: vi.fn(),
 }));
+<<<<<<< HEAD
 vi.mock('../services/ideContext.js');
+=======
+vi.mock('../ide/ideContext.js');
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 
 describe('findIndexAfterFraction', () => {
   const history: Content[] = [

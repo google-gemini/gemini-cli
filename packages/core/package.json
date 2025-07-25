@@ -8,6 +8,7 @@
   },
   "type": "module",
   "main": "dist/index.js",
+<<<<<<< HEAD
   "exports": {
     ".": "./dist/index.js",
     "./config": "./dist/src/config/index.js"
@@ -17,6 +18,8 @@
     "./config": "./dist/src/config/index.js"
   },
   
+=======
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
   "scripts": {
     "build": "node ../../scripts/build_package.js",
     "lint": "eslint . --ext .ts,.tsx",
@@ -60,12 +63,19 @@
     "@types/diff": "^7.0.2",
     "@types/dotenv": "^6.1.1",
     "@types/micromatch": "^4.0.8",
+<<<<<<< HEAD
     "@types/mime-types": "^3.0.1",
     "@types/minimatch": "^5.1.2",
     "@types/shell-quote": "^1.7.5",
     "@types/ws": "^8.5.10",
     "typescript": "^5.3.3",
     "vitest": "^3.2.4"
+=======
+    "@types/minimatch": "^5.1.2",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.3.3",
+    "vitest": "^3.1.1"
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
   },
   "engines": {
     "node": ">=20"

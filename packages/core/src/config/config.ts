@@ -45,6 +45,10 @@ import {
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
+<<<<<<< HEAD
+=======
+import { IdeClient } from '../ide/ide-client.js';
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
@@ -180,6 +184,10 @@ export interface ConfigParameters {
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideMode?: boolean;
+<<<<<<< HEAD
+=======
+  ideClient?: IdeClient;
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 }
 
 export class Config {
@@ -221,6 +229,10 @@ export class Config {
   private readonly extensionContextFilePaths: string[];
   private readonly noBrowser: boolean;
   private readonly ideMode: boolean;
+<<<<<<< HEAD
+=======
+  private readonly ideClient: IdeClient | undefined;
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
   private modelSwitchedDuringSession: boolean = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
@@ -286,6 +298,10 @@ export class Config {
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.ideMode = params.ideMode ?? false;
+<<<<<<< HEAD
+=======
+    this.ideClient = params.ideClient;
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -574,6 +590,13 @@ export class Config {
     return this.ideMode;
   }
 
+<<<<<<< HEAD
+=======
+  getIdeClient(): IdeClient | undefined {
+    return this.ideClient;
+  }
+
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
   async getGitService(): Promise<GitService> {
     if (!this.gitService) {
       this.gitService = new GitService(this.targetDir);

@@ -5,6 +5,7 @@
  */
 
 import { fileURLToPath } from 'url';
+<<<<<<< HEAD
 import {
   Config,
   getMCPDiscoveryState,
@@ -13,6 +14,9 @@ import {
   MCPDiscoveryState,
   MCPServerStatus,
 } from '@google/gemini-cli-core';
+=======
+import { Config, IDEConnectionStatus } from '@google/gemini-cli-core';
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 import {
   CommandContext,
   SlashCommand,
@@ -56,14 +60,21 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         description: 'check status of IDE integration',
         kind: CommandKind.BUILT_IN,
         action: (_context: CommandContext): SlashCommandActionReturn => {
+<<<<<<< HEAD
           const status = getMCPServerStatus(IDE_SERVER_NAME);
           const discoveryState = getMCPDiscoveryState();
           switch (status) {
             case MCPServerStatus.CONNECTED:
+=======
+          const connection = config.getIdeClient()?.getConnectionStatus();
+          switch (connection?.status) {
+            case IDEConnectionStatus.Connected:
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
               return {
                 type: 'message',
                 messageType: 'info',
                 content: `🟢 Connected`,
+<<<<<<< HEAD
               };
             case MCPServerStatus.CONNECTING:
               return {
@@ -86,6 +97,26 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
                   content: `🔴 Disconnected`,
                 };
               }
+=======
+              } as const;
+            case IDEConnectionStatus.Connecting:
+              return {
+                type: 'message',
+                messageType: 'info',
+                content: `🟡 Connecting...`,
+              } as const;
+            default: {
+              let content = `🔴 Disconnected`;
+              if (connection?.details) {
+                content += `: ${connection.details}`;
+              }
+              return {
+                type: 'message',
+                messageType: 'error',
+                content,
+              } as const;
+            }
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
           }
         },
       },

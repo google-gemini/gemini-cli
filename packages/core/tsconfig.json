@@ -4,7 +4,11 @@
     "outDir": "dist",
     "lib": ["DOM", "DOM.Iterable", "ES2021"],
     "composite": true,
+<<<<<<< HEAD
     "types": ["node"]
+=======
+    "types": ["node", "vitest/globals"]
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
   },
   "include": ["index.ts", "src/**/*.ts", "src/**/*.json"],
   "exclude": ["node_modules", "dist"]

@@ -4,8 +4,12 @@
     "outDir": "dist",
     "jsx": "react-jsx",
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
+<<<<<<< HEAD
     "types": ["node"],
     "baseUrl": "."
+=======
+    "types": ["node", "vitest/globals"]
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
   },
   "include": [
     "index.ts",

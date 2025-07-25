@@ -27,10 +27,18 @@ export async function reportError(
   baseMessage: string,
   context?: Content[] | Record<string, unknown> | unknown[],
   type = 'general',
+<<<<<<< HEAD
 ): Promise<void> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const reportFileName = `gemini-client-error-${type}-${timestamp}.json`;
   const reportPath = path.join(os.tmpdir(), reportFileName);
+=======
+  reportingDir = os.tmpdir(), // for testing
+): Promise<void> {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const reportFileName = `gemini-client-error-${type}-${timestamp}.json`;
+  const reportPath = path.join(reportingDir, reportFileName);
+>>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 
   let errorToReport: { message: string; stack?: string };
   if (error instanceof Error) {
