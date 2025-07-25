@@ -312,7 +312,7 @@ describe('ToolRegistry', () => {
         return mockChildProcess as any;
       });
 
-      await toolRegistry.discoverTools();
+      await toolRegistry.discoverAllTools();
 
       const discoveredTool = toolRegistry.getTool('tool-with-bad-format');
       expect(discoveredTool).toBeDefined();
@@ -338,7 +338,7 @@ describe('ToolRegistry', () => {
       };
       vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
 
-      await toolRegistry.discoverTools();
+      await toolRegistry.discoverAllTools();
 
       expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
         mcpServerConfigVal,
@@ -360,7 +360,7 @@ describe('ToolRegistry', () => {
       };
       vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
 
-      await toolRegistry.discoverTools();
+      await toolRegistry.discoverAllTools();
 
       expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
         mcpServerConfigVal,
