@@ -28,6 +28,13 @@ vi.mock('../../services/FileCommandLoader.js', () => ({
   })),
 }));
 
+const mockMcpLoadCommands = vi.fn();
+vi.mock('../../services/McpPromptLoader.js', () => ({
+  McpPromptLoader: vi.fn().mockImplementation(() => ({
+    loadCommands: mockMcpLoadCommands,
+  })),
+}));
+
 vi.mock('../contexts/SessionContext.js', () => ({
   useSessionStats: vi.fn(() => ({ stats: {} })),
 }));
@@ -41,6 +48,7 @@ import { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
+import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 
 const createTestCommand = (
   overrides: Partial<SlashCommand>,
@@ -75,14 +83,17 @@ describe('useSlashCommandProcessor', () => {
     (vi.mocked(BuiltinCommandLoader) as Mock).mockClear();
     mockBuiltinLoadCommands.mockResolvedValue([]);
     mockFileLoadCommands.mockResolvedValue([]);
+    mockMcpLoadCommands.mockResolvedValue([]);
   });
 
   const setupProcessorHook = (
     builtinCommands: SlashCommand[] = [],
     fileCommands: SlashCommand[] = [],
+    mcpCommands: SlashCommand[] = [],
   ) => {
     mockBuiltinLoadCommands.mockResolvedValue(Object.freeze(builtinCommands));
     mockFileLoadCommands.mockResolvedValue(Object.freeze(fileCommands));
+    mockMcpLoadCommands.mockResolvedValue(Object.freeze(mcpCommands));
 
     const { result } = renderHook(() =>
       useSlashCommandProcessor(
@@ -111,6 +122,7 @@ describe('useSlashCommandProcessor', () => {
       setupProcessorHook();
       expect(BuiltinCommandLoader).toHaveBeenCalledWith(mockConfig);
       expect(FileCommandLoader).toHaveBeenCalledWith(mockConfig);
+      expect(McpPromptLoader).toHaveBeenCalledWith(mockConfig);
     });
 
     it('should call loadCommands and populate state after mounting', async () => {
@@ -124,6 +136,7 @@ describe('useSlashCommandProcessor', () => {
       expect(result.current.slashCommands[0]?.name).toBe('test');
       expect(mockBuiltinLoadCommands).toHaveBeenCalledTimes(1);
       expect(mockFileLoadCommands).toHaveBeenCalledTimes(1);
+      expect(mockMcpLoadCommands).toHaveBeenCalledTimes(1);
     });
 
     it('should provide an immutable array of commands to consumers', async () => {
@@ -369,6 +382,38 @@ describe('useSlashCommandProcessor', () => {
         expect.any(Number),
       );
     });
+
+    it('should handle "submit_prompt" action returned from a mcp-based command', async () => {
+      const mcpCommand = createTestCommand(
+        {
+          name: 'mcpcmd',
+          description: 'A command from mcp',
+          action: async () => ({
+            type: 'submit_prompt',
+            content: 'The actual prompt from the mcp command.',
+          }),
+        },
+        CommandKind.MCP_PROMPT,
+      );
+
+      const result = setupProcessorHook([], [], [mcpCommand]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      let actionResult;
+      await act(async () => {
+        actionResult = await result.current.handleSlashCommand('/mcpcmd');
+      });
+
+      expect(actionResult).toEqual({
+        type: 'submit_prompt',
+        content: 'The actual prompt from the mcp command.',
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        { type: MessageType.USER, text: '/mcpcmd' },
+        expect.any(Number),
+      );
+    });
   });
 
   describe('Command Parsing and Matching', () => {
@@ -441,6 +486,39 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Command Precedence', () => {
+    it('should override mcp-based commands with file-based commands of the same name', async () => {
+      const mcpAction = vi.fn();
+      const fileAction = vi.fn();
+
+      const mcpCommand = createTestCommand(
+        {
+          name: 'override',
+          description: 'mcp',
+          action: mcpAction,
+        },
+        CommandKind.MCP_PROMPT,
+      );
+      const fileCommand = createTestCommand(
+        { name: 'override', description: 'file', action: fileAction },
+        CommandKind.FILE,
+      );
+
+      const result = setupProcessorHook([], [fileCommand], [mcpCommand]);
+
+      await waitFor(() => {
+        // The service should only return one command with the name 'override'
+        expect(result.current.slashCommands).toHaveLength(1);
+      });
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/override');
+      });
+
+      // Only the file-based command's action should be called.
+      expect(fileAction).toHaveBeenCalledTimes(1);
+      expect(mcpAction).not.toHaveBeenCalled();
+    });
+
     it('should prioritize a command with a primary name over a command with a matching alias', async () => {
       const quitAction = vi.fn();
       const exitAction = vi.fn();
