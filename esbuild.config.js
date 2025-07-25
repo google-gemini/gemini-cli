@@ -21,6 +21,12 @@ esbuild
     outfile: 'bundle/gemini.js',
     platform: 'node',
     format: 'esm',
+    alias: {
+      'is-in-ci': path.resolve(
+        __dirname,
+        'packages/cli/src/patches/is-in-ci.ts',
+      ),
+    },
     define: {
       'process.env.CLI_VERSION': JSON.stringify(pkg.version),
     },
