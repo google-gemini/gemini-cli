@@ -23,6 +23,7 @@ vi.mock('os');
 vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
+import { isCommandAllowed } from '../utils/shell-utils.js';
 import { ShellTool } from './shell.js';
 import { type Config } from '../config/config.js';
 import {
@@ -33,18 +34,10 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import * as summarizer from '../utils/summarizer.js';
-<<<<<<< HEAD
-import { GeminiClient } from '../core/client.js';
-import { ToolExecuteConfirmationDetails } from './tools.js';
-import os from 'os';
-
-describe('ShellTool Bug Reproduction', () => {
-=======
 import { ToolConfirmationOutcome } from './tools.js';
 import { OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 
 describe('ShellTool', () => {
->>>>>>> a8ce3fa4 (add shell exec service)
   let shellTool: ShellTool;
   let mockConfig: Config;
   let mockShellOutputCallback: (event: ShellOutputEvent) => void;
@@ -64,18 +57,6 @@ describe('ShellTool', () => {
 
     shellTool = new ShellTool(mockConfig);
 
-<<<<<<< HEAD
-    const abortSignal = new AbortController().signal;
-    const result = await shellTool.execute(
-      { command: 'echo hello' },
-      abortSignal,
-      () => {},
-    );
-
-    expect(result.returnDisplay).toBe('hello' + os.EOL);
-    expect(result.llmContent).toBe('summarized output');
-    expect(summarizeSpy).toHaveBeenCalled();
-=======
     vi.mocked(os.platform).mockReturnValue('linux');
     vi.mocked(os.tmpdir).mockReturnValue('/tmp');
     (vi.mocked(crypto.randomBytes) as Mock).mockReturnValue(
@@ -92,38 +73,20 @@ describe('ShellTool', () => {
         }),
       };
     });
->>>>>>> a8ce3fa4 (add shell exec service)
   });
 
   describe('isCommandAllowed', () => {
     it('should allow a command if no restrictions are provided', () => {
       (mockConfig.getCoreTools as Mock).mockReturnValue(undefined);
       (mockConfig.getExcludeTools as Mock).mockReturnValue(undefined);
-      expect(shellTool.isCommandAllowed('ls -l').allowed).toBe(true);
+      expect(isCommandAllowed('ls -l', mockConfig).allowed).toBe(true);
     });
 
-<<<<<<< HEAD
-    const summarizeSpy = vi
-      .spyOn(summarizer, 'summarizeToolOutput')
-      .mockResolvedValue('summarized output');
-
-    const abortSignal = new AbortController().signal;
-    const result = await shellTool.execute(
-      { command: 'echo hello' },
-      abortSignal,
-      () => {},
-    );
-
-    expect(result.returnDisplay).toBe('hello' + os.EOL);
-    expect(result.llmContent).not.toBe('summarized output');
-    expect(summarizeSpy).not.toHaveBeenCalled();
-=======
     it('should block a command with command substitution using $()', () => {
-      expect(shellTool.isCommandAllowed('echo $(rm -rf /)').allowed).toBe(
+      expect(isCommandAllowed('echo $(rm -rf /)', mockConfig).allowed).toBe(
         false,
       );
     });
->>>>>>> a8ce3fa4 (add shell exec service)
   });
 
   describe('validateToolParams', () => {
@@ -194,7 +157,17 @@ describe('ShellTool', () => {
     it('should not wrap command on windows', async () => {
       vi.mocked(os.platform).mockReturnValue('win32');
       const promise = shellTool.execute({ command: 'dir' }, mockAbortSignal);
-      resolveShellExecution();
+      resolveExecutionPromise({
+        rawOutput: Buffer.from(''),
+        output: '',
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+      });
       await promise;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         'dir',
@@ -215,6 +188,11 @@ describe('ShellTool', () => {
         exitCode: 1,
         output: 'err',
         stderr: 'err',
+        rawOutput: Buffer.from('err'),
+        stdout: '',
+        signal: null,
+        aborted: false,
+        pid: 12345,
       });
 
       const result = await promise;
@@ -232,14 +210,19 @@ describe('ShellTool', () => {
       );
 
       const promise = shellTool.execute({ command: 'ls' }, mockAbortSignal);
-      resolveShellExecution({ output: 'long output' });
+      resolveExecutionPromise({
+        output: 'long output',
+        rawOutput: Buffer.from('long output'),
+        stdout: 'long output',
+        stderr: '',
+        exitCode: 0,
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+      });
 
-<<<<<<< HEAD
-    const abortSignal = new AbortController().signal;
-    await shellTool.execute({ command: 'echo "hello"' }, abortSignal, () => {});
-=======
       const result = await promise;
->>>>>>> a8ce3fa4 (add shell exec service)
 
       expect(summarizer.summarizeToolOutput).toHaveBeenCalledWith(
         expect.any(String),
@@ -290,7 +273,17 @@ describe('ShellTool', () => {
         expect(updateOutputMock).toHaveBeenCalledOnce();
         expect(updateOutputMock).toHaveBeenCalledWith('hello \nworld');
 
-        resolveShellExecution();
+        resolveExecutionPromise({
+          rawOutput: Buffer.from(''),
+          output: '',
+          stdout: '',
+          stderr: '',
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+        });
         await promise;
       });
 
@@ -328,7 +321,17 @@ describe('ShellTool', () => {
           '[Receiving binary output... 2.0 KB received]',
         );
 
-        resolveShellExecution();
+        resolveExecutionPromise({
+          rawOutput: Buffer.from(''),
+          output: '',
+          stdout: '',
+          stderr: '',
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+        });
         await promise;
       });
     });
@@ -345,15 +348,10 @@ describe('ShellTool', () => {
       expect(confirmation).not.toBe(false);
       expect(confirmation && confirmation.type).toBe('exec');
 
-<<<<<<< HEAD
-    const abortSignal = new AbortController().signal;
-    await shellTool.execute({ command: 'echo "hello"' }, abortSignal, () => {});
-=======
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (confirmation as any).onConfirm(
         ToolConfirmationOutcome.ProceedAlways,
       );
->>>>>>> a8ce3fa4 (add shell exec service)
 
       // Should now be whitelisted
       const secondConfirmation = await shellTool.shouldConfirmExecute(
@@ -363,41 +361,6 @@ describe('ShellTool', () => {
       expect(secondConfirmation).toBe(false);
     });
 
-<<<<<<< HEAD
-  it('should pass GEMINI_CLI environment variable to executed commands', async () => {
-    config = {
-      getCoreTools: () => undefined,
-      getExcludeTools: () => undefined,
-      getDebugMode: () => false,
-      getGeminiClient: () => ({}) as GeminiClient,
-      getTargetDir: () => '.',
-      getSummarizeToolOutputConfig: () => ({}),
-    } as unknown as Config;
-    shellTool = new ShellTool(config);
-
-    const abortSignal = new AbortController().signal;
-    const command =
-      os.platform() === 'win32' ? 'echo %GEMINI_CLI%' : 'echo "$GEMINI_CLI"';
-    const result = await shellTool.execute({ command }, abortSignal, () => {});
-
-    expect(result.returnDisplay).toBe('1' + os.EOL);
-  });
-});
-
-describe('shouldConfirmExecute', () => {
-  it('should de-duplicate command roots before asking for confirmation', async () => {
-    const shellTool = new ShellTool({
-      getCoreTools: () => ['run_shell_command'],
-      getExcludeTools: () => [],
-    } as unknown as Config);
-    const result = (await shellTool.shouldConfirmExecute(
-      {
-        command: 'git status && git log',
-      },
-      new AbortController().signal,
-    )) as ToolExecuteConfirmationDetails;
-    expect(result.rootCommand).toEqual('git');
-=======
     it('should skip confirmation if validation fails', async () => {
       const confirmation = await shellTool.shouldConfirmExecute(
         { command: '' },
@@ -405,6 +368,5 @@ describe('shouldConfirmExecute', () => {
       );
       expect(confirmation).toBe(false);
     });
->>>>>>> a8ce3fa4 (add shell exec service)
   });
 });

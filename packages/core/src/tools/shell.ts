@@ -20,23 +20,19 @@ import {
 import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
-<<<<<<< HEAD
-import stripAnsi from 'strip-ansi';
-import {
-  getCommandRoots,
-  isCommandAllowed,
-  stripShellWrapper,
-} from '../utils/shell-utils.js';
-=======
 import { summarizeToolOutput } from '../utils/summarizer.js';
 import {
   ShellExecutionService,
   ShellOutputEvent,
 } from '../services/shellExecutionService.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
+import {
+  getCommandRoots,
+  isCommandAllowed,
+  stripShellWrapper,
+} from '../utils/shell-utils.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
->>>>>>> a8ce3fa4 (add shell exec service)
 
 export interface ShellToolParams {
   command: string;
@@ -105,130 +101,6 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     return description;
   }
 
-<<<<<<< HEAD
-=======
-  /**
-   * Extracts the root command from a given shell command string.
-   * This is used to identify the base command for permission checks.
-   * @param command The shell command string to parse
-   * @returns The root command name, or undefined if it cannot be determined
-   * @example getCommandRoot("ls -la /tmp") returns "ls"
-   * @example getCommandRoot("git status && npm test") returns "git"
-   */
-  getCommandRoot(command: string): string | undefined {
-    return command
-      .trim() // remove leading and trailing whitespace
-      .replace(/[{}()]/g, '') // remove all grouping operators
-      .split(/[\s;&|]+/)[0] // split on any whitespace or separator or chaining operators and take first part
-      ?.split(/[/\\]/) // split on any path separators (or return undefined if previous line was undefined)
-      .pop(); // take last part and return command root (or undefined if previous line was empty)
-  }
-
-  /**
-   * Determines whether a given shell command is allowed to execute based on
-   * the tool's configuration including allowlists and blocklists.
-   * @param command The shell command string to validate
-   * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed
-   */
-  isCommandAllowed(command: string): { allowed: boolean; reason?: string } {
-    // 0. Disallow command substitution
-    if (command.includes('$(')) {
-      return {
-        allowed: false,
-        reason:
-          'Command substitution using $() is not allowed for security reasons',
-      };
-    }
-
-    const SHELL_TOOL_NAMES = [ShellTool.name, ShellTool.Name];
-
-    const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
-
-    /**
-     * Checks if a command string starts with a given prefix, ensuring it's a
-     * whole word match (i.e., followed by a space or it's an exact match).
-     * e.g., `isPrefixedBy('npm install', 'npm')` -> true
-     * e.g., `isPrefixedBy('npm', 'npm')` -> true
-     * e.g., `isPrefixedBy('npminstall', 'npm')` -> false
-     */
-    const isPrefixedBy = (cmd: string, prefix: string): boolean => {
-      if (!cmd.startsWith(prefix)) {
-        return false;
-      }
-      return cmd.length === prefix.length || cmd[prefix.length] === ' ';
-    };
-
-    /**
-     * Extracts and normalizes shell commands from a list of tool strings.
-     * e.g., 'ShellTool("ls -l")' becomes 'ls -l'
-     */
-    const extractCommands = (tools: string[]): string[] =>
-      tools.flatMap((tool) => {
-        for (const toolName of SHELL_TOOL_NAMES) {
-          if (tool.startsWith(`${toolName}(`) && tool.endsWith(')')) {
-            return [normalize(tool.slice(toolName.length + 1, -1))];
-          }
-        }
-        return [];
-      });
-
-    const coreTools = this.config.getCoreTools() || [];
-    const excludeTools = this.config.getExcludeTools() || [];
-
-    // Check if the shell tool is globally disabled.
-    if (SHELL_TOOL_NAMES.some((name) => excludeTools.includes(name))) {
-      return {
-        allowed: false,
-        reason: 'Shell tool is globally disabled in configuration',
-      };
-    }
-
-    const blockedCommands = new Set(extractCommands(excludeTools));
-    const allowedCommands = new Set(extractCommands(coreTools));
-
-    const hasSpecificAllowedCommands = allowedCommands.size > 0;
-    const isWildcardAllowed = SHELL_TOOL_NAMES.some((name) =>
-      coreTools.includes(name),
-    );
-
-    const commandsToValidate = command.split(/&&|\|\||\||;/).map(normalize);
-
-    const blockedCommandsArr = [...blockedCommands];
-
-    for (const cmd of commandsToValidate) {
-      // Check if the command is on the blocklist.
-      const isBlocked = blockedCommandsArr.some((blocked) =>
-        isPrefixedBy(cmd, blocked),
-      );
-      if (isBlocked) {
-        return {
-          allowed: false,
-          reason: `Command '${cmd}' is blocked by configuration`,
-        };
-      }
-
-      // If in strict allow-list mode, check if the command is permitted.
-      const isStrictAllowlist =
-        hasSpecificAllowedCommands && !isWildcardAllowed;
-      const allowedCommandsArr = [...allowedCommands];
-      if (isStrictAllowlist) {
-        const isAllowed = allowedCommandsArr.some((allowed) =>
-          isPrefixedBy(cmd, allowed),
-        );
-        if (!isAllowed) {
-          return {
-            allowed: false,
-            reason: `Command '${cmd}' is not in the allowed commands list`,
-          };
-        }
-      }
-    }
-
-    // If all checks pass, the command is allowed.
-    return { allowed: true };
-  }
-
->>>>>>> a8ce3fa4 (add shell exec service)
   validateToolParams(params: ShellToolParams): string | null {
     const commandCheck = isCommandAllowed(params.command, this.config);
     if (!commandCheck.allowed) {
@@ -337,28 +209,6 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
           return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
         })();
 
-<<<<<<< HEAD
-    // spawn command in specified directory (or project root if not specified)
-    const shell = isWindows
-      ? spawn('cmd.exe', ['/c', commandToExecute], {
-          stdio: ['ignore', 'pipe', 'pipe'],
-          // detached: true, // ensure subprocess starts its own process group (esp. in Linux)
-          cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
-          env: {
-            ...process.env,
-            GEMINI_CLI: '1',
-          },
-        })
-      : spawn('bash', ['-c', commandToExecute], {
-          stdio: ['ignore', 'pipe', 'pipe'],
-          detached: true, // ensure subprocess starts its own process group (esp. in Linux)
-          cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
-          env: {
-            ...process.env,
-            GEMINI_CLI: '1',
-          },
-        });
-=======
     const cwd = path.resolve(
       this.config.getTargetDir(),
       params.directory || '',
@@ -366,13 +216,12 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
     let cumulativeStdout = '';
     let cumulativeStderr = '';
->>>>>>> a8ce3fa4 (add shell exec service)
 
     let lastUpdateTime = Date.now();
     let isBinaryStream = false;
 
     const { result: resultPromise } = ShellExecutionService.execute(
-      command,
+      commandToExecute,
       cwd,
       (event: ShellOutputEvent) => {
         if (!updateOutput) {
@@ -382,49 +231,6 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
         let currentDisplayOutput = '';
         let shouldUpdate = false;
 
-<<<<<<< HEAD
-    let stderr = '';
-    shell.stderr.on('data', (data: Buffer) => {
-      if (!exited) {
-        const str = stripAnsi(data.toString());
-        stderr += str;
-        appendOutput(str);
-      }
-    });
-
-    let error: Error | null = null;
-    shell.on('error', (err: Error) => {
-      error = err;
-      // remove wrapper from user's command in error message
-      error.message = error.message.replace(commandToExecute, params.command);
-    });
-
-    let code: number | null = null;
-    let processSignal: NodeJS.Signals | null = null;
-    const exitHandler = (
-      _code: number | null,
-      _signal: NodeJS.Signals | null,
-    ) => {
-      exited = true;
-      code = _code;
-      processSignal = _signal;
-    };
-    shell.on('exit', exitHandler);
-
-    const abortHandler = async () => {
-      if (shell.pid && !exited) {
-        if (os.platform() === 'win32') {
-          // For Windows, use taskkill to kill the process tree
-          spawn('taskkill', ['/pid', shell.pid.toString(), '/f', '/t']);
-        } else {
-          try {
-            // attempt to SIGTERM process group (negative PID)
-            // fall back to SIGKILL (to group) after 200ms
-            process.kill(-shell.pid, 'SIGTERM');
-            await new Promise((resolve) => setTimeout(resolve, 200));
-            if (shell.pid && !exited) {
-              process.kill(-shell.pid, 'SIGKILL');
-=======
         switch (event.type) {
           case 'data':
             if (isBinaryStream) break; // Don't process text if we are in binary mode
@@ -432,7 +238,6 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
               cumulativeStdout += event.chunk;
             } else {
               cumulativeStderr += event.chunk;
->>>>>>> a8ce3fa4 (add shell exec service)
             }
             currentDisplayOutput =
               cumulativeStdout +
@@ -460,29 +265,16 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
             throw new Error('An unhandled ShellOutputEvent was found.');
           }
         }
-<<<<<<< HEAD
-      }
-    };
-    signal.addEventListener('abort', abortHandler);
-
-    // wait for the shell to exit
-    try {
-      await new Promise((resolve) => shell.on('exit', resolve));
-    } finally {
-      signal.removeEventListener('abort', abortHandler);
-    }
-=======
 
         if (shouldUpdate) {
           updateOutput(currentDisplayOutput);
           lastUpdateTime = Date.now();
         }
       },
-      abortSignal,
+      signal,
     );
 
     const result = await resultPromise;
->>>>>>> a8ce3fa4 (add shell exec service)
 
     const backgroundPIDs: number[] = [];
     if (os.platform() !== 'win32') {
@@ -509,11 +301,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     }
 
     let llmContent = '';
-<<<<<<< HEAD
-    if (signal.aborted) {
-=======
     if (result.aborted) {
->>>>>>> a8ce3fa4 (add shell exec service)
       llmContent = 'Command was cancelled by user before it could complete.';
       if (result.output.trim()) {
         llmContent += ` Below is the output (on stdout and stderr) before it was cancelled:\n${result.output}`;
@@ -524,7 +312,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       // Create a formatted error string for display, replacing the wrapper command
       // with the user-facing command.
       const finalError = result.error
-        ? result.error.message.replace(command, params.command)
+        ? result.error.message.replace(commandToExecute, params.command)
         : '(none)';
 
       llmContent = [
@@ -547,12 +335,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       if (result.output.trim()) {
         returnDisplayMessage = result.output;
       } else {
-<<<<<<< HEAD
-        // Output is empty, let's provide a reason if the command failed or was cancelled
-        if (signal.aborted) {
-=======
         if (result.aborted) {
->>>>>>> a8ce3fa4 (add shell exec service)
           returnDisplayMessage = 'Command cancelled by user.';
         } else if (result.signal) {
           returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
