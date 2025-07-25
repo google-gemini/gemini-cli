@@ -140,24 +140,27 @@ export class ClearcutLogger {
           headers: { 'Content-Length': Buffer.byteLength(body) },
         };
         const bufs: Buffer[] = [];
-        const req = https.request({
-          ...options,
-          agent: this.getProxyAgent()
-        }, (res) => {
-          if (
-            res.statusCode &&
-            (res.statusCode < 200 || res.statusCode >= 300)
-          ) {
-            const err: HttpError = new Error(
-              `Request failed with status ${res.statusCode}`,
-            );
-            err.status = res.statusCode;
-            res.resume();
-            return reject(err);
-          }
-          res.on('data', (buf) => bufs.push(buf));
-          res.on('end', () => resolve(Buffer.concat(bufs)));
-        });
+        const req = https.request(
+          {
+            ...options,
+            agent: this.getProxyAgent(),
+          },
+          (res) => {
+            if (
+              res.statusCode &&
+              (res.statusCode < 200 || res.statusCode >= 300)
+            ) {
+              const err: HttpError = new Error(
+                `Request failed with status ${res.statusCode}`,
+              );
+              err.status = res.statusCode;
+              res.resume();
+              return reject(err);
+            }
+            res.on('data', (buf) => bufs.push(buf));
+            res.on('end', () => resolve(Buffer.concat(bufs)));
+          },
+        );
         req.on('error', reject);
         req.end(body);
       });
