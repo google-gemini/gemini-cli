@@ -17,6 +17,9 @@ inputs:
   node_version:
     description: 'Node.js version for context in messages'
     required: true
+  os:
+    description: 'The os for context in messages'
+    required: true
   github_token:
     description: 'GitHub token for posting comments'
     required: true
@@ -91,7 +94,7 @@ runs:
         echo "</details>" >> "$comment_file"
         echo "" >> "$comment_file"
 
-        echo "_For detailed HTML reports, please see the 'coverage-reports-${{ inputs.node_version }}' artifact from the main CI run._" >> "$comment_file"
+        echo "_For detailed HTML reports, please see the 'coverage-reports-${{ inputs.node_version }}-${{ inputs.os }}' artifact from the main CI run._" >> "$comment_file"
 
     - name: Post Coverage Comment
       uses: thollander/actions-comment-pull-request@v3
