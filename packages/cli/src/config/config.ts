@@ -21,6 +21,7 @@ import {
   FileFilteringOptions,
   MCPServerConfig,
   IDE_SERVER_NAME,
+  PasswordRequester,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -252,6 +253,7 @@ export async function loadCliConfig(
   extensions: Extension[],
   sessionId: string,
   argv: CliArgs,
+  passwordRequester?: PasswordRequester,
 ): Promise<Config> {
   const debugMode =
     argv.debug ||
@@ -450,6 +452,7 @@ export async function loadCliConfig(
     noBrowser: !!process.env.NO_BROWSER,
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
+    passwordRequester,
   });
 }
 
