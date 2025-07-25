@@ -30,6 +30,14 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "gemini-cli.runGeminiCLI",
+        "title": "Gemini CLI: Run"
+      }
+    ]
+  },
   "main": "./dist/extension.js",
   "scripts": {
     "vscode:prepublish": "npm run check-types && npm run lint && node esbuild.js --production",
