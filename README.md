@@ -174,7 +174,7 @@ gemini
 Or work with an existing project:
 
 ```sh
-git clone https://github.com/google-gemini/gemini-cli
+git clone https://github.com/zapabob/gemini-cli
 cd gemini-cli
 gemini
 > Give me a summary of all of the changes that went in yesterday
