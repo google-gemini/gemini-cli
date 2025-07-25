@@ -180,6 +180,7 @@ export interface ConfigParameters {
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideMode?: boolean;
+  temperature?: number;
 }
 
 export class Config {
@@ -235,6 +236,7 @@ export class Config {
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
   private readonly experimentalAcp: boolean = false;
+  private readonly temperature: number;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -286,6 +288,7 @@ export class Config {
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.ideMode = params.ideMode ?? false;
+    this.temperature = params.temperature ?? 0.0;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -572,6 +575,10 @@ export class Config {
 
   getIdeMode(): boolean {
     return this.ideMode;
+  }
+
+  getTemperature(): number {
+    return this.temperature;
   }
 
   async getGitService(): Promise<GitService> {

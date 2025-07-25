@@ -312,4 +312,50 @@ describe('Server Config (config.ts)', () => {
       expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
     });
   });
+
+  describe('Temperature Settings', () => {
+    it('should return default temperature (0.0) if not provided', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+      };
+      const config = new Config(params);
+      expect(config.getTemperature()).toBe(0.0);
+    });
+
+    it('should return provided temperature value', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        temperature: 1.5,
+      };
+      const config = new Config(params);
+      expect(config.getTemperature()).toBe(1.5);
+    });
+
+    it('should handle temperature value of 0.0', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        temperature: 0.0,
+      };
+      const config = new Config(params);
+      expect(config.getTemperature()).toBe(0.0);
+    });
+
+    it('should handle temperature value of 2.0', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        temperature: 2.0,
+      };
+      const config = new Config(params);
+      expect(config.getTemperature()).toBe(2.0);
+    });
+
+    it('should handle fractional temperature values', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        temperature: 0.7,
+      };
+      const config = new Config(params);
+      expect(config.getTemperature()).toBe(0.7);
+    });
+  });
 });

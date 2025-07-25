@@ -115,6 +115,12 @@ export class GeminiClient {
 
     this.embeddingModel = config.getEmbeddingModel();
     this.loopDetector = new LoopDetectionService(config);
+    
+    // Update generateContentConfig with temperature from config
+    this.generateContentConfig = {
+      temperature: config.getTemperature(),
+      topP: 1,
+    };
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
