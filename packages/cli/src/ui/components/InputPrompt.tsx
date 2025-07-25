@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
@@ -57,6 +57,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const ignoreNextReturnSequenceRef = useRef(false);
 
   const completion = useCompletion(
     buffer,
@@ -175,6 +176,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       ) {
         setShellModeActive(!shellModeActive);
         buffer.setText(''); // Clear the '!' from input
+        return;
+      }
+
+      // Handle VSCode Shift+Enter sequence: \\ \r \n
+      if (key.sequence === '\\') {
+        buffer.insert('\\');
+        buffer.newline();
+        ignoreNextReturnSequenceRef.current = true;
+        return;
+      }
+
+      // Ignore any character that follows the backslash in Shift+Enter sequence
+      if (
+        ignoreNextReturnSequenceRef.current &&
+        (key.sequence === '\r' || key.sequence === '\n')
+      ) {
+        // Reset flag immediately after seeing any following character
+        ignoreNextReturnSequenceRef.current = false;
         return;
       }
 

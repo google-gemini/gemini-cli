@@ -685,6 +685,28 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should insert backslash and newline when receiving VSCode Shift+Enter sequence', async () => {
+    mockBuffer.text = 'some text';
+    mockBuffer.cursor = [0, 9];
+    mockBuffer.lines = ['some text'];
+
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    // Simulate VSCode terminal Shift+Enter sequence: three separate events
+    stdin.write('\\'); // First: backslash
+    await wait();
+    stdin.write('\r'); // Second: carriage return
+    await wait();
+    stdin.write('\n'); // Third: ANSI escape sequence
+    await wait();
+
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(props.buffer.insert).toHaveBeenCalledWith('\\');
+    expect(props.buffer.newline).toHaveBeenCalledTimes(1); // Only called once for the backslash sequence
+    unmount();
+  });
+
   it('should clear the buffer on Ctrl+C if it has text', async () => {
     props.buffer.setText('some text to clear');
     const { stdin, unmount } = render(<InputPrompt {...props} />);
