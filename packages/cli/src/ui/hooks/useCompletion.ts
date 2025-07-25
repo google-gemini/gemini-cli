@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { glob } from 'glob';
@@ -16,12 +16,50 @@ import {
   Config,
   FileDiscoveryService,
   DEFAULT_FILE_FILTERING_OPTIONS,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  GeminiClient,
 } from '@google/gemini-cli-core';
+import { Content, GenerateContentConfig } from '@google/genai';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
   Suggestion,
 } from '../components/SuggestionsDisplay.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
+
+// Constants
+const AI_COMPLETION_MIN_LENGTH = 5;
+const AI_COMPLETION_DEBOUNCE_MS = 500;
+const AI_COMPLETION_MAX_SUGGESTIONS = 3;
+
+// Import getResponseText from core package utils
+interface ResponsePart {
+  text?: string;
+}
+
+interface ResponseCandidate {
+  content?: {
+    parts?: ResponsePart[];
+  };
+}
+
+interface ApiResponse {
+  candidates?: ResponseCandidate[];
+}
+
+const getResponseText = (response: ApiResponse): string | undefined => {
+  const parts = response.candidates?.[0]?.content?.parts;
+  if (!parts) {
+    return undefined;
+  }
+  const textSegments = parts
+    .map((part: ResponsePart) => part.text)
+    .filter((text): text is string => typeof text === 'string');
+
+  if (textSegments.length === 0) {
+    return undefined;
+  }
+  return textSegments.join('');
+};
 
 export interface UseCompletionReturn {
   suggestions: Suggestion[];
@@ -35,6 +73,7 @@ export interface UseCompletionReturn {
   resetCompletionState: () => void;
   navigateUp: () => void;
   navigateDown: () => void;
+  markSuggestionSelected: (selectedText: string) => void;
 }
 
 export function useCompletion(
@@ -44,6 +83,7 @@ export function useCompletion(
   slashCommands: readonly SlashCommand[],
   commandContext: CommandContext,
   config?: Config,
+  geminiClient?: GeminiClient | null,
 ): UseCompletionReturn {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] =
@@ -53,6 +93,13 @@ export function useCompletion(
   const [isLoadingSuggestions, setIsLoadingSuggestions] =
     useState<boolean>(false);
   const [isPerfectMatch, setIsPerfectMatch] = useState<boolean>(false);
+  
+  // Add ref to track current abort controller for AI completion
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Track if user just selected a suggestion to prevent immediate re-triggering
+  const [justSelectedSuggestion, setJustSelectedSuggestion] = useState<boolean>(false);
+  const lastSelectedTextRef = useRef<string>('');
 
   const resetCompletionState = useCallback(() => {
     setSuggestions([]);
@@ -121,6 +168,123 @@ export function useCompletion(
       return newActiveIndex;
     });
   }, [suggestions.length]);
+
+  // Function to mark that user selected a suggestion
+  const markSuggestionSelected = useCallback((selectedText: string) => {
+    setJustSelectedSuggestion(true);
+    lastSelectedTextRef.current = selectedText;
+  }, []);
+
+  // AI Prompt Completion Handler
+  const handleAIPromptCompletion = useCallback(() => {
+    const trimmedText = query.trim();
+    
+    // Check if user just selected a suggestion and text hasn't changed
+    if (justSelectedSuggestion && trimmedText === lastSelectedTextRef.current) {
+      return;
+    }
+    
+    // If text has changed from last selected text, allow new suggestions
+    if (trimmedText !== lastSelectedTextRef.current) {
+      setJustSelectedSuggestion(false);
+      lastSelectedTextRef.current = '';
+    }
+    
+    // Cancel any ongoing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Only show AI prompt completion for regular text input
+    if (trimmedText.length < AI_COMPLETION_MIN_LENGTH || !geminiClient) {
+      resetCompletionState();
+      return;
+    }
+
+    // Don't show for commands that start with special characters
+    if (trimmedText.startsWith('/') || trimmedText.includes('@')) {
+      resetCompletionState();
+      return;
+    }
+
+    setIsLoadingSuggestions(true);
+    
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
+    // Debounced AI completion
+    const generateAISuggestions = async () => {
+      try {
+        const contents: Content[] = [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: `Act as an intelligent prompt co-pilot. Your goal is to take the user’s initial thought and seamlessly continue it, building it out into 1-2 fully-formed, insightful prompts that unlock greater potential.\nUser’s initial thought: \n'''\n"${trimmedText}"\n'''\n\nYour task is to continue their sentence. Start your response with the user’s exact text ("${trimmedText}") and then add the necessary detail, context, and creative direction to transform it from a fragment into a complete, high-impact prompt.\n\nFormatting:\nPlain text only.\nOne complete prompt suggestion per line.\nMatch the user’s language.`,
+              },
+            ],
+          },
+        ];
+
+        const generationConfig: GenerateContentConfig = {
+          temperature: 0.67,
+          maxOutputTokens: 16000,
+          thinkingConfig: {
+            thinkingBudget: 0,
+          }
+        };
+
+        const response = await geminiClient.generateContent(
+          contents,
+          generationConfig,
+          signal,
+          DEFAULT_GEMINI_FLASH_MODEL,
+        );
+
+        // Check if request was aborted
+        if (signal.aborted) {
+          return;
+        }
+
+        if (response) {
+          const responseText = getResponseText(response);
+          
+          if (responseText) {
+            const suggestionTexts = responseText
+              .split('\n')
+              .map((line) => line.trim())
+              .filter((line) => line.length > 0)
+              .slice(0, AI_COMPLETION_MAX_SUGGESTIONS);
+
+            if (suggestionTexts.length > 0) {
+              const newSuggestions: Suggestion[] = suggestionTexts.map((text) => ({
+                label: text,
+                value: text,
+              }));
+              setSuggestions(newSuggestions);
+              setShowSuggestions(true);
+              setActiveSuggestionIndex(0);
+              setVisibleStartIndex(0);
+              setIsPerfectMatch(false);
+            }
+          }
+        }
+      } catch (error) {
+        // Silently handle aborted requests, log others
+        if (!(signal.aborted || (error instanceof Error && error.name === 'AbortError'))) {
+          console.error('AI completion error:', error);
+        }
+      } finally {
+        if (!signal.aborted) {
+          setIsLoadingSuggestions(false);
+        }
+      }
+    };
+
+    // Use debounced timeout
+    setTimeout(generateAISuggestions, AI_COMPLETION_DEBOUNCE_MS);
+  }, [query, geminiClient, resetCompletionState, justSelectedSuggestion]);
 
   useEffect(() => {
     if (!isActive) {
@@ -277,7 +441,8 @@ export function useCompletion(
     // Handle At Command Completion
     const atIndex = query.lastIndexOf('@');
     if (atIndex === -1) {
-      resetCompletionState();
+      // No @ character found, check for AI prompt completion
+      handleAIPromptCompletion();
       return;
     }
 
@@ -552,7 +717,18 @@ export function useCompletion(
     slashCommands,
     commandContext,
     config,
+    geminiClient,
+    handleAIPromptCompletion,
   ]);
+
+  // Cleanup effect to abort any ongoing AI completion requests
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   return {
     suggestions,
@@ -566,5 +742,6 @@ export function useCompletion(
     resetCompletionState,
     navigateUp,
     navigateDown,
+    markSuggestionSelected,
   };
 }
