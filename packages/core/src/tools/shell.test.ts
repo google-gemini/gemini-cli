@@ -10,6 +10,7 @@ import { Config } from '../config/config.js';
 import * as summarizer from '../utils/summarizer.js';
 import { GeminiClient } from '../core/client.js';
 import { ToolExecuteConfirmationDetails } from './tools.js';
+import os from 'os';
 
 describe('ShellTool Bug Reproduction', () => {
   let shellTool: ShellTool;
@@ -92,7 +93,6 @@ describe('ShellTool Bug Reproduction', () => {
 
     const abortSignal = new AbortController().signal;
     await shellTool.execute({ command: 'echo "hello"' }, abortSignal, () => {});
-
 
     expect(summarizeSpy).toHaveBeenCalledWith(
       expect.any(String),

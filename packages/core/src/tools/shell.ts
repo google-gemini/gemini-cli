@@ -64,8 +64,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
         properties: {
           command: {
             type: Type.STRING,
-            description:
-              'Exact bash command to execute as `bash -c <command>`',
+            description: 'Exact bash command to execute as `bash -c <command>`',
           },
           description: {
             type: Type.STRING,
