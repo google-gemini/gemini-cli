@@ -417,12 +417,57 @@ const listCommand: SlashCommand = {
   },
 };
 
+const refreshCommand: SlashCommand = {
+  name: 'refresh',
+  description: 'Refresh the list of MCP servers and tools',
+  kind: CommandKind.BUILT_IN,
+  action: async (
+    context: CommandContext,
+  ): Promise<SlashCommandActionReturn> => {
+    const { config } = context.services;
+    if (!config) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Config not loaded.',
+      };
+    }
+
+    const toolRegistry = await config.getToolRegistry();
+    if (!toolRegistry) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Could not retrieve tool registry.',
+      };
+    }
+
+    context.ui.addItem(
+      {
+        type: 'info',
+        text: 'Refreshing MCP servers and tools...',
+      },
+      Date.now(),
+    );
+
+    await toolRegistry.discoverMcpTools();
+
+    // Update the client with the new tools
+    const geminiClient = config.getGeminiClient();
+    if (geminiClient) {
+      await geminiClient.setTools();
+    }
+
+    return getMcpStatus(context, false, false, false);
+  },
+};
+
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
   description:
     'list configured MCP servers and tools, or authenticate with OAuth-enabled servers',
   kind: CommandKind.BUILT_IN,
-  subCommands: [listCommand, authCommand],
+  subCommands: [listCommand, authCommand, refreshCommand],
   // Default action when no subcommand is provided
   action: async (context: CommandContext, args: string) =>
     // If no subcommand, run the list command
