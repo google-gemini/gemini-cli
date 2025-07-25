@@ -1,0 +1,31 @@
+(version 1)
+
+;; allow everything by default
+(allow default)
+
+;; deny all writes EXCEPT under specific paths
+(deny file-write*)
+(allow file-write*
+    (subpath (param "TARGET_DIR"))
+    (subpath (param "TMP_DIR"))
+    (subpath (param "CACHE_DIR"))
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+    (subpath (string-append (param "HOME_DIR") "/.npm"))
+    (subpath (string-append (param "HOME_DIR") "/.cache"))
+    (subpath (string-append (param "HOME_DIR") "/.gitconfig"))
+    (literal "/dev/stdout")
+    (literal "/dev/stderr")
+    (literal "/dev/null")
+)
+
+;; deny all inbound network traffic EXCEPT on debugger port
+(deny network-inbound)
+(allow network-inbound (local ip "localhost:9229"))
+
+;; deny all outbound network traffic EXCEPT through proxy on localhost:8877
+;; set `GEMINI_SANDBOX_PROXY_COMMAND=<command>` to run proxy alongside sandbox
+;; proxy must listen on :::8877 (see docs/examples/proxy-script.md)
+(deny network-outbound)
+(allow network-outbound (remote tcp "localhost:8877"))
+
+(allow network-bind (local ip "*:*"))
