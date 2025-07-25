@@ -93,7 +93,7 @@ You have two options to install Gemini CLI.
 2. **Run the CLI:** Execute the following command in your terminal:
 
    ```bash
-   npx https://github.com/google-gemini/gemini-cli
+   npx https://github.com/zapabob/gemini-cli
    ```
 
    Or install it with:
