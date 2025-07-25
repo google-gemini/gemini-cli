@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.12"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.13"
   },
   "scripts": {
     "start": "node scripts/start.js",
@@ -24,7 +24,8 @@
     "auth": "npm run auth:npm && npm run auth:docker",
     "generate": "node scripts/generate-git-commit-info.js",
     "build": "node scripts/build.js",
-    "build:all": "npm run build && npm run build:sandbox",
+    "build:vscode": "node scripts/build_vscode_companion.js",
+    "build:all": "npm run build && npm run build:sandbox && npm run build:vscode",
     "build:packages": "npm run build --workspaces",
     "build:sandbox": "node scripts/build_sandbox.js --skip-npm-install-build",
     "bundle": "npm run generate && node esbuild.config.js && node scripts/copy_bundle_assets.js",
@@ -60,6 +61,7 @@
     "@types/micromatch": "^4.0.9",
     "@types/mime-types": "^3.0.1",
     "@types/minimatch": "^5.1.2",
+    "@types/mock-fs": "^4.13.4",
     "@types/shell-quote": "^1.7.5",
     "@vitest/coverage-v8": "^3.1.1",
     "concurrently": "^9.2.0",
@@ -76,6 +78,7 @@
     "json": "^11.0.0",
     "lodash": "^4.17.21",
     "memfs": "^4.17.2",
+    "mock-fs": "^5.5.0",
     "prettier": "^3.5.3",
     "react-devtools-core": "^4.28.5",
     "typescript-eslint": "^8.30.1",

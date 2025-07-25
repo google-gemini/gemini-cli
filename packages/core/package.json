@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Gemini CLI Core",
   "repository": {
     "type": "git",
@@ -44,7 +44,8 @@
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0",
     "undici": "^7.10.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "chardet": "^2.1.0"
   },
   "devDependencies": {
     "@types/diff": "^7.0.2",

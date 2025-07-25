@@ -1,8 +1,8 @@
 {
   "name": "gemini-cli-vscode-ide-companion",
-  "displayName": "Gemini CLI VSCode IDE Companion",
-  "description": "",
-  "version": "0.0.1",
+  "displayName": "Gemini CLI Companion",
+  "description": "Enable Gemini CLI with direct access to your VS Code workspace.",
+  "version": "99.99.99",
   "publisher": "google",
   "icon": "assets/icon.png",
   "repository": {
@@ -13,12 +13,31 @@
   "engines": {
     "vscode": "^1.101.0"
   },
+  "license": "LICENSE",
+  "preview": true,
   "categories": [
-    "Other"
+    "AI"
+  ],
+  "keywords": [
+    "gemini-cli",
+    "gemini cli",
+    "gemini",
+    "gemini code",
+    "cli",
+    "ide integration",
+    "ide companion"
   ],
   "activationEvents": [
     "onStartupFinished"
   ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "gemini-cli.runGeminiCLI",
+        "title": "Gemini CLI: Run"
+      }
+    ]
+  },
   "main": "./dist/extension.js",
   "scripts": {
     "vscode:prepublish": "npm run check-types && npm run lint && node esbuild.js --production",
@@ -30,8 +49,8 @@
     "package": "vsce package --no-dependencies",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "echo \"vscode-ide-companion has no tests yet\"",
-    "test:ci": "echo \"vscode-ide-companion has no tests yet\""
+    "test": "vitest run",
+    "test:ci": "vitest run --coverage"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -43,7 +62,8 @@
     "esbuild": "^0.25.3",
     "eslint": "^9.25.1",
     "npm-run-all": "^4.1.5",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.15.1",

@@ -11,7 +11,6 @@ import {
   ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
-import { UserTierId } from '../code_assist/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
@@ -31,7 +30,6 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
-import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 import { getProjectTempDir } from '../utils/paths.js';
 import {
   initializeTelemetry,
@@ -45,6 +43,11 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
+import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
+
+// Re-export OAuth config type
+export type { MCPOAuthConfig };
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -69,13 +72,28 @@ export interface TelemetrySettings {
   target?: TelemetryTarget;
   otlpEndpoint?: string;
   logPrompts?: boolean;
+  outfile?: string;
 }
 
-export interface ActiveExtension {
+export interface GeminiCLIExtension {
   name: string;
   version: string;
+  isActive: boolean;
 }
-
+export interface FileFilteringOptions {
+  respectGitIgnore: boolean;
+  respectGeminiIgnore: boolean;
+}
+// For memory files
+export const DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
+  respectGitIgnore: false,
+  respectGeminiIgnore: true,
+};
+// For all other files
+export const DEFAULT_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
+  respectGitIgnore: true,
+  respectGeminiIgnore: true,
+};
 export class MCPServerConfig {
   constructor(
     // For stdio transport
@@ -97,7 +115,16 @@ export class MCPServerConfig {
     readonly description?: string,
     readonly includeTools?: string[],
     readonly excludeTools?: string[],
+    readonly extensionName?: string,
+    // OAuth configuration
+    readonly oauth?: MCPOAuthConfig,
+    readonly authProviderType?: AuthProviderType,
   ) {}
+}
+
+export enum AuthProviderType {
+  DYNAMIC_DISCOVERY = 'dynamic_discovery',
+  GOOGLE_CREDENTIALS = 'google_credentials',
 }
 
 export interface SandboxConfig {
@@ -135,6 +162,7 @@ export interface ConfigParameters {
   usageStatisticsEnabled?: boolean;
   fileFiltering?: {
     respectGitIgnore?: boolean;
+    respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
   };
   checkpointing?: boolean;
@@ -147,7 +175,8 @@ export interface ConfigParameters {
   maxSessionTurns?: number;
   experimentalAcp?: boolean;
   listExtensions?: boolean;
-  activeExtensions?: ActiveExtension[];
+  extensions?: GeminiCLIExtension[];
+  blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideMode?: boolean;
@@ -179,6 +208,7 @@ export class Config {
   private geminiClient!: GeminiClient;
   private readonly fileFiltering: {
     respectGitIgnore: boolean;
+    respectGeminiIgnore: boolean;
     enableRecursiveFileSearch: boolean;
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
@@ -194,7 +224,11 @@ export class Config {
   private modelSwitchedDuringSession: boolean = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
-  private readonly _activeExtensions: ActiveExtension[];
+  private readonly _extensions: GeminiCLIExtension[];
+  private readonly _blockedMcpServers: Array<{
+    name: string;
+    extensionName: string;
+  }>;
   flashFallbackHandler?: FlashFallbackHandler;
   private quotaErrorOccurred: boolean = false;
   private readonly summarizeToolOutput:
@@ -227,11 +261,13 @@ export class Config {
       target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
       otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
       logPrompts: params.telemetry?.logPrompts ?? true,
+      outfile: params.telemetry?.outfile,
     };
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
 
     this.fileFiltering = {
       respectGitIgnore: params.fileFiltering?.respectGitIgnore ?? true,
+      respectGeminiIgnore: params.fileFiltering?.respectGeminiIgnore ?? true,
       enableRecursiveFileSearch:
         params.fileFiltering?.enableRecursiveFileSearch ?? true,
     };
@@ -245,7 +281,8 @@ export class Config {
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalAcp = params.experimentalAcp ?? false;
     this.listExtensions = params.listExtensions ?? false;
-    this._activeExtensions = params.activeExtensions ?? [];
+    this._extensions = params.extensions ?? [];
+    this._blockedMcpServers = params.blockedMcpServers ?? [];
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.ideMode = params.ideMode ?? false;
@@ -333,14 +370,6 @@ export class Config {
 
   getQuotaErrorOccurred(): boolean {
     return this.quotaErrorOccurred;
-  }
-
-  async getUserTier(): Promise<UserTierId | undefined> {
-    if (!this.geminiClient) {
-      return undefined;
-    }
-    const generator = this.geminiClient.getContentGenerator();
-    return await generator.getTier?.();
   }
 
   getEmbeddingModel(): string {
@@ -446,6 +475,10 @@ export class Config {
     return this.telemetrySettings.target ?? DEFAULT_TELEMETRY_TARGET;
   }
 
+  getTelemetryOutfile(): string | undefined {
+    return this.telemetrySettings.outfile;
+  }
+
   getGeminiClient(): GeminiClient {
     return this.geminiClient;
   }
@@ -464,6 +497,16 @@ export class Config {
 
   getFileFilteringRespectGitIgnore(): boolean {
     return this.fileFiltering.respectGitIgnore;
+  }
+  getFileFilteringRespectGeminiIgnore(): boolean {
+    return this.fileFiltering.respectGeminiIgnore;
+  }
+
+  getFileFilteringOptions(): FileFilteringOptions {
+    return {
+      respectGitIgnore: this.fileFiltering.respectGitIgnore,
+      respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
+    };
   }
 
   getCheckpointingEnabled(): boolean {
@@ -505,12 +548,20 @@ export class Config {
     return this.listExtensions;
   }
 
-  getActiveExtensions(): ActiveExtension[] {
-    return this._activeExtensions;
+  getExtensions(): GeminiCLIExtension[] {
+    return this._extensions;
+  }
+
+  getBlockedMcpServers(): Array<{ name: string; extensionName: string }> {
+    return this._blockedMcpServers;
   }
 
   getNoBrowser(): boolean {
     return this.noBrowser;
+  }
+
+  isBrowserLaunchSuppressed(): boolean {
+    return this.getNoBrowser() || !shouldAttemptBrowserLaunch();
   }
 
   getSummarizeToolOutputConfig():
@@ -529,20 +580,6 @@ export class Config {
       await this.gitService.initialize();
     }
     return this.gitService;
-  }
-
-  async refreshMemory(): Promise<{ memoryContent: string; fileCount: number }> {
-    const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
-      this.getWorkingDir(),
-      this.getDebugMode(),
-      this.getFileService(),
-      this.getExtensionContextFilePaths(),
-    );
-
-    this.setUserMemory(memoryContent);
-    this.setGeminiMdFileCount(fileCount);
-
-    return { memoryContent, fileCount };
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
@@ -593,7 +630,7 @@ export class Config {
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
 
-    await registry.discoverTools();
+    await registry.discoverAllTools();
     return registry;
   }
 }

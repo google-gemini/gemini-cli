@@ -31,10 +31,14 @@ vi.mock('http');
 vi.mock('open');
 vi.mock('crypto');
 vi.mock('node:readline');
+vi.mock('../utils/browser.js', () => ({
+  shouldAttemptBrowserLaunch: () => true,
+}));
 
 const mockConfig = {
   getNoBrowser: () => false,
   getProxy: () => 'http://test.proxy.com:8080',
+  isBrowserLaunchSuppressed: () => false,
 } as unknown as Config;
 
 // Mock fetch globally
@@ -83,7 +87,7 @@ describe('oauth2', () => {
     );
 
     vi.spyOn(crypto, 'randomBytes').mockReturnValue(mockState as never);
-    (open as Mock).mockImplementation(async () => ({}) as never);
+    (open as Mock).mockImplementation(async () => ({ on: vi.fn() }) as never);
 
     // Mock the UserInfo API response
     (global.fetch as Mock).mockResolvedValue({
@@ -177,6 +181,7 @@ describe('oauth2', () => {
     const mockConfigWithNoBrowser = {
       getNoBrowser: () => true,
       getProxy: () => 'http://test.proxy.com:8080',
+      isBrowserLaunchSuppressed: () => true,
     } as unknown as Config;
 
     const mockCodeVerifier = {
@@ -236,7 +241,7 @@ describe('oauth2', () => {
     expect(mockGetToken).toHaveBeenCalledWith({
       code: mockCode,
       codeVerifier: mockCodeVerifier.codeVerifier,
-      redirect_uri: 'https://sdk.cloud.google.com/authcode_cloudcode.html',
+      redirect_uri: 'https://codeassist.google.com/authcode',
     });
     expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
 

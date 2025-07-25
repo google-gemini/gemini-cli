@@ -37,12 +37,20 @@ vi.mock('@google/gemini-cli-core', async () => {
     ...actualServer,
     loadEnvironment: vi.fn(),
     loadServerHierarchicalMemory: vi.fn(
-      (cwd, debug, fileService, extensionPaths) =>
+      (cwd, debug, fileService, extensionPaths, _maxDirs) =>
         Promise.resolve({
           memoryContent: extensionPaths?.join(',') || '',
           fileCount: extensionPaths?.length || 0,
         }),
     ),
+    DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: {
+      respectGitIgnore: false,
+      respectGeminiIgnore: true,
+    },
+    DEFAULT_FILE_FILTERING_OPTIONS: {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    },
   };
 });
 
@@ -479,6 +487,11 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         '/path/to/ext3/context1.md',
         '/path/to/ext3/context2.md',
       ],
+      {
+        respectGitIgnore: false,
+        respectGeminiIgnore: true,
+      },
+      undefined, // maxDirs
     );
   });
 

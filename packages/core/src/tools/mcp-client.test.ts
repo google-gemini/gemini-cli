@@ -9,7 +9,6 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import {
   populateMcpServerCommand,
   createTransport,
-  generateValidName,
   isEnabled,
   discoverTools,
 } from './mcp-client.js';
@@ -17,10 +16,14 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
 import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import * as GenAiLib from '@google/genai';
+import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
+import { AuthProviderType } from '../config/config.js';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 vi.mock('@google/genai');
+vi.mock('../mcp/oauth-provider.js');
+vi.mock('../mcp/oauth-token-storage.js');
 
 describe('mcp-client', () => {
   afterEach(() => {
@@ -83,7 +86,7 @@ describe('mcp-client', () => {
 
     describe('should connect via httpUrl', () => {
       it('without headers', async () => {
-        const transport = createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             httpUrl: 'http://test-server',
@@ -97,7 +100,7 @@ describe('mcp-client', () => {
       });
 
       it('with headers', async () => {
-        const transport = createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             httpUrl: 'http://test-server',
@@ -118,7 +121,7 @@ describe('mcp-client', () => {
 
     describe('should connect via url', () => {
       it('without headers', async () => {
-        const transport = createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             url: 'http://test-server',
@@ -131,7 +134,7 @@ describe('mcp-client', () => {
       });
 
       it('with headers', async () => {
-        const transport = createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             url: 'http://test-server',
@@ -150,10 +153,10 @@ describe('mcp-client', () => {
       });
     });
 
-    it('should connect via command', () => {
+    it('should connect via command', async () => {
       const mockedTransport = vi.mocked(SdkClientStdioLib.StdioClientTransport);
 
-      createTransport(
+      await createTransport(
         'test-server',
         {
           command: 'test-command',
@@ -172,91 +175,62 @@ describe('mcp-client', () => {
         stderr: 'pipe',
       });
     });
-  });
-  describe('generateValidName', () => {
-    it('should return a valid name for a simple function', () => {
-      const funcDecl = { name: 'myFunction' };
-      const serverName = 'myServer';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('myServer__myFunction');
-    });
 
-    it('should prepend the server name', () => {
-      const funcDecl = { name: 'anotherFunction' };
-      const serverName = 'production-server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('production-server__anotherFunction');
-    });
+    describe('useGoogleCredentialProvider', () => {
+      it('should use GoogleCredentialProvider when specified', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test-server',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+          },
+          false,
+        );
 
-    it('should replace invalid characters with underscores', () => {
-      const funcDecl = { name: 'invalid-name with spaces' };
-      const serverName = 'test_server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('test_server__invalid-name_with_spaces');
-    });
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const authProvider = (transport as any)._authProvider;
+        expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
+      });
 
-    it('should truncate long names', () => {
-      const funcDecl = {
-        name: 'a_very_long_function_name_that_will_definitely_exceed_the_limit',
-      };
-      const serverName = 'a_long_server_name';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result.length).toBe(63);
-      expect(result).toBe(
-        'a_long_server_name__a_very_l___will_definitely_exceed_the_limit',
-      );
-    });
+      it('should use GoogleCredentialProvider with SSE transport', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+          },
+          false,
+        );
 
-    it('should handle names with only invalid characters', () => {
-      const funcDecl = { name: '!@#$%^&*()' };
-      const serverName = 'special-chars';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('special-chars____________');
-    });
+        expect(transport).toBeInstanceOf(SSEClientTransport);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const authProvider = (transport as any)._authProvider;
+        expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
+      });
 
-    it('should handle names that are already valid', () => {
-      const funcDecl = { name: 'already_valid' };
-      const serverName = 'validator';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('validator__already_valid');
-    });
-
-    it('should handle names with leading/trailing invalid characters', () => {
-      const funcDecl = { name: '-_invalid-_' };
-      const serverName = 'trim-test';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('trim-test__-_invalid-_');
-    });
-
-    it('should handle names that are exactly 63 characters long', () => {
-      const longName = 'a'.repeat(45);
-      const funcDecl = { name: longName };
-      const serverName = 'server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe(`server__${longName}`);
-      expect(result.length).toBe(53);
-    });
-
-    it('should handle names that are exactly 64 characters long', () => {
-      const longName = 'a'.repeat(55);
-      const funcDecl = { name: longName };
-      const serverName = 'server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result.length).toBe(63);
-      expect(result).toBe(
-        'server__aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      );
-    });
-
-    it('should handle names that are longer than 64 characters', () => {
-      const longName = 'a'.repeat(100);
-      const funcDecl = { name: longName };
-      const serverName = 'long-server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result.length).toBe(63);
-      expect(result).toBe(
-        'long-server__aaaaaaaaaaaaaaa___aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      );
+      it('should throw an error if no URL is provided with GoogleCredentialProvider', async () => {
+        await expect(
+          createTransport(
+            'test-server',
+            {
+              authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+              oauth: {
+                scopes: ['scope1'],
+              },
+            },
+            false,
+          ),
+        ).rejects.toThrow(
+          'No URL configured for Google Credentials MCP server',
+        );
+      });
     });
   });
   describe('isEnabled', () => {
