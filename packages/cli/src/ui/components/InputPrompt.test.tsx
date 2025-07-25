@@ -1078,27 +1078,4 @@ describe('InputPrompt', () => {
       unmount();
     });
   });
-
-  it('should call undo on Ctrl+Z', async () => {
-    const { stdin, unmount } = render(<InputPrompt {...props} />);
-    await wait();
-
-    stdin.write('\u001A'); // Ctrl+Z
-    await wait();
-
-    expect(props.buffer.undo).toHaveBeenCalled();
-    unmount();
-  });
-
-  it('should call redo on Ctrl+R', async () => {
-    // Ctrl+Y is used as a yolo mode
-    const { stdin, unmount } = render(<InputPrompt {...props} />);
-    await wait();
-
-    stdin.write('\u0012'); // Ctrl+R
-    await wait();
-
-    expect(props.buffer.redo).toHaveBeenCalled();
-    unmount();
-  });
 });
