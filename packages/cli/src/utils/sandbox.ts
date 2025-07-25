@@ -525,8 +525,6 @@ export async function start_sandbox(
     );
   }
 
-<<<<<<< HEAD
-=======
   // copy GOOGLE_GENAI_USE_GCA
   if (process.env.GOOGLE_GENAI_USE_GCA) {
     args.push(
@@ -535,7 +533,6 @@ export async function start_sandbox(
     );
   }
 
->>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
   // copy GOOGLE_CLOUD_PROJECT
   if (process.env.GOOGLE_CLOUD_PROJECT) {
     args.push(

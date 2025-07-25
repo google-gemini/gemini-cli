@@ -8,8 +8,6 @@ import { AuthType, Config } from '@google/gemini-cli-core';
 import { USER_SETTINGS_PATH } from './config/settings.js';
 import { validateAuthMethod } from './config/auth.js';
 
-<<<<<<< HEAD
-=======
 function getAuthTypeFromEnv(): AuthType | undefined {
   if (process.env.GOOGLE_GENAI_USE_GCA === 'true') {
     return AuthType.LOGIN_WITH_GOOGLE;
@@ -23,12 +21,10 @@ function getAuthTypeFromEnv(): AuthType | undefined {
   return undefined;
 }
 
->>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 export async function validateNonInteractiveAuth(
   configuredAuthType: AuthType | undefined,
   nonInteractiveConfig: Config,
 ) {
-<<<<<<< HEAD
   const effectiveAuthType =
     configuredAuthType ||
     (process.env.GOOGLE_GENAI_USE_VERTEXAI === 'true'
@@ -40,13 +36,6 @@ export async function validateNonInteractiveAuth(
   if (!effectiveAuthType) {
     console.error(
       `Please set an Auth method in your ${USER_SETTINGS_PATH} or specify either the GEMINI_API_KEY or GOOGLE_GENAI_USE_VERTEXAI environment variables before running`,
-=======
-  const effectiveAuthType = configuredAuthType || getAuthTypeFromEnv();
-
-  if (!effectiveAuthType) {
-    console.error(
-      `Please set an Auth method in your ${USER_SETTINGS_PATH} or specify one of the following environment variables before running: GEMINI_API_KEY, GOOGLE_GENAI_USE_VERTEXAI, GOOGLE_GENAI_USE_GCA`,
->>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
     );
     process.exit(1);
   }

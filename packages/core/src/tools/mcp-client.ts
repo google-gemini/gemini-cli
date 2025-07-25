@@ -24,14 +24,11 @@ import { ToolRegistry } from './tool-registry.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
-<<<<<<< HEAD
 import {
   OpenFilesNotificationSchema,
   IDE_SERVER_NAME,
   ideContext,
 } from '../services/ideContext.js';
-=======
->>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 import { getErrorMessage } from '../utils/errors.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
@@ -382,7 +379,6 @@ export async function connectAndDiscover(
     );
     try {
       updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
-<<<<<<< HEAD
 
       mcpClient.onerror = (error) => {
         console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
@@ -400,14 +396,6 @@ export async function connectAndDiscover(
           },
         );
       }
-
-=======
-      mcpClient.onerror = (error) => {
-        console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
-        updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
-      };
-
->>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
       const tools = await discoverTools(
         mcpServerName,
         mcpServerConfig,

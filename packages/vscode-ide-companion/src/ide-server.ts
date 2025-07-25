@@ -244,7 +244,6 @@ const createMcpServer = () => {
     },
     { capabilities: { logging: {} } },
   );
-<<<<<<< HEAD
   server.registerTool(
     'getOpenFiles',
     {
@@ -274,7 +273,5 @@ const createMcpServer = () => {
       }
     },
   );
-=======
->>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
   return server;
 };

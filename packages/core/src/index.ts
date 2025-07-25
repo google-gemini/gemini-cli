@@ -6,36 +6,27 @@
 
 // Export config
 export * from './config/config.js';
-<<<<<<< HEAD
 export * from './config/agents.js';
 export * from './config/active-agent.js';
 export * from './config/subagents.js';
 export * from './config/loadBalancer.js';
-=======
->>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
-
-// Export Core Logic
-export * from './core/client.js';
-export * from './core/contentGenerator.js';
-export * from './core/geminiChat.js';
-export * from './core/logger.js';
-export * from './core/prompts.js';
-export * from './core/tokenLimits.js';
-export * from './core/turn.js';
-export * from './core/geminiRequest.js';
-export * from './core/coreToolScheduler.js';
-export * from './core/nonInteractiveToolExecutor.js';
-
-<<<<<<< HEAD
-// Export subagents
-export * from './subagents/index.js';
-
-=======
->>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 export * from './code_assist/codeAssist.js';
 export * from './code_assist/oauth2.js';
 export * from './code_assist/server.js';
 export * from './code_assist/types.js';
+
+// Export core functionality
+export * from './core/turn.js';
+export * from './core/coreToolScheduler.js';
+export * from './core/nonInteractiveToolExecutor.js';
+export * from './core/contentGenerator.js';
+export * from './core/client.js';
+export * from './core/geminiChat.js';
+export * from './core/logger.js';
+export * from './core/tokenLimits.js';
+
+// Export subagents
+export * from './subagents/index.js';
 
 // Export utilities
 export * from './utils/paths.js';
@@ -53,15 +44,8 @@ export * from './utils/systemEncoding.js';
 // Export services
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
-<<<<<<< HEAD
 export * from './services/ideContext.js';
 export * from './services/loadBalancerService.js';
-=======
-
-// Export IDE specific logic
-export * from './ide/ide-client.js';
-export * from './ide/ideContext.js';
->>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
 
 // Export base tool definitions
 export * from './tools/tools.js';

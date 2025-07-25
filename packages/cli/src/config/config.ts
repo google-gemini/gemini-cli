@@ -21,7 +21,7 @@ import {
   FileFilteringOptions,
   MCPServerConfig,
   IDE_SERVER_NAME,
-  IdeClient,
+
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -265,10 +265,7 @@ export async function loadCliConfig(
     process.env.TERM_PROGRAM === 'vscode' &&
     !process.env.SANDBOX;
 
-  let ideClient: IdeClient | undefined;
-  if (ideMode) {
-    ideClient = new IdeClient();
-  }
+
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -455,8 +452,7 @@ export async function loadCliConfig(
     blockedMcpServers,
     noBrowser: !!process.env.NO_BROWSER,
     summarizeToolOutput: settings.summarizeToolOutput,
-    ideMode,
-    ideClient,
+    ideMode
   });
 }
 
@@ -491,5 +487,5 @@ function mergeExcludeTools(
       allExcludeTools.add(tool);
     }
   }
-  return [...allExcludeTools];
+  return Array.from(allExcludeTools);
 }

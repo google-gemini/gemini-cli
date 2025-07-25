@@ -78,8 +78,6 @@ export async function getOauthClient(
     },
   });
 
-<<<<<<< HEAD
-=======
   if (
     process.env.GOOGLE_GENAI_USE_GCA &&
     process.env.GOOGLE_CLOUD_ACCESS_TOKEN
@@ -91,7 +89,6 @@ export async function getOauthClient(
     return client;
   }
 
->>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
   client.on('tokens', async (tokens: Credentials) => {
     await cacheCredentials(tokens);
   });

@@ -14,11 +14,7 @@
     "module": "NodeNext",
     "moduleResolution": "nodenext",
     "target": "es2022",
-<<<<<<< HEAD
-    "types": ["node"]
-=======
     "types": ["node", "vitest/globals"],
     "jsx": "react-jsx"
->>>>>>> 1b8ba5ca6bf739e4100a1d313721988f953acb49
   }
 }

@@ -13,10 +13,10 @@ import {
   deleteSubagent, 
   getActiveSubagents,
   getSubagentsBySpecialty,
-  SubagentSpecialtySchema
-} from '../../../../core/src/config/subagents.js';
-import { SubagentExecutor } from '../../../../core/src/subagents/executor.js';
-import { GeminiClient } from '../../../../core/src/subagents/geminiClient.js';
+  SubagentSpecialtySchema,
+  SubagentExecutor,
+  SubagentGeminiClient
+} from '@google/gemini-cli-core';
 
 // ハンドラー関数の実装
 async function handleListSubagents(): Promise<MessageActionReturn> {
