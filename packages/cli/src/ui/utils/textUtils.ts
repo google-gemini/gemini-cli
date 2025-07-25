@@ -53,6 +53,10 @@ export function isBinary(
  * ---------------------------------------------------------------------- */
 
 export function toCodePoints(str: string): string[] {
+  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
+    const seg = new Intl.Segmenter();
+    return [...seg.segment(str)].map((seg) => seg.segment);
+  }
   // [...str] or Array.from both iterate by UTF‑32 code point, handling
   // surrogate pairs correctly.
   return Array.from(str);
