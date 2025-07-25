@@ -1023,26 +1023,27 @@ export function useTextBuffer({
   }, [visualCursor, visualScrollRow, viewport]);
 
   const insert = useCallback(
-    (ch: string): void => {
+    (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
       if (/[\n\r]/.test(ch)) {
         dispatch({ type: 'insert', payload: ch });
         return;
       }
 
       const minLengthToInferAsDragDrop = 3;
-      if (ch.length >= minLengthToInferAsDragDrop && !shellModeActive) {
-        let potentialPath = ch;
-        if (
-          potentialPath.length > 2 &&
-          potentialPath.startsWith("'") &&
-          potentialPath.endsWith("'")
-        ) {
-          potentialPath = ch.slice(1, -1);
+      if (
+        ch.length >= minLengthToInferAsDragDrop &&
+        !shellModeActive &&
+        paste
+      ) {
+        let potentialPath = ch.trim();
+        const quoteMatch = potentialPath.match(/^'(.*)'$/);
+        if (quoteMatch) {
+          potentialPath = quoteMatch[1];
         }
 
         potentialPath = potentialPath.trim();
         if (isValidPath(unescapePath(potentialPath))) {
-          ch = `@${potentialPath}`;
+          ch = `@${potentialPath} `;
         }
       }
 
@@ -1203,7 +1204,7 @@ export function useTextBuffer({
         backspace();
       else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
       else if (input && !key.ctrl && !key.meta) {
-        insert(input);
+        insert(input, { paste: key.paste });
       }
     },
     [newline, move, deleteWordLeft, deleteWordRight, backspace, del, insert],
@@ -1306,7 +1307,7 @@ export interface TextBuffer {
   /**
    * Insert a single character or string without newlines.
    */
-  insert: (ch: string) => void;
+  insert: (ch: string, opts?: { paste?: boolean }) => void;
   newline: () => void;
   backspace: () => void;
   del: () => void;
