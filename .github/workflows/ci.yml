@@ -52,7 +52,7 @@ jobs:
       pull-requests: write
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         node-version: [20.x, 22.x, 24.x]
     steps:
       - name: Checkout repository
