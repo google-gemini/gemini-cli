@@ -67,6 +67,11 @@ export interface ConversationRecord {
   messages: MessageRecord[];
 }
 
+export interface ResumedSessionData {
+  conversation: ConversationRecord;
+  filePath: string;
+}
+
 export class ChatRecordingService {
   private conversationFile: string | null = null;
   private cachedLastConvData: string | null = null;
@@ -82,60 +87,24 @@ export class ChatRecordingService {
 
   /**
    * Initializes the chat recording service: creates a new conversation file and associates it with
-   * this service instance.
+   * this service instance, or resumes from an existing session if resumedSessionData is provided.
    */
-  initialize(): void {
+  initialize(resumedSessionData?: ResumedSessionData): void {
     try {
-      const chatsDir = path.join(this.config.getProjectTempDir(), 'chats');
-      fs.mkdirSync(chatsDir, { recursive: true });
-
-      const timestamp = new Date()
-        .toISOString()
-        .slice(0, 16)
-        .replace(/:/g, '-');
-      const filename = `session-${timestamp}-${this.sessionId.slice(
-        0,
-        8,
-      )}.json`;
-      this.conversationFile = path.join(chatsDir, filename);
-
-      const initialRecord: ConversationRecord = {
-        sessionId: this.sessionId,
-        projectHash: this.projectHash,
-        startTime: new Date().toISOString(),
-        lastUpdated: new Date().toISOString(),
-        messages: [],
-      };
-
-      this.writeConversation(initialRecord);
-    } catch (error) {
-      if (this.config.getDebugMode()) {
-        console.error('Error initializing chat recording service:', error);
-      }
-    }
-  }
-
-  /**
-   * Reinitializes the chat recording service with a new session ID, optionally using an
-   * existing session file to continue appending to it.
-   */
-  reinitializeWithSession(newSessionId: string, sourceFilePath?: string): void {
-    try {
-      this.sessionId = newSessionId;
-
-      if (sourceFilePath && fs.existsSync(sourceFilePath)) {
-        // Use the existing session file directly instead of copying
-        this.conversationFile = sourceFilePath;
-
+      if (resumedSessionData) {
+        // Resume from existing session
+        this.conversationFile = resumedSessionData.filePath;
+        this.sessionId = resumedSessionData.conversation.sessionId;
+        
         // Update the session ID in the existing file
         this.updateConversation((conversation) => {
-          conversation.sessionId = newSessionId;
+          conversation.sessionId = this.sessionId;
         });
 
         // Clear any cached data to force fresh reads
         this.cachedLastConvData = null;
       } else {
-        // Create new empty session
+        // Create new session
         const chatsDir = path.join(this.config.getProjectTempDir(), 'chats');
         fs.mkdirSync(chatsDir, { recursive: true });
 
@@ -143,11 +112,14 @@ export class ChatRecordingService {
           .toISOString()
           .slice(0, 16)
           .replace(/:/g, '-');
-        const filename = `session-${timestamp}-${newSessionId.slice(0, 8)}.json`;
+        const filename = `session-${timestamp}-${this.sessionId.slice(
+          0,
+          8,
+        )}.json`;
         this.conversationFile = path.join(chatsDir, filename);
 
         const initialRecord: ConversationRecord = {
-          sessionId: newSessionId,
+          sessionId: this.sessionId,
           projectHash: this.projectHash,
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
@@ -162,10 +134,11 @@ export class ChatRecordingService {
       this.queuedTokens = null;
     } catch (error) {
       if (this.config.getDebugMode()) {
-        console.error('Error reinitializing chat recording service:', error);
+        console.error('Error initializing chat recording service:', error);
       }
     }
   }
+
 
   private getLastMessage(
     conversation: ConversationRecord,

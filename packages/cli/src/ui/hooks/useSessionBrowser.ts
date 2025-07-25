@@ -49,10 +49,10 @@ export const useSessionBrowser = (
           // Use the old session's ID to continue it.
           const existingSessionId = conversation.sessionId;
           config.setSessionId(existingSessionId);
-          chatRecordingService.reinitializeWithSession(
-            existingSessionId,
-            originalFilePath,
-          );
+          chatRecordingService.initialize({
+            conversation,
+            filePath: originalFilePath,
+          });
 
           // We've loaded it, tell the UI about it.
           setIsSessionBrowserOpen(false);

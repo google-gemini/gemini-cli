@@ -61,6 +61,8 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   ideMode: boolean | undefined;
   proxy: string | undefined;
+  resume: string | undefined;
+  listSessions: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -195,6 +197,23 @@ export async function parseArguments(): Promise<CliArgs> {
       description:
         'Proxy for gemini client, like schema://user:password@host:port',
     })
+    .option('resume', {
+      alias: 'r',
+      type: 'string',
+      description: 'Resume a previous session. Use "latest" for most recent or index number (e.g. --resume 5)',
+      default: undefined,
+      coerce: (value: string | boolean | undefined): string => {
+        // If --resume is used without a value yargs passes `true` or `undefined`.
+        if (value === true || value === undefined) {
+          return 'latest';
+        }
+        return value as string;
+      },
+    })
+    .option('list-sessions', {
+      type: 'boolean',
+      description: 'List available sessions for the current project',
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -204,6 +223,11 @@ export async function parseArguments(): Promise<CliArgs> {
       if (argv.prompt && argv.promptInteractive) {
         throw new Error(
           'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
+        );
+      }
+      if (argv.resume && !argv.prompt && !process.stdin.isTTY) {
+        throw new Error(
+          'When resuming a session, you must provide a message via --prompt (-p) or stdin',
         );
       }
       return true;

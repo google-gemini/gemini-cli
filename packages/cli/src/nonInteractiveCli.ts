@@ -11,9 +11,9 @@ import {
   ToolRegistry,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
-  ConversationRecord,
   ChatRecordingService,
   ToolCallRecord,
+  ResumedSessionData,
 } from '@google/gemini-cli-core';
 import {
   Content,
@@ -23,6 +23,7 @@ import {
 } from '@google/genai';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
+import { convertSessionToHistoryFormats } from './ui/hooks/useSessionBrowser.js';
 
 function getResponseText(response: GenerateContentResponse): string | null {
   if (response.candidates && response.candidates.length > 0) {
@@ -50,6 +51,7 @@ export async function runNonInteractive(
   config: Config,
   input: string,
   prompt_id: string,
+  resumedSessionData?: ResumedSessionData,
 ): Promise<void> {
   await config.initialize();
   // Handle EPIPE errors when the output is piped to a command that closes early.
@@ -60,11 +62,25 @@ export async function runNonInteractive(
     }
   });
 
+  // Initialize session recording service
+  const chatRecordingService = new ChatRecordingService(config);
+  chatRecordingService.initialize(resumedSessionData);
+  chatRecordingService.recordMessage({ type: 'user', content: input });
+
   const geminiClient = config.getGeminiClient();
   const toolRegistry: ToolRegistry = await config.getToolRegistry();
 
+  // Initialize chat.  Set history if resuming.
   const chat = await geminiClient.getChat();
+  if (resumedSessionData) {
+    geminiClient.setHistory(
+      convertSessionToHistoryFormats(resumedSessionData.conversation.messages)
+        .clientHistory,
+    );
+  }
+
   const abortController = new AbortController();
+
   let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
   let turnCount = 0;
   try {

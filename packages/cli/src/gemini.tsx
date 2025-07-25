@@ -38,9 +38,12 @@ import {
   AuthType,
   getOauthClient,
   shouldAttemptBrowserLaunch,
+  ResumedSessionData,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { runAcpPeer } from './acp/acpPeer.js';
+import { formatRelativeTime, SessionSelector } from './utils/sessionUtils.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -85,7 +88,31 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   await new Promise((resolve) => child.on('close', resolve));
   process.exit(0);
 }
-import { runAcpPeer } from './acp/acpPeer.js';
+
+async function listSessions(config: Config): Promise<void> {
+  const sessionSelector = new SessionSelector(config);
+  const sessions = await sessionSelector.listSessions();
+
+  if (sessions.length === 0) {
+    console.log('No previous sessions found for this project.');
+    return;
+  }
+
+  console.log(`\nAvailable sessions for this project (${sessions.length}):\n`);
+
+  sessions
+    .sort(
+      (a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+    )
+    .forEach((session, index) => {
+      const current = session.isCurrentSession ? ' (current)' : '';
+      const time = formatRelativeTime(session.lastUpdated);
+      console.log(
+        `  ${index + 1}. ${session.firstUserMessage} (${time}${current})`,
+      );
+    });
+}
 
 export async function main() {
   const workspaceRoot = process.cwd();
@@ -125,6 +152,12 @@ export async function main() {
     for (const extension of extensions) {
       console.log(`- ${extension.config.name}`);
     }
+    process.exit(0);
+  }
+
+  // Handle --list-sessions flag
+  if (argv.listSessions) {
+    await listSessions(config);
     process.exit(0);
   }
 
@@ -204,8 +237,35 @@ export async function main() {
     ...(await getUserStartupWarnings(workspaceRoot)),
   ];
 
+  // Handle --resume flag
+  let resumedSessionData: ResumedSessionData | undefined = undefined;
+  if (argv.resume) {
+    const sessionSelector = new SessionSelector(config);
+    try {
+      const result = await sessionSelector.resolveSession(argv.resume);
+      resumedSessionData = {
+        conversation: result.sessionData,
+        filePath: result.sessionPath,
+      };
+
+      if (config.getDebugMode()) {
+        console.error(
+          `Loaded session with ${resumedSessionData.conversation.messages.length} messages`,
+        );
+      }
+
+      // Use the existing session ID to continue recording to the same session
+      config.setSessionId(resumedSessionData.conversation.sessionId);
+    } catch (error) {
+      console.error(
+        `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      process.exit(1);
+    }
+  }
+
   const shouldBeInteractive =
-    !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0);
+    !!argv.promptInteractive || (process.stdin.isTTY && !input);
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (shouldBeInteractive) {
@@ -218,6 +278,7 @@ export async function main() {
           settings={settings}
           startupWarnings={startupWarnings}
           version={version}
+          resumedSessionData={resumedSessionData}
         />
       </React.StrictMode>,
       { exitOnCtrlC: false },
@@ -254,7 +315,12 @@ export async function main() {
     argv,
   );
 
-  await runNonInteractive(nonInteractiveConfig, input, prompt_id);
+  await runNonInteractive(
+    nonInteractiveConfig,
+    input,
+    prompt_id,
+    resumedSessionData,
+  );
   process.exit(0);
 }
 

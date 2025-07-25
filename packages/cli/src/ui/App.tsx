@@ -61,11 +61,11 @@ import {
   isEditorAvailable,
   EditorType,
   FlashFallbackEvent,
-  ConversationRecord,
   logFlashFallback,
   AuthType,
   type ActiveFile,
   ideContext,
+  ResumedSessionData,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -100,6 +100,7 @@ interface AppProps {
   settings: LoadedSettings;
   startupWarnings?: string[];
   version: string;
+  resumedSessionData?: ResumedSessionData;
 }
 
 export const AppWrapper = (props: AppProps) => (
@@ -108,7 +109,13 @@ export const AppWrapper = (props: AppProps) => (
   </SessionStatsProvider>
 );
 
-const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
+const App = ({
+  config,
+  settings,
+  startupWarnings = [],
+  version,
+  resumedSessionData,
+}: AppProps) => {
   const isFocused = useFocus();
   useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
@@ -120,7 +127,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, []);
 
   // Initialize the AutoSavingService to automatically log conversation history.
-  const chatRecordingService = useChatRecordingService(config);
+  const chatRecordingService = useChatRecordingService(
+    config,
+    resumedSessionData,
+  );
 
   const { history, addItem, clearItems, loadHistory } = useHistory({
     chatRecordingService,
@@ -252,7 +262,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   useEffect(() => {
     if (resumedSessionData && !isAuthenticating) {
       loadHistoryForResume(
-        convertSessionToHistoryFormats(resumedSessionData.messages),
+        convertSessionToHistoryFormats(
+          resumedSessionData.conversation.messages,
+        ),
       );
     }
   }, [resumedSessionData, isAuthenticating, loadHistoryForResume]);

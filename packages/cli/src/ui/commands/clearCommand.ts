@@ -30,7 +30,7 @@ export const clearCommand: SlashCommand = {
     if (config && chatRecording) {
       const newSessionId = randomUUID();
       config.setSessionId(newSessionId);
-      chatRecording.reinitializeWithSession(newSessionId);
+      chatRecording.initialize();
     }
 
     uiTelemetryService.resetLastPromptTokenCount();
