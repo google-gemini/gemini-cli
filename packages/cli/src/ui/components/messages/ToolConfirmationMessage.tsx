@@ -132,19 +132,14 @@ export const ToolConfirmationMessage: React.FC<
     const executionProps =
       confirmationDetails as ToolExecuteConfirmationDetails;
 
-    const isMultiCommand = executionProps.rootCommand.includes(',');
-    question = `Allow execution of ${
-      isMultiCommand ? 'these commands' : 'this command'
-    }?`;
+    question = `Allow execution of: '${executionProps.rootCommand}'?`;
     options.push(
       {
-        label: `Yes, allow once ${
-          isMultiCommand ? `(${executionProps.rootCommand})` : ''
-        }`,
+        label: `Yes, allow once`,
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: `Yes, allow always "${executionProps.rootCommand}" ...`,
+        label: `Yes, allow always ...`,
         value: ToolConfirmationOutcome.ProceedAlways,
       },
     );
