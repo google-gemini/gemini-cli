@@ -28,6 +28,13 @@ vi.mock('../../services/FileCommandLoader.js', () => ({
   })),
 }));
 
+const mockMcpLoadCommands = vi.fn();
+vi.mock('../../services/McpPromptLoader.js', () => ({
+  McpPromptLoader: vi.fn().mockImplementation(() => ({
+    loadCommands: mockMcpLoadCommands,
+  })),
+}));
+
 vi.mock('../contexts/SessionContext.js', () => ({
   useSessionStats: vi.fn(() => ({ stats: {} })),
 }));
@@ -41,6 +48,7 @@ import { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
+import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 
 const createTestCommand = (
   overrides: Partial<SlashCommand>,
@@ -75,14 +83,17 @@ describe('useSlashCommandProcessor', () => {
     (vi.mocked(BuiltinCommandLoader) as Mock).mockClear();
     mockBuiltinLoadCommands.mockResolvedValue([]);
     mockFileLoadCommands.mockResolvedValue([]);
+    mockMcpLoadCommands.mockResolvedValue([]);
   });
 
   const setupProcessorHook = (
     builtinCommands: SlashCommand[] = [],
     fileCommands: SlashCommand[] = [],
+    mcpCommands: SlashCommand[] = [],
   ) => {
     mockBuiltinLoadCommands.mockResolvedValue(Object.freeze(builtinCommands));
     mockFileLoadCommands.mockResolvedValue(Object.freeze(fileCommands));
+    mockMcpLoadCommands.mockResolvedValue(Object.freeze(mcpCommands));
 
     const { result } = renderHook(() =>
       useSlashCommandProcessor(
@@ -111,6 +122,7 @@ describe('useSlashCommandProcessor', () => {
       setupProcessorHook();
       expect(BuiltinCommandLoader).toHaveBeenCalledWith(mockConfig);
       expect(FileCommandLoader).toHaveBeenCalledWith(mockConfig);
+      expect(McpPromptLoader).toHaveBeenCalledWith(mockConfig);
     });
 
     it('should call loadCommands and populate state after mounting', async () => {
@@ -124,6 +136,7 @@ describe('useSlashCommandProcessor', () => {
       expect(result.current.slashCommands[0]?.name).toBe('test');
       expect(mockBuiltinLoadCommands).toHaveBeenCalledTimes(1);
       expect(mockFileLoadCommands).toHaveBeenCalledTimes(1);
+      expect(mockMcpLoadCommands).toHaveBeenCalledTimes(1);
     });
 
     it('should provide an immutable array of commands to consumers', async () => {
