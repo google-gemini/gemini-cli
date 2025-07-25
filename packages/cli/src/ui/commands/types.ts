@@ -117,13 +117,22 @@ export interface SubmitPromptActionReturn {
   content: string;
 }
 
+/**
+ * The return type for a command action that needs to submit a query to the AI.
+ */
+export interface SubmitQueryActionReturn {
+  type: 'query';
+  query: string;
+}
+
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
   | QuitActionReturn
   | OpenDialogActionReturn
   | LoadHistoryActionReturn
-  | SubmitPromptActionReturn;
+  | SubmitPromptActionReturn
+  | SubmitQueryActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
