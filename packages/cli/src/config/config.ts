@@ -61,7 +61,7 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   ideMode: boolean | undefined;
   proxy: string | undefined;
-  resume: string | undefined;
+  resume: string | 'latest' | undefined;
   listSessions: boolean | undefined;
 }
 
@@ -200,19 +200,25 @@ export async function parseArguments(): Promise<CliArgs> {
     .option('resume', {
       alias: 'r',
       type: 'string',
-      description: 'Resume a previous session. Use "latest" for most recent or index number (e.g. --resume 5)',
-      default: undefined,
-      coerce: (value: string | boolean | undefined): string => {
-        // If --resume is used without a value yargs passes `true` or `undefined`.
-        if (value === true || value === undefined) {
+      // `skipValidation` so that we can distinguish between it being passed with a value, without
+      // one, and not being passed at all.
+      skipValidation: true,
+      description:
+        'Resume a previous session. Use "latest" for most recent or index number (e.g. --resume 5)',
+      coerce: (value: string): string => {
+        // When --resume passed with a value (`gemini --resume 123`): value = "123" (string)
+        // When --resume passed without a value (`gemini --resume`): value = "" (string)
+        // When --resume not passed at all: this `coerce` function is not called at all, and
+        //   `yargsInstance.argv.resume` is undefined.
+        if (value === '') {
           return 'latest';
         }
-        return value as string;
+        return value;
       },
     })
     .option('list-sessions', {
       type: 'boolean',
-      description: 'List available sessions for the current project',
+      description: 'List available sessions for the current project and exit.',
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
