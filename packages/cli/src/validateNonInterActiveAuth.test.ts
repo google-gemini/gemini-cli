@@ -14,6 +14,7 @@ import { AuthType } from '@google/gemini-cli-core';
 describe('validateNonInterActiveAuth', () => {
   let originalEnvGeminiApiKey: string | undefined;
   let originalEnvVertexAi: string | undefined;
+  let originalEnvGcp: string | undefined;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let processExitSpy: ReturnType<typeof vi.spyOn>;
   let refreshAuthMock: jest.MockedFunction<
@@ -23,8 +24,10 @@ describe('validateNonInterActiveAuth', () => {
   beforeEach(() => {
     originalEnvGeminiApiKey = process.env.GEMINI_API_KEY;
     originalEnvVertexAi = process.env.GOOGLE_GENAI_USE_VERTEXAI;
+    originalEnvGcp = process.env.GOOGLE_GENAI_USE_GCA;
     delete process.env.GEMINI_API_KEY;
     delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
+    delete process.env.GOOGLE_GENAI_USE_GCA;
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
       throw new Error(`process.exit(${code}) called`);
@@ -43,6 +46,11 @@ describe('validateNonInterActiveAuth', () => {
     } else {
       delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
     }
+    if (originalEnvGcp !== undefined) {
+      process.env.GOOGLE_GENAI_USE_GCA = originalEnvGcp;
+    } else {
+      delete process.env.GOOGLE_GENAI_USE_GCA;
+    }
     vi.restoreAllMocks();
   });
 
@@ -60,6 +68,15 @@ describe('validateNonInterActiveAuth', () => {
       expect.stringContaining('Please set an Auth method'),
     );
     expect(processExitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('uses LOGIN_WITH_GOOGLE if GOOGLE_GENAI_USE_GCA is set', async () => {
+    process.env.GOOGLE_GENAI_USE_GCA = 'true';
+    const nonInteractiveConfig: NonInteractiveConfig = {
+      refreshAuth: refreshAuthMock,
+    };
+    await validateNonInteractiveAuth(undefined, nonInteractiveConfig);
+    expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
   });
 
   it('uses USE_GEMINI if GEMINI_API_KEY is set', async () => {
@@ -90,6 +107,19 @@ describe('validateNonInterActiveAuth', () => {
     };
     await validateNonInteractiveAuth(undefined, nonInteractiveConfig);
     expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.USE_VERTEX_AI);
+  });
+
+  it('uses LOGIN_WITH_GOOGLE if GOOGLE_GENAI_USE_GCA is set, even with other env vars', async () => {
+    process.env.GOOGLE_GENAI_USE_GCA = 'true';
+    process.env.GEMINI_API_KEY = 'fake-key';
+    process.env.GOOGLE_GENAI_USE_VERTEXAI = 'true';
+    process.env.GOOGLE_CLOUD_PROJECT = 'test-project';
+    process.env.GOOGLE_CLOUD_LOCATION = 'us-central1';
+    const nonInteractiveConfig: NonInteractiveConfig = {
+      refreshAuth: refreshAuthMock,
+    };
+    await validateNonInteractiveAuth(undefined, nonInteractiveConfig);
+    expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
   });
 
   it('uses USE_VERTEX_AI if both GEMINI_API_KEY and GOOGLE_GENAI_USE_VERTEXAI are set', async () => {

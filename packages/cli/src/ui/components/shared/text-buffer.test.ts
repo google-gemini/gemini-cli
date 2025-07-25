@@ -408,8 +408,8 @@ describe('useTextBuffer', () => {
         useTextBuffer({ viewport, isValidPath: () => true }),
       );
       const filePath = '/path/to/a/valid/file.txt';
-      act(() => result.current.insert(filePath));
-      expect(getBufferState(result).text).toBe(`@${filePath}`);
+      act(() => result.current.insert(filePath, { paste: true }));
+      expect(getBufferState(result).text).toBe(`@${filePath} `);
     });
 
     it('should not prepend @ to an invalid file path on insert', () => {
@@ -417,7 +417,7 @@ describe('useTextBuffer', () => {
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       const notAPath = 'this is just some long text';
-      act(() => result.current.insert(notAPath));
+      act(() => result.current.insert(notAPath, { paste: true }));
       expect(getBufferState(result).text).toBe(notAPath);
     });
 
@@ -426,8 +426,8 @@ describe('useTextBuffer', () => {
         useTextBuffer({ viewport, isValidPath: () => true }),
       );
       const filePath = "'/path/to/a/valid/file.txt'";
-      act(() => result.current.insert(filePath));
-      expect(getBufferState(result).text).toBe(`@/path/to/a/valid/file.txt`);
+      act(() => result.current.insert(filePath, { paste: true }));
+      expect(getBufferState(result).text).toBe(`@/path/to/a/valid/file.txt `);
     });
 
     it('should not prepend @ to short text that is not a path', () => {
@@ -435,7 +435,7 @@ describe('useTextBuffer', () => {
         useTextBuffer({ viewport, isValidPath: () => true }),
       );
       const shortText = 'ab';
-      act(() => result.current.insert(shortText));
+      act(() => result.current.insert(shortText, { paste: true }));
       expect(getBufferState(result).text).toBe(shortText);
     });
   });
@@ -450,7 +450,7 @@ describe('useTextBuffer', () => {
         }),
       );
       const filePath = '/path/to/a/valid/file.txt';
-      act(() => result.current.insert(filePath));
+      act(() => result.current.insert(filePath, { paste: true }));
       expect(getBufferState(result).text).toBe(filePath); // No @ prefix
     });
 
@@ -463,7 +463,7 @@ describe('useTextBuffer', () => {
         }),
       );
       const quotedFilePath = "'/path/to/a/valid/file.txt'";
-      act(() => result.current.insert(quotedFilePath));
+      act(() => result.current.insert(quotedFilePath, { paste: true }));
       expect(getBufferState(result).text).toBe(quotedFilePath); // No @ prefix, keeps quotes
     });
 
@@ -476,7 +476,7 @@ describe('useTextBuffer', () => {
         }),
       );
       const notAPath = 'this is just some text';
-      act(() => result.current.insert(notAPath));
+      act(() => result.current.insert(notAPath, { paste: true }));
       expect(getBufferState(result).text).toBe(notAPath);
     });
 
@@ -489,7 +489,7 @@ describe('useTextBuffer', () => {
         }),
       );
       const shortText = 'ls';
-      act(() => result.current.insert(shortText));
+      act(() => result.current.insert(shortText, { paste: true }));
       expect(getBufferState(result).text).toBe(shortText); // No @ prefix for short text
     });
   });
@@ -850,6 +850,7 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: '\x7f',
         });
         result.current.handleInput({
@@ -857,6 +858,7 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: '\x7f',
         });
         result.current.handleInput({
@@ -864,6 +866,7 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
+          paste: false,
           sequence: '\x7f',
         });
       });
@@ -991,9 +994,9 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
 
       // Simulate pasting the long text multiple times
       act(() => {
-        result.current.insert(longText);
-        result.current.insert(longText);
-        result.current.insert(longText);
+        result.current.insert(longText, { paste: true });
+        result.current.insert(longText, { paste: true });
+        result.current.insert(longText, { paste: true });
       });
 
       const state = getBufferState(result);
