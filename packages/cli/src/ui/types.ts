@@ -238,4 +238,8 @@ export type SlashCommandProcessorResult =
   | {
       type: 'handled'; // Indicates the command was processed and no further action is needed.
     }
-  | SubmitPromptResult;
+  | SubmitPromptResult
+  | {
+      type: 'submit_query'; // Submit a query to the AI
+      query: string;
+    };

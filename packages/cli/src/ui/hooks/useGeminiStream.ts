@@ -261,6 +261,15 @@ export const useGeminiStream = (
                 shouldProceed: true,
               };
             }
+            case 'submit_query': {
+              // Add the query as a user message and proceed to send it
+              addItem(
+                { type: MessageType.USER, text: slashCommandResult.query },
+                userMessageTimestamp,
+              );
+              localQueryToSendToGemini = slashCommandResult.query;
+              return { queryToSend: localQueryToSendToGemini, shouldProceed: true };
+            }
             case 'handled': {
               return { queryToSend: null, shouldProceed: false };
             }
