@@ -40,6 +40,8 @@ import {
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
+import { checkForUpdates } from './ui/utils/updateCheck.js';
+import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -221,6 +223,10 @@ export async function main() {
       </React.StrictMode>,
       { exitOnCtrlC: false },
     );
+
+    checkForUpdates().then((info) => {
+      handleAutoUpdate(info, settings, config.getProjectRoot());
+    });
 
     registerCleanup(() => instance.unmount());
     return;

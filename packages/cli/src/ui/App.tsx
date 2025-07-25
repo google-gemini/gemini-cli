@@ -80,11 +80,12 @@ import {
   isGenericQuotaExceededError,
   UserTierId,
 } from '@google/gemini-cli-core';
-import { checkForUpdates } from './utils/updateCheck.js';
+import { UpdateInfo } from './utils/updateCheck.js';
 import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { updateEventEmitter } from '../utils/updateEventEmitter.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -104,15 +105,76 @@ export const AppWrapper = (props: AppProps) => (
 const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const isFocused = useFocus();
   useBracketedPaste();
-  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const { stdout } = useStdout();
   const nightly = version.includes('nightly');
+  const { history, addItem, clearItems, loadHistory } = useHistory();
 
   useEffect(() => {
-    checkForUpdates().then(setUpdateMessage);
-  }, []);
+    let successfullyInstalled = false;
+    const handleUpdateRecieved = (info: UpdateInfo) => {
+      setUpdateInfo(info);
+      const savedMessage = info.message;
+      setTimeout((_: UpdateInfo) => {
+        if (!successfullyInstalled) {
+          addItem(
+            {
+              type: MessageType.INFO,
+              text: savedMessage,
+            },
+            Date.now(),
+          );
+        }
+        setUpdateInfo(null);
+      }, 60000);
+    };
 
-  const { history, addItem, clearItems, loadHistory } = useHistory();
+    const handleUpdateFailed = (_: UpdateInfo) => {
+      setUpdateInfo(null);
+      addItem(
+        {
+          type: MessageType.ERROR,
+          text: `Automatic update failed. Please try updating manually`,
+        },
+        Date.now(),
+      );
+    };
+
+    const handleUpdateSuccess = (_: UpdateInfo) => {
+      successfullyInstalled = true;
+      setUpdateInfo(null);
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: `Update successful! The new version will be used on your next run.`,
+        },
+        Date.now(),
+      );
+    };
+
+    const handleUpdateInfo = (data: { message: string }) => {
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: data.message,
+        },
+        Date.now(),
+      );
+    };
+
+    updateEventEmitter.on('update-received', handleUpdateRecieved);
+    updateEventEmitter.on('update-failed', handleUpdateFailed);
+    updateEventEmitter.on('update-success', handleUpdateSuccess);
+    updateEventEmitter.on('update-info', handleUpdateInfo);
+
+    return () => {
+      updateEventEmitter.off('update-received', handleUpdateRecieved);
+      updateEventEmitter.off('update-failed', handleUpdateFailed);
+      updateEventEmitter.off('update-success', handleUpdateSuccess);
+      updateEventEmitter.off('update-info', handleUpdateInfo);
+    };
+  }, [addItem]);
+
   const {
     consoleMessages,
     handleNewMessage,
@@ -700,9 +762,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   return (
     <StreamingContext.Provider value={streamingState}>
       <Box flexDirection="column" marginBottom={1} width="90%">
-        {/* Move UpdateNotification outside Static so it can re-render when updateMessage changes */}
-        {updateMessage && <UpdateNotification message={updateMessage} />}
-
         {/*
          * The Static component is an Ink intrinsic in which there can only be 1 per application.
          * Because of this restriction we're hacking it slightly by having a 'header' item here to
@@ -765,6 +824,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         {showHelp && <Help commands={slashCommands} />}
 
         <Box flexDirection="column" ref={mainControlsRef}>
+          {/* Move UpdateNotification to render update notification above input area */}
+          {updateInfo && (
+            <UpdateNotification message={`${updateInfo.message}`} />
+          )}
           {startupWarnings.length > 0 && (
             <Box
               borderStyle="round"
