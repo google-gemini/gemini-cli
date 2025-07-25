@@ -751,7 +751,29 @@ export type TextBufferAction =
   | {
       type: 'vim_change_movement';
       payload: { movement: 'h' | 'j' | 'k' | 'l'; count: number };
-    };
+    }
+  // New vim actions for stateless command handling
+  | { type: 'vim_move_left'; payload: { count: number } }
+  | { type: 'vim_move_right'; payload: { count: number } }
+  | { type: 'vim_move_up'; payload: { count: number } }
+  | { type: 'vim_move_down'; payload: { count: number } }
+  | { type: 'vim_move_word_forward'; payload: { count: number } }
+  | { type: 'vim_move_word_backward'; payload: { count: number } }
+  | { type: 'vim_move_word_end'; payload: { count: number } }
+  | { type: 'vim_delete_char'; payload: { count: number } }
+  | { type: 'vim_insert_at_cursor' }
+  | { type: 'vim_append_at_cursor' }
+  | { type: 'vim_open_line_below' }
+  | { type: 'vim_open_line_above' }
+  | { type: 'vim_append_at_line_end' }
+  | { type: 'vim_insert_at_line_start' }
+  | { type: 'vim_move_to_line_start' }
+  | { type: 'vim_move_to_line_end' }
+  | { type: 'vim_move_to_first_nonwhitespace' }
+  | { type: 'vim_move_to_first_line' }
+  | { type: 'vim_move_to_last_line' }
+  | { type: 'vim_move_to_line'; payload: { lineNumber: number } }
+  | { type: 'vim_escape_insert_mode' };
 
 export function textBufferReducer(
   state: TextBufferState,
@@ -1225,6 +1247,27 @@ export function textBufferReducer(
     case 'vim_delete_to_end_of_line':
     case 'vim_change_to_end_of_line':
     case 'vim_change_movement':
+    case 'vim_move_left':
+    case 'vim_move_right':
+    case 'vim_move_up':
+    case 'vim_move_down':
+    case 'vim_move_word_forward':
+    case 'vim_move_word_backward':
+    case 'vim_move_word_end':
+    case 'vim_delete_char':
+    case 'vim_insert_at_cursor':
+    case 'vim_append_at_cursor':
+    case 'vim_open_line_below':
+    case 'vim_open_line_above':
+    case 'vim_append_at_line_end':
+    case 'vim_insert_at_line_start':
+    case 'vim_move_to_line_start':
+    case 'vim_move_to_line_end':
+    case 'vim_move_to_first_nonwhitespace':
+    case 'vim_move_to_first_line':
+    case 'vim_move_to_last_line':
+    case 'vim_move_to_line':
+    case 'vim_escape_insert_mode':
       return handleVimAction(state, action as VimAction);
 
     default: {
@@ -1441,6 +1484,91 @@ export function useTextBuffer({
     [],
   );
 
+  // New vim navigation and operation methods
+  const vimMoveLeft = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_left', payload: { count } });
+  }, []);
+
+  const vimMoveRight = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_right', payload: { count } });
+  }, []);
+
+  const vimMoveUp = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_up', payload: { count } });
+  }, []);
+
+  const vimMoveDown = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_down', payload: { count } });
+  }, []);
+
+  const vimMoveWordForward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_word_forward', payload: { count } });
+  }, []);
+
+  const vimMoveWordBackward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_word_backward', payload: { count } });
+  }, []);
+
+  const vimMoveWordEnd = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_word_end', payload: { count } });
+  }, []);
+
+  const vimDeleteChar = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_char', payload: { count } });
+  }, []);
+
+  const vimInsertAtCursor = useCallback((): void => {
+    dispatch({ type: 'vim_insert_at_cursor' });
+  }, []);
+
+  const vimAppendAtCursor = useCallback((): void => {
+    dispatch({ type: 'vim_append_at_cursor' });
+  }, []);
+
+  const vimOpenLineBelow = useCallback((): void => {
+    dispatch({ type: 'vim_open_line_below' });
+  }, []);
+
+  const vimOpenLineAbove = useCallback((): void => {
+    dispatch({ type: 'vim_open_line_above' });
+  }, []);
+
+  const vimAppendAtLineEnd = useCallback((): void => {
+    dispatch({ type: 'vim_append_at_line_end' });
+  }, []);
+
+  const vimInsertAtLineStart = useCallback((): void => {
+    dispatch({ type: 'vim_insert_at_line_start' });
+  }, []);
+
+  const vimMoveToLineStart = useCallback((): void => {
+    dispatch({ type: 'vim_move_to_line_start' });
+  }, []);
+
+  const vimMoveToLineEnd = useCallback((): void => {
+    dispatch({ type: 'vim_move_to_line_end' });
+  }, []);
+
+  const vimMoveToFirstNonWhitespace = useCallback((): void => {
+    dispatch({ type: 'vim_move_to_first_nonwhitespace' });
+  }, []);
+
+  const vimMoveToFirstLine = useCallback((): void => {
+    dispatch({ type: 'vim_move_to_first_line' });
+  }, []);
+
+  const vimMoveToLastLine = useCallback((): void => {
+    dispatch({ type: 'vim_move_to_last_line' });
+  }, []);
+
+  const vimMoveToLine = useCallback((lineNumber: number): void => {
+    dispatch({ type: 'vim_move_to_line', payload: { lineNumber } });
+  }, []);
+
+  const vimEscapeInsertMode = useCallback((): void => {
+    dispatch({ type: 'vim_escape_insert_mode' });
+  }, []);
+
   const openInExternalEditor = useCallback(
     async (opts: { editor?: string } = {}): Promise<void> => {
       const editor =
@@ -1616,6 +1744,27 @@ export function useTextBuffer({
     vimDeleteToEndOfLine,
     vimChangeToEndOfLine,
     vimChangeMovement,
+    vimMoveLeft,
+    vimMoveRight,
+    vimMoveUp,
+    vimMoveDown,
+    vimMoveWordForward,
+    vimMoveWordBackward,
+    vimMoveWordEnd,
+    vimDeleteChar,
+    vimInsertAtCursor,
+    vimAppendAtCursor,
+    vimOpenLineBelow,
+    vimOpenLineAbove,
+    vimAppendAtLineEnd,
+    vimInsertAtLineStart,
+    vimMoveToLineStart,
+    vimMoveToLineEnd,
+    vimMoveToFirstNonWhitespace,
+    vimMoveToFirstLine,
+    vimMoveToLastLine,
+    vimMoveToLine,
+    vimEscapeInsertMode,
   };
   return returnValue;
 }
@@ -1776,4 +1925,88 @@ export interface TextBuffer {
    * Change movement operations (vim 'ch', 'cj', 'ck', 'cl' commands)
    */
   vimChangeMovement: (movement: 'h' | 'j' | 'k' | 'l', count: number) => void;
+  /**
+   * Move cursor left N times (vim 'h' command)
+   */
+  vimMoveLeft: (count: number) => void;
+  /**
+   * Move cursor right N times (vim 'l' command)
+   */
+  vimMoveRight: (count: number) => void;
+  /**
+   * Move cursor up N times (vim 'k' command)
+   */
+  vimMoveUp: (count: number) => void;
+  /**
+   * Move cursor down N times (vim 'j' command)
+   */
+  vimMoveDown: (count: number) => void;
+  /**
+   * Move cursor forward N words (vim 'w' command)
+   */
+  vimMoveWordForward: (count: number) => void;
+  /**
+   * Move cursor backward N words (vim 'b' command)
+   */
+  vimMoveWordBackward: (count: number) => void;
+  /**
+   * Move cursor to end of Nth word (vim 'e' command)
+   */
+  vimMoveWordEnd: (count: number) => void;
+  /**
+   * Delete N characters at cursor (vim 'x' command)
+   */
+  vimDeleteChar: (count: number) => void;
+  /**
+   * Enter insert mode at cursor (vim 'i' command)
+   */
+  vimInsertAtCursor: () => void;
+  /**
+   * Enter insert mode after cursor (vim 'a' command)
+   */
+  vimAppendAtCursor: () => void;
+  /**
+   * Open new line below and enter insert mode (vim 'o' command)
+   */
+  vimOpenLineBelow: () => void;
+  /**
+   * Open new line above and enter insert mode (vim 'O' command)
+   */
+  vimOpenLineAbove: () => void;
+  /**
+   * Move to end of line and enter insert mode (vim 'A' command)
+   */
+  vimAppendAtLineEnd: () => void;
+  /**
+   * Move to first non-whitespace and enter insert mode (vim 'I' command)
+   */
+  vimInsertAtLineStart: () => void;
+  /**
+   * Move cursor to beginning of line (vim '0' command)
+   */
+  vimMoveToLineStart: () => void;
+  /**
+   * Move cursor to end of line (vim '$' command)
+   */
+  vimMoveToLineEnd: () => void;
+  /**
+   * Move cursor to first non-whitespace character (vim '^' command)
+   */
+  vimMoveToFirstNonWhitespace: () => void;
+  /**
+   * Move cursor to first line (vim 'gg' command)
+   */
+  vimMoveToFirstLine: () => void;
+  /**
+   * Move cursor to last line (vim 'G' command)
+   */
+  vimMoveToLastLine: () => void;
+  /**
+   * Move cursor to specific line number (vim '[N]G' command)
+   */
+  vimMoveToLine: (lineNumber: number) => void;
+  /**
+   * Handle escape from insert mode (moves cursor left if not at line start)
+   */
+  vimEscapeInsertMode: () => void;
 }

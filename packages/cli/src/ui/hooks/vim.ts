@@ -7,12 +7,6 @@
 import { useCallback, useReducer, useEffect } from 'react';
 import type { Key } from './useKeypress.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
-import {
-  findNextWordStart,
-  findPrevWordStart,
-  findWordEnd,
-  logicalPosToOffset,
-} from '../components/shared/text-buffer.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
@@ -20,7 +14,6 @@ export type VimMode = 'NORMAL' | 'INSERT';
 // Constants
 const DIGIT_MULTIPLIER = 10;
 const DEFAULT_COUNT = 1;
-const WHITESPACE_CHARS = /\s/;
 const DIGIT_1_TO_9 = /^[1-9]$/;
 
 // Command types
@@ -43,8 +36,6 @@ const CMD_TYPES = {
     RIGHT: 'cl',
   },
 } as const;
-
-// Utility functions moved to text-buffer.ts to eliminate duplication and avoid stale state
 
 // Helper function to clear pending state
 const createClearPendingState = () => ({
@@ -158,12 +149,6 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
     [state.count],
   );
 
-  // Helper to get current cursor position as offset
-  const getCurrentOffset = useCallback(() => {
-    const [row, col] = buffer.cursor;
-    return logicalPosToOffset(buffer.lines, row, col);
-  }, [buffer.lines, buffer.cursor]);
-
   /** Executes common commands to eliminate duplication in dot (.) repeat command */
   const executeCommand = useCallback(
     (cmdType: string, count: number) => {
@@ -202,20 +187,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         }
 
         case CMD_TYPES.DELETE_CHAR: {
-          for (let i = 0; i < count; i++) {
-            const currentRow = buffer.cursor[0];
-            const currentCol = buffer.cursor[1];
-            const currentLine = buffer.lines[currentRow] || '';
-
-            if (currentCol < currentLine.length) {
-              const isLastChar = currentCol === currentLine.length - 1;
-              buffer.del();
-
-              if (isLastChar && currentCol > 0) {
-                buffer.move('left');
-              }
-            }
-          }
+          buffer.vimDeleteChar(count);
           break;
         }
 
@@ -234,9 +206,17 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         case CMD_TYPES.CHANGE_MOVEMENT.DOWN:
         case CMD_TYPES.CHANGE_MOVEMENT.UP:
         case CMD_TYPES.CHANGE_MOVEMENT.RIGHT: {
-          const movementType = cmdType[1] as 'h' | 'j' | 'k' | 'l';
-          buffer.vimChangeMovement(movementType, count);
-          updateMode('INSERT');
+          const movementMap: Record<string, 'h' | 'j' | 'k' | 'l'> = {
+            [CMD_TYPES.CHANGE_MOVEMENT.LEFT]: 'h',
+            [CMD_TYPES.CHANGE_MOVEMENT.DOWN]: 'j',
+            [CMD_TYPES.CHANGE_MOVEMENT.UP]: 'k',
+            [CMD_TYPES.CHANGE_MOVEMENT.RIGHT]: 'l',
+          };
+          const movementType = movementMap[cmdType];
+          if (movementType) {
+            buffer.vimChangeMovement(movementType, count);
+            updateMode('INSERT');
+          }
           break;
         }
 
@@ -259,71 +239,162 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
     [buffer, updateMode],
   );
 
+  /**
+   * Handles key input in INSERT mode
+   * @param normalizedKey - The normalized key input
+   * @returns boolean indicating if the key was handled
+   */
+  const handleInsertModeInput = useCallback(
+    (normalizedKey: Key): boolean => {
+      // Handle escape key immediately - switch to NORMAL mode on any escape
+      if (normalizedKey.name === 'escape') {
+        // Vim behavior: move cursor left when exiting insert mode (unless at beginning of line)
+        buffer.vimEscapeInsertMode();
+        dispatch({ type: 'ESCAPE_TO_NORMAL' });
+        updateMode('NORMAL');
+        return true;
+      }
+
+      // In INSERT mode, let InputPrompt handle completion keys and special commands
+      if (
+        normalizedKey.name === 'tab' ||
+        (normalizedKey.name === 'return' && !normalizedKey.ctrl) ||
+        normalizedKey.name === 'up' ||
+        normalizedKey.name === 'down'
+      ) {
+        return false; // Let InputPrompt handle completion
+      }
+
+      // Let InputPrompt handle Ctrl+V for clipboard image pasting
+      if (normalizedKey.ctrl && normalizedKey.name === 'v') {
+        return false; // Let InputPrompt handle clipboard functionality
+      }
+
+      // Special handling for Enter key to allow command submission (lower priority than completion)
+      if (
+        normalizedKey.name === 'return' &&
+        !normalizedKey.ctrl &&
+        !normalizedKey.meta
+      ) {
+        if (buffer.text.trim() && onSubmit) {
+          // Handle command submission directly
+          const submittedValue = buffer.text;
+          buffer.setText('');
+          onSubmit(submittedValue);
+          return true;
+        }
+        return true; // Handled by vim (even if no onSubmit callback)
+      }
+
+      // useKeypress already provides the correct format for TextBuffer
+      buffer.handleInput(normalizedKey);
+      return true; // Handled by vim
+    },
+    [buffer, dispatch, updateMode, onSubmit],
+  );
+
+  /**
+   * Normalizes key input to ensure all required properties are present
+   * @param key - Raw key input
+   * @returns Normalized key with all properties
+   */
+  const normalizeKey = useCallback(
+    (key: Key): Key => ({
+      name: key.name || '',
+      sequence: key.sequence || '',
+      ctrl: key.ctrl || false,
+      meta: key.meta || false,
+      shift: key.shift || false,
+      paste: key.paste || false,
+    }),
+    [],
+  );
+
+  /**
+   * Handles change movement commands (ch, cj, ck, cl)
+   * @param movement - The movement direction
+   * @returns boolean indicating if command was handled
+   */
+  const handleChangeMovement = useCallback(
+    (movement: 'h' | 'j' | 'k' | 'l'): boolean => {
+      const count = getCurrentCount();
+      dispatch({ type: 'CLEAR_COUNT' });
+      buffer.vimChangeMovement(movement, count);
+      updateMode('INSERT');
+
+      const cmdTypeMap = {
+        h: CMD_TYPES.CHANGE_MOVEMENT.LEFT,
+        j: CMD_TYPES.CHANGE_MOVEMENT.DOWN,
+        k: CMD_TYPES.CHANGE_MOVEMENT.UP,
+        l: CMD_TYPES.CHANGE_MOVEMENT.RIGHT,
+      };
+
+      dispatch({
+        type: 'SET_LAST_COMMAND',
+        command: { type: cmdTypeMap[movement], count },
+      });
+      dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+      return true;
+    },
+    [getCurrentCount, dispatch, buffer, updateMode],
+  );
+
+  /**
+   * Handles operator-motion commands (dw/cw, db/cb, de/ce)
+   * @param operator - The operator type ('d' for delete, 'c' for change)
+   * @param motion - The motion type ('w', 'b', 'e')
+   * @returns boolean indicating if command was handled
+   */
+  const handleOperatorMotion = useCallback(
+    (operator: 'd' | 'c', motion: 'w' | 'b' | 'e'): boolean => {
+      const count = getCurrentCount();
+
+      const commandMap = {
+        d: {
+          w: CMD_TYPES.DELETE_WORD_FORWARD,
+          b: CMD_TYPES.DELETE_WORD_BACKWARD,
+          e: CMD_TYPES.DELETE_WORD_END,
+        },
+        c: {
+          w: CMD_TYPES.CHANGE_WORD_FORWARD,
+          b: CMD_TYPES.CHANGE_WORD_BACKWARD,
+          e: CMD_TYPES.CHANGE_WORD_END,
+        },
+      };
+
+      const cmdType = commandMap[operator][motion];
+      executeCommand(cmdType, count);
+
+      dispatch({
+        type: 'SET_LAST_COMMAND',
+        command: { type: cmdType, count },
+      });
+      dispatch({ type: 'CLEAR_COUNT' });
+      dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+
+      return true;
+    },
+    [getCurrentCount, executeCommand, dispatch],
+  );
+
   const handleInput = useCallback(
     (key: Key): boolean => {
       if (!vimEnabled) {
         return false; // Let InputPrompt handle it
       }
 
-      // Ensure key has all required properties for tests
-      const normalizedKey: Key = {
-        name: key.name || '',
-        sequence: key.sequence || '',
-        ctrl: key.ctrl || false,
-        meta: key.meta || false,
-        shift: key.shift || false,
-        paste: key.paste || false,
-      };
+      let normalizedKey: Key;
+      try {
+        normalizedKey = normalizeKey(key);
+      } catch (error) {
+        // Handle malformed key inputs gracefully
+        console.warn('Malformed key input in vim mode:', key, error);
+        return false;
+      }
 
       // Handle INSERT mode
       if (state.mode === 'INSERT') {
-        // Handle escape key immediately - switch to NORMAL mode on any escape
-        if (normalizedKey.name === 'escape') {
-          // Move cursor left if not at beginning of line (vim behavior)
-          const currentCol = buffer.cursor[1];
-          if (currentCol > 0) {
-            buffer.move('left');
-          }
-
-          dispatch({ type: 'ESCAPE_TO_NORMAL' });
-          updateMode('NORMAL');
-          return true;
-        }
-
-        // In INSERT mode, let InputPrompt handle completion keys and special commands
-        if (
-          normalizedKey.name === 'tab' ||
-          (normalizedKey.name === 'return' && !normalizedKey.ctrl) ||
-          normalizedKey.name === 'up' ||
-          normalizedKey.name === 'down'
-        ) {
-          return false; // Let InputPrompt handle completion
-        }
-
-        // Let InputPrompt handle Ctrl+V for clipboard image pasting
-        if (normalizedKey.ctrl && normalizedKey.name === 'v') {
-          return false; // Let InputPrompt handle clipboard functionality
-        }
-
-        // Special handling for Enter key to allow command submission (lower priority than completion)
-        if (
-          normalizedKey.name === 'return' &&
-          !normalizedKey.ctrl &&
-          !normalizedKey.meta
-        ) {
-          if (buffer.text.trim() && onSubmit) {
-            // Handle command submission directly
-            const submittedValue = buffer.text;
-            buffer.setText('');
-            onSubmit(submittedValue);
-            return true;
-          }
-          return true; // Handled by vim (even if no onSubmit callback)
-        }
-
-        // useKeypress already provides the correct format for TextBuffer
-        buffer.handleInput(normalizedKey);
-        return true; // Handled by vim
+        return handleInsertModeInput(normalizedKey);
       }
 
       // Handle NORMAL mode
@@ -347,65 +418,6 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         }
 
         const repeatCount = getCurrentCount();
-        const text = buffer.text;
-        const currentOffset = getCurrentOffset();
-
-        // Helper function to handle change movement commands (ch, cj, ck, cl)
-        const handleChangeMovement = (
-          movement: 'h' | 'j' | 'k' | 'l',
-        ): boolean => {
-          const count = getCurrentCount();
-          dispatch({ type: 'CLEAR_COUNT' });
-          buffer.vimChangeMovement(movement, count);
-          updateMode('INSERT');
-
-          const cmdTypeMap = {
-            h: CMD_TYPES.CHANGE_MOVEMENT.LEFT,
-            j: CMD_TYPES.CHANGE_MOVEMENT.DOWN,
-            k: CMD_TYPES.CHANGE_MOVEMENT.UP,
-            l: CMD_TYPES.CHANGE_MOVEMENT.RIGHT,
-          };
-
-          dispatch({
-            type: 'SET_LAST_COMMAND',
-            command: { type: cmdTypeMap[movement], count },
-          });
-          dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
-          return true;
-        };
-
-        // Helper function to handle operator-motion commands (dw/cw, db/cb, de/ce)
-        const handleOperatorMotion = (
-          operator: 'd' | 'c',
-          motion: 'w' | 'b' | 'e',
-        ): boolean => {
-          const count = getCurrentCount();
-
-          const commandMap = {
-            d: {
-              w: CMD_TYPES.DELETE_WORD_FORWARD,
-              b: CMD_TYPES.DELETE_WORD_BACKWARD,
-              e: CMD_TYPES.DELETE_WORD_END,
-            },
-            c: {
-              w: CMD_TYPES.CHANGE_WORD_FORWARD,
-              b: CMD_TYPES.CHANGE_WORD_BACKWARD,
-              e: CMD_TYPES.CHANGE_WORD_END,
-            },
-          };
-
-          const cmdType = commandMap[operator][motion];
-          executeCommand(cmdType, count);
-
-          dispatch({
-            type: 'SET_LAST_COMMAND',
-            command: { type: cmdType, count },
-          });
-          dispatch({ type: 'CLEAR_COUNT' });
-          dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
-
-          return true;
-        };
 
         switch (normalizedKey.sequence) {
           case 'h': {
@@ -415,17 +427,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             }
 
             // Normal left movement
-            for (let i = 0; i < repeatCount; i++) {
-              const currentRow = buffer.cursor[0];
-              const currentCol = buffer.cursor[1];
-              if (currentCol > 0) {
-                buffer.move('left');
-              } else if (currentRow > 0) {
-                // Move to end of previous line
-                buffer.move('up');
-                buffer.move('end');
-              }
-            }
+            buffer.vimMoveLeft(repeatCount);
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
@@ -437,9 +439,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             }
 
             // Normal down movement
-            for (let i = 0; i < repeatCount; i++) {
-              buffer.move('down');
-            }
+            buffer.vimMoveDown(repeatCount);
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
@@ -451,9 +451,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             }
 
             // Normal up movement
-            for (let i = 0; i < repeatCount; i++) {
-              buffer.move('up');
-            }
+            buffer.vimMoveUp(repeatCount);
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
@@ -465,20 +463,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             }
 
             // Normal right movement
-            for (let i = 0; i < repeatCount; i++) {
-              const currentRow = buffer.cursor[0];
-              const currentCol = buffer.cursor[1];
-              const currentLine = buffer.lines[currentRow] || '';
-
-              // Don't move past the last character of the line
-              if (currentCol < currentLine.length - 1) {
-                buffer.move('right');
-              } else if (currentRow < buffer.lines.length - 1) {
-                // Move to beginning of next line
-                buffer.move('down');
-                buffer.move('home');
-              }
-            }
+            buffer.vimMoveRight(repeatCount);
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
@@ -493,17 +478,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             }
 
             // Normal word movement
-            let offset = currentOffset;
-            for (let i = 0; i < repeatCount; i++) {
-              const nextWordOffset = findNextWordStart(text, offset);
-              if (nextWordOffset > offset) {
-                offset = nextWordOffset;
-              } else {
-                // No more words to move to
-                break;
-              }
-            }
-            buffer.moveToOffset(offset);
+            buffer.vimMoveWordForward(repeatCount);
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
@@ -518,11 +493,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             }
 
             // Normal backward word movement
-            let offset = currentOffset;
-            for (let i = 0; i < repeatCount; i++) {
-              offset = findPrevWordStart(text, offset);
-            }
-            buffer.moveToOffset(offset);
+            buffer.vimMoveWordBackward(repeatCount);
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
@@ -537,18 +508,14 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             }
 
             // Normal word end movement
-            let offset = currentOffset;
-            for (let i = 0; i < repeatCount; i++) {
-              offset = findWordEnd(text, offset);
-            }
-            buffer.moveToOffset(offset);
+            buffer.vimMoveWordEnd(repeatCount);
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
 
           case 'x': {
             // Delete character under cursor
-            executeCommand(CMD_TYPES.DELETE_CHAR, repeatCount);
+            buffer.vimDeleteChar(repeatCount);
             dispatch({
               type: 'SET_LAST_COMMAND',
               command: { type: CMD_TYPES.DELETE_CHAR, count: repeatCount },
@@ -559,6 +526,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
           case 'i': {
             // Enter INSERT mode at current position
+            buffer.vimInsertAtCursor();
             updateMode('INSERT');
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
@@ -566,13 +534,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
           case 'a': {
             // Enter INSERT mode after current position
-            const currentRow = buffer.cursor[0];
-            const currentCol = buffer.cursor[1];
-            const currentLine = buffer.lines[currentRow] || '';
-
-            if (currentCol < currentLine.length) {
-              buffer.move('right');
-            }
+            buffer.vimAppendAtCursor();
             updateMode('INSERT');
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
@@ -580,8 +542,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
           case 'o': {
             // Insert new line after current line and enter INSERT mode
-            buffer.move('end');
-            buffer.newline();
+            buffer.vimOpenLineBelow();
             updateMode('INSERT');
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
@@ -589,9 +550,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
           case 'O': {
             // Insert new line before current line and enter INSERT mode
-            buffer.move('home');
-            buffer.newline();
-            buffer.move('up');
+            buffer.vimOpenLineAbove();
             updateMode('INSERT');
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
@@ -599,31 +558,21 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
           case '0': {
             // Move to start of line
-            buffer.move('home');
+            buffer.vimMoveToLineStart();
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
 
           case '$': {
             // Move to end of line
-            buffer.move('end');
+            buffer.vimMoveToLineEnd();
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
 
           case '^': {
             // Move to first non-whitespace character
-            const currentRow = buffer.cursor[0];
-            const currentLine = buffer.lines[currentRow] || '';
-            let col = 0;
-            while (
-              col < currentLine.length &&
-              WHITESPACE_CHARS.test(currentLine[col])
-            ) {
-              col++;
-            }
-            const offset = logicalPosToOffset(buffer.lines, currentRow, col);
-            buffer.moveToOffset(offset);
+            buffer.vimMoveToFirstNonWhitespace();
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
@@ -631,7 +580,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           case 'g': {
             if (state.pendingOperator === 'g') {
               // Second 'g' - go to first line (gg command)
-              buffer.moveToOffset(0);
+              buffer.vimMoveToFirstLine();
               dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
             } else {
               // First 'g' - wait for second g
@@ -644,17 +593,10 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           case 'G': {
             if (state.count > 0) {
               // Go to specific line number (1-based) when a count was provided
-              const lineNum = Math.min(
-                state.count - 1,
-                buffer.lines.length - 1,
-              );
-              const offset = logicalPosToOffset(buffer.lines, lineNum, 0);
-              buffer.moveToOffset(offset);
+              buffer.vimMoveToLine(state.count);
             } else {
               // Go to last line when no count was provided
-              const text = buffer.text;
-              const lastLineStart = text.lastIndexOf('\n') + 1;
-              buffer.moveToOffset(lastLineStart);
+              buffer.vimMoveToLastLine();
             }
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
@@ -662,17 +604,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
           case 'I': {
             // Enter INSERT mode at start of line (first non-whitespace)
-            const currentRow = buffer.cursor[0];
-            const currentLine = buffer.lines[currentRow] || '';
-            let col = 0;
-            while (
-              col < currentLine.length &&
-              WHITESPACE_CHARS.test(currentLine[col])
-            ) {
-              col++;
-            }
-            const offset = logicalPosToOffset(buffer.lines, currentRow, col);
-            buffer.moveToOffset(offset);
+            buffer.vimInsertAtLineStart();
             updateMode('INSERT');
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
@@ -680,7 +612,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
           case 'A': {
             // Enter INSERT mode at end of line
-            buffer.move('end');
+            buffer.vimAppendAtLineEnd();
             updateMode('INSERT');
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
@@ -766,17 +698,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
               }
 
               // Normal left movement (same as 'h')
-              for (let i = 0; i < repeatCount; i++) {
-                const currentRow = buffer.cursor[0];
-                const currentCol = buffer.cursor[1];
-                if (currentCol > 0) {
-                  buffer.move('left');
-                } else if (currentRow > 0) {
-                  // Move to end of previous line
-                  buffer.move('up');
-                  buffer.move('end');
-                }
-              }
+              buffer.vimMoveLeft(repeatCount);
               dispatch({ type: 'CLEAR_COUNT' });
               return true;
             }
@@ -788,9 +710,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
               }
 
               // Normal down movement (same as 'j')
-              for (let i = 0; i < repeatCount; i++) {
-                buffer.move('down');
-              }
+              buffer.vimMoveDown(repeatCount);
               dispatch({ type: 'CLEAR_COUNT' });
               return true;
             }
@@ -802,9 +722,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
               }
 
               // Normal up movement (same as 'k')
-              for (let i = 0; i < repeatCount; i++) {
-                buffer.move('up');
-              }
+              buffer.vimMoveUp(repeatCount);
               dispatch({ type: 'CLEAR_COUNT' });
               return true;
             }
@@ -816,20 +734,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
               }
 
               // Normal right movement (same as 'l')
-              for (let i = 0; i < repeatCount; i++) {
-                const currentRow = buffer.cursor[0];
-                const currentCol = buffer.cursor[1];
-                const currentLine = buffer.lines[currentRow] || '';
-
-                // Don't move past the last character of the line
-                if (currentCol < currentLine.length - 1) {
-                  buffer.move('right');
-                } else if (currentRow < buffer.lines.length - 1) {
-                  // Move to beginning of next line
-                  buffer.move('down');
-                  buffer.move('home');
-                }
-              }
+              buffer.vimMoveRight(repeatCount);
               dispatch({ type: 'CLEAR_COUNT' });
               return true;
             }
@@ -844,12 +749,18 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       return false; // Not handled by vim
     },
     [
-      state,
-      buffer,
       vimEnabled,
-      onSubmit,
+      normalizeKey,
+      handleInsertModeInput,
+      state.mode,
+      state.count,
+      state.pendingOperator,
+      state.lastCommand,
+      dispatch,
       getCurrentCount,
-      getCurrentOffset,
+      handleChangeMovement,
+      handleOperatorMotion,
+      buffer,
       executeCommand,
       updateMode,
     ],
