@@ -9,6 +9,7 @@ import { ShellTool } from './shell.js';
 import { Config } from '../config/config.js';
 import * as summarizer from '../utils/summarizer.js';
 import { GeminiClient } from '../core/client.js';
+import os from 'os';
 
 describe('ShellTool', () => {
   it('should allow a command if no restrictions are provided', async () => {
@@ -424,11 +425,11 @@ describe('ShellTool Bug Reproduction', () => {
 
     const abortSignal = new AbortController().signal;
     const result = await shellTool.execute(
-      { command: 'echo "hello"' },
+      { command: 'echo hello' },
       abortSignal,
     );
 
-    expect(result.returnDisplay).toBe('hello\n');
+    expect(result.returnDisplay).toBe('hello' + os.EOL);
     expect(result.llmContent).toBe('summarized output');
     expect(summarizeSpy).toHaveBeenCalled();
   });
@@ -450,11 +451,11 @@ describe('ShellTool Bug Reproduction', () => {
 
     const abortSignal = new AbortController().signal;
     const result = await shellTool.execute(
-      { command: 'echo "hello"' },
+      { command: 'echo hello' },
       abortSignal,
     );
 
-    expect(result.returnDisplay).toBe('hello\n');
+    expect(result.returnDisplay).toBe('hello' + os.EOL);
     expect(result.llmContent).not.toBe('summarized output');
     expect(summarizeSpy).not.toHaveBeenCalled();
   });
@@ -477,7 +478,7 @@ describe('ShellTool Bug Reproduction', () => {
       .mockResolvedValue('summarized output');
 
     const abortSignal = new AbortController().signal;
-    await shellTool.execute({ command: 'echo "hello"' }, abortSignal);
+    await shellTool.execute({ command: 'echo hello' }, abortSignal);
 
     expect(summarizeSpy).toHaveBeenCalledWith(
       expect.any(String),
@@ -505,7 +506,7 @@ describe('ShellTool Bug Reproduction', () => {
       .mockResolvedValue('summarized output');
 
     const abortSignal = new AbortController().signal;
-    await shellTool.execute({ command: 'echo "hello"' }, abortSignal);
+    await shellTool.execute({ command: 'echo hello' }, abortSignal);
 
     expect(summarizeSpy).toHaveBeenCalledWith(
       expect.any(String),
@@ -527,11 +528,10 @@ describe('ShellTool Bug Reproduction', () => {
     shellTool = new ShellTool(config);
 
     const abortSignal = new AbortController().signal;
-    const result = await shellTool.execute(
-      { command: 'echo "$GEMINI_CLI"' },
-      abortSignal,
-    );
+    const command =
+      os.platform() === 'win32' ? 'echo %GEMINI_CLI%' : 'echo $GEMINI_CLI';
+    const result = await shellTool.execute({ command }, abortSignal);
 
-    expect(result.returnDisplay).toBe('1\n');
+    expect(result.returnDisplay).toBe('1' + os.EOL);
   });
 });
