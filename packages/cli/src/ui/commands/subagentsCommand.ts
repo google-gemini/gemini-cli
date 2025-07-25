@@ -230,7 +230,15 @@ async function handleExecuteParallel(args: string[]): Promise<MessageActionRetur
   const task = taskParts.join(' ');
 
   try {
-    const subagents = await getSubagentsBySpecialty(specialty as any);
+    const specialtyResult = SubagentSpecialtySchema.safeParse(specialty);
+    if (!specialtyResult.success) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `❌ 無効な専門分野: ${specialty}\n\n利用可能な専門分野: ${SubagentSpecialtySchema.options.join(', ')}`
+      };
+    }
+    const subagents = await getSubagentsBySpecialty(specialtyResult.data);
     if (subagents.length === 0) {
       return {
         type: 'message',

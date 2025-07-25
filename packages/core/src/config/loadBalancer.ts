@@ -76,7 +76,7 @@ function getConfigFilePath(): string {
  */
 async function ensureConfigDirectory(): Promise<void> {
   const configPath = getConfigFilePath();
-  const configDir = configPath.substring(0, configPath.lastIndexOf('/'));
+  const configDir = dirname(configPath);
   
   try {
     await fs.access(configDir);
