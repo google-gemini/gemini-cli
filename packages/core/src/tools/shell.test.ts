@@ -673,7 +673,6 @@ describe('shouldConfirmExecute', () => {
       new AbortController().signal,
     )) as ToolExecuteConfirmationDetails;
     expect(result.rootCommand).toEqual('git');
-    expect(result.showAllowAlways).toBe(true);
   });
 });
 

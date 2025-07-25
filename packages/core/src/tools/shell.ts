@@ -418,13 +418,11 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       return false; // already approved and whitelisted
     }
 
-    const isMulti = commandsToConfirm.length > 1;
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',
       command: params.command,
       rootCommand: commandsToConfirm.join(', '),
-      showAllowAlways: !isMulti,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           commandsToConfirm.forEach((command) => this.whitelist.add(command));
