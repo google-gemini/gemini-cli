@@ -80,6 +80,7 @@ export async function runNonInteractive(
         return;
       }
       const functionCalls: FunctionCall[] = [];
+      let fullResponseText = '';
 
       const responseStream = await chat.sendMessageStream(
         {
@@ -106,6 +107,16 @@ export async function runNonInteractive(
         }
         if (resp.functionCalls) {
           functionCalls.push(...resp.functionCalls);
+        }
+        if (resp.usageMetadata) {
+          chatRecordingService.recordMessageTokens({
+            input: resp.usageMetadata.promptTokenCount ?? 0,
+            output: resp.usageMetadata.candidatesTokenCount ?? 0,
+            cached: resp.usageMetadata.cachedContentTokenCount ?? 0,
+            thoughts: resp.usageMetadata.thoughtsTokenCount ?? 0,
+            tool: resp.usageMetadata.toolUsePromptTokenCount ?? 0,
+            total: resp.usageMetadata.totalTokenCount ?? 0,
+          });
         }
       }
 
