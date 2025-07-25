@@ -692,4 +692,66 @@ describe('App UI', () => {
       );
     });
   });
+
+  describe('keystroke handlers', () => {
+    it('should toggle error details on ctrl+o', async () => {
+      const { lastFrame, stdin, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Initially, error details are hidden
+      expect(lastFrame()).not.toContain('DetailedMessagesDisplay');
+
+      // Simulate Ctrl+O
+      stdin.write('\x0f');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Error details should be visible
+      expect(lastFrame()).toContain('DetailedMessagesDisplay');
+
+      // Simulate Ctrl+O again
+      stdin.write('\x0f');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Error details should be hidden again
+      expect(lastFrame()).not.toContain('DetailedMessagesDisplay');
+    });
+
+    it('should toggle tool descriptions on ctrl+t', async () => {
+      mockConfig.getMcpServers.mockReturnValue({
+        server1: {} as MCPServerConfig,
+      });
+
+      const { lastFrame, stdin, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Initially, tool descriptions are hidden
+      expect(lastFrame()).not.toContain('Hide Tool Descriptions');
+
+      // Simulate Ctrl+T
+      stdin.write('\x14');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Tool descriptions should be visible
+      expect(lastFrame()).toContain('Hide Tool Descriptions');
+
+      // Simulate Ctrl+T again
+      stdin.write('\x14');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Tool descriptions should be hidden again
+      expect(lastFrame()).not.toContain('Hide Tool Descriptions');
+    });
+  });
 });

@@ -88,6 +88,8 @@ import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 
+import { type KeystrokeHandler } from './KeystrokeHandler.js';
+
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
 interface AppProps {
@@ -517,6 +519,77 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     [handleSlashCommand],
   );
 
+  const keystrokeHandlers = useMemo<KeystrokeHandler[]>(
+    () => [
+      {
+        input: 'o',
+        ctrl: true,
+        handler: () => setShowErrorDetails((prev) => !prev),
+      },
+      {
+        input: 't',
+        ctrl: true,
+        handler: () => {
+          const newValue = !showToolDescriptions;
+          setShowToolDescriptions(newValue);
+
+          const mcpServers = config.getMcpServers();
+          if (Object.keys(mcpServers || {}).length > 0) {
+            handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
+          }
+        },
+      },
+      {
+        input: 'e',
+        ctrl: true,
+        condition: () => !!ideContext,
+        handler: () => setShowIDEContextDetail((prev) => !prev),
+      },
+      {
+        input: 'c',
+        ctrl: true,
+        shift: true,
+        handler: () => {
+          handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+        },
+      },
+      {
+        input: 'd',
+        ctrl: true,
+        shift: true,
+        condition: () => useTextBuffer.length === 0,
+        handler: () => {
+          handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
+        },
+      },
+      {
+        input: 's',
+        ctrl: true,
+        condition: ({ enteringConstrainHeightMode }) =>
+          !enteringConstrainHeightMode,
+        handler: () => {
+          setConstrainHeight(false);
+        },
+      },
+    ],
+    [
+      setShowErrorDetails,
+      showToolDescriptions,
+      setShowToolDescriptions,
+      config,
+      handleSlashCommand,
+      setShowIDEContextDetail,
+      handleExit,
+      ctrlCPressedOnce,
+      setCtrlCPressedOnce,
+      ctrlCTimerRef,
+      ctrlDPressedOnce,
+      setCtrlDPressedOnce,
+      ctrlDTimerRef,
+      setConstrainHeight,
+    ],
+  );
+
   useInput((input: string, key: InkKeyType) => {
     let enteringConstrainHeightMode = false;
     if (!constrainHeight) {
@@ -528,15 +601,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       setConstrainHeight(true);
     }
 
-    if (key.ctrl && input === 'o') {
-      setShowErrorDetails((prev) => !prev);
-    } else if (key.ctrl && input === 't') {
-      const newValue = !showToolDescriptions;
-      setShowToolDescriptions(newValue);
+    const context = { enteringConstrainHeightMode };
 
-      const mcpServers = config.getMcpServers();
-      if (Object.keys(mcpServers || {}).length > 0) {
-        handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
+    const handler = keystrokeHandlers.find((h) => {
+      const inputs = Array.isArray(h.input) ? h.input : [h.input];
+      const keyMatch = key.ctrl === !!h.ctrl;
+
+      if (inputs.includes(input) && keyMatch) {
+        return h.condition ? h.condition(context) : true;
       }
     } else if (key.ctrl && input === 'e' && ideContext) {
       setShowIDEContextDetail((prev) => !prev);
