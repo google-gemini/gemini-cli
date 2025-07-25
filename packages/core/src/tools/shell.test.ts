@@ -36,12 +36,12 @@ describe('ShellTool Bug Reproduction', () => {
 
     const abortSignal = new AbortController().signal;
     const result = await shellTool.execute(
-      { command: 'echo "hello"' },
+      { command: 'echo hello' },
       abortSignal,
       () => {},
     );
 
-    expect(result.returnDisplay).toBe('hello\n');
+    expect(result.returnDisplay).toBe('hello' + os.EOL);
     expect(result.llmContent).toBe('summarized output');
     expect(summarizeSpy).toHaveBeenCalled();
   });
@@ -63,12 +63,12 @@ describe('ShellTool Bug Reproduction', () => {
 
     const abortSignal = new AbortController().signal;
     const result = await shellTool.execute(
-      { command: 'echo "hello"' },
+      { command: 'echo hello' },
       abortSignal,
       () => {},
     );
 
-    expect(result.returnDisplay).toBe('hello\n');
+    expect(result.returnDisplay).toBe('hello' + os.EOL);
     expect(result.llmContent).not.toBe('summarized output');
     expect(summarizeSpy).not.toHaveBeenCalled();
   });
@@ -92,6 +92,7 @@ describe('ShellTool Bug Reproduction', () => {
 
     const abortSignal = new AbortController().signal;
     await shellTool.execute({ command: 'echo "hello"' }, abortSignal, () => {});
+
 
     expect(summarizeSpy).toHaveBeenCalledWith(
       expect.any(String),
@@ -147,7 +148,7 @@ describe('ShellTool Bug Reproduction', () => {
       () => {},
     );
 
-    expect(result.returnDisplay).toBe('1\n');
+    expect(result.returnDisplay).toBe('1' + os.EOL);
   });
 });
 
