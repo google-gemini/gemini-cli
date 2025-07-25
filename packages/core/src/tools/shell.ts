@@ -21,6 +21,11 @@ import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import stripAnsi from 'strip-ansi';
+import {
+  getCommandRoots,
+  isCommandAllowed,
+  stripShellWrapper,
+} from '../utils/shell-utils.js';
 
 export interface ShellToolParams {
   command: string;
@@ -34,7 +39,7 @@ const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
 export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
   static Name: string = 'run_shell_command';
-  private whitelist: Set<string> = new Set();
+  private allowlist: Set<string> = new Set();
 
   constructor(private readonly config: Config) {
     super(
@@ -42,17 +47,17 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       'Shell',
       `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
 
-The following information is returned:
+      The following information is returned:
 
-Command: Executed command.
-Directory: Directory (relative to project root) where command was executed, or \`(root)\`.
-Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-Error: Error or \`(none)\` if no error was reported for the subprocess.
-Exit Code: Exit code or \`(none)\` if terminated by signal.
-Signal: Signal number or \`(none)\` if no signal was received.
-Background PIDs: List of background processes started or \`(none)\`.
-Process Group PGID: Process group started or \`(none)\``,
+      Command: Executed command.
+      Directory: Directory (relative to project root) where command was executed, or \`(root)\`.
+      Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+      Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+      Error: Error or \`(none)\` if no error was reported for the subprocess.
+      Exit Code: Exit code or \`(none)\` if terminated by signal.
+      Signal: Signal number or \`(none)\` if no signal was received.
+      Background PIDs: List of background processes started or \`(none)\`.
+      Process Group PGID: Process group started or \`(none)\``,
       Icon.Terminal,
       {
         type: Type.OBJECT,
@@ -93,131 +98,8 @@ Process Group PGID: Process group started or \`(none)\``,
     return description;
   }
 
-  /**
-   * Extracts the root command from a given shell command string.
-   * This is used to identify the base command for permission checks.
-   *
-   * @param command The shell command string to parse
-   * @returns The root command name, or undefined if it cannot be determined
-   * @example getCommandRoot("ls -la /tmp") returns "ls"
-   * @example getCommandRoot("git status && npm test") returns "git"
-   */
-  getCommandRoot(command: string): string | undefined {
-    return command
-      .trim() // remove leading and trailing whitespace
-      .replace(/[{}()]/g, '') // remove all grouping operators
-      .split(/[\s;&|]+/)[0] // split on any whitespace or separator or chaining operators and take first part
-      ?.split(/[/\\]/) // split on any path separators (or return undefined if previous line was undefined)
-      .pop(); // take last part and return command root (or undefined if previous line was empty)
-  }
-
-  /**
-   * Determines whether a given shell command is allowed to execute based on
-   * the tool's configuration including allowlists and blocklists.
-   *
-   * @param command The shell command string to validate
-   * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed
-   */
-  isCommandAllowed(command: string): { allowed: boolean; reason?: string } {
-    // 0. Disallow command substitution
-    if (command.includes('$(')) {
-      return {
-        allowed: false,
-        reason:
-          'Command substitution using $() is not allowed for security reasons',
-      };
-    }
-
-    const SHELL_TOOL_NAMES = [ShellTool.name, ShellTool.Name];
-
-    const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
-
-    /**
-     * Checks if a command string starts with a given prefix, ensuring it's a
-     * whole word match (i.e., followed by a space or it's an exact match).
-     * e.g., `isPrefixedBy('npm install', 'npm')` -> true
-     * e.g., `isPrefixedBy('npm', 'npm')` -> true
-     * e.g., `isPrefixedBy('npminstall', 'npm')` -> false
-     */
-    const isPrefixedBy = (cmd: string, prefix: string): boolean => {
-      if (!cmd.startsWith(prefix)) {
-        return false;
-      }
-      return cmd.length === prefix.length || cmd[prefix.length] === ' ';
-    };
-
-    /**
-     * Extracts and normalizes shell commands from a list of tool strings.
-     * e.g., 'ShellTool("ls -l")' becomes 'ls -l'
-     */
-    const extractCommands = (tools: string[]): string[] =>
-      tools.flatMap((tool) => {
-        for (const toolName of SHELL_TOOL_NAMES) {
-          if (tool.startsWith(`${toolName}(`) && tool.endsWith(')')) {
-            return [normalize(tool.slice(toolName.length + 1, -1))];
-          }
-        }
-        return [];
-      });
-
-    const coreTools = this.config.getCoreTools() || [];
-    const excludeTools = this.config.getExcludeTools() || [];
-
-    // 1. Check if the shell tool is globally disabled.
-    if (SHELL_TOOL_NAMES.some((name) => excludeTools.includes(name))) {
-      return {
-        allowed: false,
-        reason: 'Shell tool is globally disabled in configuration',
-      };
-    }
-
-    const blockedCommands = new Set(extractCommands(excludeTools));
-    const allowedCommands = new Set(extractCommands(coreTools));
-
-    const hasSpecificAllowedCommands = allowedCommands.size > 0;
-    const isWildcardAllowed = SHELL_TOOL_NAMES.some((name) =>
-      coreTools.includes(name),
-    );
-
-    const commandsToValidate = command.split(/&&|\|\||\||;/).map(normalize);
-
-    const blockedCommandsArr = [...blockedCommands];
-
-    for (const cmd of commandsToValidate) {
-      // 2. Check if the command is on the blocklist.
-      const isBlocked = blockedCommandsArr.some((blocked) =>
-        isPrefixedBy(cmd, blocked),
-      );
-      if (isBlocked) {
-        return {
-          allowed: false,
-          reason: `Command '${cmd}' is blocked by configuration`,
-        };
-      }
-
-      // 3. If in strict allow-list mode, check if the command is permitted.
-      const isStrictAllowlist =
-        hasSpecificAllowedCommands && !isWildcardAllowed;
-      const allowedCommandsArr = [...allowedCommands];
-      if (isStrictAllowlist) {
-        const isAllowed = allowedCommandsArr.some((allowed) =>
-          isPrefixedBy(cmd, allowed),
-        );
-        if (!isAllowed) {
-          return {
-            allowed: false,
-            reason: `Command '${cmd}' is not in the allowed commands list`,
-          };
-        }
-      }
-    }
-
-    // 4. If all checks pass, the command is allowed.
-    return { allowed: true };
-  }
-
   validateToolParams(params: ShellToolParams): string | null {
-    const commandCheck = this.isCommandAllowed(params.command);
+    const commandCheck = isCommandAllowed(params.command, this.config);
     if (!commandCheck.allowed) {
       if (!commandCheck.reason) {
         console.error(
@@ -234,7 +116,7 @@ Process Group PGID: Process group started or \`(none)\``,
     if (!params.command.trim()) {
       return 'Command cannot be empty.';
     }
-    if (!this.getCommandRoot(params.command)) {
+    if (getCommandRoots(params.command).length === 0) {
       return 'Could not identify command root to obtain permission from user.';
     }
     if (params.directory) {
@@ -259,18 +141,25 @@ Process Group PGID: Process group started or \`(none)\``,
     if (this.validateToolParams(params)) {
       return false; // skip confirmation, execute call will fail immediately
     }
-    const rootCommand = this.getCommandRoot(params.command)!; // must be non-empty string post-validation
-    if (this.whitelist.has(rootCommand)) {
+
+    const command = stripShellWrapper(params.command);
+    const rootCommands = [...new Set(getCommandRoots(command))];
+    const commandsToConfirm = rootCommands.filter(
+      (command) => !this.allowlist.has(command),
+    );
+
+    if (commandsToConfirm.length === 0) {
       return false; // already approved and whitelisted
     }
+
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',
       command: params.command,
-      rootCommand,
+      rootCommand: commandsToConfirm.join(', '),
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          this.whitelist.add(rootCommand);
+          commandsToConfirm.forEach((command) => this.allowlist.add(command));
         }
       },
     };
@@ -279,21 +168,22 @@ Process Group PGID: Process group started or \`(none)\``,
 
   async execute(
     params: ShellToolParams,
-    abortSignal: AbortSignal,
-    updateOutput?: (chunk: string) => void,
+    signal: AbortSignal,
+    updateOutput?: (output: string) => void,
   ): Promise<ToolResult> {
-    const validationError = this.validateToolParams(params);
+    const strippedCommand = stripShellWrapper(params.command);
+    const validationError = this.validateToolParams({
+      ...params,
+      command: strippedCommand,
+    });
     if (validationError) {
       return {
-        llmContent: [
-          `Command rejected: ${params.command}`,
-          `Reason: ${validationError}`,
-        ].join('\n'),
-        returnDisplay: `Error: ${validationError}`,
+        llmContent: validationError,
+        returnDisplay: validationError,
       };
     }
 
-    if (abortSignal.aborted) {
+    if (signal.aborted) {
       return {
         llmContent: 'Command was cancelled by user before it could start.',
         returnDisplay: 'Command cancelled by user.',
@@ -307,26 +197,34 @@ Process Group PGID: Process group started or \`(none)\``,
     const tempFilePath = path.join(os.tmpdir(), tempFileName);
 
     // pgrep is not available on Windows, so we can't get background PIDs
-    const command = isWindows
-      ? params.command
+    const commandToExecute = isWindows
+      ? strippedCommand
       : (() => {
           // wrap command to append subprocess pids (via pgrep) to temporary file
-          let command = params.command.trim();
+          let command = strippedCommand.trim();
           if (!command.endsWith('&')) command += ';';
           return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
         })();
 
     // spawn command in specified directory (or project root if not specified)
     const shell = isWindows
-      ? spawn('cmd.exe', ['/c', command], {
+      ? spawn('cmd.exe', ['/c', commandToExecute], {
           stdio: ['ignore', 'pipe', 'pipe'],
           // detached: true, // ensure subprocess starts its own process group (esp. in Linux)
           cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
+          env: {
+            ...process.env,
+            GEMINI_CLI: '1',
+          },
         })
-      : spawn('bash', ['-c', command], {
+      : spawn('bash', ['-c', commandToExecute], {
           stdio: ['ignore', 'pipe', 'pipe'],
           detached: true, // ensure subprocess starts its own process group (esp. in Linux)
           cwd: path.resolve(this.config.getTargetDir(), params.directory || ''),
+          env: {
+            ...process.env,
+            GEMINI_CLI: '1',
+          },
         });
 
     let exited = false;
@@ -369,7 +267,7 @@ Process Group PGID: Process group started or \`(none)\``,
     shell.on('error', (err: Error) => {
       error = err;
       // remove wrapper from user's command in error message
-      error.message = error.message.replace(command, params.command);
+      error.message = error.message.replace(commandToExecute, params.command);
     });
 
     let code: number | null = null;
@@ -411,13 +309,13 @@ Process Group PGID: Process group started or \`(none)\``,
         }
       }
     };
-    abortSignal.addEventListener('abort', abortHandler);
+    signal.addEventListener('abort', abortHandler);
 
     // wait for the shell to exit
     try {
       await new Promise((resolve) => shell.on('exit', resolve));
     } finally {
-      abortSignal.removeEventListener('abort', abortHandler);
+      signal.removeEventListener('abort', abortHandler);
     }
 
     // parse pids (pgrep output) from temporary file and remove it
@@ -440,14 +338,14 @@ Process Group PGID: Process group started or \`(none)\``,
         }
         fs.unlinkSync(tempFilePath);
       } else {
-        if (!abortSignal.aborted) {
+        if (!signal.aborted) {
           console.error('missing pgrep output');
         }
       }
     }
 
     let llmContent = '';
-    if (abortSignal.aborted) {
+    if (signal.aborted) {
       llmContent = 'Command was cancelled by user before it could complete.';
       if (output.trim()) {
         llmContent += ` Below is the output (on stdout and stderr) before it was cancelled:\n${output}`;
@@ -476,7 +374,7 @@ Process Group PGID: Process group started or \`(none)\``,
         returnDisplayMessage = output;
       } else {
         // Output is empty, let's provide a reason if the command failed or was cancelled
-        if (abortSignal.aborted) {
+        if (signal.aborted) {
           returnDisplayMessage = 'Command cancelled by user.';
         } else if (processSignal) {
           returnDisplayMessage = `Command terminated by signal: ${processSignal}`;
@@ -496,7 +394,7 @@ Process Group PGID: Process group started or \`(none)\``,
       const summary = await summarizeToolOutput(
         llmContent,
         this.config.getGeminiClient(),
-        abortSignal,
+        signal,
         summarizeConfig[this.name].tokenBudget,
       );
       return {
