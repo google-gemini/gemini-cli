@@ -21,6 +21,7 @@ esbuild
     outfile: 'bundle/gemini.js',
     platform: 'node',
     format: 'esm',
+    external: [],
     alias: {
       'is-in-ci': path.resolve(
         __dirname,
@@ -33,27 +34,5 @@ esbuild
     banner: {
       js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
     },
-    external: [
-      'es-toolkit/compat',
-      'ansi-escapes',
-      'auto-bind',
-      'command-exists',
-      '@babel/code-frame',
-      'cli-truncate',
-      'cli-cursor',
-      '@alcalzone/ansi-tokenize',
-      'cli-boxes',
-      'code-excerpt',
-      'chalk',
-      'cli-spinners',
-      'configstore',
-      'gradient-string',
-      'devlop',
-      'escape-goat',
-      '@iarna/toml',
-      '@pnpm/npm-conf',
-      'deep-extend',
-      'ansi-align',
-    ],
   })
   .catch(() => process.exit(1));
