@@ -136,6 +136,7 @@ const baseConfigParams: ConfigParameters = {
   geminiMdFileCount: 0,
   approvalMode: ApprovalMode.DEFAULT,
   sessionId: 'test-session-id',
+  version: '0.1.0-test',
 };
 
 describe('ToolRegistry', () => {
@@ -345,6 +346,7 @@ describe('ToolRegistry', () => {
         undefined,
         toolRegistry,
         false,
+        '0.1.0-test',
       );
     });
 
@@ -367,6 +369,7 @@ describe('ToolRegistry', () => {
         undefined,
         toolRegistry,
         false,
+        '0.1.0-test',
       );
     });
   });

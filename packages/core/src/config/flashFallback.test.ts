@@ -18,6 +18,7 @@ describe('Flash Model Fallback Configuration', () => {
       debugMode: false,
       cwd: '/test',
       model: DEFAULT_GEMINI_MODEL,
+      version: '0.1.0-test',
     });
 
     // Initialize contentGeneratorConfig for testing
@@ -57,6 +58,7 @@ describe('Flash Model Fallback Configuration', () => {
         debugMode: false,
         cwd: '/test',
         model: DEFAULT_GEMINI_MODEL,
+        version: '0.1.0-test',
       });
 
       // Should not crash when contentGeneratorConfig is undefined
@@ -80,6 +82,7 @@ describe('Flash Model Fallback Configuration', () => {
         debugMode: false,
         cwd: '/test',
         model: 'custom-model',
+        version: '0.1.0-test',
       });
 
       expect(newConfig.getModel()).toBe('custom-model');
@@ -129,6 +132,7 @@ describe('Flash Model Fallback Configuration', () => {
         debugMode: false,
         cwd: '/test',
         model: DEFAULT_GEMINI_MODEL,
+        version: '0.1.0-test',
       });
 
       // Should not crash when contentGeneratorConfig is undefined

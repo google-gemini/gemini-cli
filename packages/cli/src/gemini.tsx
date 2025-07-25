@@ -110,6 +110,7 @@ export async function main() {
     extensions,
     sessionId,
     argv,
+    await getCliVersion(),
   );
 
   if (argv.promptInteractive && !process.stdin.isTTY) {
@@ -316,6 +317,7 @@ async function loadNonInteractiveConfig(
       extensions,
       config.getSessionId(),
       argv,
+      config.getVersion(),
     );
     await finalConfig.initialize();
   }

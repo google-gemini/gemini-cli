@@ -171,6 +171,7 @@ export class ToolRegistry {
       this.config.getMcpServerCommand(),
       this,
       this.config.getDebugMode(),
+      this.config.getVersion(),
     );
   }
 
