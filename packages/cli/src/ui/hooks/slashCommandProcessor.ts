@@ -165,9 +165,9 @@ export const useSlashCommandProcessor = (
     const controller = new AbortController();
     const load = async () => {
       const loaders = [
+        new McpPromptLoader(config),
         new BuiltinCommandLoader(config),
         new FileCommandLoader(config),
-        new McpPromptLoader(config),
       ];
       const commandService = await CommandService.create(
         loaders,
