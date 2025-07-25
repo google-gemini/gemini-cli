@@ -13,7 +13,7 @@ import {
   Icon,
 } from './tools.js';
 import { Type } from '@google/genai';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
@@ -22,6 +22,7 @@ import { ProxyAgent, setGlobalDispatcher } from 'undici';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
+const GEMINI_API_TIMEOUT_MS = 30000; // 30 second timeout for Gemini API calls
 
 // Helper function to extract URLs from a string
 function extractUrls(text: string): string[] {
@@ -90,6 +91,73 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
     }
   }
 
+  /**
+   * Helper method to execute a Gemini API call with timeout handling
+   */
+  private async executeWithTimeout<T>(
+    operation: (signal: AbortSignal) => Promise<T>,
+    signal: AbortSignal,
+    errorContext: string,
+  ): Promise<T> {
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      timeoutController.abort();
+    }, GEMINI_API_TIMEOUT_MS);
+
+    // Combine the original signal with the timeout signal
+    let combinedSignal: AbortSignal;
+    let cleanup: (() => void) | undefined;
+
+    if (signal.aborted) {
+      combinedSignal = signal;
+    } else if ('any' in AbortSignal && typeof AbortSignal.any === 'function') {
+      // Use AbortSignal.any if available (Node.js 20.3.0+)
+      combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
+    } else {
+      // Fallback for Node.js 20.0.0 - 20.2.x
+      const combinedController = new AbortController();
+
+      const abortHandler = () => {
+        combinedController.abort();
+      };
+
+      signal.addEventListener('abort', abortHandler, { once: true });
+      timeoutController.signal.addEventListener('abort', abortHandler, {
+        once: true,
+      });
+
+      cleanup = () => {
+        signal.removeEventListener('abort', abortHandler);
+        timeoutController.signal.removeEventListener('abort', abortHandler);
+      };
+
+      combinedSignal = combinedController.signal;
+    }
+
+    try {
+      const result = await operation(combinedSignal);
+      clearTimeout(timeoutId);
+      cleanup?.();
+      return result;
+    } catch (innerError: unknown) {
+      clearTimeout(timeoutId);
+      cleanup?.();
+      // Check if it was a timeout error (not user cancellation)
+      if (
+        isNodeError(innerError) &&
+        innerError.name === 'AbortError' &&
+        timeoutController.signal.aborted
+      ) {
+        const timeoutMessage = `Request timed out after ${GEMINI_API_TIMEOUT_MS}ms ${errorContext}`;
+        console.warn(timeoutMessage);
+        const timeoutError = new Error(timeoutMessage);
+        timeoutError.name = 'TimeoutError';
+        throw timeoutError;
+      }
+      throw innerError;
+    }
+  }
+
   private async executeFallback(
     params: WebFetchToolParams,
     signal: AbortSignal,
@@ -135,16 +203,33 @@ I was unable to access the URL directly. Instead, I have fetched the raw content
 ---
 ${textContent}
 ---`;
-      const result = await geminiClient.generateContent(
-        [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
-        {},
-        signal,
-      );
-      const resultText = getResponseText(result) || '';
-      return {
-        llmContent: resultText,
-        returnDisplay: `Content for ${url} processed using fallback fetch.`,
-      };
+
+      try {
+        const result = await this.executeWithTimeout(
+          (combinedSignal) =>
+            geminiClient.generateContent(
+              [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
+              {},
+              combinedSignal,
+            ),
+          signal,
+          `while processing URL: ${url}`,
+        );
+
+        const resultText = getResponseText(result) || '';
+        return {
+          llmContent: resultText,
+          returnDisplay: `Content for ${url} processed using fallback fetch.`,
+        };
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'TimeoutError') {
+          return {
+            llmContent: `Error: ${error.message}`,
+            returnDisplay: `Error: ${error.message}`,
+          };
+        }
+        throw error;
+      }
     } catch (e) {
       const error = e as Error;
       const errorMessage = `Error during fallback fetch for ${url}: ${error.message}`;
@@ -241,10 +326,15 @@ ${textContent}
     const geminiClient = this.config.getGeminiClient();
 
     try {
-      const response = await geminiClient.generateContent(
-        [{ role: 'user', parts: [{ text: userPrompt }] }],
-        { tools: [{ urlContext: {} }] },
-        signal, // Pass signal
+      const response = await this.executeWithTimeout(
+        (combinedSignal) =>
+          geminiClient.generateContent(
+            [{ role: 'user', parts: [{ text: userPrompt }] }],
+            { tools: [{ urlContext: {} }] },
+            combinedSignal,
+          ),
+        signal,
+        `for URL: ${url}`,
       );
 
       console.debug(
@@ -346,6 +436,12 @@ ${sourceListFormatted.join('\n')}`;
         returnDisplay: `Content processed from prompt.`,
       };
     } catch (error: unknown) {
+      // Check if it was a timeout error
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        // Fall back to direct fetch on timeout
+        return this.executeFallback(params, signal);
+      }
+
       const errorMessage = `Error processing web content for prompt "${userPrompt.substring(
         0,
         50,
