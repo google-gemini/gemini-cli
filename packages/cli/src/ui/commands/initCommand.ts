@@ -31,11 +31,23 @@ export const initCommand: SlashCommand = {
     try {
       await fs.access(geminiMdPath);
       fileExists = true;
-    } catch {
-      // File doesn't exist, continue
+    } catch (e) {
+      // If the file doesn't exist, that's fine. For any other error (e.g. permissions),
+      // we should stop and inform the user.
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `Error checking for GEMINI.md: ${e instanceof Error ? e.message : String(e)}`,
+        };
+      }
     }
 
-    if (fileExists && !args.includes('--force')) {
+    // Parse arguments properly to avoid matching partial strings
+    const argsArray = args.trim().split(/\s+/);
+    const forceFlag = argsArray.includes('--force');
+    
+    if (fileExists && !forceFlag) {
       return {
         type: 'message',
         messageType: 'info',
