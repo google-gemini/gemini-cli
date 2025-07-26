@@ -249,6 +249,7 @@ export const useSlashCommandProcessor = (
             fullCommandContext,
           );
 
+          try {
             if (result) {
               switch (result.type) {
                 case 'tool':
@@ -293,16 +294,6 @@ export const useSlashCommandProcessor = (
                       );
                     }
                   }
-                case 'load_history': {
-                  await config
-                    ?.getGeminiClient()
-                    ?.setHistory(result.clientHistory);
-                  fullCommandContext.ui.clear();
-                  result.history.forEach((item, index) => {
-                    fullCommandContext.ui.addItem(item, index);
-                  });
-                  return { type: 'handled' };
-                }
 
               case 'load_history': {
                 config?.getGeminiClient()?.setHistory(result.clientHistory);
