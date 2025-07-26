@@ -44,7 +44,7 @@ describe('isCommandAllowed', () => {
     const result = isCommandAllowed('rm -rf /', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      "Command 'rm -rf /' is not in the allowed commands list",
+      "Command 'rm -rf /' is not in the global allowlist.",
     );
   });
 
@@ -143,7 +143,7 @@ describe('isCommandAllowed', () => {
     const result = isCommandAllowed('any command', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      "Command 'any command' is not in the allowed commands list",
+      "Command 'any command' is not in the global allowlist.",
     );
   });
 
@@ -155,7 +155,7 @@ describe('isCommandAllowed', () => {
     const result = isCommandAllowed('any command', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      "Command 'any command' is not in the allowed commands list",
+      "Command 'any command' is not in the global allowlist.",
     );
   });
 
@@ -224,7 +224,7 @@ describe('isCommandAllowed', () => {
     const result = isCommandAllowed('gh issue edit&&rm -rf /', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      "Command 'rm -rf /' is not in the allowed commands list",
+      "Command 'rm -rf /' is not in the global allowlist.",
     );
   });
 
@@ -236,7 +236,7 @@ describe('isCommandAllowed', () => {
     const result = isCommandAllowed('gh issue', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      "Command 'gh issue' is not in the allowed commands list",
+      "Command 'gh issue' is not in the global allowlist.",
     );
   });
 
@@ -257,7 +257,7 @@ describe('isCommandAllowed', () => {
     const result = isCommandAllowed('gh issue list | rm -rf /', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      "Command 'rm -rf /' is not in the allowed commands list",
+      "Command 'rm -rf /' is not in the global allowlist.",
     );
   });
 
@@ -269,7 +269,7 @@ describe('isCommandAllowed', () => {
     const result = isCommandAllowed('gh issue list; rm -rf /', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      "Command 'rm -rf /' is not in the allowed commands list",
+      "Command 'rm -rf /' is not in the global allowlist.",
     );
   });
 
@@ -305,7 +305,7 @@ describe('isCommandAllowed', () => {
     const result = isCommandAllowed('ECHO "hello"', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      'Command \'ECHO "hello"\' is not in the allowed commands list',
+      'Command \'ECHO "hello"\' is not in the global allowlist.',
     );
   });
 
@@ -386,8 +386,75 @@ describe('isCommandAllowed', () => {
     const result = isCommandAllowed('gh issue list || rm -rf /', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      "Command 'rm -rf /' is not in the allowed commands list",
+      "Command 'rm -rf /' is not in the global allowlist.",
     );
+  });
+
+  describe('with shellAllowlist', () => {
+    it('should allow a command on the shellAllowlist', () => {
+      const result = isCommandAllowed('ls -l', config, ['ls -l']);
+      expect(result.allowed).toBe(true);
+    });
+
+    it('should block a command not on the shellAllowlist', () => {
+      const result = isCommandAllowed('rm -rf /', config, ['ls -l']);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe(
+        "Command 'rm -rf /' is not on the provided shell allowlist.",
+      );
+    });
+
+    it('should block a chained command if one part is not on the shellAllowlist', () => {
+      const result = isCommandAllowed('ls -l && rm -rf /', config, ['ls -l']);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe(
+        "Command 'rm -rf /' is not on the provided shell allowlist.",
+      );
+    });
+
+    it('should block a command on the shellAllowlist if it is also on the global blocklist', () => {
+      config = {
+        getCoreTools: () => [],
+        getExcludeTools: () => ['run_shell_command(rm -rf /)'],
+      } as unknown as Config;
+      const result = isCommandAllowed('rm -rf /', config, ['rm -rf /']);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe(
+        "Command 'rm -rf /' is blocked by configuration",
+      );
+    });
+
+    it('should allow a command on the shellAllowlist and global allowlist', () => {
+      config = {
+        getCoreTools: () => ['run_shell_command(ls -l)'],
+        getExcludeTools: () => [],
+      } as unknown as Config;
+      const result = isCommandAllowed('ls -l', config, ['ls -l']);
+      expect(result.allowed).toBe(true);
+    });
+
+    it('should allow a command on the global allowlist, even if not on the shellAllowlist', () => {
+      config = {
+        getCoreTools: () => ['run_shell_command(ls -l)'],
+        getExcludeTools: () => [],
+      } as unknown as Config;
+      const result = isCommandAllowed('ls -l', config, ['other-command']);
+      expect(result.allowed).toBe(true);
+    });
+
+    it('should block a command if not on the global allowlist or the shellAllowlist', () => {
+      config = {
+        getCoreTools: () => ['run_shell_command(ls -l)'],
+        getExcludeTools: () => [],
+      } as unknown as Config;
+      const result = isCommandAllowed('another-command', config, [
+        'other-command',
+      ]);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe(
+        "Command 'another-command' is not in the global allowlist.",
+      );
+    });
   });
 });
 
