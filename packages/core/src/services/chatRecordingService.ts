@@ -372,4 +372,20 @@ export class ChatRecordingService {
     updateFn(conversation);
     this.writeConversation(conversation);
   }
+
+  /**
+   * Deletes a session file by session ID.
+   */
+  deleteSession(sessionId: string): void {
+    try {
+      const chatsDir = path.join(this.config.getProjectTempDir(), 'chats');
+      const sessionPath = path.join(chatsDir, `${sessionId}.json`);
+      fs.unlinkSync(sessionPath);
+    } catch (error) {
+      if (this.config.getDebugMode()) {
+        console.error('Error deleting session:', error);
+      }
+      throw error;
+    }
+  }
 }

@@ -115,6 +115,57 @@ async function listSessions(config: Config): Promise<void> {
     });
 }
 
+async function deleteSession(
+  config: Config,
+  sessionIndex: string,
+): Promise<void> {
+  const sessionSelector = new SessionSelector(config);
+  const sessions = await sessionSelector.listSessions();
+
+  if (sessions.length === 0) {
+    console.error('No sessions found for this project.');
+    return;
+  }
+
+  // Parse session index
+  const index = parseInt(sessionIndex, 10);
+  if (isNaN(index) || index < 1 || index > sessions.length) {
+    console.error(
+      `Invalid session index "${sessionIndex}". Use --list-sessions to see available sessions.`,
+    );
+    return;
+  }
+
+  // Sort sessions by start time to match list-sessions ordering
+  const sortedSessions = sessions.sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+  );
+
+  const sessionToDelete = sortedSessions[index - 1];
+
+  // Prevent deleting the current session
+  if (sessionToDelete.isCurrentSession) {
+    console.error('Cannot delete the current active session.');
+    return;
+  }
+
+  try {
+    // Use ChatRecordingService to delete the session
+    const { ChatRecordingService } = await import('@google/gemini-cli-core');
+    const chatRecordingService = new ChatRecordingService(config);
+    chatRecordingService.deleteSession(sessionToDelete.file);
+
+    const time = formatRelativeTime(sessionToDelete.lastUpdated);
+    console.log(
+      `Deleted session ${index}: ${sessionToDelete.firstUserMessage} (${time})`,
+    );
+  } catch (error) {
+    console.error(
+      `Failed to delete session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+  }
+}
+
 export async function main() {
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
@@ -159,6 +210,12 @@ export async function main() {
   // Handle --list-sessions flag
   if (argv.listSessions) {
     await listSessions(config);
+    process.exit(0);
+  }
+
+  // Handle --delete-session flag
+  if (argv.deleteSession) {
+    await deleteSession(config, argv.deleteSession);
     process.exit(0);
   }
 
@@ -258,13 +315,6 @@ export async function main() {
         conversation: result.sessionData,
         filePath: result.sessionPath,
       };
-
-      if (config.getDebugMode()) {
-        console.error(
-          `Loaded session with ${resumedSessionData.conversation.messages.length} messages`,
-        );
-      }
-
       // Use the existing session ID to continue recording to the same session
       config.setSessionId(resumedSessionData.conversation.sessionId);
     } catch (error) {

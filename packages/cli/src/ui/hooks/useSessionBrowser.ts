@@ -65,6 +65,21 @@ export const useSessionBrowser = (
       },
       [config, chatRecordingService, onLoadHistory],
     ),
+
+    /**
+     * Deletes a session by ID using the ChatRecordingService.
+     */
+    handleDeleteSession: useCallback(
+      (sessionId: string) => {
+        try {
+          chatRecordingService.deleteSession(sessionId);
+        } catch (error) {
+          console.error('Error deleting session:', error);
+          throw error;
+        }
+      },
+      [chatRecordingService],
+    ),
   };
 };
 

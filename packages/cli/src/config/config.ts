@@ -63,6 +63,7 @@ export interface CliArgs {
   proxy: string | undefined;
   resume: string | 'latest' | undefined;
   listSessions: boolean | undefined;
+  deleteSession: string | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -219,6 +220,10 @@ export async function parseArguments(): Promise<CliArgs> {
     .option('list-sessions', {
       type: 'boolean',
       description: 'List available sessions for the current project and exit.',
+    })
+    .option('delete-session', {
+      type: 'string',
+      description: 'Delete a session by index number (use --list-sessions to see available sessions).',
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')

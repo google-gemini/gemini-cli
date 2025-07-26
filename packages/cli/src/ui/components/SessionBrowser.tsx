@@ -60,6 +60,8 @@ interface SessionBrowserProps {
   config: Config;
   /** Callback when user selects a session to resume */
   onResumeSession: (sessionId: string) => void;
+  /** Callback when user deletes a session */
+  onDeleteSession?: (sessionId: string) => void;
   /** Callback when user exits the session browser */
   onExit: () => void;
 }
@@ -471,7 +473,9 @@ const NavigationHelp = (): React.JSX.Element => (
       <Kbd name="Resume" shortcut="Enter" />
       {'   '}
       <Kbd name="Search" shortcut="/" />
-      {'         '}
+      {'   '}
+      <Kbd name="Delete" shortcut="x" />
+      {'   '}
       <Kbd name="Quit" shortcut="q" />
     </Text>
     <Text color={Colors.Gray}>
@@ -888,6 +892,7 @@ const useSessionBrowserInput = (
   moveSelection: (delta: number) => void,
   cycleSortOrder: () => void,
   onResumeSession: (sessionId: string) => void,
+  onDeleteSession: ((sessionId: string) => void) | undefined,
   onExit: () => void,
 ) => {
   useInput((input, key) => {
@@ -931,6 +936,38 @@ const useSessionBrowserInput = (
       } else if (input === 'q' || input === 'Q' || key.escape) {
         onExit();
       }
+      // Delete session control.
+      else if (input === 'x' || input === 'X') {
+        const selectedSession =
+          state.filteredAndSortedSessions[state.activeIndex];
+        if (
+          selectedSession &&
+          !selectedSession.isCurrentSession &&
+          onDeleteSession
+        ) {
+          try {
+            onDeleteSession(selectedSession.file);
+            // Remove the session from the state
+            state.setSessions(
+              state.sessions.filter((s) => s.id !== selectedSession.id),
+            );
+
+            // Adjust active index if needed
+            if (
+              state.activeIndex >=
+              state.filteredAndSortedSessions.length - 1
+            ) {
+              state.setActiveIndex(
+                Math.max(0, state.filteredAndSortedSessions.length - 2),
+              );
+            }
+          } catch (error) {
+            state.setError(
+              `Failed to delete session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+          }
+        }
+      }
       // less-like u/d controls.
       else if (input === 'd') {
         moveSelection(-Math.round(SESSIONS_PER_PAGE / 2));
@@ -962,6 +999,7 @@ const useSessionBrowserInput = (
 export function SessionBrowser({
   config,
   onResumeSession,
+  onDeleteSession,
   onExit,
 }: SessionBrowserProps): React.JSX.Element {
   // Use all our custom hooks
@@ -974,6 +1012,7 @@ export function SessionBrowser({
     moveSelection,
     cycleSortOrder,
     onResumeSession,
+    onDeleteSession,
     onExit,
   );
 

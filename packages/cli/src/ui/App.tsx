@@ -255,6 +255,7 @@ const App = ({
     openSessionBrowser,
     closeSessionBrowser,
     handleResumeSession,
+    handleDeleteSession,
   } = useSessionBrowser(config, chatRecordingService, loadHistoryForResume);
 
   // Handle interactive resume from the command line (-r/--resume without -p/--prompt-interactive).
@@ -939,6 +940,7 @@ const App = ({
               <SessionBrowser
                 config={config}
                 onResumeSession={handleResumeSession}
+                onDeleteSession={handleDeleteSession}
                 onExit={closeSessionBrowser}
               />
             </Box>
