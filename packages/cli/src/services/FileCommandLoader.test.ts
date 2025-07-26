@@ -54,50 +54,62 @@ describe('FileCommandLoader', () => {
     }
   });
 
-  it('loads commands from a symlinked directory', async () => {
-    const userCommandsDir = getUserCommandsDir();
-    const realCommandsDir = '/real/commands';
-    mock({
-      [realCommandsDir]: {
-        'test.toml': 'prompt = "This is a test prompt"',
-      },
-      // Symlink the user commands directory to the real one
-      [userCommandsDir]: mock.symlink({
-        path: realCommandsDir,
-      }),
-    });
+  // Symlink creation on Windows requires special permissions that are not
+  // available in the standard CI environment. Therefore, we skip these tests
+  // on Windows to prevent CI failures. The core functionality is still
+  // validated on Linux and macOS.
+  const itif = (condition: boolean) => (condition ? it : it.skip);
 
-    const loader = new FileCommandLoader(null as unknown as Config);
-    const commands = await loader.loadCommands(signal);
-
-    expect(commands).toHaveLength(1);
-    const command = commands[0];
-    expect(command).toBeDefined();
-    expect(command.name).toBe('test');
-  });
-
-  it('loads commands from a symlinked subdirectory', async () => {
-    const userCommandsDir = getUserCommandsDir();
-    const realNamespacedDir = '/real/namespaced-commands';
-    mock({
-      [userCommandsDir]: {
-        namespaced: mock.symlink({
-          path: realNamespacedDir,
+  itif(process.platform !== 'win32')(
+    'loads commands from a symlinked directory',
+    async () => {
+      const userCommandsDir = getUserCommandsDir();
+      const realCommandsDir = '/real/commands';
+      mock({
+        [realCommandsDir]: {
+          'test.toml': 'prompt = "This is a test prompt"',
+        },
+        // Symlink the user commands directory to the real one
+        [userCommandsDir]: mock.symlink({
+          path: realCommandsDir,
         }),
-      },
-      [realNamespacedDir]: {
-        'my-test.toml': 'prompt = "This is a test prompt"',
-      },
-    });
+      });
 
-    const loader = new FileCommandLoader(null as unknown as Config);
-    const commands = await loader.loadCommands(signal);
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
 
-    expect(commands).toHaveLength(1);
-    const command = commands[0];
-    expect(command).toBeDefined();
-    expect(command.name).toBe('namespaced:my-test');
-  });
+      expect(commands).toHaveLength(1);
+      const command = commands[0];
+      expect(command).toBeDefined();
+      expect(command.name).toBe('test');
+    },
+  );
+
+  itif(process.platform !== 'win32')(
+    'loads commands from a symlinked subdirectory',
+    async () => {
+      const userCommandsDir = getUserCommandsDir();
+      const realNamespacedDir = '/real/namespaced-commands';
+      mock({
+        [userCommandsDir]: {
+          namespaced: mock.symlink({
+            path: realNamespacedDir,
+          }),
+        },
+        [realNamespacedDir]: {
+          'my-test.toml': 'prompt = "This is a test prompt"',
+        },
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(1);
+      const command = commands[0];
+      expect(command).toBeDefined();
+      expect(command.name).toBe('namespaced:my-test');
+    },
+  );
 
   it('loads multiple commands', async () => {
     const userCommandsDir = getUserCommandsDir();
