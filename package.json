@@ -84,5 +84,16 @@
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "@opentelemetry/exporter-logs-otlp-grpc": "^0.203.0",
+    "@opentelemetry/exporter-metrics-otlp-grpc": "^0.203.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "^0.203.0",
+    "@opentelemetry/instrumentation-http": "^0.203.0",
+    "@opentelemetry/resources": "^2.0.1",
+    "@opentelemetry/sdk-node": "^0.203.0",
+    "diff": "^8.0.2",
+    "google-auth-library": "^10.2.0"
   }
 }
