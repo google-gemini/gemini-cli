@@ -46,6 +46,8 @@ export * from './services/gitService.js';
 // Export IDE specific logic
 export * from './ide/ide-client.js';
 export * from './ide/ideContext.js';
+export * from './ide/ide-installer.js';
+export * from './ide/detect-ide.js';
 
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
