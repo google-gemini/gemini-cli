@@ -44,6 +44,7 @@ import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { runAcpPeer } from './acp/acpPeer.js';
 import { formatRelativeTime, SessionSelector } from './utils/sessionUtils.js';
+import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -175,6 +176,16 @@ export async function main() {
   setMaxSizedBoxDebugging(config.getDebugMode());
 
   await config.initialize();
+
+  // Add session cleanup after config initialization
+  try {
+    await cleanupExpiredSessions(config, settings.merged);
+  } catch (error) {
+    // Don't let cleanup failures prevent CLI startup
+    if (config.getDebugMode()) {
+      console.debug('Session cleanup failed:', error);
+    }
+  }
 
   // Load custom themes from settings
   themeManager.loadCustomThemes(settings.merged.customThemes);
