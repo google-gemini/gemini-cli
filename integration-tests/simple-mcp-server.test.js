@@ -62,9 +62,15 @@ describe('simple-mcp-server', () => {
     unlinkSync(serverScriptPath);
   });
 
-  test('should add two numbers', () => {
+  test('should add two numbers', async () => {
     rig.setup('should add two numbers');
-    const output = rig.run('add 5 and 10');
+    const cliPromise = rig.run('add 5 and 10');
+    const toolCall = await rig.waitForToolCall('add');
+    assert.deepEqual(toolCall, {
+      tool_name: 'add',
+      args: { a: 5, b: 10 },
+    });
+    const output = await cliPromise;
     assert.ok(output.includes('15'));
   });
 });

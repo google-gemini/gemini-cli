@@ -9,6 +9,7 @@ import { mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { env } from 'process';
+import { OTEL_DIR, fileExists } from '../scripts/telemetry_utils.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -30,6 +31,22 @@ export class TestRig {
     const sanitizedName = sanitizeTestName(testName);
     this.testDir = join(env.INTEGRATION_TEST_FILE_DIR, sanitizedName);
     mkdirSync(this.testDir, { recursive: true });
+
+    // Create a settings file to point the CLI to the local collector
+    const geminiDir = join(this.testDir, '.gemini');
+    mkdirSync(geminiDir, { recursive: true });
+    const settings = {
+      telemetry: {
+        enabled: true,
+        target: 'gcp', // Target doesn't matter as much as the endpoint
+        otlpEndpoint: 'http://localhost:4317',
+      },
+      sandbox: false, // Sandbox would prevent connection to localhost
+    };
+    writeFileSync(
+      join(geminiDir, 'settings.json'),
+      JSON.stringify(settings, null, 2),
+    );
   }
 
   createFile(fileName, content) {
@@ -97,5 +114,30 @@ export class TestRig {
       console.log(`--- END FILE: ${testId}/${fileName} ---`);
     }
     return content;
+  }
+
+  readToolLogs() {
+    const logFilePath = join(OTEL_DIR, 'collector.log');
+    if (!fileExists(logFilePath)) {
+      console.warn(`Collector log file not found at: ${logFilePath}`);
+      return [];
+    }
+    const content = readFileSync(logFilePath, 'utf-8');
+    // This regex is designed to find the Body of a log record and extract the tool name.
+    const toolLogRegex = /Body: Str\((Tool call: .*)\)/g;
+    const matches = content.matchAll(toolLogRegex);
+    const logs = [];
+    for (const match of matches) {
+      try {
+        const logDataString = match[1];
+        const parts = logDataString.split(' ');
+        // The tool name is expected to be in a format like "tool:google_web_search."
+        const toolName = parts[2].replace('.', '');
+        logs.push({ toolRequest: { name: toolName, query: '' } });
+      } catch (e) {
+        console.error('Failed to parse tool log from collector output:', e);
+      }
+    }
+    return logs;
   }
 }

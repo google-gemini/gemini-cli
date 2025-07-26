@@ -11,12 +11,21 @@ import { TestRig } from './test-helper.js';
 test.skip('should be able to read multiple files', async (t) => {
   const rig = new TestRig();
   rig.setup(t.name);
-  rig.createFile('file1.txt', 'file 1 content');
-  rig.createFile('file2.txt', 'file 2 content');
+  const file1 = rig.createFile('file1.txt', 'file 1 content');
+  const file2 = rig.createFile('file2.txt', 'file 2 content');
 
   const prompt = `Read the files in this directory, list them and print them to the screen`;
-  const result = await rig.run(prompt);
+  const cliPromise = rig.run(prompt);
 
+  const toolCall = await rig.waitForToolCall('read_many_files');
+  assert.deepEqual(toolCall, {
+    tool_name: 'read_many_files',
+    args: {
+      paths: [file1, file2],
+    },
+  });
+
+  const result = await cliPromise;
   assert.ok(result.includes('file 1 content'));
   assert.ok(result.includes('file 2 content'));
 });

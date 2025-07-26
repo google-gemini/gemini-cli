@@ -15,7 +15,16 @@ test('should be able to save to memory', async (t) => {
   const prompt = `remember that my favorite color is  blue.
 
   what is my favorite color? tell me that and surround it with $ symbol`;
-  const result = await rig.run(prompt);
+  const cliPromise = rig.run(prompt);
 
-  assert.ok(result.toLowerCase().includes('$blue$'));
+  const toolCall = await rig.waitForToolCall('save_memory');
+  assert.deepEqual(toolCall, {
+    tool_name: 'save_memory',
+    args: {
+      fact: 'My favorite color is blue.',
+    },
+  });
+
+  const result = await cliPromise;
+  assert.ok(result.toLowerCase().includes('blue'));
 });

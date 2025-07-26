@@ -13,10 +13,22 @@ test('should be able to replace content in a file', async (t) => {
   rig.setup(t.name);
 
   const fileName = 'file_to_replace.txt';
-  rig.createFile(fileName, 'original content');
+  const testFile = rig.createFile(fileName, 'original content');
   const prompt = `Can you replace 'original' with 'replaced' in the file 'file_to_replace.txt'`;
 
-  await rig.run(prompt);
+  const cliPromise = rig.run(prompt);
+
+  const toolCall = await rig.waitForToolCall('replace');
+  assert.deepEqual(toolCall, {
+    tool_name: 'replace',
+    args: {
+      file_path: testFile,
+      old_string: 'original',
+      new_string: 'replaced',
+    },
+  });
+
+  await cliPromise;
   const newFileContent = rig.readFile(fileName);
   assert.strictEqual(newFileContent, 'replaced content');
 });

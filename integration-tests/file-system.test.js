@@ -8,22 +8,39 @@ import { strict as assert } from 'assert';
 import { test } from 'node:test';
 import { TestRig } from './test-helper.js';
 
-test('reads a file', (t) => {
+test('reads a file', async (t) => {
   const rig = new TestRig();
   rig.setup(t.name);
-  rig.createFile('test.txt', 'hello world');
+  const testFile = rig.createFile('test.txt', 'hello world');
 
-  const output = rig.run(`read the file name test.txt`);
+  const cliPromise = rig.run(`read the file name test.txt`);
 
-  assert.ok(output.toLowerCase().includes('hello'));
+  const toolCall = await rig.waitForToolCall('read_file');
+  assert.deepEqual(toolCall, {
+    tool_name: 'read_file',
+    args: { absolute_path: testFile },
+  });
+
+  await cliPromise;
 });
 
-test('writes a file', (t) => {
+test('writes a file', async (t) => {
   const rig = new TestRig();
   rig.setup(t.name);
-  rig.createFile('test.txt', '');
+  const testFile = rig.createFile('test.txt', '');
 
-  rig.run(`edit test.txt to have a hello world message`);
+  const cliPromise = rig.run(`edit test.txt to have a hello world message`);
+
+  const toolCall = await rig.waitForToolCall('write_file');
+  assert.deepEqual(toolCall, {
+    tool_name: 'write_file',
+    args: {
+      file_path: testFile,
+      content: 'hello world',
+    },
+  });
+
+  await cliPromise;
 
   const fileContent = rig.readFile('test.txt');
   assert.ok(fileContent.toLowerCase().includes('hello'));
