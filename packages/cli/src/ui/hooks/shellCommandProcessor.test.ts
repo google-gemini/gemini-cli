@@ -5,70 +5,86 @@
  */
 
 import { act, renderHook } from '@testing-library/react';
-import { vi } from 'vitest';
-import { spawn } from 'child_process';
-import type { ChildProcessWithoutNullStreams } from 'child_process';
-import { useShellCommandProcessor } from './shellCommandProcessor';
-import { Config, GeminiClient } from '@google/gemini-cli-core';
-import * as fs from 'fs';
-import EventEmitter from 'events';
-import { ToolCallStatus } from '../types';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 
-// Mock dependencies
-vi.mock('child_process');
+const mockIsBinary = vi.hoisted(() => vi.fn());
+const mockShellExecutionService = vi.hoisted(() => vi.fn());
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...original,
+    ShellExecutionService: { execute: mockShellExecutionService },
+    isBinary: mockIsBinary,
+  };
+});
 vi.mock('fs');
-vi.mock('os', () => ({
-  default: {
-    platform: () => 'linux',
-    tmpdir: () => '/tmp',
-    homedir: () => '/home/user',
-  },
-  platform: () => 'linux',
-  tmpdir: () => '/tmp',
-  homedir: () => '/home/user',
-}));
-vi.mock('@google/gemini-cli-core');
-vi.mock('../utils/textUtils.js', () => ({
-  isBinary: vi.fn(),
-}));
+vi.mock('os');
+vi.mock('crypto');
+vi.mock('../utils/textUtils.js');
+
+import {
+  useShellCommandProcessor,
+  OUTPUT_UPDATE_INTERVAL_MS,
+} from './shellCommandProcessor.js';
+import {
+  type Config,
+  type GeminiClient,
+  type ShellExecutionResult,
+  type ShellOutputEvent,
+} from '@google/gemini-cli-core';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import * as crypto from 'crypto';
+import { ToolCallStatus } from '../types.js';
 
 describe('useShellCommandProcessor', () => {
-  let spawnEmitter: EventEmitter;
-  let addItemToHistoryMock: vi.Mock;
-  let setPendingHistoryItemMock: vi.Mock;
-  let onExecMock: vi.Mock;
-  let onDebugMessageMock: vi.Mock;
-  let configMock: Config;
-  let geminiClientMock: GeminiClient;
+  let addItemToHistoryMock: Mock;
+  let setPendingHistoryItemMock: Mock;
+  let onExecMock: Mock;
+  let onDebugMessageMock: Mock;
+  let mockConfig: Config;
+  let mockGeminiClient: GeminiClient;
+
+  let mockShellOutputCallback: (event: ShellOutputEvent) => void;
+  let resolveExecutionPromise: (result: ShellExecutionResult) => void;
 
   beforeEach(() => {
-    spawnEmitter = new EventEmitter();
-    spawnEmitter.stdout = new EventEmitter();
-    spawnEmitter.stderr = new EventEmitter();
-    vi.mocked(spawn).mockReturnValue(
-      spawnEmitter as ChildProcessWithoutNullStreams,
-    );
-
-    vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-    vi.spyOn(fs, 'readFileSync').mockReturnValue('');
-    vi.spyOn(fs, 'unlinkSync').mockReturnValue(undefined);
+    vi.clearAllMocks();
 
     addItemToHistoryMock = vi.fn();
     setPendingHistoryItemMock = vi.fn();
     onExecMock = vi.fn();
     onDebugMessageMock = vi.fn();
+    mockConfig = { getTargetDir: () => '/test/dir' } as Config;
+    mockGeminiClient = { addHistory: vi.fn() } as unknown as GeminiClient;
 
-    configMock = {
-      getTargetDir: () => '/test/dir',
-    } as unknown as Config;
+    vi.mocked(os.platform).mockReturnValue('linux');
+    vi.mocked(os.tmpdir).mockReturnValue('/tmp');
+    (vi.mocked(crypto.randomBytes) as Mock).mockReturnValue(
+      Buffer.from('abcdef', 'hex'),
+    );
+    mockIsBinary.mockReturnValue(false);
+    vi.mocked(fs.existsSync).mockReturnValue(false);
 
-    geminiClientMock = {
-      addHistory: vi.fn(),
-    } as unknown as GeminiClient;
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
+      mockShellOutputCallback = callback;
+      return {
+        pid: 12345,
+        result: new Promise((resolve) => {
+          resolveExecutionPromise = resolve;
+        }),
+      };
+    });
   });
 
   const renderProcessorHook = () =>
@@ -78,140 +94,386 @@ describe('useShellCommandProcessor', () => {
         setPendingHistoryItemMock,
         onExecMock,
         onDebugMessageMock,
-        configMock,
-        geminiClientMock,
+        mockConfig,
+        mockGeminiClient,
       ),
     );
 
-  it('should execute a command and update history on success', async () => {
+  const createMockServiceResult = (
+    overrides: Partial<ShellExecutionResult> = {},
+  ): ShellExecutionResult => ({
+    rawOutput: Buffer.from(overrides.output || ''),
+    output: 'Success',
+    stdout: 'Success',
+    stderr: '',
+    exitCode: 0,
+    signal: null,
+    error: null,
+    aborted: false,
+    pid: 12345,
+    ...overrides,
+  });
+
+  it('should initiate command execution and set pending state', async () => {
     const { result } = renderProcessorHook();
-    const abortController = new AbortController();
 
     act(() => {
-      result.current.handleShellCommand('ls -l', abortController.signal);
+      result.current.handleShellCommand('ls -l', new AbortController().signal);
     });
 
-    expect(spawn).toHaveBeenCalledWith(
-      'bash',
-      ['-c', expect.any(String)],
-      expect.objectContaining({
-        env: expect.objectContaining({
-          GEMINI_CLI: '1',
+    expect(addItemToHistoryMock).toHaveBeenCalledWith(
+      { type: 'user_shell', text: 'ls -l' },
+      expect.any(Number),
+    );
+    expect(setPendingHistoryItemMock).toHaveBeenCalledWith({
+      type: 'tool_group',
+      tools: [
+        expect.objectContaining({
+          name: 'Shell Command',
+          status: ToolCallStatus.Executing,
         }),
+      ],
+    });
+    const tmpFile = path.join(os.tmpdir(), 'shell_pwd_abcdef.tmp');
+    const wrappedCommand = `{ ls -l; }; __code=$?; pwd > "${tmpFile}"; exit $__code`;
+    expect(mockShellExecutionService).toHaveBeenCalledWith(
+      wrappedCommand,
+      '/test/dir',
+      expect.any(Function),
+      expect.any(Object),
+    );
+    expect(onExecMock).toHaveBeenCalledWith(expect.any(Promise));
+  });
+
+  it('should handle successful execution and update history correctly', async () => {
+    const { result } = renderProcessorHook();
+
+    act(() => {
+      result.current.handleShellCommand(
+        'echo "ok"',
+        new AbortController().signal,
+      );
+    });
+    const execPromise = onExecMock.mock.calls[0][0];
+
+    act(() => {
+      resolveExecutionPromise(createMockServiceResult({ output: 'ok' }));
+    });
+    await act(async () => await execPromise);
+
+    expect(setPendingHistoryItemMock).toHaveBeenCalledWith(null);
+    expect(addItemToHistoryMock).toHaveBeenCalledTimes(2); // Initial + final
+    expect(addItemToHistoryMock.mock.calls[1][0]).toEqual(
+      expect.objectContaining({
+        tools: [
+          expect.objectContaining({
+            status: ToolCallStatus.Success,
+            resultDisplay: 'ok',
+          }),
+        ],
       }),
     );
-
-    expect(onExecMock).toHaveBeenCalledTimes(1);
-    const execPromise = onExecMock.mock.calls[0][0];
-
-    // Simulate stdout
-    act(() => {
-      spawnEmitter.stdout.emit('data', Buffer.from('file1.txt\nfile2.txt'));
-    });
-
-    // Simulate process exit
-    act(() => {
-      spawnEmitter.emit('exit', 0, null);
-    });
-
-    await act(async () => {
-      await execPromise;
-    });
-
-    expect(addItemToHistoryMock).toHaveBeenCalledTimes(2);
-    expect(addItemToHistoryMock.mock.calls[1][0]).toEqual({
-      type: 'tool_group',
-      tools: [
-        expect.objectContaining({
-          name: 'Shell Command',
-          description: 'ls -l',
-          status: ToolCallStatus.Success,
-          resultDisplay: 'file1.txt\nfile2.txt',
-        }),
-      ],
-    });
-    expect(geminiClientMock.addHistory).toHaveBeenCalledTimes(1);
+    expect(mockGeminiClient.addHistory).toHaveBeenCalled();
   });
 
-  it('should handle binary output', async () => {
+  it('should handle command failure and display error status', async () => {
     const { result } = renderProcessorHook();
-    const abortController = new AbortController();
-    const { isBinary } = await import('../utils/textUtils.js');
-    (isBinary as vi.Mock).mockReturnValue(true);
 
     act(() => {
       result.current.handleShellCommand(
-        'cat myimage.png',
-        abortController.signal,
+        'bad-cmd',
+        new AbortController().signal,
       );
     });
-
-    expect(onExecMock).toHaveBeenCalledTimes(1);
     const execPromise = onExecMock.mock.calls[0][0];
 
     act(() => {
-      spawnEmitter.stdout.emit('data', Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+      resolveExecutionPromise(
+        createMockServiceResult({ exitCode: 127, output: 'not found' }),
+      );
+    });
+    await act(async () => await execPromise);
+
+    const finalHistoryItem = addItemToHistoryMock.mock.calls[1][0];
+    expect(finalHistoryItem.tools[0].status).toBe(ToolCallStatus.Error);
+    expect(finalHistoryItem.tools[0].resultDisplay).toContain(
+      'Command exited with code 127',
+    );
+    expect(finalHistoryItem.tools[0].resultDisplay).toContain('not found');
+  });
+
+  describe('UI Streaming and Throttling', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
     });
 
-    act(() => {
-      spawnEmitter.emit('exit', 0, null);
-    });
+    it('should throttle pending UI updates for text streams', async () => {
+      const { result } = renderProcessorHook();
+      act(() => {
+        result.current.handleShellCommand(
+          'stream',
+          new AbortController().signal,
+        );
+      });
 
-    await act(async () => {
-      await execPromise;
-    });
+      // Simulate rapid output
+      act(() => {
+        mockShellOutputCallback({
+          type: 'data',
+          stream: 'stdout',
+          chunk: 'hello',
+        });
+      });
 
-    expect(addItemToHistoryMock).toHaveBeenCalledTimes(2);
-    expect(addItemToHistoryMock.mock.calls[1][0]).toEqual({
-      type: 'tool_group',
-      tools: [
+      // Should not have updated the UI yet
+      expect(setPendingHistoryItemMock).toHaveBeenCalledTimes(1); // Only the initial call
+
+      // Advance time and send another event to trigger the throttled update
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
+      });
+      act(() => {
+        mockShellOutputCallback({
+          type: 'data',
+          stream: 'stdout',
+          chunk: ' world',
+        });
+      });
+
+      // Should now have been called with the cumulative output
+      expect(setPendingHistoryItemMock).toHaveBeenCalledTimes(2);
+      expect(setPendingHistoryItemMock).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          name: 'Shell Command',
-          description: 'cat myimage.png',
-          status: ToolCallStatus.Success,
-          resultDisplay:
-            '[Command produced binary output, which is not shown.]',
+          tools: [expect.objectContaining({ resultDisplay: 'hello world' })],
         }),
-      ],
+      );
+    });
+
+    it('should show binary progress messages correctly', async () => {
+      const { result } = renderProcessorHook();
+      act(() => {
+        result.current.handleShellCommand(
+          'cat img',
+          new AbortController().signal,
+        );
+      });
+
+      // Should immediately show the detection message
+      act(() => {
+        mockShellOutputCallback({ type: 'binary_detected' });
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
+      });
+      // Send another event to trigger the update
+      act(() => {
+        mockShellOutputCallback({ type: 'binary_progress', bytesReceived: 0 });
+      });
+
+      expect(setPendingHistoryItemMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          tools: [
+            expect.objectContaining({
+              resultDisplay: '[Binary output detected. Halting stream...]',
+            }),
+          ],
+        }),
+      );
+
+      // Now test progress updates
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
+      });
+      act(() => {
+        mockShellOutputCallback({
+          type: 'binary_progress',
+          bytesReceived: 2048,
+        });
+      });
+
+      expect(setPendingHistoryItemMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          tools: [
+            expect.objectContaining({
+              resultDisplay: '[Receiving binary output... 2.0 KB received]',
+            }),
+          ],
+        }),
+      );
     });
   });
 
-  it('should handle command failure', async () => {
+  it('should not wrap the command on Windows', async () => {
+    vi.mocked(os.platform).mockReturnValue('win32');
+    const { result } = renderProcessorHook();
+
+    act(() => {
+      result.current.handleShellCommand('dir', new AbortController().signal);
+    });
+
+    expect(mockShellExecutionService).toHaveBeenCalledWith(
+      'dir',
+      '/test/dir',
+      expect.any(Function),
+      expect.any(Object),
+    );
+  });
+
+  it('should handle command abort and display cancelled status', async () => {
     const { result } = renderProcessorHook();
     const abortController = new AbortController();
 
     act(() => {
-      result.current.handleShellCommand(
-        'a-bad-command',
-        abortController.signal,
-      );
+      result.current.handleShellCommand('sleep 5', abortController.signal);
     });
-
     const execPromise = onExecMock.mock.calls[0][0];
 
     act(() => {
-      spawnEmitter.stderr.emit('data', Buffer.from('command not found'));
+      abortController.abort();
+      resolveExecutionPromise(
+        createMockServiceResult({ aborted: true, output: 'Canceled' }),
+      );
     });
+    await act(async () => await execPromise);
+
+    const finalHistoryItem = addItemToHistoryMock.mock.calls[1][0];
+    expect(finalHistoryItem.tools[0].status).toBe(ToolCallStatus.Canceled);
+    expect(finalHistoryItem.tools[0].resultDisplay).toContain(
+      'Command was cancelled.',
+    );
+  });
+
+  it('should handle binary output result correctly', async () => {
+    const { result } = renderProcessorHook();
+    const binaryBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    mockIsBinary.mockReturnValue(true);
 
     act(() => {
-      spawnEmitter.emit('exit', 127, null);
+      result.current.handleShellCommand(
+        'cat image.png',
+        new AbortController().signal,
+      );
     });
+    const execPromise = onExecMock.mock.calls[0][0];
 
-    await act(async () => {
-      await execPromise;
+    act(() => {
+      resolveExecutionPromise(
+        createMockServiceResult({ rawOutput: binaryBuffer }),
+      );
     });
+    await act(async () => await execPromise);
 
+    const finalHistoryItem = addItemToHistoryMock.mock.calls[1][0];
+    expect(finalHistoryItem.tools[0].status).toBe(ToolCallStatus.Success);
+    expect(finalHistoryItem.tools[0].resultDisplay).toBe(
+      '[Command produced binary output, which is not shown.]',
+    );
+  });
+
+  it('should handle promise rejection and show an error', async () => {
+    const { result } = renderProcessorHook();
+    const testError = new Error('Unexpected failure');
+    mockShellExecutionService.mockImplementation(() => ({
+      pid: 12345,
+      result: Promise.reject(testError),
+    }));
+
+    act(() => {
+      result.current.handleShellCommand(
+        'a-command',
+        new AbortController().signal,
+      );
+    });
+    const execPromise = onExecMock.mock.calls[0][0];
+
+    await act(async () => await execPromise);
+
+    expect(setPendingHistoryItemMock).toHaveBeenCalledWith(null);
     expect(addItemToHistoryMock).toHaveBeenCalledTimes(2);
     expect(addItemToHistoryMock.mock.calls[1][0]).toEqual({
-      type: 'tool_group',
-      tools: [
-        expect.objectContaining({
-          name: 'Shell Command',
-          description: 'a-bad-command',
-          status: ToolCallStatus.Error,
-          resultDisplay: 'Command exited with code 127.\ncommand not found',
-        }),
-      ],
+      type: 'error',
+      text: 'An unexpected error occurred: Unexpected failure',
+    });
+  });
+
+  it('should handle synchronous errors during execution and clean up resources', async () => {
+    const testError = new Error('Synchronous spawn error');
+    mockShellExecutionService.mockImplementation(() => {
+      throw testError;
+    });
+    // Mock that the temp file was created before the error was thrown
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+
+    const { result } = renderProcessorHook();
+
+    act(() => {
+      result.current.handleShellCommand(
+        'a-command',
+        new AbortController().signal,
+      );
+    });
+    const execPromise = onExecMock.mock.calls[0][0];
+
+    await act(async () => await execPromise);
+
+    expect(setPendingHistoryItemMock).toHaveBeenCalledWith(null);
+    expect(addItemToHistoryMock).toHaveBeenCalledTimes(2);
+    expect(addItemToHistoryMock.mock.calls[1][0]).toEqual({
+      type: 'error',
+      text: 'An unexpected error occurred: Synchronous spawn error',
+    });
+    const tmpFile = path.join(os.tmpdir(), 'shell_pwd_abcdef.tmp');
+    // Verify that the temporary file was cleaned up
+    expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(tmpFile);
+  });
+
+  describe('Directory Change Warning', () => {
+    it('should show a warning if the working directory changes', async () => {
+      const tmpFile = path.join(os.tmpdir(), 'shell_pwd_abcdef.tmp');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('/test/dir/new'); // A different directory
+
+      const { result } = renderProcessorHook();
+      act(() => {
+        result.current.handleShellCommand(
+          'cd new',
+          new AbortController().signal,
+        );
+      });
+      const execPromise = onExecMock.mock.calls[0][0];
+
+      act(() => {
+        resolveExecutionPromise(createMockServiceResult());
+      });
+      await act(async () => await execPromise);
+
+      const finalHistoryItem = addItemToHistoryMock.mock.calls[1][0];
+      expect(finalHistoryItem.tools[0].resultDisplay).toContain(
+        "WARNING: shell mode is stateless; the directory change to '/test/dir/new' will not persist.",
+      );
+      expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(tmpFile);
+    });
+
+    it('should NOT show a warning if the directory does not change', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('/test/dir'); // The same directory
+
+      const { result } = renderProcessorHook();
+      act(() => {
+        result.current.handleShellCommand('ls', new AbortController().signal);
+      });
+      const execPromise = onExecMock.mock.calls[0][0];
+
+      act(() => {
+        resolveExecutionPromise(createMockServiceResult());
+      });
+      await act(async () => await execPromise);
+
+      const finalHistoryItem = addItemToHistoryMock.mock.calls[1][0];
+      expect(finalHistoryItem.tools[0].resultDisplay).not.toContain('WARNING');
     });
   });
 });

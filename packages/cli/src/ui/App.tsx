@@ -73,6 +73,8 @@ import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
+import { useVimMode, VimModeProvider } from './contexts/VimModeContext.js';
+import { useVim } from './hooks/vim.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
 import {
@@ -85,6 +87,7 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { appEvents, AppEvent } from '../utils/events.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -97,7 +100,9 @@ interface AppProps {
 
 export const AppWrapper = (props: AppProps) => (
   <SessionStatsProvider>
-    <App {...props} />
+    <VimModeProvider settings={props.settings}>
+      <App {...props} />
+    </VimModeProvider>
   </SessionStatsProvider>
 );
 
@@ -172,13 +177,38 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    const openDebugConsole = () => {
+      setShowErrorDetails(true);
+      setConstrainHeight(false); // Make sure the user sees the full message.
+    };
+    appEvents.on(AppEvent.OpenDebugConsole, openDebugConsole);
+
+    const logErrorHandler = (errorMessage: unknown) => {
+      handleNewMessage({
+        type: 'error',
+        content: String(errorMessage),
+        count: 1,
+      });
+    };
+    appEvents.on(AppEvent.LogError, logErrorHandler);
+
+    return () => {
+      appEvents.off(AppEvent.OpenDebugConsole, openDebugConsole);
+      appEvents.off(AppEvent.LogError, logErrorHandler);
+    };
+  }, [handleNewMessage]);
+
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
   }, []);
   const initialPromptSubmitted = useRef(false);
 
   const errorCount = useMemo(
-    () => consoleMessages.filter((msg) => msg.type === 'error').length,
+    () =>
+      consoleMessages
+        .filter((msg) => msg.type === 'error')
+        .reduce((total, msg) => total + msg.count, 0),
     [consoleMessages],
   );
 
@@ -374,6 +404,49 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     config.setFlashFallbackHandler(flashFallbackHandler);
   }, [config, addItem, userTier]);
 
+  // Terminal and UI setup
+  const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
+  const { stdin, setRawMode } = useStdin();
+  const isInitialMount = useRef(true);
+
+  const widthFraction = 0.9;
+  const inputWidth = Math.max(
+    20,
+    Math.floor(terminalWidth * widthFraction) - 3,
+  );
+  const suggestionsWidth = Math.max(60, Math.floor(terminalWidth * 0.8));
+
+  // Utility callbacks
+  const isValidPath = useCallback((filePath: string): boolean => {
+    try {
+      return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+    } catch (_e) {
+      return false;
+    }
+  }, []);
+
+  const getPreferredEditor = useCallback(() => {
+    const editorType = settings.merged.preferredEditor;
+    const isValidEditor = isEditorAvailable(editorType);
+    if (!isValidEditor) {
+      openEditorDialog();
+      return;
+    }
+    return editorType as EditorType;
+  }, [settings, openEditorDialog]);
+
+  const onAuthError = useCallback(() => {
+    setAuthError('reauth required');
+    openAuthDialog();
+  }, [openAuthDialog, setAuthError]);
+
+  // Core hooks and processors
+  const {
+    vimEnabled: vimModeEnabled,
+    vimMode,
+    toggleVimEnabled,
+  } = useVimMode();
+
   const {
     handleSlashCommand,
     slashCommands,
@@ -394,26 +467,41 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     toggleCorgiMode,
     setQuittingMessages,
     openPrivacyNotice,
+    toggleVimEnabled,
   );
-  const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
 
-  const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
-  const isInitialMount = useRef(true);
-  const { stdin, setRawMode } = useStdin();
-  const isValidPath = useCallback((filePath: string): boolean => {
-    try {
-      return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
-    } catch (_e) {
-      return false;
-    }
-  }, []);
-
-  const widthFraction = 0.9;
-  const inputWidth = Math.max(
-    20,
-    Math.floor(terminalWidth * widthFraction) - 3,
+  const {
+    streamingState,
+    submitQuery,
+    initError,
+    pendingHistoryItems: pendingGeminiHistoryItems,
+    thought,
+  } = useGeminiStream(
+    config.getGeminiClient(),
+    history,
+    addItem,
+    setShowHelp,
+    config,
+    setDebugMessage,
+    handleSlashCommand,
+    shellModeActive,
+    getPreferredEditor,
+    onAuthError,
+    performMemoryRefresh,
+    modelSwitchedFromQuotaError,
+    setModelSwitchedFromQuotaError,
   );
-  const suggestionsWidth = Math.max(60, Math.floor(terminalWidth * 0.8));
+
+  // Input handling
+  const handleFinalSubmit = useCallback(
+    (submittedValue: string) => {
+      const trimmedValue = submittedValue.trim();
+      if (trimmedValue.length > 0) {
+        submitQuery(trimmedValue);
+      }
+    },
+    [submitQuery],
+  );
 
   const buffer = useTextBuffer({
     initialText: '',
@@ -423,6 +511,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     isValidPath,
     shellModeActive,
   });
+
+  const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
+  const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
+  pendingHistoryItems.push(...pendingGeminiHistoryItems);
+
+  const { elapsedTime, currentLoadingPhrase } =
+    useLoadingIndicator(streamingState);
+  const showAutoAcceptIndicator = useAutoAcceptIndicator({ config });
 
   const handleExit = useCallback(
     (
@@ -488,57 +584,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       setGeminiMdFileCount(config.getGeminiMdFileCount());
     }
   }, [config]);
-
-  const getPreferredEditor = useCallback(() => {
-    const editorType = settings.merged.preferredEditor;
-    const isValidEditor = isEditorAvailable(editorType);
-    if (!isValidEditor) {
-      openEditorDialog();
-      return;
-    }
-    return editorType as EditorType;
-  }, [settings, openEditorDialog]);
-
-  const onAuthError = useCallback(() => {
-    setAuthError('reauth required');
-    openAuthDialog();
-  }, [openAuthDialog, setAuthError]);
-
-  const {
-    streamingState,
-    submitQuery,
-    initError,
-    pendingHistoryItems: pendingGeminiHistoryItems,
-    thought,
-  } = useGeminiStream(
-    config.getGeminiClient(),
-    history,
-    addItem,
-    setShowHelp,
-    config,
-    setDebugMessage,
-    handleSlashCommand,
-    shellModeActive,
-    getPreferredEditor,
-    onAuthError,
-    performMemoryRefresh,
-    modelSwitchedFromQuotaError,
-    setModelSwitchedFromQuotaError,
-  );
-  pendingHistoryItems.push(...pendingGeminiHistoryItems);
-  const { elapsedTime, currentLoadingPhrase } =
-    useLoadingIndicator(streamingState);
-  const showAutoAcceptIndicator = useAutoAcceptIndicator({ config });
-
-  const handleFinalSubmit = useCallback(
-    (submittedValue: string) => {
-      const trimmedValue = submittedValue.trim();
-      if (trimmedValue.length > 0) {
-        submitQuery(trimmedValue);
-      }
-    },
-    [submitQuery],
-  );
 
   const logger = useLogger();
   const [userMessages, setUserMessages] = useState<string[]>([]);
@@ -697,9 +742,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   // Arbitrary threshold to ensure that items in the static area are large
   // enough but not too large to make the terminal hard to use.
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
+  const placeholder = vimModeEnabled
+    ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
+    : '  Type your message or @path/to/file';
+
   return (
     <StreamingContext.Provider value={streamingState}>
-      <Box flexDirection="column" marginBottom={1} width="90%">
+      <Box flexDirection="column" width="90%">
         {/* Move UpdateNotification outside Static so it can re-render when updateMessage changes */}
         {updateMessage && <UpdateNotification message={updateMessage} />}
 
@@ -938,6 +987,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
                   focus={isFocused}
+                  vimHandleInput={vimHandleInput}
+                  placeholder={placeholder}
                 />
               )}
             </>
@@ -989,6 +1040,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             }
             promptTokenCount={sessionStats.lastPromptTokenCount}
             nightly={nightly}
+            vimMode={vimModeEnabled ? vimMode : undefined}
           />
         </Box>
       </Box>
