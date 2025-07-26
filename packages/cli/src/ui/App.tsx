@@ -169,6 +169,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     useState<boolean>(false);
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
   const [openFiles, setOpenFiles] = useState<OpenFiles | undefined>();
+  const [showEscapePrompt, setShowEscapePrompt] = useState(false);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToOpenFiles(setOpenFiles);
@@ -202,6 +203,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
   }, []);
+
+  const handleEscapePromptChange = useCallback((showPrompt: boolean) => {
+    setShowEscapePrompt(showPrompt);
+  }, []);
+
   const initialPromptSubmitted = useRef(false);
 
   const errorCount = useMemo(
@@ -543,7 +549,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     [handleSlashCommand],
   );
 
+  const handleCtrlCWithEmptyBuffer = useCallback(() => {
+    handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+  }, [ctrlCPressedOnce, handleExit]);
+
   useInput((input: string, key: InkKeyType) => {
+    // if ESC key, don't handle it in App, let InputPrompt handle it
+    if (key.escape) {
+      return;
+    }
+
     let enteringConstrainHeightMode = false;
     if (!constrainHeight) {
       // Automatically re-enter constrain height mode if the user types
@@ -567,7 +582,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     } else if (key.ctrl && input === 'e' && ideContext) {
       setShowIDEContextDetail((prev) => !prev);
     } else if (key.ctrl && (input === 'c' || input === 'C')) {
-      handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+      // This handler is kept for when InputPrompt is not active
+      if (buffer.text.length === 0) {
+        handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+      }
     } else if (key.ctrl && (input === 'd' || input === 'D')) {
       if (buffer.text.length > 0) {
         // Do nothing if there is text in the input.
@@ -934,6 +952,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     <Text color={Colors.AccentYellow}>
                       Press Ctrl+D again to exit.
                     </Text>
+                  ) : showEscapePrompt ? (
+                    <Text color={Colors.Gray}>
+                      Press Esc again to clear.
+                    </Text>
                   ) : (
                     <ContextSummaryDisplay
                       openFiles={openFiles}
@@ -986,6 +1008,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   commandContext={commandContext}
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
+                  onEscapePromptChange={handleEscapePromptChange}
+                  onCtrlCWithEmptyBuffer={handleCtrlCWithEmptyBuffer}
                   focus={isFocused}
                   vimHandleInput={vimHandleInput}
                   placeholder={placeholder}

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
@@ -39,6 +39,8 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  onEscapePromptChange?: (showPrompt: boolean) => void;
+  onCtrlCWithEmptyBuffer?: () => void;
   vimHandleInput?: (key: Key) => boolean;
 }
 
@@ -56,9 +58,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  onEscapePromptChange,
+  onCtrlCWithEmptyBuffer,
   vimHandleInput,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const [escPressCount, setEscPressCount] = useState(0);
+  const [showEscapePrompt, setShowEscapePrompt] = useState(false);
+  const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const completion = useCompletion(
     buffer,
@@ -70,6 +77,31 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const resetCompletionState = completion.resetCompletionState;
   const shellHistory = useShellHistory(config.getProjectRoot());
+
+  const resetEscapeState = useCallback(() => {
+    if (escapeTimerRef.current) {
+      clearTimeout(escapeTimerRef.current);
+      escapeTimerRef.current = null;
+    }
+    setEscPressCount(0);
+    setShowEscapePrompt(false);
+  }, []);
+
+  // Notify parent component about escape prompt state changes
+  useEffect(() => {
+    if (onEscapePromptChange) {
+      onEscapePromptChange(showEscapePrompt);
+    }
+  }, [showEscapePrompt, onEscapePromptChange]);
+
+  // Clear escape prompt timer on unmount
+  useEffect(() => {
+    return () => {
+      if (escapeTimerRef.current) {
+        clearTimeout(escapeTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
@@ -175,6 +207,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Reset ESC count and hide prompt on any non-ESC key
+      if (key.name !== 'escape') {
+        if (escPressCount > 0 || showEscapePrompt) {
+          resetEscapeState();
+        }
+      }
+
       if (
         key.sequence === '!' &&
         buffer.text === '' &&
@@ -186,15 +225,39 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.name === 'escape') {
+        // Handle existing ESC functionality first
         if (shellModeActive) {
           setShellModeActive(false);
+          resetEscapeState();
           return;
         }
 
         if (completion.showSuggestions) {
           completion.resetCompletionState();
+          resetEscapeState();
           return;
         }
+
+        // Handle double ESC for clearing input
+        if (escPressCount === 0) {
+          if (buffer.text.trim() === '') {
+            return;
+          }
+          setEscPressCount(1);
+          setShowEscapePrompt(true);
+          if (escapeTimerRef.current) {
+            clearTimeout(escapeTimerRef.current);
+          }
+          escapeTimerRef.current = setTimeout(() => {
+            resetEscapeState();
+          }, 500);
+        } else {
+          // clear input and immediately reset state
+          buffer.setText('');
+          resetCompletionState();
+          resetEscapeState();
+        }
+        return;
       }
 
       if (key.ctrl && key.name === 'l') {
@@ -305,12 +368,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
-      // Ctrl+C (Clear input)
+      // Ctrl+C (Clear input or trigger exit)
       if (key.ctrl && key.name === 'c') {
         if (buffer.text.length > 0) {
           buffer.setText('');
           resetCompletionState();
-          return;
+        } else if (onCtrlCWithEmptyBuffer) {
+          // Buffer is empty, notify parent component to handle exit
+          onCtrlCWithEmptyBuffer();
         }
         return;
       }
@@ -353,6 +418,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellHistory,
       handleClipboardImage,
       resetCompletionState,
+      escPressCount,
+      showEscapePrompt,
+      resetEscapeState,
+      onCtrlCWithEmptyBuffer,
       vimHandleInput,
     ],
   );
