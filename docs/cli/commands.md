@@ -95,6 +95,17 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/quit`** (or **`/exit`**)
   - **Description:** Exit Gemini CLI.
 
+- **`/vim`**
+  - **Description:** Toggle vim mode on or off. When vim mode is enabled, the input area supports vim-style navigation and editing commands in both NORMAL and INSERT modes.
+  - **Features:**
+    - **NORMAL mode:** Navigate with `h`, `j`, `k`, `l`; jump by words with `w`, `b`, `e`; go to line start/end with `0`, `$`, `^`; go to specific lines with `G` (or `gg` for first line)
+    - **INSERT mode:** Standard text input with escape to return to NORMAL mode
+    - **Editing commands:** Delete with `x`, change with `c`, insert with `i`, `a`, `o`, `O`; complex operations like `dd`, `cc`, `dw`, `cw`
+    - **Count support:** Prefix commands with numbers (e.g., `3h`, `5w`, `10G`)
+    - **Repeat last command:** Use `.` to repeat the last editing operation
+    - **Persistent setting:** Vim mode preference is saved to `~/.gemini/settings.json` and restored between sessions
+  - **Status indicator:** When enabled, shows `[NORMAL]` or `[INSERT]` in the footer
+
 ### Custom Commands
 
 For a quick start, see the [example](#example-a-pure-function-refactoring-command) below.
@@ -268,7 +279,7 @@ At commands are used to include the content of files or directories as part of y
 The `!` prefix lets you interact with your system's shell directly from within Gemini CLI.
 
 - **`!<shell_command>`**
-  - **Description:** Execute the given `<shell_command>` in your system's default shell. Any output or errors from the command are displayed in the terminal.
+  - **Description:** Execute the given `<shell_command>` using `bash` on Linux/macOS or `cmd.exe` on Windows. Any output or errors from the command are displayed in the terminal.
   - **Examples:**
     - `!ls -la` (executes `ls -la` and returns to Gemini CLI)
     - `!git status` (executes `git status` and returns to Gemini CLI)
@@ -282,3 +293,5 @@ The `!` prefix lets you interact with your system's shell directly from within G
       - When exited, the UI reverts to its standard appearance and normal Gemini CLI behavior resumes.
 
 - **Caution for all `!` usage:** Commands you execute in shell mode have the same permissions and impact as if you ran them directly in your terminal.
+
+- **Environment Variable:** When a command is executed via `!` or in shell mode, the `GEMINI_CLI=1` environment variable is set in the subprocess's environment. This allows scripts or tools to detect if they are being run from within the Gemini CLI.
