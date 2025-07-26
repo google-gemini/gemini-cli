@@ -15,7 +15,7 @@ import {
   SETTINGS_DIRECTORY_NAME,
 } from '../config/settings.js';
 import { promisify } from 'util';
-import { SandboxConfig } from '@google/gemini-cli-core';
+import { Config, SandboxConfig } from '@google/gemini-cli-core';
 
 const execAsync = promisify(exec);
 
@@ -183,6 +183,7 @@ function entrypoint(workdir: string): string[] {
 export async function start_sandbox(
   config: SandboxConfig,
   nodeArgs: string[] = [],
+  cliConfig?: Config,
 ) {
   if (config.command === 'sandbox-exec') {
     // disallow BUILD_SANDBOX
@@ -223,6 +224,38 @@ export async function start_sandbox(
       `HOME_DIR=${fs.realpathSync(os.homedir())}`,
       '-D',
       `CACHE_DIR=${fs.realpathSync(execSync(`getconf DARWIN_USER_CACHE_DIR`).toString().trim())}`,
+    ];
+
+    // Add included directories from the workspace context
+    // Always add 5 INCLUDE_DIR parameters to ensure .sb files can reference them
+    const MAX_INCLUDE_DIRS = 5;
+    const targetDir = fs.realpathSync(cliConfig?.getTargetDir() || '');
+    const includedDirs: string[] = [];
+
+    if (cliConfig) {
+      const workspaceContext = cliConfig.getWorkspaceContext();
+      const directories = workspaceContext.getDirectories();
+
+      // Filter out TARGET_DIR
+      for (const dir of directories) {
+        const realDir = fs.realpathSync(dir);
+        if (realDir !== targetDir) {
+          includedDirs.push(realDir);
+        }
+      }
+    }
+
+    for (let i = 0; i < MAX_INCLUDE_DIRS; i++) {
+      let dirPath = '/dev/null'; // Default to a safe path that won't cause issues
+
+      if (i < includedDirs.length) {
+        dirPath = includedDirs[i];
+      }
+
+      args.push('-D', `INCLUDE_DIR_${i}=${dirPath}`);
+    }
+
+    args.push(
       '-f',
       profileFile,
       'sh',
@@ -232,7 +265,7 @@ export async function start_sandbox(
         `NODE_OPTIONS="${nodeOptions}"`,
         ...process.argv.map((arg) => quote([arg])),
       ].join(' '),
-    ];
+    );
     // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
     const proxyCommand = process.env.GEMINI_SANDBOX_PROXY_COMMAND;
     let proxyProcess: ChildProcess | undefined = undefined;

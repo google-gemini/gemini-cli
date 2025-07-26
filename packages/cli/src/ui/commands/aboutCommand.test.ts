@@ -62,6 +62,7 @@ describe('aboutCommand', () => {
   });
 
   it('should call addItem with all version info', async () => {
+    process.env.SANDBOX = '';
     if (!aboutCommand.action) {
       throw new Error('The about command must have an action.');
     }
