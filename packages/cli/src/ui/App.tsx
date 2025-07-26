@@ -87,6 +87,7 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { appEvents, AppEvent } from '../utils/events.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -176,13 +177,38 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    const openDebugConsole = () => {
+      setShowErrorDetails(true);
+      setConstrainHeight(false); // Make sure the user sees the full message.
+    };
+    appEvents.on(AppEvent.OpenDebugConsole, openDebugConsole);
+
+    const logErrorHandler = (errorMessage: unknown) => {
+      handleNewMessage({
+        type: 'error',
+        content: String(errorMessage),
+        count: 1,
+      });
+    };
+    appEvents.on(AppEvent.LogError, logErrorHandler);
+
+    return () => {
+      appEvents.off(AppEvent.OpenDebugConsole, openDebugConsole);
+      appEvents.off(AppEvent.LogError, logErrorHandler);
+    };
+  }, [handleNewMessage]);
+
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
   }, []);
   const initialPromptSubmitted = useRef(false);
 
   const errorCount = useMemo(
-    () => consoleMessages.filter((msg) => msg.type === 'error').length,
+    () =>
+      consoleMessages
+        .filter((msg) => msg.type === 'error')
+        .reduce((total, msg) => total + msg.count, 0),
     [consoleMessages],
   );
 
