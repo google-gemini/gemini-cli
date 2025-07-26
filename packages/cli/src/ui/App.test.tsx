@@ -138,7 +138,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getShowMemoryUsage: vi.fn(() => opts.showMemoryUsage ?? false),
         getAccessibility: vi.fn(() => opts.accessibility ?? {}),
         getProjectRoot: vi.fn(() => opts.targetDir),
-        getGeminiClient: vi.fn(() => ({})),
+        getGeminiClient: vi.fn(() => ({
+          isInitialized: vi.fn(() => true),
+          setHistory: vi.fn(),
+        })),
         getCheckpointingEnabled: vi.fn(() => opts.checkpointing ?? true),
         getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
         setFlashFallbackHandler: vi.fn(),
@@ -664,6 +667,91 @@ describe('App UI', () => {
       expect(mockSubmitQuery).toHaveBeenCalledWith(
         'hello from prompt-interactive',
       );
+    });
+  });
+
+  describe('with resumed session data from --resume', () => {
+    it('should display conversation history when resuming with --resume', async () => {
+      const mockGeminiClient = {
+        isInitialized: vi.fn(() => true),
+        setHistory: vi.fn(),
+      };
+
+      mockConfig.getGeminiClient.mockReturnValue(
+        mockGeminiClient as unknown as GeminiClient,
+      );
+
+      const resumedSessionData = {
+        messages: [
+          {
+            role: 'user',
+            parts: [{ text: 'Hello from previous session' }],
+          },
+          {
+            role: 'model',
+            parts: [{ text: 'Hi! How can I help you today?' }],
+          },
+          {
+            role: 'user',
+            parts: [{ text: 'Can you list the files in the current directory?' }],
+          },
+          {
+            role: 'model',
+            parts: [
+              {
+                functionCall: {
+                  name: 'list_files',
+                  args: { path: '.' },
+                },
+              },
+            ],
+          },
+          {
+            role: 'function',
+            parts: [
+              {
+                functionResponse: {
+                  name: 'list_files',
+                  response: {
+                    files: ['package.json', 'src/', 'README.md'],
+                  },
+                },
+              },
+            ],
+          },
+          {
+            role: 'model',
+            parts: [
+              {
+                text: 'I can see the files in your current directory:\n- package.json\n- src/\n- README.md',
+              },
+            ],
+          },
+        ],
+        metadata: {
+          sessionId: 'test-session-123',
+          timestamp: Date.now(),
+        },
+      };
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+          resumedSessionData={resumedSessionData}
+        />,
+      );
+      currentUnmount = unmount;
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Verify that the Gemini client's setHistory method was called
+      expect(mockGeminiClient.setHistory).toHaveBeenCalled();
+
+      // The exact display format depends on the HistoryItemDisplay component,
+      // but we can verify the component rendered without errors
+      expect(lastFrame()).toBeDefined();
     });
   });
 });

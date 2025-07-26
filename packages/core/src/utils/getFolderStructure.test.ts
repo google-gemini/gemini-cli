@@ -18,7 +18,8 @@ vi.mock('path', async (importOriginal) => {
   return {
     ...original,
     resolve: vi.fn((str) => str),
-    // Other path functions (basename, join, normalize, etc.) will use original implementation
+    normalize: vi.fn((str) => str),
+    // Other path functions (basename, join, etc.) will use original implementation
   };
 });
 
@@ -60,11 +61,12 @@ describe('getFolderStructure', () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
-    // path.resolve is now a vi.fn() due to the top-level vi.mock.
-    // We ensure its implementation is set for each test (or rely on the one from vi.mock).
+    // path.resolve and path.normalize are now vi.fn() due to the top-level vi.mock.
+    // We ensure their implementations are set for each test (or rely on the ones from vi.mock).
     // vi.resetAllMocks() clears call history but not the implementation set by vi.fn() in vi.mock.
     // If we needed to change it per test, we would do it here:
     (path.resolve as Mock).mockImplementation((str: string) => str);
+    (path.normalize as Mock).mockImplementation((str: string) => str);
 
     // Re-apply/define the mock implementation for fsPromises.readdir for each test
     (fsPromises.readdir as Mock).mockImplementation(

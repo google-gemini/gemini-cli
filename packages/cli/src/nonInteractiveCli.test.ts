@@ -54,6 +54,9 @@ describe('runNonInteractive', () => {
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
       getMaxSessionTurns: vi.fn().mockReturnValue(10),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      getProjectRoot: vi.fn().mockReturnValue('/test/project'),
+      getDebugMode: vi.fn().mockReturnValue(false),
       initialize: vi.fn(),
     } as unknown as Config;
 
