@@ -9,7 +9,7 @@ import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useStateAndRef } from './useStateAndRef.js';
-import { Config, GitService, Logger } from '@google/gemini-cli-core';
+import { Config, GitService, Logger, ChatRecordingService } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
   Message,
@@ -43,6 +43,8 @@ export const useSlashCommandProcessor = (
   toggleCorgiMode: () => void,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
+  openSessionBrowser: () => void,
+  chatRecordingService: ChatRecordingService | null,
   toggleVimEnabled: () => Promise<boolean>,
 ) => {
   const session = useSessionStats();
@@ -127,6 +129,7 @@ export const useSlashCommandProcessor = (
         settings,
         git: gitService,
         logger,
+        chatRecording: chatRecordingService,
       },
       ui: {
         addItem,
@@ -151,6 +154,7 @@ export const useSlashCommandProcessor = (
       settings,
       gitService,
       logger,
+      chatRecordingService,
       loadHistory,
       addItem,
       clearItems,
@@ -294,6 +298,9 @@ export const useSlashCommandProcessor = (
                     case 'privacy':
                       openPrivacyNotice();
                       return { type: 'handled' };
+                    case 'sessionBrowser':
+                      openSessionBrowser();
+                      return { type: 'handled' };
                     default: {
                       const unhandled: never = result.dialog;
                       throw new Error(
@@ -375,6 +382,7 @@ export const useSlashCommandProcessor = (
       openPrivacyNotice,
       openEditorDialog,
       setQuittingMessages,
+      openSessionBrowser,
     ],
   );
 

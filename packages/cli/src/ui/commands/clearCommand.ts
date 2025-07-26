@@ -6,6 +6,7 @@
 
 import { uiTelemetryService } from '@google/gemini-cli-core';
 import { CommandKind, SlashCommand } from './types.js';
+import { randomUUID } from 'crypto';
 
 export const clearCommand: SlashCommand = {
   name: 'clear',
@@ -13,6 +14,8 @@ export const clearCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   action: async (context, _args) => {
     const geminiClient = context.services.config?.getGeminiClient();
+    const config = context.services.config;
+    const chatRecording = context.services.chatRecording;
 
     if (geminiClient) {
       context.ui.setDebugMessage('Clearing terminal and resetting chat.');
@@ -21,6 +24,13 @@ export const clearCommand: SlashCommand = {
       await geminiClient.resetChat();
     } else {
       context.ui.setDebugMessage('Clearing terminal.');
+    }
+
+    // Start a new conversation recording with a new session ID
+    if (config && chatRecording) {
+      const newSessionId = randomUUID();
+      config.setSessionId(newSessionId);
+      chatRecording.initialize();
     }
 
     uiTelemetryService.resetLastPromptTokenCount();

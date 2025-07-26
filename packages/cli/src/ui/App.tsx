@@ -22,6 +22,10 @@ import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './hooks/useAuthCommand.js';
+import {
+  convertSessionToHistoryFormats,
+  useSessionBrowser,
+} from './hooks/useSessionBrowser.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
@@ -36,6 +40,7 @@ import { ThemeDialog } from './components/ThemeDialog.js';
 import { AuthDialog } from './components/AuthDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
+import { SessionBrowser } from './components/SessionBrowser.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -61,6 +66,7 @@ import {
   AuthType,
   type OpenFiles,
   ideContext,
+  ResumedSessionData,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -87,6 +93,8 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { useChatRecordingService } from './hooks/useChatRecording.js';
+import { LoadHistoryActionReturn } from './commands/types.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
@@ -96,6 +104,7 @@ interface AppProps {
   settings: LoadedSettings;
   startupWarnings?: string[];
   version: string;
+  resumedSessionData?: ResumedSessionData;
 }
 
 export const AppWrapper = (props: AppProps) => (
@@ -106,7 +115,13 @@ export const AppWrapper = (props: AppProps) => (
   </SessionStatsProvider>
 );
 
-const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
+const App = ({
+  config,
+  settings,
+  startupWarnings = [],
+  version,
+  resumedSessionData,
+}: AppProps) => {
   const isFocused = useFocus();
   useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
@@ -117,7 +132,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     checkForUpdates().then(setUpdateMessage);
   }, []);
 
-  const { history, addItem, clearItems, loadHistory } = useHistory();
+  // Initialize the AutoSavingService to automatically log conversation history.
+  const chatRecordingService = useChatRecordingService(
+    config,
+    resumedSessionData,
+  );
+
+  const { history, addItem, clearItems, loadHistory } = useHistory({
+    chatRecordingService,
+  });
+
   const {
     consoleMessages,
     handleNewMessage,
@@ -226,6 +250,60 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     isAuthenticating,
     cancelAuthentication,
   } = useAuthCommand(settings, setAuthError, config);
+
+  // ---------- Resume -----------
+
+  // Performs the actual resuming--loading the recorded conversation history into the UI and the
+  // Gemini client, in their respective formats.
+  const loadHistoryForResume = useCallback(
+    (history: LoadHistoryActionReturn) => {
+      // Wait for the client.
+      if (!config.getGeminiClient()?.isInitialized()) {
+        return;
+      }
+
+      // Now that we have the client, load the history into the UI and the client.
+      setQuittingMessages(null);
+      clearItems();
+      history.history.forEach((item, index) => {
+        addItem(item, index, true);
+      });
+      refreshStatic(); // Force Static component to re-render with the updated history.
+
+      // Give the history to the Gemini client.
+      config.getGeminiClient()?.setHistory(history.clientHistory);
+    },
+    [
+      clearItems,
+      addItem,
+      config,
+      refreshStatic,
+      config.getGeminiClient()?.isInitialized(),
+    ],
+  );
+
+  // Setup the interactive session browser--calls loadHistoryForResume when a session is selected.
+  const {
+    isSessionBrowserOpen,
+    openSessionBrowser,
+    closeSessionBrowser,
+    handleResumeSession,
+    handleDeleteSession,
+  } = useSessionBrowser(config, chatRecordingService, loadHistoryForResume);
+
+  // Handle interactive resume from the command line (-r/--resume without -p/--prompt-interactive).
+  // Only if we're not authenticating, though.
+  useEffect(() => {
+    if (resumedSessionData && !isAuthenticating) {
+      loadHistoryForResume(
+        convertSessionToHistoryFormats(
+          resumedSessionData.conversation.messages,
+        ),
+      );
+    }
+  }, [resumedSessionData, isAuthenticating, loadHistoryForResume]);
+
+  // ---------- Auth validation ----------
 
   useEffect(() => {
     if (settings.merged.selectedAuthType) {
@@ -467,6 +545,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     toggleCorgiMode,
     setQuittingMessages,
     openPrivacyNotice,
+    openSessionBrowser,
+    chatRecordingService,
     toggleVimEnabled,
   );
 
@@ -490,6 +570,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     performMemoryRefresh,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
+    chatRecordingService,
   );
 
   // Input handling
@@ -892,6 +973,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 onSelect={handleEditorSelect}
                 settings={settings}
                 onExit={exitEditorDialog}
+              />
+            </Box>
+          ) : isSessionBrowserOpen ? (
+            <Box flexDirection="column">
+              <SessionBrowser
+                config={config}
+                onResumeSession={handleResumeSession}
+                onDeleteSession={handleDeleteSession}
+                onExit={closeSessionBrowser}
               />
             </Box>
           ) : showPrivacyNotice ? (

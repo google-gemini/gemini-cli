@@ -21,6 +21,7 @@ import {
   ToolCall,
   Status as CoreStatus,
   EditorType,
+  ChatRecordingService,
 } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo } from 'react';
 import {
@@ -70,6 +71,7 @@ export function useReactToolScheduler(
     React.SetStateAction<HistoryItemWithoutId | null>
   >,
   getPreferredEditor: () => EditorType | undefined,
+  chatRecordingService: ChatRecordingService,
 ): [TrackedToolCall[], ScheduleFn, MarkToolsAsSubmittedFn] {
   const [toolCallsForDisplay, setToolCallsForDisplay] = useState<
     TrackedToolCall[]
@@ -141,6 +143,7 @@ export function useReactToolScheduler(
         approvalMode: config.getApprovalMode(),
         getPreferredEditor,
         config,
+        chatRecordingService,
       }),
     [
       config,
@@ -148,6 +151,7 @@ export function useReactToolScheduler(
       allToolCallsCompleteHandler,
       toolCallsUpdateHandler,
       getPreferredEditor,
+      chatRecordingService,
     ],
   );
 

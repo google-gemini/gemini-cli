@@ -6,6 +6,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { HistoryItem } from '../types.js';
+import { ChatRecordingService } from '@google/gemini-cli-core/src/services/chatRecordingService.js';
 
 // Type for the updater function passed to updateHistoryItem
 type HistoryItemUpdater = (
@@ -14,7 +15,11 @@ type HistoryItemUpdater = (
 
 export interface UseHistoryManagerReturn {
   history: HistoryItem[];
-  addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number; // Returns the generated ID
+  addItem: (
+    itemData: Omit<HistoryItem, 'id'>,
+    baseTimestamp: number,
+    isResuming?: boolean,
+  ) => number; // Returns the generated ID
   updateItem: (
     id: number,
     updates: Partial<Omit<HistoryItem, 'id'>> | HistoryItemUpdater,
@@ -27,9 +32,14 @@ export interface UseHistoryManagerReturn {
  * Custom hook to manage the chat history state.
  *
  * Encapsulates the history array, message ID generation, adding items,
- * updating items, and clearing the history.
+ * updating items, clearing the history, and recording the chat history
+ * to disk.
  */
-export function useHistory(): UseHistoryManagerReturn {
+export function useHistory({
+  chatRecordingService,
+}: {
+  chatRecordingService?: ChatRecordingService | null;
+} = {}): UseHistoryManagerReturn {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const messageIdCounterRef = useRef(0);
 
@@ -45,7 +55,11 @@ export function useHistory(): UseHistoryManagerReturn {
 
   // Adds a new item to the history state with a unique ID.
   const addItem = useCallback(
-    (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number): number => {
+    (
+      itemData: Omit<HistoryItem, 'id'>,
+      baseTimestamp: number,
+      isResuming: boolean = false,
+    ): number => {
       const id = getNextMessageId(baseTimestamp);
       const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
 
@@ -63,9 +77,51 @@ export function useHistory(): UseHistoryManagerReturn {
         }
         return [...prevHistory, newItem];
       });
+
+      // Record useful info, but don't do it if we're actually loading an existing session.
+      if (!isResuming && chatRecordingService) {
+        switch (itemData.type) {
+          case 'compression':
+          case 'info':
+            chatRecordingService?.recordMessage({
+              type: 'system',
+              content: itemData.text ?? '',
+            });
+            break;
+          case 'user':
+            chatRecordingService?.recordMessage({
+              type: 'user',
+              content: itemData.text ?? '',
+            });
+            break;
+          case 'gemini':
+            chatRecordingService?.recordMessage({
+              type: 'gemini',
+              content: itemData.text ?? '',
+            });
+            break;
+          case 'gemini_content':
+            chatRecordingService?.recordMessage({
+              type: 'gemini',
+              content: itemData.text ?? '',
+              append: true,
+            });
+            break;
+          case 'error':
+            chatRecordingService?.recordMessage({
+              type: 'error',
+              content: itemData.text ?? '',
+            });
+            break;
+          default:
+            // Ignore the rest.
+            break;
+        }
+      }
+
       return id; // Return the generated ID (even if not added, to keep signature)
     },
-    [getNextMessageId],
+    [getNextMessageId, chatRecordingService],
   );
 
   /**
