@@ -5,24 +5,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import {
-  Box,
-  DOMElement,
-  measureElement,
-  Static,
-  Text,
-  useStdin,
-  useStdout,
-  useInput,
-  type Key as InkKeyType,
-} from 'ink';
+import { Box, Text, useStdin, useInput, type Key as InkKeyType } from 'ink';
 import { StreamingState, type HistoryItem, MessageType } from './types.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
-import { useThemeCommand } from './hooks/useThemeCommand.js';
-import { useAuthCommand } from './hooks/useAuthCommand.js';
-import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
@@ -39,14 +26,14 @@ import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
-import { LoadedSettings } from '../config/settings.js';
+import { LoadedSettings, SettingScope } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup } from '../utils/cleanup.js';
 import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
-import { useHistory } from './hooks/useHistoryManager.js';
+import { UseHistoryManagerReturn } from './hooks/useHistoryManager.js';
 import process from 'node:process';
 import {
   getErrorMessage,
@@ -60,58 +47,104 @@ import {
   AuthType,
   type OpenFiles,
   ideContext,
+  UserTierId,
+  isProQuotaExceededError,
+  isGenericQuotaExceededError,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
-import {
-  SessionStatsProvider,
-  useSessionStats,
-} from './contexts/SessionContext.js';
+import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
-import {
-  isProQuotaExceededError,
-  isGenericQuotaExceededError,
-  UserTierId,
-} from '@google/gemini-cli-core';
 import { checkForUpdates } from './utils/updateCheck.js';
-import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { Conversation } from './components/Conversation.js';
+import { useUI } from './contexts/UIContext.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
-interface AppProps {
+interface AppProps extends UseHistoryManagerReturn {
   config: Config;
   settings: LoadedSettings;
   startupWarnings?: string[];
   version: string;
+  isThemeDialogOpen: boolean;
+  themeError: string | null;
+  handleThemeSelect: (
+    themeName: string | undefined,
+    scope: SettingScope,
+  ) => void;
+  handleThemeHighlight: (themeName: string | undefined) => void;
+  isAuthenticating: boolean;
+  authError: string | null;
+  cancelAuthentication: () => void;
+  isAuthDialogOpen: boolean;
+  handleAuthSelect: (
+    authType: AuthType | undefined,
+    scope: SettingScope,
+  ) => void;
+  editorError: string | null;
+  isEditorDialogOpen: boolean;
+  handleEditorSelect: (
+    editorType: EditorType | undefined,
+    scope: SettingScope,
+  ) => void;
+  exitEditorDialog: () => void;
+  showPrivacyNotice: boolean;
+  setShowPrivacyNotice: (show: boolean) => void;
+  showHelp: boolean;
+  corgiMode: boolean;
+  debugMessage: string;
+  quittingMessages: HistoryItem[] | null;
 }
 
-export const AppWrapper = (props: AppProps) => (
-  <SessionStatsProvider>
-    <App {...props} />
-  </SessionStatsProvider>
-);
+export const App = (props: AppProps) => {
+  const {
+    config,
+    settings,
+    startupWarnings = [],
+    version,
+    history,
+    addItem,
+    clearItems,
+    loadHistory,
+    isThemeDialogOpen,
+    themeError,
+    handleThemeSelect,
+    handleThemeHighlight,
+    isAuthenticating,
+    authError,
+    isAuthDialogOpen,
+    handleAuthSelect,
+    editorError,
+    isEditorDialogOpen,
+    handleEditorSelect,
+    exitEditorDialog,
+    showPrivacyNotice,
+    setShowPrivacyNotice,
+    showHelp,
+    corgiMode,
+    debugMessage,
+    quittingMessages,
+  } = props;
 
-const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
+  const ui = useUI();
   const isFocused = useFocus();
   useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
-  const { stdout } = useStdout();
   const nightly = version.includes('nightly');
 
   useEffect(() => {
     checkForUpdates().then(setUpdateMessage);
   }, []);
 
-  const { history, addItem, clearItems, loadHistory } = useHistory();
   const {
     consoleMessages,
     handleNewMessage,
@@ -128,35 +161,17 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, [handleNewMessage, config]);
 
   const { stats: sessionStats } = useSessionStats();
-  const [staticNeedsRefresh, setStaticNeedsRefresh] = useState(false);
-  const [staticKey, setStaticKey] = useState(0);
-  const refreshStatic = useCallback(() => {
-    stdout.write(ansiEscapes.clearTerminal);
-    setStaticKey((prev) => prev + 1);
-  }, [setStaticKey, stdout]);
 
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(0);
-  const [debugMessage, setDebugMessage] = useState<string>('');
-  const [showHelp, setShowHelp] = useState<boolean>(false);
-  const [themeError, setThemeError] = useState<string | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [editorError, setEditorError] = useState<string | null>(null);
-  const [footerHeight, setFooterHeight] = useState<number>(0);
-  const [corgiMode, setCorgiMode] = useState(false);
   const [currentModel, setCurrentModel] = useState(config.getModel());
   const [shellModeActive, setShellModeActive] = useState(false);
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
   const [showToolDescriptions, setShowToolDescriptions] =
     useState<boolean>(false);
   const [ctrlCPressedOnce, setCtrlCPressedOnce] = useState(false);
-  const [quittingMessages, setQuittingMessages] = useState<
-    HistoryItem[] | null
-  >(null);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [ctrlDPressedOnce, setCtrlDPressedOnce] = useState(false);
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
-  const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
@@ -164,14 +179,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToOpenFiles(setOpenFiles);
-    // Set the initial value
     setOpenFiles(ideContext.getOpenFilesContext());
     return unsubscribe;
   }, []);
 
-  const openPrivacyNotice = useCallback(() => {
-    setShowPrivacyNotice(true);
-  }, []);
   const initialPromptSubmitted = useRef(false);
 
   const errorCount = useMemo(
@@ -179,49 +190,21 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     [consoleMessages],
   );
 
-  const {
-    isThemeDialogOpen,
-    openThemeDialog,
-    handleThemeSelect,
-    handleThemeHighlight,
-  } = useThemeCommand(settings, setThemeError, addItem);
-
-  const {
-    isAuthDialogOpen,
-    openAuthDialog,
-    handleAuthSelect,
-    isAuthenticating,
-    cancelAuthentication,
-  } = useAuthCommand(settings, setAuthError, config);
-
   useEffect(() => {
     if (settings.merged.selectedAuthType) {
       const error = validateAuthMethod(settings.merged.selectedAuthType);
       if (error) {
-        setAuthError(error);
-        openAuthDialog();
+        // This is now handled in AppContainer, but we might need a way
+        // to signal back up if an error occurs here. For now, this is a no-op.
       }
     }
-  }, [settings.merged.selectedAuthType, openAuthDialog, setAuthError]);
+  }, [settings.merged.selectedAuthType]);
 
-  // Sync user tier from config when authentication changes
   useEffect(() => {
-    // Only sync when not currently authenticating
     if (!isAuthenticating) {
       setUserTier(config.getGeminiClient()?.getUserTier());
     }
   }, [config, isAuthenticating]);
-
-  const {
-    isEditorDialogOpen,
-    openEditorDialog,
-    handleEditorSelect,
-    exitEditorDialog,
-  } = useEditorSettings(settings, setEditorError, addItem);
-
-  const toggleCorgiMode = useCallback(() => {
-    setCorgiMode((prev) => !prev);
-  }, []);
 
   const performMemoryRefresh = useCallback(async () => {
     addItem(
@@ -247,15 +230,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       addItem(
         {
           type: MessageType.INFO,
-          text: `Memory refreshed successfully. ${memoryContent.length > 0 ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).` : 'No memory content found.'}`,
+          text: `Memory refreshed successfully. ${
+            memoryContent.length > 0
+              ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).`
+              : 'No memory content found.'
+          }`,
         },
         Date.now(),
       );
-      if (config.getDebugMode()) {
-        console.log(
-          `[DEBUG] Refreshed memory content in config: ${memoryContent.substring(0, 200)}...`,
-        );
-      }
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       addItem(
@@ -265,27 +247,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         },
         Date.now(),
       );
-      console.error('Error refreshing memory:', error);
     }
   }, [config, addItem]);
 
-  // Watch for model changes (e.g., from Flash fallback)
   useEffect(() => {
-    const checkModelChange = () => {
-      const configModel = config.getModel();
-      if (configModel !== currentModel) {
-        setCurrentModel(configModel);
-      }
-    };
+    const unsubscribe = config.subscribeToModelChanges(setCurrentModel);
+    return unsubscribe;
+  }, [config]);
 
-    // Check immediately and then periodically
-    checkModelChange();
-    const interval = setInterval(checkModelChange, 1000); // Check every second
-
-    return () => clearInterval(interval);
-  }, [config, currentModel]);
-
-  // Set up Flash fallback handler
   useEffect(() => {
     const flashFallbackHandler = async (
       currentModel: string,
@@ -381,20 +350,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     addItem,
     clearItems,
     loadHistory,
-    refreshStatic,
-    setShowHelp,
-    setDebugMessage,
-    openThemeDialog,
-    openAuthDialog,
-    openEditorDialog,
-    toggleCorgiMode,
-    setQuittingMessages,
-    openPrivacyNotice,
+    () => {},
   );
   const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
 
-  const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
-  const isInitialMount = useRef(true);
+  const { columns: terminalWidth } = useTerminalSize();
   const { stdin, setRawMode } = useStdin();
   const isValidPath = useCallback((filePath: string): boolean => {
     try {
@@ -430,7 +390,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         if (timerRef.current) {
           clearTimeout(timerRef.current);
         }
-        // Directly invoke the central command handler.
         handleSlashCommand('/quit');
       } else {
         setPressedOnce(true);
@@ -444,36 +403,19 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   );
 
   useInput((input: string, key: InkKeyType) => {
-    let enteringConstrainHeightMode = false;
-    if (!constrainHeight) {
-      // Automatically re-enter constrain height mode if the user types
-      // anything. When constrainHeight==false, the user will experience
-      // significant flickering so it is best to disable it immediately when
-      // the user starts interacting with the app.
-      enteringConstrainHeightMode = true;
-      setConstrainHeight(true);
-    }
-
     if (key.ctrl && input === 'o') {
       setShowErrorDetails((prev) => !prev);
     } else if (key.ctrl && input === 't') {
       const newValue = !showToolDescriptions;
       setShowToolDescriptions(newValue);
-
-      const mcpServers = config.getMcpServers();
-      if (Object.keys(mcpServers || {}).length > 0) {
+      if (Object.keys(config.getMcpServers() || {}).length > 0) {
         handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
       }
     } else if (key.ctrl && (input === 'c' || input === 'C')) {
       handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
     } else if (key.ctrl && (input === 'd' || input === 'D')) {
-      if (buffer.text.length > 0) {
-        // Do nothing if there is text in the input.
-        return;
-      }
+      if (buffer.text.length > 0) return;
       handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
-    } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
-      setConstrainHeight(false);
     }
   });
 
@@ -485,18 +427,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const getPreferredEditor = useCallback(() => {
     const editorType = settings.merged.preferredEditor;
-    const isValidEditor = isEditorAvailable(editorType);
-    if (!isValidEditor) {
-      openEditorDialog();
+    if (!isEditorAvailable(editorType)) {
+      ui.openEditorDialog();
       return;
     }
     return editorType as EditorType;
-  }, [settings, openEditorDialog]);
+  }, [settings, ui]);
 
   const onAuthError = useCallback(() => {
-    setAuthError('reauth required');
-    openAuthDialog();
-  }, [openAuthDialog, setAuthError]);
+    ui.openAuthDialog();
+  }, [ui]);
 
   const {
     streamingState,
@@ -508,9 +448,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     config.getGeminiClient(),
     history,
     addItem,
-    setShowHelp,
+    ui.openHelp,
     config,
-    setDebugMessage,
+    ui.setDebugMessage,
     handleSlashCommand,
     shellModeActive,
     getPreferredEditor,
@@ -539,89 +479,36 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   useEffect(() => {
     const fetchUserMessages = async () => {
-      const pastMessagesRaw = (await logger?.getPreviousUserMessages()) || []; // Newest first
-
+      const pastMessagesRaw = (await logger?.getPreviousUserMessages()) || [];
       const currentSessionUserMessages = history
         .filter(
           (item): item is HistoryItem & { type: 'user'; text: string } =>
-            item.type === 'user' &&
-            typeof item.text === 'string' &&
-            item.text.trim() !== '',
+            item.type === 'user' && typeof item.text === 'string',
         )
         .map((item) => item.text)
-        .reverse(); // Newest first, to match pastMessagesRaw sorting
-
-      // Combine, with current session messages being more recent
-      const combinedMessages = [
-        ...currentSessionUserMessages,
-        ...pastMessagesRaw,
-      ];
-
-      // Deduplicate consecutive identical messages from the combined list (still newest first)
-      const deduplicatedMessages: string[] = [];
-      if (combinedMessages.length > 0) {
-        deduplicatedMessages.push(combinedMessages[0]); // Add the newest one unconditionally
-        for (let i = 1; i < combinedMessages.length; i++) {
-          if (combinedMessages[i] !== combinedMessages[i - 1]) {
-            deduplicatedMessages.push(combinedMessages[i]);
+        .reverse();
+      const combined = [...currentSessionUserMessages, ...pastMessagesRaw];
+      const deduplicated: string[] = [];
+      if (combined.length > 0) {
+        deduplicated.push(combined[0]);
+        for (let i = 1; i < combined.length; i++) {
+          if (combined[i] !== combined[i - 1]) {
+            deduplicated.push(combined[i]);
           }
         }
       }
-      // Reverse to oldest first for useInputHistory
-      setUserMessages(deduplicatedMessages.reverse());
+      setUserMessages(deduplicated.reverse());
     };
     fetchUserMessages();
   }, [history, logger]);
 
   const isInputActive = streamingState === StreamingState.Idle && !initError;
 
-  const handleClearScreen = useCallback(() => {
+  const handleClearScreen = () => {
     clearItems();
     clearConsoleMessagesState();
     console.clear();
-    refreshStatic();
-  }, [clearItems, clearConsoleMessagesState, refreshStatic]);
-
-  const mainControlsRef = useRef<DOMElement>(null);
-  const pendingHistoryItemRef = useRef<DOMElement>(null);
-
-  useEffect(() => {
-    if (mainControlsRef.current) {
-      const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      setFooterHeight(fullFooterMeasurement.height);
-    }
-  }, [terminalHeight, consoleMessages, showErrorDetails]);
-
-  const staticExtraHeight = /* margins and padding */ 3;
-  const availableTerminalHeight = useMemo(
-    () => terminalHeight - footerHeight - staticExtraHeight,
-    [terminalHeight, footerHeight],
-  );
-
-  useEffect(() => {
-    // skip refreshing Static during first mount
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    // debounce so it doesn't fire up too often during resize
-    const handler = setTimeout(() => {
-      setStaticNeedsRefresh(false);
-      refreshStatic();
-    }, 300);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [terminalWidth, terminalHeight, refreshStatic]);
-
-  useEffect(() => {
-    if (streamingState === StreamingState.Idle && staticNeedsRefresh) {
-      setStaticNeedsRefresh(false);
-      refreshStatic();
-    }
-  }, [streamingState, refreshStatic, staticNeedsRefresh]);
+  };
 
   const filteredConsoleMessages = useMemo(() => {
     if (config.getDebugMode()) {
@@ -634,10 +521,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const contextFileNames = useMemo(() => {
     const fromSettings = settings.merged.contextFileName;
-    if (fromSettings) {
-      return Array.isArray(fromSettings) ? fromSettings : [fromSettings];
-    }
-    return getAllGeminiMdFilenames();
+    return fromSettings
+      ? Array.isArray(fromSettings)
+        ? fromSettings
+        : [fromSettings]
+      : getAllGeminiMdFilenames();
   }, [settings.merged.contextFileName]);
 
   const initialPrompt = useMemo(() => config.getQuestion(), [config]);
@@ -668,97 +556,218 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     geminiClient,
   ]);
 
+  const QuittingSession = ({ messages }: { messages: HistoryItem[] }) => (
+    <Box flexDirection="column" marginBottom={1}>
+      {messages.map((item) => (
+        <HistoryItemDisplay
+          key={item.id}
+          terminalWidth={terminalWidth}
+          item={item}
+          isPending={false}
+          config={config}
+        />
+      ))}
+    </Box>
+  );
+
   if (quittingMessages) {
-    return (
-      <Box flexDirection="column" marginBottom={1}>
-        {quittingMessages.map((item) => (
-          <HistoryItemDisplay
-            key={item.id}
-            availableTerminalHeight={
-              constrainHeight ? availableTerminalHeight : undefined
-            }
-            terminalWidth={terminalWidth}
-            item={item}
-            isPending={false}
-            config={config}
-          />
-        ))}
-      </Box>
-    );
+    return <QuittingSession messages={quittingMessages} />;
   }
+
   const mainAreaWidth = Math.floor(terminalWidth * 0.9);
-  const debugConsoleMaxHeight = Math.floor(Math.max(terminalHeight * 0.2, 5));
-  // Arbitrary threshold to ensure that items in the static area are large
-  // enough but not too large to make the terminal hard to use.
-  const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
+  const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
+
+  const Dialogs = () => (
+    <>
+      {isThemeDialogOpen ? (
+        <Box flexDirection="column">
+          {themeError && (
+            <Box marginBottom={1}>
+              <Text color={Colors.AccentRed}>{themeError}</Text>
+            </Box>
+          )}
+          <ThemeDialog
+            onSelect={handleThemeSelect}
+            onHighlight={handleThemeHighlight}
+            settings={settings}
+            terminalWidth={mainAreaWidth}
+          />
+        </Box>
+      ) : isAuthenticating ? (
+        <>
+          <AuthInProgress
+            onTimeout={() => {
+              // This is now handled in AppContainer
+            }}
+          />
+          {showErrorDetails && (
+            <OverflowProvider>
+              <Box flexDirection="column">
+                <DetailedMessagesDisplay
+                  messages={filteredConsoleMessages}
+                  maxHeight={debugConsoleMaxHeight}
+                  width={inputWidth}
+                />
+                <ShowMoreLines />
+              </Box>
+            </OverflowProvider>
+          )}
+        </>
+      ) : isAuthDialogOpen ? (
+        <Box flexDirection="column">
+          <AuthDialog
+            onSelect={handleAuthSelect}
+            settings={settings}
+            initialErrorMessage={authError}
+          />
+        </Box>
+      ) : isEditorDialogOpen ? (
+        <Box flexDirection="column">
+          {editorError && (
+            <Box marginBottom={1}>
+              <Text color={Colors.AccentRed}>{editorError}</Text>
+            </Box>
+          )}
+          <EditorSettingsDialog
+            onSelect={handleEditorSelect}
+            settings={settings}
+            onExit={exitEditorDialog}
+          />
+        </Box>
+      ) : showPrivacyNotice ? (
+        <PrivacyNotice
+          onExit={() => setShowPrivacyNotice(false)}
+          config={config}
+        />
+      ) : null}
+    </>
+  );
+
+  const ActiveSession = () => (
+    <>
+      <LoadingIndicator
+        thought={
+          streamingState === StreamingState.WaitingForConfirmation ||
+          config.getAccessibility()?.disableLoadingPhrases
+            ? undefined
+            : thought
+        }
+        currentLoadingPhrase={
+          config.getAccessibility()?.disableLoadingPhrases
+            ? undefined
+            : currentLoadingPhrase
+        }
+        elapsedTime={elapsedTime}
+      />
+      <Box
+        marginTop={1}
+        display="flex"
+        justifyContent="space-between"
+        width="100%"
+      >
+        <Box>
+          {process.env.GEMINI_SYSTEM_MD && (
+            <Text color={Colors.AccentRed}>|⌐■_■| </Text>
+          )}
+          {ctrlCPressedOnce ? (
+            <Text color={Colors.AccentYellow}>Press Ctrl+C again to exit.</Text>
+          ) : ctrlDPressedOnce ? (
+            <Text color={Colors.AccentYellow}>Press Ctrl+D again to exit.</Text>
+          ) : (
+            <ContextSummaryDisplay
+              openFiles={openFiles}
+              geminiMdFileCount={geminiMdFileCount}
+              contextFileNames={contextFileNames}
+              mcpServers={config.getMcpServers()}
+              blockedMcpServers={config.getBlockedMcpServers()}
+              showToolDescriptions={showToolDescriptions}
+            />
+          )}
+        </Box>
+        <Box>
+          {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
+            !shellModeActive && (
+              <AutoAcceptIndicator approvalMode={showAutoAcceptIndicator} />
+            )}
+          {shellModeActive && <ShellModeIndicator />}
+        </Box>
+      </Box>
+
+      {showErrorDetails && (
+        <OverflowProvider>
+          <Box flexDirection="column">
+            <DetailedMessagesDisplay
+              messages={filteredConsoleMessages}
+              maxHeight={debugConsoleMaxHeight}
+              width={inputWidth}
+            />
+            <ShowMoreLines />
+          </Box>
+        </OverflowProvider>
+      )}
+
+      {isInputActive && (
+        <InputPrompt
+          buffer={buffer}
+          inputWidth={inputWidth}
+          suggestionsWidth={suggestionsWidth}
+          onSubmit={handleFinalSubmit}
+          userMessages={userMessages}
+          onClearScreen={handleClearScreen}
+          config={config}
+          slashCommands={slashCommands}
+          commandContext={commandContext}
+          shellModeActive={shellModeActive}
+          setShellModeActive={setShellModeActive}
+          focus={isFocused}
+        />
+      )}
+    </>
+  );
+
+  const showDialog =
+    isThemeDialogOpen ||
+    isAuthenticating ||
+    isAuthDialogOpen ||
+    isEditorDialogOpen ||
+    showPrivacyNotice;
+
   return (
     <StreamingContext.Provider value={streamingState}>
-      <Box flexDirection="column" marginBottom={1} width="90%">
-        {/* Move UpdateNotification outside Static so it can re-render when updateMessage changes */}
+      <Box flexDirection="column" width="90%" height="100%">
         {updateMessage && <UpdateNotification message={updateMessage} />}
-
-        {/*
-         * The Static component is an Ink intrinsic in which there can only be 1 per application.
-         * Because of this restriction we're hacking it slightly by having a 'header' item here to
-         * ensure that it's statically rendered.
-         *
-         * Background on the Static Item: Anything in the Static component is written a single time
-         * to the console. Think of it like doing a console.log and then never using ANSI codes to
-         * clear that content ever again. Effectively it has a moving frame that every time new static
-         * content is set it'll flush content to the terminal and move the area which it's "clearing"
-         * down a notch. Without Static the area which gets erased and redrawn continuously grows.
-         */}
-        <Static
-          key={staticKey}
-          items={[
-            <Box flexDirection="column" key="header">
-              {!settings.merged.hideBanner && (
-                <Header
-                  terminalWidth={terminalWidth}
-                  version={version}
-                  nightly={nightly}
-                />
-              )}
-              {!settings.merged.hideTips && <Tips config={config} />}
-            </Box>,
-            ...history.map((h) => (
-              <HistoryItemDisplay
-                terminalWidth={mainAreaWidth}
-                availableTerminalHeight={staticAreaMaxItemHeight}
-                key={h.id}
-                item={h}
-                isPending={false}
-                config={config}
-              />
-            )),
-          ]}
-        >
-          {(item) => item}
-        </Static>
+        {!settings.merged.hideBanner && (
+          <Header
+            terminalWidth={terminalWidth}
+            version={version}
+            nightly={nightly}
+          />
+        )}
+        {!settings.merged.hideTips && <Tips config={config} />}
+        <Conversation
+          history={history}
+          config={config}
+          terminalWidth={terminalWidth}
+        />
         <OverflowProvider>
-          <Box ref={pendingHistoryItemRef} flexDirection="column">
+          <Box flexDirection="column">
             {pendingHistoryItems.map((item, i) => (
               <HistoryItemDisplay
                 key={i}
-                availableTerminalHeight={
-                  constrainHeight ? availableTerminalHeight : undefined
-                }
                 terminalWidth={mainAreaWidth}
-                // TODO(taehykim): It seems like references to ids aren't necessary in
-                // HistoryItemDisplay. Refactor later. Use a fake id for now.
                 item={{ ...item, id: 0 }}
                 isPending={true}
                 config={config}
                 isFocused={!isEditorDialogOpen}
               />
             ))}
-            <ShowMoreLines constrainHeight={constrainHeight} />
+            <ShowMoreLines />
           </Box>
         </OverflowProvider>
 
         {showHelp && <Help commands={slashCommands} />}
 
-        <Box flexDirection="column" ref={mainControlsRef}>
+        <Box flexDirection="column">
           {startupWarnings.length > 0 && (
             <Box
               borderStyle="round"
@@ -775,164 +784,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             </Box>
           )}
 
-          {isThemeDialogOpen ? (
-            <Box flexDirection="column">
-              {themeError && (
-                <Box marginBottom={1}>
-                  <Text color={Colors.AccentRed}>{themeError}</Text>
-                </Box>
-              )}
-              <ThemeDialog
-                onSelect={handleThemeSelect}
-                onHighlight={handleThemeHighlight}
-                settings={settings}
-                availableTerminalHeight={
-                  constrainHeight
-                    ? terminalHeight - staticExtraHeight
-                    : undefined
-                }
-                terminalWidth={mainAreaWidth}
-              />
-            </Box>
-          ) : isAuthenticating ? (
-            <>
-              <AuthInProgress
-                onTimeout={() => {
-                  setAuthError('Authentication timed out. Please try again.');
-                  cancelAuthentication();
-                  openAuthDialog();
-                }}
-              />
-              {showErrorDetails && (
-                <OverflowProvider>
-                  <Box flexDirection="column">
-                    <DetailedMessagesDisplay
-                      messages={filteredConsoleMessages}
-                      maxHeight={
-                        constrainHeight ? debugConsoleMaxHeight : undefined
-                      }
-                      width={inputWidth}
-                    />
-                    <ShowMoreLines constrainHeight={constrainHeight} />
-                  </Box>
-                </OverflowProvider>
-              )}
-            </>
-          ) : isAuthDialogOpen ? (
-            <Box flexDirection="column">
-              <AuthDialog
-                onSelect={handleAuthSelect}
-                settings={settings}
-                initialErrorMessage={authError}
-              />
-            </Box>
-          ) : isEditorDialogOpen ? (
-            <Box flexDirection="column">
-              {editorError && (
-                <Box marginBottom={1}>
-                  <Text color={Colors.AccentRed}>{editorError}</Text>
-                </Box>
-              )}
-              <EditorSettingsDialog
-                onSelect={handleEditorSelect}
-                settings={settings}
-                onExit={exitEditorDialog}
-              />
-            </Box>
-          ) : showPrivacyNotice ? (
-            <PrivacyNotice
-              onExit={() => setShowPrivacyNotice(false)}
-              config={config}
-            />
-          ) : (
-            <>
-              <LoadingIndicator
-                thought={
-                  streamingState === StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.disableLoadingPhrases
-                    ? undefined
-                    : thought
-                }
-                currentLoadingPhrase={
-                  config.getAccessibility()?.disableLoadingPhrases
-                    ? undefined
-                    : currentLoadingPhrase
-                }
-                elapsedTime={elapsedTime}
-              />
-              <Box
-                marginTop={1}
-                display="flex"
-                justifyContent="space-between"
-                width="100%"
-              >
-                <Box>
-                  {process.env.GEMINI_SYSTEM_MD && (
-                    <Text color={Colors.AccentRed}>|⌐■_■| </Text>
-                  )}
-                  {ctrlCPressedOnce ? (
-                    <Text color={Colors.AccentYellow}>
-                      Press Ctrl+C again to exit.
-                    </Text>
-                  ) : ctrlDPressedOnce ? (
-                    <Text color={Colors.AccentYellow}>
-                      Press Ctrl+D again to exit.
-                    </Text>
-                  ) : (
-                    <ContextSummaryDisplay
-                      openFiles={openFiles}
-                      geminiMdFileCount={geminiMdFileCount}
-                      contextFileNames={contextFileNames}
-                      mcpServers={config.getMcpServers()}
-                      blockedMcpServers={config.getBlockedMcpServers()}
-                      showToolDescriptions={showToolDescriptions}
-                    />
-                  )}
-                </Box>
-                <Box>
-                  {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
-                    !shellModeActive && (
-                      <AutoAcceptIndicator
-                        approvalMode={showAutoAcceptIndicator}
-                      />
-                    )}
-                  {shellModeActive && <ShellModeIndicator />}
-                </Box>
-              </Box>
-
-              {showErrorDetails && (
-                <OverflowProvider>
-                  <Box flexDirection="column">
-                    <DetailedMessagesDisplay
-                      messages={filteredConsoleMessages}
-                      maxHeight={
-                        constrainHeight ? debugConsoleMaxHeight : undefined
-                      }
-                      width={inputWidth}
-                    />
-                    <ShowMoreLines constrainHeight={constrainHeight} />
-                  </Box>
-                </OverflowProvider>
-              )}
-
-              {isInputActive && (
-                <InputPrompt
-                  buffer={buffer}
-                  inputWidth={inputWidth}
-                  suggestionsWidth={suggestionsWidth}
-                  onSubmit={handleFinalSubmit}
-                  userMessages={userMessages}
-                  onClearScreen={handleClearScreen}
-                  config={config}
-                  slashCommands={slashCommands}
-                  commandContext={commandContext}
-                  shellModeActive={shellModeActive}
-                  setShellModeActive={setShellModeActive}
-                  focus={isFocused}
-                />
-              )}
-            </>
-          )}
+          {showDialog ? <Dialogs /> : <ActiveSession />}
 
           {initError && streamingState !== StreamingState.Responding && (
             <Box
@@ -941,29 +793,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               paddingX={1}
               marginBottom={1}
             >
-              {history.find(
-                (item) =>
-                  item.type === 'error' && item.text?.includes(initError),
-              )?.text ? (
-                <Text color={Colors.AccentRed}>
-                  {
-                    history.find(
-                      (item) =>
-                        item.type === 'error' && item.text?.includes(initError),
-                    )?.text
-                  }
-                </Text>
-              ) : (
-                <>
-                  <Text color={Colors.AccentRed}>
-                    Initialization Error: {initError}
-                  </Text>
-                  <Text color={Colors.AccentRed}>
-                    {' '}
-                    Please check API key and configuration.
-                  </Text>
-                </>
-              )}
+              <Text color={Colors.AccentRed}>
+                Initialization Error: {initError}
+              </Text>
             </Box>
           )}
           <Footer

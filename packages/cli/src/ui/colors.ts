@@ -4,47 +4,47 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { themeManager } from './themes/theme-manager.js';
+import { ThemeManager } from './themes/theme-manager.js';
 import { ColorsTheme } from './themes/theme.js';
 
 export const Colors: ColorsTheme = {
   get type() {
-    return themeManager.getActiveTheme().colors.type;
+    return ThemeManager.getInstance().getActiveTheme().colors.type;
   },
   get Foreground() {
-    return themeManager.getActiveTheme().colors.Foreground;
+    return ThemeManager.getInstance().getActiveTheme().colors.Foreground;
   },
   get Background() {
-    return themeManager.getActiveTheme().colors.Background;
+    return ThemeManager.getInstance().getActiveTheme().colors.Background;
   },
   get LightBlue() {
-    return themeManager.getActiveTheme().colors.LightBlue;
+    return ThemeManager.getInstance().getActiveTheme().colors.LightBlue;
   },
   get AccentBlue() {
-    return themeManager.getActiveTheme().colors.AccentBlue;
+    return ThemeManager.getInstance().getActiveTheme().colors.AccentBlue;
   },
   get AccentPurple() {
-    return themeManager.getActiveTheme().colors.AccentPurple;
+    return ThemeManager.getInstance().getActiveTheme().colors.AccentPurple;
   },
   get AccentCyan() {
-    return themeManager.getActiveTheme().colors.AccentCyan;
+    return ThemeManager.getInstance().getActiveTheme().colors.AccentCyan;
   },
   get AccentGreen() {
-    return themeManager.getActiveTheme().colors.AccentGreen;
+    return ThemeManager.getInstance().getActiveTheme().colors.AccentGreen;
   },
   get AccentYellow() {
-    return themeManager.getActiveTheme().colors.AccentYellow;
+    return ThemeManager.getInstance().getActiveTheme().colors.AccentYellow;
   },
   get AccentRed() {
-    return themeManager.getActiveTheme().colors.AccentRed;
+    return ThemeManager.getInstance().getActiveTheme().colors.AccentRed;
   },
   get Comment() {
-    return themeManager.getActiveTheme().colors.Comment;
+    return ThemeManager.getInstance().getActiveTheme().colors.Comment;
   },
   get Gray() {
-    return themeManager.getActiveTheme().colors.Gray;
+    return ThemeManager.getInstance().getActiveTheme().colors.Gray;
   },
   get GradientColors() {
-    return themeManager.getActiveTheme().colors.GradientColors;
+    return ThemeManager.getInstance().getActiveTheme().colors.GradientColors;
   },
 };

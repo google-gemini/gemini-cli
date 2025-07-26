@@ -38,9 +38,11 @@ import { useSlashCommandProcessor } from './slashCommandProcessor.js';
 import { CommandKind, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
-import { MessageType } from '../types.js';
+import { MessageType, HistoryItem } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
+import { UIContext, UIContextValue } from '../contexts/UIContext.js';
+import { PropsWithChildren } from 'react';
 
 const createTestCommand = (
   overrides: Partial<SlashCommand>,
@@ -59,6 +61,26 @@ describe('useSlashCommandProcessor', () => {
   const mockSetShowHelp = vi.fn();
   const mockOpenAuthDialog = vi.fn();
   const mockSetQuittingMessages = vi.fn();
+
+  const mockUiContext: UIContextValue = {
+    openHelp: mockSetShowHelp,
+    openAuthDialog: mockOpenAuthDialog,
+    openThemeDialog: vi.fn(),
+    openEditorDialog: vi.fn(),
+    openPrivacyNotice: vi.fn(),
+    toggleCorgiMode: vi.fn(),
+    setDebugMessage: vi.fn(),
+    quit: (messages: HistoryItem[]) => {
+      mockSetQuittingMessages(messages);
+      setTimeout(() => {
+        mockProcessExit(0);
+      }, 100);
+    },
+  };
+
+  const wrapper = ({ children }: PropsWithChildren) => (
+    <UIContext.Provider value={mockUiContext}>{children}</UIContext.Provider>
+  );
 
   const mockConfig = {
     getProjectRoot: () => '/mock/cwd',
@@ -84,23 +106,17 @@ describe('useSlashCommandProcessor', () => {
     mockBuiltinLoadCommands.mockResolvedValue(Object.freeze(builtinCommands));
     mockFileLoadCommands.mockResolvedValue(Object.freeze(fileCommands));
 
-    const { result } = renderHook(() =>
-      useSlashCommandProcessor(
-        mockConfig,
-        mockSettings,
-        mockAddItem,
-        mockClearItems,
-        mockLoadHistory,
-        vi.fn(), // refreshStatic
-        mockSetShowHelp,
-        vi.fn(), // onDebugMessage
-        vi.fn(), // openThemeDialog
-        mockOpenAuthDialog,
-        vi.fn(), // openEditorDialog
-        vi.fn(), // toggleCorgiMode
-        mockSetQuittingMessages,
-        vi.fn(), // openPrivacyNotice
-      ),
+    const { result } = renderHook(
+      () =>
+        useSlashCommandProcessor(
+          mockConfig,
+          mockSettings,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          vi.fn(), // refreshStatic
+        ),
+      { wrapper },
     );
 
     return result;
@@ -276,7 +292,7 @@ describe('useSlashCommandProcessor', () => {
         await result.current.handleSlashCommand('/helpcmd');
       });
 
-      expect(mockSetShowHelp).toHaveBeenCalledWith(true);
+      expect(mockSetShowHelp).toHaveBeenCalled();
     });
 
     it('should handle "load_history" action', async () => {
@@ -506,23 +522,17 @@ describe('useSlashCommandProcessor', () => {
   describe('Lifecycle', () => {
     it('should abort command loading when the hook unmounts', async () => {
       const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
-      const { unmount } = renderHook(() =>
-        useSlashCommandProcessor(
-          mockConfig,
-          mockSettings,
-          mockAddItem,
-          mockClearItems,
-          mockLoadHistory,
-          vi.fn(), // refreshStatic
-          mockSetShowHelp,
-          vi.fn(), // onDebugMessage
-          vi.fn(), // openThemeDialog
-          mockOpenAuthDialog,
-          vi.fn(), // openEditorDialog
-          vi.fn(), // toggleCorgiMode
-          mockSetQuittingMessages,
-          vi.fn(), // openPrivacyNotice
-        ),
+      const { unmount } = renderHook(
+        () =>
+          useSlashCommandProcessor(
+            mockConfig,
+            mockSettings,
+            mockAddItem,
+            mockClearItems,
+            mockLoadHistory,
+            vi.fn(), // refreshStatic
+          ),
+        { wrapper },
       );
 
       unmount();

@@ -91,7 +91,6 @@ interface DiffRendererProps {
   diffContent: string;
   filename?: string;
   tabWidth?: number;
-  availableTerminalHeight?: number;
   terminalWidth: number;
   theme?: import('../../themes/theme.js').Theme;
 }
@@ -102,7 +101,6 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   diffContent,
   filename,
   tabWidth = DEFAULT_TAB_WIDTH,
-  availableTerminalHeight,
   terminalWidth,
   theme,
 }) => {
@@ -143,19 +141,12 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     const language = fileExtension
       ? getLanguageFromExtension(fileExtension)
       : null;
-    renderedOutput = colorizeCode(
-      addedContent,
-      language,
-      availableTerminalHeight,
-      terminalWidth,
-      theme,
-    );
+    renderedOutput = colorizeCode(addedContent, language, terminalWidth, theme);
   } else {
     renderedOutput = renderDiffContent(
       parsedLines,
       filename,
       tabWidth,
-      availableTerminalHeight,
       terminalWidth,
       theme,
     );
@@ -168,7 +159,6 @@ const renderDiffContent = (
   parsedLines: DiffLine[],
   filename: string | undefined,
   tabWidth = DEFAULT_TAB_WIDTH,
-  availableTerminalHeight: number | undefined,
   terminalWidth: number,
   theme?: import('../../themes/theme.js').Theme,
 ) => {
@@ -214,11 +204,7 @@ const renderDiffContent = (
   const MAX_CONTEXT_LINES_WITHOUT_GAP = 5;
 
   return (
-    <MaxSizedBox
-      maxHeight={availableTerminalHeight}
-      maxWidth={terminalWidth}
-      key={key}
-    >
+    <MaxSizedBox maxHeight={undefined} maxWidth={terminalWidth} key={key}>
       {displayableLines.reduce<React.ReactNode[]>((acc, line, index) => {
         // Determine the relevant line number for gap calculation based on type
         let relevantLineNumberForGapCalc: number | null = null;

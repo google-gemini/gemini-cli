@@ -12,7 +12,7 @@ import { useInputHistory } from '../hooks/useInputHistory.js';
 import { TextBuffer } from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
-import stringWidth from 'string-width';
+
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
@@ -469,10 +469,28 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   useKeypress(handleInput, { isActive: focus });
 
-  const linesToRender = buffer.viewportVisualLines;
-  const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
-    buffer.visualCursor;
-  const scrollVisualRow = buffer.visualScrollRow;
+  const renderWithCursor = () => {
+    const { text, cursor } = buffer;
+    const [row, col] = cursor;
+
+    let offset = 0;
+    for (let i = 0; i < row; i++) {
+      offset += cpLen(buffer.lines[i]) + 1; // Add 1 for the newline character
+    }
+    offset += col;
+
+    const before = cpSlice(text, 0, offset);
+    const at = cpSlice(text, offset, offset + 1) || ' ';
+    const after = cpSlice(text, offset + 1);
+
+    return (
+      <Text>
+        {before}
+        {chalk.inverse(at)}
+        {after}
+      </Text>
+    );
+  };
 
   return (
     <>
@@ -480,13 +498,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         borderStyle="round"
         borderColor={shellModeActive ? Colors.AccentYellow : Colors.AccentBlue}
         paddingX={1}
+        width={inputWidth}
       >
         <Text
           color={shellModeActive ? Colors.AccentYellow : Colors.AccentPurple}
         >
           {shellModeActive ? '! ' : '> '}
         </Text>
-        <Box flexGrow={1} flexDirection="column">
+        <Box flexGrow={1}>
           {buffer.text.length === 0 && placeholder ? (
             focus ? (
               <Text>
@@ -497,56 +516,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               <Text color={Colors.Gray}>{placeholder}</Text>
             )
           ) : (
-            linesToRender.map((lineText, visualIdxInRenderedSet) => {
-              const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
-              let display = cpSlice(lineText, 0, inputWidth);
-              const currentVisualWidth = stringWidth(display);
-              if (currentVisualWidth < inputWidth) {
-                display = display + ' '.repeat(inputWidth - currentVisualWidth);
-              }
-
-              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
-                const relativeVisualColForHighlight = cursorVisualColAbsolute;
-
-                if (relativeVisualColForHighlight >= 0) {
-                  if (relativeVisualColForHighlight < cpLen(display)) {
-                    const charToHighlight =
-                      cpSlice(
-                        display,
-                        relativeVisualColForHighlight,
-                        relativeVisualColForHighlight + 1,
-                      ) || ' ';
-                    const highlighted = chalk.inverse(charToHighlight);
-                    display =
-                      cpSlice(display, 0, relativeVisualColForHighlight) +
-                      highlighted +
-                      cpSlice(display, relativeVisualColForHighlight + 1);
-                  } else if (
-                    relativeVisualColForHighlight === cpLen(display) &&
-                    cpLen(display) === inputWidth
-                  ) {
-                    display = display + chalk.inverse(' ');
-                  }
-                }
-              }
-              return (
-                <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
-              );
-            })
+            renderWithCursor()
           )}
         </Box>
       </Box>
       {completion.showSuggestions && (
-        <Box>
-          <SuggestionsDisplay
-            suggestions={completion.suggestions}
-            activeIndex={completion.activeSuggestionIndex}
-            isLoading={completion.isLoadingSuggestions}
-            width={suggestionsWidth}
-            scrollOffset={completion.visibleStartIndex}
-            userInput={buffer.text}
-          />
-        </Box>
+        <SuggestionsDisplay
+          suggestions={completion.suggestions}
+          activeIndex={completion.activeSuggestionIndex}
+          isLoading={completion.isLoadingSuggestions}
+          width={suggestionsWidth}
+          scrollOffset={completion.visibleStartIndex}
+          userInput={buffer.text}
+        />
       )}
     </>
   );

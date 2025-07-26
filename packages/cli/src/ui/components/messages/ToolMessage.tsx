@@ -13,10 +13,7 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 
-const STATIC_HEIGHT = 1;
-const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
 const STATUS_INDICATOR_WIDTH = 3;
-const MIN_LINES_SHOWN = 2; // show at least this many lines
 
 // Large threshold to ensure we don't cause performance issues for very large
 // outputs that will get truncated further MaxSizedBox anyway.
@@ -24,7 +21,6 @@ const MAXIMUM_RESULT_DISPLAY_CHARACTERS = 1000000;
 export type TextEmphasis = 'high' | 'medium' | 'low';
 
 export interface ToolMessageProps extends IndividualToolCallDisplay {
-  availableTerminalHeight?: number;
   terminalWidth: number;
   emphasis?: TextEmphasis;
   renderOutputAsMarkdown?: boolean;
@@ -35,25 +31,10 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   description,
   resultDisplay,
   status,
-  availableTerminalHeight,
   terminalWidth,
   emphasis = 'medium',
   renderOutputAsMarkdown = true,
 }) => {
-  const availableHeight = availableTerminalHeight
-    ? Math.max(
-        availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
-        MIN_LINES_SHOWN + 1, // enforce minimum lines shown
-      )
-    : undefined;
-
-  // Long tool call response in MarkdownDisplay doesn't respect availableTerminalHeight properly,
-  // we're forcing it to not render as markdown when the response is too long, it will fallback
-  // to render as plain text, which is contained within the terminal using MaxSizedBox
-  if (availableHeight) {
-    renderOutputAsMarkdown = false;
-  }
-
   const childWidth = terminalWidth - 3; // account for padding.
   if (typeof resultDisplay === 'string') {
     if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
@@ -82,13 +63,12 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                 <MarkdownDisplay
                   text={resultDisplay}
                   isPending={false}
-                  availableTerminalHeight={availableHeight}
                   terminalWidth={childWidth}
                 />
               </Box>
             )}
             {typeof resultDisplay === 'string' && !renderOutputAsMarkdown && (
-              <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
+              <MaxSizedBox maxHeight={40} maxWidth={childWidth}>
                 <Box>
                   <Text wrap="wrap">{resultDisplay}</Text>
                 </Box>
@@ -98,7 +78,6 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
               <DiffRenderer
                 diffContent={resultDisplay.fileDiff}
                 filename={resultDisplay.fileName}
-                availableTerminalHeight={availableHeight}
                 terminalWidth={childWidth}
               />
             )}

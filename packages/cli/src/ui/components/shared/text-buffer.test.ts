@@ -225,7 +225,7 @@ describe('useTextBuffer', () => {
       expect(state.visualCursor[1]).toBe(1); // At 'o' in "world"
     });
 
-    it('should wrap visual lines', () => {
+    it('should not wrap visual lines', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: 'The quick brown fox jumps over the lazy dog.',
@@ -236,14 +236,11 @@ describe('useTextBuffer', () => {
       );
       const state = getBufferState(result);
       expect(state.allVisualLines).toEqual([
-        'The quick',
-        'brown fox',
-        'jumps over the',
-        'lazy dog.',
+        'The quick brown fox jumps over the lazy dog.',
       ]);
     });
 
-    it('should wrap visual lines with multiple spaces', () => {
+    it('should not wrap visual lines with multiple spaces', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: 'The  quick  brown fox    jumps over the lazy dog.',
@@ -256,14 +253,11 @@ describe('useTextBuffer', () => {
       // consistent with Google docs behavior and makes it intuitive to edit
       // the spaces as needed.
       expect(state.allVisualLines).toEqual([
-        'The  quick ',
-        'brown fox   ',
-        'jumps over the',
-        'lazy dog.',
+        'The  quick  brown fox    jumps over the lazy dog.',
       ]);
     });
 
-    it('should wrap visual lines even without spaces', () => {
+    it('should not wrap visual lines even without spaces', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: '123456789012345ABCDEFG', // 4 chars, 12 bytes
@@ -275,7 +269,7 @@ describe('useTextBuffer', () => {
       // Including multiple spaces at the end of the lines like this is
       // consistent with Google docs behavior and makes it intuitive to edit
       // the spaces as needed.
-      expect(state.allVisualLines).toEqual(['123456789012345', 'ABCDEFG']);
+      expect(state.allVisualLines).toEqual(['123456789012345ABCDEFG']);
     });
 
     it('should initialize with multi-byte unicode characters and correct cursor offset', () => {
@@ -292,8 +286,8 @@ describe('useTextBuffer', () => {
       expect(state.lines).toEqual(['你好世界']);
       expect(state.cursor).toEqual([0, 2]);
       // Visual: "你好" (width 4), "世"界" (width 4) with viewport width 5
-      expect(state.allVisualLines).toEqual(['你好', '世界']);
-      expect(state.visualCursor).toEqual([1, 0]);
+      expect(state.allVisualLines).toEqual(['你好世界']);
+      expect(state.visualCursor).toEqual([0, 2]);
     });
   });
 
@@ -518,7 +512,7 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).visualCursor).toEqual([0, 4]);
 
       act(() => result.current.move('right')); // visual [1,0] ("l" of "line1")
-      expect(getBufferState(result).visualCursor).toEqual([1, 0]);
+      expect(getBufferState(result).visualCursor).toEqual([0, 5]);
       expect(getBufferState(result).cursor).toEqual([0, 5]); // logical cursor
 
       act(() => result.current.move('left')); // visual [0,4] (" " of "long ")
@@ -578,11 +572,8 @@ describe('useTextBuffer', () => {
         }),
       );
       expect(result.current.allVisualLines).toEqual([
-        'line',
-        'one',
-        'secon',
-        'd',
-        'line',
+        'line one',
+        'second line',
       ]);
       // Initial cursor [0,0] (start of "line")
       act(() => result.current.move('down')); // visual cursor from [0,0] to [1,0] ("o" of "one")
@@ -593,12 +584,12 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).visualCursor).toEqual([1, 0]);
 
       act(() => result.current.move('end')); // visual cursor to [1,3] (end of "one")
-      expect(getBufferState(result).visualCursor).toEqual([1, 3]); // "one" is 3 chars
+      expect(getBufferState(result).visualCursor).toEqual([1, 11]); // "one" is 3 chars
     });
   });
 
   describe('Visual Layout & Viewport', () => {
-    it('should wrap long lines correctly into visualLines', () => {
+    it('should not wrap long lines correctly into visualLines', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: 'This is a very long line of text.', // 33 chars
@@ -612,11 +603,8 @@ describe('useTextBuffer', () => {
       // "very long"
       // "line of"
       // "text."
-      expect(state.allVisualLines.length).toBe(4);
-      expect(state.allVisualLines[0]).toBe('This is a');
-      expect(state.allVisualLines[1]).toBe('very long');
-      expect(state.allVisualLines[2]).toBe('line of');
-      expect(state.allVisualLines[3]).toBe('text.');
+      expect(state.allVisualLines.length).toBe(1);
+      expect(state.allVisualLines[0]).toBe('This is a very long line of text.');
     });
 
     it('should update visualScrollRow when visualCursor moves out of viewport', () => {

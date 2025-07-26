@@ -35,12 +35,13 @@ export interface ThemeDisplay {
 
 export const DEFAULT_THEME: Theme = DefaultDark;
 
-class ThemeManager {
+export class ThemeManager {
+  private static instance: ThemeManager;
   private readonly availableThemes: Theme[];
   private activeTheme: Theme;
   private customThemes: Map<string, Theme> = new Map();
 
-  constructor() {
+  private constructor() {
     this.availableThemes = [
       AyuDark,
       AyuLight,
@@ -57,6 +58,17 @@ class ThemeManager {
       ANSILight,
     ];
     this.activeTheme = DEFAULT_THEME;
+  }
+
+  static getInstance(): ThemeManager {
+    if (!ThemeManager.instance) {
+      ThemeManager.instance = new ThemeManager();
+    }
+    return ThemeManager.instance;
+  }
+
+  static resetInstance(): void {
+    ThemeManager.instance = new ThemeManager();
   }
 
   /**
@@ -213,6 +225,3 @@ class ThemeManager {
     return this.customThemes.get(themeName);
   }
 }
-
-// Export an instance of the ThemeManager
-export const themeManager = new ThemeManager();
