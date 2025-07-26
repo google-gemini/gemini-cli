@@ -120,8 +120,15 @@ export class ShellExecutionService {
       const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
         if (!stdoutDecoder || !stderrDecoder) {
           const encoding = getCachedEncodingForBuffer(data);
-          stdoutDecoder = new TextDecoder(encoding);
-          stderrDecoder = new TextDecoder(encoding);
+          try {
+            stdoutDecoder = new TextDecoder(encoding);
+            stderrDecoder = new TextDecoder(encoding);
+          } catch {
+            // If the encoding is not supported, fall back to utf-8.
+            // This can happen on some platforms for certain encodings like 'utf-32le'.
+            stdoutDecoder = new TextDecoder('utf-8');
+            stderrDecoder = new TextDecoder('utf-8');
+          }
         }
 
         outputChunks.push(data);
