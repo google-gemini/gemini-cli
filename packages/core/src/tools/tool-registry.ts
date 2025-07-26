@@ -138,15 +138,16 @@ export class ToolRegistry {
    * @param tool - The tool object containing schema and execution logic.
    */
   registerTool(tool: Tool): void {
+    // Always use the fully qualified name for MCP tools to avoid collisions.
+    if (tool instanceof DiscoveredMCPTool) {
+      tool = tool.asFullyQualifiedTool();
+    }
+
     if (this.tools.has(tool.name)) {
-      if (tool instanceof DiscoveredMCPTool) {
-        tool = tool.asFullyQualifiedTool();
-      } else {
-        // Decide on behavior: throw error, log warning, or allow overwrite
-        console.warn(
-          `Tool with name "${tool.name}" is already registered. Overwriting.`,
-        );
-      }
+      // Decide on behavior: throw error, log warning, or allow overwrite
+      console.warn(
+        `Tool with name "${tool.name}" is already registered. Overwriting.`,
+      );
     }
     this.tools.set(tool.name, tool);
   }
