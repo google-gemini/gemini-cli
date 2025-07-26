@@ -430,6 +430,7 @@ async function reloadToolsForServer(
       toolRegistry.registerTool(tool);
     }
     console.log(`Successfully reloaded tools for '${mcpServerName}'.`);
+    await toolRegistry.onToolsChanged();
   } catch (error) {
     console.error(
       `Error reloading tools for '${mcpServerName}': ${getErrorMessage(error)}`,

@@ -127,6 +127,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
   private config: Config;
+  onToolsChanged: () => Promise<void> = async () => {};
 
   constructor(config: Config) {
     this.config = config;

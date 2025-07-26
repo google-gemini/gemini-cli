@@ -123,6 +123,8 @@ export class GeminiClient {
       this.config,
       this.config.getSessionId(),
     );
+    const toolRegistry = await this.config.getToolRegistry();
+    toolRegistry.onToolsChanged = () => this.setTools();
     this.chat = await this.startChat();
   }
 
