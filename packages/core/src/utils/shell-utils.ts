@@ -183,13 +183,16 @@ export function detectCommandSubstitution(command: string): boolean {
  * the tool's configuration including allowlists and blocklists.
  * @param command The shell command string to validate
  * @param config The application configuration
+ * @param shellAllowlist An optional list of explicitly allowed shell commands.
+ *   If provided, commands are only allowed if they are on this list or the global allowlist (and not blocked). If not provided, a "default allow" behavior is used.
  * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed
  */
 export function isCommandAllowed(
   command: string,
   config: Config,
+  shellAllowlist?: string[],
 ): { allowed: boolean; reason?: string } {
-  // 0. Disallow command substitution
+  // Disallow command substitution
   // Parse the command to check for unquoted/unescaped command substitution
   const hasCommandSubstitution = detectCommandSubstitution(command);
   if (hasCommandSubstitution) {
@@ -235,29 +238,18 @@ export function isCommandAllowed(
   const coreTools = config.getCoreTools() || [];
   const excludeTools = config.getExcludeTools() || [];
 
-  // 1. Check if the shell tool is globally disabled.
+  // Blocklist Check (Highest Priority)
   if (SHELL_TOOL_NAMES.some((name) => excludeTools.includes(name))) {
     return {
       allowed: false,
       reason: 'Shell tool is globally disabled in configuration',
     };
   }
-
-  const blockedCommands = new Set(extractCommands(excludeTools));
-  const allowedCommands = new Set(extractCommands(coreTools));
-
-  const hasSpecificAllowedCommands = allowedCommands.size > 0;
-  const isWildcardAllowed = SHELL_TOOL_NAMES.some((name) =>
-    coreTools.includes(name),
-  );
-
+  const blockedCommands = extractCommands(excludeTools);
   const commandsToValidate = splitCommands(command).map(normalize);
 
-  const blockedCommandsArr = [...blockedCommands];
-
   for (const cmd of commandsToValidate) {
-    // 2. Check if the command is on the blocklist.
-    const isBlocked = blockedCommandsArr.some((blocked) =>
+    const isBlocked = blockedCommands.some((blocked) =>
       isPrefixedBy(cmd, blocked),
     );
     if (isBlocked) {
@@ -266,23 +258,50 @@ export function isCommandAllowed(
         reason: `Command '${cmd}' is blocked by configuration`,
       };
     }
+  }
 
-    // 3. If in strict allow-list mode, check if the command is permitted.
-    const isStrictAllowlist = hasSpecificAllowedCommands && !isWildcardAllowed;
-    const allowedCommandsArr = [...allowedCommands];
-    if (isStrictAllowlist) {
-      const isAllowed = allowedCommandsArr.some((allowed) =>
+  // Global Allowlist Check
+  const isWildcardGloballyAllowed = SHELL_TOOL_NAMES.some((name) =>
+    coreTools.includes(name),
+  );
+  if (isWildcardGloballyAllowed) {
+    return { allowed: true };
+  }
+
+  const globallyAllowedCommands = extractCommands(coreTools);
+  if (globallyAllowedCommands.length > 0) {
+    for (const cmd of commandsToValidate) {
+      const isGloballyAllowed = globallyAllowedCommands.some((allowed) =>
         isPrefixedBy(cmd, allowed),
       );
-      if (!isAllowed) {
+      if (!isGloballyAllowed) {
         return {
           allowed: false,
-          reason: `Command '${cmd}' is not in the allowed commands list`,
+          reason: `Command '${cmd}' is not in the global allowlist.`,
+        };
+      }
+    }
+    return { allowed: true };
+  }
+
+  // ShellAllowlist Check (only applies if the list is provided)
+  if (shellAllowlist) {
+    const localAllowlist = shellAllowlist.map(normalize);
+    for (const cmd of commandsToValidate) {
+      const isLocallyAllowed = localAllowlist.some((allowed) =>
+        isPrefixedBy(cmd, allowed),
+      );
+      if (!isLocallyAllowed) {
+        return {
+          allowed: false,
+          reason: `Command '${cmd}' is not on the provided shell allowlist.`,
         };
       }
     }
   }
 
-  // 4. If all checks pass, the command is allowed.
+  // Default Allow
+  // If no specific global allowlist is active and no shellAllowlist was given,
+  // we default to allowing the command (as long as it wasn't blocked).
   return { allowed: true };
 }
