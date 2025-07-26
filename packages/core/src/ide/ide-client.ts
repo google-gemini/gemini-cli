@@ -10,8 +10,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) =>
-    console.debug('[DEBUG] [ImportProcessor]', ...args),
+  debug: (...args: any[]) => console.debug('[DEBUG] [IDEClient]', ...args),
 };
 
 export type IDEConnectionState = {
@@ -37,6 +36,7 @@ export class IdeClient {
       logger.debug('Failed to initialize IdeClient:', err);
     });
   }
+
   getConnectionStatus(): {
     status: IDEConnectionStatus;
     details?: string;
@@ -64,16 +64,18 @@ export class IdeClient {
       return;
     }
 
+    let transport: StreamableHTTPClientTransport | undefined;
     try {
       this.client = new Client({
         name: 'streamable-http-client',
         // TODO(#3487): use the CLI version here.
         version: '1.0.0',
       });
-      const transport = new StreamableHTTPClientTransport(
+      transport = new StreamableHTTPClientTransport(
         new URL(`http://localhost:${idePort}/mcp`),
       );
       await this.client.connect(transport);
+
       this.client.setNotificationHandler(
         OpenFilesNotificationSchema,
         (notification) => {
@@ -95,6 +97,13 @@ export class IdeClient {
     } catch (error) {
       this.connectionStatus = IDEConnectionStatus.Disconnected;
       logger.debug('Failed to connect to MCP server:', error);
+      if (transport) {
+        try {
+          await transport.close();
+        } catch (closeError) {
+          logger.debug('Failed to close transport:', closeError);
+        }
+      }
     }
   }
 }
