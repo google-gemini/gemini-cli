@@ -10,7 +10,7 @@ export const corgiCommand: SlashCommand = {
   name: 'corgi',
   description: 'Toggles corgi mode.',
   kind: CommandKind.BUILT_IN,
-  action: (context, _args) => {
+  action: (context) => {
     context.ui.toggleCorgiMode();
   },
 };

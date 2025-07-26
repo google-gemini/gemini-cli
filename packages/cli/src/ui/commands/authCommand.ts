@@ -10,7 +10,7 @@ export const authCommand: SlashCommand = {
   name: 'auth',
   description: 'change the auth method',
   kind: CommandKind.BUILT_IN,
-  action: (_context, _args): OpenDialogActionReturn => ({
+  action: (_context): OpenDialogActionReturn => ({
     type: 'dialog',
     dialog: 'auth',
   }),

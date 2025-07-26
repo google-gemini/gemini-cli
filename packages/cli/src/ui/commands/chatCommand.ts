@@ -96,8 +96,8 @@ const saveCommand: SlashCommand = {
   description:
     'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
   kind: CommandKind.BUILT_IN,
-  action: async (context, args): Promise<MessageActionReturn> => {
-    const tag = args.trim();
+  action: async (context): Promise<MessageActionReturn> => {
+    const tag = context.invocation?.args.trim();
     if (!tag) {
       return {
         type: 'message',
@@ -108,7 +108,7 @@ const saveCommand: SlashCommand = {
 
     const { logger, config } = context.services;
     await logger.initialize();
-    const chat = await config?.getGeminiClient()?.getChat();
+    const chat = config?.getGeminiClient()?.getChat();
     if (!chat) {
       return {
         type: 'message',
@@ -141,8 +141,8 @@ const resumeCommand: SlashCommand = {
   description:
     'Resume a conversation from a checkpoint. Usage: /chat resume <tag>',
   kind: CommandKind.BUILT_IN,
-  action: async (context, args) => {
-    const tag = args.trim();
+  action: async (context) => {
+    const tag = context.invocation?.args.trim();
     if (!tag) {
       return {
         type: 'message',

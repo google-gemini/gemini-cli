@@ -4,17 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  Config,
-  getErrorMessage,
-  getMCPServerPrompts,
-} from '@google/gemini-cli-core';
-import {
-  CommandContext,
-  CommandKind,
-  SlashCommand,
-  SlashCommandActionReturn,
-} from '../ui/commands/types.js';
+import { Config, getErrorMessage, getMCPServerPrompts } from '@google/gemini-cli-core';
+import { CommandContext, CommandKind, SlashCommand, SlashCommandActionReturn } from '../ui/commands/types.js';
 import { ICommandLoader } from './types.js';
 import { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
 
@@ -84,7 +75,6 @@ export class McpPromptLoader implements ICommandLoader {
           ],
           action: async (
             context: CommandContext,
-            args: string,
           ): Promise<SlashCommandActionReturn> => {
             if (!this.config) {
               return {
@@ -94,7 +84,10 @@ export class McpPromptLoader implements ICommandLoader {
               };
             }
 
-            const promptInputs = this.parseArgs(args, prompt.arguments);
+            const promptInputs = this.parseArgs(
+              context.invocation?.args,
+              prompt.arguments,
+            );
             if (promptInputs instanceof Error) {
               return {
                 type: 'message',
@@ -170,7 +163,7 @@ export class McpPromptLoader implements ICommandLoader {
   }
 
   private parseArgs(
-    userArgs: string,
+    userArgs: string | undefined,
     promptArgs: PromptArgument[] | undefined,
   ): Record<string, unknown> | Error {
     const argValues: { [key: string]: string } = {};
@@ -182,20 +175,20 @@ export class McpPromptLoader implements ICommandLoader {
     const remainingArgs: string[] = [];
     let lastIndex = 0;
 
-    while ((match = namedArgRegex.exec(userArgs)) !== null) {
+    while ((match = namedArgRegex.exec(userArgs!)) !== null) {
       const key = match[1];
-      const value = match[2] ?? match[3]; // Quoted or unquoted value
-      argValues[key] = value;
+      // Quoted or unquoted value
+      argValues[key] = match[2] ?? match[3];
       // Capture text between matches as potential positional args
       if (match.index > lastIndex) {
-        remainingArgs.push(userArgs.substring(lastIndex, match.index).trim());
+        remainingArgs.push(userArgs!.substring(lastIndex, match.index).trim());
       }
       lastIndex = namedArgRegex.lastIndex;
     }
 
     // Capture any remaining text after the last named arg
-    if (lastIndex < userArgs.length) {
-      remainingArgs.push(userArgs.substring(lastIndex).trim());
+    if (lastIndex < userArgs!.length) {
+      remainingArgs.push(userArgs!.substring(lastIndex).trim());
     }
 
     const positionalArgs = remainingArgs.join(' ').split(/ +/);
