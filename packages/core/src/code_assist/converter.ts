@@ -32,6 +32,7 @@ import {
 export interface CAGenerateContentRequest {
   model: string;
   project?: string;
+  user_prompt_id?: string;
   request: VertexGenerateContentRequest;
 }
 
@@ -115,12 +116,14 @@ export function fromCountTokenResponse(
 
 export function toGenerateContentRequest(
   req: GenerateContentParameters,
+  userPromptId: string,
   project?: string,
   sessionId?: string,
 ): CAGenerateContentRequest {
   return {
     model: req.model,
     project,
+    user_prompt_id: userPromptId,
     request: toVertexGenerateContentRequest(req, sessionId),
   };
 }
