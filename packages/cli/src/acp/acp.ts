@@ -6,6 +6,7 @@
 
 /* ACP defines a schema for a simple (experimental) JSON-RPC protocol that allows GUI applications to interact with agents. */
 
+import { Content } from '@google/genai';
 import { Icon } from '@google/gemini-cli-core';
 import { WritableStream, ReadableStream } from 'node:stream/web';
 
@@ -272,7 +273,7 @@ export class RequestError extends Error {
 
 // Protocol types
 
-export const LATEST_PROTOCOL_VERSION = '0.0.9';
+export const LATEST_PROTOCOL_VERSION = '0.0.10';
 
 export type AssistantMessageChunk =
   | {
@@ -390,10 +391,23 @@ export interface InitializeParams {
    * This should be the latest version supported by the client.
    */
   protocolVersion: string;
+  sessionId: string;
 }
 
 export interface SendUserMessageParams {
   chunks: UserMessageChunk[];
+}
+
+export interface SaveHistoryParams {
+  tag: string;
+}
+
+export interface ResumeHistoryParams {
+  tag: string;
+}
+
+export interface ResumeHistoryResponse {
+  history: Content[]
 }
 
 export interface InitializeResponse {
@@ -408,6 +422,8 @@ export interface InitializeResponse {
    * Otherwise, the agent should respond with the latest version it supports.
    */
   protocolVersion: string;
+
+  sessionId: string;
 }
 
 export interface Error {
@@ -461,4 +477,14 @@ export interface Agent {
    * Cancels the current generation.
    */
   cancelSendMessage(): Promise<void>;
+
+  /**
+   * Saves the current chat history to a file based on tag string.
+   */
+  saveHistory(params: SaveHistoryParams): Promise<void>;
+
+  /**
+   * Resumes the chat history from a file based on tag string.
+   */
+  resumeHistory(params: ResumeHistoryParams): Promise<ResumeHistoryResponse>;
 }

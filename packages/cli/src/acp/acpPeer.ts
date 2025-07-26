@@ -21,6 +21,8 @@ import {
   getErrorMessage,
   isWithinRoot,
   getErrorStatus,
+  sessionId,
+  Logger,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { Agent } from './acp.js';
@@ -50,6 +52,7 @@ export async function runAcpPeer(config: Config, settings: LoadedSettings) {
 class GeminiAgent implements Agent {
   chat?: GeminiChat;
   pendingSend?: AbortController;
+  logger?: Logger;
 
   constructor(
     private config: Config,
@@ -57,7 +60,7 @@ class GeminiAgent implements Agent {
     private client: acp.Client,
   ) {}
 
-  async initialize(_: acp.InitializeParams): Promise<acp.InitializeResponse> {
+  async initialize(params: acp.InitializeParams): Promise<acp.InitializeResponse> {
     let isAuthenticated = false;
     if (this.settings.merged.selectedAuthType) {
       try {
@@ -67,7 +70,13 @@ class GeminiAgent implements Agent {
         console.error('Failed to refresh auth:', error);
       }
     }
-    return { protocolVersion: acp.LATEST_PROTOCOL_VERSION, isAuthenticated };
+    const selectedSessionId = params.sessionId || sessionId;
+    this.logger = new Logger(selectedSessionId);
+    return {
+      protocolVersion: acp.LATEST_PROTOCOL_VERSION,
+      isAuthenticated,
+      sessionId: selectedSessionId,
+    };
   }
 
   async authenticate(): Promise<void> {
@@ -190,6 +199,35 @@ class GeminiAgent implements Agent {
         nextMessage = { role: 'user', parts: toolResponseParts };
       }
     }
+  }
+
+  async saveHistory(params: acp.SaveHistoryParams): Promise<void> {
+    if (!this.chat || !this.logger) {
+      throw acp.RequestError.internalError('Not initialized.');
+    }
+    if (!params.tag) {
+      throw acp.RequestError.invalidParams('Missing tag.')
+    }
+    await this.logger.initialize();
+    const history = this.chat.getHistory();
+    await this.logger.saveCheckpoint(history, params.tag);
+  }
+
+  async resumeHistory(params: acp.ResumeHistoryParams): Promise<acp.ResumeHistoryResponse> {
+    if (!this.logger) {
+      throw acp.RequestError.internalError('Not initialized.')
+    }
+    if (!this.chat) {
+      const geminiClient = this.config.getGeminiClient();
+      this.chat = await geminiClient.startChat();
+    }
+    if (!params.tag) {
+      throw acp.RequestError.invalidParams('Missing tag.')
+    }
+    await this.logger.initialize();
+    const conversation = await this.logger.loadCheckpoint(params.tag);
+    this.chat.setHistory(conversation);
+    return { history: conversation };
   }
 
   async #runTool(
