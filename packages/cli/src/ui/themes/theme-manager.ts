@@ -25,6 +25,7 @@ import {
 import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
 import { NoColorTheme } from './no-color.js';
+import { Mononoke } from './mononoke.js';
 import process from 'node:process';
 
 export interface ThemeDisplay {
@@ -55,6 +56,7 @@ class ThemeManager {
       XCode,
       ANSI,
       ANSILight,
+      Mononoke,
     ];
     this.activeTheme = DEFAULT_THEME;
   }
