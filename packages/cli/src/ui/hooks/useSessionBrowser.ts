@@ -128,28 +128,103 @@ export function convertSessionToHistoryFormats(
   }
 
   // Convert to Gemini client history format
-  const clientHistory = messages
-    .filter((msg) => {
-      if (msg.type === 'user') {
-        // Skip user slash commands.
-        return (
-          !msg.content.trim().startsWith('/') &&
-          !msg.content.trim().startsWith('?')
-        );
+  const clientHistory: Array<{ role: 'user' | 'model'; parts: any[] }> = [];
+
+  for (const msg of messages) {
+    // Skip system/error messages and user slash commands
+    if (msg.type === 'system' || msg.type === 'error') {
+      continue;
+    }
+
+    if (msg.type === 'user') {
+      // Skip user slash commands
+      if (
+        msg.content.trim().startsWith('/') ||
+        msg.content.trim().startsWith('?')
+      ) {
+        continue;
       }
 
-      // All Gemini.
-      if (msg.type == 'gemini') {
-        return true;
-      }
+      // Add regular user message
+      clientHistory.push({
+        role: 'user',
+        parts: [{ text: msg.content }],
+      });
+    } else if (msg.type === 'gemini') {
+      // Handle Gemini messages with potential tool calls
+      const hasToolCalls =
+        'toolCalls' in msg && msg.toolCalls && msg.toolCalls.length > 0;
 
-      // System, error--don't pass these through.
-      return false;
-    })
-    .map((msg) => ({
-      role: msg.type === 'user' ? ('user' as const) : ('model' as const),
-      parts: [{ text: msg.content }],
-    }));
+      if (hasToolCalls) {
+        // Create model message with function calls
+        const modelParts: any[] = [];
+
+        // Add text content if present
+        if (msg.content && msg.content.trim()) {
+          modelParts.push({ text: msg.content });
+        }
+
+        // Add function calls
+        for (const toolCall of msg.toolCalls!) {
+          modelParts.push({
+            functionCall: {
+              name: toolCall.name,
+              args: toolCall.args,
+              ...(toolCall.id && { id: toolCall.id }),
+            },
+          });
+        }
+
+        clientHistory.push({
+          role: 'model',
+          parts: modelParts,
+        });
+
+        // Create function response messages
+        for (const toolCall of msg.toolCalls!) {
+          if (toolCall.result) {
+            // Convert PartListUnion result to function response format
+            let responseData: any;
+
+            if (typeof toolCall.result === 'string') {
+              responseData = { output: toolCall.result };
+            } else if (Array.isArray(toolCall.result)) {
+              // Extract text content from Part array
+              const textParts = toolCall.result
+                .filter((part: any) => part.text)
+                .map((part: any) => part.text)
+                .join('');
+              responseData = textParts
+                ? { output: textParts }
+                : toolCall.result;
+            } else {
+              responseData = toolCall.result;
+            }
+
+            clientHistory.push({
+              role: 'user',
+              parts: [
+                {
+                  functionResponse: {
+                    name: toolCall.name,
+                    response: responseData,
+                  },
+                },
+              ],
+            });
+          }
+        }
+      } else {
+        // Regular Gemini message without tool calls
+        if (msg.content && msg.content.trim()) {
+          clientHistory.push({
+            role: 'model',
+            parts: [{ text: msg.content }],
+          });
+        }
+      }
+    }
+  }
 
   return {
     history: uiHistory,
