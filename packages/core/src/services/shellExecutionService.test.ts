@@ -132,7 +132,7 @@ describe('ShellExecutionService', () => {
 
     it('should correctly decode multi-byte characters split across chunks', async () => {
       const { result } = await simulateExecution('echo "你好"', (cp) => {
-        const multiByteChar = Buffer.from('你好');
+        const multiByteChar = Buffer.from('你好', 'utf-8');
         cp.stdout?.emit('data', multiByteChar.slice(0, 2));
         cp.stdout?.emit('data', multiByteChar.slice(2));
         cp.emit('exit', 0, null);

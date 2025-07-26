@@ -32,6 +32,7 @@ import {
 } from '../services/shellExecutionService.js';
 import * as fs from 'fs';
 import * as os from 'os';
+import * as path from 'path';
 import * as crypto from 'crypto';
 import * as summarizer from '../utils/summarizer.js';
 import { ToolConfirmationOutcome } from './tools.js';
@@ -141,7 +142,8 @@ describe('ShellTool', () => {
 
       const result = await promise;
 
-      const wrappedCommand = `{ my-command & }; __code=$?; pgrep -g 0 >/tmp/shell_pgrep_abcdef.tmp 2>&1; exit $__code;`;
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const wrappedCommand = `{ my-command & }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         expect.any(String),
@@ -149,9 +151,7 @@ describe('ShellTool', () => {
         mockAbortSignal,
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
-      expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(
-        '/tmp/shell_pgrep_abcdef.tmp',
-      );
+      expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(tmpFile);
     });
 
     it('should not wrap command on windows', async () => {
@@ -245,9 +245,8 @@ describe('ShellTool', () => {
         shellTool.execute({ command: 'a-command' }, mockAbortSignal),
       ).rejects.toThrow(error);
 
-      expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(
-        '/tmp/shell_pgrep_abcdef.tmp',
-      );
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(tmpFile);
     });
 
     describe('Streaming to `updateOutput`', () => {
