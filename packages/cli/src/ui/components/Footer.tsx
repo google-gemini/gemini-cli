@@ -46,7 +46,7 @@ export const Footer: React.FC<FooterProps> = ({
   const percentage = promptTokenCount / limit;
 
   return (
-    <Box marginTop={1} justifyContent="space-between" width="100%">
+    <Box justifyContent="space-between" width="100%">
       <Box>
         {vimMode && <Text color={Colors.Gray}>[{vimMode}] </Text>}
         {nightly ? (
