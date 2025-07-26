@@ -20,7 +20,8 @@ import {
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
-import { StreamingState } from './types.js';
+import { useConsoleMessages } from './hooks/useConsoleMessages.js';
+import { StreamingState, ConsoleMessageItem } from './types.js';
 import { Tips } from './components/Tips.js';
 
 // Define a more complete mock server config based on actual Config
@@ -189,6 +190,14 @@ vi.mock('./hooks/useAuthCommand', () => ({
 vi.mock('./hooks/useLogger', () => ({
   useLogger: vi.fn(() => ({
     getPreviousUserMessages: vi.fn().mockResolvedValue([]),
+  })),
+}));
+
+vi.mock('./hooks/useConsoleMessages.js', () => ({
+  useConsoleMessages: vi.fn(() => ({
+    consoleMessages: [],
+    handleNewMessage: vi.fn(),
+    clearConsoleMessages: vi.fn(),
   })),
 }));
 
@@ -690,6 +699,37 @@ describe('App UI', () => {
       expect(mockSubmitQuery).toHaveBeenCalledWith(
         'hello from prompt-interactive',
       );
+    });
+  });
+
+  describe('errorCount', () => {
+    it('should correctly sum the counts of error messages', async () => {
+      const mockConsoleMessages: ConsoleMessageItem[] = [
+        { type: 'error', content: 'First error', count: 1 },
+        { type: 'log', content: 'some log', count: 1 },
+        { type: 'error', content: 'Second error', count: 3 },
+        { type: 'warn', content: 'a warning', count: 1 },
+        { type: 'error', content: 'Third error', count: 1 },
+      ];
+
+      vi.mocked(useConsoleMessages).mockReturnValue({
+        consoleMessages: mockConsoleMessages,
+        handleNewMessage: vi.fn(),
+        clearConsoleMessages: vi.fn(),
+      });
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      await Promise.resolve();
+
+      // Total error count should be 1 + 3 + 1 = 5
+      expect(lastFrame()).toContain('5 errors');
     });
   });
 });
