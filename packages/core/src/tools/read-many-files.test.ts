@@ -272,7 +272,7 @@ describe('ReadManyFilesTool', () => {
       );
     });
 
-    it('should handle non-existent specific files gracefully', async () => {
+    it('should handle nonexistent specific files gracefully', async () => {
       const params = { paths: ['nonexistent-file.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
       expect(result.llmContent).toEqual([

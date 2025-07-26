@@ -19,8 +19,7 @@ import {
   FileDiscoveryService,
   TelemetryTarget,
   FileFilteringOptions,
-  MCPServerConfig,
-  IDE_SERVER_NAME,
+  IdeClient,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -55,6 +54,7 @@ export interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  telemetryOutfile: string | undefined;
   allowedMcpServerNames: string[] | undefined;
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
@@ -162,6 +162,10 @@ export async function parseArguments(): Promise<CliArgs> {
       description:
         'Enable or disable logging of user prompts for telemetry. Overrides settings files.',
     })
+    .option('telemetry-outfile', {
+      type: 'string',
+      description: 'Redirect all telemetry output to the specified file.',
+    })
     .option('checkpointing', {
       alias: 'c',
       type: 'boolean',
@@ -255,6 +259,7 @@ export async function loadHierarchicalGeminiMemory(
   currentWorkingDirectory: string,
   debugMode: boolean,
   fileService: FileDiscoveryService,
+  settings: Settings,
   extensionContextFilePaths: string[] = [],
   fileFilteringOptions?: FileFilteringOptions,
 ): Promise<{ memoryContent: string; fileCount: number }> {
@@ -272,6 +277,7 @@ export async function loadHierarchicalGeminiMemory(
     fileService,
     extensionContextFilePaths,
     fileFilteringOptions,
+    settings.memoryDiscoveryMaxDirs,
   );
 }
 
@@ -291,6 +297,11 @@ export async function loadCliConfig(
     (argv.ideMode ?? settings.ideMode ?? false) &&
     process.env.TERM_PROGRAM === 'vscode' &&
     !process.env.SANDBOX;
+
+  let ideClient: IdeClient | undefined;
+  if (ideMode) {
+    ideClient = new IdeClient();
+  }
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -328,6 +339,7 @@ export async function loadCliConfig(
     process.cwd(),
     debugMode,
     fileService,
+    settings,
     extensionContextFilePaths,
     fileFiltering,
   );
@@ -382,37 +394,6 @@ export async function loadCliConfig(
     }
   }
 
-  if (ideMode) {
-    if (mcpServers[IDE_SERVER_NAME]) {
-      logger.warn(
-        `Ignoring user-defined MCP server config for "${IDE_SERVER_NAME}" as it is a reserved name.`,
-      );
-    }
-    const companionPort = process.env.GEMINI_CLI_IDE_SERVER_PORT;
-    if (companionPort) {
-      const httpUrl = `http://localhost:${companionPort}/mcp`;
-      mcpServers[IDE_SERVER_NAME] = new MCPServerConfig(
-        undefined, // command
-        undefined, // args
-        undefined, // env
-        undefined, // cwd
-        undefined, // url
-        httpUrl, // httpUrl
-        undefined, // headers
-        undefined, // tcp
-        undefined, // timeout
-        false, // trust
-        'IDE connection', // description
-        undefined, // includeTools
-        undefined, // excludeTools
-      );
-    } else {
-      logger.warn(
-        'Could not connect to IDE. Make sure you have the companion VS Code extension installed from the marketplace or via /ide install.',
-      );
-    }
-  }
-
   const sandboxConfig = await loadSandboxConfig(settings, argv);
 
   return new Config({
@@ -447,6 +428,7 @@ export async function loadCliConfig(
         process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
         settings.telemetry?.otlpEndpoint,
       logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
+      outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
     },
     usageStatisticsEnabled: settings.usageStatisticsEnabled ?? true,
     // Git-aware file filtering settings
@@ -476,6 +458,7 @@ export async function loadCliConfig(
     noBrowser: !!process.env.NO_BROWSER,
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
+    ideClient,
   });
 }
 

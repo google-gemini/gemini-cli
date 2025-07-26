@@ -19,6 +19,15 @@ import { SessionStatsState } from '../contexts/SessionContext.js';
 
 // Grouped dependencies for clarity and easier mocking
 export interface CommandContext {
+  // Invocation properties for when commands are called.
+  invocation?: {
+    /** The raw, untrimmed input string from the user. */
+    raw: string;
+    /** The primary name of the command that was matched. */
+    name: string;
+    /** The arguments string that follows the command name. */
+    args: string;
+  };
   // Core services and configuration
   services: {
     // TODO(abhipatel12): Ensure that config is never null.
@@ -55,6 +64,7 @@ export interface CommandContext {
     loadHistory: UseHistoryManagerReturn['loadHistory'];
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
+    toggleVimEnabled: () => Promise<boolean>;
   };
   // Session-specific data
   session: {
@@ -105,16 +115,27 @@ export interface LoadHistoryActionReturn {
   clientHistory: Content[]; // The history for the generative client
 }
 
+/**
+ * The return type for a command action that should immediately submit
+ * content as a prompt to the Gemini model.
+ */
+export interface SubmitPromptActionReturn {
+  type: 'submit_prompt';
+  content: string;
+}
+
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
   | QuitActionReturn
   | OpenDialogActionReturn
-  | LoadHistoryActionReturn;
+  | LoadHistoryActionReturn
+  | SubmitPromptActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
   FILE = 'file',
+  MCP_PROMPT = 'mcp-prompt',
 }
 
 // The standardized contract for any command in the system.
@@ -128,7 +149,7 @@ export interface SlashCommand {
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (
     context: CommandContext,
-    args: string,
+    args: string, // TODO: Remove args. CommandContext now contains the complete invocation.
   ) =>
     | void
     | SlashCommandActionReturn

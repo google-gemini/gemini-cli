@@ -238,6 +238,12 @@ export class Logger {
     if (!this.geminiDir) {
       throw new Error('Checkpoint file path not set.');
     }
+    // Sanitize tag to prevent directory traversal attacks
+    tag = tag.replace(/[^a-zA-Z0-9-_]/g, '');
+    if (!tag) {
+      console.error('Sanitized tag is empty setting to "default".');
+      tag = 'default';
+    }
     return path.join(this.geminiDir, `checkpoint-${tag}.json`);
   }
 

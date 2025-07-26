@@ -25,7 +25,10 @@ export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 
-function getSystemSettingsPath(): string {
+export function getSystemSettingsPath(): string {
+  if (process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH) {
+    return process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
+  }
   if (platform() === 'darwin') {
     return '/Library/Application Support/GeminiCli/settings.json';
   } else if (platform() === 'win32') {
@@ -34,8 +37,6 @@ function getSystemSettingsPath(): string {
     return '/etc/gemini-cli/settings.json';
   }
 }
-
-export const SYSTEM_SETTINGS_PATH = getSystemSettingsPath();
 
 export enum SettingScope {
   User = 'User',
@@ -99,7 +100,6 @@ export interface Settings {
     enableRecursiveFileSearch?: boolean;
   };
 
-  // UI setting. Does not display the ANSI-controlled terminal title.
   hideWindowTitle?: boolean;
 
   hideTips?: boolean;
@@ -111,11 +111,13 @@ export interface Settings {
   // A map of tool names to their summarization settings.
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
 
-  // Session retention and cleanup settings
   sessionRetention?: SessionRetentionSettings;
+
+  vimMode?: boolean;
 
   // Add other settings here.
   ideMode?: boolean;
+  memoryDiscoveryMaxDirs?: number;
 }
 
 export interface SettingsError {
@@ -314,11 +316,11 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};
   const settingsErrors: SettingsError[] = [];
-
+  const systemSettingsPath = getSystemSettingsPath();
   // Load system settings
   try {
-    if (fs.existsSync(SYSTEM_SETTINGS_PATH)) {
-      const systemContent = fs.readFileSync(SYSTEM_SETTINGS_PATH, 'utf-8');
+    if (fs.existsSync(systemSettingsPath)) {
+      const systemContent = fs.readFileSync(systemSettingsPath, 'utf-8');
       const parsedSystemSettings = JSON.parse(
         stripJsonComments(systemContent),
       ) as Settings;
@@ -327,7 +329,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   } catch (error: unknown) {
     settingsErrors.push({
       message: getErrorMessage(error),
-      path: SYSTEM_SETTINGS_PATH,
+      path: systemSettingsPath,
     });
   }
 
@@ -385,7 +387,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
 
   return new LoadedSettings(
     {
-      path: SYSTEM_SETTINGS_PATH,
+      path: systemSettingsPath,
       settings: systemSettings,
     },
     {
