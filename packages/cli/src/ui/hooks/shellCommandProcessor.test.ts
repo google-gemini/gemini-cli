@@ -15,6 +15,7 @@ import {
   type Mock,
 } from 'vitest';
 
+const mockIsBinary = vi.hoisted(() => vi.fn());
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
@@ -22,6 +23,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     ShellExecutionService: { execute: mockShellExecutionService },
+    isBinary: mockIsBinary,
   };
 });
 vi.mock('fs');
@@ -42,7 +44,6 @@ import {
 import * as fs from 'fs';
 import * as os from 'os';
 import * as crypto from 'crypto';
-import { isBinary } from '../utils/textUtils.js';
 import { ToolCallStatus } from '../types.js';
 
 describe('useShellCommandProcessor', () => {
@@ -71,7 +72,7 @@ describe('useShellCommandProcessor', () => {
     (vi.mocked(crypto.randomBytes) as Mock).mockReturnValue(
       Buffer.from('abcdef', 'hex'),
     );
-    vi.mocked(isBinary).mockReturnValue(false);
+    mockIsBinary.mockReturnValue(false);
     vi.mocked(fs.existsSync).mockReturnValue(false);
 
     mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
@@ -346,7 +347,7 @@ describe('useShellCommandProcessor', () => {
   it('should handle binary output result correctly', async () => {
     const { result } = renderProcessorHook();
     const binaryBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
-    vi.mocked(isBinary).mockReturnValue(true);
+    mockIsBinary.mockReturnValue(true);
 
     act(() => {
       result.current.handleShellCommand(
@@ -394,6 +395,38 @@ describe('useShellCommandProcessor', () => {
       type: 'error',
       text: 'An unexpected error occurred: Unexpected failure',
     });
+  });
+
+  it('should handle synchronous errors during execution and clean up resources', async () => {
+    const testError = new Error('Synchronous spawn error');
+    mockShellExecutionService.mockImplementation(() => {
+      throw testError;
+    });
+    // Mock that the temp file was created before the error was thrown
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+
+    const { result } = renderProcessorHook();
+
+    act(() => {
+      result.current.handleShellCommand(
+        'a-command',
+        new AbortController().signal,
+      );
+    });
+    const execPromise = onExecMock.mock.calls[0][0];
+
+    await act(async () => await execPromise);
+
+    expect(setPendingHistoryItemMock).toHaveBeenCalledWith(null);
+    expect(addItemToHistoryMock).toHaveBeenCalledTimes(2);
+    expect(addItemToHistoryMock.mock.calls[1][0]).toEqual({
+      type: 'error',
+      text: 'An unexpected error occurred: Synchronous spawn error',
+    });
+    // Verify that the temporary file was cleaned up
+    expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(
+      '/tmp/shell_pwd_abcdef.tmp',
+    );
   });
 
   describe('Directory Change Warning', () => {

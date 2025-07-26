@@ -13,11 +13,11 @@ import { useCallback } from 'react';
 import {
   Config,
   GeminiClient,
+  isBinary,
   ShellExecutionResult,
   ShellExecutionService,
 } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
-import { isBinary } from '../utils/textUtils.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
@@ -122,7 +122,6 @@ export const useShellCommandProcessor = (
           tools: [initialToolDisplay],
         });
 
-        // eslint-disable-next-line prefer-const
         let executionPid: number | undefined;
 
         const abortHandler = () => {
@@ -134,144 +133,168 @@ export const useShellCommandProcessor = (
 
         onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
 
-        const { pid, result } = ShellExecutionService.execute(
-          commandToExecute,
-          targetDir,
-          (event) => {
-            switch (event.type) {
-              case 'data':
-                // Do not process text data if we've already switched to binary mode.
-                if (isBinaryStream) break;
-                if (event.stream === 'stdout') {
-                  cumulativeStdout += event.chunk;
-                } else {
-                  cumulativeStderr += event.chunk;
+        try {
+          const { pid, result } = ShellExecutionService.execute(
+            commandToExecute,
+            targetDir,
+            (event) => {
+              switch (event.type) {
+                case 'data':
+                  // Do not process text data if we've already switched to binary mode.
+                  if (isBinaryStream) break;
+                  if (event.stream === 'stdout') {
+                    cumulativeStdout += event.chunk;
+                  } else {
+                    cumulativeStderr += event.chunk;
+                  }
+                  break;
+                case 'binary_detected':
+                  isBinaryStream = true;
+                  break;
+                case 'binary_progress':
+                  isBinaryStream = true;
+                  binaryBytesReceived = event.bytesReceived;
+                  break;
+                default: {
+                  throw new Error('An unhandled ShellOutputEvent was found.');
                 }
-                break;
-              case 'binary_detected':
-                isBinaryStream = true;
-                break;
-              case 'binary_progress':
-                isBinaryStream = true;
-                binaryBytesReceived = event.bytesReceived;
-                break;
-              default: {
-                throw new Error('An unhandled ShellOutputEvent was found.');
               }
-            }
 
-            // Compute the display string based on the *current* state.
-            let currentDisplayOutput: string;
-            if (isBinaryStream) {
-              if (binaryBytesReceived > 0) {
-                currentDisplayOutput = `[Receiving binary output... ${formatMemoryUsage(
-                  binaryBytesReceived,
-                )} received]`;
+              // Compute the display string based on the *current* state.
+              let currentDisplayOutput: string;
+              if (isBinaryStream) {
+                if (binaryBytesReceived > 0) {
+                  currentDisplayOutput = `[Receiving binary output... ${formatMemoryUsage(
+                    binaryBytesReceived,
+                  )} received]`;
+                } else {
+                  currentDisplayOutput =
+                    '[Binary output detected. Halting stream...]';
+                }
               } else {
                 currentDisplayOutput =
-                  '[Binary output detected. Halting stream...]';
+                  cumulativeStdout +
+                  (cumulativeStderr ? `\n${cumulativeStderr}` : '');
               }
-            } else {
-              currentDisplayOutput =
-                cumulativeStdout +
-                (cumulativeStderr ? `\n${cumulativeStderr}` : '');
-            }
 
-            // Throttle pending UI updates to avoid excessive re-renders.
-            if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-              setPendingHistoryItem({
-                type: 'tool_group',
-                tools: [
-                  {
-                    ...initialToolDisplay,
-                    resultDisplay: currentDisplayOutput,
-                  },
-                ],
-              });
-              lastUpdateTime = Date.now();
-            }
-          },
-          abortSignal,
-        );
-
-        executionPid = pid;
-
-        result
-          .then((result: ShellExecutionResult) => {
-            setPendingHistoryItem(null);
-
-            let mainContent: string;
-
-            if (isBinary(result.rawOutput)) {
-              mainContent =
-                '[Command produced binary output, which is not shown.]';
-            } else {
-              mainContent =
-                result.output.trim() || '(Command produced no output)';
-            }
-
-            let finalOutput = mainContent;
-            let finalStatus = ToolCallStatus.Success;
-
-            if (result.error) {
-              finalStatus = ToolCallStatus.Error;
-              finalOutput = `${result.error.message}\n${finalOutput}`;
-            } else if (result.aborted) {
-              finalStatus = ToolCallStatus.Canceled;
-              finalOutput = `Command was cancelled.\n${finalOutput}`;
-            } else if (result.signal) {
-              finalStatus = ToolCallStatus.Error;
-              finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;
-            } else if (result.exitCode !== 0) {
-              finalStatus = ToolCallStatus.Error;
-              finalOutput = `Command exited with code ${result.exitCode}.\n${finalOutput}`;
-            }
-
-            if (pwdFilePath && fs.existsSync(pwdFilePath)) {
-              const finalPwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
-              if (finalPwd && finalPwd !== targetDir) {
-                const warning = `WARNING: shell mode is stateless; the directory change to '${finalPwd}' will not persist.`;
-                finalOutput = `${warning}\n\n${finalOutput}`;
+              // Throttle pending UI updates to avoid excessive re-renders.
+              if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
+                setPendingHistoryItem({
+                  type: 'tool_group',
+                  tools: [
+                    {
+                      ...initialToolDisplay,
+                      resultDisplay: currentDisplayOutput,
+                    },
+                  ],
+                });
+                lastUpdateTime = Date.now();
               }
-            }
+            },
+            abortSignal,
+          );
 
-            const finalToolDisplay: IndividualToolCallDisplay = {
-              ...initialToolDisplay,
-              status: finalStatus,
-              resultDisplay: finalOutput,
-            };
+          executionPid = pid;
 
-            // Add the complete, contextual result to the local UI history.
-            addItemToHistory(
-              {
-                type: 'tool_group',
-                tools: [finalToolDisplay],
-              } as HistoryItemWithoutId,
-              userMessageTimestamp,
-            );
+          result
+            .then((result: ShellExecutionResult) => {
+              setPendingHistoryItem(null);
 
-            // Add the same complete, contextual result to the LLM's history.
-            addShellCommandToGeminiHistory(geminiClient, rawQuery, finalOutput);
-          })
-          .catch((err) => {
-            setPendingHistoryItem(null);
-            const errorMessage =
-              err instanceof Error ? err.message : String(err);
-            addItemToHistory(
-              {
-                type: 'error',
-                text: `An unexpected error occurred: ${errorMessage}`,
-              },
-              userMessageTimestamp,
-            );
-          })
-          .finally(() => {
-            abortSignal.removeEventListener('abort', abortHandler);
-            if (pwdFilePath && fs.existsSync(pwdFilePath)) {
-              fs.unlinkSync(pwdFilePath);
-            }
-            resolve();
-          });
+              let mainContent: string;
+
+              if (isBinary(result.rawOutput)) {
+                mainContent =
+                  '[Command produced binary output, which is not shown.]';
+              } else {
+                mainContent =
+                  result.output.trim() || '(Command produced no output)';
+              }
+
+              let finalOutput = mainContent;
+              let finalStatus = ToolCallStatus.Success;
+
+              if (result.error) {
+                finalStatus = ToolCallStatus.Error;
+                finalOutput = `${result.error.message}\n${finalOutput}`;
+              } else if (result.aborted) {
+                finalStatus = ToolCallStatus.Canceled;
+                finalOutput = `Command was cancelled.\n${finalOutput}`;
+              } else if (result.signal) {
+                finalStatus = ToolCallStatus.Error;
+                finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;
+              } else if (result.exitCode !== 0) {
+                finalStatus = ToolCallStatus.Error;
+                finalOutput = `Command exited with code ${result.exitCode}.\n${finalOutput}`;
+              }
+
+              if (pwdFilePath && fs.existsSync(pwdFilePath)) {
+                const finalPwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
+                if (finalPwd && finalPwd !== targetDir) {
+                  const warning = `WARNING: shell mode is stateless; the directory change to '${finalPwd}' will not persist.`;
+                  finalOutput = `${warning}\n\n${finalOutput}`;
+                }
+              }
+
+              const finalToolDisplay: IndividualToolCallDisplay = {
+                ...initialToolDisplay,
+                status: finalStatus,
+                resultDisplay: finalOutput,
+              };
+
+              // Add the complete, contextual result to the local UI history.
+              addItemToHistory(
+                {
+                  type: 'tool_group',
+                  tools: [finalToolDisplay],
+                } as HistoryItemWithoutId,
+                userMessageTimestamp,
+              );
+
+              // Add the same complete, contextual result to the LLM's history.
+              addShellCommandToGeminiHistory(
+                geminiClient,
+                rawQuery,
+                finalOutput,
+              );
+            })
+            .catch((err) => {
+              setPendingHistoryItem(null);
+              const errorMessage =
+                err instanceof Error ? err.message : String(err);
+              addItemToHistory(
+                {
+                  type: 'error',
+                  text: `An unexpected error occurred: ${errorMessage}`,
+                },
+                userMessageTimestamp,
+              );
+            })
+            .finally(() => {
+              abortSignal.removeEventListener('abort', abortHandler);
+              if (pwdFilePath && fs.existsSync(pwdFilePath)) {
+                fs.unlinkSync(pwdFilePath);
+              }
+              resolve();
+            });
+        } catch (err) {
+          // This block handles synchronous errors from `execute`
+          setPendingHistoryItem(null);
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          addItemToHistory(
+            {
+              type: 'error',
+              text: `An unexpected error occurred: ${errorMessage}`,
+            },
+            userMessageTimestamp,
+          );
+
+          // Perform cleanup here as well
+          if (pwdFilePath && fs.existsSync(pwdFilePath)) {
+            fs.unlinkSync(pwdFilePath);
+          }
+
+          resolve(); // Resolve the promise to unblock `onExec`
+        }
       });
 
       onExec(execPromise);

@@ -234,6 +234,22 @@ describe('ShellTool', () => {
       expect(result.returnDisplay).toBe('long output');
     });
 
+    it('should clean up the temp file on synchronous execution error', async () => {
+      const error = new Error('sync spawn error');
+      mockShellExecutionService.mockImplementation(() => {
+        throw error;
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true); // Pretend the file exists
+
+      await expect(
+        shellTool.execute({ command: 'a-command' }, mockAbortSignal),
+      ).rejects.toThrow(error);
+
+      expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(
+        '/tmp/shell_pgrep_abcdef.tmp',
+      );
+    });
+
     describe('Streaming to `updateOutput`', () => {
       let updateOutputMock: Mock;
       beforeEach(() => {

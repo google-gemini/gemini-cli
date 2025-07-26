@@ -11,6 +11,8 @@ import stripAnsi from 'strip-ansi';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import { isBinary } from '../utils/textUtils.js';
 
+const SIGKILL_TIMEOUT_MS = 200;
+
 /** A structured result from a shell command execution. */
 export interface ShellExecutionResult {
   /** The raw, unprocessed output buffer. */
@@ -88,9 +90,7 @@ export class ShellExecutionService {
   ): ShellExecutionHandle {
     const isWindows = os.platform() === 'win32';
     const shell = isWindows ? 'cmd.exe' : 'bash';
-    const shellArgs = isWindows
-      ? ['/c', commandToExecute]
-      : ['-c', commandToExecute];
+    const shellArgs = [isWindows ? '/c' : '-c', commandToExecute];
 
     const child = spawn(shell, shellArgs, {
       cwd,
@@ -176,7 +176,7 @@ export class ShellExecutionService {
               // Kill the entire process group (negative PID).
               // SIGTERM first, then SIGKILL if it doesn't die.
               process.kill(-child.pid, 'SIGTERM');
-              await new Promise((res) => setTimeout(res, 200));
+              await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
               if (!exited) {
                 process.kill(-child.pid, 'SIGKILL');
               }
