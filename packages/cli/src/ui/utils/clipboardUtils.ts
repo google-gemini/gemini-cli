@@ -150,6 +150,5 @@ export async function cleanupOldClipboardImages(
 
 export function getTersePath(filePath: string): string {
   const fileName = path.basename(filePath);
-  const shortName = fileName.length > 6 ? `...${fileName.slice(-6)}` : fileName;
-  return `[Image ${shortName}]`;
+  return `[Image ${fileName}]`;
 }

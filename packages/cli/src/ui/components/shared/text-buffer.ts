@@ -253,25 +253,25 @@ function calculateVisualLayout(
   visualCursor: [number, number];
   logicalToVisualMap: Array<Array<[number, number]>>; // For each logical line, an array of [visualLineIndex, startColInLogical]
   visualToLogicalMap: Array<[number, number]>; // For each visual line, its [logicalLineIndex, startColInLogical]
-  displayToLogicalMaps: Record<number, number[]>; 
+  displayToLogicalMaps: Record<number, number[]>;
 } {
   const visualLines: string[] = [];
   const logicalToVisualMap: Array<Array<[number, number]>> = [];
   const visualToLogicalMap: Array<[number, number]> = [];
-  const displayToLogicalMaps: Record<number, number[]> = {}; 
+  const displayToLogicalMaps: Record<number, number[]> = {};
   let currentVisualCursor: [number, number] = [0, 0];
 
   logicalLines.forEach((logLine, logIndex) => {
     logicalToVisualMap[logIndex] = [];
 
-    const transformations = getTransformationsForLine(logLine); 
+    const transformations = getTransformationsForLine(logLine);
     const { displayLine, displayToLogMap } = buildDisplayLineAndMap(
       logLine,
       logIndex,
       logicalCursor,
       transformations,
-    ); 
-    displayToLogicalMaps[logIndex] = displayToLogMap; 
+    );
+    displayToLogicalMaps[logIndex] = displayToLogMap;
 
     if (displayLine.length === 0) {
       // Handle empty logical line
@@ -485,7 +485,7 @@ function calculateVisualLayout(
     visualCursor: currentVisualCursor,
     logicalToVisualMap,
     visualToLogicalMap,
-    displayToLogicalMaps, 
+    displayToLogicalMaps,
   };
 }
 
