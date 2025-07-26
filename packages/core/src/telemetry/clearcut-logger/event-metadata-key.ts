@@ -163,6 +163,10 @@ export enum EventMetadataKey {
 
   // Logs the type of loop detected.
   GEMINI_CLI_LOOP_DETECTED_TYPE = 38,
+
+  // Logs a memory compression event
+  GEMINI_CLI_MEMORY_COMPRESSION_ORIGINAL_SIZE = 48,
+  GEMINI_CLI_MEMORY_COMPRESSION_COMPRESSED_SIZE = 49,
 }
 
 export function getEventMetadataKey(
