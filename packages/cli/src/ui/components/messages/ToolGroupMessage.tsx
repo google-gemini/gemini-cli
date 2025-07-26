@@ -16,7 +16,6 @@ import { SHELL_COMMAND_NAME } from '../../constants.js';
 interface ToolGroupMessageProps {
   groupId: number;
   toolCalls: IndividualToolCallDisplay[];
-  availableTerminalHeight?: number;
   terminalWidth: number;
   config?: Config;
   isFocused?: boolean;
@@ -25,7 +24,6 @@ interface ToolGroupMessageProps {
 // Main component renders the border and maps the tools using ToolMessage
 export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   toolCalls,
-  availableTerminalHeight,
   terminalWidth,
   config,
   isFocused = true,
@@ -37,7 +35,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const borderColor =
     hasPending || isShellCommand ? Colors.AccentYellow : Colors.Gray;
 
-  const staticHeight = /* border */ 2 + /* marginBottom */ 1;
   // This is a bit of a magic number, but it accounts for the border and
   // marginLeft.
   const innerWidth = terminalWidth - 4;
@@ -48,23 +45,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     () => toolCalls.find((tc) => tc.status === ToolCallStatus.Confirming),
     [toolCalls],
   );
-
-  let countToolCallsWithResults = 0;
-  for (const tool of toolCalls) {
-    if (tool.resultDisplay !== undefined && tool.resultDisplay !== '') {
-      countToolCallsWithResults++;
-    }
-  }
-  const countOneLineToolCalls = toolCalls.length - countToolCallsWithResults;
-  const availableTerminalHeightPerToolMessage = availableTerminalHeight
-    ? Math.max(
-        Math.floor(
-          (availableTerminalHeight - staticHeight - countOneLineToolCalls) /
-            Math.max(1, countToolCallsWithResults),
-        ),
-        1,
-      )
-    : undefined;
 
   return (
     <Box
@@ -93,7 +73,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                 resultDisplay={tool.resultDisplay}
                 status={tool.status}
                 confirmationDetails={tool.confirmationDetails}
-                availableTerminalHeight={availableTerminalHeightPerToolMessage}
                 terminalWidth={innerWidth}
                 emphasis={
                   isConfirming
@@ -112,9 +91,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                   confirmationDetails={tool.confirmationDetails}
                   config={config}
                   isFocused={isFocused}
-                  availableTerminalHeight={
-                    availableTerminalHeightPerToolMessage
-                  }
                   terminalWidth={innerWidth}
                 />
               )}

@@ -10,7 +10,7 @@ if (process.env.NO_COLOR !== undefined) {
 }
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { themeManager, DEFAULT_THEME } from './theme-manager.js';
+import { ThemeManager, DEFAULT_THEME } from './theme-manager.js';
 import { CustomTheme } from './theme.js';
 
 const validCustomTheme: CustomTheme = {
@@ -32,45 +32,68 @@ const validCustomTheme: CustomTheme = {
 describe('ThemeManager', () => {
   beforeEach(() => {
     // Reset themeManager state
-    themeManager.loadCustomThemes({});
-    themeManager.setActiveTheme(DEFAULT_THEME.name);
+    ThemeManager.resetInstance();
+    ThemeManager.getInstance().loadCustomThemes({});
+    ThemeManager.getInstance().setActiveTheme(DEFAULT_THEME.name);
   });
 
   it('should load valid custom themes', () => {
-    themeManager.loadCustomThemes({ MyCustomTheme: validCustomTheme });
-    expect(themeManager.getCustomThemeNames()).toContain('MyCustomTheme');
-    expect(themeManager.isCustomTheme('MyCustomTheme')).toBe(true);
+    ThemeManager.getInstance().loadCustomThemes({
+      MyCustomTheme: validCustomTheme,
+    });
+    expect(ThemeManager.getInstance().getCustomThemeNames()).toContain(
+      'MyCustomTheme',
+    );
+    expect(ThemeManager.getInstance().isCustomTheme('MyCustomTheme')).toBe(
+      true,
+    );
   });
 
   it('should not load invalid custom themes', () => {
     const invalidTheme = { ...validCustomTheme, Background: 'not-a-color' };
-    themeManager.loadCustomThemes({
+    ThemeManager.getInstance().loadCustomThemes({
       InvalidTheme: invalidTheme as unknown as CustomTheme,
     });
-    expect(themeManager.getCustomThemeNames()).not.toContain('InvalidTheme');
-    expect(themeManager.isCustomTheme('InvalidTheme')).toBe(false);
+    expect(ThemeManager.getInstance().getCustomThemeNames()).not.toContain(
+      'InvalidTheme',
+    );
+    expect(ThemeManager.getInstance().isCustomTheme('InvalidTheme')).toBe(
+      false,
+    );
   });
 
   it('should set and get the active theme', () => {
-    expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
-    themeManager.setActiveTheme('Ayu');
-    expect(themeManager.getActiveTheme().name).toBe('Ayu');
+    expect(ThemeManager.getInstance().getActiveTheme().name).toBe(
+      DEFAULT_THEME.name,
+    );
+    ThemeManager.getInstance().setActiveTheme('Ayu');
+    expect(ThemeManager.getInstance().getActiveTheme().name).toBe('Ayu');
   });
 
   it('should set and get a custom active theme', () => {
-    themeManager.loadCustomThemes({ MyCustomTheme: validCustomTheme });
-    themeManager.setActiveTheme('MyCustomTheme');
-    expect(themeManager.getActiveTheme().name).toBe('MyCustomTheme');
+    ThemeManager.getInstance().loadCustomThemes({
+      MyCustomTheme: validCustomTheme,
+    });
+    ThemeManager.getInstance().setActiveTheme('MyCustomTheme');
+    expect(ThemeManager.getInstance().getActiveTheme().name).toBe(
+      'MyCustomTheme',
+    );
   });
 
   it('should return false when setting a non-existent theme', () => {
-    expect(themeManager.setActiveTheme('NonExistentTheme')).toBe(false);
-    expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
+    expect(ThemeManager.getInstance().setActiveTheme('NonExistentTheme')).toBe(
+      false,
+    );
+    expect(ThemeManager.getInstance().getActiveTheme().name).toBe(
+      DEFAULT_THEME.name,
+    );
   });
 
   it('should list available themes including custom themes', () => {
-    themeManager.loadCustomThemes({ MyCustomTheme: validCustomTheme });
-    const available = themeManager.getAvailableThemes();
+    ThemeManager.getInstance().loadCustomThemes({
+      MyCustomTheme: validCustomTheme,
+    });
+    const available = ThemeManager.getInstance().getAvailableThemes();
     expect(
       available.some(
         (t: { name: string; isCustom?: boolean }) =>
@@ -80,23 +103,29 @@ describe('ThemeManager', () => {
   });
 
   it('should get a theme by name', () => {
-    expect(themeManager.getTheme('Ayu')).toBeDefined();
-    themeManager.loadCustomThemes({ MyCustomTheme: validCustomTheme });
-    expect(themeManager.getTheme('MyCustomTheme')).toBeDefined();
+    expect(ThemeManager.getInstance().getTheme('Ayu')).toBeDefined();
+    ThemeManager.getInstance().loadCustomThemes({
+      MyCustomTheme: validCustomTheme,
+    });
+    expect(ThemeManager.getInstance().getTheme('MyCustomTheme')).toBeDefined();
   });
 
   it('should fall back to default theme if active theme is invalid', () => {
-    (themeManager as unknown as { activeTheme: unknown }).activeTheme = {
+    (
+      ThemeManager.getInstance() as unknown as { activeTheme: unknown }
+    ).activeTheme = {
       name: 'NonExistent',
       type: 'custom',
     };
-    expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
+    expect(ThemeManager.getInstance().getActiveTheme().name).toBe(
+      DEFAULT_THEME.name,
+    );
   });
 
   it('should return NoColorTheme if NO_COLOR is set', () => {
     const original = process.env.NO_COLOR;
     process.env.NO_COLOR = '1';
-    expect(themeManager.getActiveTheme().name).toBe('NoColor');
+    expect(ThemeManager.getInstance().getActiveTheme().name).toBe('NoColor');
     if (original === undefined) {
       delete process.env.NO_COLOR;
     } else {

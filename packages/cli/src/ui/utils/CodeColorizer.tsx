@@ -14,12 +14,9 @@ import type {
   ElementContent,
   RootContent,
 } from 'hast';
-import { themeManager } from '../themes/theme-manager.js';
+import { ThemeManager } from '../themes/theme-manager.js';
 import { Theme } from '../themes/theme.js';
-import {
-  MaxSizedBox,
-  MINIMUM_MAX_HEIGHT,
-} from '../components/shared/MaxSizedBox.js';
+import { MaxSizedBox } from '../components/shared/MaxSizedBox.js';
 
 // Configure theming and parsing utilities.
 const lowlight = createLowlight(common);
@@ -98,30 +95,17 @@ function renderHastNode(
 export function colorizeCode(
   code: string,
   language: string | null,
-  availableHeight?: number,
   maxWidth?: number,
   theme?: Theme,
 ): React.ReactNode {
   const codeToHighlight = code.replace(/\n$/, '');
-  const activeTheme = theme || themeManager.getActiveTheme();
+  const activeTheme = theme || ThemeManager.getInstance().getActiveTheme();
 
   try {
     // Render the HAST tree using the adapted theme
     // Apply the theme's default foreground color to the top-level Text element
-    let lines = codeToHighlight.split('\n');
-    const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
-
-    let hiddenLinesCount = 0;
-
-    // Optimization to avoid highlighting lines that cannot possibly be displayed.
-    if (availableHeight !== undefined) {
-      availableHeight = Math.max(availableHeight, MINIMUM_MAX_HEIGHT);
-      if (lines.length > availableHeight) {
-        const sliceIndex = lines.length - availableHeight;
-        hiddenLinesCount = sliceIndex;
-        lines = lines.slice(sliceIndex);
-      }
-    }
+    const lines = codeToHighlight.split('\n');
+    const padWidth = String(lines.length).length;
 
     const getHighlightedLines = (line: string) =>
       !language || !lowlight.registered(language)
@@ -130,9 +114,9 @@ export function colorizeCode(
 
     return (
       <MaxSizedBox
-        maxHeight={availableHeight}
+        maxHeight={undefined}
         maxWidth={maxWidth}
-        additionalHiddenLinesCount={hiddenLinesCount}
+        additionalHiddenLinesCount={0}
         overflowDirection="top"
       >
         {lines.map((line, index) => {
@@ -146,7 +130,7 @@ export function colorizeCode(
           return (
             <Box key={index}>
               <Text color={activeTheme.colors.Gray}>
-                {`${String(index + 1 + hiddenLinesCount).padStart(padWidth, ' ')} `}
+                {`${String(index + 1).padStart(padWidth, ' ')} `}
               </Text>
               <Text color={activeTheme.defaultColor} wrap="wrap">
                 {contentToRender}
@@ -167,7 +151,7 @@ export function colorizeCode(
     const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
     return (
       <MaxSizedBox
-        maxHeight={availableHeight}
+        maxHeight={undefined}
         maxWidth={maxWidth}
         overflowDirection="top"
       >

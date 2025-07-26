@@ -6,16 +6,15 @@
 
 import { useCallback, useMemo, useEffect, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
-import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import { Config, GitService, Logger } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
+import { useUI } from '../contexts/UIContext.js';
 import {
   Message,
   MessageType,
   HistoryItemWithoutId,
-  HistoryItem,
   SlashCommandProcessorResult,
 } from '../types.js';
 import { LoadedSettings } from '../../config/settings.js';
@@ -34,15 +33,8 @@ export const useSlashCommandProcessor = (
   clearItems: UseHistoryManagerReturn['clearItems'],
   loadHistory: UseHistoryManagerReturn['loadHistory'],
   refreshStatic: () => void,
-  setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
-  onDebugMessage: (message: string) => void,
-  openThemeDialog: () => void,
-  openAuthDialog: () => void,
-  openEditorDialog: () => void,
-  toggleCorgiMode: () => void,
-  setQuittingMessages: (message: HistoryItem[]) => void,
-  openPrivacyNotice: () => void,
 ) => {
+  const ui = useUI();
   const session = useSessionStats();
   const [commands, setCommands] = useState<readonly SlashCommand[]>([]);
   const gitService = useMemo(() => {
@@ -127,6 +119,7 @@ export const useSlashCommandProcessor = (
         logger,
       },
       ui: {
+        ...ui,
         addItem,
         clear: () => {
           clearItems();
@@ -134,10 +127,8 @@ export const useSlashCommandProcessor = (
           refreshStatic();
         },
         loadHistory,
-        setDebugMessage: onDebugMessage,
         pendingItem: pendingCompressionItemRef.current,
         setPendingItem: setPendingCompressionItem,
-        toggleCorgiMode,
       },
       session: {
         stats: session.stats,
@@ -153,10 +144,9 @@ export const useSlashCommandProcessor = (
       clearItems,
       refreshStatic,
       session.stats,
-      onDebugMessage,
+      ui,
       pendingCompressionItemRef,
       setPendingCompressionItem,
-      toggleCorgiMode,
     ],
   );
 
@@ -263,19 +253,19 @@ export const useSlashCommandProcessor = (
               case 'dialog':
                 switch (result.dialog) {
                   case 'help':
-                    setShowHelp(true);
+                    ui.openHelp();
                     return { type: 'handled' };
                   case 'auth':
-                    openAuthDialog();
+                    ui.openAuthDialog();
                     return { type: 'handled' };
                   case 'theme':
-                    openThemeDialog();
+                    ui.openThemeDialog();
                     return { type: 'handled' };
                   case 'editor':
-                    openEditorDialog();
+                    ui.openEditorDialog();
                     return { type: 'handled' };
                   case 'privacy':
-                    openPrivacyNotice();
+                    ui.openPrivacyNotice();
                     return { type: 'handled' };
                   default: {
                     const unhandled: never = result.dialog;
@@ -295,10 +285,7 @@ export const useSlashCommandProcessor = (
                 return { type: 'handled' };
               }
               case 'quit':
-                setQuittingMessages(result.messages);
-                setTimeout(() => {
-                  process.exit(0);
-                }, 100);
+                ui.quit(result.messages);
                 return { type: 'handled' };
 
               case 'submit_prompt':
@@ -334,19 +321,7 @@ export const useSlashCommandProcessor = (
       });
       return { type: 'handled' };
     },
-    [
-      config,
-      addItem,
-      setShowHelp,
-      openAuthDialog,
-      commands,
-      commandContext,
-      addMessage,
-      openThemeDialog,
-      openPrivacyNotice,
-      openEditorDialog,
-      setQuittingMessages,
-    ],
+    [addItem, commands, commandContext, addMessage, config, ui],
   );
 
   return {

@@ -42,7 +42,6 @@ index 0000000..e69de29
     expect(mockColorizeCode).toHaveBeenCalledWith(
       'print("hello world")',
       'python',
-      undefined,
       80,
       undefined,
     );
@@ -70,7 +69,6 @@ index 0000000..e69de29
     expect(mockColorizeCode).toHaveBeenCalledWith(
       'some content',
       null,
-      undefined,
       80,
       undefined,
     );
@@ -94,7 +92,6 @@ index 0000000..e69de29
     expect(mockColorizeCode).toHaveBeenCalledWith(
       'some text content',
       null,
-      undefined,
       80,
       undefined,
     );
@@ -252,7 +249,6 @@ index 123..789 100644
     it.each([
       {
         terminalWidth: 80,
-        height: undefined,
         expected: `1      console.log('first hunk');
 2    - const oldVar = 1;
 2    + const newVar = 1;
@@ -265,8 +261,10 @@ index 123..789 100644
       },
       {
         terminalWidth: 80,
-        height: 6,
-        expected: `... first 4 lines hidden ...
+        expected: `1      console.log('first hunk');
+2    - const oldVar = 1;
+2    + const newVar = 1;
+3      console.log('end of first hunk');
 ════════════════════════════════════════════════════════════════════════════════
 20     console.log('second hunk');
 21   - const anotherOld = 'test';
@@ -275,8 +273,16 @@ index 123..789 100644
       },
       {
         terminalWidth: 30,
-        height: 6,
-        expected: `... first 10 lines hidden ...
+        expected: `1      console.log('first
+       hunk');
+2    - const oldVar = 1;
+2    + const newVar = 1;
+3      console.log('end of
+       first hunk');
+══════════════════════════════
+20     console.log('second
+       hunk');
+21   - const anotherOld =
        'test';
 21   + const anotherNew =
        'test';
@@ -285,14 +291,13 @@ index 123..789 100644
       },
     ])(
       'with terminalWidth $terminalWidth and height $height',
-      ({ terminalWidth, height, expected }) => {
+      ({ terminalWidth, expected }) => {
         const { lastFrame } = render(
           <OverflowProvider>
             <DiffRenderer
               diffContent={diffWithMultipleHunks}
               filename="multi.js"
               terminalWidth={terminalWidth}
-              availableTerminalHeight={height}
             />
           </OverflowProvider>,
         );

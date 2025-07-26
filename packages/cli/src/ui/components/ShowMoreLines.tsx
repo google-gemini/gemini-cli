@@ -10,18 +10,13 @@ import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
 import { Colors } from '../colors.js';
 
-interface ShowMoreLinesProps {
-  constrainHeight: boolean;
-}
-
-export const ShowMoreLines = ({ constrainHeight }: ShowMoreLinesProps) => {
+export const ShowMoreLines = () => {
   const overflowState = useOverflowState();
   const streamingState = useStreamingContext();
 
   if (
     overflowState === undefined ||
     overflowState.overflowingIds.size === 0 ||
-    !constrainHeight ||
     !(
       streamingState === StreamingState.Idle ||
       streamingState === StreamingState.WaitingForConfirmation

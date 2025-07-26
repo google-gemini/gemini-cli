@@ -12,7 +12,7 @@ import { useInputHistory } from '../hooks/useInputHistory.js';
 import { TextBuffer } from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
-import stringWidth from 'string-width';
+
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
@@ -500,10 +500,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             linesToRender.map((lineText, visualIdxInRenderedSet) => {
               const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
               let display = cpSlice(lineText, 0, inputWidth);
-              const currentVisualWidth = stringWidth(display);
-              if (currentVisualWidth < inputWidth) {
-                display = display + ' '.repeat(inputWidth - currentVisualWidth);
-              }
 
               if (focus && visualIdxInRenderedSet === cursorVisualRow) {
                 const relativeVisualColForHighlight = cursorVisualColAbsolute;
@@ -536,18 +532,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           )}
         </Box>
       </Box>
-      {completion.showSuggestions && (
-        <Box>
-          <SuggestionsDisplay
-            suggestions={completion.suggestions}
-            activeIndex={completion.activeSuggestionIndex}
-            isLoading={completion.isLoadingSuggestions}
-            width={suggestionsWidth}
-            scrollOffset={completion.visibleStartIndex}
-            userInput={buffer.text}
-          />
-        </Box>
-      )}
+      <Box>
+        <SuggestionsDisplay
+          showSuggestions={completion.showSuggestions}
+          suggestions={completion.suggestions}
+          activeIndex={completion.activeSuggestionIndex}
+          isLoading={completion.isLoadingSuggestions}
+          width={suggestionsWidth}
+          scrollOffset={completion.visibleStartIndex}
+          userInput={buffer.text}
+        />
+      </Box>
     </>
   );
 };

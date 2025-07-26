@@ -5,7 +5,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { themeManager } from '../themes/theme-manager.js';
+import { ThemeManager } from '../themes/theme-manager.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
 import { type HistoryItem, MessageType } from '../types.js';
 import process from 'node:process';
@@ -30,7 +30,10 @@ export const useThemeCommand = (
   // Check for invalid theme configuration on startup
   useEffect(() => {
     const effectiveTheme = loadedSettings.merged.theme;
-    if (effectiveTheme && !themeManager.findThemeByName(effectiveTheme)) {
+    if (
+      effectiveTheme &&
+      !ThemeManager.getInstance().findThemeByName(effectiveTheme)
+    ) {
       setIsThemeDialogOpen(true);
       setThemeError(`Theme "${effectiveTheme}" not found.`);
     } else {
@@ -54,7 +57,7 @@ export const useThemeCommand = (
 
   const applyTheme = useCallback(
     (themeName: string | undefined) => {
-      if (!themeManager.setActiveTheme(themeName)) {
+      if (!ThemeManager.getInstance().setActiveTheme(themeName)) {
         // If theme is not found, open the theme selection dialog and set error message
         setIsThemeDialogOpen(true);
         setThemeError(`Theme "${themeName}" not found.`);
@@ -81,7 +84,7 @@ export const useThemeCommand = (
           ...(loadedSettings.workspace.settings.customThemes || {}),
         };
         // Only allow selecting themes available in the merged custom themes or built-in themes
-        const isBuiltIn = themeManager.findThemeByName(themeName);
+        const isBuiltIn = ThemeManager.getInstance().findThemeByName(themeName);
         const isCustom = themeName && mergedCustomThemes[themeName];
         if (!isBuiltIn && !isCustom) {
           setThemeError(`Theme "${themeName}" not found in selected scope.`);
@@ -90,7 +93,9 @@ export const useThemeCommand = (
         }
         loadedSettings.setValue(scope, 'theme', themeName); // Update the merged settings
         if (loadedSettings.merged.customThemes) {
-          themeManager.loadCustomThemes(loadedSettings.merged.customThemes);
+          ThemeManager.getInstance().loadCustomThemes(
+            loadedSettings.merged.customThemes,
+          );
         }
         applyTheme(loadedSettings.merged.theme); // Apply the current theme
         setThemeError(null);

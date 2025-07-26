@@ -229,6 +229,7 @@ export class Config {
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
   private readonly experimentalAcp: boolean = false;
+  private modelChangeListeners: Array<(newModel: string) => void> = [];
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -335,7 +336,17 @@ export class Config {
     if (this.contentGeneratorConfig) {
       this.contentGeneratorConfig.model = newModel;
       this.modelSwitchedDuringSession = true;
+      this.modelChangeListeners.forEach((listener) => listener(newModel));
     }
+  }
+
+  subscribeToModelChanges(callback: (newModel: string) => void): () => void {
+    this.modelChangeListeners.push(callback);
+    return () => {
+      this.modelChangeListeners = this.modelChangeListeners.filter(
+        (listener) => listener !== callback,
+      );
+    };
   }
 
   isModelSwitchedDuringSession(): boolean {

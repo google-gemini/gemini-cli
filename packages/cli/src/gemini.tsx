@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { render } from 'ink';
-import { AppWrapper } from './ui/App.js';
+import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments, CliArgs } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
@@ -19,7 +19,7 @@ import {
   loadSettings,
   SettingScope,
 } from './config/settings.js';
-import { themeManager } from './ui/themes/theme-manager.js';
+import { ThemeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
@@ -143,10 +143,10 @@ export async function main() {
   await config.initialize();
 
   // Load custom themes from settings
-  themeManager.loadCustomThemes(settings.merged.customThemes);
+  ThemeManager.getInstance().loadCustomThemes(settings.merged.customThemes);
 
   if (settings.merged.theme) {
-    if (!themeManager.setActiveTheme(settings.merged.theme)) {
+    if (!ThemeManager.getInstance().setActiveTheme(settings.merged.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
       // The useThemeCommand hook in App.tsx will handle opening the dialog.
       console.warn(`Warning: Theme "${settings.merged.theme}" not found.`);
@@ -212,7 +212,7 @@ export async function main() {
     setWindowTitle(basename(workspaceRoot), settings);
     const instance = render(
       <React.StrictMode>
-        <AppWrapper
+        <AppContainer
           config={config}
           settings={settings}
           startupWarnings={startupWarnings}

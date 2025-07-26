@@ -25,18 +25,12 @@ export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
   config?: Config;
   isFocused?: boolean;
-  availableTerminalHeight?: number;
   terminalWidth: number;
 }
 
 export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
-> = ({
-  confirmationDetails,
-  isFocused = true,
-  availableTerminalHeight,
-  terminalWidth,
-}) => {
+> = ({ confirmationDetails, isFocused = true, terminalWidth }) => {
   const { onConfirm } = confirmationDetails;
   const childWidth = terminalWidth - 2; // 2 for padding
 
@@ -59,32 +53,6 @@ export const ToolConfirmationMessage: React.FC<
   // Body content is now the DiffRenderer, passing filename to it
   // The bordered box is removed from here and handled within DiffRenderer
 
-  function availableBodyContentHeight() {
-    if (options.length === 0) {
-      // This should not happen in practice as options are always added before this is called.
-      throw new Error('Options not provided for confirmation message');
-    }
-
-    if (availableTerminalHeight === undefined) {
-      return undefined;
-    }
-
-    // Calculate the vertical space (in lines) consumed by UI elements
-    // surrounding the main body content.
-    const PADDING_OUTER_Y = 2; // Main container has `padding={1}` (top & bottom).
-    const MARGIN_BODY_BOTTOM = 1; // margin on the body container.
-    const HEIGHT_QUESTION = 1; // The question text is one line.
-    const MARGIN_QUESTION_BOTTOM = 1; // Margin on the question container.
-    const HEIGHT_OPTIONS = options.length; // Each option in the radio select takes one line.
-
-    const surroundingElementsHeight =
-      PADDING_OUTER_Y +
-      MARGIN_BODY_BOTTOM +
-      HEIGHT_QUESTION +
-      MARGIN_QUESTION_BOTTOM +
-      HEIGHT_OPTIONS;
-    return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
-  }
   if (confirmationDetails.type === 'edit') {
     if (confirmationDetails.isModifying) {
       return (
@@ -124,7 +92,6 @@ export const ToolConfirmationMessage: React.FC<
       <DiffRenderer
         diffContent={confirmationDetails.fileDiff}
         filename={confirmationDetails.fileName}
-        availableTerminalHeight={availableBodyContentHeight()}
         terminalWidth={childWidth}
       />
     );
@@ -145,15 +112,11 @@ export const ToolConfirmationMessage: React.FC<
       { label: 'No (esc)', value: ToolConfirmationOutcome.Cancel },
     );
 
-    let bodyContentHeight = availableBodyContentHeight();
-    if (bodyContentHeight !== undefined) {
-      bodyContentHeight -= 2; // Account for padding;
-    }
     bodyContent = (
       <Box flexDirection="column">
         <Box paddingX={1} marginLeft={1}>
           <MaxSizedBox
-            maxHeight={bodyContentHeight}
+            maxHeight={undefined}
             maxWidth={Math.max(childWidth - 4, 1)}
           >
             <Box>

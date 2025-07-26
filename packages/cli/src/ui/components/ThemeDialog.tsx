@@ -7,7 +7,7 @@
 import React, { useCallback, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Colors } from '../colors.js';
-import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
+import { ThemeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
@@ -21,7 +21,6 @@ interface ThemeDialogProps {
   onHighlight: (themeName: string | undefined) => void;
   /** The settings object */
   settings: LoadedSettings;
-  availableTerminalHeight?: number;
   terminalWidth: number;
 }
 
@@ -29,7 +28,6 @@ export function ThemeDialog({
   onSelect,
   onHighlight,
   settings,
-  availableTerminalHeight,
   terminalWidth,
 }: ThemeDialogProps): React.JSX.Element {
   const [selectedScope, setSelectedScope] = useState<SettingScope>(
@@ -46,7 +44,7 @@ export function ThemeDialog({
     selectedScope === SettingScope.User
       ? settings.user.settings.customThemes || {}
       : settings.merged.customThemes || {};
-  const builtInThemes = themeManager
+  const builtInThemes = ThemeManager.getInstance()
     .getAvailableThemes()
     .filter((theme) => theme.type !== 'custom');
   const customThemeNames = Object.keys(customThemes);
@@ -154,69 +152,13 @@ export function ThemeDialog({
     1,
   );
 
-  const DIALOG_PADDING = 2;
-  const selectThemeHeight = themeItems.length + 1;
-  const SCOPE_SELECTION_HEIGHT = 4; // Height for the scope selection section + margin.
-  const SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO = 1;
-  const TAB_TO_SELECT_HEIGHT = 2;
-  availableTerminalHeight = availableTerminalHeight ?? Number.MAX_SAFE_INTEGER;
-  availableTerminalHeight -= 2; // Top and bottom borders.
-  availableTerminalHeight -= TAB_TO_SELECT_HEIGHT;
-
-  let totalLeftHandSideHeight =
-    DIALOG_PADDING +
-    selectThemeHeight +
-    SCOPE_SELECTION_HEIGHT +
-    SPACE_BETWEEN_THEME_SELECTION_AND_APPLY_TO;
-
-  let showScopeSelection = true;
-  let includePadding = true;
-
-  // Remove content from the LHS that can be omitted if it exceeds the available height.
-  if (totalLeftHandSideHeight > availableTerminalHeight) {
-    includePadding = false;
-    totalLeftHandSideHeight -= DIALOG_PADDING;
-  }
-
-  if (totalLeftHandSideHeight > availableTerminalHeight) {
-    // First, try hiding the scope selection
-    totalLeftHandSideHeight -= SCOPE_SELECTION_HEIGHT;
-    showScopeSelection = false;
-  }
-
-  // Don't focus the scope selection if it is hidden due to height constraints.
-  const currentFocusedSection = !showScopeSelection ? 'theme' : focusedSection;
-
-  // Vertical space taken by elements other than the two code blocks in the preview pane.
-  // Includes "Preview" title, borders, and margin between blocks.
-  const PREVIEW_PANE_FIXED_VERTICAL_SPACE = 8;
-
-  // The right column doesn't need to ever be shorter than the left column.
-  availableTerminalHeight = Math.max(
-    availableTerminalHeight,
-    totalLeftHandSideHeight,
-  );
-  const availableTerminalHeightCodeBlock =
-    availableTerminalHeight -
-    PREVIEW_PANE_FIXED_VERTICAL_SPACE -
-    (includePadding ? 2 : 0) * 2;
-
-  // Subtract margin between code blocks from available height.
-  const availableHeightForPanes = Math.max(
-    0,
-    availableTerminalHeightCodeBlock - 1,
-  );
-
-  // The code block is slightly longer than the diff, so give it more space.
-  const codeBlockHeight = Math.ceil(availableHeightForPanes * 0.6);
-  const diffHeight = Math.floor(availableHeightForPanes * 0.4);
   return (
     <Box
       borderStyle="round"
       borderColor={Colors.Gray}
       flexDirection="column"
-      paddingTop={includePadding ? 1 : 0}
-      paddingBottom={includePadding ? 1 : 0}
+      paddingTop={1}
+      paddingBottom={1}
       paddingLeft={1}
       paddingRight={1}
       width="100%"
@@ -224,8 +166,8 @@ export function ThemeDialog({
       <Box flexDirection="row">
         {/* Left Column: Selection */}
         <Box flexDirection="column" width="45%" paddingRight={2}>
-          <Text bold={currentFocusedSection === 'theme'} wrap="truncate">
-            {currentFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
+          <Text bold={focusedSection === 'theme'} wrap="truncate">
+            {focusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
             <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
           </Text>
           <RadioButtonSelect
@@ -234,28 +176,26 @@ export function ThemeDialog({
             initialIndex={safeInitialThemeIndex}
             onSelect={handleThemeSelect}
             onHighlight={handleThemeHighlight}
-            isFocused={currentFocusedSection === 'theme'}
+            isFocused={focusedSection === 'theme'}
             maxItemsToShow={8}
             showScrollArrows={true}
-            showNumbers={currentFocusedSection === 'theme'}
+            showNumbers={focusedSection === 'theme'}
           />
 
           {/* Scope Selection */}
-          {showScopeSelection && (
-            <Box marginTop={1} flexDirection="column">
-              <Text bold={currentFocusedSection === 'scope'} wrap="truncate">
-                {currentFocusedSection === 'scope' ? '> ' : '  '}Apply To
-              </Text>
-              <RadioButtonSelect
-                items={scopeItems}
-                initialIndex={0} // Default to User Settings
-                onSelect={handleScopeSelect}
-                onHighlight={handleScopeHighlight}
-                isFocused={currentFocusedSection === 'scope'}
-                showNumbers={currentFocusedSection === 'scope'}
-              />
-            </Box>
-          )}
+          <Box marginTop={1} flexDirection="column">
+            <Text bold={focusedSection === 'scope'} wrap="truncate">
+              {focusedSection === 'scope' ? '> ' : '  '}Apply To
+            </Text>
+            <RadioButtonSelect
+              items={scopeItems}
+              initialIndex={0} // Default to User Settings
+              onSelect={handleScopeSelect}
+              onHighlight={handleScopeHighlight}
+              isFocused={focusedSection === 'scope'}
+              showNumbers={focusedSection === 'scope'}
+            />
+          </Box>
         </Box>
 
         {/* Right Column: Preview */}
@@ -264,34 +204,27 @@ export function ThemeDialog({
           {/* Get the Theme object for the highlighted theme, fall back to default if not found */}
           {(() => {
             const previewTheme =
-              themeManager.getTheme(
+              ThemeManager.getInstance().getTheme(
                 highlightedThemeName || DEFAULT_THEME.name,
               ) || DEFAULT_THEME;
             return (
               <Box
                 borderStyle="single"
                 borderColor={Colors.Gray}
-                paddingTop={includePadding ? 1 : 0}
-                paddingBottom={includePadding ? 1 : 0}
+                paddingTop={1}
+                paddingBottom={1}
                 paddingLeft={1}
                 paddingRight={1}
                 flexDirection="column"
               >
                 {colorizeCode(
-                  `# function
--def fibonacci(n):
--    a, b = 0, 1
--    for _ in range(n):
--        a, b = b, a + b
--    return a`,
+                  `# function\n-def fibonacci(n):\n-    a, b = 0, 1\n-    for _ in range(n):\n-        a, b = b, a + b\n-    return a`,
                   'python',
-                  codeBlockHeight,
                   colorizeCodeWidth,
                 )}
                 <Box marginTop={1} />
                 <DiffRenderer
                   diffContent={`--- a/old_file.txt\n+++ b/new_file.txt\n@@ -1,6 +1,7 @@\n # function\n-def fibonacci(n):\n-    a, b = 0, 1\n-    for _ in range(n):\n-        a, b = b, a + b\n-    return a\n+def fibonacci(n):\n+    a, b = 0, 1\n+    for _ in range(n):\n+        a, b = b, a + b\n+    return a\n+\n+print(fibonacci(10))\n`}
-                  availableTerminalHeight={diffHeight}
                   terminalWidth={colorizeCodeWidth}
                   theme={previewTheme}
                 />
@@ -302,8 +235,7 @@ export function ThemeDialog({
       </Box>
       <Box marginTop={1}>
         <Text color={Colors.Gray} wrap="truncate">
-          (Use Enter to select
-          {showScopeSelection ? ', Tab to change focus' : ''})
+          (Use Enter to select, Tab to change focus)
         </Text>
       </Box>
     </Box>
