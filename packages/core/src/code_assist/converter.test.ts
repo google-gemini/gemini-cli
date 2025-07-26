@@ -24,7 +24,11 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
       };
-      const codeAssistReq = toGenerateContentRequest(genaiReq, 'my-project');
+      const { requestId, ...codeAssistReq } = toGenerateContentRequest(
+        genaiReq,
+        'my-project',
+      );
+      expect(requestId).toEqual(expect.any(String));
       expect(codeAssistReq).toEqual({
         model: 'gemini-pro',
         project: 'my-project',
@@ -47,7 +51,9 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
       };
-      const codeAssistReq = toGenerateContentRequest(genaiReq);
+      const { requestId, ...codeAssistReq } =
+        toGenerateContentRequest(genaiReq);
+      expect(requestId).toEqual(expect.any(String));
       expect(codeAssistReq).toEqual({
         model: 'gemini-pro',
         project: undefined,
@@ -70,11 +76,12 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
       };
-      const codeAssistReq = toGenerateContentRequest(
+      const { requestId, ...codeAssistReq } = toGenerateContentRequest(
         genaiReq,
         'my-project',
         'session-123',
       );
+      expect(requestId).toEqual(expect.any(String));
       expect(codeAssistReq).toEqual({
         model: 'gemini-pro',
         project: 'my-project',
@@ -180,6 +187,15 @@ describe('converter', () => {
         seed: 9,
         responseMimeType: 'application/json',
       });
+    });
+
+    it('should set a requestId', () => {
+      const genaiReq: GenerateContentParameters = {
+        model: 'gemini-pro',
+        contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+      };
+      const codeAssistReq = toGenerateContentRequest(genaiReq);
+      expect(codeAssistReq.requestId).toEqual(expect.any(String));
     });
   });
 

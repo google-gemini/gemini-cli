@@ -28,11 +28,13 @@ import {
   ToolListUnion,
   ToolConfig,
 } from '@google/genai';
+import { randomUUID } from 'crypto';
 
 export interface CAGenerateContentRequest {
   model: string;
   project?: string;
   request: VertexGenerateContentRequest;
+  requestId: string;
 }
 
 interface VertexGenerateContentRequest {
@@ -122,6 +124,7 @@ export function toGenerateContentRequest(
     model: req.model,
     project,
     request: toVertexGenerateContentRequest(req, sessionId),
+    requestId: randomUUID(),
   };
 }
 
