@@ -91,9 +91,9 @@ export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
   process.on('unhandledRejection', (reason, _promise) => {
     const errorMessage = `=========================================
+This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Unhandled Promise Rejection!
 =========================================
-This is an unexpected error. Please file a bug report using the /bug tool.
 Reason: ${reason}${
       reason instanceof Error && reason.stack
         ? `
