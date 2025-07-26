@@ -445,22 +445,18 @@ const listCommand: SlashCommand = {
   description: 'List configured MCP servers and tools',
   kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext) => {
-    const lowerCaseArgs = context.invocation?.args.toLowerCase().split(/\s+/).filter(Boolean);
-
+    const lowerCaseArgs = (context.invocation?.args || '').toLowerCase().split(/\s+/).filter(Boolean);
     const hasDesc =
-      lowerCaseArgs!.includes('desc') || lowerCaseArgs!.includes('descriptions');
+      lowerCaseArgs.includes('desc') || lowerCaseArgs.includes('descriptions');
     const hasNodesc =
-      lowerCaseArgs!.includes('nodesc') ||
-      lowerCaseArgs!.includes('nodescriptions');
-    const showSchema = lowerCaseArgs!.includes('schema');
-
+      lowerCaseArgs.includes('nodesc') ||
+      lowerCaseArgs.includes('nodescriptions');
+    const showSchema = lowerCaseArgs.includes('schema');
     // Show descriptions if `desc` or `schema` is present,
     // but `nodesc` takes precedence and disables them.
     const showDescriptions = !hasNodesc && (hasDesc || showSchema);
-
     // Show tips only when no arguments are provided
-    const showTips = lowerCaseArgs!.length === 0;
-
+    const showTips = lowerCaseArgs.length === 0;
     return getMcpStatus(context, showDescriptions, showSchema, showTips);
   },
 };
