@@ -386,19 +386,19 @@ function calculateVisualLayout(
           const cursorLogCol = logicalCursor[1];
           let displayColForCursor;
           const exactMatchIndex = displayToLogMap.indexOf(cursorLogCol);
+          // Find the first display position whose logical mapping is > our cursor's logical position.
+          const firstGreaterIndex = displayToLogMap.findIndex(
+            (logCol) => logCol > cursorLogCol,
+          );
 
-          if (exactMatchIndex !== -1) {
-            displayColForCursor = exactMatchIndex;
+          if (firstGreaterIndex === -1) {
+            // This means the cursor is at or after the last logical position mapped.
+            // Place it at the end of the display line.
+            displayColForCursor = displayToLogMap.length - 1;
           } else {
-            // A compatible way to find the last index that satisfies the condition.
-            let lastValidIndex = -1;
-            for (let i = displayToLogMap.length - 1; i >= 0; i--) {
-              if (displayToLogMap[i] <= cursorLogCol) {
-                lastValidIndex = i;
-                break;
-              }
-            }
-            displayColForCursor = lastValidIndex;
+            // The correct display position is the one right before the first greater one.
+            // We ensure it's not negative, which can happen if the cursor is at position 0.
+            displayColForCursor = Math.max(0, firstGreaterIndex - 1);
           }
 
           if (
@@ -440,7 +440,7 @@ function calculateVisualLayout(
       // if the cursor is at the very end of this logical line, update visual cursor.
       if (
         logIndex === logicalCursor[0] &&
-        logicalCursor[1] === codePointsInLogLine.length // Cursor at end of logical line
+        logicalCursor[1] === cpLen(logLine) // Cursor at end of logical line
       ) {
         const lastVisualLineIdx = visualLines.length - 1;
         if (
