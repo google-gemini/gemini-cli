@@ -201,6 +201,53 @@ The command follows this format: `/changelog <version> <type> <message>`
 
 When you run `/changelog 1.2.0 added "New feature"`, the final text sent to the model will be the original prompt followed by two newlines and the command you typed.
 
+##### 3. Executing Shell Commands with `!{...}`
+
+You can make your commands dynamic by executing shell commands directly within your `prompt` and injecting their output. This is ideal for gathering context from your local environment, like reading file content or checking the status of Git.
+
+To use this feature, you must define a `shell-allowlist` in your TOML file **OR** have allowed the shell commands in your global allowlist. This is a security measure to ensure that only intended commands can be run.
+
+**How It Works:**
+
+1.  **Define Permissions:** Add a `shell-allowlist` array to your TOML file, listing the exact shell commands your prompt is allowed to execute.
+2.  **Inject Commands:** Use the `!{...}` syntax in your `prompt` to specify where the command should be run and its output injected.
+
+The CLI checks permissions in this order:
+
+1.  Global `excludeTools` settings (if blocked here, it can't run).
+2.  Global `coreTools` settings (if allowed here, it can run).
+3.  The command's local `shell-allowlist`.
+4.  If the command is not in either allowlist, it will cause the command to fail.
+
+**Example (`git/commit.toml`):**
+
+This command gets the staged git diff and uses it to ask the model to write a commit message.
+
+````toml
+# In: <project>/.gemini/commands/git/commit.toml
+# Invoked via: /git:commit
+
+description = "Generates a Git commit message based on staged changes."
+
+# Define the list of shell commands this prompt is allowed to run.
+shell-allowlist = [
+  "git diff --staged"
+]
+
+# The prompt uses !{...} to execute the command and inject its output.
+prompt = """
+Please generate a Conventional Commit message based on the following git diff:
+
+```diff
+!{git diff --staged}
+````
+
+"""
+
+````
+
+When you run `/git:commit`, the CLI first executes `git diff --staged`, then replaces `!{git diff --staged}` with the output of that command before sending the final, complete prompt to the model.
+
 ---
 
 #### Example: A "Pure Function" Refactoring Command
@@ -214,7 +261,7 @@ First, ensure the user commands directory exists, then create a `refactor` subdi
 ```bash
 mkdir -p ~/.gemini/commands/refactor
 touch ~/.gemini/commands/refactor/pure.toml
-```
+````
 
 **2. Add the content to the file:**
 
