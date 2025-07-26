@@ -28,7 +28,9 @@ import {
 import {
   IPromptProcessor,
   SHORTHAND_ARGS_PLACEHOLDER,
+  SHELL_INJECTION_TRIGGER,
 } from './prompt-processors/types.js';
+import { ShellProcessor } from './prompt-processors/shellProcessor.js';
 
 /**
  * Defines the Zod schema for a command definition file. This serves as the
@@ -40,6 +42,7 @@ const TomlCommandDefSchema = z.object({
     invalid_type_error: "The 'prompt' field must be a string.",
   }),
   description: z.string().optional(),
+  'shell-allowlist': z.array(z.string()).optional(),
 });
 
 /**
@@ -171,6 +174,12 @@ export class FileCommandLoader implements ICommandLoader {
       .join(':');
 
     const processors: IPromptProcessor[] = [];
+
+    // Add the Shell Processor if needed.
+    const shellAllowlist = validDef['shell-allowlist'] || [];
+    if (validDef.prompt.includes(SHELL_INJECTION_TRIGGER)) {
+      processors.push(new ShellProcessor(shellAllowlist, commandName));
+    }
 
     // The presence of '{{args}}' is the switch that determines the behavior.
     if (validDef.prompt.includes(SHORTHAND_ARGS_PLACEHOLDER)) {
