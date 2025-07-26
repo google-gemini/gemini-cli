@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Content, SchemaUnion, Type } from '@google/genai';
+import { Content } from '@google/genai';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { GeminiClient } from '../core/client.js';
 import { GeminiChat } from '../core/geminiChat.js';
@@ -36,16 +36,16 @@ Respond *only* in JSON format according to the following schema. Do not include 
 \`\`\`
 `;
 
-const RESPONSE_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const RESPONSE_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     reasoning: {
-      type: Type.STRING,
+      type: 'string',
       description:
         "Brief explanation justifying the 'next_speaker' choice based *strictly* on the applicable rule and the content/structure of the preceding turn.",
     },
     next_speaker: {
-      type: Type.STRING,
+      type: 'string',
       enum: ['user', 'model'],
       description:
         'Who should speak next based *only* on the preceding turn and the decision rules',
