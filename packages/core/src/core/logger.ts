@@ -292,6 +292,16 @@ export class Logger {
     }
   }
 
+  async deleteCheckpoint(tag: string): Promise<void> {
+    if (!this.initialized) {
+      throw new Error(
+        'Logger not initialized or checkpoint file path not set. Cannot delete a checkpoint.'
+      );
+    }
+    const path = this._checkpointPath(tag);
+    await fs.unlink(path);
+  }
+
   close(): void {
     this.initialized = false;
     this.logFilePath = undefined;
