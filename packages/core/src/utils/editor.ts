@@ -13,7 +13,8 @@ export type EditorType =
   | 'cursor'
   | 'vim'
   | 'neovim'
-  | 'zed';
+  | 'zed'
+  | 'trae';
 
 function isValidEditorType(editor: string): editor is EditorType {
   return [
@@ -24,6 +25,7 @@ function isValidEditorType(editor: string): editor is EditorType {
     'vim',
     'neovim',
     'zed',
+    'trae',
   ].includes(editor);
 }
 
@@ -59,6 +61,8 @@ const editorCommands: Record<
   vim: { win32: ['vim'], default: ['vim'] },
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
+  trae: { win32: ['trae'], default: ['trae'] },
+
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
@@ -70,7 +74,9 @@ export function checkHasEditorType(editor: EditorType): boolean {
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   const notUsingSandbox = !process.env.SANDBOX;
-  if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
+  if (
+    ['vscode', 'vscodium', 'windsurf', 'cursor', 'zed', 'trae'].includes(editor)
+  ) {
     return notUsingSandbox;
   }
   return true;
@@ -111,6 +117,7 @@ export function getDiffCommand(
     case 'windsurf':
     case 'cursor':
     case 'zed':
+    case 'trae':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
     case 'vim':
     case 'neovim':
@@ -169,6 +176,7 @@ export async function openDiff(
       case 'windsurf':
       case 'cursor':
       case 'zed':
+      case 'trae':
         // Use spawn for GUI-based editors to avoid blocking the entire process
         return new Promise((resolve, reject) => {
           const childProcess = spawn(diffCommand.command, diffCommand.args, {
