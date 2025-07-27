@@ -36,6 +36,7 @@ import { ThemeDialog } from './components/ThemeDialog.js';
 import { AuthDialog } from './components/AuthDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
+import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -169,6 +170,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     useState<boolean>(false);
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
   const [openFiles, setOpenFiles] = useState<OpenFiles | undefined>();
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToOpenFiles(setOpenFiles);
@@ -452,6 +454,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     slashCommands,
     pendingHistoryItems: pendingSlashCommandHistoryItems,
     commandContext,
+    shellConfirmationRequest,
   } = useSlashCommandProcessor(
     config,
     settings,
@@ -468,6 +471,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setQuittingMessages,
     openPrivacyNotice,
     toggleVimEnabled,
+    setIsProcessing,
   );
 
   const {
@@ -624,7 +628,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     fetchUserMessages();
   }, [history, logger]);
 
-  const isInputActive = streamingState === StreamingState.Idle && !initError;
+  const isInputActive =
+    streamingState === StreamingState.Idle && !initError && !isProcessing;
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -830,7 +835,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             </Box>
           )}
 
-          {isThemeDialogOpen ? (
+          {shellConfirmationRequest ? (
+            <ShellConfirmationDialog request={shellConfirmationRequest} />
+          ) : isThemeDialogOpen ? (
             <Box flexDirection="column">
               {themeError && (
                 <Box marginBottom={1}>
