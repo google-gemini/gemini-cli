@@ -103,6 +103,7 @@ describe('useKeypress', () => {
   let originalNodeVersion: string;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     stdin = new MockStdin();
     (useStdin as vi.Mock).mockReturnValue({
@@ -115,6 +116,7 @@ describe('useKeypress', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     Object.defineProperty(process.versions, 'node', {
       value: originalNodeVersion,
       configurable: true,
@@ -137,7 +139,11 @@ describe('useKeypress', () => {
   it('should listen for keypress when active', () => {
     renderHook(() => useKeypress(onKeypress, { isActive: true }));
     const key = { name: 'a', sequence: 'a' };
-    act(() => stdin.pressKey(key));
+    act(() => {
+      stdin.pressKey(key);
+      // Advance timer past the RAPID_INPUT_THRESHOLD (30ms)
+      vi.advanceTimersByTime(35);
+    });
     expect(onKeypress).toHaveBeenCalledWith(expect.objectContaining(key));
   });
 
@@ -162,7 +168,11 @@ describe('useKeypress', () => {
   it('should correctly identify alt+enter (meta key)', () => {
     renderHook(() => useKeypress(onKeypress, { isActive: true }));
     const key = { name: 'return', sequence: '\x1B\r' };
-    act(() => stdin.pressKey(key));
+    act(() => {
+      stdin.pressKey(key);
+      // Advance timer past the RAPID_INPUT_THRESHOLD (30ms)
+      vi.advanceTimersByTime(35);
+    });
     expect(onKeypress).toHaveBeenCalledWith(
       expect.objectContaining({ ...key, meta: true, paste: false }),
     );
@@ -196,7 +206,13 @@ describe('useKeypress', () => {
     it('should process a paste as a single event', () => {
       renderHook(() => useKeypress(onKeypress, { isActive: true }));
       const pasteText = 'hello world';
-      act(() => stdin.paste(pasteText));
+      act(() => {
+        stdin.paste(pasteText);
+        // For legacy mode, advance timers to handle any buffering
+        if (isLegacy) {
+          vi.advanceTimersByTime(35);
+        }
+      });
 
       expect(onKeypress).toHaveBeenCalledTimes(1);
       expect(onKeypress).toHaveBeenCalledWith({
@@ -213,19 +229,33 @@ describe('useKeypress', () => {
       renderHook(() => useKeypress(onKeypress, { isActive: true }));
 
       const keyA = { name: 'a', sequence: 'a' };
-      act(() => stdin.pressKey(keyA));
+      act(() => {
+        stdin.pressKey(keyA);
+        // Advance timer for individual keystroke
+        vi.advanceTimersByTime(35);
+      });
       expect(onKeypress).toHaveBeenCalledWith(
         expect.objectContaining({ ...keyA, paste: false }),
       );
 
       const pasteText = 'pasted';
-      act(() => stdin.paste(pasteText));
+      act(() => {
+        stdin.paste(pasteText);
+        // For legacy mode, advance timers
+        if (isLegacy) {
+          vi.advanceTimersByTime(35);
+        }
+      });
       expect(onKeypress).toHaveBeenCalledWith(
         expect.objectContaining({ paste: true, sequence: pasteText }),
       );
 
       const keyB = { name: 'b', sequence: 'b' };
-      act(() => stdin.pressKey(keyB));
+      act(() => {
+        stdin.pressKey(keyB);
+        // Advance timer for individual keystroke
+        vi.advanceTimersByTime(35);
+      });
       expect(onKeypress).toHaveBeenCalledWith(
         expect.objectContaining({ ...keyB, paste: false }),
       );
@@ -245,7 +275,7 @@ describe('useKeypress', () => {
       expect(onKeypress).not.toHaveBeenCalled();
 
       // Unmounting should trigger the flush.
-      unmount();
+      act(() => unmount());
 
       expect(onKeypress).toHaveBeenCalledTimes(1);
       expect(onKeypress).toHaveBeenCalledWith({
