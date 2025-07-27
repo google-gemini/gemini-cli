@@ -95,6 +95,7 @@ describe('useSlashCommandProcessor', () => {
     builtinCommands: SlashCommand[] = [],
     fileCommands: SlashCommand[] = [],
     mcpCommands: SlashCommand[] = [],
+    setIsProcessing = vi.fn(),
   ) => {
     mockBuiltinLoadCommands.mockResolvedValue(Object.freeze(builtinCommands));
     mockFileLoadCommands.mockResolvedValue(Object.freeze(fileCommands));
@@ -117,6 +118,7 @@ describe('useSlashCommandProcessor', () => {
         mockSetQuittingMessages,
         vi.fn(), // openPrivacyNotice
         vi.fn(), // toggleVimEnabled
+        setIsProcessing,
       ),
     );
 
@@ -279,6 +281,32 @@ describe('useSlashCommandProcessor', () => {
         }),
         'with args',
       );
+    });
+
+    it('should set isProcessing to true during execution and false afterwards', async () => {
+      const mockSetIsProcessing = vi.fn();
+      const command = createTestCommand({
+        name: 'long-running',
+        action: () => new Promise((resolve) => setTimeout(resolve, 50)),
+      });
+
+      const result = setupProcessorHook([command], [], [], mockSetIsProcessing);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      const executionPromise = act(async () => {
+        await result.current.handleSlashCommand('/long-running');
+      });
+
+      // It should be true immediately after starting
+      expect(mockSetIsProcessing).toHaveBeenCalledWith(true);
+      // It should not have been called with false yet
+      expect(mockSetIsProcessing).not.toHaveBeenCalledWith(false);
+
+      await executionPromise;
+
+      // After the promise resolves, it should be called with false
+      expect(mockSetIsProcessing).toHaveBeenCalledWith(false);
+      expect(mockSetIsProcessing).toHaveBeenCalledTimes(2);
     });
   });
 
