@@ -326,8 +326,8 @@ const App = (props: AppProps) => {
     await newConfig.initialize();
     setConfig(newConfig);
     setSettings(newSettings);
-    await performMemoryRefresh();
-  }, [performMemoryRefresh]);
+    setGeminiMdFileCount(newConfig.getGeminiMdFileCount());
+  }, []);
 
   // Watch for model changes (e.g., from Flash fallback)
   useEffect(() => {

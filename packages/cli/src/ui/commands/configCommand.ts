@@ -20,7 +20,7 @@ export const configCommand: SlashCommand = {
       description: 'Reload settings and extensions from the filesystem.',
       kind: CommandKind.BUILT_IN,
       action: async (context): Promise<SlashCommandActionReturn> => {
-        await context.services.config?.refresh();
+        await context.ui.refreshConfig();
         return {
           type: 'message',
           messageType: 'info',
