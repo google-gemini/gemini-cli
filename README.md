@@ -151,11 +151,11 @@ Start by `cd`ing into an existing or newly-cloned repository and running `gemini
 ```
 
 ```text
-> Identify potential areas for improvement or refactoring in this codebase, highlighting parts that appear fragile, complex, or hard to maintain. 
+> Identify potential areas for improvement or refactoring in this codebase, highlighting parts that appear fragile, complex, or hard to maintain.
 ```
 
 ```text
-> Which parts of this codebase might be challenging to scale or debug? 
+> Which parts of this codebase might be challenging to scale or debug?
 ```
 
 ```text
@@ -163,11 +163,11 @@ Start by `cd`ing into an existing or newly-cloned repository and running `gemini
 ```
 
 ```text
-> What kind of error handling and logging strategies does the project use? 
+> What kind of error handling and logging strategies does the project use?
 ```
 
 ```text
-> Which tools, libraries, and dependencies are used in this project? 
+> Which tools, libraries, and dependencies are used in this project?
 ```
 
 ### Work with your existing code
