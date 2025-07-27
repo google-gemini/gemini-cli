@@ -174,7 +174,16 @@ const cleanMessage = (message: string): string => {
 const extractFirstUserMessage = (
   messages: ConversationRecord['messages'],
 ): string => {
-  const firstUserMsg = messages.find((msg) => msg.type === 'user');
+  const firstUserMsg =
+    messages
+      // First try filtering out slash commands.
+      .filter(
+        (msg) => !msg.content.startsWith('/') && !msg.content.startsWith('?'),
+      )
+      .find((msg) => msg.type === 'user') ??
+    // Then just default to the first message, even though it be a slash command, if there aren't
+    // any non-slash commands.
+    messages.find((msg) => msg.type === 'user');
   return firstUserMsg ? cleanMessage(firstUserMsg.content) : '';
 };
 
