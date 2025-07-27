@@ -12,12 +12,11 @@ export class MemoryDiscovery {
         } catch (error: unknown) {
             // Check if it's a Node.js file system error.
             if (error instanceof Error && 'code' in error) {
-                const nodeError = error as { code: string; message: string };
-                if (nodeError.code === 'ENOENT') {
+                if ((error as any).code === 'ENOENT') {
                     // File doesn't exist, which is an expected and valid case.
                     return null;
                 }
-                if (nodeError.code === 'EISDIR') {
+                if ((error as any).code === 'EISDIR') {
                     // Path is a directory, not a file. Log a warning and skip.
                     console.warn(`[WARN] [MemoryDiscovery] Skipping ${filePath}: is a directory, expected a file`);
                     return null;
