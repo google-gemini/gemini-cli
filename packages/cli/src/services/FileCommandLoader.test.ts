@@ -13,7 +13,10 @@ import {
 import mock from 'mock-fs';
 import { assert, vi } from 'vitest';
 import { createMockCommandContext } from '../test-utils/mockCommandContext.js';
-import { SHORTHAND_ARGS_PLACEHOLDER } from './prompt-processors/types.js';
+import {
+  SHELL_INJECTION_TRIGGER,
+  SHORTHAND_ARGS_PLACEHOLDER,
+} from './prompt-processors/types.js';
 import {
   ConfirmationRequiredError,
   ShellProcessor,
@@ -430,7 +433,7 @@ describe('FileCommandLoader', () => {
       const userCommandsDir = getUserCommandsDir();
       mock({
         [userCommandsDir]: {
-          'shell.toml': `prompt = "Run this: !{{echo hello}}"`,
+          'shell.toml': `prompt = "Run this: ${SHELL_INJECTION_TRIGGER}echo hello}"`,
         },
       });
 
@@ -458,7 +461,7 @@ describe('FileCommandLoader', () => {
       const userCommandsDir = getUserCommandsDir();
       mock({
         [userCommandsDir]: {
-          'shell.toml': `prompt = "Run !{{echo 'hello'}}"`,
+          'shell.toml': `prompt = "Run !{echo 'hello'}"`,
         },
       });
       mockShellProcess.mockResolvedValue('Run hello');
@@ -486,7 +489,7 @@ describe('FileCommandLoader', () => {
       const rawInvocation = '/shell rm -rf /';
       mock({
         [userCommandsDir]: {
-          'shell.toml': `prompt = "Run !{{rm -rf /}}"`,
+          'shell.toml': `prompt = "Run !{rm -rf /}"`,
         },
       });
 
@@ -519,7 +522,7 @@ describe('FileCommandLoader', () => {
       const userCommandsDir = getUserCommandsDir();
       mock({
         [userCommandsDir]: {
-          'shell.toml': `prompt = "Run !{{something}}"`,
+          'shell.toml': `prompt = "Run !{something}"`,
         },
       });
 
@@ -546,7 +549,7 @@ describe('FileCommandLoader', () => {
       mock({
         [userCommandsDir]: {
           'pipeline.toml': `
-            prompt = "Shell says: !{{echo foo}} and user says: ${SHORTHAND_ARGS_PLACEHOLDER}"
+            prompt = "Shell says: ${SHELL_INJECTION_TRIGGER}echo foo} and user says: ${SHORTHAND_ARGS_PLACEHOLDER}"
           `,
         },
       });

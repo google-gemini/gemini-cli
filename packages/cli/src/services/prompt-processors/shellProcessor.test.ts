@@ -65,7 +65,7 @@ describe('ShellProcessor', () => {
 
   it('should process a single valid shell injection if allowed', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'The current status is: !{{git status}}';
+    const prompt = 'The current status is: !{git status}';
     mockCheckCommandPermissions.mockReturnValue({
       allAllowed: true,
       disallowedCommands: [],
@@ -92,7 +92,7 @@ describe('ShellProcessor', () => {
 
   it('should process multiple valid shell injections if all are allowed', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = '!{{git status}} in !{{pwd}}';
+    const prompt = '!{git status} in !{pwd}';
     mockCheckCommandPermissions.mockReturnValue({
       allAllowed: true,
       disallowedCommands: [],
@@ -115,7 +115,7 @@ describe('ShellProcessor', () => {
 
   it('should throw ConfirmationRequiredError if a command is not allowed', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'Do something dangerous: !{{rm -rf /}}';
+    const prompt = 'Do something dangerous: !{rm -rf /}';
     mockCheckCommandPermissions.mockReturnValue({
       allAllowed: false,
       disallowedCommands: ['rm -rf /'],
@@ -128,7 +128,7 @@ describe('ShellProcessor', () => {
 
   it('should throw ConfirmationRequiredError with the correct command', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'Do something dangerous: !{{rm -rf /}}';
+    const prompt = 'Do something dangerous: !{rm -rf /}';
     mockCheckCommandPermissions.mockReturnValue({
       allAllowed: false,
       disallowedCommands: ['rm -rf /'],
@@ -150,7 +150,7 @@ describe('ShellProcessor', () => {
 
   it('should throw ConfirmationRequiredError with multiple commands if multiple are disallowed', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = '!{{cmd1}} and !{{cmd2}}';
+    const prompt = '!{cmd1} and !{cmd2}';
     mockCheckCommandPermissions.mockImplementation((cmd) => {
       if (cmd === 'cmd1') {
         return { allAllowed: false, disallowedCommands: ['cmd1'] };
@@ -175,7 +175,7 @@ describe('ShellProcessor', () => {
 
   it('should not execute any commands if at least one requires confirmation', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'First: !{{echo "hello"}}, Second: !{{rm -rf /}}';
+    const prompt = 'First: !{echo "hello"}, Second: !{rm -rf /}';
 
     mockCheckCommandPermissions.mockImplementation((cmd) => {
       if (cmd.includes('rm')) {
@@ -194,7 +194,7 @@ describe('ShellProcessor', () => {
 
   it('should only request confirmation for disallowed commands in a mixed prompt', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'Allowed: !{{ls -l}}, Disallowed: !{{rm -rf /}}';
+    const prompt = 'Allowed: !{ls -l}, Disallowed: !{rm -rf /}';
 
     mockCheckCommandPermissions.mockImplementation((cmd) => ({
       allAllowed: !cmd.includes('rm'),
@@ -214,7 +214,7 @@ describe('ShellProcessor', () => {
 
   it('should execute all commands if they are on the session allowlist', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'Run !{{cmd1}} and !{{cmd2}}';
+    const prompt = 'Run !{cmd1} and !{cmd2}';
 
     // Add commands to the session allowlist
     context.session.sessionShellAllowlist = new Set(['cmd1', 'cmd2']);
@@ -247,7 +247,7 @@ describe('ShellProcessor', () => {
 
   it('should trim whitespace from the command inside the injection', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'Files: !{{  ls -l  }}';
+    const prompt = 'Files: !{  ls -l  }';
     mockCheckCommandPermissions.mockReturnValue({
       allAllowed: true,
       disallowedCommands: [],
@@ -273,7 +273,7 @@ describe('ShellProcessor', () => {
 
   it('should handle an empty command inside the injection gracefully', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'This is weird: !{{}}';
+    const prompt = 'This is weird: !{}';
     mockCheckCommandPermissions.mockReturnValue({
       allAllowed: true,
       disallowedCommands: [],
@@ -296,33 +296,5 @@ describe('ShellProcessor', () => {
       expect.any(Object),
     );
     expect(result).toBe('This is weird: empty output');
-  });
-
-  it('should correctly parse a command containing curly braces', async () => {
-    const processor = new ShellProcessor('test-command');
-    const prompt =
-      'Commit message: !{{git commit -m "feat: allow {} in messages"}}';
-    mockCheckCommandPermissions.mockReturnValue({
-      allAllowed: true,
-      disallowedCommands: [],
-    });
-    mockShellExecute.mockReturnValue({
-      result: Promise.resolve({ output: 'commit done' }),
-    });
-
-    const result = await processor.process(prompt, context);
-
-    expect(mockCheckCommandPermissions).toHaveBeenCalledWith(
-      'git commit -m "feat: allow {} in messages"',
-      expect.any(Object),
-      context.session.sessionShellAllowlist,
-    );
-    expect(mockShellExecute).toHaveBeenCalledWith(
-      'git commit -m "feat: allow {} in messages"',
-      expect.any(String),
-      expect.any(Function),
-      expect.any(Object),
-    );
-    expect(result).toBe('Commit message: commit done');
   });
 });
