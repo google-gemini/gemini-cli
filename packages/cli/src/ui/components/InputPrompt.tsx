@@ -4,26 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
-import { SuggestionsDisplay } from './SuggestionsDisplay.js';
-import { useInputHistory } from '../hooks/useInputHistory.js';
-import { TextBuffer } from './shared/text-buffer.js';
-import { cpSlice, cpLen } from '../utils/textUtils.js';
-import chalk from 'chalk';
-import stringWidth from 'string-width';
-import { useShellHistory } from '../hooks/useShellHistory.js';
-import { useCompletion } from '../hooks/useCompletion.js';
-import { useKeypress, Key } from '../hooks/useKeypress.js';
-import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
+import chalk from 'chalk';
+import { Box, Text } from 'ink';
+import * as path from 'path';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import stringWidth from 'string-width';
+import { Colors } from '../colors.js';
+import { CommandContext, SlashCommand } from '../commands/types.js';
+import { useCompletion } from '../hooks/useCompletion.js';
+import { useInputHistory } from '../hooks/useInputHistory.js';
+import { Key, useKeypress } from '../hooks/useKeypress.js';
+import { useShellHistory } from '../hooks/useShellHistory.js';
 import {
+  cleanupOldClipboardImages,
   clipboardHasImage,
   saveClipboardImage,
-  cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
-import * as path from 'path';
+import { cpLen, cpSlice } from '../utils/textUtils.js';
+import { TextBuffer } from './shared/text-buffer.js';
+import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -59,6 +59,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   vimHandleInput,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const bufferRef = useRef(buffer);
+  useEffect(() => {
+    bufferRef.current = buffer;
+  }, [buffer]);
 
   const completion = useCompletion(
     buffer,
@@ -283,7 +287,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.backspace();
             buffer.newline();
           } else {
-            handleSubmitAndClear(buffer.text);
+            // HACK: Defer submission to allow IME to finalize.
+            // This is a workaround for terminals that don't support
+            // proper IME composition events. The ref ensures we
+            // get the latest buffer text after the IME has updated it.
+            setTimeout(() => {
+              handleSubmitAndClear(bufferRef.current.text);
+            }, 50);
           }
         }
         return;
