@@ -44,6 +44,7 @@ import { runAcpPeer } from './acp/acpPeer.js';
 import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { formatRelativeTime, SessionSelector } from './utils/sessionUtils.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
