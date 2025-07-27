@@ -20,7 +20,8 @@ import {
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
-import { StreamingState } from './types.js';
+import { useConsoleMessages } from './hooks/useConsoleMessages.js';
+import { StreamingState, ConsoleMessageItem } from './types.js';
 import { Tips } from './components/Tips.js';
 
 // Define a more complete mock server config based on actual Config
@@ -125,6 +126,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getToolCallCommand: vi.fn(() => opts.toolCallCommand),
         getMcpServerCommand: vi.fn(() => opts.mcpServerCommand),
         getMcpServers: vi.fn(() => opts.mcpServers),
+        getPromptRegistry: vi.fn(),
         getExtensions: vi.fn(() => []),
         getBlockedMcpServers: vi.fn(() => []),
         getUserAgent: vi.fn(() => opts.userAgent || 'test-agent'),
@@ -188,6 +190,14 @@ vi.mock('./hooks/useAuthCommand', () => ({
 vi.mock('./hooks/useLogger', () => ({
   useLogger: vi.fn(() => ({
     getPreviousUserMessages: vi.fn().mockResolvedValue([]),
+  })),
+}));
+
+vi.mock('./hooks/useConsoleMessages.js', () => ({
+  useConsoleMessages: vi.fn(() => ({
+    consoleMessages: [],
+    handleNewMessage: vi.fn(),
+    clearConsoleMessages: vi.fn(),
   })),
 }));
 
@@ -281,6 +291,7 @@ describe('App UI', () => {
   it('should display active file when available', async () => {
     vi.mocked(ideContext.getOpenFilesContext).mockReturnValue({
       activeFile: '/path/to/my-file.ts',
+      recentOpenFiles: [{ filePath: '/path/to/my-file.ts', content: 'hello' }],
       selectedText: 'hello',
     });
 
@@ -293,7 +304,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Open File (my-file.ts)');
+    expect(lastFrame()).toContain('1 recent file (ctrl+e to view)');
   });
 
   it('should not display active file when not available', async () => {
@@ -316,9 +327,11 @@ describe('App UI', () => {
   it('should display active file and other context', async () => {
     vi.mocked(ideContext.getOpenFilesContext).mockReturnValue({
       activeFile: '/path/to/my-file.ts',
+      recentOpenFiles: [{ filePath: '/path/to/my-file.ts', content: 'hello' }],
       selectedText: 'hello',
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(1);
+    mockConfig.getAllGeminiMdFilenames.mockReturnValue(['GEMINI.md']);
 
     const { lastFrame, unmount } = render(
       <App
@@ -329,11 +342,14 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Open File (my-file.ts) | 1 GEMINI.md File');
+    expect(lastFrame()).toContain(
+      'Using: 1 recent file (ctrl+e to view) | 1 GEMINI.md file',
+    );
   });
 
   it('should display default "GEMINI.md" in footer when contextFileName is not set and count is 1', async () => {
     mockConfig.getGeminiMdFileCount.mockReturnValue(1);
+    mockConfig.getAllGeminiMdFilenames.mockReturnValue(['GEMINI.md']);
     // For this test, ensure showMemoryUsage is false or debugMode is false if it relies on that
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
@@ -347,11 +363,15 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve(); // Wait for any async updates
-    expect(lastFrame()).toContain('Using: 1 GEMINI.md File');
+    expect(lastFrame()).toContain('Using: 1 GEMINI.md file');
   });
 
   it('should display default "GEMINI.md" with plural when contextFileName is not set and count is > 1', async () => {
     mockConfig.getGeminiMdFileCount.mockReturnValue(2);
+    mockConfig.getAllGeminiMdFilenames.mockReturnValue([
+      'GEMINI.md',
+      'GEMINI.md',
+    ]);
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
@@ -364,7 +384,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using: 2 GEMINI.md Files');
+    expect(lastFrame()).toContain('Using: 2 GEMINI.md files');
   });
 
   it('should display custom contextFileName in footer when set and count is 1', async () => {
@@ -372,6 +392,7 @@ describe('App UI', () => {
       workspace: { contextFileName: 'AGENTS.md', theme: 'Default' },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(1);
+    mockConfig.getAllGeminiMdFilenames.mockReturnValue(['AGENTS.md']);
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
@@ -384,7 +405,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using: 1 AGENTS.md File');
+    expect(lastFrame()).toContain('Using: 1 AGENTS.md file');
   });
 
   it('should display a generic message when multiple context files with different names are provided', async () => {
@@ -395,6 +416,10 @@ describe('App UI', () => {
       },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(2);
+    mockConfig.getAllGeminiMdFilenames.mockReturnValue([
+      'AGENTS.md',
+      'CONTEXT.md',
+    ]);
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
@@ -407,7 +432,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using: 2 Context Files');
+    expect(lastFrame()).toContain('Using: 2 context files');
   });
 
   it('should display custom contextFileName with plural when set and count is > 1', async () => {
@@ -415,6 +440,11 @@ describe('App UI', () => {
       workspace: { contextFileName: 'MY_NOTES.TXT', theme: 'Default' },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(3);
+    mockConfig.getAllGeminiMdFilenames.mockReturnValue([
+      'MY_NOTES.TXT',
+      'MY_NOTES.TXT',
+      'MY_NOTES.TXT',
+    ]);
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
@@ -427,7 +457,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using: 3 MY_NOTES.TXT Files');
+    expect(lastFrame()).toContain('Using: 3 MY_NOTES.TXT files');
   });
 
   it('should not display context file message if count is 0, even if contextFileName is set', async () => {
@@ -435,6 +465,7 @@ describe('App UI', () => {
       workspace: { contextFileName: 'ANY_FILE.MD', theme: 'Default' },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(0);
+    mockConfig.getAllGeminiMdFilenames.mockReturnValue([]);
     mockConfig.getDebugMode.mockReturnValue(false);
     mockConfig.getShowMemoryUsage.mockReturnValue(false);
 
@@ -452,6 +483,10 @@ describe('App UI', () => {
 
   it('should display GEMINI.md and MCP server count when both are present', async () => {
     mockConfig.getGeminiMdFileCount.mockReturnValue(2);
+    mockConfig.getAllGeminiMdFilenames.mockReturnValue([
+      'GEMINI.md',
+      'GEMINI.md',
+    ]);
     mockConfig.getMcpServers.mockReturnValue({
       server1: {} as MCPServerConfig,
     });
@@ -467,11 +502,12 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('1 MCP Server');
+    expect(lastFrame()).toContain('1 MCP server');
   });
 
   it('should display only MCP server count when GEMINI.md count is 0', async () => {
     mockConfig.getGeminiMdFileCount.mockReturnValue(0);
+    mockConfig.getAllGeminiMdFilenames.mockReturnValue([]);
     mockConfig.getMcpServers.mockReturnValue({
       server1: {} as MCPServerConfig,
       server2: {} as MCPServerConfig,
@@ -488,7 +524,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('Using: 2 MCP Servers');
+    expect(lastFrame()).toContain('Using: 2 MCP servers (ctrl+t to view)');
   });
 
   it('should display Tips component by default', async () => {
@@ -621,6 +657,38 @@ describe('App UI', () => {
     });
   });
 
+  it('should render the initial UI correctly', () => {
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('should render correctly with the prompt input box', () => {
+    vi.mocked(useGeminiStream).mockReturnValue({
+      streamingState: StreamingState.Idle,
+      submitQuery: vi.fn(),
+      initError: null,
+      pendingHistoryItems: [],
+      thought: null,
+    });
+
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   describe('with initial prompt from --prompt-interactive', () => {
     it('should submit the initial prompt automatically', async () => {
       const mockSubmitQuery = vi.fn();
@@ -663,6 +731,37 @@ describe('App UI', () => {
       expect(mockSubmitQuery).toHaveBeenCalledWith(
         'hello from prompt-interactive',
       );
+    });
+  });
+
+  describe('errorCount', () => {
+    it('should correctly sum the counts of error messages', async () => {
+      const mockConsoleMessages: ConsoleMessageItem[] = [
+        { type: 'error', content: 'First error', count: 1 },
+        { type: 'log', content: 'some log', count: 1 },
+        { type: 'error', content: 'Second error', count: 3 },
+        { type: 'warn', content: 'a warning', count: 1 },
+        { type: 'error', content: 'Third error', count: 1 },
+      ];
+
+      vi.mocked(useConsoleMessages).mockReturnValue({
+        consoleMessages: mockConsoleMessages,
+        handleNewMessage: vi.fn(),
+        clearConsoleMessages: vi.fn(),
+      });
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      await Promise.resolve();
+
+      // Total error count should be 1 + 3 + 1 = 5
+      expect(lastFrame()).toContain('5 errors');
     });
   });
 });

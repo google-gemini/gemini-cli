@@ -28,6 +28,7 @@ vi.mock('vscode', () => ({
   }),
   window: {
     onDidChangeActiveTextEditor: vi.fn(),
+    onDidChangeTextEditorSelection: vi.fn(),
   },
   workspace: {
     onDidDeleteFiles: vi.fn(),
