@@ -5,12 +5,22 @@
  */
 
 import {
-  isCommandAllowed,
+  checkCommandPermissions,
   ShellExecutionService,
 } from '@google/gemini-cli-core';
 
 import { CommandContext } from '../../ui/commands/types.js';
 import { IPromptProcessor } from './types.js';
+
+export class ConfirmationRequiredError extends Error {
+  constructor(
+    message: string,
+    public commandsToConfirm: string[],
+  ) {
+    super(message);
+    this.name = 'ConfirmationRequiredError';
+  }
+}
 
 /**
  * Finds all instances of shell command injections (`!{...}`) in a prompt,
@@ -27,41 +37,56 @@ export class ShellProcessor implements IPromptProcessor {
   private static readonly SHELL_INJECTION_REGEX = /!\{([^}]*)\}/g;
 
   /**
-   * @param shellAllowlist A list of shell commands that are explicitly
-   *   allowed in the user's config.
    * @param commandName The name of the custom command being executed, used
    *   for logging and error messages.
    */
-  constructor(
-    private readonly shellAllowlist: string[],
-    private readonly commandName: string,
-  ) {}
+  constructor(private readonly commandName: string) {}
 
   async process(prompt: string, context: CommandContext): Promise<string> {
+    const { config, sessionShellAllowlist } = {
+      ...context.services,
+      ...context.session,
+    };
+    const commandsToExecute: Array<{ fullMatch: string; command: string }> = [];
+    const commandsToConfirm = new Set<string>();
+
     const matches = [...prompt.matchAll(ShellProcessor.SHELL_INJECTION_REGEX)];
     if (matches.length === 0) {
-      return prompt;
+      return prompt; // No shell commands, nothing to do.
     }
 
-    let processedPrompt = prompt;
-
+    // Discover all commands and check permissions.
     for (const match of matches) {
-      const fullMatch = match[0]; // e.g., "!{git status}"
-      const command = match[1].trim(); // e.g., "git status"
+      const command = match[1].trim();
+      const { allAllowed, disallowedCommands, blockReason, isHardDenial } =
+        checkCommandPermissions(command, config!, sessionShellAllowlist);
 
-      const { config } = context.services;
-      const permission = isCommandAllowed(
-        command,
-        config!,
-        this.shellAllowlist,
-      );
+      if (!allAllowed) {
+        // If it's a hard denial, this is a non-recoverable security error.
+        if (isHardDenial) {
+          throw new Error(
+            `${this.commandName} cannot be run. ${blockReason || 'A shell command in this custom command is explicitly blocked in your config settings.'}`,
+          );
+        }
 
-      if (!permission.allowed) {
-        const errorMessage = `Shell command "${command}" in custom command "${this.commandName}" is not allowed. Reason: ${permission.reason}`;
-        throw new Error(errorMessage);
+        // Add each soft denial disallowed command to the set for confirmation.
+        disallowedCommands.forEach((uc) => commandsToConfirm.add(uc));
       }
+      commandsToExecute.push({ fullMatch: match[0], command });
+    }
 
-      // We have permission, now execute.
+    // If any commands require confirmation, throw a special error to halt the
+    // pipeline and trigger the UI flow.
+    if (commandsToConfirm.size > 0) {
+      throw new ConfirmationRequiredError(
+        'Shell command confirmation required',
+        Array.from(commandsToConfirm),
+      );
+    }
+
+    // Execute all commands (only runs if no confirmation was needed).
+    let processedPrompt = prompt;
+    for (const { fullMatch, command } of commandsToExecute) {
       const { result } = ShellExecutionService.execute(
         command,
         config!.getTargetDir(),

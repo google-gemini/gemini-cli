@@ -36,6 +36,7 @@ import { ThemeDialog } from './components/ThemeDialog.js';
 import { AuthDialog } from './components/AuthDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
+import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -452,6 +453,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     slashCommands,
     pendingHistoryItems: pendingSlashCommandHistoryItems,
     commandContext,
+    shellConfirmationRequest,
   } = useSlashCommandProcessor(
     config,
     settings,
@@ -830,7 +832,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             </Box>
           )}
 
-          {isThemeDialogOpen ? (
+          {shellConfirmationRequest ? (
+            <ShellConfirmationDialog request={shellConfirmationRequest} />
+          ) : isThemeDialogOpen ? (
             <Box flexDirection="column">
               {themeError && (
                 <Box marginBottom={1}>

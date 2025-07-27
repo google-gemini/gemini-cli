@@ -17,10 +17,28 @@ import {
   SHELL_INJECTION_TRIGGER,
   SHORTHAND_ARGS_PLACEHOLDER,
 } from './prompt-processors/types.js';
-import { ShellProcessor } from './prompt-processors/shellProcessor.js';
+import {
+  ConfirmationRequiredError,
+  ShellProcessor,
+} from './prompt-processors/shellProcessor.js';
 import { ShorthandArgumentProcessor } from './prompt-processors/argumentProcessor.js';
 
-vi.mock('./prompt-processors/shellProcessor.js');
+const mockShellProcess = vi.hoisted(() => vi.fn());
+vi.mock('./prompt-processors/shellProcessor.js', () => ({
+  ShellProcessor: vi.fn().mockImplementation(() => ({
+    process: mockShellProcess,
+  })),
+  ConfirmationRequiredError: class extends Error {
+    constructor(
+      message: string,
+      public commandsToConfirm: string[],
+    ) {
+      super(message);
+      this.name = 'ConfirmationRequiredError';
+    }
+  },
+}));
+
 vi.mock('./prompt-processors/argumentProcessor.js', async (importOriginal) => {
   const original =
     await importOriginal<
@@ -52,6 +70,7 @@ describe('FileCommandLoader', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockShellProcess.mockImplementation((prompt) => Promise.resolve(prompt));
   });
 
   afterEach(() => {
@@ -410,32 +429,25 @@ describe('FileCommandLoader', () => {
   });
 
   describe('Shell Processor Integration', () => {
-    it('loads a command with a shell-allowlist and a shell injection trigger', async () => {
+    it('instantiates ShellProcessor if the trigger is present', async () => {
       const userCommandsDir = getUserCommandsDir();
       mock({
         [userCommandsDir]: {
-          'shell.toml': `
-            prompt = "Run this: ${SHELL_INJECTION_TRIGGER}echo hello}"
-            shell-allowlist = ["echo"]
-          `,
+          'shell.toml': `prompt = "Run this: ${SHELL_INJECTION_TRIGGER}echo hello}"`,
         },
       });
 
       const loader = new FileCommandLoader(null as unknown as Config);
       await loader.loadCommands(signal);
 
-      // Check that the ShellProcessor was instantiated with the correct allowlist
-      expect(ShellProcessor).toHaveBeenCalledWith(['echo'], 'shell');
+      expect(ShellProcessor).toHaveBeenCalledWith('shell');
     });
 
-    it('does not add ShellProcessor if trigger is missing, even with allowlist', async () => {
+    it('does not instantiate ShellProcessor if trigger is missing', async () => {
       const userCommandsDir = getUserCommandsDir();
       mock({
         [userCommandsDir]: {
-          'shell.toml': `
-            prompt = "Just a regular prompt"
-            shell-allowlist = ["echo"]
-          `,
+          'regular.toml': `prompt = "Just a regular prompt"`,
         },
       });
 
@@ -445,42 +457,91 @@ describe('FileCommandLoader', () => {
       expect(ShellProcessor).not.toHaveBeenCalled();
     });
 
-    it('adds ShellProcessor with an empty allowlist if trigger is present but allowlist is not', async () => {
+    it('returns a "submit_prompt" action if shell processing succeeds', async () => {
       const userCommandsDir = getUserCommandsDir();
       mock({
         [userCommandsDir]: {
-          'shell.toml': `
-            prompt = "Run this: ${SHELL_INJECTION_TRIGGER}echo hello}"
-          `,
+          'shell.toml': `prompt = "Run !{echo 'hello'}"`,
         },
       });
-
-      const loader = new FileCommandLoader(null as unknown as Config);
-      await loader.loadCommands(signal);
-
-      // Check that the ShellProcessor was instantiated with an empty array
-      expect(ShellProcessor).toHaveBeenCalledWith([], 'shell');
-    });
-
-    it('ignores commands with a malformed shell-allowlist', async () => {
-      const userCommandsDir = getUserCommandsDir();
-      mock({
-        [userCommandsDir]: {
-          'bad.toml': `
-            prompt = "Run this: ${SHELL_INJECTION_TRIGGER}echo hello}"
-            shell-allowlist = "this should be an array"
-          `,
-          'good.toml': 'prompt = "This one is fine"',
-        },
-      });
+      mockShellProcess.mockResolvedValue('Run hello');
 
       const loader = new FileCommandLoader(null as unknown as Config);
       const commands = await loader.loadCommands(signal);
+      const command = commands.find((c) => c.name === 'shell');
+      expect(command).toBeDefined();
 
-      // Only the valid command should be loaded
-      expect(commands).toHaveLength(1);
-      expect(commands[0].name).toBe('good');
-      expect(ShellProcessor).not.toHaveBeenCalled();
+      const result = await command!.action!(
+        createMockCommandContext({
+          invocation: { raw: '/shell', name: 'shell', args: '' },
+        }),
+        '',
+      );
+
+      expect(result?.type).toBe('submit_prompt');
+      if (result?.type === 'submit_prompt') {
+        expect(result.content).toBe('Run hello');
+      }
+    });
+
+    it('returns a "confirm_shell_commands" action if shell processing requires it', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      const rawInvocation = '/shell rm -rf /';
+      mock({
+        [userCommandsDir]: {
+          'shell.toml': `prompt = "Run !{rm -rf /}"`,
+        },
+      });
+
+      // Mock the processor to throw the specific error
+      const error = new ConfirmationRequiredError('Confirmation needed', [
+        'rm -rf /',
+      ]);
+      mockShellProcess.mockRejectedValue(error);
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+      const command = commands.find((c) => c.name === 'shell');
+      expect(command).toBeDefined();
+
+      const result = await command!.action!(
+        createMockCommandContext({
+          invocation: { raw: rawInvocation, name: 'shell', args: 'rm -rf /' },
+        }),
+        'rm -rf /',
+      );
+
+      expect(result?.type).toBe('confirm_shell_commands');
+      if (result?.type === 'confirm_shell_commands') {
+        expect(result.commandsToConfirm).toEqual(['rm -rf /']);
+        expect(result.originalInvocation.raw).toBe(rawInvocation);
+      }
+    });
+
+    it('re-throws other errors from the processor', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'shell.toml': `prompt = "Run !{something}"`,
+        },
+      });
+
+      const genericError = new Error('Something else went wrong');
+      mockShellProcess.mockRejectedValue(genericError);
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+      const command = commands.find((c) => c.name === 'shell');
+      expect(command).toBeDefined();
+
+      await expect(
+        command!.action!(
+          createMockCommandContext({
+            invocation: { raw: '/shell', name: 'shell', args: '' },
+          }),
+          '',
+        ),
+      ).rejects.toThrow('Something else went wrong');
     });
 
     it('assembles the processor pipeline in the correct order (Shell -> Argument)', async () => {
@@ -489,24 +550,20 @@ describe('FileCommandLoader', () => {
         [userCommandsDir]: {
           'pipeline.toml': `
             prompt = "Shell says: ${SHELL_INJECTION_TRIGGER}echo foo} and user says: ${SHORTHAND_ARGS_PLACEHOLDER}"
-            shell-allowlist = ["echo"]
           `,
         },
       });
 
       // Mock the process methods to track call order
-      const shellProcessMock = vi
-        .fn()
-        .mockImplementation((p) => `${p}-shell-processed`);
       const argProcessMock = vi
         .fn()
         .mockImplementation((p) => `${p}-arg-processed`);
-      vi.mocked(ShellProcessor).mockImplementation(
-        () =>
-          ({
-            process: shellProcessMock,
-          }) as unknown as ShellProcessor,
+
+      // Redefine the mock for this specific test
+      mockShellProcess.mockImplementation((p) =>
+        Promise.resolve(`${p}-shell-processed`),
       );
+
       vi.mocked(ShorthandArgumentProcessor).mockImplementation(
         () =>
           ({
@@ -531,19 +588,12 @@ describe('FileCommandLoader', () => {
       );
 
       // Verify that the shell processor was called before the argument processor
-      const shellInstance = vi.mocked(ShellProcessor).mock.results[0].value;
-      const argInstance = vi.mocked(ShorthandArgumentProcessor).mock.results[0]
-        .value;
-
-      // This is a bit of a trick to check call order with Vitest mocks.
-      // If shellInstance.process was called before argInstance.process, its
-      // mock.invocationCallOrder[0] will be less than the arg processor's.
-      expect(shellInstance.process.mock.invocationCallOrder[0]).toBeLessThan(
-        argInstance.process.mock.invocationCallOrder[0],
+      expect(mockShellProcess.mock.invocationCallOrder[0]).toBeLessThan(
+        argProcessMock.mock.invocationCallOrder[0],
       );
 
       // Also verify the flow of the prompt through the processors
-      expect(shellProcessMock).toHaveBeenCalledWith(
+      expect(mockShellProcess).toHaveBeenCalledWith(
         expect.any(String),
         expect.any(Object),
       );

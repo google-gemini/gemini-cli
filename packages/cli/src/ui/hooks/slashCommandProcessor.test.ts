@@ -42,8 +42,13 @@ vi.mock('../contexts/SessionContext.js', () => ({
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
-import { CommandKind, SlashCommand } from '../commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import {
+  CommandContext,
+  CommandKind,
+  ConfirmShellCommandsActionReturn,
+  SlashCommand,
+} from '../commands/types.js';
+import { Config, ToolConfirmationOutcome } from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
@@ -417,6 +422,176 @@ describe('useSlashCommandProcessor', () => {
     });
   });
 
+  describe('Shell Command Confirmation Flow', () => {
+    // Use a generic vi.fn() for the action. We will change its behavior in each test.
+    const mockCommandAction = vi.fn();
+
+    const shellCommand = createTestCommand({
+      name: 'shellcmd',
+      action: mockCommandAction,
+    });
+
+    beforeEach(() => {
+      // Reset the mock before each test
+      mockCommandAction.mockClear();
+
+      // Default behavior: request confirmation
+      mockCommandAction.mockResolvedValue({
+        type: 'confirm_shell_commands',
+        commandsToConfirm: ['rm -rf /'],
+        originalInvocation: { raw: '/shellcmd' },
+      } as ConfirmShellCommandsActionReturn);
+    });
+
+    it('should set confirmation request when action returns confirm_shell_commands', async () => {
+      const result = setupProcessorHook([shellCommand]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      // This is intentionally not awaited, because the promise it returns
+      // will not resolve until the user responds to the confirmation.
+      act(() => {
+        result.current.handleSlashCommand('/shellcmd');
+      });
+
+      // We now wait for the state to be updated with the request.
+      await waitFor(() => {
+        expect(result.current.shellConfirmationRequest).not.toBeNull();
+      });
+
+      expect(result.current.shellConfirmationRequest?.commands).toEqual([
+        'rm -rf /',
+      ]);
+    });
+
+    it('should do nothing if user cancels confirmation', async () => {
+      const result = setupProcessorHook([shellCommand]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      act(() => {
+        result.current.handleSlashCommand('/shellcmd');
+      });
+
+      // Wait for the confirmation dialog to be set
+      await waitFor(() => {
+        expect(result.current.shellConfirmationRequest).not.toBeNull();
+      });
+
+      const onConfirm = result.current.shellConfirmationRequest?.onConfirm;
+      expect(onConfirm).toBeDefined();
+
+      // Change the mock action's behavior for a potential second run.
+      // If the test is flawed, this will be called, and we can detect it.
+      mockCommandAction.mockResolvedValue({
+        type: 'message',
+        messageType: 'info',
+        content: 'This should not be called',
+      });
+
+      await act(async () => {
+        onConfirm!(ToolConfirmationOutcome.Cancel, []); // Pass empty array for safety
+      });
+
+      expect(result.current.shellConfirmationRequest).toBeNull();
+      // Verify the action was only called the initial time.
+      expect(mockCommandAction).toHaveBeenCalledTimes(1);
+    });
+
+    it('should re-run command with one-time allowlist on "Proceed Once"', async () => {
+      const result = setupProcessorHook([shellCommand]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      act(() => {
+        result.current.handleSlashCommand('/shellcmd');
+      });
+      await waitFor(() => {
+        expect(result.current.shellConfirmationRequest).not.toBeNull();
+      });
+
+      const onConfirm = result.current.shellConfirmationRequest?.onConfirm;
+
+      // **Change the mock's behavior for the SECOND run.**
+      // This is the key to testing the outcome.
+      mockCommandAction.mockResolvedValue({
+        type: 'message',
+        messageType: 'info',
+        content: 'Success!',
+      });
+
+      await act(async () => {
+        onConfirm!(ToolConfirmationOutcome.ProceedOnce, ['rm -rf /']);
+      });
+
+      expect(result.current.shellConfirmationRequest).toBeNull();
+
+      // The action should have been called twice (initial + re-run).
+      await waitFor(() => {
+        expect(mockCommandAction).toHaveBeenCalledTimes(2);
+      });
+
+      // We can inspect the context of the second call to ensure the one-time list was used.
+      const secondCallContext = mockCommandAction.mock
+        .calls[1][0] as CommandContext;
+      expect(
+        secondCallContext.session.sessionShellAllowlist.has('rm -rf /'),
+      ).toBe(true);
+
+      // Verify the final success message was added.
+      expect(mockAddItem).toHaveBeenCalledWith(
+        { type: MessageType.INFO, text: 'Success!' },
+        expect.any(Number),
+      );
+
+      // Verify the session-wide allowlist was NOT permanently updated.
+      // Re-render the hook by calling a no-op command to get the latest context.
+      await act(async () => {
+        result.current.handleSlashCommand('/no-op');
+      });
+      const finalContext = result.current.commandContext;
+      expect(finalContext.session.sessionShellAllowlist.size).toBe(0);
+    });
+
+    it('should re-run command and update session allowlist on "Proceed Always"', async () => {
+      const result = setupProcessorHook([shellCommand]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      act(() => {
+        result.current.handleSlashCommand('/shellcmd');
+      });
+      await waitFor(() => {
+        expect(result.current.shellConfirmationRequest).not.toBeNull();
+      });
+
+      const onConfirm = result.current.shellConfirmationRequest?.onConfirm;
+      mockCommandAction.mockResolvedValue({
+        type: 'message',
+        messageType: 'info',
+        content: 'Success!',
+      });
+
+      await act(async () => {
+        onConfirm!(ToolConfirmationOutcome.ProceedAlways, ['rm -rf /']);
+      });
+
+      expect(result.current.shellConfirmationRequest).toBeNull();
+      await waitFor(() => {
+        expect(mockCommandAction).toHaveBeenCalledTimes(2);
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        { type: MessageType.INFO, text: 'Success!' },
+        expect.any(Number),
+      );
+
+      // Check that the session-wide allowlist WAS updated.
+      await waitFor(() => {
+        const finalContext = result.current.commandContext;
+        expect(finalContext.session.sessionShellAllowlist.has('rm -rf /')).toBe(
+          true,
+        );
+      });
+    });
+  });
+
   describe('Command Parsing and Matching', () => {
     it('should be case-sensitive', async () => {
       const command = createTestCommand({ name: 'test' });
@@ -583,7 +758,7 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Lifecycle', () => {
-    it('should abort command loading when the hook unmounts', async () => {
+    it('should abort command loading when the hook unmounts', () => {
       const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
       const { unmount } = renderHook(() =>
         useSlashCommandProcessor(
@@ -597,10 +772,11 @@ describe('useSlashCommandProcessor', () => {
           vi.fn(), // onDebugMessage
           vi.fn(), // openThemeDialog
           mockOpenAuthDialog,
-          vi.fn(), // openEditorDialog
+          vi.fn(), // openEditorDialog,
           vi.fn(), // toggleCorgiMode
           mockSetQuittingMessages,
           vi.fn(), // openPrivacyNotice
+          vi.fn(), // toggleVimEnabled
         ),
       );
 

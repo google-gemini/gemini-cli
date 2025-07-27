@@ -9,7 +9,12 @@ import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useStateAndRef } from './useStateAndRef.js';
-import { Config, GitService, Logger } from '@google/gemini-cli-core';
+import {
+  Config,
+  GitService,
+  Logger,
+  ToolConfirmationOutcome,
+} from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
   Message,
@@ -47,6 +52,17 @@ export const useSlashCommandProcessor = (
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<readonly SlashCommand[]>([]);
+  const [shellConfirmationRequest, setShellConfirmationRequest] =
+    useState<null | {
+      commands: string[];
+      onConfirm: (
+        outcome: ToolConfirmationOutcome,
+        approvedCommands?: string[],
+      ) => void;
+    }>(null);
+  const [sessionShellAllowlist, setSessionShellAllowlist] = useState(
+    new Set<string>(),
+  );
   const gitService = useMemo(() => {
     if (!config?.getProjectRoot()) {
       return;
@@ -144,6 +160,7 @@ export const useSlashCommandProcessor = (
       },
       session: {
         stats: session.stats,
+        sessionShellAllowlist,
       },
     }),
     [
@@ -161,6 +178,7 @@ export const useSlashCommandProcessor = (
       setPendingCompressionItem,
       toggleCorgiMode,
       toggleVimEnabled,
+      sessionShellAllowlist,
     ],
   );
 
@@ -189,6 +207,7 @@ export const useSlashCommandProcessor = (
   const handleSlashCommand = useCallback(
     async (
       rawQuery: PartListUnion,
+      oneTimeShellAllowlist?: Set<string>,
     ): Promise<SlashCommandProcessorResult | false> => {
       if (typeof rawQuery !== 'string') {
         return false;
@@ -251,6 +270,19 @@ export const useSlashCommandProcessor = (
               args,
             },
           };
+
+          // If a one-time list is provided for a "Proceed" action, temporarily
+          // augment the session allowlist for this single execution.
+          if (oneTimeShellAllowlist && oneTimeShellAllowlist.size > 0) {
+            fullCommandContext.session = {
+              ...fullCommandContext.session,
+              sessionShellAllowlist: new Set([
+                ...fullCommandContext.session.sessionShellAllowlist,
+                ...oneTimeShellAllowlist,
+              ]),
+            };
+          }
+
           try {
             const result = await commandToExecute.action(
               fullCommandContext,
@@ -323,6 +355,46 @@ export const useSlashCommandProcessor = (
                     type: 'submit_prompt',
                     content: result.content,
                   };
+                case 'confirm_shell_commands': {
+                  const { outcome, approvedCommands } = await new Promise<{
+                    outcome: ToolConfirmationOutcome;
+                    approvedCommands?: string[];
+                  }>((resolve) => {
+                    setShellConfirmationRequest({
+                      commands: result.commandsToConfirm,
+                      onConfirm: (
+                        resolvedOutcome,
+                        resolvedApprovedCommands,
+                      ) => {
+                        setShellConfirmationRequest(null); // Close the dialog
+                        resolve({
+                          outcome: resolvedOutcome,
+                          approvedCommands: resolvedApprovedCommands,
+                        });
+                      },
+                    });
+                  });
+
+                  if (
+                    outcome === ToolConfirmationOutcome.Cancel ||
+                    !approvedCommands ||
+                    approvedCommands.length === 0
+                  ) {
+                    return { type: 'handled' };
+                  }
+
+                  if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+                    setSessionShellAllowlist(
+                      (prev) => new Set([...prev, ...approvedCommands]),
+                    );
+                  }
+
+                  return handleSlashCommand(
+                    result.originalInvocation.raw,
+                    // Pass the approved commands as a one-time grant for this execution.
+                    new Set(approvedCommands),
+                  );
+                }
                 default: {
                   const unhandled: never = result;
                   throw new Error(
@@ -375,6 +447,8 @@ export const useSlashCommandProcessor = (
       openPrivacyNotice,
       openEditorDialog,
       setQuittingMessages,
+      setShellConfirmationRequest,
+      setSessionShellAllowlist,
     ],
   );
 
@@ -383,5 +457,6 @@ export const useSlashCommandProcessor = (
     slashCommands: commands,
     pendingHistoryItems,
     commandContext,
+    shellConfirmationRequest,
   };
 };

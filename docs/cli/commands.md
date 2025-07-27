@@ -205,19 +205,18 @@ When you run `/changelog 1.2.0 added "New feature"`, the final text sent to the 
 
 You can make your commands dynamic by executing shell commands directly within your `prompt` and injecting their output. This is ideal for gathering context from your local environment, like reading file content or checking the status of Git.
 
-To use this feature, you must define a `shell-allowlist` in your TOML file **OR** have allowed the shell commands in your global allowlist. This is a security measure to ensure that only intended commands can be run.
+When a custom command attempts to execute a shell command, Gemini CLI will now prompt you for confirmation before proceeding. This is a security measure to ensure that only intended commands can be run.
 
 **How It Works:**
 
-1.  **Define Permissions:** Add a `shell-allowlist` array to your TOML file, listing the exact shell commands your prompt is allowed to execute.
-2.  **Inject Commands:** Use the `!{...}` syntax in your `prompt` to specify where the command should be run and its output injected.
+1.  **Inject Commands:** Use the `!{...}` syntax in your `prompt` to specify where the command should be run and its output injected.
+2.  **Confirm Execution:** When you run the command, a dialog will appear listing the shell commands the prompt wants to execute.
+3.  **Grant Permission:** You can choose to:
+    - **Allow once:** The command(s) will run this one time.
+    - **Allow always for this session:** The command(s) will be added to a temporary allowlist for the current CLI session and will not require confirmation again.
+    - **No:** Cancel the execution of the shell command(s).
 
-The CLI checks permissions in this order:
-
-1.  Global `excludeTools` settings (if blocked here, it can't run).
-2.  Global `coreTools` settings (if allowed here, it can run).
-3.  The command's local `shell-allowlist`.
-4.  If the command is not in either allowlist, it will cause the command to fail.
+The CLI still respects the global `excludeTools` and `coreTools` settings. A command will be blocked without a confirmation prompt if it is explicitly disallowed in your configuration.
 
 **Example (`git/commit.toml`):**
 
@@ -228,11 +227,6 @@ This command gets the staged git diff and uses it to ask the model to write a co
 # Invoked via: /git:commit
 
 description = "Generates a Git commit message based on staged changes."
-
-# Define the list of shell commands this prompt is allowed to run.
-shell-allowlist = [
-  "git diff --staged"
-]
 
 # The prompt uses !{...} to execute the command and inject its output.
 prompt = """

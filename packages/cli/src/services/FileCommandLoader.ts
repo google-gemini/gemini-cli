@@ -19,7 +19,7 @@ import {
   CommandContext,
   CommandKind,
   SlashCommand,
-  SubmitPromptActionReturn,
+  SlashCommandActionReturn,
 } from '../ui/commands/types.js';
 import {
   DefaultArgumentProcessor,
@@ -30,7 +30,10 @@ import {
   SHORTHAND_ARGS_PLACEHOLDER,
   SHELL_INJECTION_TRIGGER,
 } from './prompt-processors/types.js';
-import { ShellProcessor } from './prompt-processors/shellProcessor.js';
+import {
+  ConfirmationRequiredError,
+  ShellProcessor,
+} from './prompt-processors/shellProcessor.js';
 
 /**
  * Defines the Zod schema for a command definition file. This serves as the
@@ -42,7 +45,6 @@ const TomlCommandDefSchema = z.object({
     invalid_type_error: "The 'prompt' field must be a string.",
   }),
   description: z.string().optional(),
-  'shell-allowlist': z.array(z.string()).optional(),
 });
 
 /**
@@ -176,9 +178,8 @@ export class FileCommandLoader implements ICommandLoader {
     const processors: IPromptProcessor[] = [];
 
     // Add the Shell Processor if needed.
-    const shellAllowlist = validDef['shell-allowlist'] || [];
     if (validDef.prompt.includes(SHELL_INJECTION_TRIGGER)) {
-      processors.push(new ShellProcessor(shellAllowlist, commandName));
+      processors.push(new ShellProcessor(commandName));
     }
 
     // The presence of '{{args}}' is the switch that determines the behavior.
@@ -197,7 +198,7 @@ export class FileCommandLoader implements ICommandLoader {
       action: async (
         context: CommandContext,
         _args: string,
-      ): Promise<SubmitPromptActionReturn> => {
+      ): Promise<SlashCommandActionReturn> => {
         if (!context.invocation) {
           console.error(
             `[FileCommandLoader] Critical error: Command '${commandName}' was executed without invocation context.`,
@@ -208,15 +209,31 @@ export class FileCommandLoader implements ICommandLoader {
           };
         }
 
-        let processedPrompt = validDef.prompt;
-        for (const processor of processors) {
-          processedPrompt = await processor.process(processedPrompt, context);
-        }
+        try {
+          let processedPrompt = validDef.prompt;
+          for (const processor of processors) {
+            processedPrompt = await processor.process(processedPrompt, context);
+          }
 
-        return {
-          type: 'submit_prompt',
-          content: processedPrompt,
-        };
+          return {
+            type: 'submit_prompt',
+            content: processedPrompt,
+          };
+        } catch (e) {
+          // Check if it's our specific error type
+          if (e instanceof ConfirmationRequiredError) {
+            // Halt and request confirmation from the UI layer.
+            return {
+              type: 'confirm_shell_commands',
+              commandsToConfirm: e.commandsToConfirm,
+              originalInvocation: {
+                raw: context.invocation.raw,
+              },
+            };
+          }
+          // Re-throw other errors to be handled by the global error handler.
+          throw e;
+        }
       },
     };
   }
