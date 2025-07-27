@@ -20,6 +20,7 @@ import {
   ToolResult,
   Config,
   Icon,
+  ApprovalMode,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 
@@ -126,6 +127,7 @@ describe('CoreToolScheduler', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -194,6 +196,7 @@ describe('CoreToolScheduler with payload', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -470,6 +473,7 @@ describe('CoreToolScheduler edit cancellation', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -525,5 +529,87 @@ describe('CoreToolScheduler edit cancellation', () => {
       '--- test.txt\n+++ test.txt\n@@ -1,1 +1,1 @@\n-old content\n+new content',
     );
     expect(cancelledCall.response.resultDisplay.fileName).toBe('test.txt');
+  });
+});
+
+describe('CoreToolScheduler YOLO mode', () => {
+  it('should execute tool requiring confirmation directly without waiting', async () => {
+    // Arrange
+    const mockTool = new MockTool();
+    // This tool would normally require confirmation.
+    mockTool.shouldConfirm = true;
+
+    const toolRegistry = {
+      getTool: () => mockTool,
+      getToolByName: () => mockTool,
+      // Other properties are not needed for this test but are included for type consistency.
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {} as any,
+      registerTool: () => {},
+      getToolByDisplayName: () => mockTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    };
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    // Configure the scheduler for YOLO mode.
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.YOLO,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      toolRegistry: Promise.resolve(toolRegistry as any),
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockTool',
+      args: { param: 'value' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-yolo',
+    };
+
+    // Act
+    await scheduler.schedule([request], abortController.signal);
+
+    // Assert
+    // 1. The tool's execute method was called directly.
+    expect(mockTool.executeFn).toHaveBeenCalledWith({ param: 'value' });
+
+    // 2. The tool call status never entered 'awaiting_approval'.
+    const statusUpdates = onToolCallsUpdate.mock.calls
+      .map((call) => (call[0][0] as ToolCall)?.status)
+      .filter(Boolean);
+    expect(statusUpdates).not.toContain('awaiting_approval');
+    expect(statusUpdates).toEqual([
+      'validating',
+      'scheduled',
+      'executing',
+      'success',
+    ]);
+
+    // 3. The final callback indicates the tool call was successful.
+    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls).toHaveLength(1);
+    const completedCall = completedCalls[0];
+    expect(completedCall.status).toBe('success');
+    if (completedCall.status === 'success') {
+      expect(completedCall.response.resultDisplay).toBe('Tool executed');
+    }
   });
 });

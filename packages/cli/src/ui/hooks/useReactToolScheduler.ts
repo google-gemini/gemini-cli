@@ -140,7 +140,6 @@ export function useReactToolScheduler(
         outputUpdateHandler,
         onAllToolCallsComplete: allToolCallsCompleteHandler,
         onToolCallsUpdate: toolCallsUpdateHandler,
-        approvalMode: config.getApprovalMode(),
         getPreferredEditor,
         config,
         chatRecordingService,

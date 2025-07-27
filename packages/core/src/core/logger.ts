@@ -230,9 +230,6 @@ export class Logger {
     }
   }
 
-
-
-
   close(): void {
     this.initialized = false;
     this.logFilePath = undefined;
