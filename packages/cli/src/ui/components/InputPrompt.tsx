@@ -14,7 +14,8 @@ import { cpSlice, cpLen } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
-import { useCompletion } from '../hooks/useCompletion.js';
+import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
+import { useSlashCompletion } from '../hooks/useSlashCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
@@ -64,7 +65,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const shellHistory = useShellHistory(config.getProjectRoot());
   const historyData = shellHistory.history;
 
-  const completion = useCompletion(
+  const completion = useSlashCompletion(
     buffer,
     config.getTargetDir(),
     slashCommands,
@@ -73,40 +74,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     config,
   );
 
-  const reverseSearchCompletion = useCompletion(
+  const reverseSearchCompletion = useReverseSearchCompletion(
     buffer,
-    config.getTargetDir(),
-    slashCommands,
-    commandContext,
-    reverseSearchActive,
-    config,
     historyData,
+    reverseSearchActive,
   );
-
   const resetCompletionState = completion.resetCompletionState;
   const resetReverseSearchCompletionState =
     reverseSearchCompletion.resetCompletionState;
-
-  const handleReverseSearchAutoComplete = useCallback(
-    (indexToUse: number) => {
-      if (
-        indexToUse < 0 ||
-        indexToUse >= reverseSearchCompletion.suggestions.length
-      ) {
-        return;
-      }
-      const suggestion = reverseSearchCompletion.suggestions[indexToUse].value;
-      buffer.setText(suggestion);
-      setReverseSearchActive(false);
-      resetReverseSearchCompletionState();
-    },
-    [
-      buffer,
-      reverseSearchCompletion.suggestions,
-      setReverseSearchActive,
-      resetReverseSearchCompletionState,
-    ],
-  );
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
@@ -281,7 +256,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             return;
           }
           if (key.name === 'tab') {
-            handleReverseSearchAutoComplete(activeSuggestionIndex);
+            reverseSearchCompletion.handleAutocomplete(activeSuggestionIndex);
             return;
           }
         }
@@ -450,7 +425,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       inputHistory,
       handleSubmitAndClear,
       shellHistory,
-      handleReverseSearchAutoComplete,
       reverseSearchCompletion,
       handleClipboardImage,
       resetCompletionState,
@@ -554,7 +528,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           <SuggestionsDisplay
             suggestions={reverseSearchCompletion.suggestions}
             activeIndex={reverseSearchCompletion.activeSuggestionIndex}
-            isLoading={false}
+            isLoading={reverseSearchCompletion.isLoadingSuggestions}
             width={suggestionsWidth}
             scrollOffset={reverseSearchCompletion.visibleStartIndex}
             userInput={buffer.text}
