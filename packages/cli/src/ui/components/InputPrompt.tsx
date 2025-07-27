@@ -60,9 +60,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const bufferRef = useRef(buffer);
+  const imeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
     bufferRef.current = buffer;
   }, [buffer]);
+
+  useEffect(
+    () => () => {
+      if (imeTimeoutRef.current) {
+        clearTimeout(imeTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   const completion = useCompletion(
     buffer,
@@ -291,7 +301,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             // This is a workaround for terminals that don't support
             // proper IME composition events. The ref ensures we
             // get the latest buffer text after the IME has updated it.
-            setTimeout(() => {
+            if (imeTimeoutRef.current) {
+              clearTimeout(imeTimeoutRef.current);
+            }
+            imeTimeoutRef.current = setTimeout(() => {
               handleSubmitAndClear(bufferRef.current.text);
             }, 50);
           }
