@@ -273,7 +273,7 @@ const App = ({
       refreshStatic(); // Force Static component to re-render with the updated history.
 
       // Give the history to the Gemini client.
-      config.getGeminiClient()?.startChat(history.clientHistory);
+      config.getGeminiClient()?.resumeChat(history.clientHistory);
     },
     [
       clearItems,
