@@ -14,8 +14,6 @@ import mock from 'mock-fs';
 import { assert } from 'vitest';
 import { createMockCommandContext } from '../test-utils/mockCommandContext.js';
 
-const mockContext = createMockCommandContext();
-
 describe('FileCommandLoader', () => {
   const signal: AbortSignal = new AbortController().signal;
 
@@ -39,13 +37,79 @@ describe('FileCommandLoader', () => {
     expect(command).toBeDefined();
     expect(command.name).toBe('test');
 
-    const result = await command.action?.(mockContext, '');
+    const result = await command.action?.(
+      createMockCommandContext({
+        invocation: {
+          raw: '/test',
+          name: 'test',
+          args: '',
+        },
+      }),
+      '',
+    );
     if (result?.type === 'submit_prompt') {
       expect(result.content).toBe('This is a test prompt');
     } else {
       assert.fail('Incorrect action type');
     }
   });
+
+  // Symlink creation on Windows requires special permissions that are not
+  // available in the standard CI environment. Therefore, we skip these tests
+  // on Windows to prevent CI failures. The core functionality is still
+  // validated on Linux and macOS.
+  const itif = (condition: boolean) => (condition ? it : it.skip);
+
+  itif(process.platform !== 'win32')(
+    'loads commands from a symlinked directory',
+    async () => {
+      const userCommandsDir = getUserCommandsDir();
+      const realCommandsDir = '/real/commands';
+      mock({
+        [realCommandsDir]: {
+          'test.toml': 'prompt = "This is a test prompt"',
+        },
+        // Symlink the user commands directory to the real one
+        [userCommandsDir]: mock.symlink({
+          path: realCommandsDir,
+        }),
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(1);
+      const command = commands[0];
+      expect(command).toBeDefined();
+      expect(command.name).toBe('test');
+    },
+  );
+
+  itif(process.platform !== 'win32')(
+    'loads commands from a symlinked subdirectory',
+    async () => {
+      const userCommandsDir = getUserCommandsDir();
+      const realNamespacedDir = '/real/namespaced-commands';
+      mock({
+        [userCommandsDir]: {
+          namespaced: mock.symlink({
+            path: realNamespacedDir,
+          }),
+        },
+        [realNamespacedDir]: {
+          'my-test.toml': 'prompt = "This is a test prompt"',
+        },
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(1);
+      const command = commands[0];
+      expect(command).toBeDefined();
+      expect(command.name).toBe('namespaced:my-test');
+    },
+  );
 
   it('loads multiple commands', async () => {
     const userCommandsDir = getUserCommandsDir();
@@ -122,7 +186,16 @@ describe('FileCommandLoader', () => {
     const command = commands[0];
     expect(command).toBeDefined();
 
-    const result = await command.action?.(mockContext, '');
+    const result = await command.action?.(
+      createMockCommandContext({
+        invocation: {
+          raw: '/test',
+          name: 'test',
+          args: '',
+        },
+      }),
+      '',
+    );
     if (result?.type === 'submit_prompt') {
       expect(result.content).toBe('Project prompt');
     } else {
@@ -231,5 +304,71 @@ describe('FileCommandLoader', () => {
 
     // Verify that the ':' in the filename was replaced with an '_'
     expect(command.name).toBe('legacy_command');
+  });
+
+  describe('Shorthand Argument Processor Integration', () => {
+    it('correctly processes a command with {{args}}', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'shorthand.toml':
+            'prompt = "The user wants to: {{args}}"\ndescription = "Shorthand test"',
+        },
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+      const command = commands.find((c) => c.name === 'shorthand');
+      expect(command).toBeDefined();
+
+      const result = await command!.action?.(
+        createMockCommandContext({
+          invocation: {
+            raw: '/shorthand do something cool',
+            name: 'shorthand',
+            args: 'do something cool',
+          },
+        }),
+        'do something cool',
+      );
+      expect(result?.type).toBe('submit_prompt');
+      if (result?.type === 'submit_prompt') {
+        expect(result.content).toBe('The user wants to: do something cool');
+      }
+    });
+  });
+
+  describe('Default Argument Processor Integration', () => {
+    it('correctly processes a command without {{args}}', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'model_led.toml':
+            'prompt = "This is the instruction."\ndescription = "Default processor test"',
+        },
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+      const command = commands.find((c) => c.name === 'model_led');
+      expect(command).toBeDefined();
+
+      const result = await command!.action?.(
+        createMockCommandContext({
+          invocation: {
+            raw: '/model_led 1.2.0 added "a feature"',
+            name: 'model_led',
+            args: '1.2.0 added "a feature"',
+          },
+        }),
+        '1.2.0 added "a feature"',
+      );
+      expect(result?.type).toBe('submit_prompt');
+      if (result?.type === 'submit_prompt') {
+        const expectedContent =
+          'This is the instruction.\n\n/model_led 1.2.0 added "a feature"';
+        expect(result.content).toBe(expectedContent);
+      }
+    });
   });
 });
