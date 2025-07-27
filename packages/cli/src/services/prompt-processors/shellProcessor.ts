@@ -23,7 +23,7 @@ export class ConfirmationRequiredError extends Error {
 }
 
 /**
- * Finds all instances of shell command injections (`!{...}`) in a prompt,
+ * Finds all instances of shell command injections (`!{{...}}`) in a prompt,
  * executes them, and replaces the injection site with the command's output.
  *
  * This processor ensures that only allowlisted commands are executed. If a
@@ -31,10 +31,10 @@ export class ConfirmationRequiredError extends Error {
  */
 export class ShellProcessor implements IPromptProcessor {
   /**
-   * A regular expression to find all instances of `!{...}`. The inner
+   * A regular expression to find all instances of `!{{...}}`. The inner
    * capture group extracts the command itself.
    */
-  private static readonly SHELL_INJECTION_REGEX = /!\{([^}]*)\}/g;
+  private static readonly SHELL_INJECTION_REGEX = /!\{\{((?:.|\n)*?)\}\}/g;
 
   /**
    * @param commandName The name of the custom command being executed, used
