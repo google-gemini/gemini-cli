@@ -300,10 +300,7 @@ export class MCPOAuthProvider {
     // Add resource parameter for MCP OAuth spec compliance
     // Use the MCP server URL if provided, otherwise fall back to authorization URL
     const resourceUrl = mcpServerUrl || config.authorizationUrl!;
-    params.append(
-      'resource',
-      OAuthUtils.buildResourceParameter(resourceUrl),
-    );
+    params.append('resource', OAuthUtils.buildResourceParameter(resourceUrl));
 
     return `${config.authorizationUrl}?${params.toString()}`;
   }
@@ -342,10 +339,7 @@ export class MCPOAuthProvider {
     // Add resource parameter for MCP OAuth spec compliance
     // Use the MCP server URL if provided, otherwise fall back to token URL
     const resourceUrl = mcpServerUrl || config.tokenUrl!;
-    params.append(
-      'resource',
-      OAuthUtils.buildResourceParameter(resourceUrl),
-    );
+    params.append('resource', OAuthUtils.buildResourceParameter(resourceUrl));
 
     const response = await fetch(config.tokenUrl!, {
       method: 'POST',
@@ -547,7 +541,11 @@ export class MCPOAuthProvider {
     const pkceParams = this.generatePKCEParams();
 
     // Build authorization URL
-    const authUrl = this.buildAuthorizationUrl(config, pkceParams, mcpServerUrl);
+    const authUrl = this.buildAuthorizationUrl(
+      config,
+      pkceParams,
+      mcpServerUrl,
+    );
 
     console.log('\nOpening browser for OAuth authentication...');
     console.log('If the browser does not open, please visit:');
