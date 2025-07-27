@@ -139,7 +139,7 @@ export function useKeypress(
                 combinedContent.includes('\n');
               const charCount = combinedContent.length;
 
-              if (hasNewlines && charCount > 10) {
+              if (hasNewlines && charCount > 5) {
                 // Looks like multiline paste
                 onKeypressRef.current({
                   name: '',
@@ -207,7 +207,11 @@ export function useKeypress(
 
       // Check for paste start
       const pasteStartIndex = bufferStr.indexOf(PASTE_START);
-      if (pasteStartIndex !== -1 && !isLegacyPaste) {
+      if (pasteStartIndex !== -1) {
+        const dataBeforePaste = bufferStr.slice(0, pasteStartIndex);
+        if (dataBeforePaste.length > 0) {
+          keypressStream.write(Buffer.from(dataBeforePaste));
+        }
         isLegacyPaste = true;
         // Remove everything up to and including the paste start sequence
         const afterPasteStart = bufferStr.slice(
@@ -249,7 +253,7 @@ export function useKeypress(
       // If we're not in a paste, or haven't found the end yet,
       // process normally (but don't process during paste)
       if (!isLegacyPaste) {
-        keypressStream.write(data);
+        keypressStream.write(legacyPasteBuffer);
         legacyPasteBuffer = Buffer.alloc(0); // Clear buffer if not in paste
       }
       // If we are in a paste but haven't found the end, keep buffering
