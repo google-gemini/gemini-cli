@@ -11,11 +11,67 @@ import {
   getUserCommandsDir,
 } from '@google/gemini-cli-core';
 import mock from 'mock-fs';
-import { assert } from 'vitest';
+import { assert, vi } from 'vitest';
 import { createMockCommandContext } from '../test-utils/mockCommandContext.js';
+import {
+  SHELL_INJECTION_TRIGGER,
+  SHORTHAND_ARGS_PLACEHOLDER,
+} from './prompt-processors/types.js';
+import {
+  ConfirmationRequiredError,
+  ShellProcessor,
+} from './prompt-processors/shellProcessor.js';
+import { ShorthandArgumentProcessor } from './prompt-processors/argumentProcessor.js';
+
+const mockShellProcess = vi.hoisted(() => vi.fn());
+vi.mock('./prompt-processors/shellProcessor.js', () => ({
+  ShellProcessor: vi.fn().mockImplementation(() => ({
+    process: mockShellProcess,
+  })),
+  ConfirmationRequiredError: class extends Error {
+    constructor(
+      message: string,
+      public commandsToConfirm: string[],
+    ) {
+      super(message);
+      this.name = 'ConfirmationRequiredError';
+    }
+  },
+}));
+
+vi.mock('./prompt-processors/argumentProcessor.js', async (importOriginal) => {
+  const original =
+    await importOriginal<
+      typeof import('./prompt-processors/argumentProcessor.js')
+    >();
+  return {
+    ShorthandArgumentProcessor: vi
+      .fn()
+      .mockImplementation(() => new original.ShorthandArgumentProcessor()),
+    DefaultArgumentProcessor: vi
+      .fn()
+      .mockImplementation(() => new original.DefaultArgumentProcessor()),
+  };
+});
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...original,
+    isCommandAllowed: vi.fn(),
+    ShellExecutionService: {
+      execute: vi.fn(),
+    },
+  };
+});
 
 describe('FileCommandLoader', () => {
   const signal: AbortSignal = new AbortController().signal;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockShellProcess.mockImplementation((prompt) => Promise.resolve(prompt));
+  });
 
   afterEach(() => {
     mock.restore();
@@ -53,6 +109,63 @@ describe('FileCommandLoader', () => {
       assert.fail('Incorrect action type');
     }
   });
+
+  // Symlink creation on Windows requires special permissions that are not
+  // available in the standard CI environment. Therefore, we skip these tests
+  // on Windows to prevent CI failures. The core functionality is still
+  // validated on Linux and macOS.
+  const itif = (condition: boolean) => (condition ? it : it.skip);
+
+  itif(process.platform !== 'win32')(
+    'loads commands from a symlinked directory',
+    async () => {
+      const userCommandsDir = getUserCommandsDir();
+      const realCommandsDir = '/real/commands';
+      mock({
+        [realCommandsDir]: {
+          'test.toml': 'prompt = "This is a test prompt"',
+        },
+        // Symlink the user commands directory to the real one
+        [userCommandsDir]: mock.symlink({
+          path: realCommandsDir,
+        }),
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(1);
+      const command = commands[0];
+      expect(command).toBeDefined();
+      expect(command.name).toBe('test');
+    },
+  );
+
+  itif(process.platform !== 'win32')(
+    'loads commands from a symlinked subdirectory',
+    async () => {
+      const userCommandsDir = getUserCommandsDir();
+      const realNamespacedDir = '/real/namespaced-commands';
+      mock({
+        [userCommandsDir]: {
+          namespaced: mock.symlink({
+            path: realNamespacedDir,
+          }),
+        },
+        [realNamespacedDir]: {
+          'my-test.toml': 'prompt = "This is a test prompt"',
+        },
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(1);
+      const command = commands[0];
+      expect(command).toBeDefined();
+      expect(command.name).toBe('namespaced:my-test');
+    },
+  );
 
   it('loads multiple commands', async () => {
     const userCommandsDir = getUserCommandsDir();
@@ -312,6 +425,182 @@ describe('FileCommandLoader', () => {
           'This is the instruction.\n\n/model_led 1.2.0 added "a feature"';
         expect(result.content).toBe(expectedContent);
       }
+    });
+  });
+
+  describe('Shell Processor Integration', () => {
+    it('instantiates ShellProcessor if the trigger is present', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'shell.toml': `prompt = "Run this: ${SHELL_INJECTION_TRIGGER}echo hello}"`,
+        },
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      await loader.loadCommands(signal);
+
+      expect(ShellProcessor).toHaveBeenCalledWith('shell');
+    });
+
+    it('does not instantiate ShellProcessor if trigger is missing', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'regular.toml': `prompt = "Just a regular prompt"`,
+        },
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      await loader.loadCommands(signal);
+
+      expect(ShellProcessor).not.toHaveBeenCalled();
+    });
+
+    it('returns a "submit_prompt" action if shell processing succeeds', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'shell.toml': `prompt = "Run !{echo 'hello'}"`,
+        },
+      });
+      mockShellProcess.mockResolvedValue('Run hello');
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+      const command = commands.find((c) => c.name === 'shell');
+      expect(command).toBeDefined();
+
+      const result = await command!.action!(
+        createMockCommandContext({
+          invocation: { raw: '/shell', name: 'shell', args: '' },
+        }),
+        '',
+      );
+
+      expect(result?.type).toBe('submit_prompt');
+      if (result?.type === 'submit_prompt') {
+        expect(result.content).toBe('Run hello');
+      }
+    });
+
+    it('returns a "confirm_shell_commands" action if shell processing requires it', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      const rawInvocation = '/shell rm -rf /';
+      mock({
+        [userCommandsDir]: {
+          'shell.toml': `prompt = "Run !{rm -rf /}"`,
+        },
+      });
+
+      // Mock the processor to throw the specific error
+      const error = new ConfirmationRequiredError('Confirmation needed', [
+        'rm -rf /',
+      ]);
+      mockShellProcess.mockRejectedValue(error);
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+      const command = commands.find((c) => c.name === 'shell');
+      expect(command).toBeDefined();
+
+      const result = await command!.action!(
+        createMockCommandContext({
+          invocation: { raw: rawInvocation, name: 'shell', args: 'rm -rf /' },
+        }),
+        'rm -rf /',
+      );
+
+      expect(result?.type).toBe('confirm_shell_commands');
+      if (result?.type === 'confirm_shell_commands') {
+        expect(result.commandsToConfirm).toEqual(['rm -rf /']);
+        expect(result.originalInvocation.raw).toBe(rawInvocation);
+      }
+    });
+
+    it('re-throws other errors from the processor', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'shell.toml': `prompt = "Run !{something}"`,
+        },
+      });
+
+      const genericError = new Error('Something else went wrong');
+      mockShellProcess.mockRejectedValue(genericError);
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+      const command = commands.find((c) => c.name === 'shell');
+      expect(command).toBeDefined();
+
+      await expect(
+        command!.action!(
+          createMockCommandContext({
+            invocation: { raw: '/shell', name: 'shell', args: '' },
+          }),
+          '',
+        ),
+      ).rejects.toThrow('Something else went wrong');
+    });
+
+    it('assembles the processor pipeline in the correct order (Shell -> Argument)', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'pipeline.toml': `
+            prompt = "Shell says: ${SHELL_INJECTION_TRIGGER}echo foo} and user says: ${SHORTHAND_ARGS_PLACEHOLDER}"
+          `,
+        },
+      });
+
+      // Mock the process methods to track call order
+      const argProcessMock = vi
+        .fn()
+        .mockImplementation((p) => `${p}-arg-processed`);
+
+      // Redefine the mock for this specific test
+      mockShellProcess.mockImplementation((p) =>
+        Promise.resolve(`${p}-shell-processed`),
+      );
+
+      vi.mocked(ShorthandArgumentProcessor).mockImplementation(
+        () =>
+          ({
+            process: argProcessMock,
+          }) as unknown as ShorthandArgumentProcessor,
+      );
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+      const command = commands.find((c) => c.name === 'pipeline');
+      expect(command).toBeDefined();
+
+      await command!.action!(
+        createMockCommandContext({
+          invocation: {
+            raw: '/pipeline bar',
+            name: 'pipeline',
+            args: 'bar',
+          },
+        }),
+        'bar',
+      );
+
+      // Verify that the shell processor was called before the argument processor
+      expect(mockShellProcess.mock.invocationCallOrder[0]).toBeLessThan(
+        argProcessMock.mock.invocationCallOrder[0],
+      );
+
+      // Also verify the flow of the prompt through the processors
+      expect(mockShellProcess).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Object),
+      );
+      expect(argProcessMock).toHaveBeenCalledWith(
+        expect.stringContaining('-shell-processed'), // It receives the output of the shell processor
+        expect.any(Object),
+      );
     });
   });
 });

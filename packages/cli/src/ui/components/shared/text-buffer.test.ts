@@ -11,6 +11,7 @@ import {
   Viewport,
   TextBuffer,
   offsetToLogicalPos,
+  logicalPosToOffset,
   textBufferReducer,
   TextBufferState,
   TextBufferAction,
@@ -1339,5 +1340,218 @@ describe('offsetToLogicalPos', () => {
     expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]);
     expect(offsetToLogicalPos(text, 1)).toEqual([0, 1]); // After 🐶
     expect(offsetToLogicalPos(text, 2)).toEqual([0, 2]); // After 🐱
+  });
+});
+
+describe('logicalPosToOffset', () => {
+  it('should convert row/col position to offset correctly', () => {
+    const lines = ['hello', 'world', '123'];
+
+    // Line 0: "hello" (5 chars)
+    expect(logicalPosToOffset(lines, 0, 0)).toBe(0); // Start of 'hello'
+    expect(logicalPosToOffset(lines, 0, 3)).toBe(3); // 'l' in 'hello'
+    expect(logicalPosToOffset(lines, 0, 5)).toBe(5); // End of 'hello'
+
+    // Line 1: "world" (5 chars), offset starts at 6 (5 + 1 for newline)
+    expect(logicalPosToOffset(lines, 1, 0)).toBe(6); // Start of 'world'
+    expect(logicalPosToOffset(lines, 1, 2)).toBe(8); // 'r' in 'world'
+    expect(logicalPosToOffset(lines, 1, 5)).toBe(11); // End of 'world'
+
+    // Line 2: "123" (3 chars), offset starts at 12 (5 + 1 + 5 + 1)
+    expect(logicalPosToOffset(lines, 2, 0)).toBe(12); // Start of '123'
+    expect(logicalPosToOffset(lines, 2, 1)).toBe(13); // '2' in '123'
+    expect(logicalPosToOffset(lines, 2, 3)).toBe(15); // End of '123'
+  });
+
+  it('should handle empty lines', () => {
+    const lines = ['a', '', 'c'];
+
+    expect(logicalPosToOffset(lines, 0, 0)).toBe(0); // 'a'
+    expect(logicalPosToOffset(lines, 0, 1)).toBe(1); // End of 'a'
+    expect(logicalPosToOffset(lines, 1, 0)).toBe(2); // Empty line
+    expect(logicalPosToOffset(lines, 2, 0)).toBe(3); // 'c'
+    expect(logicalPosToOffset(lines, 2, 1)).toBe(4); // End of 'c'
+  });
+
+  it('should handle single empty line', () => {
+    const lines = [''];
+
+    expect(logicalPosToOffset(lines, 0, 0)).toBe(0);
+  });
+
+  it('should be inverse of offsetToLogicalPos', () => {
+    const lines = ['hello', 'world', '123'];
+    const text = lines.join('\n');
+
+    // Test round-trip conversion
+    for (let offset = 0; offset <= text.length; offset++) {
+      const [row, col] = offsetToLogicalPos(text, offset);
+      const convertedOffset = logicalPosToOffset(lines, row, col);
+      expect(convertedOffset).toBe(offset);
+    }
+  });
+
+  it('should handle out-of-bounds positions', () => {
+    const lines = ['hello'];
+
+    // Beyond end of line
+    expect(logicalPosToOffset(lines, 0, 10)).toBe(5); // Clamps to end of line
+
+    // Beyond array bounds - should clamp to the last line
+    expect(logicalPosToOffset(lines, 5, 0)).toBe(0); // Clamps to start of last line (row 0)
+    expect(logicalPosToOffset(lines, 5, 10)).toBe(5); // Clamps to end of last line
+  });
+});
+
+describe('textBufferReducer vim operations', () => {
+  describe('vim_delete_line', () => {
+    it('should delete a single line including newline in multi-line text', () => {
+      const initialState: TextBufferState = {
+        lines: ['line1', 'line2', 'line3'],
+        cursorRow: 1,
+        cursorCol: 2,
+        preferredCol: null,
+        visualLines: [['line1'], ['line2'], ['line3']],
+        visualScrollRow: 0,
+        visualCursor: { row: 1, col: 2 },
+        viewport: { width: 10, height: 5 },
+        undoStack: [],
+        redoStack: [],
+      };
+
+      const action: TextBufferAction = {
+        type: 'vim_delete_line',
+        payload: { count: 1 },
+      };
+
+      const result = textBufferReducer(initialState, action);
+
+      // After deleting line2, we should have line1 and line3, with cursor on line3 (now at index 1)
+      expect(result.lines).toEqual(['line1', 'line3']);
+      expect(result.cursorRow).toBe(1);
+      expect(result.cursorCol).toBe(0);
+    });
+
+    it('should delete multiple lines when count > 1', () => {
+      const initialState: TextBufferState = {
+        lines: ['line1', 'line2', 'line3', 'line4'],
+        cursorRow: 1,
+        cursorCol: 0,
+        preferredCol: null,
+        visualLines: [['line1'], ['line2'], ['line3'], ['line4']],
+        visualScrollRow: 0,
+        visualCursor: { row: 1, col: 0 },
+        viewport: { width: 10, height: 5 },
+        undoStack: [],
+        redoStack: [],
+      };
+
+      const action: TextBufferAction = {
+        type: 'vim_delete_line',
+        payload: { count: 2 },
+      };
+
+      const result = textBufferReducer(initialState, action);
+
+      // Should delete line2 and line3, leaving line1 and line4
+      expect(result.lines).toEqual(['line1', 'line4']);
+      expect(result.cursorRow).toBe(1);
+      expect(result.cursorCol).toBe(0);
+    });
+
+    it('should clear single line content when only one line exists', () => {
+      const initialState: TextBufferState = {
+        lines: ['only line'],
+        cursorRow: 0,
+        cursorCol: 5,
+        preferredCol: null,
+        visualLines: [['only line']],
+        visualScrollRow: 0,
+        visualCursor: { row: 0, col: 5 },
+        viewport: { width: 10, height: 5 },
+        undoStack: [],
+        redoStack: [],
+      };
+
+      const action: TextBufferAction = {
+        type: 'vim_delete_line',
+        payload: { count: 1 },
+      };
+
+      const result = textBufferReducer(initialState, action);
+
+      // Should clear the line content but keep the line
+      expect(result.lines).toEqual(['']);
+      expect(result.cursorRow).toBe(0);
+      expect(result.cursorCol).toBe(0);
+    });
+
+    it('should handle deleting the last line properly', () => {
+      const initialState: TextBufferState = {
+        lines: ['line1', 'line2'],
+        cursorRow: 1,
+        cursorCol: 0,
+        preferredCol: null,
+        visualLines: [['line1'], ['line2']],
+        visualScrollRow: 0,
+        visualCursor: { row: 1, col: 0 },
+        viewport: { width: 10, height: 5 },
+        undoStack: [],
+        redoStack: [],
+      };
+
+      const action: TextBufferAction = {
+        type: 'vim_delete_line',
+        payload: { count: 1 },
+      };
+
+      const result = textBufferReducer(initialState, action);
+
+      // Should delete the last line completely, not leave empty line
+      expect(result.lines).toEqual(['line1']);
+      expect(result.cursorRow).toBe(0);
+      expect(result.cursorCol).toBe(0);
+    });
+
+    it('should handle deleting all lines and maintain valid state for subsequent paste', () => {
+      const initialState: TextBufferState = {
+        lines: ['line1', 'line2', 'line3', 'line4'],
+        cursorRow: 0,
+        cursorCol: 0,
+        preferredCol: null,
+        visualLines: [['line1'], ['line2'], ['line3'], ['line4']],
+        visualScrollRow: 0,
+        visualCursor: { row: 0, col: 0 },
+        viewport: { width: 10, height: 5 },
+        undoStack: [],
+        redoStack: [],
+      };
+
+      // Delete all 4 lines with 4dd
+      const deleteAction: TextBufferAction = {
+        type: 'vim_delete_line',
+        payload: { count: 4 },
+      };
+
+      const afterDelete = textBufferReducer(initialState, deleteAction);
+
+      // After deleting all lines, should have one empty line
+      expect(afterDelete.lines).toEqual(['']);
+      expect(afterDelete.cursorRow).toBe(0);
+      expect(afterDelete.cursorCol).toBe(0);
+
+      // Now paste multiline content - this should work correctly
+      const pasteAction: TextBufferAction = {
+        type: 'insert',
+        payload: 'new1\nnew2\nnew3\nnew4',
+      };
+
+      const afterPaste = textBufferReducer(afterDelete, pasteAction);
+
+      // All lines including the first one should be present
+      expect(afterPaste.lines).toEqual(['new1', 'new2', 'new3', 'new4']);
+      expect(afterPaste.cursorRow).toBe(3);
+      expect(afterPaste.cursorCol).toBe(4);
+    });
   });
 });
