@@ -137,8 +137,8 @@ export function getDiffCommand(
           // Auto close all windows when one is closed
           '-c',
           'autocmd WinClosed * wqa',
-          oldPath,
-          newPath,
+          shellQuote.quote([oldPath]),
+          shellQuote.quote([newPath]),
         ],
       };
     default:
@@ -173,7 +173,6 @@ export async function openDiff(
         return new Promise((resolve, reject) => {
           const childProcess = spawn(diffCommand.command, diffCommand.args, {
             stdio: 'inherit',
-            shell: true,
           });
 
           childProcess.on('close', (code) => {
@@ -192,11 +191,8 @@ export async function openDiff(
       case 'vim':
       case 'neovim': {
         // Use execSync for terminal-based editors
-        const command =
-          process.platform === 'win32'
-            ? `${diffCommand.command} ${diffCommand.args.join(' ')}`
-            : `${diffCommand.command} ${diffCommand.args.map((arg) => `"${arg}"`).join(' ')}`;
-        execSync(command, {
+        const args = diffCommand.args;
+        execFileSync(diffCommand.command, args, {
           stdio: 'inherit',
           encoding: 'utf8',
         });

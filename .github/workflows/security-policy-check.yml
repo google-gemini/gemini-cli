@@ -1,0 +1,13 @@
+name: Security Policy Check
+on: [push, pull_request]
+jobs:
+  verify-security-md:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for placeholders
+        run: |
+          if grep -qE "Use this section|Tell them|placeholder" SECURITY.md; then
+            echo "::error::Placeholder text detected in SECURITY.md"
+            exit 1
+          fi
