@@ -214,6 +214,7 @@ export const useSlashCommandProcessor = (
     async (
       rawQuery: PartListUnion,
       oneTimeShellAllowlist?: Set<string>,
+      addToHistory: boolean = true,
     ): Promise<SlashCommandProcessorResult | false> => {
       setIsProcessing(true);
       try {
@@ -226,11 +227,13 @@ export const useSlashCommandProcessor = (
           return false;
         }
 
-        const userMessageTimestamp = Date.now();
-        addItem(
-          { type: MessageType.USER, text: trimmed },
-          userMessageTimestamp,
-        );
+        if (addToHistory) {
+          const userMessageTimestamp = Date.now();
+          addItem(
+            { type: MessageType.USER, text: trimmed },
+            userMessageTimestamp,
+          );
+        }
 
         const parts = trimmed.substring(1).trim().split(/\s+/);
         const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']

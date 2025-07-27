@@ -616,7 +616,7 @@ const App = ({
           clearTimeout(timerRef.current);
         }
         // Directly invoke the central command handler.
-        handleSlashCommand('/quit');
+        handleSlashCommand('/quit', undefined, false);
       } else {
         setPressedOnce(true);
         timerRef.current = setTimeout(() => {
