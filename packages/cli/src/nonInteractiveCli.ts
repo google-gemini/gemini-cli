@@ -70,7 +70,7 @@ export async function runNonInteractive(
   const geminiClient = config.getGeminiClient();
   const toolRegistry: ToolRegistry = await config.getToolRegistry();
 
-  // Initialize chat.  Set history if resuming.
+  // Initialize chat.  Set history if resuming with startChat.
   const chat = await geminiClient.getChat();
   if (resumedSessionData) {
     geminiClient.startChat(
@@ -80,7 +80,6 @@ export async function runNonInteractive(
   }
 
   const abortController = new AbortController();
-
   let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
   let turnCount = 0;
   try {

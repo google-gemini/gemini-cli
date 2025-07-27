@@ -203,7 +203,7 @@ const getSessionFiles = async (
     const files = await fs.readdir(chatsDir);
     const sessionFiles = files
       .filter((f) => f.startsWith('session-') && f.endsWith('.json'))
-      .sort(); // Initial sort by filename (includes timestamp)
+      .sort(); // Initial sort by filename, which includes timestamp
 
     const sessionPromises = sessionFiles.map(async (file, index) => {
       const filePath = path.join(chatsDir, file);

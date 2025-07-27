@@ -121,15 +121,13 @@ export class ChatRecordingService {
         )}.json`;
         this.conversationFile = path.join(chatsDir, filename);
 
-        const initialRecord: ConversationRecord = {
+        this.writeConversation({
           sessionId: this.sessionId,
           projectHash: this.projectHash,
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
           messages: [],
-        };
-
-        this.writeConversation(initialRecord);
+        });
       }
 
       // Clear any queued data since this is a fresh start

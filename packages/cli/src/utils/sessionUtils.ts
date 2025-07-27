@@ -109,7 +109,7 @@ export const getSessionFiles = async (
     const files = await fs.readdir(chatsDir);
     const sessionFiles = files
       .filter((f) => f.startsWith('session-') && f.endsWith('.json'))
-      .sort(); // Sort by filename (includes timestamp)
+      .sort(); // Sort by filename, which includes timestamp
 
     const sessionPromises = sessionFiles.map(async (file) => {
       const filePath = path.join(chatsDir, file);

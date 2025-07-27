@@ -54,12 +54,11 @@ export const useSessionBrowser = (
             filePath: originalFilePath,
           });
 
-          // We've loaded it, tell the UI about it.
+          // We've loaded it; tell the UI about it.
           setIsSessionBrowserOpen(false);
           onLoadHistory(convertSessionToHistoryFormats(conversation.messages));
         } catch (error) {
           console.error('Error resuming session:', error);
-          // For now, just close the browser on error
           setIsSessionBrowserOpen(false);
         }
       },
@@ -85,7 +84,6 @@ export const useSessionBrowser = (
 
 /**
  * Converts session/conversation data into UI history and Gemini client history formats.
- * This shared function eliminates duplication between App.tsx resume logic and useSessionBrowser.
  */
 export function convertSessionToHistoryFormats(
   messages: ConversationRecord['messages'],

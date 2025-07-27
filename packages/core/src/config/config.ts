@@ -185,7 +185,7 @@ export interface ConfigParameters {
   ideClient?: IdeClient;
 }
 
-export class Config { 
+export class Config {
   private toolRegistry!: ToolRegistry;
   private promptRegistry!: PromptRegistry;
   private sessionId: string;
