@@ -22,7 +22,7 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 | `!`                                                | Toggle shell mode when the input is empty.                                                                                          |
 | `\` (at end of line) + `Enter`                     | Insert a newline.                                                                                                                   |
 | `Down Arrow`                                       | Navigate down through the input history.                                                                                            |
-| `Enter` / `Ctrl+Enter`                             | Submit the current prompt.                                                                                                          |
+| `Enter`                                            | Submit the current prompt.                                                                                                          |
 | `Meta+Delete` / `Ctrl+Delete`                      | Delete the word to the right of the cursor.                                                                                         |
 | `Tab`                                              | Autocomplete the current suggestion if one exists.                                                                                  |
 | `Up Arrow`                                         | Navigate up through the input history.                                                                                              |
