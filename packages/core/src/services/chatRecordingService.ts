@@ -55,6 +55,7 @@ export type ConversationRecordExtra =
       toolCalls?: ToolCallRecord[];
       thoughts?: Array<ThoughtSummary & { timestamp: string }>;
       tokens?: TokensSummary | null;
+      model?: string;
     };
 
 export type MessageRecord = BaseMessageRecord & ConversationRecordExtra;
@@ -79,8 +80,10 @@ export class ChatRecordingService {
   private projectHash: string;
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
+  private config: Config;
 
-  constructor(private config: Config) {
+  constructor(config: Config) {
+    this.config = config;
     this.sessionId = config.getSessionId();
     this.projectHash = getProjectHash(config.getProjectRoot());
   }
@@ -95,7 +98,7 @@ export class ChatRecordingService {
         // Resume from existing session
         this.conversationFile = resumedSessionData.filePath;
         this.sessionId = resumedSessionData.conversation.sessionId;
-        
+
         // Update the session ID in the existing file
         this.updateConversation((conversation) => {
           conversation.sessionId = this.sessionId;
@@ -138,7 +141,6 @@ export class ChatRecordingService {
       }
     }
   }
-
 
   private getLastMessage(
     conversation: ConversationRecord,
@@ -183,6 +185,7 @@ export class ChatRecordingService {
             ...msg,
             thoughts: this.queuedThoughts,
             tokens: this.queuedTokens,
+            model: this.config.getModel(),
           });
           this.queuedThoughts = [];
           this.queuedTokens = null;
@@ -245,9 +248,7 @@ export class ChatRecordingService {
 
   /**
    * Adds tool calls to the last message in the conversation (which should be by Gemini). */
-  recordToolCalls(
-    toolCalls: Array<ToolCallRecord>,
-  ): void {
+  recordToolCalls(toolCalls: Array<ToolCallRecord>): void {
     if (!this.conversationFile) return;
 
     try {
@@ -274,6 +275,7 @@ export class ChatRecordingService {
             type: 'gemini' as const,
             toolCalls,
             thoughts: this.queuedThoughts,
+            model: this.config.getModel(),
           };
           // If there are any queued thoughts join them to this message.
           if (this.queuedThoughts.length > 0) {
