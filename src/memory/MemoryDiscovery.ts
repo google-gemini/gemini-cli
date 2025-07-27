@@ -5,14 +5,18 @@ export class MemoryDiscovery {
     // ...existing code...
 
     private async readGeminiFile(filePath: string): Promise<string | null> {
+        const isErrnoException = (e: unknown): e is NodeJS.ErrnoException => {
+            return e instanceof Error && 'code' in e;
+        };
+
         try {
             // Attempt to read the file directly. This is more efficient than stat + read.
             const content = await fs.promises.readFile(filePath, 'utf8');
             return content;
         } catch (error: unknown) {
             // Check if it's a Node.js file system error.
-            if (error instanceof Error && 'code' in error) {
-                switch ((error as { code: string }).code) {
+            if (isErrnoException(error)) {
+                switch (error.code) {
                     case 'ENOENT':
                         // File doesn't exist, which is an expected and valid case.
                         return null;
