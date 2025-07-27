@@ -240,6 +240,23 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     }
     ```
 
+- **`sessionRetention`** (object):
+  - **Description:** Configures automatic cleanup of old chat recording sessions. See [Chat Recording](../chat-recording.md) for more details.
+  - **Default:** `{"enabled": false}`
+  - **Properties:**
+    - **`enabled`** (boolean): Whether to enable automatic session cleanup.
+    - **`maxAge`** (string): Maximum age of sessions before deletion (e.g., "1h", "7d", "30d"). Minimum: "1h".
+    - **`maxCount`** (number): Maximum number of sessions to keep. When exceeded, oldest sessions are deleted first. Minimum: 1.
+  - **Note:** Both `maxAge` and `maxCount` can be used together. Sessions are deleted if they exceed **either** limit.
+  - **Example:**
+    ```json
+    "sessionRetention": {
+      "enabled": true,
+      "maxAge": "7d",
+      "maxCount": 50
+    }
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -387,6 +404,19 @@ Arguments passed directly when running the CLI can override other configurations
 - **`--proxy`**:
   - Sets the proxy for the CLI.
   - Example: `--proxy http://localhost:7890`.
+- **`--resume [session_id]`** (**`-r [session_id]`**):
+  - Resume a previous chat session. Use "latest" for the most recent session or provide a session index number.
+  - If no session_id is provided, defaults to "latest".
+  - Example: `gemini --resume 5` or `gemini --resume latest` or `gemini --resume`
+  - See [Chat Recording](../chat-recording.md) for more details.
+- **`--list-sessions`**:
+  - List all available chat sessions for the current project and exit.
+  - Shows session indices, dates, message counts, and preview of first user message.
+  - Example: `gemini --list-sessions`
+- **`--delete-session <index>`**:
+  - Delete a specific chat session by its index number.
+  - Use `--list-sessions` first to see available sessions and their indices.
+  - Example: `gemini --delete-session 3`
 - **`--version`**:
   - Displays the version of the CLI.
 

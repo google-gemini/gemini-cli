@@ -1,61 +1,167 @@
 # Chat Recording
 
-The Gemini CLI includes a Chat Recording feature that automatically saves your conversations to disk. This allows you to review, resume, and search your chat history across different sessions.
+The Gemini CLI includes comprehensive **automatic chat recording** that saves every conversation to disk without any manual intervention. This powerful feature allows you to review, resume, search, and manage your chat history across different sessions with zero effort on your part.
 
 ## How It Works
 
-Chat recording is enabled by default. Every conversation you have with the Gemini agent is automatically saved to a JSON file in your project's temporary directory, typically located at `~/.gemini/tmp/<project_hash>/chats`.
+**Chat recording is enabled by default and completely automatic.** Starting with your first user message, every conversation is immediately saved to JSON files in your project's temporary directory at `~/.gemini/tmp/<project_hash>/chats`.
 
-Each conversation file contains:
+### What Gets Recorded
 
-1.  **Session Information:** The session ID and a hash of the project path.
-2.  **Timestamps:** The start and last updated times for the conversation.
-3.  **Messages:** A complete record of all messages in the conversation, including user prompts, Gemini's responses, tool calls, and system messages.
+Each conversation file contains a complete record of your session:
 
-This data is stored locally on your machine.
+- **Session Information:** Unique session ID, project hash, start time, and last updated timestamp
+- **All Messages:** User prompts and Gemini responses with timestamps, UUIDs, and model information
+- **Tool Calls:** Complete tool execution history including inputs, outputs, states, and timestamps
+- **Thoughts:** Gemini's internal reasoning with subjects, descriptions, and timestamps
+- **Token Usage:** Detailed token consumption (input, output, cached, thoughts, tools)
+- **API Events:** Error messages and system notifications
 
-## Using the `/chat` Command
+**Important:** Messages are saved immediately as they occur, so no data is lost even if the CLI crashes or is terminated unexpectedly.
 
-You can manage your recorded conversations using the `/chat` command.
+## Interactive Session Browser (`/resume`)
 
-### List Available Conversations
+The **interactive session browser** provides a comprehensive interface for managing saved conversations. Type `/resume` to open it.
 
-To see a list of all auto-saved conversations for the current project, simply run:
+### Features
 
-```
-/chat list
-```
+- **Session List:** View all saved conversations with timestamps, message counts, and preview of first user message
+- **Search:** Press `/` to search through conversation content across all sessions
+- **Sorting:** Sort sessions by date or message count
+- **Delete:** Remove unwanted sessions directly from the browser
+- **Resume:** Select any session to duplicate and continue the conversation
 
-The CLI will display a list of available conversation files, showing the session ID, the number of messages, and when the conversation started.
+### Usage
 
-### Resume a Specific Conversation
-
-To resume a previous conversation, use the session ID from the list:
-
-```
-/chat resume <session-id>
-```
-
-For example:
-
-```
-/chat resume session-2025-07-16T10-00-00-abcdef12-0
+```bash
+/resume
 ```
 
-After running the command, your conversation history will be loaded into the current session.
+This opens the session browser where you can:
 
-### Search Conversations
+1. Browse through your conversation history
+2. Use `/` to search for specific content
+3. Select a session to resume
+4. Delete sessions you no longer need
 
-You can search the content of all your saved conversations for a specific word or phrase:
+## Command-Line Session Management
 
+For non-interactive workflows, several CLI flags are available:
+
+### Resume Sessions
+
+```bash
+# Resume the most recent session
+gemini --resume
+
+# Resume a specific session by index
+gemini --resume 5
+
+# Resume latest session with a new prompt
+gemini --resume latest -p "Continue working on the API"
 ```
-/chat search <text>
+
+### List Sessions
+
+```bash
+# List all available sessions for current project
+gemini --list-sessions
 ```
 
-For example:
+Output shows session indices, dates, message counts, and first user message preview.
 
-```
-/chat search "react component"
+### Delete Sessions
+
+```bash
+# Delete a specific session by index
+gemini --delete-session 3
 ```
 
-The CLI will display a list of all conversations that contain the search term, along with the number of matches in each conversation.
+## Session Retention & Cleanup
+
+Configure automatic cleanup of old sessions via `settings.json`:
+
+```json
+{
+  "sessionRetention": {
+    "enabled": true,
+    "maxAge": "7d", // Keep sessions for 7 days
+    "maxCount": 50 // Keep max 50 sessions
+  }
+}
+```
+
+**Settings:**
+
+- **`enabled`:** Enable/disable automatic cleanup
+- **`maxAge`:** Maximum age (e.g., "1h", "7d", "30d"). Minimum: "1h"
+- **`maxCount`:** Maximum number of sessions to keep. Minimum: 1
+
+Both settings can be used together - sessions are deleted if they exceed **either** limit.
+
+## Session File Format
+
+Sessions are stored as JSON files with this structure:
+
+```json
+{
+  "sessionId": "6577c6cc-dfe2-42f1-a861-ff475f3dc692",
+  "projectHash": "7bf1664fd227f3ccca27efcaffc3225990adc35edcf3ffcb8c5b2624c3749ced",
+  "startTime": "2025-07-25T14:27:05.262Z",
+  "lastUpdated": "2025-07-25T14:28:10.713Z",
+  "messages": [
+    {
+      "id": "89d02136-a4fa-489d-9efa-b17af3edaa69",
+      "timestamp": "2025-07-25T14:27:08.141Z",
+      "type": "user",
+      "content": "Hello"
+    },
+    {
+      "id": "c325c8dc-a69a-4134-ae15-5626361c71c0",
+      "timestamp": "2025-07-25T14:27:12.766Z",
+      "type": "gemini",
+      "content": "Hi there! How can I help you today?",
+      "model": "gemini-2.5-pro",
+      "thoughts": [
+        {
+          "subject": "Formulating a Response",
+          "description": "I'm crafting a friendly greeting...",
+          "timestamp": "2025-07-25T14:27:10.687Z"
+        }
+      ],
+      "tokens": {
+        "input": 12823,
+        "output": 10,
+        "cached": 0,
+        "thoughts": 22,
+        "tool": 0,
+        "total": 12855
+      }
+    }
+  ]
+}
+```
+
+## Key Behaviors
+
+### Starting New Sessions
+
+- **`/clear`:** Starts a new session recording
+- **New CLI instance:** Each new interactive session gets a unique ID
+- **Resume:** Resumes modify the existing session file in place
+
+### Data Storage Location
+
+- **Path:** `~/.gemini/tmp/<project_hash>/chats/`
+- **Project-specific:** Each project gets its own chat directory
+- **Local only:** All data stays on your machine
+
+### What's Not Recorded
+
+- Automatically injected messages (like "This is the Gemini CLI" setup message)
+- MCP-specific metadata (currently)
+- Pending tool calls cannot be resumed for user action (yet)
+
+## Migration from Old System
+
+The previous manual `/chat save|resume|list` system has been **completely replaced**. All conversations are now automatically saved, eliminating the need for manual management while providing far more comprehensive features and data capture.

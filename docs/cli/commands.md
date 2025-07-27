@@ -11,17 +11,15 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/bug`**
   - **Description:** File an issue about Gemini CLI. By default, the issue is filed within the GitHub repository for Gemini CLI. The string you enter after `/bug` will become the headline for the bug being filed. The default `/bug` behavior can be modified using the `bugCommand` setting in your `.gemini/settings.json` files.
 
-- **`/chat`**
-  - **Description:** Save and resume conversation history for branching conversation state interactively, or resuming a previous state from a later session.
-  - **Sub-commands:**
-    - **`save`**
-      - **Description:** Saves the current conversation history. You must add a `<tag>` for identifying the conversation state.
-      - **Usage:** `/chat save <tag>`
-    - **`resume`**
-      - **Description:** Resumes a conversation from a previous save.
-      - **Usage:** `/chat resume <tag>`
-    - **`list`**
-      - **Description:** Lists available tags for chat state resumption.
+- **`/resume`**
+  - **Description:** Browse and resume previous conversation sessions. Opens an interactive session browser where you can search, filter, and select from automatically saved conversations.
+  - **Features:**
+    - **Session Browser:** Interactive interface showing all saved sessions with timestamps, message counts, and first user message for context
+    - **Search:** Use `/` to search through conversation content across all sessions
+    - **Sorting:** Sort sessions by date or message count
+    - **Management:** Delete unwanted sessions directly from the browser
+    - **Resume:** Select any session to resume and continue the conversation
+  - **Note:** All conversations are automatically saved as you chat - no manual saving required. See [Chat Recording](../chat-recording.md) for complete details.
 
 - **`/clear`**
   - **Description:** Clear the terminal screen, including the visible session history and scrollback within the CLI. The underlying session data (for history recall) might be preserved depending on the exact implementation, but the visual display is cleared.
