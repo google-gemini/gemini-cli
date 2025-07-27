@@ -73,7 +73,7 @@ export async function runNonInteractive(
   // Initialize chat.  Set history if resuming.
   const chat = await geminiClient.getChat();
   if (resumedSessionData) {
-    geminiClient.setHistory(
+    geminiClient.startChat(
       convertSessionToHistoryFormats(resumedSessionData.conversation.messages)
         .clientHistory,
     );
