@@ -265,7 +265,7 @@ describe('useCompletion', () => {
           { name: 'stats', description: 'Show stats' },
           { name: 'clear', description: 'Clear screen' },
           { name: 'memory', description: 'Manage memory' },
-          { name: 'chat', description: 'Manage chat' },
+          { name: 'resume', description: 'Browse and resume sessions' },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
           useCompletion(
@@ -365,8 +365,8 @@ describe('useCompletion', () => {
             ],
           },
           {
-            name: 'chat',
-            description: 'Manage chat history',
+            name: 'resume',
+            description: 'Browse and resume sessions',
           },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
@@ -380,7 +380,7 @@ describe('useCompletion', () => {
 
         expect(result.current.suggestions.length).toBe(slashCommands.length);
         expect(result.current.suggestions.map((s) => s.label)).toEqual(
-          expect.arrayContaining(['help', 'clear', 'memory', 'chat', 'stats']),
+          expect.arrayContaining(['help', 'clear', 'memory', 'resume', 'stats']),
         );
       });
 
@@ -677,21 +677,14 @@ describe('useCompletion', () => {
 
         const slashCommands = [
           {
-            name: 'chat',
-            description: 'Manage chat history',
-            subCommands: [
-              {
-                name: 'resume',
-                description: 'Resume a saved chat',
-                completion: mockCompletionFn,
-              },
-            ],
+            name: 'resume',
+            description: 'Browse and resume sessions',
           },
         ] as unknown as SlashCommand[];
 
         const { result } = renderHook(() =>
           useCompletion(
-            useTextBufferForTest('/chat resume my-ch'),
+            useTextBufferForTest('/resume my-ch'),
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -720,21 +713,14 @@ describe('useCompletion', () => {
 
         const slashCommands = [
           {
-            name: 'chat',
-            description: 'Manage chat history',
-            subCommands: [
-              {
-                name: 'resume',
-                description: 'Resume a saved chat',
-                completion: mockCompletionFn,
-              },
-            ],
+            name: 'resume',
+            description: 'Browse and resume sessions',
           },
         ] as unknown as SlashCommand[];
 
         const { result } = renderHook(() =>
           useCompletion(
-            useTextBufferForTest('/chat resume '),
+            useTextBufferForTest('/resume '),
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -754,21 +740,14 @@ describe('useCompletion', () => {
         const completionFn = vi.fn().mockResolvedValue(null);
         const slashCommands = [
           {
-            name: 'chat',
-            description: 'Manage chat history',
-            subCommands: [
-              {
-                name: 'resume',
-                description: 'Resume a saved chat',
-                completion: completionFn,
-              },
-            ],
+            name: 'resume',
+            description: 'Browse and resume sessions',
           },
         ] as unknown as SlashCommand[];
 
         const { result } = renderHook(() =>
           useCompletion(
-            useTextBufferForTest('/chat resume '),
+            useTextBufferForTest('/resume '),
             testRootDir,
             slashCommands,
             mockCommandContext,
