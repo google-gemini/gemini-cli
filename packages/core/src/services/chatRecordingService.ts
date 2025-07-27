@@ -346,6 +346,8 @@ export class ChatRecordingService {
   private writeConversation(conversation: ConversationRecord): void {
     try {
       if (!this.conversationFile) return;
+      // Don't write the file yet until there's at least one message.
+      if (conversation.messages.length === 0) return;
 
       // Only write the file if this change would change the file.
       if (this.cachedLastConvData !== JSON.stringify(conversation, null, 2)) {
