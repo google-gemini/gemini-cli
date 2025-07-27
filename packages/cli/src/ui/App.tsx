@@ -284,7 +284,7 @@ const App = ({
     ],
   );
 
-  // Setup the interactive session browser--calls loadHistoryForResume when a session is selected.
+  // Setup the interactive session browser.  Calls loadHistoryForResume when a session is selected.
   const {
     isSessionBrowserOpen,
     openSessionBrowser,
