@@ -179,38 +179,53 @@ export function detectCommandSubstitution(command: string): boolean {
 }
 
 /**
- * Determines whether a given shell command is allowed to execute based on
- * the tool's configuration including allowlists and blocklists.
- * @param command The shell command string to validate
- * @param config The application configuration
- * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed
+ * Checks a shell command against security policies and allowlists.
+ *
+ * This function operates in one of two modes depending on the presence of
+ * the `sessionAllowlist` parameter:
+ *
+ * 1.  **"Default Deny" Mode (sessionAllowlist is provided):** This is the
+ *     strictest mode, used for user-defined scripts like custom commands.
+ *     A command is only permitted if it is found on the global `coreTools`
+ *     allowlist OR the provided `sessionAllowlist`. It must not be on the
+ *     global `excludeTools` blocklist.
+ *
+ * 2.  **"Default Allow" Mode (sessionAllowlist is NOT provided):** This mode
+ *     is used for direct tool invocations (e.g., by the model). If a strict
+ *     global `coreTools` allowlist exists, commands must be on it. Otherwise,
+ *     any command is permitted as long as it is not on the `excludeTools`
+ *     blocklist.
+ *
+ * @param command The shell command string to validate.
+ * @param config The application configuration.
+ * @param sessionAllowlist A session-level list of approved commands. Its
+ *   presence activates "Default Deny" mode.
+ * @returns An object detailing which commands are not allowed.
  */
-export function isCommandAllowed(
+export function checkCommandPermissions(
   command: string,
   config: Config,
-): { allowed: boolean; reason?: string } {
-  // 0. Disallow command substitution
-  // Parse the command to check for unquoted/unescaped command substitution
-  const hasCommandSubstitution = detectCommandSubstitution(command);
-  if (hasCommandSubstitution) {
+  sessionAllowlist?: Set<string>,
+): {
+  allAllowed: boolean;
+  disallowedCommands: string[];
+  blockReason?: string;
+  isHardDenial?: boolean;
+} {
+  // Disallow command substitution for security.
+  if (detectCommandSubstitution(command)) {
     return {
-      allowed: false,
-      reason:
+      allAllowed: false,
+      disallowedCommands: [command],
+      blockReason:
         'Command substitution using $(), <(), or >() is not allowed for security reasons',
+      isHardDenial: true,
     };
   }
 
   const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
-
   const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
 
-  /**
-   * Checks if a command string starts with a given prefix, ensuring it's a
-   * whole word match (i.e., followed by a space or it's an exact match).
-   * e.g., `isPrefixedBy('npm install', 'npm')` -> true
-   * e.g., `isPrefixedBy('npm', 'npm')` -> true
-   * e.g., `isPrefixedBy('npminstall', 'npm')` -> false
-   */
   const isPrefixedBy = (cmd: string, prefix: string): boolean => {
     if (!cmd.startsWith(prefix)) {
       return false;
@@ -218,10 +233,6 @@ export function isCommandAllowed(
     return cmd.length === prefix.length || cmd[prefix.length] === ' ';
   };
 
-  /**
-   * Extracts and normalizes shell commands from a list of tool strings.
-   * e.g., 'ShellTool("ls -l")' becomes 'ls -l'
-   */
   const extractCommands = (tools: string[]): string[] =>
     tools.flatMap((tool) => {
       for (const toolName of SHELL_TOOL_NAMES) {
@@ -234,55 +245,115 @@ export function isCommandAllowed(
 
   const coreTools = config.getCoreTools() || [];
   const excludeTools = config.getExcludeTools() || [];
+  const commandsToValidate = splitCommands(command).map(normalize);
 
-  // 1. Check if the shell tool is globally disabled.
+  // 1. Blocklist Check (Highest Priority)
   if (SHELL_TOOL_NAMES.some((name) => excludeTools.includes(name))) {
     return {
-      allowed: false,
-      reason: 'Shell tool is globally disabled in configuration',
+      allAllowed: false,
+      disallowedCommands: commandsToValidate,
+      blockReason: 'Shell tool is globally disabled in configuration',
+      isHardDenial: true,
     };
   }
+  const blockedCommands = extractCommands(excludeTools);
+  for (const cmd of commandsToValidate) {
+    if (blockedCommands.some((blocked) => isPrefixedBy(cmd, blocked))) {
+      return {
+        allAllowed: false,
+        disallowedCommands: [cmd],
+        blockReason: `Command '${cmd}' is blocked by configuration`,
+        isHardDenial: true,
+      };
+    }
+  }
 
-  const blockedCommands = new Set(extractCommands(excludeTools));
-  const allowedCommands = new Set(extractCommands(coreTools));
-
-  const hasSpecificAllowedCommands = allowedCommands.size > 0;
+  const globallyAllowedCommands = extractCommands(coreTools);
   const isWildcardAllowed = SHELL_TOOL_NAMES.some((name) =>
     coreTools.includes(name),
   );
 
-  const commandsToValidate = splitCommands(command).map(normalize);
+  // If there's a global wildcard, all commands are allowed at this point
+  // because they have already passed the blocklist check.
+  if (isWildcardAllowed) {
+    return { allAllowed: true, disallowedCommands: [] };
+  }
 
-  const blockedCommandsArr = [...blockedCommands];
+  if (sessionAllowlist) {
+    // "DEFAULT DENY" MODE: A session allowlist is provided.
+    // All commands must be in either the session or global allowlist.
+    const disallowedCommands: string[] = [];
+    for (const cmd of commandsToValidate) {
+      const isSessionAllowed = [...sessionAllowlist].some((allowed) =>
+        isPrefixedBy(cmd, normalize(allowed)),
+      );
+      if (isSessionAllowed) continue;
 
-  for (const cmd of commandsToValidate) {
-    // 2. Check if the command is on the blocklist.
-    const isBlocked = blockedCommandsArr.some((blocked) =>
-      isPrefixedBy(cmd, blocked),
-    );
-    if (isBlocked) {
-      return {
-        allowed: false,
-        reason: `Command '${cmd}' is blocked by configuration`,
-      };
-    }
-
-    // 3. If in strict allow-list mode, check if the command is permitted.
-    const isStrictAllowlist = hasSpecificAllowedCommands && !isWildcardAllowed;
-    const allowedCommandsArr = [...allowedCommands];
-    if (isStrictAllowlist) {
-      const isAllowed = allowedCommandsArr.some((allowed) =>
+      const isGloballyAllowed = globallyAllowedCommands.some((allowed) =>
         isPrefixedBy(cmd, allowed),
       );
-      if (!isAllowed) {
+      if (isGloballyAllowed) continue;
+
+      disallowedCommands.push(cmd);
+    }
+
+    if (disallowedCommands.length > 0) {
+      return {
+        allAllowed: false,
+        disallowedCommands,
+        blockReason: `Command(s) not on the global or session allowlist.`,
+        isHardDenial: false, // This is a soft denial; confirmation is possible.
+      };
+    }
+  } else {
+    // "DEFAULT ALLOW" MODE: No session allowlist.
+    const hasSpecificAllowedCommands = globallyAllowedCommands.length > 0;
+    if (hasSpecificAllowedCommands) {
+      const disallowedCommands: string[] = [];
+      for (const cmd of commandsToValidate) {
+        const isGloballyAllowed = globallyAllowedCommands.some((allowed) =>
+          isPrefixedBy(cmd, allowed),
+        );
+        if (!isGloballyAllowed) {
+          disallowedCommands.push(cmd);
+        }
+      }
+      if (disallowedCommands.length > 0) {
         return {
-          allowed: false,
-          reason: `Command '${cmd}' is not in the allowed commands list`,
+          allAllowed: false,
+          disallowedCommands,
+          blockReason: `Command(s) not in the allowed commands list.`,
+          isHardDenial: false, // This is a soft denial.
         };
       }
     }
+    // If no specific global allowlist exists, and it passed the blocklist,
+    // the command is allowed by default.
   }
 
-  // 4. If all checks pass, the command is allowed.
-  return { allowed: true };
+  // If all checks for the current mode pass, the command is allowed.
+  return { allAllowed: true, disallowedCommands: [] };
+}
+
+/**
+ * Determines whether a given shell command is allowed to execute based on
+ * the tool's configuration including allowlists and blocklists.
+ *
+ * This function operates in "default allow" mode. It is a wrapper around
+ * `checkCommandPermissions`.
+ *
+ * @param command The shell command string to validate.
+ * @param config The application configuration.
+ * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed.
+ */
+export function isCommandAllowed(
+  command: string,
+  config: Config,
+): { allowed: boolean; reason?: string } {
+  // By not providing a sessionAllowlist, we invoke "default allow" behavior.
+  const { allAllowed, blockReason } = checkCommandPermissions(command, config);
+  if (allAllowed) {
+    return { allowed: true };
+  }
+  return { allowed: false, reason: blockReason };
 }

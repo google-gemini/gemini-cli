@@ -41,6 +41,7 @@ import { AuthDialog } from './components/AuthDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { SessionBrowser } from './components/SessionBrowser.js';
+import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -193,6 +194,7 @@ const App = ({
     useState<boolean>(false);
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
   const [openFiles, setOpenFiles] = useState<OpenFiles | undefined>();
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToOpenFiles(setOpenFiles);
@@ -530,6 +532,7 @@ const App = ({
     slashCommands,
     pendingHistoryItems: pendingSlashCommandHistoryItems,
     commandContext,
+    shellConfirmationRequest,
   } = useSlashCommandProcessor(
     config,
     settings,
@@ -548,6 +551,7 @@ const App = ({
     openSessionBrowser,
     chatRecordingService,
     toggleVimEnabled,
+    setIsProcessing,
   );
 
   const {
@@ -705,7 +709,8 @@ const App = ({
     fetchUserMessages();
   }, [history, logger]);
 
-  const isInputActive = streamingState === StreamingState.Idle && !initError;
+  const isInputActive =
+    streamingState === StreamingState.Idle && !initError && !isProcessing;
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -911,7 +916,9 @@ const App = ({
             </Box>
           )}
 
-          {isThemeDialogOpen ? (
+          {shellConfirmationRequest ? (
+            <ShellConfirmationDialog request={shellConfirmationRequest} />
+          ) : isThemeDialogOpen ? (
             <Box flexDirection="column">
               {themeError && (
                 <Box marginBottom={1}>
