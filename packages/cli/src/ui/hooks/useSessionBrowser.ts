@@ -195,39 +195,43 @@ export function convertSessionToHistoryFormats(
           parts: modelParts,
         });
 
-        // Create function response messages
+        // Create single function response message with all tool call responses
+        const functionResponseParts: any[] = [];
         for (const toolCall of msg.toolCalls!) {
           if (toolCall.result) {
             // Convert PartListUnion result to function response format
             let responseData: any;
 
             if (typeof toolCall.result === 'string') {
-              responseData = { output: toolCall.result };
+              responseData = {
+                id: toolCall.id,
+                name: toolCall.name,
+                output: toolCall.result,
+              };
             } else if (Array.isArray(toolCall.result)) {
               // Extract text content from Part array
               const textParts = toolCall.result
-                .filter((part: any) => part.text)
-                .map((part: any) => part.text)
+                .map((part) => (typeof part == 'string' ? part : part.text))
                 .join('');
-              responseData = textParts
-                ? { output: textParts }
-                : toolCall.result;
+              responseData = {
+                id: toolCall.id,
+                name: toolCall.name,
+                output: textParts ? { output: textParts } : toolCall.result,
+              };
             } else {
               responseData = toolCall.result;
             }
 
-            clientHistory.push({
-              role: 'user',
-              parts: [
-                {
-                  functionResponse: {
-                    name: toolCall.name,
-                    response: responseData,
-                  },
-                },
-              ],
-            });
+            functionResponseParts.push(responseData);
           }
+        }
+
+        // Only add user message if we have function responses
+        if (functionResponseParts.length > 0) {
+          clientHistory.push({
+            role: 'user',
+            parts: functionResponseParts,
+          });
         }
       } else {
         // Regular Gemini message without tool calls
