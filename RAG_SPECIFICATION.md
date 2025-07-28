@@ -45,11 +45,13 @@ gemini labs rag chat --persist-directory <PATH>
 1.  **File Discovery:** Use the `glob` package (existing dependency) to recursively find all supported files (e.g., `.md`, `.txt`, `.ts`, `.py`) in the `--source` directory.
 2.  **File Reading:** Use the built-in Node.js `fs/promises` module to read the content of each discovered file.
 3.  **Text Chunking:**
-    - Implement a simple, custom `chunkText` function.
-    - This function will split text first by paragraphs (e.g., `
-
-`).
-    - It will then ensure each chunk is small enough to not exceed the `gemini-embedding-001` model's **2048 token limit**.
+    - Implement a custom, asynchronous `chunkText` function that is aware of the model's token limit.
+    - **Token-Aware Splitting Strategy:**
+        1. Start with an initial block of text (e.g., a whole file or a large paragraph).
+        2. Use the `model.countTokens()` method from the `@google/genai` SDK to get an accurate token count for the block.
+        3. If the token count is within the **2048 token limit**, the block is considered a valid chunk.
+        4. If the token count exceeds the limit, the block must be split. It will be divided into smaller pieces (e.g., split by sentences or lines).
+        5. Each new, smaller piece will then be passed recursively through this same process (check token count, then split if needed) until all resulting sub-chunks are under the token limit. This ensures no data is truncated and all text is indexed reliably.
 4.  **Embedding Generation:**
     - For each text chunk, call the `embedContent` function from the `@google/genai` package to get its vector embedding.
     - To manage API rate limits and efficiency, process chunks in batches.
