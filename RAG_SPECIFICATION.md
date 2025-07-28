@@ -56,9 +56,11 @@ gemini labs rag chat --persist-directory <PATH>
     - For each text chunk, call the `embedContent` function from the `@google/genai` package to get its vector embedding.
     - To manage API rate limits and efficiency, process chunks in batches.
 5.  **Vector Storage:**
-    - Create a single JSON file, e.g., `vector_store.json`, inside the `--persist-directory`.
-    - This file will contain an array of objects: `[{ chunk: string, embedding: number[] }]`.
-    - This approach avoids adding a new database dependency.
+    - Use `LanceDB` as the local, file-based vector store. It is a lightweight, serverless database that is highly efficient for vector search and avoids the scalability issues of a single JSON file.
+    - **Rationale:** `LanceDB` is chosen over other options because its Node.js package (`vectordb`) is based on WebAssembly (WASM). This means it requires no native compilation during installation, ensuring a smooth and reliable `npm install` experience for end-users, which is critical for a CLI tool.
+    - The `LanceDB` store will be created in the `--persist-directory`.
+    - This approach provides a robust and scalable foundation for the feature while only adding a single, focused, and easy-to-install dependency.
+
 
 ### **Step 2: Chatting (`chat` command)**
 
@@ -79,7 +81,7 @@ gemini labs rag chat --persist-directory <PATH>
 
 ## 3. Dependencies
 
-- **New Dependencies:** None. This plan is designed to work with the existing dependencies in the project.
+- **New Dependencies:** `vectordb` (for LanceDB).
 - **Key Existing Dependencies:**
     - `@google/genai`
     - `glob`
