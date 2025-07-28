@@ -42,8 +42,8 @@ import {
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
-import { ideContext } from '../services/ideContext.js';
-import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { ideContext } from '../ide/ideContext.js';
+import { logFlashDecidedToContinue } from '../telemetry/loggers.js';
 import { FlashDecidedToContinueEvent } from '../telemetry/types.js';
 
 function isThinkingSupported(model: string) {
@@ -293,7 +293,7 @@ export class GeminiClient {
     originalModel?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (this.lastPromptId !== prompt_id) {
-      this.loopDetector.reset();
+      this.loopDetector.reset(prompt_id);
       this.lastPromptId = prompt_id;
     }
     this.sessionTurnCount++;
@@ -320,32 +320,40 @@ export class GeminiClient {
     }
 
     if (this.config.getIdeMode()) {
-      const openFiles = ideContext.getOpenFilesContext();
-      if (openFiles) {
+      const ideContextState = ideContext.getIdeContext();
+      const openFiles = ideContextState?.workspaceState?.openFiles;
+
+      if (openFiles && openFiles.length > 0) {
         const contextParts: string[] = [];
-        if (openFiles.activeFile) {
+        const firstFile = openFiles[0];
+        const activeFile = firstFile.isActive ? firstFile : undefined;
+
+        if (activeFile) {
           contextParts.push(
-            `This is the file that the user was most recently looking at:\n- Path: ${openFiles.activeFile}`,
+            `This is the file that the user is looking at:\n- Path: ${activeFile.path}`,
           );
-          if (openFiles.cursor) {
+          if (activeFile.cursor) {
             contextParts.push(
-              `This is the cursor position in the file:\n- Cursor Position: Line ${openFiles.cursor.line}, Character ${openFiles.cursor.character}`,
+              `This is the cursor position in the file:\n- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`,
             );
           }
-          if (openFiles.selectedText) {
+          if (activeFile.selectedText) {
             contextParts.push(
-              `This is the selected text in the active file:\n- ${openFiles.selectedText}`,
+              `This is the selected text in the file:\n- ${activeFile.selectedText}`,
             );
           }
         }
 
-        if (openFiles.recentOpenFiles && openFiles.recentOpenFiles.length > 0) {
-          const recentFiles = openFiles.recentOpenFiles
-            .map((file) => `- ${file.filePath}`)
+        const otherOpenFiles = activeFile ? openFiles.slice(1) : openFiles;
+
+        if (otherOpenFiles.length > 0) {
+          const recentFiles = otherOpenFiles
+            .map((file) => `- ${file.path}`)
             .join('\n');
-          contextParts.push(
-            `Here are files the user has recently opened, with the most recent at the top:\n${recentFiles}`,
-          );
+          const heading = activeFile
+            ? `Here are some other files the user has open, with the most recent at the top:`
+            : `Here are some files the user has open, with the most recent at the top:`;
+          contextParts.push(`${heading}\n${recentFiles}`);
         }
 
         if (contextParts.length > 0) {
@@ -388,7 +396,8 @@ export class GeminiClient {
         signal,
       );
       if (nextSpeakerCheck?.next_speaker === 'model') {
-        ClearcutLogger.getInstance(this.config)?.logFlashDecidedToContinueEvent(
+        logFlashDecidedToContinue(
+          this.config,
           new FlashDecidedToContinueEvent(prompt_id),
         );
         const nextRequest = [{ text: 'Please continue.' }];
@@ -708,6 +717,7 @@ export class GeminiClient {
         );
         if (accepted !== false && accepted !== null) {
           this.config.setModel(fallbackModel);
+          this.config.setFallbackMode(true);
           return fallbackModel;
         }
         // Check if the model was switched manually in the handler

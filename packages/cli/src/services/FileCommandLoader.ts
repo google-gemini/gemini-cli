@@ -15,7 +15,25 @@ import {
   getUserCommandsDir,
 } from '@google/gemini-cli-core';
 import { ICommandLoader } from './types.js';
-import { CommandKind, SlashCommand } from '../ui/commands/types.js';
+import {
+  CommandContext,
+  CommandKind,
+  SlashCommand,
+  SlashCommandActionReturn,
+} from '../ui/commands/types.js';
+import {
+  DefaultArgumentProcessor,
+  ShorthandArgumentProcessor,
+} from './prompt-processors/argumentProcessor.js';
+import {
+  IPromptProcessor,
+  SHORTHAND_ARGS_PLACEHOLDER,
+  SHELL_INJECTION_TRIGGER,
+} from './prompt-processors/types.js';
+import {
+  ConfirmationRequiredError,
+  ShellProcessor,
+} from './prompt-processors/shellProcessor.js';
 
 interface CommandDirectory {
   path: string;
@@ -68,6 +86,7 @@ export class FileCommandLoader implements ICommandLoader {
       nodir: true,
       dot: true,
       signal,
+      follow: true,
     };
 
     // Load commands from each directory
@@ -204,15 +223,65 @@ export class FileCommandLoader implements ICommandLoader {
       description = `[${extensionName}] ${description}`;
     }
 
+    const processors: IPromptProcessor[] = [];
+
+    // Add the Shell Processor if needed.
+    if (validDef.prompt.includes(SHELL_INJECTION_TRIGGER)) {
+      processors.push(new ShellProcessor(baseCommandName));
+    }
+
+    // The presence of '{{args}}' is the switch that determines the behavior.
+    if (validDef.prompt.includes(SHORTHAND_ARGS_PLACEHOLDER)) {
+      processors.push(new ShorthandArgumentProcessor());
+    } else {
+      processors.push(new DefaultArgumentProcessor());
+    }
+
     return {
       name: baseCommandName,
       description,
       kind: CommandKind.FILE,
       extensionName,
-      action: async () => ({
-        type: 'submit_prompt',
-        content: validDef.prompt,
-      }),
+      action: async (
+        context: CommandContext,
+        _args: string,
+      ): Promise<SlashCommandActionReturn> => {
+        if (!context.invocation) {
+          console.error(
+            `[FileCommandLoader] Critical error: Command '${baseCommandName}' was executed without invocation context.`,
+          );
+          return {
+            type: 'submit_prompt',
+            content: validDef.prompt, // Fallback to unprocessed prompt
+          };
+        }
+
+        try {
+          let processedPrompt = validDef.prompt;
+          for (const processor of processors) {
+            processedPrompt = await processor.process(processedPrompt, context);
+          }
+
+          return {
+            type: 'submit_prompt',
+            content: processedPrompt,
+          };
+        } catch (e) {
+          // Check if it's our specific error type
+          if (e instanceof ConfirmationRequiredError) {
+            // Halt and request confirmation from the UI layer.
+            return {
+              type: 'confirm_shell_commands',
+              commandsToConfirm: e.commandsToConfirm,
+              originalInvocation: {
+                raw: context.invocation.raw,
+              },
+            };
+          }
+          // Re-throw other errors to be handled by the global error handler.
+          throw e;
+        }
+      },
     };
   }
 }

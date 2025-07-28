@@ -279,18 +279,23 @@ export function ThemeDialog({
               >
                 {colorizeCode(
                   `# function
--def fibonacci(n):
--    a, b = 0, 1
--    for _ in range(n):
--        a, b = b, a + b
--    return a`,
+def fibonacci(n):
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a`,
                   'python',
                   codeBlockHeight,
                   colorizeCodeWidth,
                 )}
                 <Box marginTop={1} />
                 <DiffRenderer
-                  diffContent={`--- a/old_file.txt\n+++ b/new_file.txt\n@@ -1,6 +1,7 @@\n # function\n-def fibonacci(n):\n-    a, b = 0, 1\n-    for _ in range(n):\n-        a, b = b, a + b\n-    return a\n+def fibonacci(n):\n+    a, b = 0, 1\n+    for _ in range(n):\n+        a, b = b, a + b\n+    return a\n+\n+print(fibonacci(10))\n`}
+                  diffContent={`--- a/util.py
++++ b/util.py
+@@ -1,2 +1,2 @@
+- print("Hello, " + name)
++ print(f"Hello, {name}!")
+`}
                   availableTerminalHeight={diffHeight}
                   terminalWidth={colorizeCodeWidth}
                   theme={previewTheme}

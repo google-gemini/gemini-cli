@@ -78,6 +78,17 @@ export async function getOauthClient(
     },
   });
 
+  if (
+    process.env.GOOGLE_GENAI_USE_GCA &&
+    process.env.GOOGLE_CLOUD_ACCESS_TOKEN
+  ) {
+    client.setCredentials({
+      access_token: process.env.GOOGLE_CLOUD_ACCESS_TOKEN,
+    });
+    await fetchAndCacheUserInfo(client);
+    return client;
+  }
+
   client.on('tokens', async (tokens: Credentials) => {
     await cacheCredentials(tokens);
   });

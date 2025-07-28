@@ -25,6 +25,7 @@ interface FooterProps {
   showMemoryUsage?: boolean;
   promptTokenCount: number;
   nightly: boolean;
+  vimMode?: string;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -39,13 +40,15 @@ export const Footer: React.FC<FooterProps> = ({
   showMemoryUsage,
   promptTokenCount,
   nightly,
+  vimMode,
 }) => {
   const limit = tokenLimit(model);
   const percentage = promptTokenCount / limit;
 
   return (
-    <Box marginTop={1} justifyContent="space-between" width="100%">
+    <Box justifyContent="space-between" width="100%">
       <Box>
+        {vimMode && <Text color={Colors.Gray}>[{vimMode}] </Text>}
         {nightly ? (
           <Gradient colors={Colors.GradientColors}>
             <Text>
