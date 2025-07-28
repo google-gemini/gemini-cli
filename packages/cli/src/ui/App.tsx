@@ -172,7 +172,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [ideContextState, setIdeContextState] = useState<
     IdeContext | undefined
   >();
-  const [openFiles, setOpenFiles] = useState<OpenFiles | undefined>();
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   useEffect(() => {
