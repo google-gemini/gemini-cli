@@ -35,7 +35,10 @@ export * from './utils/editor.js';
 export * from './utils/quotaErrorDetection.js';
 export * from './utils/fileUtils.js';
 export * from './utils/retry.js';
+export * from './utils/shell-utils.js';
 export * from './utils/systemEncoding.js';
+export * from './utils/textUtils.js';
+export * from './utils/formatters.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -47,9 +50,15 @@ export * from './ide/ideContext.js';
 export * from './ide/ide-installer.js';
 export * from './ide/detect-ide.js';
 
+// Export Shell Execution Service
+export * from './services/shellExecutionService.js';
+
 // Export base tool definitions
 export * from './tools/tools.js';
 export * from './tools/tool-registry.js';
+
+// Export prompt logic
+export * from './prompts/mcp-prompts.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';

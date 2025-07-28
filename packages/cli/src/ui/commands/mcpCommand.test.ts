@@ -71,6 +71,7 @@ describe('mcpCommand', () => {
     getToolRegistry: ReturnType<typeof vi.fn>;
     getMcpServers: ReturnType<typeof vi.fn>;
     getBlockedMcpServers: ReturnType<typeof vi.fn>;
+    getPromptRegistry: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -92,6 +93,10 @@ describe('mcpCommand', () => {
       }),
       getMcpServers: vi.fn().mockReturnValue({}),
       getBlockedMcpServers: vi.fn().mockReturnValue([]),
+      getPromptRegistry: vi.fn().mockResolvedValue({
+        getAllPrompts: vi.fn().mockReturnValue([]),
+        getPromptsByServer: vi.fn().mockReturnValue([]),
+      }),
     };
 
     mockContext = createMockCommandContext({
@@ -223,7 +228,7 @@ describe('mcpCommand', () => {
 
         // Server 2 - Connected
         expect(message).toContain(
-          '🟢 \u001b[1mserver2\u001b[0m - Ready (1 tools)',
+          '🟢 \u001b[1mserver2\u001b[0m - Ready (1 tool)',
         );
         expect(message).toContain('server2_tool1');
 
@@ -365,13 +370,13 @@ describe('mcpCommand', () => {
       if (isMessageAction(result)) {
         const message = result.content;
         expect(message).toContain(
-          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tools)',
+          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tool)',
         );
         expect(message).toContain('\u001b[36mserver1_tool1\u001b[0m');
         expect(message).toContain(
           '🔴 \u001b[1mserver2\u001b[0m - Disconnected (0 tools cached)',
         );
-        expect(message).toContain('No tools available');
+        expect(message).toContain('No tools or prompts available');
       }
     });
 
@@ -421,10 +426,10 @@ describe('mcpCommand', () => {
 
         // Check server statuses
         expect(message).toContain(
-          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tools)',
+          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tool)',
         );
         expect(message).toContain(
-          '🔄 \u001b[1mserver2\u001b[0m - Starting... (first startup may take longer) (tools will appear when ready)',
+          '🔄 \u001b[1mserver2\u001b[0m - Starting... (first startup may take longer) (tools and prompts will appear when ready)',
         );
       }
     });
@@ -994,6 +999,9 @@ describe('mcpCommand', () => {
             getBlockedMcpServers: vi.fn().mockReturnValue([]),
             getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
             getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+            getPromptRegistry: vi.fn().mockResolvedValue({
+              getPromptsByServer: vi.fn().mockReturnValue([]),
+            }),
           },
         },
       });
