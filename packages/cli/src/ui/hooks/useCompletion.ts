@@ -540,11 +540,10 @@ export function useCompletion(
       }
     };
 
-    const debounceTimeout = setTimeout(fetchSuggestions, 75);
+    fetchSuggestions();
 
     return () => {
       isMounted = false;
-      clearTimeout(debounceTimeout);
     };
   }, [
     query,

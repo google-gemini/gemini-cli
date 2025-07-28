@@ -83,7 +83,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     onTextChange?.(buffer.text);
   }, [buffer.text, onTextChange]);
 
-  const debouncedText = useDebounce(buffer.text, 200);
+  const debouncedText = useDebounce(buffer.text, 75);
 
   useEffect(() => {
     const text = debouncedText.trim();
