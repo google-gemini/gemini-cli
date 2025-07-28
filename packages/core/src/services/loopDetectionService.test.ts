@@ -303,6 +303,81 @@ describe('LoopDetectionService', () => {
     });
   });
 
+  describe('Content Loop with Code Blocks', () => {
+    it('should not detect a loop for repeated content inside a code block', () => {
+      const content = '```\nconsole.log("repeated");\n```';
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        const event = createContentEvent(content);
+        expect(service.addAndCheck(event)).toBe(false);
+      }
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should detect a loop for repeated sentences outside of code blocks', () => {
+      const sentence = 'This is a repeated sentence.';
+      const codeBlock = '```\nconst x = 1;\n```';
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        expect(service.addAndCheck(createContentEvent(sentence))).toBe(false);
+        expect(service.addAndCheck(createContentEvent(codeBlock))).toBe(false);
+      }
+      expect(service.addAndCheck(createContentEvent(sentence))).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should correctly toggle inCodeBlock state with multiple code blocks', () => {
+      const sentence1 = 'Sentence A.';
+      const code1 = '```\ncode1\n```';
+      const sentence2 = 'Sentence B.';
+      const code2 = '```\ncode2\n```';
+
+      // Intersperse sentences and code, repeating Sentence B
+      service.addAndCheck(createContentEvent(sentence1));
+      service.addAndCheck(createContentEvent(code1));
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        expect(service.addAndCheck(createContentEvent(sentence2))).toBe(
+          i === CONTENT_LOOP_THRESHOLD - 1,
+        );
+        service.addAndCheck(createContentEvent(code2));
+      }
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle content that starts or ends with a code block marker', () => {
+      const sentence = 'This is a test.';
+      // Starts with a marker
+      service.addAndCheck(createContentEvent('```\nconst y = 2;\n```'));
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        expect(service.addAndCheck(createContentEvent(sentence))).toBe(
+          i === CONTENT_LOOP_THRESHOLD - 1,
+        );
+      }
+      service.reset('');
+      // Ends with a marker
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        expect(service.addAndCheck(createContentEvent(sentence))).toBe(false);
+      }
+      expect(service.addAndCheck(createContentEvent(sentence))).toBe(true);
+      service.addAndCheck(createContentEvent('```\nconst z = 3;\n```'));
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not count content within an unclosed code block', () => {
+      service.addAndCheck(createContentEvent('```\n')); // Open code block
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        expect(
+          service.addAndCheck(createContentEvent('console.log("loop?");')),
+        ).toBe(false);
+      }
+      service.addAndCheck(createContentEvent('\n```')); // Close code block
+      // Now, text outside should be counted
+      const sentence = 'Now we count.';
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        expect(service.addAndCheck(createContentEvent(sentence))).toBe(false);
+      }
+      expect(service.addAndCheck(createContentEvent(sentence))).toBe(true);
+    });
+  });
+
   describe('Reset Functionality', () => {
     it('tool call should reset content count', () => {
       const contentEvent = createContentEvent('Some content.');

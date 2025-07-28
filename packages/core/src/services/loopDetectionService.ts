@@ -60,6 +60,7 @@ export class LoopDetectionService {
   private lastRepeatedSentence: string = '';
   private sentenceRepetitionCount: number = 0;
   private partialContent: string = '';
+  private inCodeBlock = false;
 
   // LLM loop track tracking
   private turnsInCurrentPrompt = 0;
@@ -141,7 +142,36 @@ export class LoopDetectionService {
   }
 
   private checkContentLoop(content: string): boolean {
-    this.partialContent += content;
+    let textOnlyContent = '';
+    let remainingContent = content;
+
+    while (remainingContent.length > 0) {
+      const codeBlockMarker = '```';
+      const markerIndex = remainingContent.indexOf(codeBlockMarker);
+
+      if (markerIndex === -1) {
+        if (!this.inCodeBlock) {
+          textOnlyContent += remainingContent;
+        }
+        break;
+      }
+
+      const textBeforeMarker = remainingContent.substring(0, markerIndex);
+      if (!this.inCodeBlock) {
+        textOnlyContent += textBeforeMarker;
+      }
+
+      this.inCodeBlock = !this.inCodeBlock;
+      remainingContent = remainingContent.substring(
+        markerIndex + codeBlockMarker.length,
+      );
+    }
+
+    if (!textOnlyContent) {
+      return false;
+    }
+
+    this.partialContent += textOnlyContent;
 
     if (!SENTENCE_ENDING_PUNCTUATION_REGEX.test(this.partialContent)) {
       return false;
@@ -274,6 +304,7 @@ Please analyze the conversation history to determine the possibility that the co
     this.lastRepeatedSentence = '';
     this.sentenceRepetitionCount = 0;
     this.partialContent = '';
+    this.inCodeBlock = false;
   }
 
   private resetLlmCheckTracking(): void {
