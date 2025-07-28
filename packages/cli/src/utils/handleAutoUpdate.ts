@@ -9,6 +9,7 @@ import { UpdateInfo } from '../ui/utils/updateCheck.js';
 import { LoadedSettings } from '../config/settings.js';
 import { getInstallationInfo } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
+import { HistoryItem, MessageType } from '../ui/types.js';
 
 export function handleAutoUpdate(
   info: UpdateInfo | null,
@@ -67,4 +68,73 @@ export function handleAutoUpdate(
     });
   });
   return updateProcess;
+}
+
+export function useUpdateHandler(
+  addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
+  setUpdateInfo: (info: UpdateInfo | null) => void,
+) {
+    let successfullyInstalled = false;
+    const handleUpdateRecieved = (info: UpdateInfo) => {
+      setUpdateInfo(info);
+      const savedMessage = info.message;
+      setTimeout((_: UpdateInfo) => {
+        if (!successfullyInstalled) {
+          addItem(
+            {
+              type: MessageType.INFO,
+              text: savedMessage,
+            },
+            Date.now(),
+          );
+        }
+        setUpdateInfo(null);
+      }, 60000);
+    };
+
+    const handleUpdateFailed = (_: UpdateInfo) => {
+      setUpdateInfo(null);
+      addItem(
+        {
+          type: MessageType.ERROR,
+          text: `Automatic update failed. Please try updating manually`,
+        },
+        Date.now(),
+      );
+    };
+
+    const handleUpdateSuccess = (_: UpdateInfo) => {
+      successfullyInstalled = true;
+      setUpdateInfo(null);
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: `Update successful! The new version will be used on your next run.`,
+        },
+        Date.now(),
+      );
+    };
+
+    const handleUpdateInfo = (data: { message: string }) => {
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: data.message,
+        },
+        Date.now(),
+      );
+    };
+
+    updateEventEmitter.on('update-received', handleUpdateRecieved);
+    updateEventEmitter.on('update-failed', handleUpdateFailed);
+    updateEventEmitter.on('update-success', handleUpdateSuccess);
+    updateEventEmitter.on('update-info', handleUpdateInfo);
+
+    return () => {
+      updateEventEmitter.off('update-received', handleUpdateRecieved);
+      updateEventEmitter.off('update-failed', handleUpdateFailed);
+      updateEventEmitter.off('update-success', handleUpdateSuccess);
+      updateEventEmitter.off('update-info', handleUpdateInfo);
+    };
+
 }

@@ -224,9 +224,16 @@ export async function main() {
       { exitOnCtrlC: false },
     );
 
-    checkForUpdates().then((info) => {
-      handleAutoUpdate(info, settings, config.getProjectRoot());
-    });
+    checkForUpdates()
+      .then((info) => {
+        handleAutoUpdate(info, settings, config.getProjectRoot());
+      })
+      .catch((err) => {
+        // Silently ignore update check errors.
+        if (config.getDebugMode()) {
+          console.error('Update check failed:', err);
+        }
+      });
 
     registerCleanup(() => instance.unmount());
     return;
