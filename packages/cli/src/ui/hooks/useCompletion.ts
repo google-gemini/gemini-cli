@@ -123,104 +123,106 @@ export function useCompletion(
   }, [suggestions.length]);
 
   useEffect(() => {
-    if (!isActive) {
-      resetCompletionState();
-      return;
-    }
+    let isMounted = true;
 
-    const trimmedQuery = query.trimStart();
-
-    if (trimmedQuery.startsWith('/')) {
-      // Always reset perfect match at the beginning of processing.
-      setIsPerfectMatch(false);
-
-      const fullPath = trimmedQuery.substring(1);
-      const hasTrailingSpace = trimmedQuery.endsWith(' ');
-
-      // Get all non-empty parts of the command.
-      const rawParts = fullPath.split(/\s+/).filter((p) => p);
-
-      let commandPathParts = rawParts;
-      let partial = '';
-
-      // If there's no trailing space, the last part is potentially a partial segment.
-      // We tentatively separate it.
-      if (!hasTrailingSpace && rawParts.length > 0) {
-        partial = rawParts[rawParts.length - 1];
-        commandPathParts = rawParts.slice(0, -1);
+    const fetchSuggestions = async () => {
+      if (!isActive) {
+        resetCompletionState();
+        return;
       }
 
-      // Traverse the Command Tree using the tentative completed path
-      let currentLevel: readonly SlashCommand[] | undefined = slashCommands;
-      let leafCommand: SlashCommand | null = null;
+      const trimmedQuery = query.trimStart();
 
-      for (const part of commandPathParts) {
-        if (!currentLevel) {
-          leafCommand = null;
-          currentLevel = [];
-          break;
+      if (trimmedQuery.startsWith('/')) {
+        // Always reset perfect match at the beginning of processing.
+        setIsPerfectMatch(false);
+
+        const fullPath = trimmedQuery.substring(1);
+        const hasTrailingSpace = trimmedQuery.endsWith(' ');
+
+        // Get all non-empty parts of the command.
+        const rawParts = fullPath.split(/\s+/).filter((p) => p);
+
+        let commandPathParts = rawParts;
+        let partial = '';
+
+        // If there's no trailing space, the last part is potentially a partial segment.
+        // We tentatively separate it.
+        if (!hasTrailingSpace && rawParts.length > 0) {
+          partial = rawParts[rawParts.length - 1];
+          commandPathParts = rawParts.slice(0, -1);
         }
-        const found: SlashCommand | undefined = currentLevel.find(
-          (cmd) => cmd.name === part || cmd.altNames?.includes(part),
-        );
-        if (found) {
-          leafCommand = found;
-          currentLevel = found.subCommands as
-            | readonly SlashCommand[]
-            | undefined;
-        } else {
-          leafCommand = null;
-          currentLevel = [];
-          break;
-        }
-      }
 
-      // Handle the Ambiguous Case
-      if (!hasTrailingSpace && currentLevel) {
-        const exactMatchAsParent = currentLevel.find(
-          (cmd) =>
-            (cmd.name === partial || cmd.altNames?.includes(partial)) &&
-            cmd.subCommands,
-        );
+        // Traverse the Command Tree using the tentative completed path
+        let currentLevel: readonly SlashCommand[] | undefined = slashCommands;
+        let leafCommand: SlashCommand | null = null;
 
-        if (exactMatchAsParent) {
-          // It's a perfect match for a parent command. Override our initial guess.
-          // Treat it as a completed command path.
-          leafCommand = exactMatchAsParent;
-          currentLevel = exactMatchAsParent.subCommands;
-          partial = ''; // We now want to suggest ALL of its sub-commands.
-        }
-      }
-
-      // Check for perfect, executable match
-      if (!hasTrailingSpace) {
-        if (leafCommand && partial === '' && leafCommand.action) {
-          // Case: /command<enter> - command has action, no sub-commands were suggested
-          setIsPerfectMatch(true);
-        } else if (currentLevel) {
-          // Case: /command subcommand<enter>
-          const perfectMatch = currentLevel.find(
-            (cmd) =>
-              (cmd.name === partial || cmd.altNames?.includes(partial)) &&
-              cmd.action,
+        for (const part of commandPathParts) {
+          if (!currentLevel) {
+            leafCommand = null;
+            currentLevel = [];
+            break;
+          }
+          const found: SlashCommand | undefined = currentLevel.find(
+            (cmd) => cmd.name === part || cmd.altNames?.includes(part),
           );
-          if (perfectMatch) {
-            setIsPerfectMatch(true);
+          if (found) {
+            leafCommand = found;
+            currentLevel = found.subCommands as
+              | readonly SlashCommand[]
+              | undefined;
+          } else {
+            leafCommand = null;
+            currentLevel = [];
+            break;
           }
         }
-      }
 
-      const depth = commandPathParts.length;
+        // Handle the Ambiguous Case
+        if (!hasTrailingSpace && currentLevel) {
+          const exactMatchAsParent = currentLevel.find(
+            (cmd) =>
+              (cmd.name === partial || cmd.altNames?.includes(partial)) &&
+              cmd.subCommands,
+          );
 
-      // Provide Suggestions based on the now-corrected context
+          if (exactMatchAsParent) {
+            // It's a perfect match for a parent command. Override our initial guess.
+            // Treat it as a completed command path.
+            leafCommand = exactMatchAsParent;
+            currentLevel = exactMatchAsParent.subCommands;
+            partial = ''; // We now want to suggest ALL of its sub-commands.
+          }
+        }
 
-      // Argument Completion
-      if (
-        leafCommand?.completion &&
-        (hasTrailingSpace ||
-          (rawParts.length > depth && depth > 0 && partial !== ''))
-      ) {
-        const fetchAndSetSuggestions = async () => {
+        // Check for perfect, executable match
+        if (!hasTrailingSpace) {
+          if (leafCommand && partial === '' && leafCommand.action) {
+            // Case: /command<enter> - command has action, no sub-commands were suggested
+            setIsPerfectMatch(true);
+          } else if (currentLevel) {
+            // Case: /command subcommand<enter>
+            const perfectMatch = currentLevel.find(
+              (cmd) =>
+                (cmd.name === partial || cmd.altNames?.includes(partial)) &&
+                cmd.action,
+            );
+            if (perfectMatch) {
+              setIsPerfectMatch(true);
+            }
+          }
+        }
+
+        const depth = commandPathParts.length;
+
+        // Provide Suggestions based on the now-corrected context
+
+        // Argument Completion
+        if (
+          leafCommand?.completion &&
+          (hasTrailingSpace ||
+            (rawParts.length > depth && depth > 0 && partial !== ''))
+        ) {
           setIsLoadingSuggestions(true);
           const argString = rawParts.slice(depth).join(' ');
           const results =
@@ -230,190 +232,188 @@ export function useCompletion(
           setShowSuggestions(finalSuggestions.length > 0);
           setActiveSuggestionIndex(finalSuggestions.length > 0 ? 0 : -1);
           setIsLoadingSuggestions(false);
-        };
-        fetchAndSetSuggestions();
-        return;
-      }
-
-      // Command/Sub-command Completion
-      const commandsToSearch = currentLevel || [];
-      if (commandsToSearch.length > 0) {
-        let potentialSuggestions = commandsToSearch.filter(
-          (cmd) =>
-            cmd.description &&
-            (cmd.name.startsWith(partial) ||
-              cmd.altNames?.some((alt) => alt.startsWith(partial))),
-        );
-
-        // If a user's input is an exact match and it is a leaf command,
-        // enter should submit immediately.
-        if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
-          const perfectMatch = potentialSuggestions.find(
-            (s) => s.name === partial || s.altNames?.includes(partial),
-          );
-          if (perfectMatch && perfectMatch.action) {
-            potentialSuggestions = [];
-          }
+          return;
         }
 
-        const finalSuggestions = potentialSuggestions.map((cmd) => ({
-          label: cmd.name,
-          value: cmd.name,
-          description: cmd.description,
-        }));
-
-        setSuggestions(finalSuggestions);
-        setShowSuggestions(finalSuggestions.length > 0);
-        setActiveSuggestionIndex(finalSuggestions.length > 0 ? 0 : -1);
-        setIsLoadingSuggestions(false);
-        return;
-      }
-
-      // If we fall through, no suggestions are available.
-      resetCompletionState();
-      return;
-    }
-
-    // Handle At Command Completion
-    const atIndex = query.lastIndexOf('@');
-    if (atIndex === -1) {
-      resetCompletionState();
-      return;
-    }
-
-    const partialPath = query.substring(atIndex + 1);
-    const lastSlashIndex = partialPath.lastIndexOf('/');
-    const baseDirRelative =
-      lastSlashIndex === -1
-        ? '.'
-        : partialPath.substring(0, lastSlashIndex + 1);
-    const prefix = unescapePath(
-      lastSlashIndex === -1
-        ? partialPath
-        : partialPath.substring(lastSlashIndex + 1),
-    );
-
-    const baseDirAbsolute = path.resolve(cwd, baseDirRelative);
-
-    let isMounted = true;
-
-    const findFilesRecursively = async (
-      startDir: string,
-      searchPrefix: string,
-      fileDiscovery: FileDiscoveryService | null,
-      filterOptions: {
-        respectGitIgnore?: boolean;
-        respectGeminiIgnore?: boolean;
-      },
-      currentRelativePath = '',
-      depth = 0,
-      maxDepth = 10, // Limit recursion depth
-      maxResults = 50, // Limit number of results
-    ): Promise<Suggestion[]> => {
-      if (depth > maxDepth) {
-        return [];
-      }
-
-      const lowerSearchPrefix = searchPrefix.toLowerCase();
-      let foundSuggestions: Suggestion[] = [];
-      try {
-        const entries = await fs.readdir(startDir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (foundSuggestions.length >= maxResults) break;
-
-          const entryPathRelative = path.join(currentRelativePath, entry.name);
-          const entryPathFromRoot = path.relative(
-            cwd,
-            path.join(startDir, entry.name),
+        // Command/Sub-command Completion
+        const commandsToSearch = currentLevel || [];
+        if (commandsToSearch.length > 0) {
+          let potentialSuggestions = commandsToSearch.filter(
+            (cmd) =>
+              cmd.description &&
+              (cmd.name.startsWith(partial) ||
+                cmd.altNames?.some((alt) => alt.startsWith(partial))),
           );
 
-          // Conditionally ignore dotfiles
-          if (!searchPrefix.startsWith('.') && entry.name.startsWith('.')) {
-            continue;
-          }
-
-          // Check if this entry should be ignored by filtering options
-          if (
-            fileDiscovery &&
-            fileDiscovery.shouldIgnoreFile(entryPathFromRoot, filterOptions)
-          ) {
-            continue;
-          }
-
-          if (entry.name.toLowerCase().startsWith(lowerSearchPrefix)) {
-            foundSuggestions.push({
-              label: entryPathRelative + (entry.isDirectory() ? '/' : ''),
-              value: escapePath(
-                entryPathRelative + (entry.isDirectory() ? '/' : ''),
-              ),
-            });
-          }
-          if (
-            entry.isDirectory() &&
-            entry.name !== 'node_modules' &&
-            !entry.name.startsWith('.')
-          ) {
-            if (foundSuggestions.length < maxResults) {
-              foundSuggestions = foundSuggestions.concat(
-                await findFilesRecursively(
-                  path.join(startDir, entry.name),
-                  searchPrefix, // Pass original searchPrefix for recursive calls
-                  fileDiscovery,
-                  filterOptions,
-                  entryPathRelative,
-                  depth + 1,
-                  maxDepth,
-                  maxResults - foundSuggestions.length,
-                ),
-              );
+          // If a user's input is an exact match and it is a leaf command,
+          // enter should submit immediately.
+          if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
+            const perfectMatch = potentialSuggestions.find(
+              (s) => s.name === partial || s.altNames?.includes(partial),
+            );
+            if (perfectMatch && perfectMatch.action) {
+              potentialSuggestions = [];
             }
           }
+
+          const finalSuggestions = potentialSuggestions.map((cmd) => ({
+            label: cmd.name,
+            value: cmd.name,
+            description: cmd.description,
+          }));
+
+          setSuggestions(finalSuggestions);
+          setShowSuggestions(finalSuggestions.length > 0);
+          setActiveSuggestionIndex(finalSuggestions.length > 0 ? 0 : -1);
+          setIsLoadingSuggestions(false);
+          return;
         }
-      } catch (_err) {
-        // Ignore errors like permission denied or ENOENT during recursive search
+
+        // If we fall through, no suggestions are available.
+        resetCompletionState();
+        return;
       }
-      return foundSuggestions.slice(0, maxResults);
-    };
 
-    const findFilesWithGlob = async (
-      searchPrefix: string,
-      fileDiscoveryService: FileDiscoveryService,
-      filterOptions: {
-        respectGitIgnore?: boolean;
-        respectGeminiIgnore?: boolean;
-      },
-      maxResults = 50,
-    ): Promise<Suggestion[]> => {
-      const globPattern = `**/${searchPrefix}*`;
-      const files = await glob(globPattern, {
-        cwd,
-        dot: searchPrefix.startsWith('.'),
-        nocase: true,
-      });
+      // Handle At Command Completion
+      const atIndex = query.lastIndexOf('@');
+      if (atIndex === -1) {
+        resetCompletionState();
+        return;
+      }
 
-      const suggestions: Suggestion[] = files
-        .map((file: string) => {
-          const relativePath = path.relative(cwd, file);
-          return {
-            label: relativePath,
-            value: escapePath(relativePath),
-          };
-        })
-        .filter((s) => {
-          if (fileDiscoveryService) {
-            return !fileDiscoveryService.shouldIgnoreFile(
-              s.label,
-              filterOptions,
-            ); // relative path
+      const partialPath = query.substring(atIndex + 1);
+      const lastSlashIndex = partialPath.lastIndexOf('/');
+      const baseDirRelative =
+        lastSlashIndex === -1
+          ? '.'
+          : partialPath.substring(0, lastSlashIndex + 1);
+      const prefix = unescapePath(
+        lastSlashIndex === -1
+          ? partialPath
+          : partialPath.substring(lastSlashIndex + 1),
+      );
+
+      const baseDirAbsolute = path.resolve(cwd, baseDirRelative);
+
+      const findFilesRecursively = async (
+        startDir: string,
+        searchPrefix: string,
+        fileDiscovery: FileDiscoveryService | null,
+        filterOptions: {
+          respectGitIgnore?: boolean;
+          respectGeminiIgnore?: boolean;
+        },
+        currentRelativePath = '',
+        depth = 0,
+        maxDepth = 10, // Limit recursion depth
+        maxResults = 50, // Limit number of results
+      ): Promise<Suggestion[]> => {
+        if (depth > maxDepth) {
+          return [];
+        }
+
+        const lowerSearchPrefix = searchPrefix.toLowerCase();
+        let foundSuggestions: Suggestion[] = [];
+        try {
+          const entries = await fs.readdir(startDir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (foundSuggestions.length >= maxResults) break;
+
+            const entryPathRelative = path.join(
+              currentRelativePath,
+              entry.name,
+            );
+            const entryPathFromRoot = path.relative(
+              cwd,
+              path.join(startDir, entry.name),
+            );
+
+            // Conditionally ignore dotfiles
+            if (!searchPrefix.startsWith('.') && entry.name.startsWith('.')) {
+              continue;
+            }
+
+            // Check if this entry should be ignored by filtering options
+            if (
+              fileDiscovery &&
+              fileDiscovery.shouldIgnoreFile(entryPathFromRoot, filterOptions)
+            ) {
+              continue;
+            }
+
+            if (entry.name.toLowerCase().startsWith(lowerSearchPrefix)) {
+              foundSuggestions.push({
+                label: entryPathRelative + (entry.isDirectory() ? '/' : ''),
+                value: escapePath(
+                  entryPathRelative + (entry.isDirectory() ? '/' : ''),
+                ),
+              });
+            }
+            if (
+              entry.isDirectory() &&
+              entry.name !== 'node_modules' &&
+              !entry.name.startsWith('.')
+            ) {
+              if (foundSuggestions.length < maxResults) {
+                foundSuggestions = foundSuggestions.concat(
+                  await findFilesRecursively(
+                    path.join(startDir, entry.name),
+                    searchPrefix, // Pass original searchPrefix for recursive calls
+                    fileDiscovery,
+                    filterOptions,
+                    entryPathRelative,
+                    depth + 1,
+                    maxDepth,
+                    maxResults - foundSuggestions.length,
+                  ),
+                );
+              }
+            }
           }
-          return true;
-        })
-        .slice(0, maxResults);
+        } catch (_err) {
+          // Ignore errors like permission denied or ENOENT during recursive search
+        }
+        return foundSuggestions.slice(0, maxResults);
+      };
 
-      return suggestions;
-    };
+      const findFilesWithGlob = async (
+        searchPrefix: string,
+        fileDiscoveryService: FileDiscoveryService,
+        filterOptions: {
+          respectGitIgnore?: boolean;
+          respectGeminiIgnore?: boolean;
+        },
+        maxResults = 50,
+      ): Promise<Suggestion[]> => {
+        const globPattern = `**/${searchPrefix}*`;
+        const files = await glob(globPattern, {
+          cwd,
+          dot: searchPrefix.startsWith('.'),
+          nocase: true,
+        });
 
-    const fetchSuggestions = async () => {
+        const suggestions: Suggestion[] = files
+          .map((file: string) => {
+            const relativePath = path.relative(cwd, file);
+            return {
+              label: relativePath,
+              value: escapePath(relativePath),
+            };
+          })
+          .filter((s) => {
+            if (fileDiscoveryService) {
+              return !fileDiscoveryService.shouldIgnoreFile(
+                s.label,
+                filterOptions,
+              ); // relative path
+            }
+            return true;
+          })
+          .slice(0, maxResults);
+
+        return suggestions;
+      };
+
       setIsLoadingSuggestions(true);
       let fetchedSuggestions: Suggestion[] = [];
 
@@ -526,7 +526,9 @@ export function useCompletion(
           }
         } else {
           console.error(
-            `Error fetching completion suggestions for ${partialPath}: ${getErrorMessage(error)}`,
+            `Error fetching completion suggestions for ${partialPath}: ${getErrorMessage(
+              error,
+            )}`,
           );
           if (isMounted) {
             resetCompletionState();
@@ -538,7 +540,7 @@ export function useCompletion(
       }
     };
 
-    const debounceTimeout = setTimeout(fetchSuggestions, 100);
+    const debounceTimeout = setTimeout(fetchSuggestions, 75);
 
     return () => {
       isMounted = false;
