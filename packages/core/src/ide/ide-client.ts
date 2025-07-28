@@ -44,6 +44,7 @@ export class IdeClient {
   }
 
   private setState(status: IDEConnectionStatus, details?: string) {
+
     this.state = { status, details };
 
     if (status === IDEConnectionStatus.Disconnected) {
@@ -66,7 +67,14 @@ export class IdeClient {
 
   private validateWorkspacePath(): boolean {
     const ideWorkspacePath = process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
-    if (!ideWorkspacePath || ideWorkspacePath !== process.cwd()) {
+    if (!ideWorkspacePath) {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        'IDE integration requires a single workspace folder to be open in the IDE. Please ensure one folder is open and try again.',
+      );
+      return false;
+    }
+    if (ideWorkspacePath !== process.cwd()) {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `Gemini CLI is running in a different directory (${process.cwd()}) from the IDE's open workspace (${ideWorkspacePath}). Please run Gemini CLI in the same directory.`,
