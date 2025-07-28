@@ -56,6 +56,56 @@ export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
 }
 
+export interface LoggingSettings {
+  /**
+   * Whether conversation logging is enabled
+   * @default true
+   */
+  enabled?: boolean;
+
+  /**
+   * Directory where conversation logs are stored
+   * @default '~/.config/gemini/logs'
+   */
+  logDirectory?: string;
+
+  /**
+   * Maximum number of log entries to keep
+   * @default 1000
+   */
+  maxLogEntries?: number;
+
+  /**
+   * Maximum log file size in MB before rotation
+   * @default 10
+   */
+  maxLogFileSizeMB?: number;
+
+  /**
+   * Number of backup log files to keep
+   * @default 5
+   */
+  maxBackupCount?: number;
+
+  /**
+   * Log level for the conversation logger
+   * @default 'info'
+   */
+  logLevel?: 'debug' | 'info' | 'warn' | 'error';
+
+  /**
+   * Whether to log the full API response or just the text
+   * @default true
+   */
+  logFullResponse?: boolean;
+
+  /**
+   * Retention period in days
+   * @default 30
+   */
+  retentionDays?: number;
+}
+
 export interface Settings {
   theme?: string;
   customThemes?: Record<string, CustomTheme>;
@@ -102,7 +152,23 @@ export interface Settings {
   // Add other settings here.
   ideMode?: boolean;
   memoryDiscoveryMaxDirs?: number;
+
+  /**
+   * Configuration for conversation logging
+   */
+  logging?: LoggingSettings;
 }
+
+export const DEFAULT_LOGGING_SETTINGS: Required<LoggingSettings> = {
+  enabled: true,
+  logDirectory: path.join(homedir(), '.config', 'gemini', 'logs'),
+  maxLogEntries: 1000,
+  maxLogFileSizeMB: 10,
+  maxBackupCount: 5,
+  logLevel: 'info',
+  logFullResponse: true,
+  retentionDays: 30,
+};
 
 export interface SettingsError {
   message: string;
@@ -113,6 +179,7 @@ export interface SettingsFile {
   settings: Settings;
   path: string;
 }
+
 export class LoadedSettings {
   constructor(
     system: SettingsFile,
@@ -138,12 +205,22 @@ export class LoadedSettings {
     return this._merged;
   }
 
+  private mergeWithDefaults(settings: Settings): Settings {
+    return {
+      ...settings,
+      logging: {
+        ...DEFAULT_LOGGING_SETTINGS,
+        ...(settings.logging || {}),
+      },
+    };
+  }
+
   private computeMergedSettings(): Settings {
     const system = this.system.settings;
     const user = this.user.settings;
     const workspace = this.workspace.settings;
 
-    return {
+    const merged: Settings = {
       ...user,
       ...workspace,
       ...system,
@@ -158,6 +235,8 @@ export class LoadedSettings {
         ...(system.mcpServers || {}),
       },
     };
+
+    return this.mergeWithDefaults(merged);
   }
 
   forScope(scope: SettingScope): SettingsFile {
