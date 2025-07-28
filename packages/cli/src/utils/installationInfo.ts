@@ -38,15 +38,17 @@ export function getInstallationInfo(
   }
 
   try {
-    const realPath = fs.realpathSync(cliPath);
+    // Normalize path separators to forward slashes for consistent matching.
+    const realPath = fs.realpathSync(cliPath).replace(/\\/g, '/');
+    const normalizedProjectRoot = projectRoot?.replace(/\\/g, '/');
     const isGit = isGitRepository(process.cwd());
 
     // Check for local git clone first
     if (
       isGit &&
-      projectRoot &&
-      realPath.startsWith(projectRoot) &&
-      !realPath.includes('node_modules')
+      normalizedProjectRoot &&
+      realPath.startsWith(normalizedProjectRoot) &&
+      !realPath.includes('/node_modules/')
     ) {
       return {
         packageManager: PackageManager.UNKNOWN, // Not managed by a package manager in this sense
@@ -57,17 +59,14 @@ export function getInstallationInfo(
     }
 
     // Check for npx/pnpx
-    if (
-      realPath.includes(path.join('.npm', '_npx')) ||
-      realPath.includes(path.join('npm', '_npx'))
-    ) {
+    if (realPath.includes('/.npm/_npx') || realPath.includes('/npm/_npx')) {
       return {
         packageManager: PackageManager.NPX,
         isGlobal: false,
         updateMessage: 'Running via npx, update not applicable.',
       };
     }
-    if (realPath.includes(path.join('.pnpm', '_pnpx'))) {
+    if (realPath.includes('/.pnpm/_pnpx')) {
       return {
         packageManager: PackageManager.PNPX,
         isGlobal: false,
@@ -76,24 +75,26 @@ export function getInstallationInfo(
     }
 
     // Check for Homebrew
-    try {
-      // The package name in homebrew is gemini-cli
-      childProcess.execSync('brew list -1 | grep -q "^gemini-cli$"', {
-        stdio: 'ignore',
-      });
-      return {
-        packageManager: PackageManager.HOMEBREW,
-        isGlobal: true,
-        updateMessage:
-          'Installed via Homebrew. Please update with "brew upgrade".',
-      };
-    } catch (_error) {
-      // Brew is not installed or gemini-cli is not installed via brew.
-      // Continue to the next check.
+    if (process.platform === 'darwin') {
+      try {
+        // The package name in homebrew is gemini-cli
+        childProcess.execSync('brew list -1 | grep -q "^gemini-cli$"', {
+          stdio: 'ignore',
+        });
+        return {
+          packageManager: PackageManager.HOMEBREW,
+          isGlobal: true,
+          updateMessage:
+            'Installed via Homebrew. Please update with "brew upgrade".',
+        };
+      } catch (_error) {
+        // Brew is not installed or gemini-cli is not installed via brew.
+        // Continue to the next check.
+      }
     }
 
     // Check for pnpm
-    if (realPath.includes(path.join('.pnpm', 'global'))) {
+    if (realPath.includes('/.pnpm/global')) {
       const updateCommand = 'pnpm add -g @google/gemini-cli@latest';
       return {
         packageManager: PackageManager.PNPM,
@@ -106,7 +107,7 @@ export function getInstallationInfo(
     }
 
     // Check for yarn
-    if (realPath.includes(path.join('.yarn', 'global'))) {
+    if (realPath.includes('/.yarn/global')) {
       const updateCommand = 'yarn global add @google/gemini-cli@latest';
       return {
         packageManager: PackageManager.YARN,
@@ -119,14 +120,14 @@ export function getInstallationInfo(
     }
 
     // Check for bun
-    if (realPath.includes(path.join('.bun', 'install', 'cache'))) {
+    if (realPath.includes('/.bun/install/cache')) {
       return {
         packageManager: PackageManager.BUNX,
         isGlobal: false,
         updateMessage: 'Running via bunx, update not applicable.',
       };
     }
-    if (realPath.includes(path.join('.bun', 'bin'))) {
+    if (realPath.includes('/.bun/bin')) {
       const updateCommand = 'bun add -g @google/gemini-cli@latest';
       return {
         packageManager: PackageManager.BUN,
@@ -140,8 +141,8 @@ export function getInstallationInfo(
 
     // Check for local install
     if (
-      projectRoot &&
-      realPath.startsWith(path.join(projectRoot, 'node_modules'))
+      normalizedProjectRoot &&
+      realPath.startsWith(`${normalizedProjectRoot}/node_modules`)
     ) {
       let pm = PackageManager.NPM;
       if (fs.existsSync(path.join(projectRoot, 'yarn.lock'))) {

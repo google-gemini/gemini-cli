@@ -129,6 +129,9 @@ describe('getInstallationInfo', () => {
   });
 
   it('should detect Homebrew installation via execSync', () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'darwin',
+    });
     const cliPath = '/usr/local/bin/gemini';
     process.argv[1] = cliPath;
     mockedRealPathSync.mockReturnValue(cliPath);
@@ -146,6 +149,9 @@ describe('getInstallationInfo', () => {
   });
 
   it('should fall through if brew command fails', () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'darwin',
+    });
     const cliPath = '/usr/local/bin/gemini';
     process.argv[1] = cliPath;
     mockedRealPathSync.mockReturnValue(cliPath);
