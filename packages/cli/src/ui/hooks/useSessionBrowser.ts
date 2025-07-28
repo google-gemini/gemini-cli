@@ -202,9 +202,13 @@ export function convertSessionToHistoryFormats(
 
             if (typeof toolCall.result === 'string') {
               responseData = {
-                id: toolCall.id,
-                name: toolCall.name,
-                output: toolCall.result,
+                functionResponse: {
+                  id: toolCall.id,
+                  name: toolCall.name,
+                  response: {
+                    output: toolCall.result,
+                  },
+                },
               };
             } else if (Array.isArray(toolCall.result)) {
               // Extract text content from Part array
@@ -212,9 +216,11 @@ export function convertSessionToHistoryFormats(
                 .map((part) => (typeof part == 'string' ? part : part.text))
                 .join('');
               responseData = {
-                id: toolCall.id,
-                name: toolCall.name,
-                output: textParts ? { output: textParts } : toolCall.result,
+                functionResponse: {
+                  id: toolCall.id,
+                  name: toolCall.name,
+                  response: textParts ? { output: textParts } : toolCall.result,
+                },
               };
             } else {
               responseData = toolCall.result;

@@ -22,22 +22,22 @@ const MOCKED_SESSION_FILE = path.join(MOCKED_CHATS_DIR, `${MOCKED_SESSION_ID}.js
 describe('useSessionBrowser', () => {
   const mockedFs = vi.mocked(fs);
   const mockedPath = vi.mocked(path);
-  
+
   // Mock dependencies
   const mockConfig = {
     getProjectTempDir: vi.fn().mockReturnValue(MOCKED_PROJECT_TEMP_DIR),
     setSessionId: vi.fn(),
   };
-  
+
   const mockChatRecordingService = {
     initialize: vi.fn(),
   };
-  
+
   const mockOnLoadHistory = vi.fn();
 
   beforeEach(() => {
     vi.resetAllMocks();
-    
+
     // Mock path.join to return predictable paths
     mockedPath.join.mockImplementation((...segments) => {
       if (segments.includes('chats') && segments.includes('test-session-123.json')) {
@@ -45,14 +45,14 @@ describe('useSessionBrowser', () => {
       }
       return segments.join('/');
     });
-    
+
     // Default successful file read
     mockedFs.readFile.mockResolvedValue('{}');
   });
 
   describe('hook initialization', () => {
     it('should initialize with isSessionBrowserOpen set to false', () => {
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useSessionBrowser(mockConfig as any, mockChatRecordingService as any, mockOnLoadHistory)
       );
 
@@ -60,7 +60,7 @@ describe('useSessionBrowser', () => {
     });
 
     it('should provide all expected hook methods', () => {
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useSessionBrowser(mockConfig as any, mockChatRecordingService as any, mockOnLoadHistory)
       );
 
@@ -73,7 +73,7 @@ describe('useSessionBrowser', () => {
 
   describe('session browser open/close functionality', () => {
     it('should open session browser when openSessionBrowser is called', () => {
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useSessionBrowser(mockConfig as any, mockChatRecordingService as any, mockOnLoadHistory)
       );
 
@@ -85,7 +85,7 @@ describe('useSessionBrowser', () => {
     });
 
     it('should close session browser when closeSessionBrowser is called', () => {
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useSessionBrowser(mockConfig as any, mockChatRecordingService as any, mockOnLoadHistory)
       );
 
@@ -128,7 +128,7 @@ describe('useSessionBrowser', () => {
 
       mockedFs.readFile.mockResolvedValue(JSON.stringify(mockConversation));
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useSessionBrowser(mockConfig as any, mockChatRecordingService as any, mockOnLoadHistory)
       );
 
@@ -138,19 +138,19 @@ describe('useSessionBrowser', () => {
 
       // Verify file was read from correct path
       expect(mockedFs.readFile).toHaveBeenCalledWith('/chats/test-session-123.json', 'utf8');
-      
+
       // Verify config was updated with session ID
       expect(mockConfig.setSessionId).toHaveBeenCalledWith('existing-session-456');
-      
+
       // Verify chat recording service was initialized with resumed session data
       expect(mockChatRecordingService.initialize).toHaveBeenCalledWith({
         conversation: mockConversation,
         filePath: '/chats/test-session-123.json'
       });
-      
+
       // Verify session browser was closed
       expect(result.current.isSessionBrowserOpen).toBe(false);
-      
+
       // Verify onLoadHistory was called
       expect(mockOnLoadHistory).toHaveBeenCalled();
     });
@@ -192,7 +192,7 @@ describe('useSessionBrowser', () => {
 
       mockedFs.readFile.mockResolvedValue(JSON.stringify(mockConversation));
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useSessionBrowser(mockConfig as any, mockChatRecordingService as any, mockOnLoadHistory)
       );
 
@@ -202,7 +202,7 @@ describe('useSessionBrowser', () => {
 
       expect(mockOnLoadHistory).toHaveBeenCalled();
       const loadHistoryCall = mockOnLoadHistory.mock.calls[0][0];
-      
+
       // Should contain both text message and tool group
       expect(loadHistoryCall.history).toHaveLength(3); // user message, gemini message, tool group
       expect(loadHistoryCall.history[2].type).toBe('tool_group');
@@ -247,7 +247,7 @@ describe('useSessionBrowser', () => {
 
       mockedFs.readFile.mockResolvedValue(JSON.stringify(mockConversation));
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useSessionBrowser(mockConfig as any, mockChatRecordingService as any, mockOnLoadHistory)
       );
 
@@ -270,7 +270,7 @@ describe('useSessionBrowser', () => {
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useSessionBrowser(mockConfig as any, mockChatRecordingService as any, mockOnLoadHistory)
       );
 
@@ -295,7 +295,7 @@ describe('useSessionBrowser', () => {
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useSessionBrowser(mockConfig as any, mockChatRecordingService as any, mockOnLoadHistory)
       );
 
@@ -325,7 +325,7 @@ describe('useSessionBrowser', () => {
 
       mockedFs.readFile.mockResolvedValue(JSON.stringify(mockConversation));
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useSessionBrowser(mockConfig as any, mockChatRecordingService as any, mockOnLoadHistory)
       );
 
@@ -345,7 +345,7 @@ describe('useSessionBrowser', () => {
 
   describe('callback stability', () => {
     it('should maintain stable callback references', () => {
-      const { result, rerender } = renderHook(() => 
+      const { result, rerender } = renderHook(() =>
         useSessionBrowser(mockConfig as any, mockChatRecordingService as any, mockOnLoadHistory)
       );
 
@@ -364,7 +364,7 @@ describe('useSessionBrowser', () => {
 
     it('should update handleResumeSession callback when dependencies change', () => {
       const { result, rerender } = renderHook(
-        ({ config, chatRecordingService, onLoadHistory }) => 
+        ({ config, chatRecordingService, onLoadHistory }) =>
           useSessionBrowser(config, chatRecordingService, onLoadHistory),
         {
           initialProps: {
@@ -392,7 +392,7 @@ describe('useSessionBrowser', () => {
 describe('convertSessionToHistoryFormats', () => {
   it('should convert empty messages array', () => {
     const result = convertSessionToHistoryFormats([]);
-    
+
     expect(result.type).toBe('load_history');
     expect(result.history).toEqual([]);
     expect(result.clientHistory).toEqual([]);
@@ -415,7 +415,7 @@ describe('convertSessionToHistoryFormats', () => {
     ];
 
     const result = convertSessionToHistoryFormats(messages);
-    
+
     expect(result.history).toHaveLength(2);
     expect(result.history[0]).toEqual({
       type: MessageType.USER,
@@ -425,7 +425,7 @@ describe('convertSessionToHistoryFormats', () => {
       type: MessageType.GEMINI,
       text: 'Hi there!',
     });
-    
+
     expect(result.clientHistory).toHaveLength(2);
     expect(result.clientHistory[0]).toEqual({
       role: 'user',
@@ -454,7 +454,7 @@ describe('convertSessionToHistoryFormats', () => {
     ];
 
     const result = convertSessionToHistoryFormats(messages);
-    
+
     expect(result.history[0]).toEqual({
       type: MessageType.INFO,
       text: 'System message',
@@ -463,7 +463,7 @@ describe('convertSessionToHistoryFormats', () => {
       type: MessageType.ERROR,
       text: 'Error occurred',
     });
-    
+
     // System and error messages should not be included in client history
     expect(result.clientHistory).toEqual([]);
   });
@@ -491,10 +491,10 @@ describe('convertSessionToHistoryFormats', () => {
     ];
 
     const result = convertSessionToHistoryFormats(messages);
-    
+
     // All messages should appear in UI history
     expect(result.history).toHaveLength(3);
-    
+
     // Only non-slash commands should appear in client history
     expect(result.clientHistory).toHaveLength(1);
     expect(result.clientHistory[0]).toEqual({
@@ -537,13 +537,13 @@ describe('convertSessionToHistoryFormats', () => {
     ];
 
     const result = convertSessionToHistoryFormats(messages);
-    
+
     expect(result.history).toHaveLength(2); // text message + tool group
     expect(result.history[0]).toEqual({
       type: MessageType.GEMINI,
       text: 'I\'ll help you with that.',
     });
-    
+
     expect(result.history[1].type).toBe('tool_group');
     expect(result.history[1].tools).toHaveLength(2);
     expect(result.history[1].tools[0]).toEqual({
@@ -578,7 +578,7 @@ describe('convertSessionToHistoryFormats', () => {
     ];
 
     const result = convertSessionToHistoryFormats(messages);
-    
+
     expect(result.history).toHaveLength(1); // Only text message
     expect(result.history[0]).toEqual({
       type: MessageType.GEMINI,
@@ -607,7 +607,7 @@ describe('convertSessionToHistoryFormats', () => {
     ];
 
     const result = convertSessionToHistoryFormats(messages);
-    
+
     expect(result.history).toHaveLength(1); // Only user message, no tool group
     expect(result.history[0]).toEqual({
       type: MessageType.USER,
@@ -636,18 +636,22 @@ describe('convertSessionToHistoryFormats', () => {
     ];
 
     const result = convertSessionToHistoryFormats(messages);
-    
+
     expect(result.history).toHaveLength(2);
     expect(result.history[1].type).toBe('tool_group');
-    expect(result.history[1].tools[0]).toEqual({
-      callId: 'tool-1',
-      name: 'minimal_tool', // Falls back to name when displayName missing
-      description: '', // Default empty string
-      renderOutputAsMarkdown: true, // Default value  
-      status: ToolCallStatus.Success,
-      resultDisplay: undefined,
-      confirmationDetails: undefined,
-    });
+    if (result.history[1].type === 'tool_group') {
+      expect(result.history[1].tools[0]).toEqual({
+        callId: 'tool-1',
+        name: 'minimal_tool', // Falls back to name when displayName missing
+        description: '', // Default empty string
+        renderOutputAsMarkdown: true, // Default value
+        status: ToolCallStatus.Success,
+        resultDisplay: undefined,
+        confirmationDetails: undefined,
+      });
+    } else {
+      throw new Error('unreachable');
+    }
   });
 
   describe('tool calls in client history', () => {
@@ -662,14 +666,22 @@ describe('convertSessionToHistoryFormats', () => {
         {
           id: 'msg-2',
           timestamp: '2025-01-01T00:02:00Z',
-          content: 'I\'ll list the files for you.',
+          content: "I'll list the files for you.",
           type: 'gemini',
           toolCalls: [
             {
               id: 'tool-1',
               name: 'list_directory',
               args: { path: '/home/user' },
-              result: { output: 'file1.txt\nfile2.txt' },
+              result: {
+                functionResponse: {
+                  id: 'list_directory-1753650620141-f3b8b9e73919d',
+                  name: 'list_directory',
+                  response: {
+                    output: 'file1.txt\nfile2.txt',
+                  },
+                },
+              },
               status: 'success',
               timestamp: '2025-01-01T00:02:30Z',
             },
@@ -678,21 +690,21 @@ describe('convertSessionToHistoryFormats', () => {
       ];
 
       const result = convertSessionToHistoryFormats(messages);
-      
+
       // Should have: user message, model with function call, user with function response
       expect(result.clientHistory).toHaveLength(3);
-      
+
       // User message
       expect(result.clientHistory[0]).toEqual({
         role: 'user',
         parts: [{ text: 'List files' }],
       });
-      
+
       // Model message with function call
       expect(result.clientHistory[1]).toEqual({
         role: 'model',
         parts: [
-          { text: 'I\'ll list the files for you.' },
+          { text: "I'll list the files for you." },
           {
             functionCall: {
               name: 'list_directory',
@@ -702,13 +714,14 @@ describe('convertSessionToHistoryFormats', () => {
           },
         ],
       });
-      
+
       // Function response
       expect(result.clientHistory[2]).toEqual({
         role: 'user',
         parts: [
           {
             functionResponse: {
+              id: 'list_directory-1753650620141-f3b8b9e73919d',
               name: 'list_directory',
               response: { output: 'file1.txt\nfile2.txt' },
             },
@@ -738,9 +751,9 @@ describe('convertSessionToHistoryFormats', () => {
       ];
 
       const result = convertSessionToHistoryFormats(messages);
-      
+
       expect(result.clientHistory).toHaveLength(2);
-      
+
       // Model message with only function call (no text)
       expect(result.clientHistory[0]).toEqual({
         role: 'model',
@@ -754,15 +767,18 @@ describe('convertSessionToHistoryFormats', () => {
           },
         ],
       });
-      
+
       // Function response
       expect(result.clientHistory[1]).toEqual({
         role: 'user',
         parts: [
           {
             functionResponse: {
+              id: 'tool-1',
               name: 'bash',
-              response: { output: 'file1.txt\nfile2.txt' },
+              response: {
+                output: 'file1.txt\nfile2.txt',
+              },
             },
           },
         ],
@@ -798,10 +814,10 @@ describe('convertSessionToHistoryFormats', () => {
       ];
 
       const result = convertSessionToHistoryFormats(messages);
-      
-      // Should have: model with both function calls, then two function responses
-      expect(result.clientHistory).toHaveLength(3);
-      
+
+      // Should have: model with both function calls, then one response
+      expect(result.clientHistory).toHaveLength(2);
+
       // Model message with both function calls
       expect(result.clientHistory[0]).toEqual({
         role: 'model',
@@ -823,28 +839,23 @@ describe('convertSessionToHistoryFormats', () => {
           },
         ],
       });
-      
+
       // First function response
       expect(result.clientHistory[1]).toEqual({
         role: 'user',
         parts: [
           {
             functionResponse: {
+              id: 'tool-1',
               name: 'bash',
               response: { output: '/home/user' },
             },
           },
-        ],
-      });
-      
-      // Second function response
-      expect(result.clientHistory[2]).toEqual({
-        role: 'user',
-        parts: [
           {
             functionResponse: {
+              id: 'tool-2',
               name: 'bash',
-              response: ['file1.txt', 'file2.txt'],
+              response: { output: 'file1.txtfile2.txt' },
             },
           },
         ],
@@ -863,10 +874,7 @@ describe('convertSessionToHistoryFormats', () => {
               id: 'tool-1',
               name: 'read_file',
               args: { path: 'test.txt' },
-              result: [
-                { text: 'Hello' },
-                { text: ' World' },
-              ],
+              result: [{ text: 'Hello' }, { text: ' World' }],
               status: 'success',
               timestamp: '2025-01-01T00:01:30Z',
             },
@@ -875,17 +883,20 @@ describe('convertSessionToHistoryFormats', () => {
       ];
 
       const result = convertSessionToHistoryFormats(messages);
-      
+
       expect(result.clientHistory).toHaveLength(2);
-      
+
       // Function response should extract and join text parts
       expect(result.clientHistory[1]).toEqual({
         role: 'user',
         parts: [
           {
             functionResponse: {
+              id: 'tool-1',
               name: 'read_file',
-              response: { output: 'Hello World' },
+              response: {
+                output: 'Hello World',
+              },
             },
           },
         ],
@@ -913,10 +924,10 @@ describe('convertSessionToHistoryFormats', () => {
       ];
 
       const result = convertSessionToHistoryFormats(messages);
-      
+
       // Should only have the model message with function call, no function response
       expect(result.clientHistory).toHaveLength(1);
-      
+
       expect(result.clientHistory[0]).toEqual({
         role: 'model',
         parts: [
@@ -952,9 +963,9 @@ describe('convertSessionToHistoryFormats', () => {
       ];
 
       const result = convertSessionToHistoryFormats(messages);
-      
+
       expect(result.clientHistory).toHaveLength(2);
-      
+
       // Function call should not include id field when not present
       expect(result.clientHistory[0]).toEqual({
         role: 'model',
