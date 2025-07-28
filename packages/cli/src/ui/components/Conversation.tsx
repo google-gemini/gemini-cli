@@ -8,6 +8,7 @@ import { Box } from 'ink';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { type HistoryItem } from '../types.js';
 import { type Config } from '@google/gemini-cli-core';
+import { memo } from 'react';
 
 interface ConversationProps {
   history: HistoryItem[];
@@ -15,24 +16,24 @@ interface ConversationProps {
   terminalWidth: number;
 }
 
-export const Conversation = ({
-  history,
-  config,
-  terminalWidth,
-}: ConversationProps) => {
-  const mainAreaWidth = Math.floor(terminalWidth * 0.9);
+export const Conversation = memo(
+  ({ history, config, terminalWidth }: ConversationProps) => {
+    const mainAreaWidth = Math.floor(terminalWidth * 0.9);
 
-  return (
-    <Box flexDirection="column" flexGrow={1} width="90%">
-      {history.map((h) => (
-        <HistoryItemDisplay
-          terminalWidth={mainAreaWidth}
-          key={h.id}
-          item={h}
-          isPending={false}
-          config={config}
-        />
-      ))}
-    </Box>
-  );
-};
+    return (
+      <Box flexDirection="column" flexGrow={1} width="90%">
+        {history.map((h) => (
+          <HistoryItemDisplay
+            terminalWidth={mainAreaWidth}
+            key={h.id}
+            item={h}
+            isPending={false}
+            config={config}
+          />
+        ))}
+      </Box>
+    );
+  },
+);
+
+Conversation.displayName = 'Conversation';

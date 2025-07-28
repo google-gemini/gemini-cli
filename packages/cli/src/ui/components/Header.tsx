@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { memo } from 'react';
 import { Box, Text } from 'ink';
 import Gradient from 'ink-gradient';
 import { Colors } from '../colors.js';
@@ -18,46 +18,45 @@ interface HeaderProps {
   nightly: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({
-  customAsciiArt,
-  terminalWidth,
-  version,
-  nightly,
-}) => {
-  let displayTitle;
-  const widthOfLongLogo = getAsciiArtWidth(longAsciiLogo);
+export const Header = memo(
+  ({ customAsciiArt, terminalWidth, version, nightly }: HeaderProps) => {
+    let displayTitle;
+    const widthOfLongLogo = getAsciiArtWidth(longAsciiLogo);
 
-  if (customAsciiArt) {
-    displayTitle = customAsciiArt;
-  } else {
-    displayTitle =
-      terminalWidth >= widthOfLongLogo ? longAsciiLogo : shortAsciiLogo;
-  }
+    if (customAsciiArt) {
+      displayTitle = customAsciiArt;
+    } else {
+      displayTitle =
+        terminalWidth >= widthOfLongLogo ? longAsciiLogo : shortAsciiLogo;
+    }
 
-  const artWidth = getAsciiArtWidth(displayTitle);
+    const artWidth = getAsciiArtWidth(displayTitle);
 
-  return (
-    <Box
-      marginBottom={1}
-      alignItems="flex-start"
-      width={artWidth}
-      flexShrink={0}
-      flexDirection="column"
-    >
-      {Colors.GradientColors ? (
-        <Gradient colors={Colors.GradientColors}>
-          <Text>{displayTitle}</Text>
-        </Gradient>
-      ) : (
-        <Text>{displayTitle}</Text>
-      )}
-      {nightly && (
-        <Box width="100%" flexDirection="row" justifyContent="flex-end">
+    return (
+      <Box
+        marginBottom={1}
+        alignItems="flex-start"
+        width={artWidth}
+        flexShrink={0}
+        flexDirection="column"
+      >
+        {Colors.GradientColors ? (
           <Gradient colors={Colors.GradientColors}>
-            <Text>v{version}</Text>
+            <Text>{displayTitle}</Text>
           </Gradient>
-        </Box>
-      )}
-    </Box>
-  );
-};
+        ) : (
+          <Text>{displayTitle}</Text>
+        )}
+        {nightly && (
+          <Box width="100%" flexDirection="row" justifyContent="flex-end">
+            <Gradient colors={Colors.GradientColors}>
+              <Text>v{version}</Text>
+            </Gradient>
+          </Box>
+        )}
+      </Box>
+    );
+  },
+);
+
+Header.displayName = 'Header';
