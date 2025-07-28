@@ -25,6 +25,7 @@ export {
   logApiRequest,
   logApiError,
   logApiResponse,
+  logFlashFallback,
 } from './loggers.js';
 export {
   StartSessionEvent,
@@ -35,6 +36,7 @@ export {
   ApiErrorEvent,
   ApiResponseEvent,
   TelemetryEvent,
+  FlashFallbackEvent,
 } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';

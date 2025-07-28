@@ -5,9 +5,11 @@
  */
 
 import { Schema } from '@google/genai';
-import * as ajv from 'ajv';
-
-const ajValidator = new ajv.Ajv();
+import AjvPkg from 'ajv';
+// Ajv's ESM/CJS interop: use 'any' for compatibility as recommended by Ajv docs
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AjvClass = (AjvPkg as any).default || AjvPkg;
+const ajValidator = new AjvClass();
 
 /**
  * Simple utility to validate objects against JSON Schemas
@@ -34,7 +36,7 @@ export class SchemaValidator {
 
   /**
    * Converts @google/genai's Schema to an object compatible with avj.
-   * This is necessry because it represents Types as an Enum (with
+   * This is necessary because it represents Types as an Enum (with
    * UPPERCASE values) and minItems and minLength as strings, when they should be numbers.
    */
   private static toObjectSchema(schema: Schema): object {

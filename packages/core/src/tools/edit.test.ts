@@ -608,6 +608,19 @@ describe('EditTool', () => {
         /User modified the `new_string` content/,
       );
     });
+
+    it('should return error if old_string and new_string are identical', async () => {
+      const initialContent = 'This is some identical text.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'identical',
+        new_string: 'identical',
+      };
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.llmContent).toMatch(/No changes to apply/);
+      expect(result.returnDisplay).toMatch(/No changes to apply/);
+    });
   });
 
   describe('getDescription', () => {

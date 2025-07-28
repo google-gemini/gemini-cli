@@ -27,7 +27,7 @@ This guide provides solutions to common issues and debugging tips.
 ## Common error messages and solutions
 
 - **Error: `EADDRINUSE` (Address already in use) when starting an MCP server.**
-  - **Cause:** Another process is already using the port the MCP server is trying to bind to.
+  - **Cause:** Another process is already using the port that the MCP server is trying to bind to.
   - **Solution:**
     Either stop the other process that is using the port or configure the MCP server to use a different port.
 

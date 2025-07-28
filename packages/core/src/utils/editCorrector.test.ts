@@ -81,7 +81,7 @@ describe('editCorrector', () => {
     it('should correctly count occurrences when substring is longer', () => {
       expect(countOccurrences('abc', 'abcdef')).toBe(0);
     });
-    it('should be case sensitive', () => {
+    it('should be case-sensitive', () => {
       expect(countOccurrences('abcABC', 'a')).toBe(1);
       expect(countOccurrences('abcABC', 'A')).toBe(1);
     });
@@ -214,6 +214,8 @@ describe('editCorrector', () => {
         setAlwaysSkipModificationConfirmation: vi.fn((skip: boolean) => {
           configParams.alwaysSkipModificationConfirmation = skip;
         }),
+        getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
+        setQuotaErrorOccurred: vi.fn(),
       } as unknown as Config;
 
       callCount = 0;
@@ -654,6 +656,8 @@ describe('editCorrector', () => {
         setAlwaysSkipModificationConfirmation: vi.fn((skip: boolean) => {
           configParams.alwaysSkipModificationConfirmation = skip;
         }),
+        getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
+        setQuotaErrorOccurred: vi.fn(),
       } as unknown as Config;
 
       callCount = 0;
