@@ -565,9 +565,7 @@ export const App = (props: AppProps) => {
     </Box>
   );
 
-  if (quittingMessages) {
-    return <QuittingSession messages={quittingMessages} />;
-  }
+  
 
   const mainAreaWidth = Math.floor(terminalWidth * 0.9);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
@@ -834,34 +832,38 @@ export const App = (props: AppProps) => {
 
   return (
     <StreamingContext.Provider value={streamingState}>
-      <Box flexDirection="column" width="90%" height="100%">
-        {updateMessage && <UpdateNotification message={updateMessage} />}
-        {memoizedHeader}
-        {memoizedTips}
-        {memoizedConversation}
-        {memoizedPendingHistory}
-        {memoizedHelp}
+      {quittingMessages ? (
+        <QuittingSession messages={quittingMessages} />
+      ) : (
+        <Box flexDirection="column" width="90%" height="100%">
+          {updateMessage && <UpdateNotification message={updateMessage} />}
+          {memoizedHeader}
+          {memoizedTips}
+          {memoizedConversation}
+          {memoizedPendingHistory}
+          {memoizedHelp}
 
-        <Box flexDirection="column">
-          {memoizedStartupWarnings}
+          <Box flexDirection="column">
+            {memoizedStartupWarnings}
 
-          {showDialog ? <Dialogs /> : <ActiveSession />}
+            {showDialog ? <Dialogs /> : <ActiveSession />}
 
-          {initError && streamingState !== StreamingState.Responding && (
-            <Box
-              borderStyle="round"
-              borderColor={Colors.AccentRed}
-              paddingX={1}
-              marginBottom={1}
-            >
-              <Text color={Colors.AccentRed}>
-                Initialization Error: {initError}
-              </Text>
-            </Box>
-          )}
-          {memoizedFooter}
+            {initError && streamingState !== StreamingState.Responding && (
+              <Box
+                borderStyle="round"
+                borderColor={Colors.AccentRed}
+                paddingX={1}
+                marginBottom={1}
+              >
+                <Text color={Colors.AccentRed}>
+                  Initialization Error: {initError}
+                </Text>
+              </Box>
+            )}
+            {memoizedFooter}
+          </Box>
         </Box>
-      </Box>
+      )}
     </StreamingContext.Provider>
   );
 };
