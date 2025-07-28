@@ -135,7 +135,7 @@ export function recordTokenUsageMetrics(
 ): void {
   if (!tokenUsageCounter || !isMetricsInitialized) return;
   tokenUsageCounter.add(tokenCount, {
-    ...getCommonAtrributes(config),
+    ...getCommonAttributes(config),
     model,
     type,
   });
