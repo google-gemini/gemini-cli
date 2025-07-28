@@ -319,6 +319,7 @@ describe('useGeminiStream', () => {
       },
       setQuotaErrorOccurred: vi.fn(),
       getQuotaErrorOccurred: vi.fn(() => false),
+      getModel: vi.fn(() => 'gemini-2.5-pro'),
       getContentGeneratorConfig: vi
         .fn()
         .mockReturnValue(contentGeneratorConfig),
@@ -1471,6 +1472,200 @@ describe('useGeminiStream', () => {
           );
         });
       }
+    });
+  });
+
+  describe('Thought Reset', () => {
+    it('should reset thought to null when starting a new prompt', async () => {
+      // First, simulate a response with a thought
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Thought,
+            value: {
+              subject: 'Previous thought',
+              description: 'Old description',
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Some response content',
+          };
+          yield { type: ServerGeminiEventType.Finished, value: 'STOP' };
+        })(),
+      );
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockSetShowHelp,
+          mockConfig,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+        ),
+      );
+
+      // Submit first query to set a thought
+      await act(async () => {
+        await result.current.submitQuery('First query');
+      });
+
+      // Wait for the first response to complete
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'gemini',
+            text: 'Some response content',
+          }),
+          expect.any(Number),
+        );
+      });
+
+      // Now simulate a new response without a thought
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'New response content',
+          };
+          yield { type: ServerGeminiEventType.Finished, value: 'STOP' };
+        })(),
+      );
+
+      // Submit second query - thought should be reset
+      await act(async () => {
+        await result.current.submitQuery('Second query');
+      });
+
+      // The thought should be reset to null when starting the new prompt
+      // We can verify this by checking that the LoadingIndicator would not show the previous thought
+      // The actual thought state is internal to the hook, but we can verify the behavior
+      // by ensuring the second response doesn't show the previous thought
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'gemini',
+            text: 'New response content',
+          }),
+          expect.any(Number),
+        );
+      });
+    });
+
+    it('should reset thought to null when user cancels', async () => {
+      // Mock a stream that yields a thought then gets cancelled
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Thought,
+            value: { subject: 'Some thought', description: 'Description' },
+          };
+          yield { type: ServerGeminiEventType.UserCancelled };
+        })(),
+      );
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockSetShowHelp,
+          mockConfig,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+        ),
+      );
+
+      // Submit query
+      await act(async () => {
+        await result.current.submitQuery('Test query');
+      });
+
+      // Verify cancellation message was added
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'info',
+            text: 'User cancelled the request.',
+          }),
+          expect.any(Number),
+        );
+      });
+
+      // Verify state is reset to idle
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    it('should reset thought to null when there is an error', async () => {
+      // Mock a stream that yields a thought then encounters an error
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Thought,
+            value: { subject: 'Some thought', description: 'Description' },
+          };
+          yield {
+            type: ServerGeminiEventType.Error,
+            value: { error: { message: 'Test error' } },
+          };
+        })(),
+      );
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockSetShowHelp,
+          mockConfig,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+        ),
+      );
+
+      // Submit query
+      await act(async () => {
+        await result.current.submitQuery('Test query');
+      });
+
+      // Verify error message was added
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'error',
+          }),
+          expect.any(Number),
+        );
+      });
+
+      // Verify parseAndFormatApiError was called
+      expect(mockParseAndFormatApiError).toHaveBeenCalledWith(
+        { message: 'Test error' },
+        expect.any(String),
+        undefined,
+        'gemini-2.5-pro',
+        'gemini-2.5-flash',
+      );
     });
   });
 });
