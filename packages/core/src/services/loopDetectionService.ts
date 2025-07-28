@@ -200,14 +200,7 @@ export class LoopDetectionService {
    */
   private truncateAndUpdate(): void {
     if (this.streamContentHistory.length <= MAX_HISTORY_LENGTH) {
-    if (!SENTENCE_ENDING_PUNCTUATION_REGEX.test(this.partialContent)) {
-      return false;
-    }
-
-    const completeSentences =
-      this.partialContent.match(/[^.!?]+[.!?]+(?=\s|$)/g) || [];
-    if (completeSentences.length === 0) {
-      return false;
+      return;
     }
 
     // Calculate how much content to remove from the beginning
