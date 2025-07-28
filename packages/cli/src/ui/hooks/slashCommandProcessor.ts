@@ -159,7 +159,6 @@ export const useSlashCommandProcessor = (
         setPendingItem: setPendingCompressionItem,
         toggleCorgiMode,
         toggleVimEnabled,
-        refreshConfig,
       },
       session: {
         stats: session.stats,
@@ -182,7 +181,6 @@ export const useSlashCommandProcessor = (
       toggleCorgiMode,
       toggleVimEnabled,
       sessionShellAllowlist,
-      refreshConfig,
     ],
   );
 
