@@ -104,7 +104,7 @@ describe('FileCommandLoader', () => {
     expect(command.name).toBe('git:commit');
   });
 
-  it('overrides user commands with project commands', async () => {
+  it('returns both user and project commands in order', async () => {
     const userCommandsDir = getUserCommandsDir();
     const projectCommandsDir = getProjectCommandsDir(process.cwd());
     mock({
@@ -123,15 +123,23 @@ describe('FileCommandLoader', () => {
     const loader = new FileCommandLoader(mockConfig);
     const commands = await loader.loadCommands(signal);
 
-    expect(commands).toHaveLength(1);
-    const command = commands[0];
-    expect(command).toBeDefined();
+    // Now returns both commands, CommandService handles override
+    expect(commands).toHaveLength(2);
 
-    const result = await command.action?.(mockContext, '');
-    if (result?.type === 'submit_prompt') {
-      expect(result.content).toBe('Project prompt');
+    // First is user command
+    const userResult = await commands[0].action?.(mockContext, '');
+    if (userResult?.type === 'submit_prompt') {
+      expect(userResult.content).toBe('User prompt');
     } else {
-      assert.fail('Incorrect action type');
+      assert.fail('Incorrect action type for user command');
+    }
+
+    // Second is project command
+    const projectResult = await commands[1].action?.(mockContext, '');
+    if (projectResult?.type === 'submit_prompt') {
+      expect(projectResult.content).toBe('Project prompt');
+    } else {
+      assert.fail('Incorrect action type for project command');
     }
   });
 
@@ -280,11 +288,17 @@ describe('FileCommandLoader', () => {
       const commands = await loader.loadCommands(signal);
 
       expect(commands).toHaveLength(3);
-      const commandNames = commands.map((cmd) => cmd.name).sort();
-      expect(commandNames).toEqual(['ext:test-ext:ext', 'project', 'user']);
+      // Check order: user → project → extension
+      const commandNames = commands.map((cmd) => cmd.name);
+      expect(commandNames).toEqual(['user', 'project', 'ext']);
+
+      // Check that extension commands have extensionName metadata
+      const extCommand = commands.find((cmd) => cmd.name === 'ext');
+      expect(extCommand?.extensionName).toBe('test-ext');
+      expect(extCommand?.description).toMatch(/^\[test-ext\]/);
     });
 
-    it('extension commands are prefixed and do not collide', async () => {
+    it('extension commands have extensionName metadata for conflict resolution', async () => {
       const userCommandsDir = getUserCommandsDir();
       const projectCommandsDir = getProjectCommandsDir(process.cwd());
       const extensionDir = path.join(
@@ -324,32 +338,28 @@ describe('FileCommandLoader', () => {
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
 
-      // Should have 2 commands: 'deploy' and 'ext:test-ext:deploy'
-      expect(commands).toHaveLength(2);
+      // FileCommandLoader now returns all commands without deduplication
+      expect(commands).toHaveLength(3);
 
-      const deployCommand = commands.find((cmd) => cmd.name === 'deploy');
-      const extDeployCommand = commands.find(
-        (cmd) => cmd.name === 'ext:test-ext:deploy',
-      );
+      // Check order and content
+      expect(commands[0].name).toBe('deploy');
+      expect(commands[0].extensionName).toBeUndefined();
+      const result0 = await commands[0].action?.(mockContext, '');
+      expect(result0?.type).toBe('submit_prompt');
+      expect((result0 as any).content).toBe('User deploy command');
 
-      expect(deployCommand).toBeDefined();
-      expect(extDeployCommand).toBeDefined();
+      expect(commands[1].name).toBe('deploy');
+      expect(commands[1].extensionName).toBeUndefined();
+      const result1 = await commands[1].action?.(mockContext, '');
+      expect(result1?.type).toBe('submit_prompt');
+      expect((result1 as any).content).toBe('Project deploy command');
 
-      // Check that the project command wins for 'deploy'
-      const deployResult = await deployCommand!.action?.(mockContext, '');
-      if (deployResult?.type === 'submit_prompt') {
-        expect(deployResult.content).toBe('Project deploy command');
-      } else {
-        assert.fail('Incorrect action type for deploy');
-      }
-
-      // Check that the extension command is available as 'ext:test-ext:deploy'
-      const extResult = await extDeployCommand!.action?.(mockContext, '');
-      if (extResult?.type === 'submit_prompt') {
-        expect(extResult.content).toBe('Extension deploy command');
-      } else {
-        assert.fail('Incorrect action type for ext:test-ext:deploy');
-      }
+      expect(commands[2].name).toBe('deploy');
+      expect(commands[2].extensionName).toBe('test-ext');
+      expect(commands[2].description).toMatch(/^\[test-ext\]/);
+      const result2 = await commands[2].action?.(mockContext, '');
+      expect(result2?.type).toBe('submit_prompt');
+      expect((result2 as any).content).toBe('Extension deploy command');
     });
 
     it('only loads commands from active extensions', async () => {
@@ -404,7 +414,9 @@ describe('FileCommandLoader', () => {
       const commands = await loader.loadCommands(signal);
 
       expect(commands).toHaveLength(1);
-      expect(commands[0].name).toBe('ext:active-ext:active');
+      expect(commands[0].name).toBe('active');
+      expect(commands[0].extensionName).toBe('active-ext');
+      expect(commands[0].description).toMatch(/^\[active-ext\]/);
     });
 
     it('handles missing extension commands directory gracefully', async () => {
@@ -474,14 +486,12 @@ describe('FileCommandLoader', () => {
       expect(commands).toHaveLength(3);
 
       const commandNames = commands.map((cmd) => cmd.name).sort();
-      expect(commandNames).toEqual([
-        'ext:a:b:c',
-        'ext:a:b:d:e',
-        'ext:a:simple',
-      ]);
+      expect(commandNames).toEqual(['b:c', 'b:d:e', 'simple']);
 
       // Verify one of the commands works correctly
-      const nestedCmd = commands.find((cmd) => cmd.name === 'ext:a:b:c');
+      const nestedCmd = commands.find((cmd) => cmd.name === 'b:c');
+      expect(nestedCmd?.extensionName).toBe('a');
+      expect(nestedCmd?.description).toMatch(/^\[a\]/);
       expect(nestedCmd).toBeDefined();
       const result = await nestedCmd!.action?.(mockContext, '');
       if (result?.type === 'submit_prompt') {

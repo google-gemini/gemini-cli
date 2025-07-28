@@ -52,21 +52,25 @@ export class FileCommandLoader implements ICommandLoader {
   }
 
   /**
-   * Loads all commands, applying the precedence rule where project-level
-   * commands override user-level commands with the same name.
+   * Loads all commands from user, project, and extension directories.
+   * Returns commands in order: user → project → extensions (alphabetically).
+   *
+   * Order is important for conflict resolution in CommandService:
+   * - User/project commands (without extensionName) use "last wins" strategy
+   * - Extension commands (with extensionName) get renamed if conflicts exist
+   *
    * @param signal An AbortSignal to cancel the loading process.
-   * @returns A promise that resolves to an array of loaded SlashCommands.
+   * @returns A promise that resolves to an array of all loaded SlashCommands.
    */
   async loadCommands(signal: AbortSignal): Promise<SlashCommand[]> {
-    const commandMap = new Map<string, SlashCommand>();
+    const allCommands: SlashCommand[] = [];
     const globOptions = {
       nodir: true,
       dot: true,
       signal,
     };
 
-    // Load commands from each directory in order
-    // Later directories override commands from earlier ones
+    // Load commands from each directory
     const commandDirs = this.getCommandDirectories();
     for (const dirInfo of commandDirs) {
       try {
@@ -87,10 +91,8 @@ export class FileCommandLoader implements ICommandLoader {
           (cmd): cmd is SlashCommand => cmd !== null,
         );
 
-        // Add/override commands in the map
-        for (const cmd of commands) {
-          commandMap.set(cmd.name, cmd);
-        }
+        // Add all commands without deduplication
+        allCommands.push(...commands);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
           console.error(
@@ -101,21 +103,29 @@ export class FileCommandLoader implements ICommandLoader {
       }
     }
 
-    return Array.from(commandMap.values());
+    return allCommands;
   }
 
   /**
-   * Get all command directories in precedence order (lowest to highest).
-   * Extension commands < User commands < Project commands
+   * Get all command directories in order for loading.
+   * User commands → Project commands → Extension commands
+   * This order ensures extension commands can detect all conflicts.
    */
   private getCommandDirectories(): CommandDirectory[] {
     const dirs: CommandDirectory[] = [];
 
-    // 1. Extension commands (lowest precedence)
+    // 1. User commands
+    dirs.push({ path: getUserCommandsDir() });
+
+    // 2. Project commands (override user commands)
+    dirs.push({ path: getProjectCommandsDir(this.projectRoot) });
+
+    // 3. Extension commands (processed last to detect all conflicts)
     if (this.config) {
       const activeExtensions = this.config
         .getExtensions()
-        .filter((ext) => ext.isActive);
+        .filter((ext) => ext.isActive)
+        .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically for deterministic loading
 
       const extensionCommandDirs = activeExtensions.map((ext) => ({
         path: path.join(ext.path, 'commands'),
@@ -124,12 +134,6 @@ export class FileCommandLoader implements ICommandLoader {
 
       dirs.push(...extensionCommandDirs);
     }
-
-    // 2. User commands
-    dirs.push({ path: getUserCommandsDir() });
-
-    // 3. Project commands (highest precedence)
-    dirs.push({ path: getProjectCommandsDir(this.projectRoot) });
 
     return dirs;
   }
@@ -193,20 +197,18 @@ export class FileCommandLoader implements ICommandLoader {
       .map((segment) => segment.replaceAll(':', '_'))
       .join(':');
 
-    // Prefix with extension name if this is an extension command
-    const commandName = extensionName
-      ? `ext:${extensionName}:${baseCommandName}`
-      : baseCommandName;
-
-    // Update description to indicate source
-    const defaultDescription = extensionName
-      ? `Custom command from ${extensionName} extension`
-      : `Custom command from ${path.basename(filePath)}`;
+    // Add extension name tag for extension commands
+    const defaultDescription = `Custom command from ${path.basename(filePath)}`;
+    let description = validDef.description || defaultDescription;
+    if (extensionName) {
+      description = `[${extensionName}] ${description}`;
+    }
 
     return {
-      name: commandName,
-      description: validDef.description || defaultDescription,
+      name: baseCommandName,
+      description,
       kind: CommandKind.FILE,
+      extensionName,
       action: async () => ({
         type: 'submit_prompt',
         content: validDef.prompt,

@@ -177,4 +177,94 @@ describe('CommandService', () => {
     expect(loader2.loadCommands).toHaveBeenCalledTimes(1);
     expect(loader2.loadCommands).toHaveBeenCalledWith(signal);
   });
+
+  it('should rename extension commands when they conflict', async () => {
+    const builtinCommand = createMockCommand('deploy', CommandKind.BUILT_IN);
+    const userCommand = createMockCommand('sync', CommandKind.FILE);
+    const extensionCommand1 = {
+      ...createMockCommand('deploy', CommandKind.FILE),
+      extensionName: 'firebase',
+      description: '[firebase] Deploy to Firebase',
+    };
+    const extensionCommand2 = {
+      ...createMockCommand('sync', CommandKind.FILE),
+      extensionName: 'git-helper',
+      description: '[git-helper] Sync with remote',
+    };
+
+    const mockLoader1 = new MockCommandLoader([builtinCommand]);
+    const mockLoader2 = new MockCommandLoader([
+      userCommand,
+      extensionCommand1,
+      extensionCommand2,
+    ]);
+
+    const service = await CommandService.create(
+      [mockLoader1, mockLoader2],
+      new AbortController().signal,
+    );
+
+    const commands = service.getCommands();
+    expect(commands).toHaveLength(4);
+
+    // Built-in command keeps original name
+    const deployBuiltin = commands.find(
+      (cmd) => cmd.name === 'deploy' && !cmd.extensionName,
+    );
+    expect(deployBuiltin).toBeDefined();
+    expect(deployBuiltin?.kind).toBe(CommandKind.BUILT_IN);
+
+    // Extension command conflicting with built-in gets renamed
+    const deployExtension = commands.find(
+      (cmd) => cmd.name === 'firebase.deploy',
+    );
+    expect(deployExtension).toBeDefined();
+    expect(deployExtension?.extensionName).toBe('firebase');
+
+    // User command keeps original name
+    const syncUser = commands.find(
+      (cmd) => cmd.name === 'sync' && !cmd.extensionName,
+    );
+    expect(syncUser).toBeDefined();
+    expect(syncUser?.kind).toBe(CommandKind.FILE);
+
+    // Extension command conflicting with user command gets renamed
+    const syncExtension = commands.find(
+      (cmd) => cmd.name === 'git-helper.sync',
+    );
+    expect(syncExtension).toBeDefined();
+    expect(syncExtension?.extensionName).toBe('git-helper');
+  });
+
+  it('should handle user/project command override correctly', async () => {
+    const builtinCommand = createMockCommand('help', CommandKind.BUILT_IN);
+    const userCommand = createMockCommand('help', CommandKind.FILE);
+    const projectCommand = createMockCommand('deploy', CommandKind.FILE);
+    const userDeployCommand = createMockCommand('deploy', CommandKind.FILE);
+
+    const mockLoader1 = new MockCommandLoader([builtinCommand]);
+    const mockLoader2 = new MockCommandLoader([
+      userCommand,
+      userDeployCommand,
+      projectCommand,
+    ]);
+
+    const service = await CommandService.create(
+      [mockLoader1, mockLoader2],
+      new AbortController().signal,
+    );
+
+    const commands = service.getCommands();
+    expect(commands).toHaveLength(2);
+
+    // User command overrides built-in
+    const helpCommand = commands.find((cmd) => cmd.name === 'help');
+    expect(helpCommand).toBeDefined();
+    expect(helpCommand?.kind).toBe(CommandKind.FILE);
+
+    // Project command overrides user command (last wins)
+    const deployCommand = commands.find((cmd) => cmd.name === 'deploy');
+    expect(deployCommand).toBeDefined();
+    expect(deployCommand?.kind).toBe(CommandKind.FILE);
+  });
 });

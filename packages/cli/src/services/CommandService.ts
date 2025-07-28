@@ -30,13 +30,17 @@ export class CommandService {
    *
    * This factory method orchestrates the entire command loading process. It
    * runs all provided loaders in parallel, aggregates their results, handles
-   * name conflicts by letting the last-loaded command win, and then returns a
+   * name conflicts for extension commands by renaming them, and then returns a
    * fully constructed `CommandService` instance.
    *
+   * Conflict resolution:
+   * - Extension commands that conflict with existing commands are renamed to
+   *   `extensionName.commandName`
+   * - Non-extension commands (built-in, user, project) override earlier commands
+   *   with the same name based on loader order
+   *
    * @param loaders An array of objects that conform to the `ICommandLoader`
-   *   interface. The order of loaders is significant: if multiple loaders
-   *   provide a command with the same name, the command from the loader that
-   *   appears later in the array will take precedence.
+   *   interface. Built-in commands should come first, followed by FileCommandLoader.
    * @param signal An AbortSignal to cancel the loading process.
    * @returns A promise that resolves to a new, fully initialized `CommandService` instance.
    */
@@ -57,12 +61,19 @@ export class CommandService {
       }
     }
 
-    // De-duplicate commands using a Map. The last one found with a given name wins.
-    // This creates a natural override system based on the order of the loaders
-    // passed to the constructor.
     const commandMap = new Map<string, SlashCommand>();
     for (const cmd of allCommands) {
-      commandMap.set(cmd.name, cmd);
+      let finalName = cmd.name;
+
+      // Extension commands get renamed if they conflict with existing commands
+      if (cmd.extensionName && commandMap.has(cmd.name)) {
+        finalName = `${cmd.extensionName}.${cmd.name}`;
+      }
+
+      commandMap.set(finalName, {
+        ...cmd,
+        name: finalName,
+      });
     }
 
     const finalCommands = Object.freeze(Array.from(commandMap.values()));
