@@ -71,5 +71,6 @@ Extension commands have the lowest precedence. When a conflict occurs with user 
 2. **With conflict**: Extension command is renamed with the extension prefix (e.g., `/gcp.deploy`)
 
 For example, if both a user and the `gcp` extension define a `deploy` command:
+
 - `/deploy` - Executes the user's deploy command
 - `/gcp.deploy` - Executes the extension's deploy command (marked with `[gcp]` tag)
