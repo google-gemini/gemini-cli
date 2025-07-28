@@ -89,36 +89,33 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const isCursorAfterCommandWithoutSpace = useCallback(() => {
     const [row, col] = buffer.cursor;
     const currentLine = buffer.lines[row] || '';
+    const textBeforeCursor = cpSlice(currentLine, 0, col);
 
-    // Convert current line to code points for Unicode-aware processing
-    const codePoints = toCodePoints(currentLine);
+    const lastAt = textBeforeCursor.lastIndexOf('@');
+    const lastSlash = textBeforeCursor.lastIndexOf('/');
+    const lastTriggerIndex = Math.max(lastAt, lastSlash);
 
-    // Search backwards from cursor position within the current line only
-    for (let i = col - 1; i >= 0; i--) {
-      const char = codePoints[i];
-
-      if (char === ' ') {
-        // Check if this space is escaped by counting backslashes before it
-        let backslashCount = 0;
-        for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
-          backslashCount++;
-        }
-
-        // If there's an odd number of backslashes, the space is escaped
-        const isEscaped = backslashCount % 2 === 1;
-
-        if (!isEscaped) {
-          // Found unescaped space before @ or /, return false
-          return false;
-        }
-        // If escaped, continue searching backwards
-      } else if (char === '@' || char === '/') {
-        // Found @ or / without unescaped space in between
-        return true;
-      }
+    if (lastTriggerIndex === -1) {
+      return false;
     }
 
-    return false;
+    const textAfterTrigger = textBeforeCursor.substring(lastTriggerIndex);
+
+    // This regex finds a space that is preceded by an even number of backslashes,
+    // which means the space is "unescaped".
+    // Breaking it down:
+    // - `(?:^|[^\\])`: Matches either the start of the string or any character that is NOT a backslash.
+    // - `(?:\\)*`: Matches zero or more pairs of backslashes (an even number).
+    // - ` `: A literal space.
+    const unescapedSpaceRegex = /(?:^|[^\\])(?:\\)* /;
+
+    // If we find an unescaped space in the part of the string after the @ or /,
+    // then we should NOT show suggestions.
+    if (unescapedSpaceRegex.test(textAfterTrigger)) {
+      return false;
+    }
+
+    return true;
   }, [buffer.cursor, buffer.lines]);
 
   const shouldShowCompletion = useCallback(
