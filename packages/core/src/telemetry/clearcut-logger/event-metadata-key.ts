@@ -137,6 +137,32 @@ export enum EventMetadataKey {
 
   // Logs the end of a session.
   GEMINI_CLI_END_SESSION_ID = 34,
+
+  // ==========================================================================
+  // Shared Keys
+  // ===========================================================================
+
+  // Logs the Prompt Id
+  GEMINI_CLI_PROMPT_ID = 35,
+
+  // Logs the Auth type for the prompt, api responses and errors.
+  GEMINI_CLI_AUTH_TYPE = 36,
+
+  // Logs the total number of Google accounts ever used.
+  GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT = 37,
+
+  // Logs the Surface from where the Gemini CLI was invoked, eg: VSCode.
+  GEMINI_CLI_SURFACE = 39,
+
+  // Logs the session id
+  GEMINI_CLI_SESSION_ID = 40,
+
+  // ==========================================================================
+  // Loop Detected Event Keys
+  // ===========================================================================
+
+  // Logs the type of loop detected.
+  GEMINI_CLI_LOOP_DETECTED_TYPE = 38,
 }
 
 export function getEventMetadataKey(

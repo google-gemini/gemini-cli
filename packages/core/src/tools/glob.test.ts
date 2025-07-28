@@ -22,12 +22,13 @@ describe('GlobTool', () => {
   const mockConfig = {
     getFileService: () => new FileDiscoveryService(tempRootDir),
     getFileFilteringRespectGitIgnore: () => true,
-  } as Partial<Config> as Config;
+    getTargetDir: () => tempRootDir,
+  } as unknown as Config;
 
   beforeEach(async () => {
     // Create a unique root directory for each test run
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'glob-tool-root-'));
-    globTool = new GlobTool(tempRootDir, mockConfig);
+    globTool = new GlobTool(mockConfig);
 
     // Create some test files and directories within this root
     // Top-level files
@@ -149,11 +150,19 @@ describe('GlobTool', () => {
       expect(typeof llmContent).toBe('string');
 
       const filesListed = llmContent
-        .substring(llmContent.indexOf(':') + 1)
         .trim()
-        .split('\n');
-      expect(filesListed[0]).toContain(path.join(tempRootDir, 'newer.sortme'));
-      expect(filesListed[1]).toContain(path.join(tempRootDir, 'older.sortme'));
+        .split(/\r?\n/)
+        .slice(1)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      expect(filesListed).toHaveLength(2);
+      expect(path.resolve(filesListed[0])).toBe(
+        path.resolve(tempRootDir, 'newer.sortme'),
+      );
+      expect(path.resolve(filesListed[1])).toBe(
+        path.resolve(tempRootDir, 'older.sortme'),
+      );
     });
   });
 
@@ -181,8 +190,8 @@ describe('GlobTool', () => {
       // Need to correctly define this as an object without pattern
       const params = { path: '.' };
       // @ts-expect-error - We're intentionally creating invalid params for testing
-      expect(globTool.validateToolParams(params)).toContain(
-        'Parameters failed schema validation',
+      expect(globTool.validateToolParams(params)).toBe(
+        `params must have required property 'pattern'`,
       );
     });
 
@@ -206,8 +215,8 @@ describe('GlobTool', () => {
         path: 123,
       };
       // @ts-expect-error - We're intentionally creating invalid params for testing
-      expect(globTool.validateToolParams(params)).toContain(
-        'Parameters failed schema validation',
+      expect(globTool.validateToolParams(params)).toBe(
+        'params/path must be string',
       );
     });
 
@@ -217,15 +226,15 @@ describe('GlobTool', () => {
         case_sensitive: 'true',
       };
       // @ts-expect-error - We're intentionally creating invalid params for testing
-      expect(globTool.validateToolParams(params)).toContain(
-        'Parameters failed schema validation',
+      expect(globTool.validateToolParams(params)).toBe(
+        'params/case_sensitive must be boolean',
       );
     });
 
     it("should return error if search path resolves outside the tool's root directory", () => {
       // Create a globTool instance specifically for this test, with a deeper root
-      const deeperRootDir = path.join(tempRootDir, 'sub');
-      const specificGlobTool = new GlobTool(deeperRootDir, mockConfig);
+      tempRootDir = path.join(tempRootDir, 'sub');
+      const specificGlobTool = new GlobTool(mockConfig);
       // const params: GlobToolParams = { pattern: '*.txt', path: '..' }; // This line is unused and will be removed.
       // This should be fine as tempRootDir is still within the original tempRootDir (the parent of deeperRootDir)
       // Let's try to go further up.

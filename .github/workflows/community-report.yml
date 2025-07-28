@@ -1,0 +1,188 @@
+name: Generate Weekly Community Report 📊
+
+on:
+  schedule:
+    - cron: '0 12 * * 1' # Run at 12:00 UTC on Monday
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Number of days to look back for the report'
+        required: true
+        default: '7'
+
+jobs:
+  generate-report:
+    name: Generate Report 📝
+    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+      discussions: read
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Generate GitHub App Token 🔑
+        id: generate_token
+        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Generate Report 📜
+        id: report
+        env:
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
+          REPO: ${{ github.repository }}
+          DAYS: ${{ github.event.inputs.days || '7' }}
+        run: |
+          set -e
+
+          START_DATE=$(date -u -d "$DAYS days ago" +'%Y-%m-%d')
+          END_DATE=$(date -u +'%Y-%m-%d')
+          echo "⏳ Generating report for contributions from $START_DATE to $END_DATE..."
+
+          declare -A author_is_googler
+          check_googler_status() {
+              local author=$1
+              if [[ "$author" == *"[bot]" ]]; then
+                  author_is_googler[$author]=1
+                  return 1
+              fi
+              if [[ -v "author_is_googler[$author]" ]]; then
+                  return ${author_is_googler[$author]}
+              fi
+
+              if gh api "orgs/googlers/members/$author" --silent 2>/dev/null; then
+                  echo "🧑‍💻 $author is a Googler."
+                  author_is_googler[$author]=0
+              else
+                  echo "🌍 $author is a community contributor."
+                  author_is_googler[$author]=1
+              fi
+              return ${author_is_googler[$author]}
+          }
+
+          googler_issues=0
+          non_googler_issues=0
+          googler_prs=0
+          non_googler_prs=0
+
+          echo "🔎 Fetching issues and pull requests..."
+          ITEMS_JSON=$(gh search issues --repo "$REPO" "created:>$START_DATE" --json author,isPullRequest --limit 1000)
+
+          for row in $(echo "${ITEMS_JSON}" | jq -r '.[] | @base64'); do
+              _jq() {
+                  echo ${row} | base64 --decode | jq -r ${1}
+              }
+              author=$(_jq '.author.login')
+              is_pr=$(_jq '.isPullRequest')
+
+              if [[ -z "$author" || "$author" == "null" ]]; then
+                continue
+              fi
+
+              if check_googler_status "$author"; then
+                  if [[ "$is_pr" == "true" ]]; then
+                      ((googler_prs++))
+                  else
+                      ((googler_issues++))
+                  fi
+              else
+                  if [[ "$is_pr" == "true" ]]; then
+                      ((non_googler_prs++))
+                  else
+                      ((non_googler_issues++))
+                  fi
+              fi
+          done
+
+          googler_discussions=0
+          non_googler_discussions=0
+
+          echo "🗣️ Fetching discussions..."
+          DISCUSSION_QUERY='''
+          query($q: String!) {
+            search(query: $q, type: DISCUSSION, first: 100) {
+              nodes {
+                ... on Discussion {
+                  author {
+                    login
+                  }
+                }
+              }
+            }
+          }'''
+          DISCUSSIONS_JSON=$(gh api graphql -f q="repo:$REPO created:>$START_DATE" -f query="$DISCUSSION_QUERY")
+
+          for row in $(echo "${DISCUSSIONS_JSON}" | jq -r '.data.search.nodes[] | @base64'); do
+              _jq() {
+                  echo ${row} | base64 --decode | jq -r ${1}
+              }
+              author=$(_jq '.author.login')
+
+              if [[ -z "$author" || "$author" == "null" ]]; then
+                continue
+              fi
+
+              if check_googler_status "$author"; then
+                  ((googler_discussions++))
+              else
+                  ((non_googler_discussions++))
+              fi
+          done
+
+          echo "✍️ Generating report content..."
+          REPORT_TITLE="Community Contribution Report: $START_DATE to $END_DATE"
+          TOTAL_ISSUES=$((googler_issues + non_googler_issues))
+          TOTAL_PRS=$((googler_prs + non_googler_prs))
+          TOTAL_DISCUSSIONS=$((googler_discussions + non_googler_discussions))
+
+          REPORT_BODY=$(cat <<EOF
+          ### 💖 Community Contribution Report
+
+          **Period:** $START_DATE to $END_DATE
+
+          | Category | Googlers | Community | Total |
+          |---|---:|---:|---:|
+          | **Issues** | $googler_issues | $non_googler_issues | **$TOTAL_ISSUES** |
+          | **Pull Requests** | $googler_prs | $non_googler_prs | **$TOTAL_PRS** |
+          | **Discussions** | $googler_discussions | $non_googler_discussions | **$TOTAL_DISCUSSIONS** |
+
+          _This report was generated automatically by a GitHub Action._
+          EOF
+          )
+
+          echo "report_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$REPORT_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "📊 Community Contribution Report:"
+          echo "$REPORT_BODY"
+
+      - name: 🤖 Get Insights from Report
+        if: steps.report.outputs.report_body != ''
+        uses: google-gemini/gemini-cli-action@df3f890f003d28c60a2a09d2c29e0126e4d1e2ff
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+        with:
+          version: 0.1.8-rc.0
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OTLP_GCP_WIF_PROVIDER: ${{ secrets.OTLP_GCP_WIF_PROVIDER }}
+          OTLP_GOOGLE_CLOUD_PROJECT: ${{ secrets.OTLP_GOOGLE_CLOUD_PROJECT }}
+          settings_json: |
+            {
+              "coreTools": [
+                "run_shell_command(gh issue list)",
+                "run_shell_command(gh pr list)",
+                "run_shell_command(gh search issues)",
+                "run_shell_command(gh search prs)"
+              ]
+            }
+          prompt: |
+            You are a helpful assistant that analyzes community contribution reports.
+            Based on the following report, please provide a brief summary and highlight any interesting trends or potential areas for improvement.
+
+            Report:
+            ${{ steps.report.outputs.report_body }}

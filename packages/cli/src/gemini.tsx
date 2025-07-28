@@ -7,7 +7,7 @@
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
-import { loadCliConfig } from './config/config.js';
+import { loadCliConfig, parseArguments, CliArgs } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
 import v8 from 'node:v8';
@@ -21,9 +21,11 @@ import {
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
+import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions, Extension } from './config/extension.js';
-import { cleanupCheckpoints } from './utils/cleanup.js';
+import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
+import { getCliVersion } from './utils/version.js';
 import {
   ApprovalMode,
   Config,
@@ -33,9 +35,12 @@ import {
   sessionId,
   logUserPrompt,
   AuthType,
+  getOauthClient,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
+import { appEvents, AppEvent } from './utils/events.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -80,8 +85,32 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   await new Promise((resolve) => child.on('close', resolve));
   process.exit(0);
 }
+import { runAcpPeer } from './acp/acpPeer.js';
+
+export function setupUnhandledRejectionHandler() {
+  let unhandledRejectionOccurred = false;
+  process.on('unhandledRejection', (reason, _promise) => {
+    const errorMessage = `=========================================
+This is an unexpected error. Please file a bug report using the /bug tool.
+CRITICAL: Unhandled Promise Rejection!
+=========================================
+Reason: ${reason}${
+      reason instanceof Error && reason.stack
+        ? `
+Stack trace:
+${reason.stack}`
+        : ''
+    }`;
+    appEvents.emit(AppEvent.LogError, errorMessage);
+    if (!unhandledRejectionOccurred) {
+      unhandledRejectionOccurred = true;
+      appEvents.emit(AppEvent.OpenDebugConsole);
+    }
+  });
+}
 
 export async function main() {
+  setupUnhandledRejectionHandler();
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
 
@@ -98,30 +127,47 @@ export async function main() {
     process.exit(1);
   }
 
+  const argv = await parseArguments();
   const extensions = loadExtensions(workspaceRoot);
-  const config = await loadCliConfig(settings.merged, extensions, sessionId);
+  const config = await loadCliConfig(
+    settings.merged,
+    extensions,
+    sessionId,
+    argv,
+  );
 
-  // set default fallback to gemini api key
-  // this has to go after load cli because thats where the env is set
-  if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {
-    settings.setValue(
-      SettingScope.User,
-      'selectedAuthType',
-      AuthType.USE_GEMINI,
+  if (argv.promptInteractive && !process.stdin.isTTY) {
+    console.error(
+      'Error: The --prompt-interactive flag is not supported when piping input from stdin.',
     );
+    process.exit(1);
+  }
+
+  if (config.getListExtensions()) {
+    console.log('Installed extensions:');
+    for (const extension of extensions) {
+      console.log(`- ${extension.config.name}`);
+    }
+    process.exit(0);
+  }
+
+  // Set a default auth type if one isn't set.
+  if (!settings.merged.selectedAuthType) {
+    if (process.env.CLOUD_SHELL === 'true') {
+      settings.setValue(
+        SettingScope.User,
+        'selectedAuthType',
+        AuthType.CLOUD_SHELL,
+      );
+    }
   }
 
   setMaxSizedBoxDebugging(config.getDebugMode());
 
-  // Initialize centralized FileDiscoveryService
-  config.getFileService();
-  if (config.getCheckpointingEnabled()) {
-    try {
-      await config.getGitService();
-    } catch {
-      // For now swallow the error, later log it.
-    }
-  }
+  await config.initialize();
+
+  // Load custom themes from settings
+  themeManager.loadCustomThemes(settings.merged.customThemes);
 
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
@@ -131,12 +177,11 @@ export async function main() {
     }
   }
 
-  const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
-    ? getNodeMemoryArgs(config)
-    : [];
-
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env.SANDBOX) {
+    const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
+      ? getNodeMemoryArgs(config)
+      : [];
     const sandboxConfig = config.getSandbox();
     if (sandboxConfig) {
       if (settings.merged.selectedAuthType) {
@@ -163,27 +208,50 @@ export async function main() {
       }
     }
   }
+
+  if (
+    settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
+    config.isBrowserLaunchSuppressed()
+  ) {
+    // Do oauth before app renders to make copying the link possible.
+    await getOauthClient(settings.merged.selectedAuthType, config);
+  }
+
+  if (config.getExperimentalAcp()) {
+    return runAcpPeer(config, settings);
+  }
+
   let input = config.getQuestion();
-  const startupWarnings = await getStartupWarnings();
+  const startupWarnings = [
+    ...(await getStartupWarnings()),
+    ...(await getUserStartupWarnings(workspaceRoot)),
+  ];
+
+  const shouldBeInteractive =
+    !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0);
 
   // Render UI, passing necessary config values. Check that there is no command line question.
-  if (process.stdin.isTTY && input?.length === 0) {
+  if (shouldBeInteractive) {
+    const version = await getCliVersion();
     setWindowTitle(basename(workspaceRoot), settings);
-    render(
+    const instance = render(
       <React.StrictMode>
         <AppWrapper
           config={config}
           settings={settings}
           startupWarnings={startupWarnings}
+          version={version}
         />
       </React.StrictMode>,
       { exitOnCtrlC: false },
     );
+
+    registerCleanup(() => instance.unmount());
     return;
   }
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
-  if (!process.stdin.isTTY) {
+  if (!process.stdin.isTTY && !input) {
     input += await readStdin();
   }
   if (!input) {
@@ -191,10 +259,13 @@ export async function main() {
     process.exit(1);
   }
 
+  const prompt_id = Math.random().toString(16).slice(2);
   logUserPrompt(config, {
     'event.name': 'user_prompt',
     'event.timestamp': new Date().toISOString(),
     prompt: input,
+    prompt_id,
+    auth_type: config.getContentGeneratorConfig()?.authType,
     prompt_length: input.length,
   });
 
@@ -203,15 +274,21 @@ export async function main() {
     config,
     extensions,
     settings,
+    argv,
   );
 
-  await runNonInteractive(nonInteractiveConfig, input);
+  await runNonInteractive(nonInteractiveConfig, input, prompt_id);
   process.exit(0);
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.hideWindowTitle) {
-    process.stdout.write(`\x1b]2; Gemini - ${title} \x07`);
+    const windowTitle = (process.env.CLI_TITLE || `Gemini - ${title}`).replace(
+      // eslint-disable-next-line no-control-regex
+      /[\x00-\x1F\x7F]/g,
+      '',
+    );
+    process.stdout.write(`\x1b]2;${windowTitle}\x07`);
 
     process.on('exit', () => {
       process.stdout.write(`\x1b]2;\x07`);
@@ -219,25 +296,11 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
   }
 }
 
-// --- Global Unhandled Rejection Handler ---
-process.on('unhandledRejection', (reason, _promise) => {
-  // Log other unexpected unhandled rejections as critical errors
-  console.error('=========================================');
-  console.error('CRITICAL: Unhandled Promise Rejection!');
-  console.error('=========================================');
-  console.error('Reason:', reason);
-  console.error('Stack trace may follow:');
-  if (!(reason instanceof Error)) {
-    console.error(reason);
-  }
-  // Exit for genuinely unhandled errors
-  process.exit(1);
-});
-
 async function loadNonInteractiveConfig(
   config: Config,
   extensions: Extension[],
   settings: LoadedSettings,
+  argv: CliArgs,
 ) {
   let finalConfig = config;
   if (config.getApprovalMode() !== ApprovalMode.YOLO) {
@@ -261,36 +324,13 @@ async function loadNonInteractiveConfig(
       nonInteractiveSettings,
       extensions,
       config.getSessionId(),
+      argv,
     );
+    await finalConfig.initialize();
   }
 
-  return await validateNonInterActiveAuth(
+  return await validateNonInteractiveAuth(
     settings.merged.selectedAuthType,
     finalConfig,
   );
-}
-
-async function validateNonInterActiveAuth(
-  selectedAuthType: AuthType | undefined,
-  nonInteractiveConfig: Config,
-) {
-  // making a special case for the cli. many headless environments might not have a settings.json set
-  // so if GEMINI_API_KEY is set, we'll use that. However since the oauth things are interactive anyway, we'll
-  // still expect that exists
-  if (!selectedAuthType && !process.env.GEMINI_API_KEY) {
-    console.error(
-      'Please set an Auth method in your .gemini/settings.json OR specify GEMINI_API_KEY env variable file before running',
-    );
-    process.exit(1);
-  }
-
-  selectedAuthType = selectedAuthType || AuthType.USE_GEMINI;
-  const err = validateAuthMethod(selectedAuthType);
-  if (err != null) {
-    console.error(err);
-    process.exit(1);
-  }
-
-  await nonInteractiveConfig.refreshAuth(selectedAuthType);
-  return nonInteractiveConfig;
 }

@@ -37,6 +37,7 @@ describe('converter', () => {
           labels: undefined,
           safetySettings: undefined,
           generationConfig: undefined,
+          session_id: undefined,
         },
       });
     });
@@ -59,6 +60,34 @@ describe('converter', () => {
           labels: undefined,
           safetySettings: undefined,
           generationConfig: undefined,
+          session_id: undefined,
+        },
+      });
+    });
+
+    it('should convert a request with sessionId', () => {
+      const genaiReq: GenerateContentParameters = {
+        model: 'gemini-pro',
+        contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+      };
+      const codeAssistReq = toGenerateContentRequest(
+        genaiReq,
+        'my-project',
+        'session-123',
+      );
+      expect(codeAssistReq).toEqual({
+        model: 'gemini-pro',
+        project: 'my-project',
+        request: {
+          contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+          systemInstruction: undefined,
+          cachedContent: undefined,
+          tools: undefined,
+          toolConfig: undefined,
+          labels: undefined,
+          safetySettings: undefined,
+          generationConfig: undefined,
+          session_id: 'session-123',
         },
       });
     });

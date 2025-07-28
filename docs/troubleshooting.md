@@ -13,11 +13,11 @@ This guide provides solutions to common issues and debugging tips, including top
   - Users with Google Workspace accounts or Google Cloud accounts
     associated with their Gmail accounts may not be able to activate the free
     tier of the Google Code Assist plan.
-    - For Google Cloud accounts, you can work around this by setting
-      `GOOGLE_CLOUD_PROJECT` to your project ID.
-    - Alternatively, you can also grab an API key from [AI
-      Studio](http://aistudio.google.com/app/apikey), which also includes a
-      separate free tier.
+  - For Google Cloud accounts, you can work around this by setting
+    `GOOGLE_CLOUD_PROJECT` to your project ID.
+  - Alternatively, you can obtain the Gemini API key from
+    [Google AI Studio](http://aistudio.google.com/app/apikey), which also includes a
+    separate free tier.
 
 ## Frequently asked questions (FAQs)
 
@@ -29,7 +29,7 @@ This guide provides solutions to common issues and debugging tips, including top
     1. In your home directory: `~/.gemini/settings.json`.
     2. In your project's root directory: `./.gemini/settings.json`.
 
-    Refer to [CLI Configuration](./cli/configuration.md) for more details.
+    Refer to [Gemini CLI Configuration](./cli/configuration.md) for more details.
 
 - **Q: Why don't I see cached token counts in my stats output?**
   - A: Currently, cached token information is only displayed when cached tokens are being used. This feature is currently available for API key users (Gemini API key or Google Cloud Vertex AI) but not for OAuth users (such as Google Personal/Enterprise accounts like Google Gmail or Google Workspace, respectively). This is because the Gemini Code Assist API does not support cached content creation. You can still view your total token usage with the `/stats` command.
@@ -37,7 +37,7 @@ This guide provides solutions to common issues and debugging tips, including top
 ## Common error messages and solutions
 
 - **Error: `EADDRINUSE` (Address already in use) when starting an MCP server.**
-  - **Cause:** Another process is already using the port the MCP server is trying to bind to.
+  - **Cause:** Another process is already using the port that the MCP server is trying to bind to.
   - **Solution:**
     Either stop the other process that is using the port or configure the MCP server to use a different port.
 

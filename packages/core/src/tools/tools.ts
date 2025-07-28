@@ -29,6 +29,11 @@ export interface Tool<
   description: string;
 
   /**
+   * The icon to display when interacting via ACP
+   */
+  icon: Icon;
+
+  /**
    * Function declaration schema from @google/genai
    */
   schema: FunctionDeclaration;
@@ -59,6 +64,13 @@ export interface Tool<
    * Optional for backward compatibility
    */
   getDescription(params: TParams): string;
+
+  /**
+   * Determines what file system paths the tool will affect
+   * @param params Parameters for the tool execution
+   * @returns A list of such paths
+   */
+  toolLocations(params: TParams): ToolLocation[];
 
   /**
    * Determines if the tool should prompt for confirmation before execution
@@ -97,13 +109,14 @@ export abstract class BaseTool<
    * @param description Description of what the tool does
    * @param isOutputMarkdown Whether the tool's output should be rendered as markdown
    * @param canUpdateOutput Whether the tool supports live (streaming) output
-   * @param parameterSchema JSON Schema defining the parameters
+   * @param parameterSchema Open API 3.0 Schema defining the parameters
    */
   constructor(
     readonly name: string,
     readonly displayName: string,
     readonly description: string,
-    readonly parameterSchema: Record<string, unknown>,
+    readonly icon: Icon,
+    readonly parameterSchema: Schema,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
   ) {}
@@ -115,7 +128,7 @@ export abstract class BaseTool<
     return {
       name: this.name,
       description: this.description,
-      parameters: this.parameterSchema as Schema,
+      parameters: this.parameterSchema,
     };
   }
 
@@ -159,6 +172,18 @@ export abstract class BaseTool<
   }
 
   /**
+   * Determines what file system paths the tool will affect
+   * @param params Parameters for the tool execution
+   * @returns A list of such paths
+   */
+  toolLocations(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    params: TParams,
+  ): ToolLocation[] {
+    return [];
+  }
+
+  /**
    * Abstract method to execute the tool with the given parameters
    * Must be implemented by derived classes
    * @param params Parameters for the tool execution
@@ -173,6 +198,11 @@ export abstract class BaseTool<
 }
 
 export interface ToolResult {
+  /**
+   * A short, one-line summary of the tool's action and result.
+   * e.g., "Read 5 files", "Wrote 256 bytes to foo.txt"
+   */
+  summary?: string;
   /**
    * Content meant to be included in LLM history.
    * This should represent the factual outcome of the tool execution.
@@ -194,15 +224,28 @@ export type ToolResultDisplay = string | FileDiff;
 export interface FileDiff {
   fileDiff: string;
   fileName: string;
+  originalContent: string | null;
+  newContent: string;
 }
 
 export interface ToolEditConfirmationDetails {
   type: 'edit';
   title: string;
-  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
   fileName: string;
   fileDiff: string;
+  originalContent: string | null;
+  newContent: string;
   isModifying?: boolean;
+}
+
+export interface ToolConfirmationPayload {
+  // used to override `modifiedProposedContent` for modifiable tools in the
+  // inline modify flow
+  newContent: string;
 }
 
 export interface ToolExecuteConfirmationDetails {
@@ -243,4 +286,22 @@ export enum ToolConfirmationOutcome {
   ProceedAlwaysTool = 'proceed_always_tool',
   ModifyWithEditor = 'modify_with_editor',
   Cancel = 'cancel',
+}
+
+export enum Icon {
+  FileSearch = 'fileSearch',
+  Folder = 'folder',
+  Globe = 'globe',
+  Hammer = 'hammer',
+  LightBulb = 'lightBulb',
+  Pencil = 'pencil',
+  Regex = 'regex',
+  Terminal = 'terminal',
+}
+
+export interface ToolLocation {
+  // Absolute path to the file
+  path: string;
+  // Which line (if known)
+  line?: number;
 }

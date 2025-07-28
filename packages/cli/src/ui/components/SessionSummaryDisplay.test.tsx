@@ -26,14 +26,18 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
       sessionStartTime: new Date(),
       metrics,
       lastPromptTokenCount: 0,
+      promptCount: 5,
     },
+
+    getPromptCount: () => 5,
+    startNewPrompt: vi.fn(),
   });
 
   return render(<SessionSummaryDisplay duration="1h 23m 45s" />);
 };
 
 describe('<SessionSummaryDisplay />', () => {
-  it('correctly sums and displays stats from multiple models', () => {
+  it('renders the summary display with a title', () => {
     const metrics: SessionMetrics = {
       models: {
         'gemini-2.5-pro': {
@@ -45,17 +49,6 @@ describe('<SessionSummaryDisplay />', () => {
             cached: 500,
             thoughts: 300,
             tool: 200,
-          },
-        },
-        'gemini-2.5-flash': {
-          api: { totalRequests: 5, totalErrors: 0, totalLatencyMs: 12345 },
-          tokens: {
-            prompt: 500,
-            candidates: 1000,
-            total: 1500,
-            cached: 100,
-            thoughts: 50,
-            tool: 20,
           },
         },
       },
@@ -72,25 +65,7 @@ describe('<SessionSummaryDisplay />', () => {
     const { lastFrame } = renderWithMockedStats(metrics);
     const output = lastFrame();
 
-    // Verify totals are summed correctly
-    expect(output).toContain('Cumulative Stats (15 API calls)');
+    expect(output).toContain('Agent powering down. Goodbye!');
     expect(output).toMatchSnapshot();
-  });
-
-  it('renders zero state correctly', () => {
-    const zeroMetrics: SessionMetrics = {
-      models: {},
-      tools: {
-        totalCalls: 0,
-        totalSuccess: 0,
-        totalFail: 0,
-        totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
-        byName: {},
-      },
-    };
-
-    const { lastFrame } = renderWithMockedStats(zeroMetrics);
-    expect(lastFrame()).toMatchSnapshot();
   });
 });
