@@ -44,7 +44,6 @@ export class IdeClient {
   }
 
   private setState(status: IDEConnectionStatus, details?: string) {
-
     this.state = { status, details };
 
     if (status === IDEConnectionStatus.Disconnected) {
@@ -58,7 +57,7 @@ export class IdeClient {
     if (!port) {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        'Gemini CLI Companion extension not found. Install via /ide install and restart gemini-cli in a fresh terminal window.',
+        'Gemini CLI Companion extension not found. Install via /ide install and restart the CLI in a fresh terminal window.',
       );
       return undefined;
     }
