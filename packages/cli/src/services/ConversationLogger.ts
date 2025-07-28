@@ -24,6 +24,8 @@ export class ConversationLogger {
   private currentLogSize: number = 0;
   private logEntriesCount: number = 0;
   private initialized: boolean = false;
+  private writeQueue: Array<() => Promise<void>> = [];
+  private isWriting: boolean = false;
 
   constructor(settings?: Partial<LoggingSettings>) {
     this.settings = { ...DEFAULT_LOGGING_SETTINGS, ...(settings || {}) };
@@ -36,25 +38,12 @@ export class ConversationLogger {
   async init(): Promise<void> {
     if (this.initialized) return;
     
-    await mkdirp(path.dirname(this.logFile));
-    
-    // Set file permissions (read/write for user only)
-    const dirMode = 0o700; // drwx------
-    const fileMode = 0o600; // -rw-------
-    
     try {
-      // Ensure directory permissions
-      await fs.chmod(path.dirname(this.logFile), dirMode);
+      await mkdirp(path.dirname(this.logFile));
+      await fs.chmod(path.dirname(this.logFile), 0o700);
       
-      // Initialize log file if it doesn't exist
-      if (!await this.fileExists(this.logFile)) {
-        await fs.writeFile(this.logFile, '[]', { mode: fileMode });
-      } else {
-        // Check if rotation is needed
-        await this.checkAndRotateLogs();
-      }
-      
-      // Update current log size and entry count
+      // Initialize or repair log file
+      await this.initializeOrRepairLogFile();
       await this.updateLogStats();
       this.initialized = true;
     } catch (error) {
@@ -63,33 +52,92 @@ export class ConversationLogger {
     }
   }
 
+  private async initializeOrRepairLogFile(): Promise<void> {
+    try {
+      const fileExists = await this.fileExists(this.logFile);
+      if (fileExists) {
+        try {
+          const data = await fs.readFile(this.logFile, 'utf-8');
+          JSON.parse(data); // Validate JSON
+          return; // File is valid
+        } catch (error) {
+          console.warn('Log file is corrupted, resetting...');
+          await this.backupCorruptedFile();
+        }
+      }
+      await fs.writeFile(this.logFile, '[]', { mode: 0o600 });
+    } catch (error) {
+      console.error('Failed to initialize log file:', error);
+      throw error;
+    }
+  }
+
+  private async backupCorruptedFile(): Promise<void> {
+    try {
+      const backupFile = `${this.logFile}.corrupted.${Date.now()}.bak`;
+      await fs.rename(this.logFile, backupFile);
+      console.warn(`Corrupted log file backed up to: ${backupFile}`);
+    } catch (e) {
+      console.error('Failed to backup corrupted log file:', e);
+    }
+  }
+
   async log(entry: Omit<ConversationEntry, 'timestamp'>): Promise<void> {
     if (!this.settings.enabled) return;
-    
     await this.ensureInitialized();
     
-    const timestamp = new Date().toISOString();
-    const logEntry = { timestamp, ...entry };
+    return new Promise((resolve, reject) => {
+      this.writeQueue.push(async () => {
+        try {
+          const timestamp = new Date().toISOString();
+          const logEntry = { timestamp, ...entry };
+          await this.processLogWrite(logEntry);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+      
+      if (!this.isWriting) {
+        this.processWriteQueue();
+      }
+    });
+  }
+
+  private async processWriteQueue(): Promise<void> {
+    if (this.isWriting || this.writeQueue.length === 0) return;
+    this.isWriting = true;
     
     try {
-      // Read current logs
-      const logs = await this.readLogs();
+      const writeOperation = this.writeQueue.shift();
+      if (writeOperation) await writeOperation();
+    } finally {
+      this.isWriting = false;
+      setImmediate(() => this.processWriteQueue());
+    }
+  }
+
+  private async processLogWrite(logEntry: ConversationEntry): Promise<void> {
+    const logs = await this.readLogs();
+    logs.unshift(logEntry);
+    
+    // Keep only the most recent entries
+    const prunedLogs = logs.slice(0, this.settings.maxLogEntries);
+    
+    // Write to temporary file first for atomicity
+    const tempFile = `${this.logFile}.${Date.now()}.tmp`;
+    const logData = JSON.stringify(prunedLogs, null, 2);
+    
+    try {
+      await fs.writeFile(tempFile, logData, { mode: 0o600 });
+      await fs.rename(tempFile, this.logFile);
       
-      // Add new entry and maintain max entries limit
-      logs.unshift(logEntry);
-      const prunedLogs = logs.slice(0, this.settings.maxLogEntries);
-      
-      // Write back to file
-      const logData = JSON.stringify(prunedLogs, null, 2);
-      await fs.writeFile(this.logFile, logData, { mode: 0o600 });
-      
-      // Update stats
       this.currentLogSize = Buffer.byteLength(logData);
       this.logEntriesCount = prunedLogs.length;
       
-      // Check if rotation is needed
       await this.checkAndRotateLogs();
     } catch (error) {
+      try { await fs.unlink(tempFile); } catch { /* ignore */ }
       console.error('Failed to write log entry:', error);
       throw error;
     }
