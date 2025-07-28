@@ -24,12 +24,7 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
       };
-      const codeAssistReq = toGenerateContentRequest(
-        genaiReq,
-        'my-prompt',
-        'my-project',
-        'my-session',
-      );
+      const codeAssistReq = toGenerateContentRequest(genaiReq, 'my-project');
       expect(codeAssistReq).toEqual({
         model: 'gemini-pro',
         project: 'my-project',
@@ -42,9 +37,8 @@ describe('converter', () => {
           labels: undefined,
           safetySettings: undefined,
           generationConfig: undefined,
-          session_id: 'my-session',
+          session_id: undefined,
         },
-        user_prompt_id: 'my-prompt',
       });
     });
 
@@ -53,12 +47,7 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
       };
-      const codeAssistReq = toGenerateContentRequest(
-        genaiReq,
-        'my-prompt',
-        undefined,
-        'my-session',
-      );
+      const codeAssistReq = toGenerateContentRequest(genaiReq);
       expect(codeAssistReq).toEqual({
         model: 'gemini-pro',
         project: undefined,
@@ -71,9 +60,8 @@ describe('converter', () => {
           labels: undefined,
           safetySettings: undefined,
           generationConfig: undefined,
-          session_id: 'my-session',
+          session_id: undefined,
         },
-        user_prompt_id: 'my-prompt',
       });
     });
 
@@ -84,7 +72,6 @@ describe('converter', () => {
       };
       const codeAssistReq = toGenerateContentRequest(
         genaiReq,
-        'my-prompt',
         'my-project',
         'session-123',
       );
@@ -102,7 +89,6 @@ describe('converter', () => {
           generationConfig: undefined,
           session_id: 'session-123',
         },
-        user_prompt_id: 'my-prompt',
       });
     });
 
@@ -111,12 +97,7 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: 'Hello',
       };
-      const codeAssistReq = toGenerateContentRequest(
-        genaiReq,
-        'my-prompt',
-        'my-project',
-        'my-session',
-      );
+      const codeAssistReq = toGenerateContentRequest(genaiReq);
       expect(codeAssistReq.request.contents).toEqual([
         { role: 'user', parts: [{ text: 'Hello' }] },
       ]);
@@ -127,12 +108,7 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: [{ text: 'Hello' }, { text: 'World' }],
       };
-      const codeAssistReq = toGenerateContentRequest(
-        genaiReq,
-        'my-prompt',
-        'my-project',
-        'my-session',
-      );
+      const codeAssistReq = toGenerateContentRequest(genaiReq);
       expect(codeAssistReq.request.contents).toEqual([
         { role: 'user', parts: [{ text: 'Hello' }] },
         { role: 'user', parts: [{ text: 'World' }] },
@@ -147,12 +123,7 @@ describe('converter', () => {
           systemInstruction: 'You are a helpful assistant.',
         },
       };
-      const codeAssistReq = toGenerateContentRequest(
-        genaiReq,
-        'my-prompt',
-        'my-project',
-        'my-session',
-      );
+      const codeAssistReq = toGenerateContentRequest(genaiReq);
       expect(codeAssistReq.request.systemInstruction).toEqual({
         role: 'user',
         parts: [{ text: 'You are a helpful assistant.' }],
@@ -168,12 +139,7 @@ describe('converter', () => {
           topK: 40,
         },
       };
-      const codeAssistReq = toGenerateContentRequest(
-        genaiReq,
-        'my-prompt',
-        'my-project',
-        'my-session',
-      );
+      const codeAssistReq = toGenerateContentRequest(genaiReq);
       expect(codeAssistReq.request.generationConfig).toEqual({
         temperature: 0.8,
         topK: 40,
@@ -199,12 +165,7 @@ describe('converter', () => {
           responseMimeType: 'application/json',
         },
       };
-      const codeAssistReq = toGenerateContentRequest(
-        genaiReq,
-        'my-prompt',
-        'my-project',
-        'my-session',
-      );
+      const codeAssistReq = toGenerateContentRequest(genaiReq);
       expect(codeAssistReq.request.generationConfig).toEqual({
         temperature: 0.1,
         topP: 0.2,
