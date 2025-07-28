@@ -243,10 +243,7 @@ describe('FileCommandLoader', () => {
     const loader = new FileCommandLoader(mockConfig);
     const commands = await loader.loadCommands(signal);
 
-    // Now returns both commands, CommandService handles override
     expect(commands).toHaveLength(2);
-
-    // First is user command
     const userResult = await commands[0].action?.(
       createMockCommandContext({
         invocation: {
@@ -262,8 +259,6 @@ describe('FileCommandLoader', () => {
     } else {
       assert.fail('Incorrect action type for user command');
     }
-
-    // Second is project command
     const projectResult = await commands[1].action?.(
       createMockCommandContext({
         invocation: {
@@ -426,11 +421,9 @@ describe('FileCommandLoader', () => {
       const commands = await loader.loadCommands(signal);
 
       expect(commands).toHaveLength(3);
-      // Check order: user → project → extension
       const commandNames = commands.map((cmd) => cmd.name);
       expect(commandNames).toEqual(['user', 'project', 'ext']);
 
-      // Check that extension commands have extensionName metadata
       const extCommand = commands.find((cmd) => cmd.name === 'ext');
       expect(extCommand?.extensionName).toBe('test-ext');
       expect(extCommand?.description).toMatch(/^\[test-ext\]/);
@@ -476,10 +469,9 @@ describe('FileCommandLoader', () => {
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
 
-      // FileCommandLoader now returns all commands without deduplication
+      // Return all commands, even duplicates
       expect(commands).toHaveLength(3);
 
-      // Check order and content
       expect(commands[0].name).toBe('deploy');
       expect(commands[0].extensionName).toBeUndefined();
       const result0 = await commands[0].action?.(
@@ -613,8 +605,6 @@ describe('FileCommandLoader', () => {
       } as Config;
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
-
-      // Should not throw, just return empty
       expect(commands).toHaveLength(0);
     });
 
@@ -653,7 +643,6 @@ describe('FileCommandLoader', () => {
       const commandNames = commands.map((cmd) => cmd.name).sort();
       expect(commandNames).toEqual(['b:c', 'b:d:e', 'simple']);
 
-      // Verify one of the commands works correctly
       const nestedCmd = commands.find((cmd) => cmd.name === 'b:c');
       expect(nestedCmd?.extensionName).toBe('a');
       expect(nestedCmd?.description).toMatch(/^\[a\]/);
