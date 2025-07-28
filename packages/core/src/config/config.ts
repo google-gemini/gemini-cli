@@ -226,7 +226,7 @@ export class Config {
   private readonly noBrowser: boolean;
   private readonly ideMode: boolean;
   private readonly ideClient: IdeClient | undefined;
-  private modelSwitchedDuringSession: boolean = false;
+  private inFallbackMode = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
   private readonly _extensions: GeminiCLIExtension[];
@@ -330,7 +330,7 @@ export class Config {
     await this.geminiClient.initialize(this.contentGeneratorConfig);
 
     // Reset the session flag since we're explicitly changing auth and using default model
-    this.modelSwitchedDuringSession = false;
+    this.inFallbackMode = false;
   }
 
   getSessionId(): string {
@@ -348,19 +348,15 @@ export class Config {
   setModel(newModel: string): void {
     if (this.contentGeneratorConfig) {
       this.contentGeneratorConfig.model = newModel;
-      this.modelSwitchedDuringSession = true;
     }
   }
 
-  isModelSwitchedDuringSession(): boolean {
-    return this.modelSwitchedDuringSession;
+  isInFallbackMode(): boolean {
+    return this.inFallbackMode;
   }
 
-  resetModelToDefault(): void {
-    if (this.contentGeneratorConfig) {
-      this.contentGeneratorConfig.model = this.model; // Reset to the original default model
-      this.modelSwitchedDuringSession = false;
-    }
+  setFallbackMode(active: boolean): void {
+    this.inFallbackMode = active;
   }
 
   setFlashFallbackHandler(handler: FlashFallbackHandler): void {
