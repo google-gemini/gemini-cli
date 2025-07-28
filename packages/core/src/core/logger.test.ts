@@ -393,44 +393,12 @@ describe('Logger', () => {
       { role: 'model', parts: [{ text: 'Hi there' }] },
     ];
 
-    it('should save a checkpoint to a tagged file when a tag is provided', async () => {
-      const tag = 'my-test-tag';
-      await logger.saveCheckpoint(conversation, tag);
-      const taggedFilePath = path.join(
-        TEST_GEMINI_DIR,
-        `${CHECKPOINT_FILE_NAME.replace('.json', '')}-${tag}.json`,
-      );
-      const fileContent = await fs.readFile(taggedFilePath, 'utf-8');
-      expect(JSON.parse(fileContent)).toEqual(conversation);
-    });
-
-    it('should save a checkpoint with a sanitized tag', async () => {
-      const tag = 'invalid/tag?*!';
-      const sanitizedTag = 'invalidtag';
-      await logger.saveCheckpoint(conversation, tag);
-      const taggedFilePath = path.join(
-        TEST_GEMINI_DIR,
-        `checkpoint-${sanitizedTag}.json`,
-      );
-      const fileContent = await fs.readFile(taggedFilePath, 'utf-8');
-      expect(JSON.parse(fileContent)).toEqual(conversation);
-    });
-
-    it('should save a checkpoint with "default" tag if sanitized tag is empty', async () => {
-      const tag = '/?*!';
-      const defaultTag = 'default';
-      await logger.saveCheckpoint(conversation, tag);
-      const taggedFilePath = path.join(
-        TEST_GEMINI_DIR,
-        `checkpoint-${defaultTag}.json`,
-      );
-      const fileContent = await fs.readFile(taggedFilePath, 'utf-8');
-      expect(JSON.parse(fileContent)).toEqual(conversation);
-    });
-
-    it('should save a checkpoint with a sanitized tag to prevent directory traversal', async () => {
-      const tag = '../../secret';
-      const sanitizedTag = 'secret';
+    it.each([
+      { tag: 'test-tag', sanitizedTag: 'test-tag' },
+      { tag: 'invalid/?*!', sanitizedTag: 'invalid' },
+      { tag: '/?*!', sanitizedTag: 'default' },
+      { tag: '../../secret', sanitizedTag: 'secret' },
+    ])('should save a checkpoint', async ({ tag, sanitizedTag }) => {
       await logger.saveCheckpoint(conversation, tag);
       const taggedFilePath = path.join(
         TEST_GEMINI_DIR,
@@ -469,71 +437,15 @@ describe('Logger', () => {
       );
     });
 
-    it('should load from a tagged checkpoint file when a tag is provided', async () => {
-      const tag = 'my-load-tag';
+    it.each([
+      { tag: 'load-tag', sanitizedTag: 'load-tag' },
+      { tag: 'inv/load?*!', sanitizedTag: 'invload' },
+      { tag: '/?*!', sanitizedTag: 'default' },
+      { tag: '../../secret', sanitizedTag: 'secret' },
+    ])('should load from a checkpoint', async ({ tag, sanitizedTag }) => {
       const taggedConversation = [
         ...conversation,
-        { role: 'user', parts: [{ text: 'Another message' }] },
-      ];
-      const taggedFilePath = path.join(
-        TEST_GEMINI_DIR,
-        `${CHECKPOINT_FILE_NAME.replace('.json', '')}-${tag}.json`,
-      );
-      await fs.writeFile(
-        taggedFilePath,
-        JSON.stringify(taggedConversation, null, 2),
-      );
-
-      const loaded = await logger.loadCheckpoint(tag);
-      expect(loaded).toEqual(taggedConversation);
-    });
-
-    it('should load from a sanitized tagged checkpoint file', async () => {
-      const tag = 'invalid/load?*!';
-      const sanitizedTag = 'invalidload';
-      const taggedConversation = [
-        ...conversation,
-        { role: 'user', parts: [{ text: 'Sanitized load' }] },
-      ];
-      const taggedFilePath = path.join(
-        TEST_GEMINI_DIR,
-        `checkpoint-${sanitizedTag}.json`,
-      );
-      await fs.writeFile(
-        taggedFilePath,
-        JSON.stringify(taggedConversation, null, 2),
-      );
-
-      const loaded = await logger.loadCheckpoint(tag);
-      expect(loaded).toEqual(taggedConversation);
-    });
-
-    it('should load from a "default" tagged checkpoint file if sanitized tag is empty', async () => {
-      const tag = '/?*!';
-      const defaultTag = 'default';
-      const taggedConversation = [
-        ...conversation,
-        { role: 'user', parts: [{ text: 'Default load' }] },
-      ];
-      const taggedFilePath = path.join(
-        TEST_GEMINI_DIR,
-        `checkpoint-${defaultTag}.json`,
-      );
-      await fs.writeFile(
-        taggedFilePath,
-        JSON.stringify(taggedConversation, null, 2),
-      );
-
-      const loaded = await logger.loadCheckpoint(tag);
-      expect(loaded).toEqual(taggedConversation);
-    });
-
-    it('should load from a sanitized tagged checkpoint file to prevent directory traversal', async () => {
-      const tag = '../../secret-load';
-      const sanitizedTag = 'secret-load';
-      const taggedConversation = [
-        ...conversation,
-        { role: 'user', parts: [{ text: 'Sanitized traversal load' }] },
+        { role: 'user', parts: [{ text: 'hello' }] },
       ];
       const taggedFilePath = path.join(
         TEST_GEMINI_DIR,
@@ -560,11 +472,16 @@ describe('Logger', () => {
     });
 
     it('should return an empty array if the file contains invalid JSON', async () => {
-      await fs.writeFile(TEST_CHECKPOINT_FILE_PATH, 'invalid json');
+      const tag = 'invalid-json-tag';
+      const taggedFilePath = path.join(
+        TEST_GEMINI_DIR,
+        `checkpoint-${tag}.json`,
+      );
+      await fs.writeFile(taggedFilePath, 'invalid json');
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
-      const loadedCheckpoint = await logger.loadCheckpoint('missing');
+      const loadedCheckpoint = await logger.loadCheckpoint(tag);
       expect(loadedCheckpoint).toEqual([]);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to read or parse checkpoint file'),
