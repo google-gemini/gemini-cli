@@ -49,11 +49,8 @@ describe('setupUser', () => {
     });
     await setupUser({} as OAuth2Client);
     expect(CodeAssistServer).toHaveBeenCalledWith(
-      {},
+      expect.any(Object),
       'test-project',
-      {},
-      '',
-      undefined,
     );
   });
 
@@ -65,10 +62,7 @@ describe('setupUser', () => {
     });
     const projectId = await setupUser({} as OAuth2Client);
     expect(CodeAssistServer).toHaveBeenCalledWith(
-      {},
-      undefined,
-      {},
-      '',
+      expect.any(Object),
       undefined,
     );
     expect(projectId).toEqual({
