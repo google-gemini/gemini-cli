@@ -247,13 +247,40 @@ export class ConversationLogger {
   private async readLogs(): Promise<ConversationEntry[]> {
     try {
       const data = await fs.readFile(this.logFile, 'utf-8');
-      return JSON.parse(data);
-    } catch (error) {
-      if (error.code === 'ENOENT') {
+      try {
+        return JSON.parse(data);
+      } catch (parseError) {
+        // Handle JSON parsing errors
+        console.error(`Failed to parse log file (${this.logFile}):`, parseError);
+        // Create a backup of the corrupted file
+        const backupFile = `${this.logFile}.corrupted.${Date.now()}`;
+        await fs.rename(this.logFile, backupFile);
+        console.error(`Created backup of corrupted log file at: ${backupFile}`);
         return [];
       }
-      console.error('Failed to read log file:', error);
-      throw error;
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      
+      // Handle file not found
+      if (err.code === 'ENOENT') {
+        return [];
+      }
+      
+      // Handle permission errors
+      if (err.code === 'EACCES' || err.code === 'EPERM') {
+        console.error(`Permission denied when reading log file (${this.logFile}):`, err);
+        throw new Error(`Insufficient permissions to read log file: ${this.logFile}`);
+      }
+      
+      // Handle directory instead of file
+      if (err.code === 'EISDIR') {
+        console.error(`Expected a file but found a directory: ${this.logFile}`);
+        throw new Error(`Log file path is a directory: ${this.logFile}`);
+      }
+      
+      // Handle other filesystem errors
+      console.error(`Failed to read log file (${this.logFile}):`, err);
+      throw new Error(`Failed to read log file: ${err.message}`);
     }
   }
 

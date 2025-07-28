@@ -292,8 +292,7 @@ const logShowCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Error retrieving logs: ${error.message}`,
-      };
+        content: `Error retrieving logs: ${(error as Error).message}`,      };
     }
   },
 };
