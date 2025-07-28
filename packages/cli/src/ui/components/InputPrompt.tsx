@@ -18,7 +18,7 @@ import { useCompletion } from '../hooks/useCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import { Config, unescapePath } from '@google/gemini-cli-core';
 import {
   clipboardHasImage,
   saveClipboardImage,
@@ -85,6 +85,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const debouncedText = useDebounce(buffer.text, 200);
 
+  useEffect(() => {
+    const text = debouncedText.trim();
+    // Auto-prefix pasted paths with @
+    // Check length, and that it's not already a command or prefixed.
+    if (
+      text.length > 2 &&
+      !text.startsWith('@') &&
+      !text.startsWith('/') &&
+      !shellModeActive
+    ) {
+      if (isValidPath(unescapePath(text))) {
+        buffer.setText(`@${text}`);
+      }
+    }
+  }, [debouncedText, buffer.setText, isValidPath, shellModeActive]);
+
   // Check if cursor is after @ or / without unescaped spaces
   const isCursorAfterCommandWithoutSpace = useCallback(() => {
     const [row, col] = buffer.cursor;
@@ -133,7 +149,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     commandContext,
     config,
   );
-
 
   const resetCompletionState = completion.resetCompletionState;
   const shellHistory = useShellHistory(config.getProjectRoot());
@@ -380,8 +395,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         // Handle arrow-up/down for history on single-line or at edges
         if (
           key.name === 'up' &&
-          (buffer.lines.length === 1 ||
-            (buffer.cursor[0] === 0))
+          (buffer.lines.length === 1 || buffer.cursor[0] === 0)
         ) {
           inputHistory.navigateUp();
           return;
@@ -506,7 +520,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         >
           {shellModeActive ? '! ' : '> '}
         </Text>
-        <TextInputDisplay buffer={buffer} placeholder={placeholder} focus={focus} />
+        <TextInputDisplay
+          buffer={buffer}
+          placeholder={placeholder}
+          focus={focus}
+        />
       </Box>
       {completion.showSuggestions && (
         <SuggestionsDisplay

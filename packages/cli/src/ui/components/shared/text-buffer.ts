@@ -362,22 +362,14 @@ export function textBufferReducer(
           if (newRow > 0) {
             if (newPreferredCol === null) newPreferredCol = newCol;
             newRow--;
-            newCol = clamp(
-              newPreferredCol,
-              0,
-              cpLen(lines[newRow] ?? ''),
-            );
+            newCol = clamp(newPreferredCol, 0, cpLen(lines[newRow] ?? ''));
           }
           break;
         case 'down':
           if (newRow < lines.length - 1) {
             if (newPreferredCol === null) newPreferredCol = newCol;
             newRow++;
-            newCol = clamp(
-              newPreferredCol,
-              0,
-              cpLen(lines[newRow] ?? ''),
-            );
+            newCol = clamp(newPreferredCol, 0, cpLen(lines[newRow] ?? ''));
           }
           break;
         case 'home':
@@ -767,49 +759,28 @@ export function useTextBuffer({
     dispatch({ type: 'set_viewport_width', payload: viewport.width });
   }, [viewport.width]);
 
+  const insert = useCallback((ch: string): void => {
+    if (/[\n\r]/.test(ch)) {
+      dispatch({ type: 'insert', payload: ch });
+      return;
+    }
 
-  const insert = useCallback(
-    (ch: string): void => {
-      if (/[\n\r]/.test(ch)) {
-        dispatch({ type: 'insert', payload: ch });
-        return;
-      }
-
-      const minLengthToInferAsDragDrop = 3;
-      if (ch.length >= minLengthToInferAsDragDrop && !shellModeActive) {
-        let potentialPath = ch;
-        if (
-          potentialPath.length > 2 &&
-          potentialPath.startsWith("'") &&
-          potentialPath.endsWith("'")
-        ) {
-          potentialPath = ch.slice(1, -1);
+    let currentText = '';
+    for (const char of toCodePoints(ch)) {
+      if (char.codePointAt(0) === 127) {
+        if (currentText.length > 0) {
+          dispatch({ type: 'insert', payload: currentText });
+          currentText = '';
         }
-
-        potentialPath = potentialPath.trim();
-        if (isValidPath(unescapePath(potentialPath))) {
-          ch = `@${potentialPath}`;
-        }
+        dispatch({ type: 'backspace' });
+      } else {
+        currentText += char;
       }
-
-      let currentText = '';
-      for (const char of toCodePoints(ch)) {
-        if (char.codePointAt(0) === 127) {
-          if (currentText.length > 0) {
-            dispatch({ type: 'insert', payload: currentText });
-            currentText = '';
-          }
-          dispatch({ type: 'backspace' });
-        } else {
-          currentText += char;
-        }
-      }
-      if (currentText.length > 0) {
-        dispatch({ type: 'insert', payload: currentText });
-      }
-    },
-    [isValidPath, shellModeActive],
-  );
+    }
+    if (currentText.length > 0) {
+      dispatch({ type: 'insert', payload: currentText });
+    }
+  }, []);
 
   const newline = useCallback((): void => {
     dispatch({ type: 'insert', payload: '\n' });
