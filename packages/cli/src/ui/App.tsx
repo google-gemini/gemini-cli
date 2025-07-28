@@ -44,12 +44,8 @@ import { SessionBrowser } from './components/SessionBrowser.js';
 import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
-import {
-  loadHierarchicalGeminiMemory,
-  loadCliConfig,
-  parseArguments,
-} from '../config/config.js';
-import { LoadedSettings, loadSettings } from '../config/settings.js';
+import { loadHierarchicalGeminiMemory } from '../config/config.js';
+import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup } from '../utils/cleanup.js';
@@ -72,7 +68,6 @@ import {
   type IdeContext,
   ideContext,
   ResumedSessionData,
-  sessionId,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -102,7 +97,6 @@ import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import { useChatRecordingService } from './hooks/useChatRecording.js';
 import { LoadHistoryActionReturn } from './commands/types.js';
 import { appEvents, AppEvent } from '../utils/events.js';
-import { loadExtensions } from '../config/extension.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -122,14 +116,18 @@ export const AppWrapper = (props: AppProps) => (
   </SessionStatsProvider>
 );
 
-const App = (props: AppProps) => {
-  const [config, setConfig] = useState<Config>(props.config);
-  const [settings, setSettings] = useState<LoadedSettings>(props.settings);
+const App = ({
+  config,
+  settings,
+  startupWarnings = [],
+  version,
+  resumedSessionData,
+}: AppProps) => {
   const isFocused = useFocus();
   useBracketedPaste();
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
-  const nightly = props.version.includes('nightly');
+  const nightly = version.includes('nightly');
 
   useEffect(() => {
     checkForUpdates().then(setUpdateMessage);
@@ -138,7 +136,7 @@ const App = (props: AppProps) => {
   // Initialize the AutoSavingService to automatically log conversation history.
   const chatRecordingService = useChatRecordingService(
     config,
-    props.resumedSessionData,
+    resumedSessionData,
   );
 
   const { history, addItem, clearItems, loadHistory } = useHistory({
@@ -300,14 +298,14 @@ const App = (props: AppProps) => {
   // Handle interactive resume from the command line (-r/--resume without -p/--prompt-interactive).
   // Only if we're not authenticating, though.
   useEffect(() => {
-    if (props.resumedSessionData && !isAuthenticating) {
+    if (resumedSessionData && !isAuthenticating) {
       loadHistoryForResume(
         convertSessionToHistoryFormats(
-          props.resumedSessionData.conversation.messages,
+          resumedSessionData.conversation.messages,
         ),
       );
     }
-  }, [props.resumedSessionData, isAuthenticating, loadHistoryForResume]);
+  }, [resumedSessionData, isAuthenticating, loadHistoryForResume]);
 
   // ---------- Auth validation ----------
 
@@ -386,22 +384,6 @@ const App = (props: AppProps) => {
       console.error('Error refreshing memory:', error);
     }
   }, [config, addItem, settings.merged]);
-
-  const refreshConfig = useCallback(async () => {
-    const newSettings = loadSettings(process.cwd());
-    const newExtensions = loadExtensions(process.cwd());
-    const argv = await parseArguments();
-    const newConfig = await loadCliConfig(
-      newSettings.merged,
-      newExtensions,
-      sessionId,
-      argv,
-    );
-    await newConfig.initialize();
-    setConfig(newConfig);
-    setSettings(newSettings);
-    setGeminiMdFileCount(newConfig.getGeminiMdFileCount());
-  }, []);
 
   // Watch for model changes (e.g., from Flash fallback)
   useEffect(() => {
@@ -494,6 +476,7 @@ const App = (props: AppProps) => {
 
       // Switch model for future use but return false to stop current retry
       config.setModel(fallbackModel);
+      config.setFallbackMode(true);
       logFlashFallback(
         config,
         new FlashFallbackEvent(config.getContentGeneratorConfig().authType!),
@@ -572,7 +555,6 @@ const App = (props: AppProps) => {
     chatRecordingService,
     toggleVimEnabled,
     setIsProcessing,
-    refreshConfig,
   );
 
   const {
@@ -877,7 +859,7 @@ const App = (props: AppProps) => {
               {!settings.merged.hideBanner && (
                 <Header
                   terminalWidth={terminalWidth}
-                  version={props.version}
+                  version={version}
                   nightly={nightly}
                 />
               )}
@@ -921,7 +903,7 @@ const App = (props: AppProps) => {
         {showHelp && <Help commands={slashCommands} />}
 
         <Box flexDirection="column" ref={mainControlsRef}>
-          {props.startupWarnings && props.startupWarnings.length > 0 && (
+          {startupWarnings.length > 0 && (
             <Box
               borderStyle="round"
               borderColor={Colors.AccentYellow}
@@ -929,7 +911,7 @@ const App = (props: AppProps) => {
               marginY={1}
               flexDirection="column"
             >
-              {props.startupWarnings.map((warning, index) => (
+              {startupWarnings.map((warning, index) => (
                 <Text key={index} color={Colors.AccentYellow}>
                   {warning}
                 </Text>
