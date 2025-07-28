@@ -156,6 +156,10 @@ describe('loadCliConfig', () => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     process.env.GEMINI_API_KEY = 'test-api-key'; // Ensure API key is set for tests
+    delete process.env.https_proxy;
+    delete process.env.http_proxy;
+    delete process.env.HTTPS_PROXY;
+    delete process.env.HTTP_PROXY;
   });
 
   afterEach(() => {

@@ -101,6 +101,7 @@ export interface Settings {
 
   // Add other settings here.
   ideMode?: boolean;
+  'session.persistence'?: boolean;
   memoryDiscoveryMaxDirs?: number;
 }
 
