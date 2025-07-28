@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { homedir } from 'node:os';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
@@ -228,16 +229,23 @@ export async function loadHierarchicalGeminiMemory(
   extensionContextFilePaths: string[] = [],
   fileFilteringOptions?: FileFilteringOptions,
 ): Promise<{ memoryContent: string; fileCount: number }> {
+  // FIX: Check if the current directory is the user's home directory.
+  const isHomeDirectory = currentWorkingDirectory === homedir();
+
+  // If it is the home directory, there is no separate "workspace" to search.
+  // The core function will find the user-level memory on its own.
+  // We pass an empty path for the CWD to prevent it from loading the same directory twice.
+  const effectiveCwd = isHomeDirectory ? '' : currentWorkingDirectory;
+
   if (debugMode) {
     logger.debug(
-      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory}`,
+      `CLI: Delegating hierarchical memory load to server for CWD: ${effectiveCwd}`,
     );
   }
 
-  // Directly call the server function.
-  // The server function will use its own homedir() for the global path.
+  // Directly call the server function with the corrected path.
   return loadServerHierarchicalMemory(
-    currentWorkingDirectory,
+    effectiveCwd,
     debugMode,
     fileService,
     extensionContextFilePaths,

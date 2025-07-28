@@ -345,28 +345,32 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     'settings.json',
   );
 
-  // Load workspace settings
-  try {
-    if (fs.existsSync(workspaceSettingsPath)) {
-      const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
-      const parsedWorkspaceSettings = JSON.parse(
-        stripJsonComments(projectContent),
-      ) as Settings;
-      workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
-      if (workspaceSettings.theme && workspaceSettings.theme === 'VS') {
-        workspaceSettings.theme = DefaultLight.name;
-      } else if (
-        workspaceSettings.theme &&
-        workspaceSettings.theme === 'VS2015'
-      ) {
-        workspaceSettings.theme = DefaultDark.name;
+  // FIX: Only load workspace settings if the workspace is not the home directory.
+  // This prevents loading the same settings.json file twice.
+  if (workspaceDir !== homedir()) {
+    // Load workspace settings
+    try {
+      if (fs.existsSync(workspaceSettingsPath)) {
+        const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
+        const parsedWorkspaceSettings = JSON.parse(
+          stripJsonComments(projectContent),
+        ) as Settings;
+        workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
+        if (workspaceSettings.theme && workspaceSettings.theme === 'VS') {
+          workspaceSettings.theme = DefaultLight.name;
+        } else if (
+          workspaceSettings.theme &&
+          workspaceSettings.theme === 'VS2015'
+        ) {
+          workspaceSettings.theme = DefaultDark.name;
+        }
       }
+    } catch (error: unknown) {
+      settingsErrors.push({
+        message: getErrorMessage(error),
+        path: workspaceSettingsPath,
+      });
     }
-  } catch (error: unknown) {
-    settingsErrors.push({
-      message: getErrorMessage(error),
-      path: workspaceSettingsPath,
-    });
   }
 
   return new LoadedSettings(
