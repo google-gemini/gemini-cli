@@ -27,6 +27,7 @@ import {
 import * as path from 'path';
 import * as fs from 'fs';
 import { useDebounce } from '../hooks/useDebounce.js';
+import { TextInputDisplay } from './TextInputDisplay.js';
 
 export interface InputPromptProps {
   onSubmit: (value: string) => void;
@@ -508,39 +509,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         >
           {shellModeActive ? '! ' : '> '}
         </Text>
-        <Box flexGrow={1}>
-          {buffer.text.length === 0 && placeholder ? (
-            focus ? (
-              <Text>
-                {chalk.inverse(placeholder.slice(0, 1))}
-                <Text color={Colors.Gray}>{placeholder.slice(1)}</Text>
-              </Text>
-            ) : (
-              <Text color={Colors.Gray}>{placeholder}</Text>
-            )
-          ) : (
-            <Box flexDirection="column">
-              {buffer.lines.map((line, i) => {
-                if (i !== buffer.cursor[0]) {
-                  return <Text key={i}>{line || ' '}</Text>;
-                }
-
-                const col = buffer.cursor[1];
-                const before = cpSlice(line, 0, col);
-                const at = cpSlice(line, col, col + 1) || ' ';
-                const after = cpSlice(line, col + 1);
-
-                return (
-                  <Text key={i}>
-                    {before}
-                    {chalk.inverse(at)}
-                    {after}
-                  </Text>
-                );
-              })}
-            </Box>
-          )}
-        </Box>
+        <TextInputDisplay buffer={buffer} placeholder={placeholder} focus={focus} />
       </Box>
       {completion.showSuggestions && (
         <SuggestionsDisplay
