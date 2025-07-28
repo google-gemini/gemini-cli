@@ -201,6 +201,7 @@ describe('Gemini Client (client.ts)', () => {
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
       getIdeMode: vi.fn().mockReturnValue(false),
       getGeminiClient: vi.fn(),
+      setFallbackMode: vi.fn(),
     };
     const MockedConfig = vi.mocked(Config, true);
     MockedConfig.mockImplementation(
@@ -1262,7 +1263,8 @@ Here are some files the user has open, with the most recent at the top:
 
       // mock config been changed
       const currentModel = initialModel + '-changed';
-      vi.spyOn(client['config'], 'getModel').mockReturnValueOnce(currentModel);
+      const getModelSpy = vi.spyOn(client['config'], 'getModel');
+      getModelSpy.mockReturnValue(currentModel);
 
       const mockFallbackHandler = vi.fn().mockResolvedValue(true);
       client['config'].flashFallbackHandler = mockFallbackHandler;
