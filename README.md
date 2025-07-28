@@ -212,4 +212,4 @@ For details on the terms of service and privacy notice applicable to your use of
 
 ## Security Disclosures
 
-Please see our [security disclosure process](SECURITY.md).  All [security advisories](https://github.com/google-gemini/gemini-cli/security/advisories) are managed on Github.
+Please see our [security disclosure process](SECURITY.md). All [security advisories](https://github.com/google-gemini/gemini-cli/security/advisories) are managed on Github.
