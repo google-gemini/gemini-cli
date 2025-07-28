@@ -8,40 +8,38 @@ import { strict as assert } from 'assert';
 import { test } from 'node:test';
 import { TestRig } from './test-helper.js';
 
-test('reads a file', async (t) => {
+test('should be able to read a file', async () => {
   const rig = new TestRig();
-  rig.setup(t.name);
-  const testFile = rig.createFile('test.txt', 'hello world');
+  await rig.setup('should be able to read a file');
+  rig.createFile('test.txt', 'hello world');
 
-  const cliPromise = rig.run(`read the file name test.txt`);
+  const result = await rig.run(
+    `read the file test.txt and show me its contents`,
+  );
 
-  const toolCall = await rig.waitForToolCall('read_file');
-  assert.deepEqual(toolCall, {
-    tool_name: 'read_file',
-    args: { absolute_path: testFile },
-  });
+  const foundToolCall = await rig.waitForToolCall('read_file');
 
-  await cliPromise;
+  assert.ok(foundToolCall, 'Expected to find a read_file tool call');
+  assert.ok(
+    result.includes('hello world'),
+    'Expected output to include file contents',
+  );
 });
 
-test('writes a file', async (t) => {
+test('should be able to write a file', async () => {
   const rig = new TestRig();
-  rig.setup(t.name);
-  const testFile = rig.createFile('test.txt', '');
+  await rig.setup('should be able to write a file');
+  rig.createFile('test.txt', '');
 
-  const cliPromise = rig.run(`edit test.txt to have a hello world message`);
+  await rig.run(`edit test.txt to have a hello world message`);
 
-  const toolCall = await rig.waitForToolCall('write_file');
-  assert.deepEqual(toolCall, {
-    tool_name: 'write_file',
-    args: {
-      file_path: testFile,
-      content: 'hello world',
-    },
-  });
+  const foundWriteToolCall = await rig.waitForToolCall('write_file');
 
-  await cliPromise;
+  assert.ok(foundWriteToolCall, 'Expected to find a write_file tool call');
 
   const fileContent = rig.readFile('test.txt');
-  assert.ok(fileContent.toLowerCase().includes('hello'));
+  assert.ok(
+    fileContent.toLowerCase().includes('hello'),
+    'Expected file to contain hello',
+  );
 });

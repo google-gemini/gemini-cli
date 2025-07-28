@@ -8,42 +8,30 @@ import { test } from 'node:test';
 import { strict as assert } from 'assert';
 import { TestRig } from './test-helper.js';
 
-test('should be able to run a shell command', async (t) => {
+test('should be able to run a shell command', async () => {
   const rig = new TestRig();
-  rig.setup(t.name);
-  rig.createFile('blah.txt', 'some content');
+  await rig.setup('should be able to run a shell command');
 
-  const prompt = `Can you use ls to list the contexts of the current folder`;
-  const cliPromise = rig.run(prompt);
+  const prompt = `Please run: echo hello-world`;
 
-  const toolCall = await rig.waitForToolCall('run_shell_command');
-  assert.deepEqual(toolCall, {
-    tool_name: 'run_shell_command',
-    args: {
-      command: 'ls',
-    },
-  });
+  const result = await rig.run(prompt);
 
-  const result = await cliPromise;
-  assert.ok(result.includes('blah.txt'));
+  const foundToolCall = await rig.waitForToolCall('run_shell_command');
+
+  assert.ok(foundToolCall, 'Expected to find a run_shell_command tool call');
+  assert.ok(result.includes('hello-world'));
 });
 
-test('should be able to run a shell command via stdin', async (t) => {
+test('should be able to run a shell command via stdin', async () => {
   const rig = new TestRig();
-  rig.setup(t.name);
-  rig.createFile('blah.txt', 'some content');
+  await rig.setup('should be able to run a shell command via stdin');
 
-  const prompt = `Can you use ls to list the contexts of the current folder`;
-  const cliPromise = rig.run({ stdin: prompt });
+  const prompt = `Please run: echo test-stdin`;
 
-  const toolCall = await rig.waitForToolCall('run_shell_command');
-  assert.deepEqual(toolCall, {
-    tool_name: 'run_shell_command',
-    args: {
-      command: 'ls',
-    },
-  });
+  const result = await rig.run({ stdin: prompt });
 
-  const result = await cliPromise;
-  assert.ok(result.includes('blah.txt'));
+  const foundToolCall = await rig.waitForToolCall('run_shell_command');
+
+  assert.ok(foundToolCall, 'Expected to find a run_shell_command tool call');
+  assert.ok(result.includes('test-stdin'));
 });

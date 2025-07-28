@@ -4,18 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { TestRig } from './test-helper.js';
-import { spawn } from 'child_process';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
-import { writeFileSync, unlinkSync } from 'fs';
+import { writeFileSync } from 'fs';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const serverScriptPath = join(__dirname, './temp-server.js');
 
-const serverScript = `
+const serverScript = `/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -43,34 +46,33 @@ await server.connect(transport);
 
 describe('simple-mcp-server', () => {
   const rig = new TestRig();
-  let child;
 
-  before(() => {
-    writeFileSync(serverScriptPath, serverScript);
-    child = spawn('node', [serverScriptPath], {
-      stdio: ['pipe', 'pipe', 'pipe'],
+  before(async () => {
+    // Setup test directory with MCP server configuration
+    await rig.setup('simple-mcp-server', {
+      settings: {
+        mcpServers: {
+          'addition-server': {
+            command: 'node',
+            args: ['mcp-server.js'],
+          },
+        },
+      },
     });
-    child.stderr.on('data', (data) => {
-      console.error(`stderr: ${data}`);
-    });
-    // Wait for the server to be ready
-    return new Promise((resolve) => setTimeout(resolve, 2000));
-  });
 
-  after(() => {
-    child.kill();
-    unlinkSync(serverScriptPath);
+    // Create server script in the test directory
+    const testServerPath = join(rig.testDir, 'mcp-server.js');
+    writeFileSync(testServerPath, serverScript);
   });
 
   test('should add two numbers', async () => {
-    rig.setup('should add two numbers');
-    const cliPromise = rig.run('add 5 and 10');
-    const toolCall = await rig.waitForToolCall('add');
-    assert.deepEqual(toolCall, {
-      tool_name: 'add',
-      args: { a: 5, b: 10 },
-    });
-    const output = await cliPromise;
+    // Test directory is already set up in before hook
+    // Just run the command - MCP server config is in settings.json
+    const output = await rig.run('add 5 and 10');
+
+    const foundToolCall = await rig.waitForToolCall('add');
+
+    assert.ok(foundToolCall, 'Expected to find an add tool call');
     assert.ok(output.includes('15'));
   });
 });

@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
+import { parse } from 'shell-quote';
 import { mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { env } from 'process';
-import { OTEL_DIR, fileExists } from '../scripts/telemetry_utils.js';
+import { fileExists } from '../scripts/telemetry_utils.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -26,7 +27,7 @@ export class TestRig {
     this.testDir = null;
   }
 
-  setup(testName) {
+  setup(testName, options = {}) {
     this.testName = testName;
     const sanitizedName = sanitizeTestName(testName);
     this.testDir = join(env.INTEGRATION_TEST_FILE_DIR, sanitizedName);
@@ -38,10 +39,12 @@ export class TestRig {
     const settings = {
       telemetry: {
         enabled: true,
-        target: 'gcp', // Target doesn't matter as much as the endpoint
-        otlpEndpoint: 'http://localhost:4317',
+        target: 'local',
+        otlpEndpoint: '',
+        outfile: env.TELEMETRY_LOG_FILE,
       },
-      sandbox: false, // Sandbox would prevent connection to localhost
+      sandbox: env.GEMINI_SANDBOX !== 'false' ? env.GEMINI_SANDBOX : false,
+      ...options.settings, // Allow tests to override/add settings
     };
     writeFileSync(
       join(geminiDir, 'settings.json'),
@@ -56,7 +59,7 @@ export class TestRig {
   }
 
   mkdir(dir) {
-    mkdirSync(join(this.testDir, dir));
+    mkdirSync(join(this.testDir, dir), { recursive: true });
   }
 
   sync() {
@@ -87,19 +90,48 @@ export class TestRig {
 
     command += ` ${args.join(' ')}`;
 
-    const output = execSync(command, execOptions);
+    const commandArgs = parse(command);
+    const node = commandArgs.shift();
 
-    if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
-      const testId = `${env.TEST_FILE_NAME.replace(
-        '.test.js',
-        '',
-      )}:${this.testName.replace(/ /g, '-')}`;
-      console.log(`--- TEST: ${testId} ---`);
-      console.log(output);
-      console.log(`--- END TEST: ${testId} ---`);
+    const child = spawn(node, commandArgs, {
+      cwd: this.testDir,
+      stdio: 'pipe',
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    // Handle stdin if provided
+    if (execOptions.input) {
+      child.stdin.write(execOptions.input);
+      child.stdin.end();
     }
 
-    return output;
+    child.stdout.on('data', (data) => {
+      stdout += data;
+      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+        process.stdout.write(data);
+      }
+    });
+
+    child.stderr.on('data', (data) => {
+      stderr += data;
+      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+        process.stderr.write(data);
+      }
+    });
+
+    const promise = new Promise((resolve, reject) => {
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve(stdout);
+        } else {
+          reject(new Error(`Process exited with code ${code}:\n${stderr}`));
+        }
+      });
+    });
+
+    return promise;
   }
 
   readFile(fileName) {
@@ -116,28 +148,115 @@ export class TestRig {
     return content;
   }
 
+  async waitForTelemetryReady() {
+    const logFilePath = env.TELEMETRY_LOG_FILE;
+    if (!logFilePath) return;
+
+    // Wait for telemetry file to exist and have content
+    await this.poll(
+      () => {
+        if (!fileExists(logFilePath)) return false;
+        try {
+          const content = readFileSync(logFilePath, 'utf-8');
+          // Check if file has meaningful content (at least one complete JSON object)
+          return content.includes('"event.name"');
+        } catch (_e) {
+          return false;
+        }
+      },
+      2000, // 2 seconds max - reduced since telemetry should flush on exit now
+      100, // check every 100ms
+    );
+  }
+
+  async waitForToolCall(toolName, timeout = 5000) {
+    // Since we now wait for CLI to complete first, we don't need the initial wait
+    return this.poll(
+      () => {
+        const toolLogs = this.readToolLogs();
+        return toolLogs.some((log) => log.toolRequest.name === toolName);
+      },
+      timeout,
+      100,
+    );
+  }
+
+  async poll(predicate, timeout, interval) {
+    const startTime = Date.now();
+    let attempts = 0;
+    while (Date.now() - startTime < timeout) {
+      attempts++;
+      const result = predicate();
+      if (env.VERBOSE === 'true' && attempts % 5 === 0) {
+        console.log(
+          `Poll attempt ${attempts}: ${result ? 'success' : 'waiting...'}`,
+        );
+      }
+      if (result) {
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+    if (env.VERBOSE === 'true') {
+      console.log(`Poll timed out after ${attempts} attempts`);
+    }
+    return false;
+  }
+
   readToolLogs() {
-    const logFilePath = join(OTEL_DIR, 'collector.log');
-    if (!fileExists(logFilePath)) {
-      console.warn(`Collector log file not found at: ${logFilePath}`);
+    const logFilePath = env.TELEMETRY_LOG_FILE;
+    if (!logFilePath) {
+      console.warn(`TELEMETRY_LOG_FILE environment variable not set`);
       return [];
     }
+
+    // Check if file exists, if not return empty array (file might not be created yet)
+    if (!fileExists(logFilePath)) {
+      return [];
+    }
+
     const content = readFileSync(logFilePath, 'utf-8');
-    // This regex is designed to find the Body of a log record and extract the tool name.
-    const toolLogRegex = /Body: Str\((Tool call: .*)\)/g;
-    const matches = content.matchAll(toolLogRegex);
+
+    // Split the content into individual JSON objects
+    // They are separated by "}\n{" pattern
+    const jsonObjects = content
+      .split(/}\s*\n\s*{/)
+      .map((obj, index, array) => {
+        // Add back the braces we removed during split
+        if (index > 0) obj = '{' + obj;
+        if (index < array.length - 1) obj = obj + '}';
+        return obj.trim();
+      })
+      .filter((obj) => obj);
+
     const logs = [];
-    for (const match of matches) {
+
+    for (const jsonStr of jsonObjects) {
       try {
-        const logDataString = match[1];
-        const parts = logDataString.split(' ');
-        // The tool name is expected to be in a format like "tool:google_web_search."
-        const toolName = parts[2].replace('.', '');
-        logs.push({ toolRequest: { name: toolName, query: '' } });
-      } catch (e) {
-        console.error('Failed to parse tool log from collector output:', e);
+        const logData = JSON.parse(jsonStr);
+        // Look for tool call logs
+        if (
+          logData.attributes &&
+          logData.attributes['event.name'] === 'gemini_cli.tool_call'
+        ) {
+          const toolName = logData.attributes.function_name;
+          logs.push({
+            toolRequest: {
+              name: toolName,
+              args: logData.attributes.function_args,
+              success: logData.attributes.success,
+              duration_ms: logData.attributes.duration_ms,
+            },
+          });
+        }
+      } catch (_e) {
+        // Skip objects that aren't valid JSON
+        if (env.VERBOSE === 'true') {
+          console.error('Failed to parse telemetry object:', _e.message);
+        }
       }
     }
+
     return logs;
   }
 }

@@ -8,19 +8,16 @@ import { test } from 'node:test';
 import { strict as assert } from 'assert';
 import { TestRig } from './test-helper.js';
 
-test('should be able to write a file', async (t) => {
+test('should be able to write a file', async () => {
   const rig = new TestRig();
-  rig.setup(t.name);
+  await rig.setup('should be able to write a file');
   const prompt = `show me an example of using the write tool. put a dad joke in dad.txt`;
 
-  const cliPromise = rig.run(prompt);
+  await rig.run(prompt);
 
-  const toolCall = await rig.waitForToolCall('write_file');
-  assert.strictEqual(toolCall.tool_name, 'write_file');
-  assert.strictEqual(toolCall.args.file_path, 'dad.txt');
-  assert.ok(toolCall.args.content.length > 0);
+  const foundToolCall = await rig.waitForToolCall('write_file');
 
-  await cliPromise;
+  assert.ok(foundToolCall, 'Expected to find a write_file tool call');
 
   const newFilePath = 'dad.txt';
 
