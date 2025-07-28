@@ -4,16 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import updateNotifier, { type UpdateInfo as Update } from 'update-notifier';
+import updateNotifier, { UpdateInfo } from 'update-notifier';
 import semver from 'semver';
 import { getPackageJson } from '../../utils/package.js';
 
-export interface UpdateInfo {
+export interface UpdateObject {
   message: string;
-  update: Update;
+  update: UpdateInfo;
 }
 
-export async function checkForUpdates(): Promise<UpdateInfo | null> {
+export async function checkForUpdates(): Promise<UpdateObject | null> {
   try {
     // Skip update check when running from source (development mode)
     if (process.env.DEV === 'true') {
@@ -35,13 +35,12 @@ export async function checkForUpdates(): Promise<UpdateInfo | null> {
       shouldNotifyInNpmScript: true,
     });
 
-    if (
-      notifier.update &&
-      semver.gt(notifier.update.latest, notifier.update.current)
-    ) {
+    const updateInfo = await notifier.fetchInfo();
+
+    if (updateInfo && semver.gt(updateInfo.latest, updateInfo.current)) {
       return {
-        message: `Gemini CLI update available! ${notifier.update.current} → ${notifier.update.latest}`,
-        update: notifier.update,
+        message: `Gemini CLI update available! ${updateInfo.current} → ${updateInfo.latest}`,
+        update: updateInfo,
       };
     }
 

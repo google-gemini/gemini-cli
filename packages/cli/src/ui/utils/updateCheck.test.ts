@@ -50,7 +50,9 @@ describe('checkForUpdates', () => {
       name: 'test-package',
       version: '1.0.0',
     });
-    updateNotifier.mockReturnValue({ update: null });
+    updateNotifier.mockReturnValue({
+      fetchInfo: vi.fn(async () => null),
+    });
     const result = await checkForUpdates();
     expect(result).toBeNull();
   });
@@ -61,8 +63,9 @@ describe('checkForUpdates', () => {
       version: '1.0.0',
     });
     updateNotifier.mockReturnValue({
-      update: { current: '1.0.0', latest: '1.1.0' },
+      fetchInfo: vi.fn(async () => ({ current: '1.0.0', latest: '1.1.0' })),
     });
+
     const result = await checkForUpdates();
     expect(result?.message).toContain('1.0.0 → 1.1.0');
     expect(result?.update).toEqual({ current: '1.0.0', latest: '1.1.0' });
@@ -74,7 +77,7 @@ describe('checkForUpdates', () => {
       version: '1.0.0',
     });
     updateNotifier.mockReturnValue({
-      update: { current: '1.0.0', latest: '1.0.0' },
+      fetchInfo: vi.fn(async () => ({ current: '1.0.0', latest: '1.0.0' })),
     });
     const result = await checkForUpdates();
     expect(result).toBeNull();
@@ -86,7 +89,7 @@ describe('checkForUpdates', () => {
       version: '1.1.0',
     });
     updateNotifier.mockReturnValue({
-      update: { current: '1.1.0', latest: '1.0.0' },
+      fetchInfo: vi.fn(async () => ({ current: '1.0.0', latest: '0.09' })),
     });
     const result = await checkForUpdates();
     expect(result).toBeNull();

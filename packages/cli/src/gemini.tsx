@@ -42,6 +42,7 @@ import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
+import { appEvents, AppEvent } from './utils/events.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -88,7 +89,30 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
 }
 import { runAcpPeer } from './acp/acpPeer.js';
 
+export function setupUnhandledRejectionHandler() {
+  let unhandledRejectionOccurred = false;
+  process.on('unhandledRejection', (reason, _promise) => {
+    const errorMessage = `=========================================
+This is an unexpected error. Please file a bug report using the /bug tool.
+CRITICAL: Unhandled Promise Rejection!
+=========================================
+Reason: ${reason}${
+      reason instanceof Error && reason.stack
+        ? `
+Stack trace:
+${reason.stack}`
+        : ''
+    }`;
+    appEvents.emit(AppEvent.LogError, errorMessage);
+    if (!unhandledRejectionOccurred) {
+      unhandledRejectionOccurred = true;
+      appEvents.emit(AppEvent.OpenDebugConsole);
+    }
+  });
+}
+
 export async function main() {
+  setupUnhandledRejectionHandler();
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
 
@@ -284,21 +308,6 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
     });
   }
 }
-
-// --- Global Unhandled Rejection Handler ---
-process.on('unhandledRejection', (reason, _promise) => {
-  // Log other unexpected unhandled rejections as critical errors
-  console.error('=========================================');
-  console.error('CRITICAL: Unhandled Promise Rejection!');
-  console.error('=========================================');
-  console.error('Reason:', reason);
-  console.error('Stack trace may follow:');
-  if (!(reason instanceof Error)) {
-    console.error(reason);
-  }
-  // Exit for genuinely unhandled errors
-  process.exit(1);
-});
 
 async function loadNonInteractiveConfig(
   config: Config,

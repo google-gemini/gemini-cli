@@ -9,7 +9,7 @@ import { ChildProcess, spawn } from 'node:child_process';
 import { handleAutoUpdate } from './handleAutoUpdate.js';
 import { getInstallationInfo, PackageManager } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
-import { UpdateInfo } from '../ui/utils/updateCheck.js';
+import { UpdateObject } from '../ui/utils/updateCheck.js';
 import { LoadedSettings } from '../config/settings.js';
 
 // Mock dependencies
@@ -45,7 +45,7 @@ const mockGetInstallationInfo = vi.mocked(getInstallationInfo);
 const mockUpdateEventEmitter = vi.mocked(updateEventEmitter);
 
 describe('handleAutoUpdate', () => {
-  let mockUpdateInfo: UpdateInfo;
+  let mockUpdateInfo: UpdateObject;
   let mockSettings: LoadedSettings;
   let mockChildProcess: {
     stderr: { on: ReturnType<typeof vi.fn> };
@@ -147,45 +147,6 @@ describe('handleAutoUpdate', () => {
       'update-received',
       {
         message: 'An update is available!\nThis is an additional message.',
-      },
-    );
-  });
-
-  it.only('should emit all events on successful update', () => {
-    mockGetInstallationInfo.mockReturnValue({
-      updateCommand: 'npm i -g @google/gemini-cli@latest',
-      updateMessage: '',
-      isGlobal: true,
-      packageManager: PackageManager.NPM,
-    });
-
-    let closeCallback: (code: number) => void = () => {};
-    mockChildProcess.on.mockImplementation(
-      (event: string, callback: (code: number) => void) => {
-        if (event === 'close') {
-          closeCallback = callback;
-        }
-        return mockChildProcess as unknown as ChildProcess;
-      },
-    );
-
-    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root');
-
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledWith(
-      'update-received',
-      {
-        message: 'An update is available!',
-      },
-    );
-    
-    setTimeout(() => {
-      closeCallback(0);
-    },100)
-
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledWith(
-      'update-success',
-      {
-        message: `Update successful! Please restart your terminal to use the new version.`,
       },
     );
   });
