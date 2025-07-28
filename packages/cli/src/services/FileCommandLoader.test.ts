@@ -485,7 +485,9 @@ describe('FileCommandLoader', () => {
         '',
       );
       expect(result0?.type).toBe('submit_prompt');
-      expect((result0 as any).content).toBe('User deploy command');
+      if (result0?.type === 'submit_prompt') {
+        expect(result0.content).toBe('User deploy command');
+      }
 
       expect(commands[1].name).toBe('deploy');
       expect(commands[1].extensionName).toBeUndefined();
@@ -500,7 +502,9 @@ describe('FileCommandLoader', () => {
         '',
       );
       expect(result1?.type).toBe('submit_prompt');
-      expect((result1 as any).content).toBe('Project deploy command');
+      if (result1?.type === 'submit_prompt') {
+        expect(result1.content).toBe('Project deploy command');
+      }
 
       expect(commands[2].name).toBe('deploy');
       expect(commands[2].extensionName).toBe('test-ext');
@@ -516,7 +520,9 @@ describe('FileCommandLoader', () => {
         '',
       );
       expect(result2?.type).toBe('submit_prompt');
-      expect((result2 as any).content).toBe('Extension deploy command');
+      if (result2?.type === 'submit_prompt') {
+        expect(result2.content).toBe('Extension deploy command');
+      }
     });
 
     it('only loads commands from active extensions', async () => {
