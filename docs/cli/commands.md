@@ -17,6 +17,11 @@ Slash commands provide meta-level control over the CLI itself.
     - **`save`**
       - **Description:** Saves the current conversation history. You must add a `<tag>` for identifying the conversation state.
       - **Usage:** `/chat save <tag>`
+      - **Details on Checkpoint Location:** The default locations for saved chat checkpoints are:
+          - `Linux/macOS: ~/.config/google-generative-ai/checkpoints/`
+          - `Windows: C:\Users\<YourUsername>\AppData\Roaming\google-generative-ai\checkpoints\`
+          - When you run `/chat list`, the CLI only scans these specific directories to find available checkpoints.
+
     - **`resume`**
       - **Description:** Resumes a conversation from a previous save.
       - **Usage:** `/chat resume <tag>`
