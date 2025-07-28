@@ -69,7 +69,7 @@ function sendIdeContextUpdateNotification(
     },
   };
   log(
-    `Sending active file changed notification: ${JSON.stringify(
+    `Sending IDE context update notification: ${JSON.stringify(
       notification,
       null,
       2,
