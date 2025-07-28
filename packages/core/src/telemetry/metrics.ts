@@ -21,6 +21,7 @@ import {
   METRIC_TOKEN_USAGE,
   METRIC_SESSION_COUNT,
   METRIC_FILE_OPERATION_COUNT,
+  METRIC_MEMORY_COMPRESSION_COUNT,
 } from './constants.js';
 import { Config } from '../config/config.js';
 
@@ -37,6 +38,7 @@ let apiRequestCounter: Counter | undefined;
 let apiRequestLatencyHistogram: Histogram | undefined;
 let tokenUsageCounter: Counter | undefined;
 let fileOperationCounter: Counter | undefined;
+let memoryCompressionCounter: Counter | undefined;
 let isMetricsInitialized = false;
 
 function getCommonAttributes(config: Config): Attributes {
@@ -87,6 +89,13 @@ export function initializeMetrics(config: Config): void {
     description: 'Counts file operations (create, read, update).',
     valueType: ValueType.INT,
   });
+  memoryCompressionCounter = meter.createCounter(
+    METRIC_MEMORY_COMPRESSION_COUNT,
+    {
+      description: 'Counts memory compression events.',
+      valueType: ValueType.INT,
+    },
+  );
   const sessionCounter = meter.createCounter(METRIC_SESSION_COUNT, {
     description: 'Count of CLI sessions started.',
     valueType: ValueType.INT,
@@ -126,7 +135,7 @@ export function recordTokenUsageMetrics(
 ): void {
   if (!tokenUsageCounter || !isMetricsInitialized) return;
   tokenUsageCounter.add(tokenCount, {
-    ...getCommonAttributes(config),
+    ...getCommonAtrributes(config),
     model,
     type,
   });
@@ -199,4 +208,18 @@ export function recordFileOperationMetric(
   if (mimetype !== undefined) attributes.mimetype = mimetype;
   if (extension !== undefined) attributes.extension = extension;
   fileOperationCounter.add(1, attributes);
+}
+
+export function recordMemoryCompressionMetric(
+  config: Config,
+  tokensBefore: number,
+  tokensAfter: number,
+): void {
+  if (!memoryCompressionCounter || !isMetricsInitialized) return;
+  const attributes: Attributes = {
+    ...getCommonAttributes(config),
+    tokens_before: tokensBefore,
+    tokens_after: tokensAfter,
+  };
+  memoryCompressionCounter.add(1, attributes);
 }

@@ -43,7 +43,10 @@ import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ideContext } from '../ide/ideContext.js';
-import { logFlashDecidedToContinue } from '../telemetry/loggers.js';
+import {
+  logFlashDecidedToContinue,
+  recordMemoryCompressionMetric,
+} from '../telemetry/loggers.js';
 import { FlashDecidedToContinueEvent } from '../telemetry/types.js';
 
 function isThinkingSupported(model: string) {
@@ -320,40 +323,32 @@ export class GeminiClient {
     }
 
     if (this.config.getIdeMode()) {
-      const ideContextState = ideContext.getIdeContext();
-      const openFiles = ideContextState?.workspaceState?.openFiles;
-
-      if (openFiles && openFiles.length > 0) {
+      const openFiles = ideContext.getOpenFilesContext();
+      if (openFiles) {
         const contextParts: string[] = [];
-        const firstFile = openFiles[0];
-        const activeFile = firstFile.isActive ? firstFile : undefined;
-
-        if (activeFile) {
+        if (openFiles.activeFile) {
           contextParts.push(
-            `This is the file that the user is looking at:\n- Path: ${activeFile.path}`,
+            `This is the file that the user was most recently looking at:\n- Path: ${openFiles.activeFile}`,
           );
-          if (activeFile.cursor) {
+          if (openFiles.cursor) {
             contextParts.push(
-              `This is the cursor position in the file:\n- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`,
+              `This is the cursor position in the file:\n- Cursor Position: Line ${openFiles.cursor.line}, Character ${openFiles.cursor.character}`,
             );
           }
-          if (activeFile.selectedText) {
+          if (openFiles.selectedText) {
             contextParts.push(
-              `This is the selected text in the file:\n- ${activeFile.selectedText}`,
+              `This is the selected text in the active file:\n- ${openFiles.selectedText}`,
             );
           }
         }
 
-        const otherOpenFiles = activeFile ? openFiles.slice(1) : openFiles;
-
-        if (otherOpenFiles.length > 0) {
-          const recentFiles = otherOpenFiles
-            .map((file) => `- ${file.path}`)
+        if (openFiles.recentOpenFiles && openFiles.recentOpenFiles.length > 0) {
+          const recentFiles = openFiles.recentOpenFiles
+            .map((file) => `- ${file.filePath}`)
             .join('\n');
-          const heading = activeFile
-            ? `Here are some other files the user has open, with the most recent at the top:`
-            : `Here are some files the user has open, with the most recent at the top:`;
-          contextParts.push(`${heading}\n${recentFiles}`);
+          contextParts.push(
+            `Here are files the user has recently opened, with the most recent at the top:\n${recentFiles}`,
+          );
         }
 
         if (contextParts.length > 0) {
@@ -679,6 +674,12 @@ export class GeminiClient {
       return null;
     }
 
+    recordMemoryCompressionMetric(
+      this.config,
+      originalTokenCount,
+      newTokenCount,
+    );
+
     return {
       originalTokenCount,
       newTokenCount,
@@ -717,7 +718,6 @@ export class GeminiClient {
         );
         if (accepted !== false && accepted !== null) {
           this.config.setModel(fallbackModel);
-          this.config.setFallbackMode(true);
           return fallbackModel;
         }
         // Check if the model was switched manually in the handler
