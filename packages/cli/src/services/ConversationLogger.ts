@@ -79,6 +79,7 @@ export class ConversationLogger {
       console.warn(`Corrupted log file backed up to: ${backupFile}`);
     } catch (e) {
       console.error('Failed to backup corrupted log file:', e);
+      // Continue even if backup fails
     }
   }
 
@@ -118,26 +119,34 @@ export class ConversationLogger {
   }
 
   private async processLogWrite(logEntry: ConversationEntry): Promise<void> {
-    const logs = await this.readLogs();
-    logs.unshift(logEntry);
-    
-    // Keep only the most recent entries
-    const prunedLogs = logs.slice(0, this.settings.maxLogEntries);
-    
-    // Write to temporary file first for atomicity
-    const tempFile = `${this.logFile}.${Date.now()}.tmp`;
-    const logData = JSON.stringify(prunedLogs, null, 2);
-    
     try {
-      await fs.writeFile(tempFile, logData, { mode: 0o600 });
-      await fs.rename(tempFile, this.logFile);
+      const logs = await this.readLogs();
+      logs.unshift(logEntry);
+      const prunedLogs = logs.slice(0, this.settings.maxLogEntries);
       
-      this.currentLogSize = Buffer.byteLength(logData);
-      this.logEntriesCount = prunedLogs.length;
+      const tempFile = `${this.logFile}.${Date.now()}.tmp`;
+      const logData = JSON.stringify(prunedLogs, null, 2);
       
-      await this.checkAndRotateLogs();
+      try {
+        await fs.writeFile(tempFile, logData, { mode: 0o600 });
+        await fs.rename(tempFile, this.logFile);
+        
+        this.currentLogSize = Buffer.byteLength(logData);
+        this.logEntriesCount = prunedLogs.length;
+        
+        await this.checkAndRotateLogs();
+      } catch (error) {
+        // Clean up temp file if it exists
+        try { 
+          if (await this.fileExists(tempFile)) {
+            await fs.unlink(tempFile);
+          }
+        } catch (unlinkError) {
+          console.error('Failed to clean up temp file:', unlinkError);
+        }
+        throw error; // Re-throw the original error
+      }
     } catch (error) {
-      try { await fs.unlink(tempFile); } catch { /* ignore */ }
       console.error('Failed to write log entry:', error);
       throw error;
     }

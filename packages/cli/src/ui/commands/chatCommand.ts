@@ -302,19 +302,20 @@ const logClearCommand: SlashCommand = {
   name: 'log clear',
   description: 'Clear all conversation logs',
   kind: CommandKind.BUILT_IN,
-  action: async (): Promise<MessageActionReturn> => {
+  async action(): Promise<MessageActionReturn> {
     try {
       await conversationLogger.clearLogs();
       return {
         type: 'message',
-        messageType: 'success',
-        content: 'All conversation logs have been cleared.',
+        messageType: 'info',
+        content: 'All conversation logs have been cleared.'
       };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         type: 'message',
         messageType: 'error',
-        content: `Error clearing logs: ${error.message}`,
+        content: `Error clearing logs: ${errorMessage}`
       };
     }
   },
@@ -329,48 +330,58 @@ export const chatCommand: SlashCommand = {
     saveCommand,
     resumeCommand,
     deleteCommand,
-    logShowCommand,  
-    logClearCommand,  
+    logShowCommand,
+    logClearCommand,
   ],
-  action: async (context, args): Promise<MessageActionReturn> => {
-    // Log the conversation when a new message is sent
-    if (args.length > 0) {
-      const prompt = args.join(' ');
-      try {
-        // Get the current model from context or use default
-        const model = context.services.config?.get('model') || 'default-model';
-        
-        // Get the response (this is a simplified example - you'd get the actual response from the API)
-        const response = await context.services.chat?.sendMessage(prompt);
-        
-        if (response) {
-          // Log the conversation
-          await conversationLogger.log({
-            model,
-            prompt,
-            fullResponse: response,
-            textResponse: response.text || ''
-          });
-        }
-        
-        // Return the response to be displayed
+  async action(context, args): Promise<MessageActionReturn> {
+    try {
+      // Handle args which could be string or string[]
+      const prompt = Array.isArray(args) ? args.join(' ') : args || '';
+      
+      if (!prompt) {
         return {
           type: 'message',
-          content: response?.text || 'No response from model',
+          messageType: 'info',
+          content: 'Please provide a message to chat with Gemini.'
         };
-      } catch (error) {
+      }
+
+      // Safely get model from config with type checking
+      const model = (context.services.config && 
+                    typeof context.services.config.get === 'function') 
+        ? (context.services.config.get('model') as string) 
+        : 'default-model';
+      
+      if (context.services.chat) {
+        const response = await context.services.chat.sendMessage(prompt);
+        
+        // Log the conversation
+        await conversationLogger.log({
+          model,
+          prompt,
+          textResponse: typeof response === 'string' ? response : JSON.stringify(response),
+          fullResponse: response
+        });
+        
+        return {
+          type: 'message',
+          messageType: 'info',
+          content: typeof response === 'string' ? response : JSON.stringify(response, null, 2)
+        };
+      } else {
         return {
           type: 'message',
           messageType: 'error',
-          content: `Error processing message: ${error.message}`,
+          content: 'Chat service is not available.'
         };
       }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Error processing message: ${errorMessage}`
+      };
     }
-    
-    return {
-      type: 'message',
-      messageType: 'info',
-      content: 'Please provide a message to send to the chat.',
-    };
   },
 };

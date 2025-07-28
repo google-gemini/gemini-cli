@@ -297,4 +297,91 @@ describe('ConversationLogger', () => {
       await expect(logger.log(sampleEntry)).resolves.not.toThrow();
     });
   });
+
+  describe('Corrupted log file handling', () => {
+    it('should recover from corrupted log file', async () => {
+      // Simulate a corrupted log file
+      mockReadFile.mockResolvedValueOnce('{invalid json');
+      
+      await logger.init();
+      
+      // Should create a backup of the corrupted file
+      expect(mockRename).toHaveBeenCalledWith(
+        testLogFile,
+        expect.stringMatching(/\.bak$/)
+      );
+      
+      // Should create a new empty log file
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        testLogFile,
+        '[]',
+        { mode: 0o600 }
+      );
+    });
+  });
+
+  describe('Atomic write operations', () => {
+    it('should use temporary file for atomic writes', async () => {
+      await logger.init();
+      await logger.log(sampleEntry);
+      
+      // Should write to a temporary file first
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        expect.stringMatching(/\.tmp$/),
+        expect.any(String),
+        { mode: 0o600 }
+      );
+      
+      // Then rename the temp file to the target file
+      expect(mockRename).toHaveBeenCalledWith(
+        expect.stringMatching(/\.tmp$/),
+        testLogFile
+      );
+    });
+    
+    it('should clean up temp file on write failure', async () => {
+      // Make writeFile fail
+      const error = new Error('Write failed');
+      mockWriteFile.mockRejectedValueOnce(error);
+      
+      await logger.init();
+      
+      // Logging should reject with the error
+      await expect(logger.log(sampleEntry)).rejects.toThrow(error);
+      
+      // Should attempt to clean up the temp file
+      expect(mockUnlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+    });
+  });
+
+  describe('Write queue', () => {
+    it('should process writes sequentially', async () => {
+      await logger.init();
+      
+      // Track write operations
+      let writeCount = 0;
+      mockWriteFile.mockImplementation(async () => {
+        writeCount++;
+        // Simulate some processing time
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return Promise.resolve();
+      });
+      
+      // Start multiple log operations
+      const logPromises = [
+        logger.log({ ...sampleEntry, prompt: 'First' }),
+        logger.log({ ...sampleEntry, prompt: 'Second' }),
+        logger.log({ ...sampleEntry, prompt: 'Third' })
+      ];
+      
+      // Wait for all operations to complete
+      await Promise.all(logPromises);
+      
+      // Should have processed all writes
+      expect(writeCount).toBe(3);
+      
+      // Should have written to the log file
+      expect(mockWriteFile).toHaveBeenCalledTimes(3);
+    });
+  });
 });
