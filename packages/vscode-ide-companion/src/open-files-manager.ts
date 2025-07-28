@@ -56,8 +56,13 @@ export class OpenFilesManager {
 
     const renameWatcher = vscode.workspace.onDidRenameFiles((event) => {
       for (const { oldUri, newUri } of event.files) {
-        if (this.isFileUri(oldUri) || this.isFileUri(newUri)) {
-          this.rename(oldUri, newUri);
+        if (this.isFileUri(oldUri)) {
+          if (this.isFileUri(newUri)) {
+            this.rename(oldUri, newUri);
+          } else {
+            // The file was renamed to a non-file URI, so we should remove it.
+            this.remove(oldUri);
+          }
         }
       }
       this.fireWithDebounce();
