@@ -46,7 +46,7 @@ function sendIdeContextUpdateNotification(
       selectedText.substring(0, MAX_SELECTED_TEXT_LENGTH) + '... [TRUNCATED]';
   }
 
-  const files = recentFilesManager.recentFiles.map((file) => {
+  const openFiles = recentFilesManager.recentFiles.map((file) => {
     const isActive = file.filePath === activeFile;
     return {
       path: file.filePath,
@@ -64,7 +64,7 @@ function sendIdeContextUpdateNotification(
     method: 'ide/contextUpdate',
     params: {
       workspaceState: {
-        files,
+        openFiles,
       },
     },
   };
