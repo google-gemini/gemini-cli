@@ -11,7 +11,7 @@ export const helpCommand: SlashCommand = {
   altNames: ['?'],
   description: 'for help on gemini-cli',
   kind: CommandKind.BUILT_IN,
-  action: (_context, _args): OpenDialogActionReturn => {
+  action: (_context): OpenDialogActionReturn => {
     console.debug('Opening help UI ...');
     return {
       type: 'dialog',

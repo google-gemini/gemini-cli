@@ -60,7 +60,7 @@ const TomlCommandDefSchema = z.object({
 export class FileCommandLoader implements ICommandLoader {
   private readonly projectRoot: string;
 
-  constructor(private readonly config: Config | null) {
+  constructor(config: Config | null) {
     this.projectRoot = config?.getProjectRoot() || process.cwd();
   }
 
@@ -197,8 +197,7 @@ export class FileCommandLoader implements ICommandLoader {
       kind: CommandKind.FILE,
       action: async (
         context: CommandContext,
-        _args: string,
-      ): Promise<SlashCommandActionReturn> => {
+      ): Promise<SubmitPromptActionReturn> => {
         if (!context.invocation) {
           console.error(
             `[FileCommandLoader] Critical error: Command '${commandName}' was executed without invocation context.`,
