@@ -1121,4 +1121,35 @@ describe('InputPrompt', () => {
       unmount();
     });
   });
+
+  describe('unfocused paste', () => {
+    it('should handle bracketed paste when not focused', async () => {
+      props.focus = false;
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x1B[200~pasted text\x1B[201~');
+      await wait();
+
+      expect(mockBuffer.handleInput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paste: true,
+          sequence: 'pasted text',
+        }),
+      );
+      unmount();
+    });
+
+    it('should ignore regular keypresses when not focused', async () => {
+      props.focus = false;
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('a');
+      await wait();
+
+      expect(mockBuffer.handleInput).not.toHaveBeenCalled();
+      unmount();
+    });
+  });
 });

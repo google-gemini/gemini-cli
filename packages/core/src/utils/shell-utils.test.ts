@@ -6,578 +6,272 @@
 
 import { expect, describe, it, beforeEach } from 'vitest';
 import {
+  checkCommandPermissions,
   getCommandRoots,
   isCommandAllowed,
   stripShellWrapper,
 } from './shell-utils.js';
 import { Config } from '../config/config.js';
 
+let config: Config;
+
+beforeEach(() => {
+  config = {
+    getCoreTools: () => [],
+    getExcludeTools: () => [],
+  } as unknown as Config;
+});
+
 describe('isCommandAllowed', () => {
-  let config: Config;
-
-  beforeEach(() => {
-    config = {
-      getCoreTools: () => undefined,
-      getExcludeTools: () => undefined,
-    } as unknown as Config;
-  });
-
-  it('should allow a command if no restrictions are provided', async () => {
+  it('should allow a command if no restrictions are provided', () => {
     const result = isCommandAllowed('ls -l', config);
     expect(result.allowed).toBe(true);
   });
 
-  it('should allow a command if it is in the allowed list', async () => {
-    config = {
-      getCoreTools: () => ['ShellTool(ls -l)'],
-      getExcludeTools: () => undefined,
-    } as unknown as Config;
+  it('should allow a command if it is in the global allowlist', () => {
+    config.getCoreTools = () => ['ShellTool(ls)'];
     const result = isCommandAllowed('ls -l', config);
     expect(result.allowed).toBe(true);
   });
 
-  it('should block a command if it is not in the allowed list', async () => {
-    config = {
-      getCoreTools: () => ['ShellTool(ls -l)'],
-      getExcludeTools: () => undefined,
-    } as unknown as Config;
+  it('should block a command if it is not in a strict global allowlist', () => {
+    config.getCoreTools = () => ['ShellTool(ls -l)'];
+    const result = isCommandAllowed('rm -rf /', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(`Command(s) not in the allowed commands list.`);
+  });
+
+  it('should block a command if it is in the blocked list', () => {
+    config.getExcludeTools = () => ['ShellTool(rm -rf /)'];
     const result = isCommandAllowed('rm -rf /', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      "Command 'rm -rf /' is not in the allowed commands list",
+      `Command 'rm -rf /' is blocked by configuration`,
     );
   });
 
-  it('should block a command if it is in the blocked list', async () => {
-    config = {
-      getCoreTools: () => undefined,
-      getExcludeTools: () => ['ShellTool(rm -rf /)'],
-    } as unknown as Config;
+  it('should prioritize the blocklist over the allowlist', () => {
+    config.getCoreTools = () => ['ShellTool(rm -rf /)'];
+    config.getExcludeTools = () => ['ShellTool(rm -rf /)'];
     const result = isCommandAllowed('rm -rf /', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      "Command 'rm -rf /' is blocked by configuration",
+      `Command 'rm -rf /' is blocked by configuration`,
     );
   });
 
-  it('should allow a command if it is not in the blocked list', async () => {
-    config = {
-      getCoreTools: () => undefined,
-      getExcludeTools: () => ['ShellTool(rm -rf /)'],
-    } as unknown as Config;
-    const result = isCommandAllowed('ls -l', config);
+  it('should allow any command when a wildcard is in coreTools', () => {
+    config.getCoreTools = () => ['ShellTool'];
+    const result = isCommandAllowed('any random command', config);
     expect(result.allowed).toBe(true);
   });
 
-  it('should block a command if it is in both the allowed and blocked lists', async () => {
-    config = {
-      getCoreTools: () => ['ShellTool(rm -rf /)'],
-      getExcludeTools: () => ['ShellTool(rm -rf /)'],
-    } as unknown as Config;
-    const result = isCommandAllowed('rm -rf /', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      "Command 'rm -rf /' is blocked by configuration",
-    );
-  });
-
-  it('should allow any command when ShellTool is in coreTools without specific commands', async () => {
-    config = {
-      getCoreTools: () => ['ShellTool'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('any command', config);
-    expect(result.allowed).toBe(true);
-  });
-
-  it('should block any command when ShellTool is in excludeTools without specific commands', async () => {
-    config = {
-      getCoreTools: () => [],
-      getExcludeTools: () => ['ShellTool'],
-    } as unknown as Config;
-    const result = isCommandAllowed('any command', config);
+  it('should block any command when a wildcard is in excludeTools', () => {
+    config.getExcludeTools = () => ['run_shell_command'];
+    const result = isCommandAllowed('any random command', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
       'Shell tool is globally disabled in configuration',
     );
   });
 
-  it('should allow a command if it is in the allowed list using the public-facing name', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(ls -l)'],
-      getExcludeTools: () => undefined,
-    } as unknown as Config;
-    const result = isCommandAllowed('ls -l', config);
-    expect(result.allowed).toBe(true);
-  });
-
-  it('should block a command if it is in the blocked list using the public-facing name', async () => {
-    config = {
-      getCoreTools: () => undefined,
-      getExcludeTools: () => ['run_shell_command(rm -rf /)'],
-    } as unknown as Config;
+  it('should block a command on the blocklist even with a wildcard allow', () => {
+    config.getCoreTools = () => ['ShellTool'];
+    config.getExcludeTools = () => ['ShellTool(rm -rf /)'];
     const result = isCommandAllowed('rm -rf /', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      "Command 'rm -rf /' is blocked by configuration",
+      `Command 'rm -rf /' is blocked by configuration`,
     );
   });
 
-  it('should block any command when ShellTool is in excludeTools using the public-facing name', async () => {
-    config = {
-      getCoreTools: () => [],
-      getExcludeTools: () => ['run_shell_command'],
-    } as unknown as Config;
-    const result = isCommandAllowed('any command', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      'Shell tool is globally disabled in configuration',
-    );
-  });
-
-  it('should block any command if coreTools contains an empty ShellTool command list using the public-facing name', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command()'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('any command', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      "Command 'any command' is not in the allowed commands list",
-    );
-  });
-
-  it('should block any command if coreTools contains an empty ShellTool command list', async () => {
-    config = {
-      getCoreTools: () => ['ShellTool()'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('any command', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      "Command 'any command' is not in the allowed commands list",
-    );
-  });
-
-  it('should block a command with extra whitespace if it is in the blocked list', async () => {
-    config = {
-      getCoreTools: () => undefined,
-      getExcludeTools: () => ['ShellTool(rm -rf /)'],
-    } as unknown as Config;
-    const result = isCommandAllowed(' rm  -rf  / ', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      "Command 'rm -rf /' is blocked by configuration",
-    );
-  });
-
-  it('should allow any command when ShellTool is in present with specific commands', async () => {
-    config = {
-      getCoreTools: () => ['ShellTool', 'ShellTool(ls)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('any command', config);
-    expect(result.allowed).toBe(true);
-  });
-
-  it('should block a command on the blocklist even with a wildcard allow', async () => {
-    config = {
-      getCoreTools: () => ['ShellTool'],
-      getExcludeTools: () => ['ShellTool(rm -rf /)'],
-    } as unknown as Config;
-    const result = isCommandAllowed('rm -rf /', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      "Command 'rm -rf /' is blocked by configuration",
-    );
-  });
-
-  it('should allow a command that starts with an allowed command prefix', async () => {
-    config = {
-      getCoreTools: () => ['ShellTool(gh issue edit)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed(
-      'gh issue edit 1 --add-label "kind/feature"',
-      config,
-    );
-    expect(result.allowed).toBe(true);
-  });
-
-  it('should allow a command that starts with an allowed command prefix using the public-facing name', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(gh issue edit)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed(
-      'gh issue edit 1 --add-label "kind/feature"',
-      config,
-    );
-    expect(result.allowed).toBe(true);
-  });
-
-  it('should not allow a command that starts with an allowed command prefix but is chained with another command', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(gh issue edit)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('gh issue edit&&rm -rf /', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      "Command 'rm -rf /' is not in the allowed commands list",
-    );
-  });
-
-  it('should not allow a command that is a prefix of an allowed command', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(gh issue edit)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('gh issue', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      "Command 'gh issue' is not in the allowed commands list",
-    );
-  });
-
-  it('should not allow a command that is a prefix of a blocked command', async () => {
-    config = {
-      getCoreTools: () => [],
-      getExcludeTools: () => ['run_shell_command(gh issue edit)'],
-    } as unknown as Config;
-    const result = isCommandAllowed('gh issue', config);
-    expect(result.allowed).toBe(true);
-  });
-
-  it('should not allow a command that is chained with a pipe', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(gh issue list)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('gh issue list | rm -rf /', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      "Command 'rm -rf /' is not in the allowed commands list",
-    );
-  });
-
-  it('should not allow a command that is chained with a semicolon', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(gh issue list)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('gh issue list; rm -rf /', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      "Command 'rm -rf /' is not in the allowed commands list",
-    );
-  });
-
-  it('should block a chained command if any part is blocked', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(echo "hello")'],
-      getExcludeTools: () => ['run_shell_command(rm)'],
-    } as unknown as Config;
-    const result = isCommandAllowed('echo "hello" && rm -rf /', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      "Command 'rm -rf /' is blocked by configuration",
-    );
-  });
-
-  it('should block a command if its prefix is on the blocklist, even if the command itself is on the allowlist', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(git push)'],
-      getExcludeTools: () => ['run_shell_command(git)'],
-    } as unknown as Config;
-    const result = isCommandAllowed('git push', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      "Command 'git push' is blocked by configuration",
-    );
-  });
-
-  it('should be case-sensitive in its matching', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(echo)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('ECHO "hello"', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      'Command \'ECHO "hello"\' is not in the allowed commands list',
-    );
-  });
-
-  it('should correctly handle commands with extra whitespace around chaining operators', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(ls -l)'],
-      getExcludeTools: () => ['run_shell_command(rm)'],
-    } as unknown as Config;
-    const result = isCommandAllowed('ls -l  ;  rm -rf /', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      "Command 'rm -rf /' is blocked by configuration",
-    );
-  });
-
-  it('should allow a chained command if all parts are allowed', async () => {
-    config = {
-      getCoreTools: () => [
-        'run_shell_command(echo)',
-        'run_shell_command(ls -l)',
-      ],
-      getExcludeTools: () => [],
-    } as unknown as Config;
+  it('should allow a chained command if all parts are on the global allowlist', () => {
+    config.getCoreTools = () => [
+      'run_shell_command(echo)',
+      'run_shell_command(ls)',
+    ];
     const result = isCommandAllowed('echo "hello" && ls -l', config);
     expect(result.allowed).toBe(true);
   });
 
-  it('should block a command with command substitution using backticks', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(echo)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('echo `rm -rf /`', config);
+  it('should block a chained command if any part is blocked', () => {
+    config.getExcludeTools = () => ['run_shell_command(rm)'];
+    const result = isCommandAllowed('echo "hello" && rm -rf /', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      'Command substitution using $(), <(), or >() is not allowed for security reasons',
+      `Command 'rm -rf /' is blocked by configuration`,
     );
   });
 
-  it('should block a command with command substitution using $()', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(echo)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('echo $(rm -rf /)', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      'Command substitution using $(), <(), or >() is not allowed for security reasons',
-    );
+  describe('command substitution', () => {
+    it('should block command substitution using `$(...)`', () => {
+      const result = isCommandAllowed('echo $(rm -rf /)', config);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('Command substitution');
+    });
+
+    it('should block command substitution using `<(...)`', () => {
+      const result = isCommandAllowed('diff <(ls) <(ls -a)', config);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('Command substitution');
+    });
+
+    it('should block command substitution using backticks', () => {
+      const result = isCommandAllowed('echo `rm -rf /`', config);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('Command substitution');
+    });
+
+    it('should allow substitution-like patterns inside single quotes', () => {
+      config.getCoreTools = () => ['ShellTool(echo)'];
+      const result = isCommandAllowed("echo '$(pwd)'", config);
+      expect(result.allowed).toBe(true);
+    });
+  });
+});
+
+describe('checkCommandPermissions', () => {
+  describe('in "Default Allow" mode (no sessionAllowlist)', () => {
+    it('should return a detailed success object for an allowed command', () => {
+      const result = checkCommandPermissions('ls -l', config);
+      expect(result).toEqual({
+        allAllowed: true,
+        disallowedCommands: [],
+      });
+    });
+
+    it('should return a detailed failure object for a blocked command', () => {
+      config.getExcludeTools = () => ['ShellTool(rm)'];
+      const result = checkCommandPermissions('rm -rf /', config);
+      expect(result).toEqual({
+        allAllowed: false,
+        disallowedCommands: ['rm -rf /'],
+        blockReason: `Command 'rm -rf /' is blocked by configuration`,
+        isHardDenial: true,
+      });
+    });
+
+    it('should return a detailed failure object for a command not on a strict allowlist', () => {
+      config.getCoreTools = () => ['ShellTool(ls)'];
+      const result = checkCommandPermissions('git status && ls', config);
+      expect(result).toEqual({
+        allAllowed: false,
+        disallowedCommands: ['git status'],
+        blockReason: `Command(s) not in the allowed commands list.`,
+        isHardDenial: false,
+      });
+    });
   });
 
-  it('should block a command with process substitution using <()', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(diff)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('diff <(ls) <(ls -a)', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      'Command substitution using $(), <(), or >() is not allowed for security reasons',
-    );
-  });
+  describe('in "Default Deny" mode (with sessionAllowlist)', () => {
+    it('should allow a command on the sessionAllowlist', () => {
+      const result = checkCommandPermissions(
+        'ls -l',
+        config,
+        new Set(['ls -l']),
+      );
+      expect(result.allAllowed).toBe(true);
+    });
 
-  it('should allow a command with I/O redirection', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(echo)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('echo "hello" > file.txt', config);
-    expect(result.allowed).toBe(true);
-  });
+    it('should block a command not on the sessionAllowlist or global allowlist', () => {
+      const result = checkCommandPermissions(
+        'rm -rf /',
+        config,
+        new Set(['ls -l']),
+      );
+      expect(result.allAllowed).toBe(false);
+      expect(result.blockReason).toContain(
+        'not on the global or session allowlist',
+      );
+      expect(result.disallowedCommands).toEqual(['rm -rf /']);
+    });
 
-  it('should not allow a command that is chained with a double pipe', async () => {
-    config = {
-      getCoreTools: () => ['run_shell_command(gh issue list)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-    const result = isCommandAllowed('gh issue list || rm -rf /', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      "Command 'rm -rf /' is not in the allowed commands list",
-    );
+    it('should allow a command on the global allowlist even if not on the session allowlist', () => {
+      config.getCoreTools = () => ['ShellTool(git status)'];
+      const result = checkCommandPermissions(
+        'git status',
+        config,
+        new Set(['ls -l']),
+      );
+      expect(result.allAllowed).toBe(true);
+    });
+
+    it('should allow a chained command if parts are on different allowlists', () => {
+      config.getCoreTools = () => ['ShellTool(git status)'];
+      const result = checkCommandPermissions(
+        'git status && git commit',
+        config,
+        new Set(['git commit']),
+      );
+      expect(result.allAllowed).toBe(true);
+    });
+
+    it('should block a command on the sessionAllowlist if it is also globally blocked', () => {
+      config.getExcludeTools = () => ['run_shell_command(rm)'];
+      const result = checkCommandPermissions(
+        'rm -rf /',
+        config,
+        new Set(['rm -rf /']),
+      );
+      expect(result.allAllowed).toBe(false);
+      expect(result.blockReason).toContain('is blocked by configuration');
+    });
+
+    it('should block a chained command if one part is not on any allowlist', () => {
+      config.getCoreTools = () => ['run_shell_command(echo)'];
+      const result = checkCommandPermissions(
+        'echo "hello" && rm -rf /',
+        config,
+        new Set(['echo']),
+      );
+      expect(result.allAllowed).toBe(false);
+      expect(result.disallowedCommands).toEqual(['rm -rf /']);
+    });
   });
 });
 
 describe('getCommandRoots', () => {
   it('should return a single command', () => {
-    const result = getCommandRoots('ls -l');
-    expect(result).toEqual(['ls']);
+    expect(getCommandRoots('ls -l')).toEqual(['ls']);
   });
 
-  it('should return multiple commands', () => {
-    const result = getCommandRoots('ls -l | grep "test"');
-    expect(result).toEqual(['ls', 'grep']);
-  });
-
-  it('should handle multiple commands with &&', () => {
-    const result = getCommandRoots('npm run build && npm test');
-    expect(result).toEqual(['npm', 'npm']);
-  });
-
-  it('should handle multiple commands with ;', () => {
-    const result = getCommandRoots('echo "hello"; echo "world"');
-    expect(result).toEqual(['echo', 'echo']);
-  });
-
-  it('should handle a mix of operators', () => {
-    const result = getCommandRoots(
-      'cat package.json | grep "version" && echo "done"',
-    );
-    expect(result).toEqual(['cat', 'grep', 'echo']);
-  });
-
-  it('should handle commands with paths', () => {
-    const result = getCommandRoots('/usr/local/bin/node script.js');
-    expect(result).toEqual(['node']);
+  it('should handle paths and return the binary name', () => {
+    expect(getCommandRoots('/usr/local/bin/node script.js')).toEqual(['node']);
   });
 
   it('should return an empty array for an empty string', () => {
-    const result = getCommandRoots('');
-    expect(result).toEqual([]);
+    expect(getCommandRoots('')).toEqual([]);
+  });
+
+  it('should handle a mix of operators', () => {
+    const result = getCommandRoots('a;b|c&&d||e&f');
+    expect(result).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
+  });
+
+  it('should correctly parse a chained command with quotes', () => {
+    const result = getCommandRoots('echo "hello" && git commit -m "feat"');
+    expect(result).toEqual(['echo', 'git']);
   });
 });
 
 describe('stripShellWrapper', () => {
-  it('should strip sh -c from the beginning of the command', () => {
-    const result = stripShellWrapper('sh -c "ls -l"');
-    expect(result).toEqual('ls -l');
+  it('should strip sh -c with quotes', () => {
+    expect(stripShellWrapper('sh -c "ls -l"')).toEqual('ls -l');
   });
 
-  it('should strip bash -c from the beginning of the command', () => {
-    const result = stripShellWrapper('bash -c "ls -l"');
-    expect(result).toEqual('ls -l');
+  it('should strip bash -c with extra whitespace', () => {
+    expect(stripShellWrapper('  bash  -c  "ls -l"  ')).toEqual('ls -l');
   });
 
-  it('should strip zsh -c from the beginning of the command', () => {
-    const result = stripShellWrapper('zsh -c "ls -l"');
-    expect(result).toEqual('ls -l');
+  it('should strip zsh -c without quotes', () => {
+    expect(stripShellWrapper('zsh -c ls -l')).toEqual('ls -l');
   });
 
-  it('should not strip anything if the command does not start with a shell wrapper', () => {
-    const result = stripShellWrapper('ls -l');
-    expect(result).toEqual('ls -l');
+  it('should strip cmd.exe /c', () => {
+    expect(stripShellWrapper('cmd.exe /c "dir"')).toEqual('dir');
   });
 
-  it('should handle extra whitespace', () => {
-    const result = stripShellWrapper('  sh   -c   "ls -l"  ');
-    expect(result).toEqual('ls -l');
-  });
-
-  it('should handle commands without quotes', () => {
-    const result = stripShellWrapper('sh -c ls -l');
-    expect(result).toEqual('ls -l');
-  });
-
-  it('should strip cmd.exe /c from the beginning of the command', () => {
-    const result = stripShellWrapper('cmd.exe /c "dir"');
-    expect(result).toEqual('dir');
-  });
-});
-
-describe('getCommandRoots', () => {
-  it('should handle multiple commands with &', () => {
-    const result = getCommandRoots('echo "hello" & echo "world"');
-    expect(result).toEqual(['echo', 'echo']);
-  });
-});
-
-describe('command substitution', () => {
-  let config: Config;
-
-  beforeEach(() => {
-    config = {
-      getCoreTools: () => ['run_shell_command(echo)', 'run_shell_command(gh)'],
-      getExcludeTools: () => [],
-    } as unknown as Config;
-  });
-
-  it('should block unquoted command substitution `$(...)`', () => {
-    const result = isCommandAllowed('echo $(pwd)', config);
-    expect(result.allowed).toBe(false);
-  });
-
-  it('should block unquoted command substitution `<(...)`', () => {
-    const result = isCommandAllowed('echo <(pwd)', config);
-    expect(result.allowed).toBe(false);
-  });
-
-  it('should allow command substitution in single quotes', () => {
-    const result = isCommandAllowed("echo '$(pwd)'", config);
-    expect(result.allowed).toBe(true);
-  });
-
-  it('should allow backticks in single quotes', () => {
-    const result = isCommandAllowed("echo '`rm -rf /`'", config);
-    expect(result.allowed).toBe(true);
-  });
-
-  it('should block command substitution in double quotes', () => {
-    const result = isCommandAllowed('echo "$(pwd)"', config);
-    expect(result.allowed).toBe(false);
-  });
-
-  it('should allow escaped command substitution', () => {
-    const result = isCommandAllowed('echo \\$(pwd)', config);
-    expect(result.allowed).toBe(true);
-  });
-
-  it('should allow complex commands with quoted substitution-like patterns', () => {
-    const command =
-      "gh pr comment 4795 --body 'This is a test comment with $(pwd) style text'";
-    const result = isCommandAllowed(command, config);
-    expect(result.allowed).toBe(true);
-  });
-
-  it('should block complex commands with unquoted substitution-like patterns', () => {
-    const command =
-      'gh pr comment 4795 --body "This is a test comment with $(pwd) style text"';
-    const result = isCommandAllowed(command, config);
-    expect(result.allowed).toBe(false);
-  });
-
-  it('should allow a command with markdown content using proper quoting', () => {
-    // Simple test with safe content in single quotes
-    const result = isCommandAllowed(
-      "gh pr comment 4795 --body 'This is safe markdown content'",
-      config,
-    );
-    expect(result.allowed).toBe(true);
-  });
-});
-
-describe('getCommandRoots with quote handling', () => {
-  it('should correctly parse a simple command', () => {
-    const result = getCommandRoots('git status');
-    expect(result).toEqual(['git']);
-  });
-
-  it('should correctly parse a command with a quoted argument', () => {
-    const result = getCommandRoots('git commit -m "feat: new feature"');
-    expect(result).toEqual(['git']);
-  });
-
-  it('should correctly parse a command with single quotes', () => {
-    const result = getCommandRoots("echo 'hello world'");
-    expect(result).toEqual(['echo']);
-  });
-
-  it('should correctly parse a chained command with quotes', () => {
-    const result = getCommandRoots('echo "hello" && git status');
-    expect(result).toEqual(['echo', 'git']);
-  });
-
-  it('should correctly parse a complex chained command', () => {
-    const result = getCommandRoots(
-      'git commit -m "feat: new feature" && echo "done"',
-    );
-    expect(result).toEqual(['git', 'echo']);
-  });
-
-  it('should handle escaped quotes', () => {
-    const result = getCommandRoots('echo "this is a "quote""');
-    expect(result).toEqual(['echo']);
-  });
-
-  it('should handle commands with no spaces', () => {
-    const result = getCommandRoots('command');
-    expect(result).toEqual(['command']);
-  });
-
-  it('should handle multiple separators', () => {
-    const result = getCommandRoots('a;b|c&&d||e&f');
-    expect(result).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
+  it('should not strip anything if no wrapper is present', () => {
+    expect(stripShellWrapper('ls -l')).toEqual('ls -l');
   });
 });

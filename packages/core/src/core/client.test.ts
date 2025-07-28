@@ -647,14 +647,26 @@ describe('Gemini Client (client.ts)', () => {
   describe('sendMessageStream', () => {
     it('should include IDE context when ideMode is enabled', async () => {
       // Arrange
-      vi.mocked(ideContext.getOpenFilesContext).mockReturnValue({
-        activeFile: '/path/to/active/file.ts',
-        selectedText: 'hello',
-        cursor: { line: 5, character: 10 },
-        recentOpenFiles: [
-          { filePath: '/path/to/recent/file1.ts', timestamp: Date.now() },
-          { filePath: '/path/to/recent/file2.ts', timestamp: Date.now() },
-        ],
+      vi.mocked(ideContext.getIdeContext).mockReturnValue({
+        workspaceState: {
+          openFiles: [
+            {
+              path: '/path/to/active/file.ts',
+              timestamp: Date.now(),
+              isActive: true,
+              selectedText: 'hello',
+              cursor: { line: 5, character: 10 },
+            },
+            {
+              path: '/path/to/recent/file1.ts',
+              timestamp: Date.now(),
+            },
+            {
+              path: '/path/to/recent/file2.ts',
+              timestamp: Date.now(),
+            },
+          ],
+        },
       });
 
       vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
@@ -689,15 +701,188 @@ describe('Gemini Client (client.ts)', () => {
       }
 
       // Assert
-      expect(ideContext.getOpenFilesContext).toHaveBeenCalled();
+      expect(ideContext.getIdeContext).toHaveBeenCalled();
       const expectedContext = `
-This is the file that the user was most recently looking at:
+This is the file that the user is looking at:
 - Path: /path/to/active/file.ts
 This is the cursor position in the file:
 - Cursor Position: Line 5, Character 10
-This is the selected text in the active file:
+This is the selected text in the file:
 - hello
-Here are files the user has recently opened, with the most recent at the top:
+Here are some other files the user has open, with the most recent at the top:
+- /path/to/recent/file1.ts
+- /path/to/recent/file2.ts
+      `.trim();
+      const expectedRequest = [{ text: expectedContext }, ...initialRequest];
+      expect(mockTurnRunFn).toHaveBeenCalledWith(
+        expectedRequest,
+        expect.any(Object),
+      );
+    });
+
+    it('should not add context if ideMode is enabled but no open files', async () => {
+      // Arrange
+      vi.mocked(ideContext.getIdeContext).mockReturnValue({
+        workspaceState: {
+          openFiles: [],
+        },
+      });
+
+      vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
+
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        generateContent: mockGenerateContentFn,
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      const initialRequest = [{ text: 'Hi' }];
+
+      // Act
+      const stream = client.sendMessageStream(
+        initialRequest,
+        new AbortController().signal,
+        'prompt-id-ide',
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      // Assert
+      expect(ideContext.getIdeContext).toHaveBeenCalled();
+      expect(mockTurnRunFn).toHaveBeenCalledWith(
+        initialRequest,
+        expect.any(Object),
+      );
+    });
+
+    it('should add context if ideMode is enabled and there is one active file', async () => {
+      // Arrange
+      vi.mocked(ideContext.getIdeContext).mockReturnValue({
+        workspaceState: {
+          openFiles: [
+            {
+              path: '/path/to/active/file.ts',
+              timestamp: Date.now(),
+              isActive: true,
+              selectedText: 'hello',
+              cursor: { line: 5, character: 10 },
+            },
+          ],
+        },
+      });
+
+      vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
+
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        generateContent: mockGenerateContentFn,
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      const initialRequest = [{ text: 'Hi' }];
+
+      // Act
+      const stream = client.sendMessageStream(
+        initialRequest,
+        new AbortController().signal,
+        'prompt-id-ide',
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      // Assert
+      expect(ideContext.getIdeContext).toHaveBeenCalled();
+      const expectedContext = `
+This is the file that the user is looking at:
+- Path: /path/to/active/file.ts
+This is the cursor position in the file:
+- Cursor Position: Line 5, Character 10
+This is the selected text in the file:
+- hello
+      `.trim();
+      const expectedRequest = [{ text: expectedContext }, ...initialRequest];
+      expect(mockTurnRunFn).toHaveBeenCalledWith(
+        expectedRequest,
+        expect.any(Object),
+      );
+    });
+
+    it('should add context if ideMode is enabled and there are open files but no active file', async () => {
+      // Arrange
+      vi.mocked(ideContext.getIdeContext).mockReturnValue({
+        workspaceState: {
+          openFiles: [
+            {
+              path: '/path/to/recent/file1.ts',
+              timestamp: Date.now(),
+            },
+            {
+              path: '/path/to/recent/file2.ts',
+              timestamp: Date.now(),
+            },
+          ],
+        },
+      });
+
+      vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
+
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        generateContent: mockGenerateContentFn,
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      const initialRequest = [{ text: 'Hi' }];
+
+      // Act
+      const stream = client.sendMessageStream(
+        initialRequest,
+        new AbortController().signal,
+        'prompt-id-ide',
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      // Assert
+      expect(ideContext.getIdeContext).toHaveBeenCalled();
+      const expectedContext = `
+Here are some files the user has open, with the most recent at the top:
 - /path/to/recent/file1.ts
 - /path/to/recent/file2.ts
       `.trim();
