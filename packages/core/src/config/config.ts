@@ -11,6 +11,7 @@ import {
   ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
@@ -45,6 +46,7 @@ import {
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
+import { IdeClient } from '../ide/ide-client.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
@@ -180,63 +182,68 @@ export interface ConfigParameters {
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideMode?: boolean;
+  ideClient?: IdeClient;
 }
 
 export class Config {
   private toolRegistry!: ToolRegistry;
-  private readonly sessionId: string;
+  private promptRegistry!: PromptRegistry;
+  private sessionId: string;
   private contentGeneratorConfig!: ContentGeneratorConfig;
-  private readonly embeddingModel: string;
-  private readonly sandbox: SandboxConfig | undefined;
-  private readonly targetDir: string;
-  private readonly debugMode: boolean;
-  private readonly question: string | undefined;
-  private readonly fullContext: boolean;
-  private readonly coreTools: string[] | undefined;
-  private readonly excludeTools: string[] | undefined;
-  private readonly toolDiscoveryCommand: string | undefined;
-  private readonly toolCallCommand: string | undefined;
-  private readonly mcpServerCommand: string | undefined;
-  private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
+  private embeddingModel: string;
+  private sandbox: SandboxConfig | undefined;
+  private targetDir: string;
+  private debugMode: boolean;
+  private question: string | undefined;
+  private fullContext: boolean;
+  private coreTools: string[] | undefined;
+  private excludeTools: string[] | undefined;
+  private toolDiscoveryCommand: string | undefined;
+  private toolCallCommand: string | undefined;
+  private mcpServerCommand: string | undefined;
+  private mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
   private approvalMode: ApprovalMode;
-  private readonly showMemoryUsage: boolean;
-  private readonly accessibility: AccessibilitySettings;
-  private readonly telemetrySettings: TelemetrySettings;
-  private readonly usageStatisticsEnabled: boolean;
+  private showMemoryUsage: boolean;
+  private accessibility: AccessibilitySettings;
+  private telemetrySettings: TelemetrySettings;
+  private usageStatisticsEnabled: boolean;
   private geminiClient!: GeminiClient;
-  private readonly fileFiltering: {
+  private fileFiltering: {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
     enableRecursiveFileSearch: boolean;
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
-  private readonly checkpointing: boolean;
-  private readonly proxy: string | undefined;
-  private readonly cwd: string;
-  private readonly bugCommand: BugCommandSettings | undefined;
-  private readonly model: string;
-  private readonly extensionContextFilePaths: string[];
-  private readonly noBrowser: boolean;
-  private readonly ideMode: boolean;
+  private checkpointing: boolean;
+  private proxy: string | undefined;
+  private cwd: string;
+  private bugCommand: BugCommandSettings | undefined;
+  private model: string;
+  private extensionContextFilePaths: string[];
+  private noBrowser: boolean;
+  private ideMode: boolean;
+  private ideClient: IdeClient | undefined;
   private modelSwitchedDuringSession: boolean = false;
-  private readonly maxSessionTurns: number;
-  private readonly listExtensions: boolean;
-  private readonly _extensions: GeminiCLIExtension[];
-  private readonly _blockedMcpServers: Array<{
+  private maxSessionTurns: number;
+  private listExtensions: boolean;
+  private _extensions: GeminiCLIExtension[];
+  private _blockedMcpServers: Array<{
     name: string;
     extensionName: string;
   }>;
   flashFallbackHandler?: FlashFallbackHandler;
   private quotaErrorOccurred: boolean = false;
-  private readonly summarizeToolOutput:
+  private summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
-  private readonly experimentalAcp: boolean = false;
+  private experimentalAcp: boolean = false;
+  private _params: ConfigParameters;
 
   constructor(params: ConfigParameters) {
+    this._params = params;
     this.sessionId = params.sessionId;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
@@ -286,6 +293,7 @@ export class Config {
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.ideMode = params.ideMode ?? false;
+    this.ideClient = params.ideClient;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -304,12 +312,75 @@ export class Config {
     }
   }
 
+  async refresh() {
+    // Re-run initialization logic.
+    await this.initialize();
+    // After re-initializing, the tool registry will be updated.
+    // We need to update the gemini client with the new tools.
+    await this.geminiClient.setTools();
+  }
+
+  update(params: ConfigParameters) {
+    this._params = params;
+    // Re-assign all properties from the new params.
+    this.sessionId = params.sessionId;
+    this.embeddingModel =
+      params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
+    this.sandbox = params.sandbox;
+    this.targetDir = path.resolve(params.targetDir);
+    this.debugMode = params.debugMode;
+    this.question = params.question;
+    this.fullContext = params.fullContext ?? false;
+    this.coreTools = params.coreTools;
+    this.excludeTools = params.excludeTools;
+    this.toolDiscoveryCommand = params.toolDiscoveryCommand;
+    this.toolCallCommand = params.toolCallCommand;
+    this.mcpServerCommand = params.mcpServerCommand;
+    this.mcpServers = params.mcpServers;
+    this.userMemory = params.userMemory ?? '';
+    this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
+    this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
+    this.showMemoryUsage = params.showMemoryUsage ?? false;
+    this.accessibility = params.accessibility ?? {};
+    this.telemetrySettings = {
+      enabled: params.telemetry?.enabled ?? false,
+      target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
+      otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
+      logPrompts: params.telemetry?.logPrompts ?? true,
+      outfile: params.telemetry?.outfile,
+    };
+    this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
+    this.fileFiltering = {
+      respectGitIgnore: params.fileFiltering?.respectGitIgnore ?? true,
+      respectGeminiIgnore: params.fileFiltering?.respectGeminiIgnore ?? true,
+      enableRecursiveFileSearch:
+        params.fileFiltering?.enableRecursiveFileSearch ?? true,
+    };
+    this.checkpointing = params.checkpointing ?? false;
+    this.proxy = params.proxy;
+    this.cwd = params.cwd ?? process.cwd();
+    this.fileDiscoveryService = params.fileDiscoveryService ?? null;
+    this.bugCommand = params.bugCommand;
+    this.model = params.model;
+    this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
+    this.maxSessionTurns = params.maxSessionTurns ?? -1;
+    this.experimentalAcp = params.experimentalAcp ?? false;
+    this.listExtensions = params.listExtensions ?? false;
+    this._extensions = params.extensions ?? [];
+    this._blockedMcpServers = params.blockedMcpServers ?? [];
+    this.noBrowser = params.noBrowser ?? false;
+    this.summarizeToolOutput = params.summarizeToolOutput;
+    this.ideMode = params.ideMode ?? false;
+    this.ideClient = params.ideClient;
+  }
+
   async initialize(): Promise<void> {
     // Initialize centralized FileDiscoveryService
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
       await this.getGitService();
     }
+    this.promptRegistry = new PromptRegistry();
     this.toolRegistry = await this.createToolRegistry();
   }
 
@@ -390,6 +461,10 @@ export class Config {
 
   getToolRegistry(): Promise<ToolRegistry> {
     return Promise.resolve(this.toolRegistry);
+  }
+
+  getPromptRegistry(): PromptRegistry {
+    return this.promptRegistry;
   }
 
   getDebugMode(): boolean {
@@ -574,6 +649,10 @@ export class Config {
     return this.ideMode;
   }
 
+  getIdeClient(): IdeClient | undefined {
+    return this.ideClient;
+  }
+
   async getGitService(): Promise<GitService> {
     if (!this.gitService) {
       this.gitService = new GitService(this.targetDir);
@@ -630,7 +709,7 @@ export class Config {
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
 
-    await registry.discoverTools();
+    await registry.discoverAllTools();
     return registry;
   }
 }
