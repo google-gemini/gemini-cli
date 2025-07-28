@@ -14,10 +14,10 @@ This guide provides solutions to common issues and debugging tips, including top
     associated with their Gmail accounts may not be able to activate the free
     tier of the Google Code Assist plan.
     - For Google Cloud accounts, you can work around this by setting
-    `GOOGLE_CLOUD_PROJECT` to your project ID.
+      `GOOGLE_CLOUD_PROJECT` to your project ID.
     - Alternatively, you can also grab an API key from [AI
-    Studio](http://aistudio.google.com/app/apikey), which also includes a
-    separate free tier.
+      Studio](http://aistudio.google.com/app/apikey), which also includes a
+      separate free tier.
 
 ## Frequently asked questions (FAQs)
 
@@ -26,10 +26,9 @@ This guide provides solutions to common issues and debugging tips, including top
 
 - **Q: Where are the Gemini CLI configuration or settings files stored?**
   - A: The Gemini CLI configuration is stored in two `settings.json` files:
-
     1. In your home directory: `~/.gemini/settings.json`.
     2. In your project's root directory: `./.gemini/settings.json`.
-    
+
     Refer to [CLI Configuration](./cli/configuration.md) for more details.
 
 - **Q: Why don't I see cached token counts in my stats output?**
@@ -58,7 +57,7 @@ This guide provides solutions to common issues and debugging tips, including top
 
 - **Error: "Operation not permitted", "Permission denied", or similar.**
   - **Cause:** When sandboxing is enabled, Gemini CLI may attempt operations that are restricted by your sandbox configuration, such as writing outside the project directory or system temp directory.
-  - **Solution:** Refer to the [Configuration: Sandboxing](./cli/configuration.md#sandboxing)  documentation for more information, including how to customize your sandbox configuration.
+  - **Solution:** Refer to the [Configuration: Sandboxing](./cli/configuration.md#sandboxing) documentation for more information, including how to customize your sandbox configuration.
 
 - **Gemini CLI is not running in interactive mode in "CI" environments**
   - **Issue:** The Gemini CLI does not enter interactive mode (no prompt appears) if an environment variable starting with `CI_` (e.g., `CI_TOKEN`) is set. This is because the `is-in-ci` package, used by the underlying UI framework, detects these variables and assumes a non-interactive CI environment.
@@ -79,11 +78,11 @@ This guide provides solutions to common issues and debugging tips, including top
 - **Tool issues:**
   - If a specific tool is failing, try to isolate the issue by running the simplest possible version of the command or operation the tool performs.
   - For `run_shell_command`, check that the command works directly in your shell first.
-  - For *file system tools*, verify that paths are correct and check the permissions.
+  - For _file system tools_, verify that paths are correct and check the permissions.
 
 - **Pre-flight checks:**
   - Always run `npm run preflight` before committing code. This can catch many common issues related to formatting, linting, and type errors.
 
 ## Existing GitHub Issues similar to yours or creating new Issues
 
-If you encounter an issue that was not covered here in this *Troubleshooting guide*, consider searching the Gemini CLI [Issue tracker on GitHub](https://github.com/google-gemini/gemini-cli/issues). If you can't find an issue similar to yours, consider creating a new GitHub Issue with a detailed description. Pull requests are also welcome!
+If you encounter an issue that was not covered here in this _Troubleshooting guide_, consider searching the Gemini CLI [Issue tracker on GitHub](https://github.com/google-gemini/gemini-cli/issues). If you can't find an issue similar to yours, consider creating a new GitHub Issue with a detailed description. Pull requests are also welcome!
