@@ -69,7 +69,7 @@ export class IdeClient {
     if (!ideWorkspacePath || ideWorkspacePath !== process.cwd()) {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `Gemini CLI is running in a different directory (${process.cwd()}) from the IDE's open workspace (${ideWorkspacePath}). Please change your directory to match the IDE's workspace.`,
+        `Gemini CLI is running in a different directory (${process.cwd()}) from the IDE's open workspace (${ideWorkspacePath}). Please run Gemini CLI in the same directory.`,
       );
       return false;
     }
