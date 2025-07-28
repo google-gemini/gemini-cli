@@ -16,14 +16,14 @@ interface RecentFile {
 
 /**
  * Keeps track of the 10 most recently-opened files
- * opened less than 5 ago. If a file is closed or deleted,
- * it will be removed. If the length is maxxed out,
- * the now-removed file will not be replaced by an older file.
+ * opened less than 5 min ago. If a file is closed or deleted,
+ * it will be removed. If the max length is reached, older files will get removed first.
  */
 export class RecentFilesManager {
   private readonly files: RecentFile[] = [];
   private readonly onDidChangeEmitter = new vscode.EventEmitter<void>();
   readonly onDidChange = this.onDidChangeEmitter.event;
+  private debounceTimer: NodeJS.Timeout | undefined;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     const editorWatcher = vscode.window.onDidChangeActiveTextEditor(
@@ -33,7 +33,7 @@ export class RecentFilesManager {
         }
       },
     );
-    const fileWatcher = vscode.workspace.onDidDeleteFiles((event) => {
+    const deleteWatcher = vscode.workspace.onDidDeleteFiles((event) => {
       for (const uri of event.files) {
         this.remove(uri);
       }
@@ -47,12 +47,29 @@ export class RecentFilesManager {
         this.add(newUri);
       }
     });
+
+    const selectionWatcher = vscode.window.onDidChangeTextEditorSelection(
+      () => {
+        this.fireWithDebounce();
+      },
+    );
+
     context.subscriptions.push(
       editorWatcher,
-      fileWatcher,
+      deleteWatcher,
       closeWatcher,
       renameWatcher,
+      selectionWatcher,
     );
+  }
+
+  private fireWithDebounce() {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = setTimeout(() => {
+      this.onDidChangeEmitter.fire();
+    }, 50); // 50ms
   }
 
   private remove(uri: vscode.Uri, fireEvent = true) {
@@ -62,21 +79,23 @@ export class RecentFilesManager {
     if (index !== -1) {
       this.files.splice(index, 1);
       if (fireEvent) {
-        this.onDidChangeEmitter.fire();
+        this.fireWithDebounce();
       }
     }
   }
 
   add(uri: vscode.Uri) {
-    // Remove if it already exists to avoid duplicates and move it to the top.
-    this.remove(uri, false);
+    if (uri.scheme !== 'file') {
+      return;
+    }
 
+    this.remove(uri, false);
     this.files.unshift({ uri, timestamp: Date.now() });
 
     if (this.files.length > MAX_FILES) {
       this.files.pop();
     }
-    this.onDidChangeEmitter.fire();
+    this.fireWithDebounce();
   }
 
   get recentFiles(): Array<{ filePath: string; timestamp: number }> {
