@@ -53,6 +53,8 @@ export const createMockCommandContext = (
       setPendingItem: vi.fn(),
       loadHistory: vi.fn(),
       toggleCorgiMode: vi.fn(),
+      refreshConfig: vi.fn(),
+      toggleVimEnabled: vi.fn(),
     },
     session: {
       stats: {

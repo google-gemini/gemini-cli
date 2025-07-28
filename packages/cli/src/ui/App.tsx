@@ -315,7 +315,7 @@ const App = (props: AppProps) => {
     }
   }, [config, addItem, settings.merged]);
 
-  const refreshConfig = useCallback(async () => {
+  const refreshConfig = useCallback(async (): Promise<Config> => {
     const newSettings = loadSettings(process.cwd());
     const newExtensions = loadExtensions(process.cwd());
     const argv = await parseArguments();
@@ -329,6 +329,7 @@ const App = (props: AppProps) => {
     setConfig(newConfig);
     setSettings(newSettings);
     setGeminiMdFileCount(newConfig.getGeminiMdFileCount());
+    return newConfig;
   }, []);
 
   // Watch for model changes (e.g., from Flash fallback)
