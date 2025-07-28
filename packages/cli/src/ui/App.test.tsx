@@ -20,7 +20,8 @@ import {
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
-import { StreamingState } from './types.js';
+import { useConsoleMessages } from './hooks/useConsoleMessages.js';
+import { StreamingState, ConsoleMessageItem } from './types.js';
 import { Tips } from './components/Tips.js';
 
 // Define a more complete mock server config based on actual Config
@@ -125,6 +126,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getToolCallCommand: vi.fn(() => opts.toolCallCommand),
         getMcpServerCommand: vi.fn(() => opts.mcpServerCommand),
         getMcpServers: vi.fn(() => opts.mcpServers),
+        getPromptRegistry: vi.fn(),
         getExtensions: vi.fn(() => []),
         getBlockedMcpServers: vi.fn(() => []),
         getUserAgent: vi.fn(() => opts.userAgent || 'test-agent'),
@@ -151,8 +153,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     });
 
   const ideContextMock = {
-    getOpenFilesContext: vi.fn(),
-    subscribeToOpenFiles: vi.fn(() => vi.fn()), // subscribe returns an unsubscribe function
+    getIdeContext: vi.fn(),
+    subscribeToIdeContext: vi.fn(() => vi.fn()), // subscribe returns an unsubscribe function
   };
 
   return {
@@ -188,6 +190,14 @@ vi.mock('./hooks/useAuthCommand', () => ({
 vi.mock('./hooks/useLogger', () => ({
   useLogger: vi.fn(() => ({
     getPreviousUserMessages: vi.fn().mockResolvedValue([]),
+  })),
+}));
+
+vi.mock('./hooks/useConsoleMessages.js', () => ({
+  useConsoleMessages: vi.fn(() => ({
+    consoleMessages: [],
+    handleNewMessage: vi.fn(),
+    clearConsoleMessages: vi.fn(),
   })),
 }));
 
@@ -267,7 +277,7 @@ describe('App UI', () => {
 
     // Ensure a theme is set so the theme dialog does not appear.
     mockSettings = createMockSettings({ workspace: { theme: 'Default' } });
-    vi.mocked(ideContext.getOpenFilesContext).mockReturnValue(undefined);
+    vi.mocked(ideContext.getIdeContext).mockReturnValue(undefined);
   });
 
   afterEach(() => {
@@ -279,10 +289,17 @@ describe('App UI', () => {
   });
 
   it('should display active file when available', async () => {
-    vi.mocked(ideContext.getOpenFilesContext).mockReturnValue({
-      activeFile: '/path/to/my-file.ts',
-      recentOpenFiles: [{ filePath: '/path/to/my-file.ts', content: 'hello' }],
-      selectedText: 'hello',
+    vi.mocked(ideContext.getIdeContext).mockReturnValue({
+      workspaceState: {
+        openFiles: [
+          {
+            path: '/path/to/my-file.ts',
+            isActive: true,
+            selectedText: 'hello',
+            timestamp: 0,
+          },
+        ],
+      },
     });
 
     const { lastFrame, unmount } = render(
@@ -294,12 +311,14 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('1 recent file (ctrl+e to view)');
+    expect(lastFrame()).toContain('1 open file (ctrl+e to view)');
   });
 
-  it('should not display active file when not available', async () => {
-    vi.mocked(ideContext.getOpenFilesContext).mockReturnValue({
-      activeFile: '',
+  it('should not display any files when not available', async () => {
+    vi.mocked(ideContext.getIdeContext).mockReturnValue({
+      workspaceState: {
+        openFiles: [],
+      },
     });
 
     const { lastFrame, unmount } = render(
@@ -314,11 +333,54 @@ describe('App UI', () => {
     expect(lastFrame()).not.toContain('Open File');
   });
 
+  it('should display active file and other open files', async () => {
+    vi.mocked(ideContext.getIdeContext).mockReturnValue({
+      workspaceState: {
+        openFiles: [
+          {
+            path: '/path/to/my-file.ts',
+            isActive: true,
+            selectedText: 'hello',
+            timestamp: 0,
+          },
+          {
+            path: '/path/to/another-file.ts',
+            isActive: false,
+            timestamp: 1,
+          },
+          {
+            path: '/path/to/third-file.ts',
+            isActive: false,
+            timestamp: 2,
+          },
+        ],
+      },
+    });
+
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    expect(lastFrame()).toContain('3 open files (ctrl+e to view)');
+  });
+
   it('should display active file and other context', async () => {
-    vi.mocked(ideContext.getOpenFilesContext).mockReturnValue({
-      activeFile: '/path/to/my-file.ts',
-      recentOpenFiles: [{ filePath: '/path/to/my-file.ts', content: 'hello' }],
-      selectedText: 'hello',
+    vi.mocked(ideContext.getIdeContext).mockReturnValue({
+      workspaceState: {
+        openFiles: [
+          {
+            path: '/path/to/my-file.ts',
+            isActive: true,
+            selectedText: 'hello',
+            timestamp: 0,
+          },
+        ],
+      },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(1);
     mockConfig.getAllGeminiMdFilenames.mockReturnValue(['GEMINI.md']);
@@ -333,7 +395,7 @@ describe('App UI', () => {
     currentUnmount = unmount;
     await Promise.resolve();
     expect(lastFrame()).toContain(
-      'Using: 1 recent file (ctrl+e to view) | 1 GEMINI.md file',
+      'Using: 1 open file (ctrl+e to view) | 1 GEMINI.md file',
     );
   });
 
@@ -647,6 +709,38 @@ describe('App UI', () => {
     });
   });
 
+  it('should render the initial UI correctly', () => {
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('should render correctly with the prompt input box', () => {
+    vi.mocked(useGeminiStream).mockReturnValue({
+      streamingState: StreamingState.Idle,
+      submitQuery: vi.fn(),
+      initError: null,
+      pendingHistoryItems: [],
+      thought: null,
+    });
+
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   describe('with initial prompt from --prompt-interactive', () => {
     it('should submit the initial prompt automatically', async () => {
       const mockSubmitQuery = vi.fn();
@@ -689,6 +783,37 @@ describe('App UI', () => {
       expect(mockSubmitQuery).toHaveBeenCalledWith(
         'hello from prompt-interactive',
       );
+    });
+  });
+
+  describe('errorCount', () => {
+    it('should correctly sum the counts of error messages', async () => {
+      const mockConsoleMessages: ConsoleMessageItem[] = [
+        { type: 'error', content: 'First error', count: 1 },
+        { type: 'log', content: 'some log', count: 1 },
+        { type: 'error', content: 'Second error', count: 3 },
+        { type: 'warn', content: 'a warning', count: 1 },
+        { type: 'error', content: 'Third error', count: 1 },
+      ];
+
+      vi.mocked(useConsoleMessages).mockReturnValue({
+        consoleMessages: mockConsoleMessages,
+        handleNewMessage: vi.fn(),
+        clearConsoleMessages: vi.fn(),
+      });
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      await Promise.resolve();
+
+      // Total error count should be 1 + 3 + 1 = 5
+      expect(lastFrame()).toContain('5 errors');
     });
   });
 });

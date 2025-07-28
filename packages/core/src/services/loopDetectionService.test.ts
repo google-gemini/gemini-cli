@@ -23,6 +23,7 @@ vi.mock('../telemetry/loggers.js', () => ({
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
+const CONTENT_CHUNK_SIZE = 50;
 
 describe('LoopDetectionService', () => {
   let service: LoopDetectionService;
@@ -79,7 +80,7 @@ describe('LoopDetectionService', () => {
         service.addAndCheck(event);
       }
       expect(service.addAndCheck(event)).toBe(true);
-      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(2);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
     });
 
     it('should not detect a loop for different tool calls', () => {
@@ -123,176 +124,59 @@ describe('LoopDetectionService', () => {
   });
 
   describe('Content Loop Detection', () => {
-    it(`should not detect a loop for fewer than CONTENT_LOOP_THRESHOLD identical content strings`, () => {
-      const event = createContentEvent('This is a test sentence.');
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
-        expect(service.addAndCheck(event)).toBe(false);
+    const generateRandomString = (length: number) => {
+      let result = '';
+      const characters =
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      const charactersLength = characters.length;
+      for (let i = 0; i < length; i++) {
+        result += characters.charAt(
+          Math.floor(Math.random() * charactersLength),
+        );
+      }
+      return result;
+    };
+
+    it('should not detect a loop for random content', () => {
+      service.reset('');
+      for (let i = 0; i < 1000; i++) {
+        const content = generateRandomString(10);
+        const isLoop = service.addAndCheck(createContentEvent(content));
+        expect(isLoop).toBe(false);
       }
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
 
-    it(`should detect a loop on the CONTENT_LOOP_THRESHOLD-th identical content string`, () => {
-      const event = createContentEvent('This is a test sentence.');
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
-        service.addAndCheck(event);
+    it('should detect a loop when a chunk of content repeats consecutively', () => {
+      service.reset('');
+      const repeatedContent = 'a'.repeat(CONTENT_CHUNK_SIZE);
+
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        for (const char of repeatedContent) {
+          isLoop = service.addAndCheck(createContentEvent(char));
+        }
       }
-      expect(service.addAndCheck(event)).toBe(true);
+      expect(isLoop).toBe(true);
       expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
     });
 
-    it('should not detect a loop for different content strings', () => {
-      const event1 = createContentEvent('Sentence A');
-      const event2 = createContentEvent('Sentence B');
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 2; i++) {
-        expect(service.addAndCheck(event1)).toBe(false);
-        expect(service.addAndCheck(event2)).toBe(false);
+    it('should not detect a loop if repetitions are very far apart', () => {
+      service.reset('');
+      const repeatedContent = 'b'.repeat(CONTENT_CHUNK_SIZE);
+      const fillerContent = generateRandomString(500);
+
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        for (const char of repeatedContent) {
+          isLoop = service.addAndCheck(createContentEvent(char));
+        }
+        for (const char of fillerContent) {
+          isLoop = service.addAndCheck(createContentEvent(char));
+        }
       }
+      expect(isLoop).toBe(false);
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Sentence Extraction and Punctuation', () => {
-    it('should not check for loops when content has no sentence-ending punctuation', () => {
-      const eventNoPunct = createContentEvent('This has no punctuation');
-      expect(service.addAndCheck(eventNoPunct)).toBe(false);
-
-      const eventWithPunct = createContentEvent('This has punctuation!');
-      expect(service.addAndCheck(eventWithPunct)).toBe(false);
-    });
-
-    it('should not treat function calls or method calls as sentence endings', () => {
-      // These should not trigger sentence detection, so repeating them many times should never cause a loop
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 2; i++) {
-        expect(service.addAndCheck(createContentEvent('console.log()'))).toBe(
-          false,
-        );
-      }
-
-      service.reset('');
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 2; i++) {
-        expect(service.addAndCheck(createContentEvent('obj.method()'))).toBe(
-          false,
-        );
-      }
-
-      service.reset('');
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 2; i++) {
-        expect(
-          service.addAndCheck(createContentEvent('arr.filter().map()')),
-        ).toBe(false);
-      }
-
-      service.reset('');
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 2; i++) {
-        expect(
-          service.addAndCheck(
-            createContentEvent('if (condition) { return true; }'),
-          ),
-        ).toBe(false);
-      }
-    });
-
-    it('should correctly identify actual sentence endings and trigger loop detection', () => {
-      // These should trigger sentence detection, so repeating them should eventually cause a loop
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
-        expect(
-          service.addAndCheck(createContentEvent('This is a sentence.')),
-        ).toBe(false);
-      }
-      expect(
-        service.addAndCheck(createContentEvent('This is a sentence.')),
-      ).toBe(true);
-
-      service.reset('');
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
-        expect(
-          service.addAndCheck(createContentEvent('Is this a question? ')),
-        ).toBe(false);
-      }
-      expect(
-        service.addAndCheck(createContentEvent('Is this a question? ')),
-      ).toBe(true);
-
-      service.reset('');
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
-        expect(
-          service.addAndCheck(createContentEvent('What excitement!\n')),
-        ).toBe(false);
-      }
-      expect(
-        service.addAndCheck(createContentEvent('What excitement!\n')),
-      ).toBe(true);
-    });
-
-    it('should handle content with mixed punctuation', () => {
-      service.addAndCheck(createContentEvent('Question?'));
-      service.addAndCheck(createContentEvent('Exclamation!'));
-      service.addAndCheck(createContentEvent('Period.'));
-
-      // Repeat one of them multiple times
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
-        service.addAndCheck(createContentEvent('Period.'));
-      }
-      expect(service.addAndCheck(createContentEvent('Period.'))).toBe(true);
-    });
-
-    it('should handle empty sentences after trimming', () => {
-      service.addAndCheck(createContentEvent('   .'));
-      expect(service.addAndCheck(createContentEvent('Normal sentence.'))).toBe(
-        false,
-      );
-    });
-
-    it('should require at least two sentences for loop detection', () => {
-      const event = createContentEvent('Only one sentence.');
-      expect(service.addAndCheck(event)).toBe(false);
-
-      // Even repeating the same single sentence shouldn't trigger detection
-      for (let i = 0; i < 5; i++) {
-        expect(service.addAndCheck(event)).toBe(false);
-      }
-    });
-  });
-
-  describe('Performance Optimizations', () => {
-    it('should cache sentence extraction and only re-extract when content grows significantly', () => {
-      // Add initial content
-      service.addAndCheck(createContentEvent('First sentence.'));
-      service.addAndCheck(createContentEvent('Second sentence.'));
-
-      // Add small amounts of content (shouldn't trigger re-extraction)
-      for (let i = 0; i < 10; i++) {
-        service.addAndCheck(createContentEvent('X'));
-      }
-      service.addAndCheck(createContentEvent('.'));
-
-      // Should still work correctly
-      expect(service.addAndCheck(createContentEvent('Test.'))).toBe(false);
-    });
-
-    it('should re-extract sentences when content grows by more than 100 characters', () => {
-      service.addAndCheck(createContentEvent('Initial sentence.'));
-
-      // Add enough content to trigger re-extraction
-      const longContent = 'X'.repeat(101);
-      service.addAndCheck(createContentEvent(longContent + '.'));
-
-      // Should work correctly after re-extraction
-      expect(service.addAndCheck(createContentEvent('Test.'))).toBe(false);
-    });
-
-    it('should use indexOf for efficient counting instead of regex', () => {
-      const repeatedSentence = 'This is a repeated sentence.';
-
-      // Build up content with the sentence repeated
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
-        service.addAndCheck(createContentEvent(repeatedSentence));
-      }
-
-      // The threshold should be reached
-      expect(service.addAndCheck(createContentEvent(repeatedSentence))).toBe(
-        true,
-      );
     });
   });
 
