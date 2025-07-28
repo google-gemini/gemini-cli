@@ -174,9 +174,9 @@ class ThemeManager {
     const sortedThemes = allThemes.sort((a, b) => {
       const typeOrder = (type: ThemeType): number => {
         switch (type) {
-          case 'dark':
-            return 1;
           case 'light':
+            return 1;
+          case 'dark':
             return 2;
           case 'ansi':
             return 3;
