@@ -15,7 +15,7 @@ import {
 } from 'vitest';
 import { ideCommand } from './ideCommand.js';
 import { type CommandContext } from './types.js';
-import { type Config, SupportedIDE } from '@google/gemini-cli-core';
+import { type Config, DetectedIde } from '@google/gemini-cli-core';
 import * as core from '@google/gemini-cli-core';
 
 vi.mock('child_process');
@@ -37,7 +37,6 @@ describe('ideCommand', () => {
     mockConfig = {
       getIdeMode: vi.fn(),
       getIdeClient: vi.fn(),
-      getCurrentIde: vi.fn(),
     } as unknown as Config;
 
     platformSpy = vi.spyOn(process, 'platform', 'get');
@@ -55,7 +54,9 @@ describe('ideCommand', () => {
 
   it('should return the ide command if ideMode is enabled', () => {
     vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
-    vi.mocked(mockConfig.getCurrentIde).mockReturnValue(SupportedIDE.VSCode);
+    vi.mocked(mockConfig.getIdeClient).mockReturnValue({
+      getCurrentIde: () => DetectedIde.VSCode,
+    } as ReturnType<Config['getIdeClient']>);
     const command = ideCommand(mockConfig);
     expect(command).not.toBeNull();
     expect(command?.name).toBe('ide');
@@ -68,9 +69,9 @@ describe('ideCommand', () => {
     const mockGetConnectionStatus = vi.fn();
     beforeEach(() => {
       vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
-      vi.mocked(mockConfig.getCurrentIde).mockReturnValue(SupportedIDE.VSCode);
       vi.mocked(mockConfig.getIdeClient).mockReturnValue({
         getConnectionStatus: mockGetConnectionStatus,
+        getCurrentIde: () => DetectedIde.VSCode,
       } as ReturnType<Config['getIdeClient']>);
     });
 
@@ -136,7 +137,9 @@ describe('ideCommand', () => {
     const mockInstall = vi.fn();
     beforeEach(() => {
       vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
-      vi.mocked(mockConfig.getCurrentIde).mockReturnValue(SupportedIDE.VSCode);
+      vi.mocked(mockConfig.getIdeClient).mockReturnValue({
+        getCurrentIde: () => DetectedIde.VSCode,
+      } as ReturnType<Config['getIdeClient']>);
       vi.mocked(core.getIdeInstaller).mockReturnValue({
         install: mockInstall,
         isInstalled: vi.fn(),

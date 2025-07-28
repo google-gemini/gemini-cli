@@ -9,10 +9,10 @@ import * as process from 'process';
 import { glob } from 'glob';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { SupportedIDE } from './detect-ide.js';
+import { DetectedIde } from './detect-ide.js';
 
 const VSCODE_COMMAND = process.platform === 'win32' ? 'code.cmd' : 'code';
-const VSCODE_COMPANION_EXTENSION_FOLDER = 'packages/vscode-ide-companion';
+const VSCODE_COMPANION_EXTENSION_FOLDER = 'vscode-ide-companion';
 
 export interface IdeInstaller {
   install(): Promise<InstallResult>;
@@ -92,7 +92,7 @@ class VsCodeInstaller implements IdeInstaller {
   }
 }
 
-export function getIdeInstaller(ide: SupportedIDE): IdeInstaller | null {
+export function getIdeInstaller(ide: DetectedIde): IdeInstaller | null {
   switch (ide) {
     case 'vscode':
       return new VsCodeInstaller();

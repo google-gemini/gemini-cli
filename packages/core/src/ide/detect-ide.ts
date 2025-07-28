@@ -4,22 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export enum SupportedIDE {
+export enum DetectedIde {
   VSCode = 'vscode',
 }
 
-export function getIdeDisplayName(ide: SupportedIDE): string {
+export function getIdeDisplayName(ide: DetectedIde): string {
   switch (ide) {
-    case SupportedIDE.VSCode:
+    case DetectedIde.VSCode:
       return 'VSCode';
     default:
       throw new Error(`Unsupported IDE: ${ide}`);
   }
 }
 
-export function detectIde(): SupportedIDE | undefined {
+export function detectIde(): DetectedIde | undefined {
   if (process.env.TERM_PROGRAM === 'vscode') {
-    return SupportedIDE.VSCode;
+    return DetectedIde.VSCode;
   }
   return undefined;
 }

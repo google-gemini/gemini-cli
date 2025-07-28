@@ -47,7 +47,7 @@ import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js'
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
-import { SupportedIDE } from '../ide/detect-ide.js';
+import { getIdeDisplayName } from '../ide/detect-ide.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
@@ -184,7 +184,6 @@ export interface ConfigParameters {
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideMode?: boolean;
   ideClient?: IdeClient;
-  currentIde?: SupportedIDE;
 }
 
 export class Config {
@@ -228,7 +227,7 @@ export class Config {
   private readonly noBrowser: boolean;
   private readonly ideMode: boolean;
   private readonly ideClient: IdeClient | undefined;
-  private readonly currentIde: SupportedIDE | undefined;
+
   private modelSwitchedDuringSession: boolean = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
@@ -295,7 +294,6 @@ export class Config {
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.ideMode = params.ideMode ?? false;
     this.ideClient = params.ideClient;
-    this.currentIde = params.currentIde;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -593,8 +591,12 @@ export class Config {
     return this.ideClient;
   }
 
-  getCurrentIde(): SupportedIDE | undefined {
-    return this.currentIde;
+  getDetectedIdeDisplayName(): string | undefined {
+    const currentIde = this.ideClient?.getCurrentIde();
+    if (currentIde) {
+      return getIdeDisplayName(currentIde);
+    }
+    return;
   }
 
   async getGitService(): Promise<GitService> {

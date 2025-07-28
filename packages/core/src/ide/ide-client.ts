@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { detectIde, DetectedIde } from '../ide/detect-ide.js';
 import { ideContext, IdeContextNotificationSchema } from '../ide/ideContext.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -28,13 +29,31 @@ export enum IDEConnectionStatus {
  * Manages the connection to and interaction with the IDE server.
  */
 export class IdeClient {
+  private static instance: IdeClient;
   client: Client | undefined = undefined;
   connectionStatus: IDEConnectionStatus = IDEConnectionStatus.Disconnected;
+  private readonly currentIde: DetectedIde | undefined;
 
-  constructor() {
+  private constructor() {
+    this.currentIde = detectIde();
+    if (!this.currentIde) {
+      logger.debug('Not running in a supported IDE, skipping connection.');
+      return;
+    }
     this.connectToMcpServer().catch((err) => {
       logger.debug('Failed to initialize IdeClient:', err);
     });
+  }
+
+  static getInstance(): IdeClient {
+    if (!IdeClient.instance) {
+      IdeClient.instance = new IdeClient();
+    }
+    return IdeClient.instance;
+  }
+
+  getCurrentIde(): DetectedIde | undefined {
+    return this.currentIde;
   }
 
   getConnectionStatus(): {
@@ -54,6 +73,11 @@ export class IdeClient {
   }
 
   async connectToMcpServer(): Promise<void> {
+    if (!this.currentIde) {
+      logger.debug('Not running in a supported IDE, skipping connection.');
+      this.connectionStatus = IDEConnectionStatus.Disconnected;
+      return;
+    }
     this.connectionStatus = IDEConnectionStatus.Connecting;
     const idePort = process.env['GEMINI_CLI_IDE_SERVER_PORT'];
     if (!idePort) {

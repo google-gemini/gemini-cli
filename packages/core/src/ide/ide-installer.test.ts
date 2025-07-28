@@ -7,14 +7,14 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getIdeInstaller, IdeInstaller } from './ide-installer.js';
 import * as child_process from 'child_process';
-import { SupportedIDE } from './detect-ide.js';
+import { DetectedIde } from './detect-ide.js';
 
 vi.mock('child_process');
 
 describe('ide-installer', () => {
   describe('getIdeInstaller', () => {
     it('should return a VsCodeInstaller for "vscode"', () => {
-      const installer = getIdeInstaller(SupportedIDE.VSCode);
+      const installer = getIdeInstaller(DetectedIde.VSCode);
       expect(installer).not.toBeNull();
       expect(installer).toBeInstanceOf(Object);
     });
@@ -24,7 +24,7 @@ describe('ide-installer', () => {
     let installer: IdeInstaller;
 
     beforeEach(() => {
-      installer = getIdeInstaller(SupportedIDE.VSCode)!;
+      installer = getIdeInstaller(DetectedIde.VSCode)!;
       vi.spyOn(child_process, 'execSync').mockImplementation(() => '');
     });
 

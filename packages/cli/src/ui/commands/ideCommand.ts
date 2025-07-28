@@ -21,7 +21,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
   if (!config?.getIdeMode()) {
     return null;
   }
-  const currentIDE = config.getCurrentIde();
+  const currentIDE = config.getIdeClient()?.getCurrentIde();
   if (!currentIDE) {
     return null;
   }
