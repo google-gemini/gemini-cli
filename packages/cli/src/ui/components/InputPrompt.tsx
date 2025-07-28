@@ -5,11 +5,11 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useStdin } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import { TextBuffer } from './shared/text-buffer.js';
+import { useTextBuffer } from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 
@@ -25,10 +25,12 @@ import {
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
 import * as path from 'path';
+import * as fs from 'fs';
+import { useDebounce } from '../hooks/useDebounce.js';
 
 export interface InputPromptProps {
-  buffer: TextBuffer;
   onSubmit: (value: string) => void;
+  onTextChange?: (text: string) => void;
   userMessages: readonly string[];
   onClearScreen: () => void;
   config: Config;
@@ -43,8 +45,8 @@ export interface InputPromptProps {
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
-  buffer,
   onSubmit,
+  onTextChange,
   userMessages,
   onClearScreen,
   config,
@@ -58,6 +60,29 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const { stdin, setRawMode } = useStdin();
+  const isValidPath = useCallback((filePath: string): boolean => {
+    try {
+      return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+    } catch (_e) {
+      return false;
+    }
+  }, []);
+
+  const buffer = useTextBuffer({
+    initialText: '',
+    viewport: { height: 10, width: inputWidth },
+    stdin,
+    setRawMode,
+    isValidPath,
+    shellModeActive,
+  });
+
+  useEffect(() => {
+    onTextChange?.(buffer.text);
+  }, [buffer.text, onTextChange]);
+
+  const debouncedText = useDebounce(buffer.text, 200);
 
   // Check if cursor is after @ or / without unescaped spaces
   const isCursorAfterCommandWithoutSpace = useCallback(() => {
@@ -97,19 +122,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const shouldShowCompletion = useCallback(
     () =>
-      (isAtCommand(buffer.text) || isSlashCommand(buffer.text)) &&
+      (isAtCommand(debouncedText) || isSlashCommand(debouncedText)) &&
       isCursorAfterCommandWithoutSpace(),
-    [buffer.text, isCursorAfterCommandWithoutSpace],
+    [debouncedText, isCursorAfterCommandWithoutSpace],
   );
 
   const completion = useCompletion(
-    buffer.text,
+    debouncedText,
     config.getTargetDir(),
     shouldShowCompletion(),
     slashCommands,
     commandContext,
     config,
   );
+
 
   const resetCompletionState = completion.resetCompletionState;
   const shellHistory = useShellHistory(config.getProjectRoot());
@@ -356,16 +382,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         // Handle arrow-up/down for history on single-line or at edges
         if (
           key.name === 'up' &&
-          (buffer.allVisualLines.length === 1 ||
-            (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
+          (buffer.lines.length === 1 ||
+            (buffer.cursor[0] === 0))
         ) {
           inputHistory.navigateUp();
           return;
         }
         if (
           key.name === 'down' &&
-          (buffer.allVisualLines.length === 1 ||
-            buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
+          (buffer.lines.length === 1 ||
+            buffer.cursor[0] === buffer.lines.length - 1)
         ) {
           inputHistory.navigateDown();
           return;
@@ -469,29 +495,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   useKeypress(handleInput, { isActive: focus });
 
-  const renderWithCursor = () => {
-    const { text, cursor } = buffer;
-    const [row, col] = cursor;
-
-    let offset = 0;
-    for (let i = 0; i < row; i++) {
-      offset += cpLen(buffer.lines[i]) + 1; // Add 1 for the newline character
-    }
-    offset += col;
-
-    const before = cpSlice(text, 0, offset);
-    const at = cpSlice(text, offset, offset + 1) || ' ';
-    const after = cpSlice(text, offset + 1);
-
-    return (
-      <Text>
-        {before}
-        {chalk.inverse(at)}
-        {after}
-      </Text>
-    );
-  };
-
   return (
     <>
       <Box
@@ -516,7 +519,26 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               <Text color={Colors.Gray}>{placeholder}</Text>
             )
           ) : (
-            renderWithCursor()
+            <Box flexDirection="column">
+              {buffer.lines.map((line, i) => {
+                if (i !== buffer.cursor[0]) {
+                  return <Text key={i}>{line || ' '}</Text>;
+                }
+
+                const col = buffer.cursor[1];
+                const before = cpSlice(line, 0, col);
+                const at = cpSlice(line, col, col + 1) || ' ';
+                const after = cpSlice(line, col + 1);
+
+                return (
+                  <Text key={i}>
+                    {before}
+                    {chalk.inverse(at)}
+                    {after}
+                  </Text>
+                );
+              })}
+            </Box>
           )}
         </Box>
       </Box>

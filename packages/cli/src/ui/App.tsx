@@ -58,7 +58,6 @@ import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useBracketedPaste } from './hooks/useBracketedPaste.js';
-import { useTextBuffer } from './components/shared/text-buffer.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
 import { checkForUpdates } from './utils/updateCheck.js';
@@ -370,15 +369,11 @@ export const App = (props: AppProps) => {
     Math.floor(terminalWidth * widthFraction) - 3,
   );
   const suggestionsWidth = Math.max(60, Math.floor(terminalWidth * 0.8));
+  const inputTextRef = useRef('');
 
-  const buffer = useTextBuffer({
-    initialText: '',
-    viewport: { height: 10, width: inputWidth },
-    stdin,
-    setRawMode,
-    isValidPath,
-    shellModeActive,
-  });
+  const handleTextChange = useCallback((text: string) => {
+    inputTextRef.current = text;
+  }, []);
 
   const handleExit = useCallback(
     (
@@ -414,7 +409,7 @@ export const App = (props: AppProps) => {
     } else if (key.ctrl && (input === 'c' || input === 'C')) {
       handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
     } else if (key.ctrl && (input === 'd' || input === 'D')) {
-      if (buffer.text.length > 0) return;
+      if (inputTextRef.current.length > 0) return;
       handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
     }
   });
@@ -577,6 +572,111 @@ export const App = (props: AppProps) => {
   const mainAreaWidth = Math.floor(terminalWidth * 0.9);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
 
+  const memoizedHeader = useMemo(
+    () =>
+      !settings.merged.hideBanner && (
+        <Header
+          terminalWidth={terminalWidth}
+          version={version}
+          nightly={nightly}
+        />
+      ),
+    [settings.merged.hideBanner, terminalWidth, version, nightly],
+  );
+
+  const memoizedTips = useMemo(
+    () => !settings.merged.hideTips && <Tips config={config} />,
+    [settings.merged.hideTips, config],
+  );
+
+  const memoizedConversation = useMemo(
+    () => (
+      <Conversation
+        history={history}
+        config={config}
+        terminalWidth={terminalWidth}
+      />
+    ),
+    [history, config, terminalWidth],
+  );
+
+  const memoizedPendingHistory = useMemo(
+    () => (
+      <OverflowProvider>
+        <Box flexDirection="column">
+          {pendingHistoryItems.map((item, i) => (
+            <HistoryItemDisplay
+              key={i}
+              terminalWidth={mainAreaWidth}
+              item={{ ...item, id: 0 }}
+              isPending={true}
+              config={config}
+              isFocused={!isEditorDialogOpen}
+            />
+          ))}
+          <ShowMoreLines />
+        </Box>
+      </OverflowProvider>
+    ),
+    [pendingHistoryItems, mainAreaWidth, config, isEditorDialogOpen],
+  );
+
+  const memoizedHelp = useMemo(
+    () => showHelp && <Help commands={slashCommands} />,
+    [showHelp, slashCommands],
+  );
+
+  const memoizedStartupWarnings = useMemo(
+    () =>
+      startupWarnings.length > 0 && (
+        <Box
+          borderStyle="round"
+          borderColor={Colors.AccentYellow}
+          paddingX={1}
+          marginY={1}
+          flexDirection="column"
+        >
+          {startupWarnings.map((warning, index) => (
+            <Text key={index} color={Colors.AccentYellow}>
+              {warning}
+            </Text>
+          ))}
+        </Box>
+      ),
+    [startupWarnings],
+  );
+
+  const memoizedFooter = useMemo(
+    () => (
+      <Footer
+        model={currentModel}
+        targetDir={config.getTargetDir()}
+        debugMode={config.getDebugMode()}
+        branchName={branchName}
+        debugMessage={debugMessage}
+        corgiMode={corgiMode}
+        errorCount={errorCount}
+        showErrorDetails={showErrorDetails}
+        showMemoryUsage={
+          config.getDebugMode() || config.getShowMemoryUsage()
+        }
+        promptTokenCount={sessionStats.lastPromptTokenCount}
+        nightly={nightly}
+      />
+    ),
+    [
+      currentModel,
+      config,
+      branchName,
+      debugMessage,
+      corgiMode,
+      errorCount,
+      showErrorDetails,
+      sessionStats.lastPromptTokenCount,
+      nightly,
+    ],
+  );
+
   const Dialogs = () => (
     <>
       {isThemeDialogOpen ? (
@@ -708,10 +808,10 @@ export const App = (props: AppProps) => {
 
       {isInputActive && (
         <InputPrompt
-          buffer={buffer}
           inputWidth={inputWidth}
           suggestionsWidth={suggestionsWidth}
           onSubmit={handleFinalSubmit}
+          onTextChange={handleTextChange}
           userMessages={userMessages}
           onClearScreen={handleClearScreen}
           config={config}
@@ -736,53 +836,14 @@ export const App = (props: AppProps) => {
     <StreamingContext.Provider value={streamingState}>
       <Box flexDirection="column" width="90%" height="100%">
         {updateMessage && <UpdateNotification message={updateMessage} />}
-        {!settings.merged.hideBanner && (
-          <Header
-            terminalWidth={terminalWidth}
-            version={version}
-            nightly={nightly}
-          />
-        )}
-        {!settings.merged.hideTips && <Tips config={config} />}
-        <Conversation
-          history={history}
-          config={config}
-          terminalWidth={terminalWidth}
-        />
-        <OverflowProvider>
-          <Box flexDirection="column">
-            {pendingHistoryItems.map((item, i) => (
-              <HistoryItemDisplay
-                key={i}
-                terminalWidth={mainAreaWidth}
-                item={{ ...item, id: 0 }}
-                isPending={true}
-                config={config}
-                isFocused={!isEditorDialogOpen}
-              />
-            ))}
-            <ShowMoreLines />
-          </Box>
-        </OverflowProvider>
-
-        {showHelp && <Help commands={slashCommands} />}
+        {memoizedHeader}
+        {memoizedTips}
+        {memoizedConversation}
+        {memoizedPendingHistory}
+        {memoizedHelp}
 
         <Box flexDirection="column">
-          {startupWarnings.length > 0 && (
-            <Box
-              borderStyle="round"
-              borderColor={Colors.AccentYellow}
-              paddingX={1}
-              marginY={1}
-              flexDirection="column"
-            >
-              {startupWarnings.map((warning, index) => (
-                <Text key={index} color={Colors.AccentYellow}>
-                  {warning}
-                </Text>
-              ))}
-            </Box>
-          )}
+          {memoizedStartupWarnings}
 
           {showDialog ? <Dialogs /> : <ActiveSession />}
 
@@ -798,21 +859,7 @@ export const App = (props: AppProps) => {
               </Text>
             </Box>
           )}
-          <Footer
-            model={currentModel}
-            targetDir={config.getTargetDir()}
-            debugMode={config.getDebugMode()}
-            branchName={branchName}
-            debugMessage={debugMessage}
-            corgiMode={corgiMode}
-            errorCount={errorCount}
-            showErrorDetails={showErrorDetails}
-            showMemoryUsage={
-              config.getDebugMode() || config.getShowMemoryUsage()
-            }
-            promptTokenCount={sessionStats.lastPromptTokenCount}
-            nightly={nightly}
-          />
+          {memoizedFooter}
         </Box>
       </Box>
     </StreamingContext.Provider>
