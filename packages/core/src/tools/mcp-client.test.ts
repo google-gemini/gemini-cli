@@ -11,15 +11,21 @@ import {
   createTransport,
   isEnabled,
   discoverTools,
+  discoverPrompts,
 } from './mcp-client.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
 import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import * as GenAiLib from '@google/genai';
+import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
+import { AuthProviderType } from '../config/config.js';
+import { PromptRegistry } from '../prompts/prompt-registry.js';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 vi.mock('@google/genai');
+vi.mock('../mcp/oauth-provider.js');
+vi.mock('../mcp/oauth-token-storage.js');
 
 describe('mcp-client', () => {
   afterEach(() => {
@@ -43,6 +49,77 @@ describe('mcp-client', () => {
 
       expect(tools.length).toBe(1);
       expect(mockedMcpToTool).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('discoverPrompts', () => {
+    const mockedPromptRegistry = {
+      registerPrompt: vi.fn(),
+    } as unknown as PromptRegistry;
+
+    it('should discover and log prompts', async () => {
+      const mockRequest = vi.fn().mockResolvedValue({
+        prompts: [
+          { name: 'prompt1', description: 'desc1' },
+          { name: 'prompt2' },
+        ],
+      });
+      const mockedClient = {
+        request: mockRequest,
+      } as unknown as ClientLib.Client;
+
+      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
+
+      expect(mockRequest).toHaveBeenCalledWith(
+        { method: 'prompts/list', params: {} },
+        expect.anything(),
+      );
+    });
+
+    it('should do nothing if no prompts are discovered', async () => {
+      const mockRequest = vi.fn().mockResolvedValue({
+        prompts: [],
+      });
+      const mockedClient = {
+        request: mockRequest,
+      } as unknown as ClientLib.Client;
+
+      const consoleLogSpy = vi
+        .spyOn(console, 'debug')
+        .mockImplementation(() => {
+          // no-op
+        });
+
+      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
+
+      expect(mockRequest).toHaveBeenCalledOnce();
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should log an error if discovery fails', async () => {
+      const testError = new Error('test error');
+      testError.message = 'test error';
+      const mockRequest = vi.fn().mockRejectedValue(testError);
+      const mockedClient = {
+        request: mockRequest,
+      } as unknown as ClientLib.Client;
+
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {
+          // no-op
+        });
+
+      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
+
+      expect(mockRequest).toHaveBeenCalledOnce();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        `Error discovering prompts from test-server: ${testError.message}`,
+      );
+
+      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -82,7 +159,7 @@ describe('mcp-client', () => {
 
     describe('should connect via httpUrl', () => {
       it('without headers', async () => {
-        const transport = createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             httpUrl: 'http://test-server',
@@ -96,7 +173,7 @@ describe('mcp-client', () => {
       });
 
       it('with headers', async () => {
-        const transport = createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             httpUrl: 'http://test-server',
@@ -117,7 +194,7 @@ describe('mcp-client', () => {
 
     describe('should connect via url', () => {
       it('without headers', async () => {
-        const transport = createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             url: 'http://test-server',
@@ -130,7 +207,7 @@ describe('mcp-client', () => {
       });
 
       it('with headers', async () => {
-        const transport = createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             url: 'http://test-server',
@@ -149,10 +226,10 @@ describe('mcp-client', () => {
       });
     });
 
-    it('should connect via command', () => {
+    it('should connect via command', async () => {
       const mockedTransport = vi.mocked(SdkClientStdioLib.StdioClientTransport);
 
-      createTransport(
+      await createTransport(
         'test-server',
         {
           command: 'test-command',
@@ -169,6 +246,63 @@ describe('mcp-client', () => {
         cwd: 'test/cwd',
         env: { FOO: 'bar' },
         stderr: 'pipe',
+      });
+    });
+
+    describe('useGoogleCredentialProvider', () => {
+      it('should use GoogleCredentialProvider when specified', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test-server',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const authProvider = (transport as any)._authProvider;
+        expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
+      });
+
+      it('should use GoogleCredentialProvider with SSE transport', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(SSEClientTransport);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const authProvider = (transport as any)._authProvider;
+        expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
+      });
+
+      it('should throw an error if no URL is provided with GoogleCredentialProvider', async () => {
+        await expect(
+          createTransport(
+            'test-server',
+            {
+              authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+              oauth: {
+                scopes: ['scope1'],
+              },
+            },
+            false,
+          ),
+        ).rejects.toThrow(
+          'No URL configured for Google Credentials MCP server',
+        );
       });
     });
   });

@@ -238,6 +238,12 @@ export class Logger {
     if (!this.geminiDir) {
       throw new Error('Checkpoint file path not set.');
     }
+    // Sanitize tag to prevent directory traversal attacks
+    tag = tag.replace(/[^a-zA-Z0-9-_]/g, '');
+    if (!tag) {
+      console.error('Sanitized tag is empty setting to "default".');
+      tag = 'default';
+    }
     return path.join(this.geminiDir, `checkpoint-${tag}.json`);
   }
 
@@ -283,6 +289,30 @@ export class Logger {
         return [];
       }
       return [];
+    }
+  }
+
+  async deleteCheckpoint(tag: string): Promise<boolean> {
+    if (!this.initialized || !this.geminiDir) {
+      console.error(
+        'Logger not initialized or checkpoint file path not set. Cannot delete checkpoint.',
+      );
+      return false;
+    }
+
+    const path = this._checkpointPath(tag);
+
+    try {
+      await fs.unlink(path);
+      return true;
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === 'ENOENT') {
+        // File doesn't exist, which is fine.
+        return false;
+      }
+      console.error(`Failed to delete checkpoint file ${path}:`, error);
+      throw error;
     }
   }
 

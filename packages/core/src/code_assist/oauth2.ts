@@ -26,7 +26,6 @@ import {
   clearCachedGoogleAccount,
 } from '../utils/user_account.js';
 import { AuthType } from '../core/contentGenerator.js';
-import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import readline from 'node:readline';
 
 //  OAuth Client ID used to initiate OAuth2Client class.
@@ -79,6 +78,17 @@ export async function getOauthClient(
     },
   });
 
+  if (
+    process.env.GOOGLE_GENAI_USE_GCA &&
+    process.env.GOOGLE_CLOUD_ACCESS_TOKEN
+  ) {
+    client.setCredentials({
+      access_token: process.env.GOOGLE_CLOUD_ACCESS_TOKEN,
+    });
+    await fetchAndCacheUserInfo(client);
+    return client;
+  }
+
   client.on('tokens', async (tokens: Credentials) => {
     await cacheCredentials(tokens);
   });
@@ -122,7 +132,7 @@ export async function getOauthClient(
     }
   }
 
-  if (config.getNoBrowser() || !shouldAttemptBrowserLaunch()) {
+  if (config.isBrowserLaunchSuppressed()) {
     let success = false;
     const maxRetries = 2;
     for (let i = 0; !success && i < maxRetries; i++) {

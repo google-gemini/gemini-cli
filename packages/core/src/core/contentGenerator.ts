@@ -25,17 +25,19 @@ import { UserTierId } from '../code_assist/types.js';
 export interface ContentGenerator {
   generateContent(
     request: GenerateContentParameters,
+    userPromptId: string,
   ): Promise<GenerateContentResponse>;
 
   generateContentStream(
     request: GenerateContentParameters,
+    userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>>;
 
   countTokens(request: CountTokensParameters): Promise<CountTokensResponse>;
 
   embedContent(request: EmbedContentParameters): Promise<EmbedContentResponse>;
 
-  getTier?(): Promise<UserTierId | undefined>;
+  userTier?: UserTierId;
 }
 
 export enum AuthType {
@@ -62,7 +64,7 @@ export function createContentGeneratorConfig(
   const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT || undefined;
   const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION || undefined;
 
-  // Use runtime model from config if available, otherwise fallback to parameter or default
+  // Use runtime model from config if available; otherwise, fall back to parameter or default
   const effectiveModel = config.getModel() || DEFAULT_GEMINI_MODEL;
 
   const contentGeneratorConfig: ContentGeneratorConfig = {

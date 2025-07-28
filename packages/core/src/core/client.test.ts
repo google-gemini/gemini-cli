@@ -23,6 +23,7 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { tokenLimit } from './tokenLimits.js';
+import { ideContext } from '../ide/ideContext.js';
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
@@ -71,6 +72,7 @@ vi.mock('../telemetry/index.js', () => ({
   logApiResponse: vi.fn(),
   logApiError: vi.fn(),
 }));
+vi.mock('../ide/ideContext.js');
 
 describe('findIndexAfterFraction', () => {
   const history: Content[] = [
@@ -196,6 +198,7 @@ describe('Gemini Client (client.ts)', () => {
       getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
       setQuotaErrorOccurred: vi.fn(),
       getNoBrowser: vi.fn().mockReturnValue(false),
+      getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
       getIdeMode: vi.fn().mockReturnValue(false),
       getGeminiClient: vi.fn(),
     };
@@ -206,7 +209,9 @@ describe('Gemini Client (client.ts)', () => {
 
     // We can instantiate the client here since Config is mocked
     // and the constructor will use the mocked GoogleGenAI
-    client = new GeminiClient(new Config({} as never));
+    client = new GeminiClient(
+      new Config({ sessionId: 'test-session-id' } as never),
+    );
     mockConfigObject.getGeminiClient.mockReturnValue(client);
 
     await client.initialize(contentGeneratorConfig);
@@ -345,16 +350,19 @@ describe('Gemini Client (client.ts)', () => {
 
       await client.generateContent(contents, generationConfig, abortSignal);
 
-      expect(mockGenerateContentFn).toHaveBeenCalledWith({
-        model: 'test-model',
-        config: {
-          abortSignal,
-          systemInstruction: getCoreSystemPrompt(''),
-          temperature: 0.5,
-          topP: 1,
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        {
+          model: 'test-model',
+          config: {
+            abortSignal,
+            systemInstruction: getCoreSystemPrompt(''),
+            temperature: 0.5,
+            topP: 1,
+          },
+          contents,
         },
-        contents,
-      });
+        'test-session-id',
+      );
     });
   });
 
@@ -373,18 +381,21 @@ describe('Gemini Client (client.ts)', () => {
 
       await client.generateJson(contents, schema, abortSignal);
 
-      expect(mockGenerateContentFn).toHaveBeenCalledWith({
-        model: 'test-model', // Should use current model from config
-        config: {
-          abortSignal,
-          systemInstruction: getCoreSystemPrompt(''),
-          temperature: 0,
-          topP: 1,
-          responseSchema: schema,
-          responseMimeType: 'application/json',
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        {
+          model: 'test-model', // Should use current model from config
+          config: {
+            abortSignal,
+            systemInstruction: getCoreSystemPrompt(''),
+            temperature: 0,
+            topP: 1,
+            responseSchema: schema,
+            responseMimeType: 'application/json',
+          },
+          contents,
         },
-        contents,
-      });
+        'test-session-id',
+      );
     });
 
     it('should allow overriding model and config', async () => {
@@ -408,19 +419,22 @@ describe('Gemini Client (client.ts)', () => {
         customConfig,
       );
 
-      expect(mockGenerateContentFn).toHaveBeenCalledWith({
-        model: customModel,
-        config: {
-          abortSignal,
-          systemInstruction: getCoreSystemPrompt(''),
-          temperature: 0.9,
-          topP: 1, // from default
-          topK: 20,
-          responseSchema: schema,
-          responseMimeType: 'application/json',
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        {
+          model: customModel,
+          config: {
+            abortSignal,
+            systemInstruction: getCoreSystemPrompt(''),
+            temperature: 0.9,
+            topP: 1, // from default
+            topK: 20,
+            responseSchema: schema,
+            responseMimeType: 'application/json',
+          },
+          contents,
         },
-        contents,
-      });
+        'test-session-id',
+      );
     });
   });
 
@@ -642,6 +656,69 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   describe('sendMessageStream', () => {
+    it('should include IDE context when ideMode is enabled', async () => {
+      // Arrange
+      vi.mocked(ideContext.getOpenFilesContext).mockReturnValue({
+        activeFile: '/path/to/active/file.ts',
+        selectedText: 'hello',
+        cursor: { line: 5, character: 10 },
+        recentOpenFiles: [
+          { filePath: '/path/to/recent/file1.ts', timestamp: Date.now() },
+          { filePath: '/path/to/recent/file2.ts', timestamp: Date.now() },
+        ],
+      });
+
+      vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
+
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        generateContent: mockGenerateContentFn,
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      const initialRequest = [{ text: 'Hi' }];
+
+      // Act
+      const stream = client.sendMessageStream(
+        initialRequest,
+        new AbortController().signal,
+        'prompt-id-ide',
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      // Assert
+      expect(ideContext.getOpenFilesContext).toHaveBeenCalled();
+      const expectedContext = `
+This is the file that the user was most recently looking at:
+- Path: /path/to/active/file.ts
+This is the cursor position in the file:
+- Cursor Position: Line 5, Character 10
+This is the selected text in the active file:
+- hello
+Here are files the user has recently opened, with the most recent at the top:
+- /path/to/recent/file1.ts
+- /path/to/recent/file2.ts
+      `.trim();
+      const expectedRequest = [{ text: expectedContext }, ...initialRequest];
+      expect(mockTurnRunFn).toHaveBeenCalledWith(
+        expectedRequest,
+        expect.any(Object),
+      );
+    });
+
     it('should return the turn instance after the stream is complete', async () => {
       // Arrange
       const mockStream = (async function* () {
@@ -940,11 +1017,14 @@ describe('Gemini Client (client.ts)', () => {
         config: expect.any(Object),
         contents,
       });
-      expect(mockGenerateContentFn).toHaveBeenCalledWith({
-        model: currentModel,
-        config: expect.any(Object),
-        contents,
-      });
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        {
+          model: currentModel,
+          config: expect.any(Object),
+          contents,
+        },
+        'test-session-id',
+      );
     });
   });
 
