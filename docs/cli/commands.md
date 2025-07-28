@@ -22,7 +22,6 @@ Slash commands provide meta-level control over the CLI itself.
           - Windows: `C:\Users\<YourUsername>\AppData\Roaming\google-generative-ai\checkpoints\`
           - When you run `/chat list`, the CLI only scans these specific directories to find available checkpoints.
           - **Note:** These checkpoints are for manually saving and resuming conversation states. For automatic checkpoints created before file modifications, see the [Checkpointing documentation](../checkpointing.md).
-
     - **`resume`**
       - **Description:** Resumes a conversation from a previous save.
       - **Usage:** `/chat resume <tag>`
