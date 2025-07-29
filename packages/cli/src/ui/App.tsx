@@ -277,7 +277,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         config.getFileService(),
         settings.merged,
         config.getExtensionContextFilePaths(),
-        'tree', // importFormat: 'tree' | 'flat'
+        settings.merged.memoryImportFormat || 'tree', // Use setting or default to 'tree'
         config.getFileFilteringOptions(),
       );
 

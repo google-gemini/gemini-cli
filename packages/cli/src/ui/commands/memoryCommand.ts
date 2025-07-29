@@ -92,7 +92,7 @@ export const memoryCommand: SlashCommand = {
                 config.getDebugMode(),
                 config.getFileService(),
                 config.getExtensionContextFilePaths(),
-                'tree', // importFormat: 'tree' | 'flat'
+                context.services.settings.merged.memoryImportFormat || 'tree', // Use setting or default to 'tree'
                 config.getFileFilteringOptions(),
                 context.services.settings.merged.memoryDiscoveryMaxDirs,
               );

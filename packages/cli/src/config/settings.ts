@@ -98,6 +98,7 @@ export interface Settings {
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
 
   vimMode?: boolean;
+  memoryImportFormat?: 'tree' | 'flat';
 
   // Add other settings here.
   ideMode?: boolean;

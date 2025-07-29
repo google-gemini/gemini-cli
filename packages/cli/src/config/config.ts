@@ -54,7 +54,6 @@ export interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
-  importFormat?: 'flat' | 'tree';
   telemetryOutfile: string | undefined;
   allowedMcpServerNames: string[] | undefined;
   experimentalAcp: boolean | undefined;
@@ -170,13 +169,6 @@ export async function parseArguments(): Promise<CliArgs> {
       description: 'Enables checkpointing of file edits',
       default: false,
     })
-    .option('import-format', {
-      type: 'string',
-      choices: ['flat', 'tree'],
-      description:
-        'Format for memory import resolution: "flat" (Claude-style) or "tree" (hierarchical, default)',
-      default: 'tree',
-    })
     .option('experimental-acp', {
       type: 'boolean',
       description: 'Starts the agent in ACP mode',
@@ -224,16 +216,9 @@ export async function parseArguments(): Promise<CliArgs> {
   yargsInstance.wrap(yargsInstance.terminalWidth());
   const result = yargsInstance.parseSync();
 
-  // Get import format from args or default to 'tree'
-  const importFormatArg = (result as { 'import-format'?: 'flat' | 'tree' })[
-    'import-format'
-  ];
-  const importFormat =
-    importFormatArg === 'flat' || importFormatArg === 'tree'
-      ? importFormatArg
-      : 'tree';
-
-  return { ...result, importFormat } as CliArgs;
+  // The import format is now only controlled by settings.memoryImportFormat
+  // We no longer accept it as a CLI argument
+  return result as CliArgs;
 }
 
 // This function is now a thin wrapper around the server's implementation.
@@ -245,12 +230,12 @@ export async function loadHierarchicalGeminiMemory(
   fileService: FileDiscoveryService,
   settings: Settings,
   extensionContextFilePaths: string[] = [],
-  importFormat: 'flat' | 'tree' = 'tree',
+  memoryImportFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode) {
     logger.debug(
-      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory} (importFormat: ${importFormat})`,
+      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory} (memoryImportFormat: ${memoryImportFormat})`,
     );
   }
 
@@ -261,7 +246,7 @@ export async function loadHierarchicalGeminiMemory(
     debugMode,
     fileService,
     extensionContextFilePaths,
-    importFormat,
+    memoryImportFormat,
     fileFilteringOptions,
     settings.memoryDiscoveryMaxDirs,
   );
@@ -279,7 +264,7 @@ export async function loadCliConfig(
       (v) => v === 'true' || v === '1',
     ) ||
     false;
-  const importFormat = argv.importFormat || 'tree';
+  const memoryImportFormat = settings.memoryImportFormat || 'tree';
   const ideMode =
     (argv.ideMode ?? settings.ideMode ?? false) &&
     process.env.TERM_PROGRAM === 'vscode' &&
@@ -328,7 +313,7 @@ export async function loadCliConfig(
     fileService,
     settings,
     extensionContextFilePaths,
-    importFormat,
+    memoryImportFormat,
     fileFiltering,
   );
 
