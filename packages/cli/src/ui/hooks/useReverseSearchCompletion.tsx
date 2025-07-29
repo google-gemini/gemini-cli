@@ -23,7 +23,7 @@ export interface UseReverseSearchCompletionReturn {
 
 export function useReverseSearchCompletion(
   buffer: TextBuffer,
-  shellHistory: string[],
+  shellHistory: readonly string[],
   reverseSearchActive: boolean,
 ): UseReverseSearchCompletionReturn {
   const {
@@ -48,7 +48,7 @@ export function useReverseSearchCompletion(
       return;
     }
     const q = buffer.text.toLowerCase();
-    const matches = shellHistory.reduce<typeof suggestions>((acc, cmd) => {
+    const matches = shellHistory.reduce<Suggestion[]>((acc, cmd) => {
       const idx = cmd.toLowerCase().indexOf(q);
       if (idx !== -1) {
         acc.push({ label: cmd, value: cmd, matchedIndex: idx });
