@@ -42,10 +42,6 @@ export class IdeClient {
 
   private constructor() {
     this.currentIde = detectIde();
-    if (!this.currentIde) {
-      logger.debug('Not running in a supported IDE, skipping connection.');
-      return;
-    }
     this.init().catch((err) => {
       logger.debug('Failed to initialize IdeClient:', err);
     });
@@ -164,6 +160,10 @@ export class IdeClient {
     if (this.state.status === IDEConnectionStatus.Connected) {
       return;
     }
+    if (!this.currentIde) {
+      throw new Error('Not running in a supported IDE, skipping connection.');
+    }
+
     this.setState(IDEConnectionStatus.Connecting);
 
     if (!this.validateWorkspacePath()) {
