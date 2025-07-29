@@ -36,12 +36,17 @@ export class TestRig {
     // Create a settings file to point the CLI to the local collector
     const geminiDir = join(this.testDir, '.gemini');
     mkdirSync(geminiDir, { recursive: true });
+    // In sandbox mode, use a relative path for telemetry that works inside the container
+    const telemetryPath = env.GEMINI_SANDBOX && env.GEMINI_SANDBOX !== 'false' 
+      ? 'telemetry.log'  // Relative path in current directory
+      : env.TELEMETRY_LOG_FILE;  // Absolute path for non-sandbox
+      
     const settings = {
       telemetry: {
         enabled: true,
         target: 'local',
         otlpEndpoint: '',
-        outfile: env.TELEMETRY_LOG_FILE,
+        outfile: telemetryPath,
       },
       sandbox: env.GEMINI_SANDBOX !== 'false' ? env.GEMINI_SANDBOX : false,
       ...options.settings, // Allow tests to override/add settings
@@ -149,7 +154,11 @@ export class TestRig {
   }
 
   async waitForTelemetryReady() {
-    const logFilePath = env.TELEMETRY_LOG_FILE;
+    // In sandbox mode, telemetry is written to a relative path in the test directory
+    const logFilePath = env.GEMINI_SANDBOX && env.GEMINI_SANDBOX !== 'false'
+      ? join(this.testDir, 'telemetry.log')
+      : env.TELEMETRY_LOG_FILE;
+      
     if (!logFilePath) return;
 
     // Wait for telemetry file to exist and have content
@@ -204,7 +213,11 @@ export class TestRig {
   }
 
   readToolLogs() {
-    const logFilePath = env.TELEMETRY_LOG_FILE;
+    // In sandbox mode, telemetry is written to a relative path in the test directory
+    const logFilePath = env.GEMINI_SANDBOX && env.GEMINI_SANDBOX !== 'false'
+      ? join(this.testDir, 'telemetry.log')
+      : env.TELEMETRY_LOG_FILE;
+      
     if (!logFilePath) {
       console.warn(`TELEMETRY_LOG_FILE environment variable not set`);
       return [];
