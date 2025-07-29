@@ -78,7 +78,6 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/install`**
   - **Description:** Install VS Code themes from marketplace URLs.
   - **Usage:** `/install <marketplace-url>`
-  - **Example:** `/install https://marketplace.visualstudio.com/items?itemName=arcticicestudio.nord-visual-studio-code`
 
 - **`/auth`**
   - **Description:** Open a dialog that lets you change the authentication method.
