@@ -84,9 +84,9 @@
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2",
-    "@types/glob": "^8.1.0"
+    "@types/glob": "8.1.0"
   },
   "overrides": {
-    "@types/glob": "^8.1.0"
+    "@types/glob": "8.1.0"
   }
 }
