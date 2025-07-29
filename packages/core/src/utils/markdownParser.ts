@@ -28,7 +28,7 @@ export function parseMarkdown(content: string): AstNode[] {
 
     // Match fenced code blocks (including language identifiers)
     const codeBlockMatch = remainingContent.match(
-      /^```[a-zA-Z]*\n[\s\S]*?\n```/,
+      /^```[^\n]*\n[\s\S]*?\n?```/,
     );
     if (codeBlockMatch) {
       ast.push({ type: 'code_block', content: codeBlockMatch[0] });
