@@ -187,7 +187,7 @@ describe('simple-mcp-server', () => {
     // Create server script in the test directory
     const testServerPath = join(rig.testDir, 'mcp-server.js');
     writeFileSync(testServerPath, serverScript);
-    
+
     // Make the script executable (though running with 'node' should work anyway)
     if (process.platform !== 'win32') {
       const { chmodSync } = await import('fs');

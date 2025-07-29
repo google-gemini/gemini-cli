@@ -22,11 +22,17 @@ test('should be able to write a file', async () => {
     console.error('Test failed - Debug info:');
     console.error('Result length:', result.length);
     console.error('Result (first 500 chars):', result.substring(0, 500));
-    console.error('Result (last 500 chars):', result.substring(result.length - 500));
-    
+    console.error(
+      'Result (last 500 chars):',
+      result.substring(result.length - 500),
+    );
+
     // Check what tools were actually called
     const allTools = rig.readToolLogs();
-    console.error('All tool calls found:', allTools.map(t => t.toolRequest.name));
+    console.error(
+      'All tool calls found:',
+      allTools.map((t) => t.toolRequest.name),
+    );
   }
 
   assert.ok(foundToolCall, 'Expected to find a write_file tool call');
@@ -34,20 +40,26 @@ test('should be able to write a file', async () => {
   const newFilePath = 'dad.txt';
 
   const newFileContent = rig.readFile(newFilePath);
-  
+
   // Add debugging for file content
   if (newFileContent === '') {
     console.error('File was created but is empty');
-    console.error('Tool calls:', rig.readToolLogs().map(t => ({
-      name: t.toolRequest.name,
-      args: t.toolRequest.args
-    })));
+    console.error(
+      'Tool calls:',
+      rig.readToolLogs().map((t) => ({
+        name: t.toolRequest.name,
+        args: t.toolRequest.args,
+      })),
+    );
   }
-  
+
   assert.notEqual(newFileContent, '', 'Expected file to have content');
-  
+
   // Log success info if verbose
   if (process.env.VERBOSE === 'true') {
-    console.log('File created successfully with content:', newFileContent.substring(0, 100) + '...');
+    console.log(
+      'File created successfully with content:',
+      newFileContent.substring(0, 100) + '...',
+    );
   }
 });
