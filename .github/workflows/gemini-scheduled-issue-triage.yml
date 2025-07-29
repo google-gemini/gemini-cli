@@ -73,17 +73,18 @@ jobs:
             1. Run: `gh label list --repo ${{ github.repository }} --limit 100` to get all available labels.
             2. Check environment variable for issues to triage: $ISSUES_TO_TRIAGE (JSON array of issues)
             3. Review the issue title, body and any comments provided in the environment variables.
-            4. Ignore any existing priorities or tags on the issue. Just report your findings.
-            5. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. For area/* and kind/* limit yourself to only the single most applicable label in each case. 
-            6. Give me a single short paragraph about why you are selecting each label in the process. use the format Issue ID: , Title, Label applied: Reason 
-            7. Parse the JSON array from step 2 and for EACH INDIVIDUAL issue, apply appropriate labels using separate commands:
+            4. Ignore any existing priorities or tags on the issue.
+            5. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. 
+            6. For area/* and kind/* limit yourself to only the single most applicable label in each case. If there is an existing area/ or kind/ label remove it after you apply the new recommendation. 
+            7. Give me a single short paragraph about why you are selecting each label in the process. use the format Issue ID: , Title, Label applied: Reason 
+            8. Parse the JSON array from step 2 and for EACH INDIVIDUAL issue, apply appropriate labels using separate commands:
                - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --add-label "label1"`
                - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --add-label "label2"`
                - Continue for each label separately
                - IMPORTANT: Label each issue individually, one command per issue, one label at a time if needed.
-            8. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5 
+            9. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5 
             - Anything more than 6 versions older than the most recent should add the status/need-retesting label
-            9. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label
+            10. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label
             - After applying appropriate labels to an issue, remove the "status/need-triage" label if present: `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "status/need-triage"`
             - Execute one `gh issue edit` command per issue, wait for success before proceeding to the next
             Process each issue sequentially and confirm each labeling operation before moving to the next issue.
