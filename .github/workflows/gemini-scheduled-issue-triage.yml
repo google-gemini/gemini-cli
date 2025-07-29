@@ -84,7 +84,9 @@ jobs:
             8. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5 
             - Anything more than 6 versions older than the most recent should add the status/need-retesting label
             9. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label
-            10. Once done get the list of labels assigned to the issue and verify that your proposals took effect by using gh issue list command to get the list of labels. 
+            - After applying appropriate labels to an issue, remove the "status/need-triage" label if present: `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "status/need-triage"`
+            - Execute one `gh issue edit` command per issue, wait for success before proceeding to the next
+            Process each issue sequentially and confirm each labeling operation before moving to the next issue.
             Guidelines:
             - Only use labels that already exist in the repository.
             - Do not add comments or modify the issue content.
