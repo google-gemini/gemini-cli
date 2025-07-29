@@ -162,15 +162,18 @@ export class LoopDetectionService {
       const fenceIndex = content.indexOf('```', currentPos);
 
       if (fenceIndex === -1) {
+        let remaining = content.substring(currentPos);
         // No more fences in the rest of the content.
-        if (!this.inCodeBlock) {
-          contentOutsideCodeblocks += content.substring(currentPos);
-        }
-        // Check for partial fence at the end of the content.
-        if (content.endsWith('``')) {
+        if (remaining.endsWith('``')) {
           this.partialFence = '``';
-        } else if (content.endsWith('`')) {
+          remaining = remaining.slice(0, -2);
+        } else if (remaining.endsWith('`')) {
           this.partialFence = '`';
+          remaining = remaining.slice(0, -1);
+        }
+
+        if (!this.inCodeBlock) {
+          contentOutsideCodeblocks += remaining;
         }
         break;
       }
