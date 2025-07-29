@@ -1,0 +1,50 @@
+name: '🤖 PR Triage'
+
+# Run on new PRs and when new commits are pushed to existing PRs.
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+# This ensures only one instance of the workflow runs per PR at a time.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    name: 'Triage PR'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write # To add labels and comments
+      contents: read     # To checkout code
+
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+
+      - name: 'Generate GitHub App Token'
+        id: generate_token
+        # This is the more secure and robust authentication method.
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: 'Install Gemini CLI'
+        uses: google-gemini/setup-gemini-cli@v0
+        with:
+          gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: 'Run PR Triage Script'
+        id: run_triage
+        env:
+          # Pass the superior App token to the script.
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+          # Pass context to the script.
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        # The core logic is now cleanly contained in this script.
+        run: ./.github/scripts/pr-triage-size.sh
