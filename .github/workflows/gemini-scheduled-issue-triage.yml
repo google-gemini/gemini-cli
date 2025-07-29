@@ -141,7 +141,7 @@ jobs:
             area/platform: 
             - Issues related to installation, packaging, OS compatibility (Windows, macOS, Linux), and the underlying CLI framework.
             area/background: Issues related to long-running background tasks, daemons, and autonomous or proactive agent features.
-            area/models: area/model -
+            area/models: 
             - i am not getting a response that is reasonable or expected. this can include things like
             - I am calling a tool and the tool is not performing as expected.
             - i am expecting a tool to be called and it is not getting called ,
