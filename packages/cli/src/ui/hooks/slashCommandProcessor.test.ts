@@ -74,11 +74,12 @@ describe('useSlashCommandProcessor', () => {
   const mockSetQuittingMessages = vi.fn();
 
   const mockConfig = {
-    getProjectRoot: () => '/mock/cwd',
-    getSessionId: () => 'test-session',
-    getGeminiClient: () => ({
+    getProjectRoot: vi.fn(() => '/mock/cwd'),
+    getSessionId: vi.fn(() => 'test-session'),
+    getGeminiClient: vi.fn(() => ({
       setHistory: vi.fn().mockResolvedValue(undefined),
-    }),
+    })),
+    getExtensions: vi.fn(() => []),
   } as unknown as Config;
 
   const mockSettings = {} as LoadedSettings;
