@@ -16,7 +16,7 @@ For the most part, `.geminiignore` follows the conventions of `.gitignore` files
 - Putting a `/` at the beginning anchors the path relative to the `.geminiignore` file.
 - `!` negates a pattern.
 
-You can update your `.geminiignore` file at any time. To ensure that the file is properly updated, restarting your Gemini CLI session is recommended.
+You can update your `.geminiignore` file at any time. To apply the changes, you must restart your Gemini CLI session.
 
 ## How to use `.geminiignore`
 
