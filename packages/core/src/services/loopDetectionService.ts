@@ -164,16 +164,17 @@ export class LoopDetectionService {
     // Code blocks can often contain repetitive syntax that is not indicative of a loop.
     // To avoid false positives, we detect when we are inside a code block and
     // temporarily disable loop detection.
-    const numFences = (content.match('```') ?? []).length;
+    const numFences = (content.match(/```/g) ?? []).length;
     if (numFences) {
       // Reset tracking when a code fence is detected to avoid analyzing content
       // that spans across code block boundaries.
       this.resetContentTracking();
     }
 
+    const wasInCodeBlock = this.inCodeBlock;
     this.inCodeBlock =
       numFences % 2 === 0 ? this.inCodeBlock : !this.inCodeBlock;
-    if (this.inCodeBlock) {
+    if (wasInCodeBlock) {
       return false;
     }
 
