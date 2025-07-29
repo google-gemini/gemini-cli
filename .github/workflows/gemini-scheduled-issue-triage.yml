@@ -74,10 +74,12 @@ jobs:
             2. Review the issue title, body and any comments provided in the environment variables.
             3. Ignore any existing priorities or tags on the issue. Just report your findings.
             4. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. For area/* and kind/* limit yourself to only the single most applicable label in each case. 
+            5. Give me a single short paragraph about why you are selecting each label in the process.
             6. Apply the selected labels to this issue using: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`
             7. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5 
             - Anything more than 6 versions older than the most recent should add the status/need-retesting label
             8. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label
+            9. Once done get the list of labels assigned to the issue and verify that your proposals took effect.
             Guidelines:
             - Only use labels that already exist in the repository.
             - Do not add comments or modify the issue content.
