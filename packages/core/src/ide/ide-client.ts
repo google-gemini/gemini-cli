@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { detectIde, DetectedIde } from '../ide/detect-ide.js';
+import {
+  detectIde,
+  DetectedIde,
+  getIdeDisplayName,
+} from '../ide/detect-ide.js';
 import { ideContext, IdeContextNotificationSchema } from '../ide/ideContext.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -172,5 +176,13 @@ export class IdeClient {
     }
 
     await this.establishConnection(port);
+  }
+
+  getDetectedIdeDisplayName(): string | undefined {
+    const currentIde = this.getCurrentIde();
+    if (currentIde) {
+      return getIdeDisplayName(currentIde);
+    }
+    return;
   }
 }

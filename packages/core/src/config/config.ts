@@ -47,7 +47,6 @@ import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js'
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
-import { getIdeDisplayName } from '../ide/detect-ide.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
@@ -585,14 +584,6 @@ export class Config {
 
   getIdeClient(): IdeClient | undefined {
     return this.ideClient;
-  }
-
-  getDetectedIdeDisplayName(): string | undefined {
-    const currentIde = this.ideClient?.getCurrentIde();
-    if (currentIde) {
-      return getIdeDisplayName(currentIde);
-    }
-    return;
   }
 
   async getGitService(): Promise<GitService> {

@@ -969,7 +969,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               {showIDEContextDetail && (
                 <IDEContextDetailDisplay
                   ideContext={ideContextState}
-                  detectedIdeDisplay={config.getDetectedIdeDisplayName()}
+                  detectedIdeDisplay={config
+                    .getIdeClient()
+                    ?.getDetectedIdeDisplayName()}
                 />
               )}
               {showErrorDetails && (
