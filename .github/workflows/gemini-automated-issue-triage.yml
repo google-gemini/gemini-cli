@@ -47,9 +47,7 @@ jobs:
               "sandbox": false
             }
           prompt: |
-
             You are an issue triage assistant. Analyze the current GitHub issues apply the most appropriate existing labels. Do not remove labels titled help wanted or good first issue.
-
             Steps:
             1. Run: `gh label list --repo ${{ github.repository }} --limit 100` to get all available labels.
             2. Review the issue title, body and any comments provided in the environment variables.
