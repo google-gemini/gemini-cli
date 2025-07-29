@@ -180,6 +180,94 @@ describe('LoopDetectionService', () => {
     });
   });
 
+  describe('Content Loop Detection with Code Blocks', () => {
+    it('should ignore content inside a code block', () => {
+      service.reset('');
+      const repeatedContent = 'a'.repeat(CONTENT_CHUNK_SIZE);
+      const content = '```\n' + repeatedContent.repeat(20) + '\n```';
+
+      const isLoop = service.addAndCheck(createContentEvent(content));
+
+      expect(isLoop).toBe(false);
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should detect a loop for content outside a code block', () => {
+      service.reset('');
+      const repeatedContent = 'a'.repeat(CONTENT_CHUNK_SIZE);
+      const codeBlock = '\n```\n' + 'some code' + '\n```\n';
+      const content = (repeatedContent + codeBlock).repeat(
+        CONTENT_LOOP_THRESHOLD,
+      );
+
+      let isLoop = false;
+      for (const char of content) {
+        isLoop = service.addAndCheck(createContentEvent(char));
+      }
+
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle a code block spanning multiple events and still detect loops after', () => {
+      service.reset('');
+      const repeatedContent = 'a'.repeat(CONTENT_CHUNK_SIZE);
+
+      // Start code block
+      service.addAndCheck(createContentEvent('`'));
+      service.addAndCheck(createContentEvent('`'));
+      service.addAndCheck(createContentEvent('`'));
+
+      // Content inside code block (should be ignored)
+      for (let i = 0; i < 20; i++) {
+        service.addAndCheck(createContentEvent(repeatedContent));
+      }
+
+      // End code block
+      service.addAndCheck(createContentEvent('```'));
+
+      // Content outside code block (should be detected)
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        for (const char of repeatedContent) {
+          isLoop = service.addAndCheck(createContentEvent(char));
+        }
+      }
+
+      expect(isLoop).toBe(true);
+    });
+
+    it('should handle multiple code blocks', () => {
+      service.reset('');
+      const repeatedContent = 'a'.repeat(CONTENT_CHUNK_SIZE);
+      const codeBlock = '```\n' + 'some code' + '\n```';
+      const content = (codeBlock + repeatedContent).repeat(
+        CONTENT_LOOP_THRESHOLD,
+      );
+
+      let isLoop = false;
+      for (const char of content) {
+        isLoop = service.addAndCheck(createContentEvent(char));
+      }
+
+      expect(isLoop).toBe(true);
+    });
+
+    it('should handle content ending with a partial fence', () => {
+      service.reset('');
+      const repeatedContent = 'a'.repeat(CONTENT_CHUNK_SIZE);
+
+      service.addAndCheck(createContentEvent(repeatedContent + '``'));
+      const isLoop = service.addAndCheck(
+        createContentEvent(
+          '`' + repeatedContent.repeat(CONTENT_LOOP_THRESHOLD),
+        ),
+      );
+
+      expect(isLoop).toBe(false);
+    });
+  });
+
   describe('Edge Cases', () => {
     it('should handle empty content', () => {
       const event = createContentEvent('');

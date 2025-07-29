@@ -61,6 +61,8 @@ export class LoopDetectionService {
   private contentStats = new Map<string, number[]>();
   private lastContentIndex = 0;
   private loopDetected = false;
+  private inCodeBlock = false;
+  private partialFence = '';
 
   // LLM loop track tracking
   private turnsInCurrentPrompt = 0;
@@ -158,7 +160,46 @@ export class LoopDetectionService {
    * 4. Detecting loops when identical chunks appear frequently within a short distance
    */
   private checkContentLoop(content: string): boolean {
-    this.streamContentHistory += content;
+    let contentOutsideCodeblocks = '';
+    let currentPos = 0;
+
+    // Prepend any partial fence from the previous chunk
+    content = this.partialFence + content;
+    this.partialFence = '';
+
+    while (currentPos < content.length) {
+      const fenceIndex = content.indexOf('```', currentPos);
+
+      if (fenceIndex === -1) {
+        // No more fences in the rest of the content.
+        if (!this.inCodeBlock) {
+          contentOutsideCodeblocks += content.substring(currentPos);
+        }
+        // Check for partial fence at the end of the content.
+        if (content.endsWith('``')) {
+          this.partialFence = '``';
+        } else if (content.endsWith('`')) {
+          this.partialFence = '`';
+        }
+        break;
+      }
+
+      // We found a fence.
+      if (!this.inCodeBlock) {
+        // Content before the fence is outside a code block.
+        contentOutsideCodeblocks += content.substring(currentPos, fenceIndex);
+      }
+      // If we were in a code block, the content between fences is ignored.
+
+      this.inCodeBlock = !this.inCodeBlock;
+      currentPos = fenceIndex + 3;
+    }
+
+    if (!contentOutsideCodeblocks) {
+      return false;
+    }
+
+    this.streamContentHistory += contentOutsideCodeblocks;
 
     this.truncateAndUpdate();
     return this.analyzeContentChunksForLoop();
@@ -385,6 +426,8 @@ Please analyze the conversation history to determine the possibility that the co
     }
     this.contentStats.clear();
     this.lastContentIndex = 0;
+    this.inCodeBlock = false;
+    this.partialFence = '';
   }
 
   private resetLlmCheckTracking(): void {
