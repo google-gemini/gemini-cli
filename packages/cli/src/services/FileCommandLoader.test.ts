@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { FileCommandLoader } from './FileCommandLoader.js';
+import * as path from 'node:path';
 import {
   Config,
   getProjectCommandsDir,
   getUserCommandsDir,
 } from '@google/gemini-cli-core';
 import mock from 'mock-fs';
+import { FileCommandLoader } from './FileCommandLoader.js';
 import { assert, vi } from 'vitest';
 import { createMockCommandContext } from '../test-utils/mockCommandContext.js';
 import {
@@ -85,7 +86,7 @@ describe('FileCommandLoader', () => {
       },
     });
 
-    const loader = new FileCommandLoader(null as unknown as Config);
+    const loader = new FileCommandLoader(null);
     const commands = await loader.loadCommands(signal);
 
     expect(commands).toHaveLength(1);
@@ -176,7 +177,7 @@ describe('FileCommandLoader', () => {
       },
     });
 
-    const loader = new FileCommandLoader(null as unknown as Config);
+    const loader = new FileCommandLoader(null);
     const commands = await loader.loadCommands(signal);
 
     expect(commands).toHaveLength(2);
@@ -194,9 +195,11 @@ describe('FileCommandLoader', () => {
         },
       },
     });
-    const loader = new FileCommandLoader({
-      getProjectRoot: () => '/path/to/project',
-    } as Config);
+    const mockConfig = {
+      getProjectRoot: vi.fn(() => '/path/to/project'),
+      getExtensions: vi.fn(() => []),
+    } as Config;
+    const loader = new FileCommandLoader(mockConfig);
     const commands = await loader.loadCommands(signal);
     expect(commands).toHaveLength(1);
     expect(commands[0]!.name).toBe('gcp:pipelines:run');
@@ -212,7 +215,7 @@ describe('FileCommandLoader', () => {
       },
     });
 
-    const loader = new FileCommandLoader(null as unknown as Config);
+    const loader = new FileCommandLoader(null);
     const commands = await loader.loadCommands(signal);
 
     expect(commands).toHaveLength(1);
@@ -221,7 +224,7 @@ describe('FileCommandLoader', () => {
     expect(command.name).toBe('git:commit');
   });
 
-  it('overrides user commands with project commands', async () => {
+  it('returns both user and project commands in order', async () => {
     const userCommandsDir = getUserCommandsDir();
     const projectCommandsDir = getProjectCommandsDir(process.cwd());
     mock({
@@ -233,16 +236,15 @@ describe('FileCommandLoader', () => {
       },
     });
 
-    const loader = new FileCommandLoader({
-      getProjectRoot: () => process.cwd(),
-    } as Config);
+    const mockConfig = {
+      getProjectRoot: vi.fn(() => process.cwd()),
+      getExtensions: vi.fn(() => []),
+    } as Config;
+    const loader = new FileCommandLoader(mockConfig);
     const commands = await loader.loadCommands(signal);
 
-    expect(commands).toHaveLength(1);
-    const command = commands[0];
-    expect(command).toBeDefined();
-
-    const result = await command.action?.(
+    expect(commands).toHaveLength(2);
+    const userResult = await commands[0].action?.(
       createMockCommandContext({
         invocation: {
           raw: '/test',
@@ -252,10 +254,25 @@ describe('FileCommandLoader', () => {
       }),
       '',
     );
-    if (result?.type === 'submit_prompt') {
-      expect(result.content).toBe('Project prompt');
+    if (userResult?.type === 'submit_prompt') {
+      expect(userResult.content).toBe('User prompt');
     } else {
-      assert.fail('Incorrect action type');
+      assert.fail('Incorrect action type for user command');
+    }
+    const projectResult = await commands[1].action?.(
+      createMockCommandContext({
+        invocation: {
+          raw: '/test',
+          name: 'test',
+          args: '',
+        },
+      }),
+      '',
+    );
+    if (projectResult?.type === 'submit_prompt') {
+      expect(projectResult.content).toBe('Project prompt');
+    } else {
+      assert.fail('Incorrect action type for project command');
     }
   });
 
@@ -268,7 +285,7 @@ describe('FileCommandLoader', () => {
       },
     });
 
-    const loader = new FileCommandLoader(null as unknown as Config);
+    const loader = new FileCommandLoader(null);
     const commands = await loader.loadCommands(signal);
 
     expect(commands).toHaveLength(1);
@@ -284,7 +301,7 @@ describe('FileCommandLoader', () => {
       },
     });
 
-    const loader = new FileCommandLoader(null as unknown as Config);
+    const loader = new FileCommandLoader(null);
     const commands = await loader.loadCommands(signal);
 
     expect(commands).toHaveLength(1);
@@ -299,7 +316,7 @@ describe('FileCommandLoader', () => {
       },
     });
 
-    const loader = new FileCommandLoader(null as unknown as Config);
+    const loader = new FileCommandLoader(null);
     const commands = await loader.loadCommands(signal);
     const command = commands[0];
     expect(command).toBeDefined();
@@ -308,7 +325,7 @@ describe('FileCommandLoader', () => {
 
   it('handles file system errors gracefully', async () => {
     mock({}); // Mock an empty file system
-    const loader = new FileCommandLoader(null as unknown as Config);
+    const loader = new FileCommandLoader(null);
     const commands = await loader.loadCommands(signal);
     expect(commands).toHaveLength(0);
   });
@@ -321,7 +338,7 @@ describe('FileCommandLoader', () => {
       },
     });
 
-    const loader = new FileCommandLoader(null as unknown as Config);
+    const loader = new FileCommandLoader(null);
     const commands = await loader.loadCommands(signal);
     const command = commands[0];
     expect(command).toBeDefined();
@@ -336,7 +353,7 @@ describe('FileCommandLoader', () => {
       },
     });
 
-    const loader = new FileCommandLoader(null as unknown as Config);
+    const loader = new FileCommandLoader(null);
     const commands = await loader.loadCommands(signal);
     const command = commands[0];
     expect(command).toBeDefined();
@@ -351,7 +368,7 @@ describe('FileCommandLoader', () => {
       },
     });
 
-    const loader = new FileCommandLoader(null as unknown as Config);
+    const loader = new FileCommandLoader(null);
     const commands = await loader.loadCommands(signal);
 
     expect(commands).toHaveLength(1);
@@ -360,6 +377,298 @@ describe('FileCommandLoader', () => {
 
     // Verify that the ':' in the filename was replaced with an '_'
     expect(command.name).toBe('legacy_command');
+  });
+
+  describe('Extension Command Loading', () => {
+    it('loads commands from active extensions', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      const projectCommandsDir = getProjectCommandsDir(process.cwd());
+      const extensionDir = path.join(
+        process.cwd(),
+        '.gemini/extensions/test-ext',
+      );
+
+      mock({
+        [userCommandsDir]: {
+          'user.toml': 'prompt = "User command"',
+        },
+        [projectCommandsDir]: {
+          'project.toml': 'prompt = "Project command"',
+        },
+        [extensionDir]: {
+          'gemini-extension.json': JSON.stringify({
+            name: 'test-ext',
+            version: '1.0.0',
+          }),
+          commands: {
+            'ext.toml': 'prompt = "Extension command"',
+          },
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => process.cwd()),
+        getExtensions: vi.fn(() => [
+          {
+            name: 'test-ext',
+            version: '1.0.0',
+            isActive: true,
+            path: extensionDir,
+          },
+        ]),
+      } as Config;
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(3);
+      const commandNames = commands.map((cmd) => cmd.name);
+      expect(commandNames).toEqual(['user', 'project', 'ext']);
+
+      const extCommand = commands.find((cmd) => cmd.name === 'ext');
+      expect(extCommand?.extensionName).toBe('test-ext');
+      expect(extCommand?.description).toMatch(/^\[test-ext\]/);
+    });
+
+    it('extension commands have extensionName metadata for conflict resolution', async () => {
+      const userCommandsDir = getUserCommandsDir();
+      const projectCommandsDir = getProjectCommandsDir(process.cwd());
+      const extensionDir = path.join(
+        process.cwd(),
+        '.gemini/extensions/test-ext',
+      );
+
+      mock({
+        [extensionDir]: {
+          'gemini-extension.json': JSON.stringify({
+            name: 'test-ext',
+            version: '1.0.0',
+          }),
+          commands: {
+            'deploy.toml': 'prompt = "Extension deploy command"',
+          },
+        },
+        [userCommandsDir]: {
+          'deploy.toml': 'prompt = "User deploy command"',
+        },
+        [projectCommandsDir]: {
+          'deploy.toml': 'prompt = "Project deploy command"',
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => process.cwd()),
+        getExtensions: vi.fn(() => [
+          {
+            name: 'test-ext',
+            version: '1.0.0',
+            isActive: true,
+            path: extensionDir,
+          },
+        ]),
+      } as Config;
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+
+      // Return all commands, even duplicates
+      expect(commands).toHaveLength(3);
+
+      expect(commands[0].name).toBe('deploy');
+      expect(commands[0].extensionName).toBeUndefined();
+      const result0 = await commands[0].action?.(
+        createMockCommandContext({
+          invocation: {
+            raw: '/deploy',
+            name: 'deploy',
+            args: '',
+          },
+        }),
+        '',
+      );
+      expect(result0?.type).toBe('submit_prompt');
+      if (result0?.type === 'submit_prompt') {
+        expect(result0.content).toBe('User deploy command');
+      }
+
+      expect(commands[1].name).toBe('deploy');
+      expect(commands[1].extensionName).toBeUndefined();
+      const result1 = await commands[1].action?.(
+        createMockCommandContext({
+          invocation: {
+            raw: '/deploy',
+            name: 'deploy',
+            args: '',
+          },
+        }),
+        '',
+      );
+      expect(result1?.type).toBe('submit_prompt');
+      if (result1?.type === 'submit_prompt') {
+        expect(result1.content).toBe('Project deploy command');
+      }
+
+      expect(commands[2].name).toBe('deploy');
+      expect(commands[2].extensionName).toBe('test-ext');
+      expect(commands[2].description).toMatch(/^\[test-ext\]/);
+      const result2 = await commands[2].action?.(
+        createMockCommandContext({
+          invocation: {
+            raw: '/deploy',
+            name: 'deploy',
+            args: '',
+          },
+        }),
+        '',
+      );
+      expect(result2?.type).toBe('submit_prompt');
+      if (result2?.type === 'submit_prompt') {
+        expect(result2.content).toBe('Extension deploy command');
+      }
+    });
+
+    it('only loads commands from active extensions', async () => {
+      const extensionDir1 = path.join(
+        process.cwd(),
+        '.gemini/extensions/active-ext',
+      );
+      const extensionDir2 = path.join(
+        process.cwd(),
+        '.gemini/extensions/inactive-ext',
+      );
+
+      mock({
+        [extensionDir1]: {
+          'gemini-extension.json': JSON.stringify({
+            name: 'active-ext',
+            version: '1.0.0',
+          }),
+          commands: {
+            'active.toml': 'prompt = "Active extension command"',
+          },
+        },
+        [extensionDir2]: {
+          'gemini-extension.json': JSON.stringify({
+            name: 'inactive-ext',
+            version: '1.0.0',
+          }),
+          commands: {
+            'inactive.toml': 'prompt = "Inactive extension command"',
+          },
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => process.cwd()),
+        getExtensions: vi.fn(() => [
+          {
+            name: 'active-ext',
+            version: '1.0.0',
+            isActive: true,
+            path: extensionDir1,
+          },
+          {
+            name: 'inactive-ext',
+            version: '1.0.0',
+            isActive: false,
+            path: extensionDir2,
+          },
+        ]),
+      } as Config;
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(1);
+      expect(commands[0].name).toBe('active');
+      expect(commands[0].extensionName).toBe('active-ext');
+      expect(commands[0].description).toMatch(/^\[active-ext\]/);
+    });
+
+    it('handles missing extension commands directory gracefully', async () => {
+      const extensionDir = path.join(
+        process.cwd(),
+        '.gemini/extensions/no-commands',
+      );
+
+      mock({
+        [extensionDir]: {
+          'gemini-extension.json': JSON.stringify({
+            name: 'no-commands',
+            version: '1.0.0',
+          }),
+          // No commands directory
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => process.cwd()),
+        getExtensions: vi.fn(() => [
+          {
+            name: 'no-commands',
+            version: '1.0.0',
+            isActive: true,
+            path: extensionDir,
+          },
+        ]),
+      } as Config;
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+      expect(commands).toHaveLength(0);
+    });
+
+    it('handles nested command structure in extensions', async () => {
+      const extensionDir = path.join(process.cwd(), '.gemini/extensions/a');
+
+      mock({
+        [extensionDir]: {
+          'gemini-extension.json': JSON.stringify({
+            name: 'a',
+            version: '1.0.0',
+          }),
+          commands: {
+            b: {
+              'c.toml': 'prompt = "Nested command from extension a"',
+              d: {
+                'e.toml': 'prompt = "Deeply nested command"',
+              },
+            },
+            'simple.toml': 'prompt = "Simple command"',
+          },
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => process.cwd()),
+        getExtensions: vi.fn(() => [
+          { name: 'a', version: '1.0.0', isActive: true, path: extensionDir },
+        ]),
+      } as Config;
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(3);
+
+      const commandNames = commands.map((cmd) => cmd.name).sort();
+      expect(commandNames).toEqual(['b:c', 'b:d:e', 'simple']);
+
+      const nestedCmd = commands.find((cmd) => cmd.name === 'b:c');
+      expect(nestedCmd?.extensionName).toBe('a');
+      expect(nestedCmd?.description).toMatch(/^\[a\]/);
+      expect(nestedCmd).toBeDefined();
+      const result = await nestedCmd!.action?.(
+        createMockCommandContext({
+          invocation: {
+            raw: '/b:c',
+            name: 'b:c',
+            args: '',
+          },
+        }),
+        '',
+      );
+      if (result?.type === 'submit_prompt') {
+        expect(result.content).toBe('Nested command from extension a');
+      } else {
+        assert.fail('Incorrect action type');
+      }
+    });
   });
 
   describe('Shorthand Argument Processor Integration', () => {
