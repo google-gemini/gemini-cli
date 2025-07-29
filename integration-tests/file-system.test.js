@@ -40,6 +40,9 @@ test('should be able to read a file', async () => {
   }
 
   assert.ok(foundToolCall, 'Expected to find a read_file tool call');
+  
+  // Check if LLM returned any output at all
+  assert.ok(result && result.trim().length > 0, 'Expected LLM to return some output');
 
   // The LLM should ideally show the file contents, but it's not always consistent
   // We'll make this a warning rather than a failure
@@ -101,6 +104,9 @@ test('should be able to write a file', async () => {
   }
 
   assert.ok(foundWriteToolCall, 'Expected to find a write_file tool call');
+  
+  // Check if LLM returned any output at all
+  assert.ok(result && result.trim().length > 0, 'Expected LLM to return some output');
 
   const fileContent = rig.readFile('test.txt');
 

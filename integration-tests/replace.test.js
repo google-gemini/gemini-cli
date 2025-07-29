@@ -42,6 +42,9 @@ test('should be able to replace content in a file', async () => {
   }
 
   assert.ok(foundToolCall, 'Expected to find a replace tool call');
+  
+  // Check if LLM returned any output at all
+  assert.ok(result && result.trim().length > 0, 'Expected LLM to return some output');
 
   const newFileContent = rig.readFile(fileName);
 
