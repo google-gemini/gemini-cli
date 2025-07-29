@@ -4,6 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+const { logSlashCommand, SlashCommandEvent } = vi.hoisted(() => ({
+  logSlashCommand: vi.fn(),
+  SlashCommandEvent: vi.fn((command, subCommand) => ({ command, subCommand })),
+}));
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...original,
+    logSlashCommand,
+    SlashCommandEvent,
+  };
+});
+
 const { mockProcessExit } = vi.hoisted(() => ({
   mockProcessExit: vi.fn((_code?: number): never => undefined as never),
 }));
@@ -812,6 +827,85 @@ describe('useSlashCommandProcessor', () => {
       unmount();
 
       expect(abortSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Slash Command Logging', () => {
+    const mockCommandAction = vi.fn().mockResolvedValue({ type: 'handled' });
+    const loggingTestCommands: SlashCommand[] = [
+      createTestCommand({
+        name: 'logtest',
+        action: mockCommandAction,
+      }),
+      createTestCommand({
+        name: 'logwithsub',
+        subCommands: [
+          createTestCommand({
+            name: 'sub',
+            action: mockCommandAction,
+          }),
+        ],
+      }),
+      createTestCommand({
+        name: 'logalias',
+        altNames: ['la'],
+        action: mockCommandAction,
+      }),
+    ];
+
+    beforeEach(() => {
+      mockCommandAction.mockClear();
+      vi.mocked(logSlashCommand).mockClear();
+      vi.mocked(SlashCommandEvent).mockClear();
+    });
+
+    it('should log a simple slash command', async () => {
+      const result = setupProcessorHook(loggingTestCommands);
+      await waitFor(() =>
+        expect(result.current.slashCommands.length).toBeGreaterThan(0),
+      );
+      await act(async () => {
+        await result.current.handleSlashCommand('/logtest');
+      });
+
+      expect(logSlashCommand).toHaveBeenCalledTimes(1);
+      expect(SlashCommandEvent).toHaveBeenCalledWith('logtest', undefined);
+    });
+
+    it('should log a slash command with a subcommand', async () => {
+      const result = setupProcessorHook(loggingTestCommands);
+      await waitFor(() =>
+        expect(result.current.slashCommands.length).toBeGreaterThan(0),
+      );
+      await act(async () => {
+        await result.current.handleSlashCommand('/logwithsub sub');
+      });
+
+      expect(logSlashCommand).toHaveBeenCalledTimes(1);
+      expect(SlashCommandEvent).toHaveBeenCalledWith('logwithsub', 'sub');
+    });
+
+    it('should log the command path when an alias is used', async () => {
+      const result = setupProcessorHook(loggingTestCommands);
+      await waitFor(() =>
+        expect(result.current.slashCommands.length).toBeGreaterThan(0),
+      );
+      await act(async () => {
+        await result.current.handleSlashCommand('/la');
+      });
+      expect(logSlashCommand).toHaveBeenCalledTimes(1);
+      expect(SlashCommandEvent).toHaveBeenCalledWith('logalias', undefined);
+    });
+
+    it('should not log for unknown commands', async () => {
+      const result = setupProcessorHook(loggingTestCommands);
+      await waitFor(() =>
+        expect(result.current.slashCommands.length).toBeGreaterThan(0),
+      );
+      await act(async () => {
+        await result.current.handleSlashCommand('/unknown');
+      });
+      expect(logSlashCommand).not.toHaveBeenCalled();
     });
   });
 });
