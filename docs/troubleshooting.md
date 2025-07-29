@@ -53,7 +53,7 @@ This guide provides solutions to common issues and debugging tips, including top
   - **Solution:**
     1.  Run `npm install` to ensure all dependencies are present.
     2.  Run `npm run build` to compile the project.
-    3.  Verify that the build completed successfully with `gemini --version`.
+    3.  Verify that the build completed successfully with `npm run start`.
 
 - **Error: "Operation not permitted", "Permission denied", or similar.**
   - **Cause:** When sandboxing is enabled, Gemini CLI may attempt operations that are restricted by your sandbox configuration, such as writing outside the project directory or system temp directory.
