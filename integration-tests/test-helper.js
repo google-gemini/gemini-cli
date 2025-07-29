@@ -36,10 +36,11 @@ export class TestRig {
     // Create a settings file to point the CLI to the local collector
     const geminiDir = join(this.testDir, '.gemini');
     mkdirSync(geminiDir, { recursive: true });
-    // In sandbox mode, use a relative path for telemetry that works inside the container
+    // In sandbox mode, use an absolute path for telemetry inside the container
+    // The container mounts the test directory at the same path as the host
     const telemetryPath =
       env.GEMINI_SANDBOX && env.GEMINI_SANDBOX !== 'false'
-        ? 'telemetry.log' // Relative path in current directory
+        ? join(this.testDir, 'telemetry.log') // Absolute path in test directory
         : env.TELEMETRY_LOG_FILE; // Absolute path for non-sandbox
 
     const settings = {
@@ -130,7 +131,47 @@ export class TestRig {
     const promise = new Promise((resolve, reject) => {
       child.on('close', (code) => {
         if (code === 0) {
-          resolve(stdout);
+          // Store the raw stdout for Podman telemetry parsing
+          this._lastRunStdout = stdout;
+
+          // Filter out telemetry output when running with Podman
+          // Podman seems to output telemetry to stdout even when writing to file
+          let result = stdout;
+          if (env.GEMINI_SANDBOX === 'podman') {
+            // Remove telemetry JSON objects from output
+            // They are multi-line JSON objects that start with { and contain telemetry fields
+            const lines = result.split('\n');
+            const filteredLines = [];
+            let inTelemetryObject = false;
+            let braceDepth = 0;
+
+            for (const line of lines) {
+              if (!inTelemetryObject && line.trim() === '{') {
+                // Check if this might be start of telemetry object
+                inTelemetryObject = true;
+                braceDepth = 1;
+              } else if (inTelemetryObject) {
+                // Count braces to track nesting
+                for (const char of line) {
+                  if (char === '{') braceDepth++;
+                  else if (char === '}') braceDepth--;
+                }
+
+                // Check if we've closed all braces
+                if (braceDepth === 0) {
+                  inTelemetryObject = false;
+                  // Skip this line (the closing brace)
+                  continue;
+                }
+              } else {
+                // Not in telemetry object, keep the line
+                filteredLines.push(line);
+              }
+            }
+
+            result = filteredLines.join('\n');
+          }
+          resolve(result);
         } else {
           reject(new Error(`Process exited with code ${code}:\n${stderr}`));
         }
@@ -214,7 +255,149 @@ export class TestRig {
     return false;
   }
 
+  _parseToolLogsFromStdout(stdout) {
+    const logs = [];
+
+    // The console output from Podman is JavaScript object notation, not JSON
+    // Look for tool call events in the output
+    const toolCallPattern =
+      /body:\s*'Tool call:\s*(\w+)\..*?Success:\s*(\w+)\..*?Duration:\s*(\d+)ms\.'/g;
+    const matches = [...stdout.matchAll(toolCallPattern)];
+
+    for (const match of matches) {
+      const toolName = match[1];
+      const success = match[2] === 'true';
+      const duration = parseInt(match[3], 10);
+
+      // Try to find function_args nearby
+      const matchIndex = match.index || 0;
+      const contextStart = Math.max(0, matchIndex - 500);
+      const contextEnd = Math.min(stdout.length, matchIndex + 500);
+      const context = stdout.substring(contextStart, contextEnd);
+
+      // Look for function_args in the context
+      let args = '{}';
+      const argsMatch = context.match(/function_args:\s*'([^']+)'/);
+      if (argsMatch) {
+        args = argsMatch[1];
+      }
+
+      // Also try to find function_name to double-check
+      const nameMatch = context.match(/function_name:\s*'(\w+)'/);
+      const actualToolName = nameMatch ? nameMatch[1] : toolName;
+
+      logs.push({
+        timestamp: Date.now(),
+        toolRequest: {
+          name: actualToolName,
+          args: args,
+          success: success,
+          duration_ms: duration,
+        },
+      });
+    }
+
+    // If no matches found with the simple pattern, try the JSON parsing approach
+    // in case the format changes
+    if (logs.length === 0) {
+      const lines = stdout.split('\n');
+      let currentObject = '';
+      let inObject = false;
+      let braceDepth = 0;
+
+      for (const line of lines) {
+        if (!inObject && line.trim() === '{') {
+          inObject = true;
+          braceDepth = 1;
+          currentObject = line + '\n';
+        } else if (inObject) {
+          currentObject += line + '\n';
+
+          // Count braces
+          for (const char of line) {
+            if (char === '{') braceDepth++;
+            else if (char === '}') braceDepth--;
+          }
+
+          // If we've closed all braces, try to parse the object
+          if (braceDepth === 0) {
+            inObject = false;
+            try {
+              const obj = JSON.parse(currentObject);
+
+              // Check for tool call in different formats
+              if (
+                obj.body &&
+                obj.body.includes('Tool call:') &&
+                obj.attributes
+              ) {
+                const bodyMatch = obj.body.match(/Tool call: (\w+)\./);
+                if (bodyMatch) {
+                  logs.push({
+                    timestamp: obj.timestamp || Date.now(),
+                    toolRequest: {
+                      name: bodyMatch[1],
+                      args: obj.attributes.function_args || '{}',
+                      success: obj.attributes.success !== false,
+                      duration_ms: obj.attributes.duration_ms || 0,
+                    },
+                  });
+                }
+              } else if (
+                obj.attributes &&
+                obj.attributes['event.name'] === 'gemini_cli.tool_call'
+              ) {
+                logs.push({
+                  timestamp: obj.attributes['event.timestamp'],
+                  toolRequest: {
+                    name: obj.attributes.function_name,
+                    args: obj.attributes.function_args,
+                    success: obj.attributes.success,
+                    duration_ms: obj.attributes.duration_ms,
+                  },
+                });
+              }
+            } catch (_e) {
+              // Not valid JSON
+            }
+            currentObject = '';
+          }
+        }
+      }
+    }
+
+    return logs;
+  }
+
   readToolLogs() {
+    // For Podman, first check if telemetry file exists and has content
+    // If not, fall back to parsing from stdout
+    if (env.GEMINI_SANDBOX === 'podman') {
+      // Try reading from file first
+      const logFilePath = join(this.testDir, 'telemetry.log');
+
+      if (fileExists(logFilePath)) {
+        try {
+          const content = readFileSync(logFilePath, 'utf-8');
+          if (content && content.includes('"event.name"')) {
+            // File has content, use normal file parsing
+            // Continue to the normal file parsing logic below
+          } else if (this._lastRunStdout) {
+            // File exists but is empty or doesn't have events, parse from stdout
+            return this._parseToolLogsFromStdout(this._lastRunStdout);
+          }
+        } catch (_e) {
+          // Error reading file, fall back to stdout
+          if (this._lastRunStdout) {
+            return this._parseToolLogsFromStdout(this._lastRunStdout);
+          }
+        }
+      } else if (this._lastRunStdout) {
+        // No file exists, parse from stdout
+        return this._parseToolLogsFromStdout(this._lastRunStdout);
+      }
+    }
+
     // In sandbox mode, telemetry is written to a relative path in the test directory
     const logFilePath =
       env.GEMINI_SANDBOX && env.GEMINI_SANDBOX !== 'false'
