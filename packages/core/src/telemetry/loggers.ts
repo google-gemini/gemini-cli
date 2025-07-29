@@ -16,6 +16,7 @@ import {
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
   EVENT_FLASH_DECIDED_TO_CONTINUE,
+  EVENT_MEMORY_COMPRESSION,
   SERVICE_NAME,
 } from './constants.js';
 import {
@@ -28,12 +29,14 @@ import {
   FlashFallbackEvent,
   FlashDecidedToContinueEvent,
   LoopDetectedEvent,
+  MemoryCompressionEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
   recordTokenUsageMetrics,
   recordApiResponseMetrics,
   recordToolCallMetrics,
+  recordMemoryCompressionMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import { uiTelemetryService, UiEvent } from './uiTelemetry.js';
@@ -331,4 +334,32 @@ export function logFlashDecidedToContinue(
     attributes,
   };
   logger.emit(logRecord);
+}
+
+export function logMemoryCompression(
+  config: Config,
+  event: MemoryCompressionEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logMemoryCompressionEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_MEMORY_COMPRESSION,
+    'event.timestamp': new Date().toISOString(),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Memory compression. Original size: ${event.original_token_count}, compressed size: ${event.compressed_token_count}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+
+  recordMemoryCompressionMetrics(
+    config,
+    event.original_token_count,
+    event.compressed_token_count,
+  );
 }
