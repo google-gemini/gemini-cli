@@ -449,28 +449,56 @@ describe('memoryImportProcessor', () => {
         'flat',
       );
       // Should contain all files in order: root, a.md, b.md
-      const normalizedContent = result.content.replace(/\\/g, '/');
-      expect(normalizedContent).toContain('--- File: /test/project/src ---');
-      expect(normalizedContent).toContain(
-        '--- File: /test/project/src/a.md ---',
-      );
-      expect(normalizedContent).toContain(
-        '--- File: /test/project/src/b.md ---',
-      );
+      // Create platform-agnostic path matchers
+      const createPathMatcher = (filePath: string) => {
+        const normalized = path.normalize(filePath);
+        // Create a regex that matches both forward and backward slashes
+        const pathPattern = normalized.replace(/[\\/]/g, '[\\\\/]');
+        return new RegExp(`--- File: ${pathPattern} ---`);
+      };
 
-      // Verify order by checking indices
-      const rootIndex = normalizedContent.indexOf(
-        '--- File: /test/project/src ---',
-      );
-      const aIndex = normalizedContent.indexOf(
-        '--- File: /test/project/src/a.md ---',
-      );
-      const bIndex = normalizedContent.indexOf(
-        '--- File: /test/project/src/b.md ---',
-      );
+      // Define test paths
+      const testPaths = {
+        root: '/test/project/src',
+        a: '/test/project/src/a.md',
+        b: '/test/project/src/b.md',
+      };
 
-      expect(rootIndex).toBeLessThan(aIndex);
-      expect(aIndex).toBeLessThan(bIndex);
+      // Create matchers for each path
+      const matchers = {
+        root: createPathMatcher(testPaths.root),
+        a: createPathMatcher(testPaths.a),
+        b: createPathMatcher(testPaths.b),
+      };
+
+      // Verify all files are present
+      expect(result.content).toMatch(matchers.root);
+      expect(result.content).toMatch(matchers.a);
+      expect(result.content).toMatch(matchers.b);
+
+      // Extract all file markers with their positions
+      const markers = [];
+      for (const [name, regex] of Object.entries(matchers)) {
+        const match = result.content.match(regex);
+        if (match) {
+          markers.push({
+            name,
+            index: match.index!,
+            text: match[0],
+          });
+        }
+      }
+
+      // Sort markers by their position in the content
+      markers.sort((a, b) => a.index - b.index);
+
+      // Verify we found all markers
+      expect(markers).toHaveLength(3);
+
+      // Verify the order is root -> a -> b
+      expect(markers[0].name).toBe('root');
+      expect(markers[1].name).toBe('a');
+      expect(markers[2].name).toBe('b');
       expect(result.content).toContain('Root @./a.md');
       expect(result.content).toContain('A @./b.md');
       expect(result.content).toContain('B content');
