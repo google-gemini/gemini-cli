@@ -29,6 +29,7 @@ import { statsCommand } from '../ui/commands/statsCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
+import { installCommand } from '../ui/commands/installCommand.js';
 
 /**
  * Loads the core, hard-coded slash commands that are an integral part
@@ -68,6 +69,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       themeCommand,
       toolsCommand,
       vimCommand,
+      installCommand,
     ];
 
     return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);
