@@ -7,11 +7,12 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { shortenPath, tildeifyPath, tokenLimit } from '@google/gemini-cli-core';
+import { shortenPath, tildeifyPath } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
 import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
+import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 
 interface FooterProps {
   model: string;
@@ -41,13 +42,9 @@ export const Footer: React.FC<FooterProps> = ({
   promptTokenCount,
   nightly,
   vimMode,
-}) => {
-  const limit = tokenLimit(model);
-  const percentage = promptTokenCount / limit;
-
-  return (
-    <Box justifyContent="space-between" width="100%">
-      <Box>
+}) => (
+  <Box justifyContent="space-between" width="100%">
+    <Box>
         {vimMode && <Text color={Colors.Gray}>[{vimMode}] </Text>}
         {nightly ? (
           <Gradient colors={Colors.GradientColors}>
@@ -97,9 +94,10 @@ export const Footer: React.FC<FooterProps> = ({
         <Text color={Colors.AccentBlue}>
           {' '}
           {model}{' '}
-          <Text color={Colors.Gray}>
-            ({((1 - percentage) * 100).toFixed(0)}% context left)
-          </Text>
+          <ContextUsageDisplay
+            promptTokenCount={promptTokenCount}
+            model={model}
+          />
         </Text>
         {corgiMode && (
           <Text>
@@ -121,4 +119,3 @@ export const Footer: React.FC<FooterProps> = ({
       </Box>
     </Box>
   );
-};
