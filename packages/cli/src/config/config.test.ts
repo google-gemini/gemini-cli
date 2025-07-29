@@ -35,6 +35,11 @@ vi.mock('@google/gemini-cli-core', async () => {
   );
   return {
     ...actualServer,
+    IdeClient: vi.fn().mockImplementation(() => ({
+      getConnectionStatus: vi.fn(),
+      initialize: vi.fn(),
+      shutdown: vi.fn(),
+    })),
     loadEnvironment: vi.fn(),
     loadServerHierarchicalMemory: vi.fn(
       (cwd, debug, fileService, extensionPaths, _maxDirs) =>
