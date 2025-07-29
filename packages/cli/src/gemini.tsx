@@ -43,6 +43,8 @@ import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { runAcpPeer } from './acp/acpPeer.js';
 import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
+import { checkForUpdates } from './ui/utils/updateCheck.js';
+import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { formatRelativeTime, SessionSelector } from './utils/sessionUtils.js';
 
@@ -367,6 +369,17 @@ export async function main() {
       </React.StrictMode>,
       { exitOnCtrlC: false },
     );
+
+    checkForUpdates()
+      .then((info) => {
+        handleAutoUpdate(info, settings, config.getProjectRoot());
+      })
+      .catch((err) => {
+        // Silently ignore update check errors.
+        if (config.getDebugMode()) {
+          console.error('Update check failed:', err);
+        }
+      });
 
     registerCleanup(() => instance.unmount());
     return;
