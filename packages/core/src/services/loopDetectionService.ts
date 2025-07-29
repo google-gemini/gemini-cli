@@ -150,16 +150,7 @@ export class LoopDetectionService {
     return false;
   }
 
-  /**
-   * Detects content loops by analyzing streaming text for repetitive patterns.
-   *
-   * The algorithm works by:
-   * 1. Appending new content to the streaming history
-   * 2. Truncating history if it exceeds the maximum length
-   * 3. Analyzing content chunks for repetitive patterns using hashing
-   * 4. Detecting loops when identical chunks appear frequently within a short distance
-   */
-  private checkContentLoop(content: string): boolean {
+  private _stripCodeBlocks(content: string): string {
     let contentOutsideCodeblocks = '';
     let currentPos = 0;
 
@@ -194,6 +185,21 @@ export class LoopDetectionService {
       this.inCodeBlock = !this.inCodeBlock;
       currentPos = fenceIndex + 3;
     }
+
+    return contentOutsideCodeblocks;
+  }
+
+  /**
+   * Detects content loops by analyzing streaming text for repetitive patterns.
+   *
+   * The algorithm works by:
+   * 1. Appending new content to the streaming history
+   * 2. Truncating history if it exceeds the maximum length
+   * 3. Analyzing content chunks for repetitive patterns using hashing
+   * 4. Detecting loops when identical chunks appear frequently within a short distance
+   */
+  private checkContentLoop(content: string): boolean {
+    const contentOutsideCodeblocks = this._stripCodeBlocks(content);
 
     if (!contentOutsideCodeblocks) {
       return false;
