@@ -146,20 +146,6 @@ export function getMCPDiscoveryState(): MCPDiscoveryState {
 }
 
 /**
- * Parse www-authenticate header to extract OAuth metadata URI.
- *
- * @param wwwAuthenticate The www-authenticate header value
- * @returns The resource metadata URI if found, null otherwise
- */
-function _parseWWWAuthenticate(wwwAuthenticate: string): string | null {
-  // Parse header like: Bearer realm="MCP Server", resource_metadata_uri="https://..."
-  const resourceMetadataMatch = wwwAuthenticate.match(
-    /resource_metadata_uri="([^"]+)"/,
-  );
-  return resourceMetadataMatch ? resourceMetadataMatch[1] : null;
-}
-
-/**
  * Extract WWW-Authenticate header from error message string.
  * This is a more robust approach than regex matching.
  *
