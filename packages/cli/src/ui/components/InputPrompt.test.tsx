@@ -549,28 +549,6 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should autocomplete on Enter when suggestions are active, without submitting', async () => {
-    mockedUseCompletion.mockReturnValue({
-      ...mockCompletion,
-      showSuggestions: true,
-      suggestions: [{ label: 'memory', value: 'memory' }],
-      activeSuggestionIndex: 0,
-    });
-    props.buffer.setText('/mem');
-
-    const { stdin, unmount } = render(<InputPrompt {...props} />);
-    await wait();
-
-    stdin.write('\r');
-    await wait();
-
-    // The app should autocomplete the text, NOT submit.
-    expect(mockCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
-
-    expect(props.onSubmit).not.toHaveBeenCalled();
-    unmount();
-  });
-
   it('should complete a command based on its altNames', async () => {
     props.slashCommands = [
       {
@@ -645,26 +623,6 @@ describe('InputPrompt', () => {
     await wait();
 
     expect(props.onSubmit).toHaveBeenCalledWith('/clear');
-    unmount();
-  });
-
-  it('should autocomplete an @-path on Enter without submitting', async () => {
-    mockedUseCompletion.mockReturnValue({
-      ...mockCompletion,
-      showSuggestions: true,
-      suggestions: [{ label: 'index.ts', value: 'index.ts' }],
-      activeSuggestionIndex: 0,
-    });
-    props.buffer.setText('@src/components/');
-
-    const { stdin, unmount } = render(<InputPrompt {...props} />);
-    await wait();
-
-    stdin.write('\r');
-    await wait();
-
-    expect(mockCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
-    expect(props.onSubmit).not.toHaveBeenCalled();
     unmount();
   });
 

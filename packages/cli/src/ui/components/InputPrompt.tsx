@@ -220,7 +220,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
         }
 
-        if (key.name === 'tab' || (key.name === 'return' && !key.ctrl)) {
+        if (key.name === 'tab') {
           if (completion.suggestions.length > 0) {
             const targetIndex =
               completion.activeSuggestionIndex === -1

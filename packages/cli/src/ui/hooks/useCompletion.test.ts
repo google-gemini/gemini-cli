@@ -6,35 +6,51 @@
 
 /** @vitest-environment jsdom */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useCompletion } from './useCompletion.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as os from 'os';
+
 import { CommandContext, SlashCommand } from '../commands/types.js';
-import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
 import { useTextBuffer, TextBuffer } from '../components/shared/text-buffer.js';
+import { Config, FileSearch, AbortError } from '@google/gemini-cli-core';
+
+// Mock FileSearch
+const mockInitialize = vi.fn();
+const mockSearch = vi.fn();
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...original,
+    FileSearch: vi.fn().mockImplementation(() => ({
+      initialize: mockInitialize,
+      search: mockSearch,
+    })),
+    AbortError: class AbortError extends Error {
+      constructor(message?: string) {
+        super(message);
+        this.name = 'AbortError';
+      }
+    },
+  };
+});
 
 describe('useCompletion', () => {
-  let testRootDir: string;
-  let mockConfig: Config;
-
   // A minimal mock is sufficient for these tests.
   const mockCommandContext = {} as CommandContext;
+  const testRootDir = 'test/root/dir';
+  const mockConfig = {
+    getFileFilteringOptions: () => ({
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    }),
+  } as unknown as Config;
 
-  async function createEmptyDir(...pathSegments: string[]) {
-    const fullPath = path.join(testRootDir, ...pathSegments);
-    await fs.mkdir(fullPath, { recursive: true });
-    return fullPath;
-  }
-
-  async function createTestFile(content: string, ...pathSegments: string[]) {
-    const fullPath = path.join(testRootDir, ...pathSegments);
-    await fs.mkdir(path.dirname(fullPath), { recursive: true });
-    await fs.writeFile(fullPath, content);
-    return fullPath;
-  }
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInitialize.mockResolvedValue(undefined);
+    mockSearch.mockResolvedValue([]);
+  });
 
   // Helper to create real TextBuffer objects within renderHook
   function useTextBufferForTest(text: string) {
@@ -46,29 +62,6 @@ describe('useCompletion', () => {
       onChange: () => {},
     });
   }
-
-  beforeEach(async () => {
-    testRootDir = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'completion-unit-test-'),
-    );
-    mockConfig = {
-      getTargetDir: () => testRootDir,
-      getProjectRoot: () => testRootDir,
-      getFileFilteringOptions: vi.fn(() => ({
-        respectGitIgnore: true,
-        respectGeminiIgnore: true,
-      })),
-      getEnableRecursiveFileSearch: vi.fn(() => true),
-      getFileService: vi.fn(() => new FileDiscoveryService(testRootDir)),
-    } as unknown as Config;
-
-    vi.clearAllMocks();
-  });
-
-  afterEach(async () => {
-    vi.restoreAllMocks();
-    await fs.rm(testRootDir, { recursive: true, force: true });
-  });
 
   describe('Core Hook Behavior', () => {
     describe('State Management', () => {
@@ -786,275 +779,199 @@ describe('useCompletion', () => {
     });
   });
 
-  describe('File Path Completion (`@`)', () => {
-    describe('Basic Completion', () => {
-      it('should use glob for top-level @ completions when available', async () => {
-        await createTestFile('', 'src', 'index.ts');
-        await createTestFile('', 'derp', 'script.ts');
-        await createTestFile('', 'README.md');
+  describe('File path completion (`@`)', () => {
+    it('should initialize FileSearch and show loading state', async () => {
+      mockInitialize.mockResolvedValue(undefined);
+      // Provide a mock implementation to prevent the unhandled error
+      mockSearch.mockResolvedValue([]);
+      const { result } = renderHook(() =>
+        useCompletion(
+          useTextBufferForTest('@'),
+          testRootDir,
+          [],
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
 
-        const { result } = renderHook(() =>
-          useCompletion(
-            useTextBufferForTest('@s'),
-            testRootDir,
-            [],
-            mockCommandContext,
-            mockConfig,
-          ),
-        );
-
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 150));
-        });
-
-        expect(result.current.suggestions).toHaveLength(2);
-        expect(result.current.suggestions).toEqual(
-          expect.arrayContaining([
-            {
-              label: 'derp/script.ts',
-              value: 'derp/script.ts',
-            },
-            { label: 'src', value: 'src' },
-          ]),
-        );
+      expect(result.current.isLoadingSuggestions).toBe(true);
+      expect(FileSearch).toHaveBeenCalledWith({
+        projectRoot: testRootDir,
+        ignoreDirs: [],
+        useGitignore: true,
+        useGeminiignore: true,
+        cache: true,
+        cacheTtl: 30,
       });
 
-      it('should handle directory-specific completions with git filtering', async () => {
-        await createEmptyDir('.git');
-        await createTestFile('*.log', '.gitignore');
-        await createTestFile('', 'src', 'component.tsx');
-        await createTestFile('', 'src', 'temp.log');
-        await createTestFile('', 'src', 'index.ts');
-
-        const { result } = renderHook(() =>
-          useCompletion(
-            useTextBufferForTest('@src/comp'),
-            testRootDir,
-            [],
-            mockCommandContext,
-            mockConfig,
-          ),
-        );
-
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 150));
-        });
-
-        // Should filter out .log files but include matching .tsx files
-        expect(result.current.suggestions).toEqual([
-          { label: 'component.tsx', value: 'component.tsx' },
-        ]);
-      });
-
-      it('should include dotfiles in glob search when input starts with a dot', async () => {
-        await createTestFile('', '.env');
-        await createTestFile('', '.gitignore');
-        await createTestFile('', 'src', 'index.ts');
-
-        const { result } = renderHook(() =>
-          useCompletion(
-            useTextBufferForTest('@.'),
-            testRootDir,
-            [],
-            mockCommandContext,
-            mockConfig,
-          ),
-        );
-
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 150));
-        });
-
-        expect(result.current.suggestions).toEqual([
-          { label: '.env', value: '.env' },
-          { label: '.gitignore', value: '.gitignore' },
-        ]);
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
       });
     });
 
-    describe('Configuration-based Behavior', () => {
-      it('should not perform recursive search when disabled in config', async () => {
-        const mockConfigNoRecursive = {
-          ...mockConfig,
-          getEnableRecursiveFileSearch: vi.fn(() => false),
-        } as unknown as Config;
+    it('should display suggestions after search completes', async () => {
+      mockInitialize.mockResolvedValue(undefined);
+      mockSearch.mockResolvedValue(['file1.txt', 'file2.js']);
 
-        await createEmptyDir('data');
-        await createEmptyDir('dist');
+      const { result } = renderHook(() =>
+        useCompletion(
+          useTextBufferForTest('@f'),
+          testRootDir,
+          [],
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
 
-        const { result } = renderHook(() =>
-          useCompletion(
-            useTextBufferForTest('@d'),
-            testRootDir,
-            [],
-            mockCommandContext,
-            mockConfigNoRecursive,
-          ),
-        );
-
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 150));
-        });
-
-        expect(result.current.suggestions).toEqual([
-          { label: 'data/', value: 'data/' },
-          { label: 'dist/', value: 'dist/' },
-        ]);
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
       });
 
-      it('should work without config (fallback behavior)', async () => {
-        await createEmptyDir('src');
-        await createEmptyDir('node_modules');
-        await createTestFile('', 'README.md');
-
-        const { result } = renderHook(() =>
-          useCompletion(
-            useTextBufferForTest('@'),
-            testRootDir,
-            [],
-            mockCommandContext,
-            undefined,
-          ),
-        );
-
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 150));
-        });
-
-        // Without config, should include all files
-        expect(result.current.suggestions).toHaveLength(3);
-        expect(result.current.suggestions).toEqual(
-          expect.arrayContaining([
-            { label: 'src/', value: 'src/' },
-            { label: 'node_modules/', value: 'node_modules/' },
-            { label: 'README.md', value: 'README.md' },
-          ]),
-        );
+      expect(mockSearch).toHaveBeenCalledWith('f', {
+        signal: expect.any(AbortSignal),
+        maxResults: 24,
       });
 
-      it('should handle git discovery service initialization failure gracefully', async () => {
-        // Intentionally don't create a .git directory to cause an initialization failure.
-        await createEmptyDir('src');
-        await createTestFile('', 'README.md');
-
-        const consoleSpy = vi
-          .spyOn(console, 'warn')
-          .mockImplementation(() => {});
-
-        const { result } = renderHook(() =>
-          useCompletion(
-            useTextBufferForTest('@'),
-            testRootDir,
-            [],
-            mockCommandContext,
-            mockConfig,
-          ),
-        );
-
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 150));
-        });
-
-        // Since we use centralized service, initialization errors are handled at config level
-        // This test should verify graceful fallback behavior
-        expect(result.current.suggestions.length).toBeGreaterThanOrEqual(0);
-        // Should still show completions even if git discovery fails
-        expect(result.current.suggestions.length).toBeGreaterThan(0);
-
-        consoleSpy.mockRestore();
-      });
+      expect(result.current.suggestions).toEqual([
+        { label: 'file1.txt', value: 'file1.txt' },
+        { label: 'file2.js', value: 'file2.js' },
+      ]);
+      expect(result.current.showSuggestions).toBe(true);
     });
 
-    describe('Git-Aware Filtering', () => {
-      it('should filter git-ignored entries from @ completions', async () => {
-        await createEmptyDir('.git');
-        await createTestFile('dist', '.gitignore');
-        await createEmptyDir('data');
+    it('should queue a search if the engine is still initializing', async () => {
+      mockInitialize.mockReturnValue(new Promise(() => {})); // Never resolves
 
-        const { result } = renderHook(() =>
+      const { result } = renderHook(() =>
+        useCompletion(
+          useTextBufferForTest('@'),
+          testRootDir,
+          [],
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      expect(result.current.isLoadingSuggestions).toBe(true);
+      expect(mockSearch).not.toHaveBeenCalled();
+    });
+
+    it('should abort the previous search when the query changes', async () => {
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+      mockInitialize.mockResolvedValue(undefined);
+      // Make the search promise never resolve so we can test the abort
+      mockSearch.mockReturnValue(new Promise(() => {}));
+
+      const { rerender, unmount } = renderHook(
+        ({ text }) =>
           useCompletion(
-            useTextBufferForTest('@d'),
+            useTextBufferForTest(text),
             testRootDir,
             [],
             mockCommandContext,
             mockConfig,
           ),
-        );
+        { initialProps: { text: '@a' } },
+      );
 
-        // Wait for async operations to complete
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 150)); // Account for debounce
-        });
+      // Wait for initialization to complete and the first search to start
+      await waitFor(() => {
+        expect(mockSearch).toHaveBeenCalledTimes(1);
+      });
 
-        expect(result.current.suggestions).toEqual(
-          expect.arrayContaining([{ label: 'data', value: 'data' }]),
-        );
+      // Trigger a new search, which should abort the previous one
+      rerender({ text: '@ab' });
+
+      await waitFor(() => {
+        expect(abortSpy).toHaveBeenCalled();
+      });
+
+      unmount();
+    });
+
+    it('should handle AbortError gracefully', async () => {
+      mockInitialize.mockResolvedValue(undefined);
+      mockSearch.mockRejectedValue(new AbortError());
+
+      const { result } = renderHook(() =>
+        useCompletion(
+          useTextBufferForTest('@a'),
+          testRootDir,
+          [],
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      await waitFor(() => {
+        // After an abort, loading should stop, but we keep the suggestion
+        // box open for the user.
+        expect(result.current.isLoadingSuggestions).toBe(false);
         expect(result.current.showSuggestions).toBe(true);
       });
 
-      it('should filter git-ignored directories from @ completions', async () => {
-        await createEmptyDir('.git');
-        await createTestFile('node_modules\ndist\n.env', '.gitignore');
-        // gitignored entries
-        await createEmptyDir('node_modules');
-        await createEmptyDir('dist');
-        await createTestFile('', '.env');
+      expect(result.current.suggestions).toEqual([]);
+    });
 
-        // visible
-        await createEmptyDir('src');
-        await createTestFile('', 'README.md');
+    it('should abort the search when the hook becomes inactive', async () => {
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+      mockInitialize.mockResolvedValue(undefined);
+      mockSearch.mockReturnValue(new Promise(() => {}));
 
-        const { result } = renderHook(() =>
+      const { rerender, unmount } = renderHook(
+        ({ text }) =>
           useCompletion(
-            useTextBufferForTest('@'),
+            useTextBufferForTest(text),
             testRootDir,
             [],
             mockCommandContext,
             mockConfig,
           ),
-        );
+        { initialProps: { text: '@a' } },
+      );
 
-        // Wait for async operations to complete
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 150)); // Account for debounce
-        });
-
-        expect(result.current.suggestions).toEqual([
-          { label: 'README.md', value: 'README.md' },
-          { label: 'src/', value: 'src/' },
-        ]);
-        expect(result.current.showSuggestions).toBe(true);
+      // Wait for initialization to complete and the first search to start
+      await waitFor(() => {
+        expect(mockSearch).toHaveBeenCalledTimes(1);
       });
 
-      it('should handle recursive search with git-aware filtering', async () => {
-        await createEmptyDir('.git');
-        await createTestFile('node_modules/\ntemp/', '.gitignore');
-        await createTestFile('', 'data', 'test.txt');
-        await createEmptyDir('dist');
-        await createEmptyDir('node_modules');
-        await createTestFile('', 'src', 'index.ts');
-        await createEmptyDir('src', 'components');
-        await createTestFile('', 'temp', 'temp.log');
+      rerender({ text: ' @a' }); // Becomes inactive
 
-        const { result } = renderHook(() =>
-          useCompletion(
-            useTextBufferForTest('@t'),
-            testRootDir,
-            [],
-            mockCommandContext,
-            mockConfig,
-          ),
-        );
-
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 150));
-        });
-
-        // Should not include anything from node_modules or dist
-        const suggestionLabels = result.current.suggestions.map((s) => s.label);
-        expect(suggestionLabels).not.toContain('temp/');
-        expect(suggestionLabels).not.toContain('node_modules/');
+      await waitFor(() => {
+        expect(abortSpy).toHaveBeenCalled();
       });
+
+      unmount();
+    });
+
+    it('should handle @ at the end of query', async () => {
+      mockInitialize.mockResolvedValue(undefined);
+      mockSearch.mockResolvedValue(['file1.txt', 'file2.js']);
+
+      const { result } = renderHook(() =>
+        useCompletion(
+          useTextBufferForTest('query @'),
+          testRootDir,
+          [],
+          mockCommandContext,
+          mockConfig,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      expect(mockSearch).toHaveBeenCalledWith('', {
+        signal: expect.any(AbortSignal),
+        maxResults: 24,
+      });
+
+      expect(result.current.suggestions).toEqual([
+        { label: 'file1.txt', value: 'file1.txt' },
+        { label: 'file2.js', value: 'file2.js' },
+      ]);
+      expect(result.current.showSuggestions).toBe(true);
     });
   });
 
@@ -1238,7 +1155,7 @@ describe('useCompletion', () => {
       });
 
       expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalledWith(
-        5, // after '@src/'
+        1, // after '@src/'
         mockBuffer.text.length,
         'file1.txt',
       );

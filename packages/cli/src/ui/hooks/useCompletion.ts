@@ -4,18 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { glob } from 'glob';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  isNodeError,
   escapePath,
   unescapePath,
   getErrorMessage,
   Config,
-  FileDiscoveryService,
-  DEFAULT_FILE_FILTERING_OPTIONS,
+  FileSearch,
+  AbortError,
 } from '@google/gemini-cli-core';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
@@ -25,6 +21,16 @@ import { CommandContext, SlashCommand } from '../commands/types.js';
 import { TextBuffer } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
+
+// The FileSearch engine is initialized asynchronously. This enum manages its state.
+enum FileSearchStatus {
+  // Not yet started.
+  IDLE,
+  // The initialize() promise is in flight.
+  INITIALIZING,
+  // Ready to serve search requests.
+  READY,
+}
 
 export interface UseCompletionReturn {
   suggestions: Suggestion[];
@@ -49,6 +55,9 @@ export function useCompletion(
   config?: Config,
 ): UseCompletionReturn {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const suggestionsRef = useRef(suggestions);
+  suggestionsRef.current = suggestions;
+
   const [activeSuggestionIndex, setActiveSuggestionIndex] =
     useState<number>(-1);
   const [visibleStartIndex, setVisibleStartIndex] = useState<number>(0);
@@ -56,6 +65,12 @@ export function useCompletion(
   const [isLoadingSuggestions, setIsLoadingSuggestions] =
     useState<boolean>(false);
   const [isPerfectMatch, setIsPerfectMatch] = useState<boolean>(false);
+  const fileSearchRef = useRef<FileSearch | null>(null);
+  const searchAbortControllerRef = useRef<AbortController | null>(null);
+  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [fileSearchStatus, setFileSearchStatus] = useState<FileSearchStatus>(
+    FileSearchStatus.IDLE,
+  );
 
   const resetCompletionState = useCallback(() => {
     setSuggestions([]);
@@ -64,6 +79,11 @@ export function useCompletion(
     setShowSuggestions(false);
     setIsLoadingSuggestions(false);
     setIsPerfectMatch(false);
+    if (loadingTimerRef.current) {
+      clearTimeout(loadingTimerRef.current);
+    }
+    fileSearchRef.current = null;
+    setFileSearchStatus(FileSearchStatus.IDLE);
   }, []);
 
   const navigateUp = useCallback(() => {
@@ -156,6 +176,104 @@ export function useCompletion(
 
     return false;
   }, [buffer.text, buffer.cursor, buffer.lines]);
+
+  const fetchFileSuggestions = useCallback(
+    async (prefix: string, signal: AbortSignal) => {
+      if (!fileSearchRef.current) return;
+
+      // Clear any pending delayed loader.
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+      }
+
+      // If there are no suggestions, show the loader immediately.
+      // Otherwise, only show it if the search takes more than 100ms.
+      if (suggestionsRef.current.length === 0) {
+        setIsLoadingSuggestions(true);
+      } else {
+        loadingTimerRef.current = setTimeout(() => {
+          setIsLoadingSuggestions(true);
+        }, 100);
+      }
+
+      try {
+        const results = await fileSearchRef.current.search(prefix, {
+          signal,
+          // Never retrieve more than 3 pages of results
+          maxResults: MAX_SUGGESTIONS_TO_SHOW * 3,
+        });
+
+        if (signal.aborted) return;
+
+        const fetchedSuggestions = results.map((result) => ({
+          label: result,
+          value: escapePath(result),
+        }));
+
+        setSuggestions(fetchedSuggestions);
+        setShowSuggestions(fetchedSuggestions.length > 0);
+        setActiveSuggestionIndex(fetchedSuggestions.length > 0 ? 0 : -1);
+        setVisibleStartIndex(0);
+      } catch (e) {
+        if (e instanceof AbortError) {
+          // This is expected when the user types quickly or closes the suggestions.
+          return;
+        }
+        // TODO(b/343593467): Implement better error handling.
+        console.error(`Error fetching file suggestions: ${getErrorMessage(e)}`);
+        resetCompletionState();
+      } finally {
+        if (loadingTimerRef.current) {
+          clearTimeout(loadingTimerRef.current);
+        }
+        if (!signal.aborted) {
+          setIsLoadingSuggestions(false);
+        }
+      }
+    },
+    [resetCompletionState],
+  );
+
+  // Effect to initialize the FileSearch engine
+  useEffect(() => {
+    if (isActive && fileSearchStatus === FileSearchStatus.IDLE) {
+      const atIndex = buffer.text.lastIndexOf('@');
+      if (atIndex === -1) {
+        return;
+      }
+
+      setFileSearchStatus(FileSearchStatus.INITIALIZING);
+      setIsLoadingSuggestions(true);
+      setShowSuggestions(true);
+      const filterOptions = config?.getFileFilteringOptions() ?? {
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      };
+      fileSearchRef.current = new FileSearch({
+        projectRoot: cwd,
+        ignoreDirs: [],
+        useGitignore: filterOptions.respectGitIgnore,
+        useGeminiignore: filterOptions.respectGeminiIgnore,
+        cache: true,
+        cacheTtl: 30, // 30 seconds
+      });
+
+      fileSearchRef.current
+        .initialize()
+        .then(() => {
+          setFileSearchStatus(FileSearchStatus.READY);
+        })
+        .catch((e) => {
+          console.error(
+            `FileSearch initialization failed: ${getErrorMessage(e)}`,
+          );
+          // Reset to allow for a retry if the user starts typing again.
+          setFileSearchStatus(FileSearchStatus.IDLE);
+          setIsLoadingSuggestions(false);
+          setShowSuggestions(false);
+        });
+    }
+  }, [isActive, fileSearchStatus, cwd, buffer.text, config]);
 
   useEffect(() => {
     if (!isActive) {
@@ -316,281 +434,43 @@ export function useCompletion(
       return;
     }
 
-    const partialPath = buffer.text.substring(atIndex + 1);
-    const lastSlashIndex = partialPath.lastIndexOf('/');
-    const baseDirRelative =
-      lastSlashIndex === -1
-        ? '.'
-        : partialPath.substring(0, lastSlashIndex + 1);
-    const prefix = unescapePath(
-      lastSlashIndex === -1
-        ? partialPath
-        : partialPath.substring(lastSlashIndex + 1),
-    );
-
-    const baseDirAbsolute = path.resolve(cwd, baseDirRelative);
-
-    let isMounted = true;
-
-    const findFilesRecursively = async (
-      startDir: string,
-      searchPrefix: string,
-      fileDiscovery: FileDiscoveryService | null,
-      filterOptions: {
-        respectGitIgnore?: boolean;
-        respectGeminiIgnore?: boolean;
-      },
-      currentRelativePath = '',
-      depth = 0,
-      maxDepth = 10, // Limit recursion depth
-      maxResults = 50, // Limit number of results
-    ): Promise<Suggestion[]> => {
-      if (depth > maxDepth) {
-        return [];
-      }
-
-      const lowerSearchPrefix = searchPrefix.toLowerCase();
-      let foundSuggestions: Suggestion[] = [];
-      try {
-        const entries = await fs.readdir(startDir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (foundSuggestions.length >= maxResults) break;
-
-          const entryPathRelative = path.join(currentRelativePath, entry.name);
-          const entryPathFromRoot = path.relative(
-            cwd,
-            path.join(startDir, entry.name),
-          );
-
-          // Conditionally ignore dotfiles
-          if (!searchPrefix.startsWith('.') && entry.name.startsWith('.')) {
-            continue;
-          }
-
-          // Check if this entry should be ignored by filtering options
-          if (
-            fileDiscovery &&
-            fileDiscovery.shouldIgnoreFile(entryPathFromRoot, filterOptions)
-          ) {
-            continue;
-          }
-
-          if (entry.name.toLowerCase().startsWith(lowerSearchPrefix)) {
-            foundSuggestions.push({
-              label: entryPathRelative + (entry.isDirectory() ? '/' : ''),
-              value: escapePath(
-                entryPathRelative + (entry.isDirectory() ? '/' : ''),
-              ),
-            });
-          }
-          if (
-            entry.isDirectory() &&
-            entry.name !== 'node_modules' &&
-            !entry.name.startsWith('.')
-          ) {
-            if (foundSuggestions.length < maxResults) {
-              foundSuggestions = foundSuggestions.concat(
-                await findFilesRecursively(
-                  path.join(startDir, entry.name),
-                  searchPrefix, // Pass original searchPrefix for recursive calls
-                  fileDiscovery,
-                  filterOptions,
-                  entryPathRelative,
-                  depth + 1,
-                  maxDepth,
-                  maxResults - foundSuggestions.length,
-                ),
-              );
-            }
-          }
-        }
-      } catch (_err) {
-        // Ignore errors like permission denied or ENOENT during recursive search
-      }
-      return foundSuggestions.slice(0, maxResults);
-    };
-
-    const findFilesWithGlob = async (
-      searchPrefix: string,
-      fileDiscoveryService: FileDiscoveryService,
-      filterOptions: {
-        respectGitIgnore?: boolean;
-        respectGeminiIgnore?: boolean;
-      },
-      maxResults = 50,
-    ): Promise<Suggestion[]> => {
-      const globPattern = `**/${searchPrefix}*`;
-      const files = await glob(globPattern, {
-        cwd,
-        dot: searchPrefix.startsWith('.'),
-        nocase: true,
-      });
-
-      const suggestions: Suggestion[] = files
-        .map((file: string) => ({
-          label: file,
-          value: escapePath(file),
-        }))
-        .filter((s) => {
-          if (fileDiscoveryService) {
-            return !fileDiscoveryService.shouldIgnoreFile(
-              s.label,
-              filterOptions,
-            ); // relative path
-          }
-          return true;
-        })
-        .slice(0, maxResults);
-
-      return suggestions;
-    };
-
-    const fetchSuggestions = async () => {
+    // If the engine is still warming up, show the loading indicator
+    // but don't search yet. The search will be triggered by the effect
+    // that watches the fileSearchStatus.
+    if (fileSearchStatus === FileSearchStatus.INITIALIZING) {
       setIsLoadingSuggestions(true);
-      let fetchedSuggestions: Suggestion[] = [];
+      return;
+    }
 
-      const fileDiscoveryService = config ? config.getFileService() : null;
-      const enableRecursiveSearch =
-        config?.getEnableRecursiveFileSearch() ?? true;
-      const filterOptions =
-        config?.getFileFilteringOptions() ?? DEFAULT_FILE_FILTERING_OPTIONS;
+    // Once the engine is ready, start searching.
+    if (fileSearchStatus === FileSearchStatus.READY) {
+      const prefix = unescapePath(buffer.text.substring(atIndex + 1));
 
-      try {
-        // If there's no slash, or it's the root, do a recursive search from cwd
-        if (
-          partialPath.indexOf('/') === -1 &&
-          prefix &&
-          enableRecursiveSearch
-        ) {
-          if (fileDiscoveryService) {
-            fetchedSuggestions = await findFilesWithGlob(
-              prefix,
-              fileDiscoveryService,
-              filterOptions,
-            );
-          } else {
-            fetchedSuggestions = await findFilesRecursively(
-              cwd,
-              prefix,
-              null,
-              filterOptions,
-            );
-          }
-        } else {
-          // Original behavior: list files in the specific directory
-          const lowerPrefix = prefix.toLowerCase();
-          const entries = await fs.readdir(baseDirAbsolute, {
-            withFileTypes: true,
-          });
-
-          // Filter entries using git-aware filtering
-          const filteredEntries = [];
-          for (const entry of entries) {
-            // Conditionally ignore dotfiles
-            if (!prefix.startsWith('.') && entry.name.startsWith('.')) {
-              continue;
-            }
-            if (!entry.name.toLowerCase().startsWith(lowerPrefix)) continue;
-
-            const relativePath = path.relative(
-              cwd,
-              path.join(baseDirAbsolute, entry.name),
-            );
-            if (
-              fileDiscoveryService &&
-              fileDiscoveryService.shouldIgnoreFile(relativePath, filterOptions)
-            ) {
-              continue;
-            }
-
-            filteredEntries.push(entry);
-          }
-
-          fetchedSuggestions = filteredEntries.map((entry) => {
-            const label = entry.isDirectory() ? entry.name + '/' : entry.name;
-            return {
-              label,
-              value: escapePath(label), // Value for completion should be just the name part
-            };
-          });
-        }
-
-        // Like glob, we always return forwardslashes, even in windows.
-        fetchedSuggestions = fetchedSuggestions.map((suggestion) => ({
-          ...suggestion,
-          label: suggestion.label.replace(/\\/g, '/'),
-          value: suggestion.value.replace(/\\/g, '/'),
-        }));
-
-        // Sort by depth, then directories first, then alphabetically
-        fetchedSuggestions.sort((a, b) => {
-          const depthA = (a.label.match(/\//g) || []).length;
-          const depthB = (b.label.match(/\//g) || []).length;
-
-          if (depthA !== depthB) {
-            return depthA - depthB;
-          }
-
-          const aIsDir = a.label.endsWith('/');
-          const bIsDir = b.label.endsWith('/');
-          if (aIsDir && !bIsDir) return -1;
-          if (!aIsDir && bIsDir) return 1;
-
-          // exclude extension when comparing
-          const filenameA = a.label.substring(
-            0,
-            a.label.length - path.extname(a.label).length,
-          );
-          const filenameB = b.label.substring(
-            0,
-            b.label.length - path.extname(b.label).length,
-          );
-
-          return (
-            filenameA.localeCompare(filenameB) || a.label.localeCompare(b.label)
-          );
-        });
-
-        if (isMounted) {
-          setSuggestions(fetchedSuggestions);
-          setShowSuggestions(fetchedSuggestions.length > 0);
-          setActiveSuggestionIndex(fetchedSuggestions.length > 0 ? 0 : -1);
-          setVisibleStartIndex(0);
-        }
-      } catch (error: unknown) {
-        if (isNodeError(error) && error.code === 'ENOENT') {
-          if (isMounted) {
-            setSuggestions([]);
-            setShowSuggestions(false);
-          }
-        } else {
-          console.error(
-            `Error fetching completion suggestions for ${partialPath}: ${getErrorMessage(error)}`,
-          );
-          if (isMounted) {
-            resetCompletionState();
-          }
-        }
+      // Abort any previous search that might be in flight.
+      if (searchAbortControllerRef.current) {
+        searchAbortControllerRef.current.abort();
       }
-      if (isMounted) {
-        setIsLoadingSuggestions(false);
-      }
-    };
 
-    const debounceTimeout = setTimeout(fetchSuggestions, 100);
+      const newAbortController = new AbortController();
+      searchAbortControllerRef.current = newAbortController;
+
+      fetchFileSuggestions(prefix, newAbortController.signal);
+    }
 
     return () => {
-      isMounted = false;
-      clearTimeout(debounceTimeout);
+      if (searchAbortControllerRef.current) {
+        searchAbortControllerRef.current.abort();
+      }
     };
   }, [
     buffer.text,
-    cwd,
     isActive,
     resetCompletionState,
     slashCommands,
     commandContext,
     config,
+    fileSearchStatus,
+    fetchFileSuggestions,
   ]);
 
   const handleAutocomplete = useCallback(
@@ -654,14 +534,9 @@ export function useCompletion(
       } else {
         const atIndex = query.lastIndexOf('@');
         if (atIndex === -1) return;
-        const pathPart = query.substring(atIndex + 1);
-        const lastSlashIndexInPath = pathPart.lastIndexOf('/');
-        let autoCompleteStartIndex = atIndex + 1;
-        if (lastSlashIndexInPath !== -1) {
-          autoCompleteStartIndex += lastSlashIndexInPath + 1;
-        }
+
         buffer.replaceRangeByOffset(
-          autoCompleteStartIndex,
+          atIndex + 1,
           buffer.text.length,
           suggestion,
         );
