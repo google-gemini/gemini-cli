@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { detectIde, DetectedIde } from '../ide/detect-ide.js';
 import { ideContext, IdeContextNotificationSchema } from '../ide/ideContext.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -32,11 +33,29 @@ export class IdeClient {
   private state: IDEConnectionState = {
     status: IDEConnectionStatus.Disconnected,
   };
+  private static instance: IdeClient;
+  private readonly currentIde: DetectedIde | undefined;
 
-  constructor() {
+  private constructor() {
+    this.currentIde = detectIde();
+    if (!this.currentIde) {
+      logger.debug('Not running in a supported IDE, skipping connection.');
+      return;
+    }
     this.init().catch((err) => {
       logger.debug('Failed to initialize IdeClient:', err);
     });
+  }
+
+  static getInstance(): IdeClient {
+    if (!IdeClient.instance) {
+      IdeClient.instance = new IdeClient();
+    }
+    return IdeClient.instance;
+  }
+
+  getCurrentIde(): DetectedIde | undefined {
+    return this.currentIde;
   }
 
   getConnectionStatus(): IDEConnectionState {
