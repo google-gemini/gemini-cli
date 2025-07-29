@@ -415,9 +415,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
   const { stdin, setRawMode } = useStdin();
   const isInitialMount = useRef(true);
-
-  // Use full terminal width for input with a small fixed padding
-  const inputWidth = Math.max(20, terminalWidth - 3);
+  const inputWidth = Math.max(20, terminalWidth - 10);
   const suggestionsWidth = Math.max(60, Math.floor(terminalWidth * 0.8));
 
   // Utility callbacks
@@ -745,7 +743,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     );
   }
   // Use full terminal width for the main content area
-  const mainAreaWidth = terminalWidth;
+  const mainAreaWidth = terminalWidth - 3;
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalHeight * 0.2, 5));
   // Arbitrary threshold to ensure that items in the static area are large
   // enough but not too large to make the terminal hard to use.
@@ -756,7 +754,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   return (
     <StreamingContext.Provider value={streamingState}>
-      <Box flexDirection="column" width="100%">
+      <Box flexDirection="column" width={terminalWidth}>
         {/*
          * The Static component is an Ink intrinsic in which there can only be 1 per application.
          * Because of this restriction we're hacking it slightly by having a 'header' item here to
@@ -929,7 +927,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 marginTop={1}
                 display="flex"
                 justifyContent="space-between"
-                width="100%"
+                width={terminalWidth}
               >
                 <Box>
                   {process.env.GEMINI_SYSTEM_MD && (

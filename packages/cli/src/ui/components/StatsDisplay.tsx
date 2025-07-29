@@ -28,7 +28,7 @@ interface StatRowProps {
 const StatRow: React.FC<StatRowProps> = ({ title, children }) => (
   <Box>
     {/* Fixed width for the label creates a clean "gutter" for alignment */}
-    <Box width={28}>
+    <Box minWidth={28}>
       <Text color={Colors.LightBlue}>{title}</Text>
     </Box>
     {children}
@@ -44,7 +44,7 @@ interface SubStatRowProps {
 const SubStatRow: React.FC<SubStatRowProps> = ({ title, children }) => (
   <Box paddingLeft={2}>
     {/* Adjust width for the "» " prefix */}
-    <Box width={26}>
+    <Box minWidth={26}>
       <Text>» {title}</Text>
     </Box>
     {children}
@@ -58,7 +58,7 @@ interface SectionProps {
 }
 
 const Section: React.FC<SectionProps> = ({ title, children }) => (
-  <Box flexDirection="column" width="100%" marginBottom={1}>
+  <Box flexDirection="column" marginBottom={1}>
     <Text bold>{title}</Text>
     {children}
   </Box>
@@ -68,76 +68,68 @@ const ModelUsageTable: React.FC<{
   models: Record<string, ModelMetrics>;
   totalCachedTokens: number;
   cacheEfficiency: number;
-}> = ({ models, totalCachedTokens, cacheEfficiency }) => {
-  const nameWidth = 25;
-  const requestsWidth = 8;
-  const inputTokensWidth = 15;
-  const outputTokensWidth = 15;
+}> = ({ models, totalCachedTokens, cacheEfficiency }) => (
+  <Box flexDirection="column" marginTop={1}>
+    {/* Header */}
+    <Box>
+      <Box flexGrow={1} flexBasis={0}>
+        <Text bold>Model Usage</Text>
+      </Box>
+      <Box flexBasis={8} justifyContent="flex-end">
+        <Text bold>Reqs</Text>
+      </Box>
+      <Box flexBasis={15} justifyContent="flex-end">
+        <Text bold>Input Tokens</Text>
+      </Box>
+      <Box flexBasis={15} justifyContent="flex-end">
+        <Text bold>Output Tokens</Text>
+      </Box>
+    </Box>
+    {/* Divider */}
+    <Box
+      borderStyle="round"
+      borderBottom
+      borderTop={false}
+      borderLeft={false}
+      borderRight={false}
+    />
 
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      {/* Header */}
-      <Box>
-        <Box width={nameWidth}>
-          <Text bold>Model Usage</Text>
+    {/* Rows */}
+    {Object.entries(models).map(([name, modelMetrics]) => (
+      <Box key={name}>
+        <Box flexGrow={1} flexBasis={0}>
+          <Text>{name.replace('-001', '')}</Text>
         </Box>
-        <Box width={requestsWidth} justifyContent="flex-end">
-          <Text bold>Reqs</Text>
+        <Box flexBasis={8} justifyContent="flex-end">
+          <Text>{modelMetrics.api.totalRequests}</Text>
         </Box>
-        <Box width={inputTokensWidth} justifyContent="flex-end">
-          <Text bold>Input Tokens</Text>
+        <Box flexBasis={15} justifyContent="flex-end">
+          <Text color={Colors.AccentYellow}>
+            {modelMetrics.tokens.prompt.toLocaleString()}
+          </Text>
         </Box>
-        <Box width={outputTokensWidth} justifyContent="flex-end">
-          <Text bold>Output Tokens</Text>
+        <Box flexBasis={15} justifyContent="flex-end">
+          <Text color={Colors.AccentYellow}>
+            {modelMetrics.tokens.candidates.toLocaleString()}
+          </Text>
         </Box>
       </Box>
-      {/* Divider */}
-      <Box
-        borderStyle="round"
-        borderBottom={true}
-        borderTop={false}
-        borderLeft={false}
-        borderRight={false}
-        width={nameWidth + requestsWidth + inputTokensWidth + outputTokensWidth}
-      ></Box>
-
-      {/* Rows */}
-      {Object.entries(models).map(([name, modelMetrics]) => (
-        <Box key={name}>
-          <Box width={nameWidth}>
-            <Text>{name.replace('-001', '')}</Text>
-          </Box>
-          <Box width={requestsWidth} justifyContent="flex-end">
-            <Text>{modelMetrics.api.totalRequests}</Text>
-          </Box>
-          <Box width={inputTokensWidth} justifyContent="flex-end">
-            <Text color={Colors.AccentYellow}>
-              {modelMetrics.tokens.prompt.toLocaleString()}
-            </Text>
-          </Box>
-          <Box width={outputTokensWidth} justifyContent="flex-end">
-            <Text color={Colors.AccentYellow}>
-              {modelMetrics.tokens.candidates.toLocaleString()}
-            </Text>
-          </Box>
-        </Box>
-      ))}
-      {cacheEfficiency > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text>
-            <Text color={Colors.AccentGreen}>Savings Highlight:</Text>{' '}
-            {totalCachedTokens.toLocaleString()} ({cacheEfficiency.toFixed(1)}
-            %) of input tokens were served from the cache, reducing costs.
-          </Text>
-          <Box height={1} />
-          <Text color={Colors.Gray}>
-            » Tip: For a full token breakdown, run `/stats model`.
-          </Text>
-        </Box>
-      )}
-    </Box>
-  );
-};
+    ))}
+    {cacheEfficiency > 0 && (
+      <Box flexDirection="column" marginTop={1}>
+        <Text>
+          <Text color={Colors.AccentGreen}>Savings Highlight:</Text>{' '}
+          {totalCachedTokens.toLocaleString()} ({cacheEfficiency.toFixed(1)}
+          %) of input tokens were served from the cache, reducing costs.
+        </Text>
+        <Box height={1} />
+        <Text color={Colors.Gray}>
+          » Tip: For a full token breakdown, run `/stats model`.
+        </Text>
+      </Box>
+    )}
+  </Box>
+);
 
 interface StatsDisplayProps {
   duration: string;

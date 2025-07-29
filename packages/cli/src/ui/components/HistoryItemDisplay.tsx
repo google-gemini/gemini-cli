@@ -80,7 +80,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         toolCalls={item.tools}
         groupId={item.id}
         availableTerminalHeight={availableTerminalHeight}
-        terminalWidth={terminalWidth}
+        terminalWidth={terminalWidth - 3}
         config={config}
         isFocused={isFocused}
       />

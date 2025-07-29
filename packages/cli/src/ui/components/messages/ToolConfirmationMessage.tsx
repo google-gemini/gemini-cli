@@ -89,7 +89,7 @@ export const ToolConfirmationMessage: React.FC<
     if (confirmationDetails.isModifying) {
       return (
         <Box
-          minWidth="90%"
+          minWidth={childWidth}
           borderStyle="round"
           borderColor={Colors.Gray}
           justifyContent="space-around"
@@ -151,8 +151,8 @@ export const ToolConfirmationMessage: React.FC<
       bodyContentHeight -= 2; // Account for padding;
     }
     bodyContent = (
-      <Box flexDirection="column">
-        <Box paddingX={1} marginLeft={1}>
+      <Box flexDirection="column" width={terminalWidth}>
+        <Box>
           <MaxSizedBox
             maxHeight={bodyContentHeight}
             maxWidth={Math.max(childWidth - 4, 1)}

@@ -18,11 +18,6 @@ import {
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { ToolCallStats } from '@google/gemini-cli-core';
 
-const TOOL_NAME_COL_WIDTH = 25;
-const CALLS_COL_WIDTH = 8;
-const SUCCESS_RATE_COL_WIDTH = 15;
-const AVG_DURATION_COL_WIDTH = 15;
-
 const StatRow: React.FC<{
   name: string;
   stats: ToolCallStats;
@@ -36,16 +31,16 @@ const StatRow: React.FC<{
 
   return (
     <Box>
-      <Box width={TOOL_NAME_COL_WIDTH}>
+      <Box flexGrow={1} flexBasis={0}>
         <Text color={Colors.LightBlue}>{name}</Text>
       </Box>
-      <Box width={CALLS_COL_WIDTH} justifyContent="flex-end">
+      <Box flexBasis={8} justifyContent="flex-end">
         <Text>{stats.count}</Text>
       </Box>
-      <Box width={SUCCESS_RATE_COL_WIDTH} justifyContent="flex-end">
+      <Box flexBasis={15} justifyContent="flex-end">
         <Text color={successColor}>{successRate.toFixed(1)}%</Text>
       </Box>
-      <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
+      <Box flexBasis={15} justifyContent="flex-end">
         <Text>{formatDuration(avgDuration)}</Text>
       </Box>
     </Box>
@@ -107,16 +102,16 @@ export const ToolStatsDisplay: React.FC = () => {
 
       {/* Header */}
       <Box>
-        <Box width={TOOL_NAME_COL_WIDTH}>
+        <Box flexGrow={1} flexBasis={0}>
           <Text bold>Tool Name</Text>
         </Box>
-        <Box width={CALLS_COL_WIDTH} justifyContent="flex-end">
+        <Box flexBasis={8} justifyContent="flex-end">
           <Text bold>Calls</Text>
         </Box>
-        <Box width={SUCCESS_RATE_COL_WIDTH} justifyContent="flex-end">
+        <Box flexBasis={15} justifyContent="flex-end">
           <Text bold>Success Rate</Text>
         </Box>
-        <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
+        <Box flexBasis={15} justifyContent="flex-end">
           <Text bold>Avg Duration</Text>
         </Box>
       </Box>
@@ -128,7 +123,6 @@ export const ToolStatsDisplay: React.FC = () => {
         borderTop={false}
         borderLeft={false}
         borderRight={false}
-        width="100%"
       />
 
       {/* Tool Rows */}
@@ -141,42 +135,34 @@ export const ToolStatsDisplay: React.FC = () => {
       {/* User Decision Summary */}
       <Text bold>User Decision Summary</Text>
       <Box>
-        <Box
-          width={TOOL_NAME_COL_WIDTH + CALLS_COL_WIDTH + SUCCESS_RATE_COL_WIDTH}
-        >
+        <Box flexGrow={1} flexBasis={0}>
           <Text color={Colors.LightBlue}>Total Reviewed Suggestions:</Text>
         </Box>
-        <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
+        <Box flexBasis={15} justifyContent="flex-end">
           <Text>{totalReviewed}</Text>
         </Box>
       </Box>
       <Box>
-        <Box
-          width={TOOL_NAME_COL_WIDTH + CALLS_COL_WIDTH + SUCCESS_RATE_COL_WIDTH}
-        >
+        <Box flexGrow={1} flexBasis={0}>
           <Text> » Accepted:</Text>
         </Box>
-        <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
+        <Box flexBasis={15} justifyContent="flex-end">
           <Text color={Colors.AccentGreen}>{totalDecisions.accept}</Text>
         </Box>
       </Box>
       <Box>
-        <Box
-          width={TOOL_NAME_COL_WIDTH + CALLS_COL_WIDTH + SUCCESS_RATE_COL_WIDTH}
-        >
+        <Box flexGrow={1} flexBasis={0}>
           <Text> » Rejected:</Text>
         </Box>
-        <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
+        <Box flexBasis={15} justifyContent="flex-end">
           <Text color={Colors.AccentRed}>{totalDecisions.reject}</Text>
         </Box>
       </Box>
       <Box>
-        <Box
-          width={TOOL_NAME_COL_WIDTH + CALLS_COL_WIDTH + SUCCESS_RATE_COL_WIDTH}
-        >
+        <Box flexGrow={1} flexBasis={0}>
           <Text> » Modified:</Text>
         </Box>
-        <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
+        <Box flexBasis={15} justifyContent="flex-end">
           <Text color={Colors.AccentYellow}>{totalDecisions.modify}</Text>
         </Box>
       </Box>
@@ -188,16 +174,13 @@ export const ToolStatsDisplay: React.FC = () => {
         borderTop={false}
         borderLeft={false}
         borderRight={false}
-        width="100%"
       />
 
       <Box>
-        <Box
-          width={TOOL_NAME_COL_WIDTH + CALLS_COL_WIDTH + SUCCESS_RATE_COL_WIDTH}
-        >
+        <Box flexGrow={1} flexBasis={0}>
           <Text> Overall Agreement Rate:</Text>
         </Box>
-        <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
+        <Box flexBasis={15} justifyContent="flex-end">
           <Text bold color={totalReviewed > 0 ? agreementColor : undefined}>
             {totalReviewed > 0 ? `${agreementRate.toFixed(1)}%` : '--'}
           </Text>

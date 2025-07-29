@@ -40,64 +40,64 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
       </Text>
     </Box>
     <Box flexDirection="row">
-      <Box width="35%">
+      <Box minWidth={15}>
         <Text bold color={Colors.LightBlue}>
           CLI Version
         </Text>
       </Box>
-      <Box>
+      <Box flexGrow={1}>
         <Text>{cliVersion}</Text>
       </Box>
     </Box>
     {GIT_COMMIT_INFO && !['N/A'].includes(GIT_COMMIT_INFO) && (
       <Box flexDirection="row">
-        <Box width="35%">
+        <Box minWidth={15}>
           <Text bold color={Colors.LightBlue}>
             Git Commit
           </Text>
         </Box>
-        <Box>
+        <Box flexGrow={1}>
           <Text>{GIT_COMMIT_INFO}</Text>
         </Box>
       </Box>
     )}
     <Box flexDirection="row">
-      <Box width="35%">
+      <Box minWidth={15}>
         <Text bold color={Colors.LightBlue}>
           Model
         </Text>
       </Box>
-      <Box>
+      <Box flexGrow={1}>
         <Text>{modelVersion}</Text>
       </Box>
     </Box>
     <Box flexDirection="row">
-      <Box width="35%">
+      <Box minWidth={15}>
         <Text bold color={Colors.LightBlue}>
           Sandbox
         </Text>
       </Box>
-      <Box>
+      <Box flexGrow={1}>
         <Text>{sandboxEnv}</Text>
       </Box>
     </Box>
     <Box flexDirection="row">
-      <Box width="35%">
+      <Box minWidth={15}>
         <Text bold color={Colors.LightBlue}>
           OS
         </Text>
       </Box>
-      <Box>
+      <Box flexGrow={1}>
         <Text>{osVersion}</Text>
       </Box>
     </Box>
     <Box flexDirection="row">
-      <Box width="35%">
+      <Box minWidth={15}>
         <Text bold color={Colors.LightBlue}>
           Auth Method
         </Text>
       </Box>
-      <Box>
+      <Box flexGrow={1}>
         <Text>
           {selectedAuthType.startsWith('oauth') ? 'OAuth' : selectedAuthType}
         </Text>
@@ -105,12 +105,12 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
     </Box>
     {gcpProject && (
       <Box flexDirection="row">
-        <Box width="35%">
+        <Box minWidth={15}>
           <Text bold color={Colors.LightBlue}>
             GCP Project
           </Text>
         </Box>
-        <Box>
+        <Box flexGrow={1}>
           <Text>{gcpProject}</Text>
         </Box>
       </Box>

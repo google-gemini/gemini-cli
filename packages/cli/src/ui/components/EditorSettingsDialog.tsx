@@ -102,9 +102,8 @@ export function EditorSettingsDialog({
       borderColor={Colors.Gray}
       flexDirection="row"
       padding={1}
-      width="100%"
     >
-      <Box flexDirection="column" width="45%" paddingRight={2}>
+      <Box flexGrow={1} flexBasis={0} flexDirection="column" paddingRight={2}>
         <Text bold={focusedSection === 'editor'}>
           {focusedSection === 'editor' ? '> ' : '  '}Select Editor{' '}
           <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
@@ -140,7 +139,7 @@ export function EditorSettingsDialog({
         </Box>
       </Box>
 
-      <Box flexDirection="column" width="55%" paddingLeft={2}>
+      <Box flexGrow={1} flexBasis={0} flexDirection="column" paddingLeft={2}>
         <Text bold>Editor Preference</Text>
         <Box flexDirection="column" gap={1} marginTop={1}>
           <Text color={Colors.Gray}>
