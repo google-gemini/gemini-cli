@@ -98,6 +98,11 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Default:** `false`
   - **Example:** `"autoAccept": true`
 
+- **`showToolUsage`** (boolean):
+  - **Description:** If `true`, logs tool calls and their output to stderr in non-interactive mode.
+  - **Default:** `false`
+  - **Example:** `"showToolUsage": true`
+
 - **`theme`** (string):
   - **Description:** Sets the visual [theme](./themes.md) for Gemini CLI.
   - **Default:** `"Default"`
@@ -366,6 +371,8 @@ Arguments passed directly when running the CLI can override other configurations
   - Displays help information about command-line arguments.
 - **`--show-memory-usage`**:
   - Displays the current memory usage.
+- **`--show-tool-usage`**:
+  - Logs tool calls and their output to stderr in non-interactive mode.
 - **`--yolo`**:
   - Enables YOLO mode, which automatically approves all tool calls.
 - **`--telemetry`**:

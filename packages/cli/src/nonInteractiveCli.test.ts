@@ -54,6 +54,7 @@ describe('runNonInteractive', () => {
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
       getMaxSessionTurns: vi.fn().mockReturnValue(10),
+      getShowToolUsage: vi.fn().mockReturnValue(false),
       initialize: vi.fn(),
     } as unknown as Config;
 
@@ -340,5 +341,56 @@ describe('runNonInteractive', () => {
  Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.`,
     );
     expect(mockProcessExit).not.toHaveBeenCalled();
+  });
+
+  it('should log tool usage when showToolUsage is enabled', async () => {
+    const functionCall: FunctionCall = {
+      id: 'fc1',
+      name: 'testTool',
+      args: { p: 'v' },
+    };
+    const toolResponsePart: Part = {
+      functionResponse: {
+        name: 'testTool',
+        id: 'fc1',
+        response: { result: 'tool success' },
+      },
+    };
+
+    vi.mocked(mockConfig.getShowToolUsage).mockReturnValue(true);
+    const { executeToolCall: mockCoreExecuteToolCall } = await import(
+      '@google/gemini-cli-core'
+    );
+    vi.mocked(mockCoreExecuteToolCall).mockResolvedValue({
+      callId: 'fc1',
+      responseParts: [toolResponsePart],
+      resultDisplay: 'Tool success display',
+      error: undefined,
+    });
+
+    const stream1 = (async function* () {
+      yield { functionCalls: [functionCall] } as GenerateContentResponse;
+    })();
+    const stream2 = (async function* () {
+      yield {
+        candidates: [{ content: { parts: [{ text: 'Final answer' }] } }],
+      } as GenerateContentResponse;
+    })();
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await runNonInteractive(mockConfig, 'Use a tool', 'prompt-id-6');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[INFO] Using tool: testTool with args: {"p":"v"}',
+    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[INFO] Tool testTool output: Tool success display',
+    );
   });
 });

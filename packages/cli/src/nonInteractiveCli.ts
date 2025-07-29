@@ -118,12 +118,34 @@ export async function runNonInteractive(
             prompt_id,
           };
 
+          if (config.getShowToolUsage()) {
+            console.error(
+              `[INFO] Using tool: ${fc.name} with args: ${JSON.stringify(
+                fc.args,
+              )}`,
+            );
+          }
+
           const toolResponse = await executeToolCall(
             config,
             requestInfo,
             toolRegistry,
             abortController.signal,
           );
+
+          if (config.getShowToolUsage()) {
+            if (toolResponse.error) {
+              console.error(
+                `[INFO] Tool ${fc.name} failed with error: ${
+                  toolResponse.resultDisplay || toolResponse.error.message
+                }`,
+              );
+            } else {
+              console.error(
+                `[INFO] Tool ${fc.name} output: ${toolResponse.resultDisplay}`,
+              );
+            }
+          }
 
           if (toolResponse.error) {
             const isToolNotFound = toolResponse.error.message.includes(
