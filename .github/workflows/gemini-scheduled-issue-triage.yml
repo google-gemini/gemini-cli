@@ -80,7 +80,7 @@ jobs:
             7. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5 
             - Anything more than 6 versions older than the most recent should add the status/need-retesting label
             8. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label
-            
+
             Guidelines:
             - Only use labels that already exist in the repository.
             - Do not add comments or modify the issue content.
@@ -89,7 +89,7 @@ jobs:
             - Apply only one kind/ label
             - Apply all applicable sub-area/* and priority/* labels based on the issue content. It's ok to have multiple of these.
             - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
-            
+
             Categorization Guidelines: 
             P0: Critical / Blocker
             - A P0 bug is a catastrophic failure that demands immediate attention. It represents a complete showstopper for a significant portion of users or for the development process itself.
@@ -101,7 +101,7 @@ jobs:
             - Is it preventing contributors from contributing to the repository or is it a release blocker?
             Qualifier: Is the main function of the software broken?
             Example: The gemini auth login command fails with an unrecoverable error, preventing any user from authenticating and using the rest of the CLI.
-            
+
             P1: High
             - A P1 bug is a serious issue that significantly degrades the user experience or impacts a core feature. While not a complete blocker, it's a major problem that needs a fast resolution. 
             - Feature requests are almost never P1.
@@ -112,7 +112,7 @@ jobs:
             - No straightforward workaround exists, or the workaround is difficult and non-obvious.
             Qualifier: Is a key feature unusable or giving very wrong results?
             Example: The gemini -p "..." command consistently returns a malformed JSON response or an empty result, making the CLI's primary generation feature unreliable.
-            
+
             P2: Medium
             - A P2 bug is a moderately impactful issue. It's a noticeable problem but doesn't prevent the use of the software's main functionality.
             Impact:
@@ -121,7 +121,7 @@ jobs:
             - Noticeable UI/UX problems that don't break functionality but look unprofessional (e.g., elements are misaligned or overlapping).
             Qualifier: Is it an annoying but non-blocking problem?
             Example: An error message is unclear or contains a typo, causing user confusion but not halting their workflow.
-            
+
             P3: Low
             - A P3 bug is a minor, low-impact issue that is trivial or cosmetic. It has little to no effect on the overall functionality of the application.
             Impact:
@@ -129,12 +129,12 @@ jobs:
             - An edge-case bug that is very difficult to reproduce and affects a tiny fraction of users.
             Qualifier: Is it a "nice-to-fix" issue?
             Example: Spelling mistakes etc.
-            
+
             Things you should know.
             - If users are talking about issues where the model gets downgraded from pro to flash then i want you to categorize that as a performance issue
             - This product is designed to use different models eg.. using pro, downgrading to flash etc. 
             - When users report that they dont expect the model to change those would be categorized as feature requests.
-            
+
             Definition of Areas
             area/ux: 
             - Issues concerning user-facing elements like command usability, interactive features, help docs, and perceived performance.
