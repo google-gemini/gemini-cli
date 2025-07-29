@@ -67,7 +67,16 @@ export class CommandService {
 
       // Extension commands get renamed if they conflict with existing commands
       if (cmd.extensionName && commandMap.has(cmd.name)) {
-        finalName = `${cmd.extensionName}.${cmd.name}`;
+        let renamedName = `${cmd.extensionName}.${cmd.name}`;
+        let suffix = 1;
+        
+        // Keep trying until we find a name that doesn't conflict
+        while (commandMap.has(renamedName)) {
+          renamedName = `${cmd.extensionName}.${cmd.name}${suffix}`;
+          suffix++;
+        }
+        
+        finalName = renamedName;
       }
 
       commandMap.set(finalName, {
