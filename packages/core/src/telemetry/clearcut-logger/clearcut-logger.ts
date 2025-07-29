@@ -29,6 +29,7 @@ import {
 } from '../../utils/user_account.js';
 import { HttpError, retryWithBackoff } from '../../utils/retry.js';
 import { getInstallationId } from '../../utils/user_id.js';
+import { fetchActiveGitRepository } from '../utils/gitUtils.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -232,6 +233,11 @@ export class ClearcutLogger {
 
   logStartSessionEvent(event: StartSessionEvent): void {
     const surface = process.env.SURFACE || 'SURFACE_NOT_SET';
+    const gitRootRepo = fetchActiveGitRepository();
+    if (!gitRootRepo) {
+      console.warn(
+        'Unable to determine the Git root directory. Git repository information will not be logged.',
+      );
     const data = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
@@ -300,6 +306,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
         value: surface,
+      },
+    {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_REPO,
+        value: gitRootRepo
       },
     ];
 

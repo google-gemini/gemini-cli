@@ -157,6 +157,9 @@ export enum EventMetadataKey {
   // Logs the session id
   GEMINI_CLI_SESSION_ID = 40,
 
+  // Logs the git repository where the Gemini CLI is being used.
+  GEMINI_CLI_GIT_REPO = 41,
+
   // ==========================================================================
   // Loop Detected Event Keys
   // ===========================================================================
