@@ -15,11 +15,15 @@ With the Gemini CLI you can:
 - Use tools and MCP servers to connect new capabilities, including [media generation with Imagen,
   Veo or Lyria](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia)
 - Ground your queries with the [Google Search](https://ai.google.dev/gemini-api/docs/grounding)
-  tool, built in to Gemini.
+  tool, built into Gemini.
 
 ## Quickstart
 
-1. **Prerequisites:** Ensure you have [Node.js version 18](https://nodejs.org/en/download) or higher installed.
+You have two options to install Gemini CLI.
+
+### With Node
+
+1. **Prerequisites:** Ensure you have [Node.js version 20](https://nodejs.org/en/download) or higher installed.
 2. **Run the CLI:** Execute the following command in your terminal:
 
    ```bash
@@ -30,8 +34,30 @@ With the Gemini CLI you can:
 
    ```bash
    npm install -g @google/gemini-cli
+   ```
+
+   Then, run the CLI from anywhere:
+
+   ```bash
    gemini
    ```
+
+### With Homebrew
+
+1. **Prerequisites:** Ensure you have [Homebrew](https://brew.sh/) installed.
+2. **Install the CLI** Execute the following command in your terminal:
+
+   ```bash
+   brew install gemini-cli
+   ```
+
+   Then, run the CLI from anywhere:
+
+   ```bash
+   gemini
+   ```
+
+### Common Configuration steps
 
 3. **Pick a color theme**
 4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
@@ -40,7 +66,7 @@ You are now ready to use the Gemini CLI!
 
 ### Use a Gemini API key:
 
-The Gemini API provides a free tier with [100 requets per day](https://ai.google.dev/gemini-api/docs/rate-limits#free-tier) using Gemini 2.5 Pro, control over which model you use, and access to higher rate limits (with a paid plan):
+The Gemini API provides a free tier with [100 requests per day](https://ai.google.dev/gemini-api/docs/rate-limits#free-tier) using Gemini 2.5 Pro, control over which model you use, and access to higher rate limits (with a paid plan):
 
 1. Generate a key from [Google AI Studio](https://aistudio.google.com/apikey).
 2. Set it as an environment variable in your terminal. Replace `YOUR_API_KEY` with your generated key.
@@ -50,6 +76,20 @@ The Gemini API provides a free tier with [100 requets per day](https://ai.google
    ```
 
 3. (Optionally) Upgrade your Gemini API project to a paid plan on the API key page (will automatically unlock [Tier 1 rate limits](https://ai.google.dev/gemini-api/docs/rate-limits#tier-1))
+
+### Use a Vertex AI API key:
+
+The Vertex AI API provides a [free tier](https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview) using express mode for Gemini 2.5 Pro, control over which model you use, and access to higher rate limits with a billing account:
+
+1. Generate a key from [Google Cloud](https://cloud.google.com/vertex-ai/generative-ai/docs/start/api-keys).
+2. Set it as an environment variable in your terminal. Replace `YOUR_API_KEY` with your generated key and set GOOGLE_GENAI_USE_VERTEXAI to true
+
+   ```bash
+   export GOOGLE_API_KEY="YOUR_API_KEY"
+   export GOOGLE_GENAI_USE_VERTEXAI=true
+   ```
+
+3. (Optionally) Add a billing account on your project to get access to [higher usage limits](https://cloud.google.com/vertex-ai/generative-ai/docs/quotas)
 
 For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
 
@@ -78,13 +118,14 @@ gemini
 
 - Learn how to [contribute to or build from the source](./CONTRIBUTING.md).
 - Explore the available **[CLI Commands](./docs/cli/commands.md)**.
-- If you encounter any issues, review the **[Troubleshooting guide](./docs/troubleshooting.md)**.
+- If you encounter any issues, review the **[troubleshooting guide](./docs/troubleshooting.md)**.
 - For more comprehensive documentation, see the [full documentation](./docs/index.md).
 - Take a look at some [popular tasks](#popular-tasks) for more inspiration.
+- Check out our **[Official Roadmap](./ROADMAP.md)**
 
 ### Troubleshooting
 
-Head over to the [troubleshooting](docs/troubleshooting.md) guide if you're
+Head over to the [troubleshooting guide](docs/troubleshooting.md) if you're
 having issues.
 
 ## Popular tasks
@@ -99,6 +140,34 @@ Start by `cd`ing into an existing or newly-cloned repository and running `gemini
 
 ```text
 > What security mechanisms are in place?
+```
+
+```text
+> Provide a step-by-step dev onboarding doc for developers new to the codebase.
+```
+
+```text
+> Summarize this codebase and highlight the most interesting patterns or techniques I could learn from.
+```
+
+```text
+> Identify potential areas for improvement or refactoring in this codebase, highlighting parts that appear fragile, complex, or hard to maintain.
+```
+
+```text
+> Which parts of this codebase might be challenging to scale or debug?
+```
+
+```text
+> Generate a README section for the [module name] module explaining what it does and how to use it.
+```
+
+```text
+> What kind of error handling and logging strategies does the project use?
+```
+
+```text
+> Which tools, libraries, and dependencies are used in this project?
 ```
 
 ### Work with your existing code
@@ -130,7 +199,7 @@ Use MCP servers to integrate your local system tools with your enterprise collab
 ```
 
 ```text
-> Organise my PDF invoices by month of expenditure.
+> Organize my PDF invoices by month of expenditure.
 ```
 
 ### Uninstall

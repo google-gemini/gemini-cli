@@ -10,8 +10,7 @@ This guide provides solutions to common issues and debugging tips.
     tier of the Google Code Assist plan.
   - For Google Cloud accounts, you can work around this by setting
     `GOOGLE_CLOUD_PROJECT` to your project ID.
-  - You can also grab an API key from [AI
-    Studio](https://aistudio.google.com/app/apikey), which also includes a
+  - You can also grab an API key from [AI Studio](https://aistudio.google.com/app/apikey), which also includes a
     separate free tier.
 
 ## Frequently asked questions (FAQs)
@@ -28,7 +27,7 @@ This guide provides solutions to common issues and debugging tips.
 ## Common error messages and solutions
 
 - **Error: `EADDRINUSE` (Address already in use) when starting an MCP server.**
-  - **Cause:** Another process is already using the port the MCP server is trying to bind to.
+  - **Cause:** Another process is already using the port that the MCP server is trying to bind to.
   - **Solution:**
     Either stop the other process that is using the port or configure the MCP server to use a different port.
 

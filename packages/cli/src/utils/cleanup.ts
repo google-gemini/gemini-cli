@@ -8,6 +8,23 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import { getProjectTempDir } from '@google/gemini-cli-core';
 
+const cleanupFunctions: Array<() => void> = [];
+
+export function registerCleanup(fn: () => void) {
+  cleanupFunctions.push(fn);
+}
+
+export function runExitCleanup() {
+  for (const fn of cleanupFunctions) {
+    try {
+      fn();
+    } catch (_) {
+      // Ignore errors during cleanup.
+    }
+  }
+  cleanupFunctions.length = 0; // Clear the array
+}
+
 export async function cleanupCheckpoints() {
   const tempDir = getProjectTempDir(process.cwd());
   const checkpointsDir = join(tempDir, 'checkpoints');

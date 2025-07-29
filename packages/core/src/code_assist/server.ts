@@ -9,7 +9,7 @@ import {
   CodeAssistGlobalUserSettingResponse,
   LoadCodeAssistRequest,
   LoadCodeAssistResponse,
-  LongrunningOperationResponse,
+  LongRunningOperationResponse,
   OnboardUserRequest,
   SetCodeAssistGlobalUserSettingRequest,
 } from './types.js';
@@ -23,6 +23,7 @@ import {
 } from '@google/genai';
 import * as readline from 'readline';
 import { ContentGenerator } from '../core/contentGenerator.js';
+import { UserTierId } from './types.js';
 import {
   CaCountTokenResponse,
   CaGenerateContentResponse,
@@ -31,7 +32,6 @@ import {
   toCountTokenRequest,
   toGenerateContentRequest,
 } from './converter.js';
-import { PassThrough } from 'node:stream';
 
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
@@ -39,7 +39,6 @@ export interface HttpOptions {
   headers?: Record<string, string>;
 }
 
-// TODO: Use production endpoint once it supports our methods.
 export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
 
@@ -49,6 +48,7 @@ export class CodeAssistServer implements ContentGenerator {
     readonly projectId?: string,
     readonly httpOptions: HttpOptions = {},
     readonly sessionId?: string,
+    readonly userTier?: UserTierId,
   ) {}
 
   async generateContentStream(
@@ -79,8 +79,8 @@ export class CodeAssistServer implements ContentGenerator {
 
   async onboardUser(
     req: OnboardUserRequest,
-  ): Promise<LongrunningOperationResponse> {
-    return await this.requestPost<LongrunningOperationResponse>(
+  ): Promise<LongRunningOperationResponse> {
+    return await this.requestPost<LongRunningOperationResponse>(
       'onboardUser',
       req,
     );
@@ -179,7 +179,7 @@ export class CodeAssistServer implements ContentGenerator {
 
     return (async function* (): AsyncGenerator<T> {
       const rl = readline.createInterface({
-        input: res.data as PassThrough,
+        input: res.data as NodeJS.ReadableStream,
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
 

@@ -6,12 +6,13 @@
 
 import stripAnsi from 'strip-ansi';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { main } from './gemini.js';
+import { main, setupUnhandledRejectionHandler } from './gemini.js';
 import {
   LoadedSettings,
   SettingsFile,
   loadSettings,
 } from './config/settings.js';
+import { appEvents, AppEvent } from './utils/events.js';
 
 // Custom error to identify mock process.exit calls
 class MockProcessExitError extends Error {
@@ -55,6 +56,16 @@ vi.mock('update-notifier', () => ({
   })),
 }));
 
+vi.mock('./utils/events.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./utils/events.js')>();
+  return {
+    ...actual,
+    appEvents: {
+      emit: vi.fn(),
+    },
+  };
+});
+
 vi.mock('./utils/sandbox.js', () => ({
   sandbox_command: vi.fn(() => ''), // Default to no sandbox command
   start_sandbox: vi.fn(() => Promise.resolve()), // Mock as an async function that resolves
@@ -65,6 +76,8 @@ describe('gemini.tsx main function', () => {
   let loadSettingsMock: ReturnType<typeof vi.mocked<typeof loadSettings>>;
   let originalEnvGeminiSandbox: string | undefined;
   let originalEnvSandbox: string | undefined;
+  let initialUnhandledRejectionListeners: NodeJS.UnhandledRejectionListener[] =
+    [];
 
   const processExitSpy = vi
     .spyOn(process, 'exit')
@@ -82,6 +95,8 @@ describe('gemini.tsx main function', () => {
     delete process.env.SANDBOX;
 
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    initialUnhandledRejectionListeners =
+      process.listeners('unhandledRejection');
   });
 
   afterEach(() => {
@@ -95,6 +110,15 @@ describe('gemini.tsx main function', () => {
       process.env.SANDBOX = originalEnvSandbox;
     } else {
       delete process.env.SANDBOX;
+    }
+
+    const currentListeners = process.listeners('unhandledRejection');
+    const addedListener = currentListeners.find(
+      (listener) => !initialUnhandledRejectionListeners.includes(listener),
+    );
+
+    if (addedListener) {
+      process.removeListener('unhandledRejection', addedListener);
     }
     vi.restoreAllMocks();
   });
@@ -112,7 +136,12 @@ describe('gemini.tsx main function', () => {
       path: '/workspace/.gemini/settings.json',
       settings: {},
     };
+    const systemSettingsFile: SettingsFile = {
+      path: '/system/settings.json',
+      settings: {},
+    };
     const mockLoadedSettings = new LoadedSettings(
+      systemSettingsFile,
       userSettingsFile,
       workspaceSettingsFile,
       [settingsError],
@@ -140,7 +169,45 @@ describe('gemini.tsx main function', () => {
       'Please fix /test/settings.json and try again.',
     );
 
-    // Verify process.exit was called (indirectly, via the thrown error)
+    // Verify process.exit was called.
     expect(processExitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should log unhandled promise rejections and open debug console on first error', async () => {
+    const appEventsMock = vi.mocked(appEvents);
+    const rejectionError = new Error('Test unhandled rejection');
+
+    setupUnhandledRejectionHandler();
+    // Simulate an unhandled rejection.
+    // We are not using Promise.reject here as vitest will catch it.
+    // Instead we will dispatch the event manually.
+    process.emit('unhandledRejection', rejectionError, Promise.resolve());
+
+    // We need to wait for the rejection handler to be called.
+    await new Promise(process.nextTick);
+
+    expect(appEventsMock.emit).toHaveBeenCalledWith(AppEvent.OpenDebugConsole);
+    expect(appEventsMock.emit).toHaveBeenCalledWith(
+      AppEvent.LogError,
+      expect.stringContaining('Unhandled Promise Rejection'),
+    );
+    expect(appEventsMock.emit).toHaveBeenCalledWith(
+      AppEvent.LogError,
+      expect.stringContaining('Please file a bug report using the /bug tool.'),
+    );
+
+    // Simulate a second rejection
+    const secondRejectionError = new Error('Second test unhandled rejection');
+    process.emit('unhandledRejection', secondRejectionError, Promise.resolve());
+    await new Promise(process.nextTick);
+
+    // Ensure emit was only called once for OpenDebugConsole
+    const openDebugConsoleCalls = appEventsMock.emit.mock.calls.filter(
+      (call) => call[0] === AppEvent.OpenDebugConsole,
+    );
+    expect(openDebugConsoleCalls.length).toBe(1);
+
+    // Avoid the process.exit error from being thrown.
+    processExitSpy.mockRestore();
   });
 });

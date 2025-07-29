@@ -13,20 +13,18 @@ import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
-  GEMINI_CONFIG_DIR as GEMINI_DIR,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
   TelemetryTarget,
+  FileFilteringOptions,
+  IdeClient,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
-import { Extension } from './extension.js';
+import { Extension, annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
-import * as dotenv from 'dotenv';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import * as os from 'node:os';
 import { loadSandboxConfig } from './sandboxConfig.js';
 
 // Simple console logger for now - replace with actual logger if available
@@ -39,13 +37,16 @@ const logger = {
   error: (...args: any[]) => console.error('[ERROR]', ...args),
 };
 
-interface CliArgs {
+export interface CliArgs {
   model: string | undefined;
   sandbox: boolean | string | undefined;
-  'sandbox-image': string | undefined;
+  sandboxImage: string | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
+  promptInteractive: string | undefined;
+  allFiles: boolean | undefined;
   all_files: boolean | undefined;
+  showMemoryUsage: boolean | undefined;
   show_memory_usage: boolean | undefined;
   yolo: boolean | undefined;
   telemetry: boolean | undefined;
@@ -54,10 +55,22 @@ interface CliArgs {
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
   importFormat?: 'flat' | 'tree';
+  telemetryOutfile: string | undefined;
+  allowedMcpServerNames: string[] | undefined;
+  experimentalAcp: boolean | undefined;
+  extensions: string[] | undefined;
+  listExtensions: boolean | undefined;
+  ideMode: boolean | undefined;
+  proxy: string | undefined;
 }
 
-async function parseArguments(): Promise<CliArgs> {
-  const argv = await yargs(hideBin(process.argv))
+export async function parseArguments(): Promise<CliArgs> {
+  const yargsInstance = yargs(hideBin(process.argv))
+    .scriptName('gemini')
+    .usage(
+      '$0 [options]',
+      'Gemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
+    )
     .option('model', {
       alias: 'm',
       type: 'string',
@@ -68,6 +81,12 @@ async function parseArguments(): Promise<CliArgs> {
       alias: 'p',
       type: 'string',
       description: 'Prompt. Appended to input on stdin (if any).',
+    })
+    .option('prompt-interactive', {
+      alias: 'i',
+      type: 'string',
+      description:
+        'Execute the provided prompt and continue in interactive mode',
     })
     .option('sandbox', {
       alias: 's',
@@ -84,10 +103,24 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Run in debug mode?',
       default: false,
     })
-    .option('all_files', {
-      alias: 'a',
+    .option('all-files', {
+      alias: ['a'],
       type: 'boolean',
       description: 'Include ALL files in context?',
+      default: false,
+    })
+    .option('all_files', {
+      type: 'boolean',
+      description: 'Include ALL files in context?',
+      default: false,
+    })
+    .deprecateOption(
+      'all_files',
+      'Use --all-files instead. We will be removing --all_files in the coming weeks.',
+    )
+    .option('show-memory-usage', {
+      type: 'boolean',
+      description: 'Show memory usage in status bar',
       default: false,
     })
     .option('show_memory_usage', {
@@ -95,6 +128,10 @@ async function parseArguments(): Promise<CliArgs> {
       description: 'Show memory usage in status bar',
       default: false,
     })
+    .deprecateOption(
+      'show_memory_usage',
+      'Use --show-memory-usage instead. We will be removing --show_memory_usage in the coming weeks.',
+    )
     .option('yolo', {
       alias: 'y',
       type: 'boolean',
@@ -123,6 +160,10 @@ async function parseArguments(): Promise<CliArgs> {
       description:
         'Enable or disable logging of user prompts for telemetry. Overrides settings files.',
     })
+    .option('telemetry-outfile', {
+      type: 'string',
+      description: 'Redirect all telemetry output to the specified file.',
+    })
     .option('checkpointing', {
       alias: 'c',
       type: 'boolean',
@@ -136,18 +177,63 @@ async function parseArguments(): Promise<CliArgs> {
         'Format for memory import resolution: "flat" (Claude-style) or "tree" (hierarchical, default)',
       default: 'tree',
     })
+    .option('experimental-acp', {
+      type: 'boolean',
+      description: 'Starts the agent in ACP mode',
+    })
+    .option('allowed-mcp-server-names', {
+      type: 'array',
+      string: true,
+      description: 'Allowed MCP server names',
+    })
+    .option('extensions', {
+      alias: 'e',
+      type: 'array',
+      string: true,
+      description:
+        'A list of extensions to use. If not provided, all extensions are used.',
+    })
+    .option('list-extensions', {
+      alias: 'l',
+      type: 'boolean',
+      description: 'List all available extensions and exit.',
+    })
+    .option('ide-mode', {
+      type: 'boolean',
+      description: 'Run in IDE mode?',
+    })
+    .option('proxy', {
+      type: 'string',
+      description:
+        'Proxy for gemini client, like schema://user:password@host:port',
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
-    .strict().argv;
+    .strict()
+    .check((argv) => {
+      if (argv.prompt && argv.promptInteractive) {
+        throw new Error(
+          'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
+        );
+      }
+      return true;
+    });
 
-  // Ensure importFormat is typed as 'flat' | 'tree'
-  let importFormat: 'flat' | 'tree' = 'tree';
-  if (argv['import-format'] === 'flat') importFormat = 'flat';
-  else if (argv['import-format'] === 'tree') importFormat = 'tree';
+  yargsInstance.wrap(yargsInstance.terminalWidth());
+  const result = yargsInstance.parseSync();
 
-  return { ...argv, importFormat };
+  // Get import format from args or default to 'tree'
+  const importFormatArg = (result as { 'import-format'?: 'flat' | 'tree' })[
+    'import-format'
+  ];
+  const importFormat =
+    importFormatArg === 'flat' || importFormatArg === 'tree'
+      ? importFormatArg
+      : 'tree';
+
+  return { ...result, importFormat } as CliArgs;
 }
 
 // This function is now a thin wrapper around the server's implementation.
@@ -157,14 +243,17 @@ export async function loadHierarchicalGeminiMemory(
   currentWorkingDirectory: string,
   debugMode: boolean,
   fileService: FileDiscoveryService,
+  settings: Settings,
   extensionContextFilePaths: string[] = [],
   importFormat: 'flat' | 'tree' = 'tree',
+  fileFilteringOptions?: FileFilteringOptions,
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode) {
     logger.debug(
       `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory} (importFormat: ${importFormat})`,
     );
   }
+
   // Directly call the server function.
   // The server function will use its own homedir() for the global path.
   return loadServerHierarchicalMemory(
@@ -173,6 +262,8 @@ export async function loadHierarchicalGeminiMemory(
     fileService,
     extensionContextFilePaths,
     importFormat,
+    fileFilteringOptions,
+    settings.memoryDiscoveryMaxDirs,
   );
 }
 
@@ -180,12 +271,33 @@ export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
   sessionId: string,
+  argv: CliArgs,
 ): Promise<Config> {
-  loadEnvironment();
-
-  const argv = await parseArguments();
-  const debugMode = argv.debug || false;
+  const debugMode =
+    argv.debug ||
+    [process.env.DEBUG, process.env.DEBUG_MODE].some(
+      (v) => v === 'true' || v === '1',
+    ) ||
+    false;
   const importFormat = argv.importFormat || 'tree';
+  const ideMode =
+    (argv.ideMode ?? settings.ideMode ?? false) &&
+    process.env.TERM_PROGRAM === 'vscode' &&
+    !process.env.SANDBOX;
+
+  let ideClient: IdeClient | undefined;
+  if (ideMode) {
+    ideClient = new IdeClient();
+  }
+
+  const allExtensions = annotateActiveExtensions(
+    extensions,
+    argv.extensions || [],
+  );
+
+  const activeExtensions = extensions.filter(
+    (_, i) => allExtensions[i].isActive,
+  );
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
@@ -198,20 +310,77 @@ export async function loadCliConfig(
     setServerGeminiMdFilename(getCurrentGeminiMdFilename());
   }
 
-  const extensionContextFilePaths = extensions.flatMap((e) => e.contextFiles);
+  const extensionContextFilePaths = activeExtensions.flatMap(
+    (e) => e.contextFiles,
+  );
 
   const fileService = new FileDiscoveryService(process.cwd());
+
+  const fileFiltering = {
+    ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+    ...settings.fileFiltering,
+  };
+
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
     process.cwd(),
     debugMode,
     fileService,
+    settings,
     extensionContextFilePaths,
     importFormat,
+    fileFiltering,
   );
 
-  const mcpServers = mergeMcpServers(settings, extensions);
-  const excludeTools = mergeExcludeTools(settings, extensions);
+  let mcpServers = mergeMcpServers(settings, activeExtensions);
+  const excludeTools = mergeExcludeTools(settings, activeExtensions);
+  const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
+
+  if (!argv.allowedMcpServerNames) {
+    if (settings.allowMCPServers) {
+      const allowedNames = new Set(settings.allowMCPServers.filter(Boolean));
+      if (allowedNames.size > 0) {
+        mcpServers = Object.fromEntries(
+          Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
+        );
+      }
+    }
+
+    if (settings.excludeMCPServers) {
+      const excludedNames = new Set(settings.excludeMCPServers.filter(Boolean));
+      if (excludedNames.size > 0) {
+        mcpServers = Object.fromEntries(
+          Object.entries(mcpServers).filter(([key]) => !excludedNames.has(key)),
+        );
+      }
+    }
+  }
+
+  if (argv.allowedMcpServerNames) {
+    const allowedNames = new Set(argv.allowedMcpServerNames.filter(Boolean));
+    if (allowedNames.size > 0) {
+      mcpServers = Object.fromEntries(
+        Object.entries(mcpServers).filter(([key, server]) => {
+          const isAllowed = allowedNames.has(key);
+          if (!isAllowed) {
+            blockedMcpServers.push({
+              name: key,
+              extensionName: server.extensionName || '',
+            });
+          }
+          return isAllowed;
+        }),
+      );
+    } else {
+      blockedMcpServers.push(
+        ...Object.entries(mcpServers).map(([key, server]) => ({
+          name: key,
+          extensionName: server.extensionName || '',
+        })),
+      );
+      mcpServers = {};
+    }
+  }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
 
@@ -221,8 +390,8 @@ export async function loadCliConfig(
     sandbox: sandboxConfig,
     targetDir: process.cwd(),
     debugMode,
-    question: argv.prompt || '',
-    fullContext: argv.all_files || false,
+    question: argv.promptInteractive || argv.prompt || '',
+    fullContext: argv.allFiles || argv.all_files || false,
     coreTools: settings.coreTools || undefined,
     excludeTools,
     toolDiscoveryCommand: settings.toolDiscoveryCommand,
@@ -233,7 +402,10 @@ export async function loadCliConfig(
     geminiMdFileCount: fileCount,
     approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
     showMemoryUsage:
-      argv.show_memory_usage || settings.showMemoryUsage || false,
+      argv.showMemoryUsage ||
+      argv.show_memory_usage ||
+      settings.showMemoryUsage ||
+      false,
     accessibility: settings.accessibility,
     telemetry: {
       enabled: argv.telemetry ?? settings.telemetry?.enabled,
@@ -244,16 +416,19 @@ export async function loadCliConfig(
         process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
         settings.telemetry?.otlpEndpoint,
       logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
+      outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
     },
     usageStatisticsEnabled: settings.usageStatisticsEnabled ?? true,
     // Git-aware file filtering settings
     fileFiltering: {
       respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
+      respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
       enableRecursiveFileSearch:
         settings.fileFiltering?.enableRecursiveFileSearch,
     },
     checkpointing: argv.checkpointing || settings.checkpointing?.enabled,
     proxy:
+      argv.proxy ||
       process.env.HTTPS_PROXY ||
       process.env.https_proxy ||
       process.env.HTTP_PROXY ||
@@ -263,6 +438,15 @@ export async function loadCliConfig(
     bugCommand: settings.bugCommand,
     model: argv.model!,
     extensionContextFilePaths,
+    maxSessionTurns: settings.maxSessionTurns ?? -1,
+    experimentalAcp: argv.experimentalAcp || false,
+    listExtensions: argv.listExtensions || false,
+    extensions: allExtensions,
+    blockedMcpServers,
+    noBrowser: !!process.env.NO_BROWSER,
+    summarizeToolOutput: settings.summarizeToolOutput,
+    ideMode,
+    ideClient,
   });
 }
 
@@ -277,7 +461,10 @@ function mergeMcpServers(settings: Settings, extensions: Extension[]) {
           );
           return;
         }
-        mcpServers[key] = server;
+        mcpServers[key] = {
+          ...server,
+          extensionName: extension.config.name,
+        };
       },
     );
   }
@@ -295,40 +482,4 @@ function mergeExcludeTools(
     }
   }
   return [...allExcludeTools];
-}
-
-function findEnvFile(startDir: string): string | null {
-  let currentDir = path.resolve(startDir);
-  while (true) {
-    // prefer gemini-specific .env under GEMINI_DIR
-    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
-    if (fs.existsSync(geminiEnvPath)) {
-      return geminiEnvPath;
-    }
-    const envPath = path.join(currentDir, '.env');
-    if (fs.existsSync(envPath)) {
-      return envPath;
-    }
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir || !parentDir) {
-      // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(os.homedir(), GEMINI_DIR, '.env');
-      if (fs.existsSync(homeGeminiEnvPath)) {
-        return homeGeminiEnvPath;
-      }
-      const homeEnvPath = path.join(os.homedir(), '.env');
-      if (fs.existsSync(homeEnvPath)) {
-        return homeEnvPath;
-      }
-      return null;
-    }
-    currentDir = parentDir;
-  }
-}
-
-export function loadEnvironment(): void {
-  const envFilePath = findEnvFile(process.cwd());
-  if (envFilePath) {
-    dotenv.config({ path: envFilePath, quiet: true });
-  }
 }

@@ -449,9 +449,28 @@ describe('memoryImportProcessor', () => {
         'flat',
       );
       // Should contain all files in order: root, a.md, b.md
-      expect(result.content).toMatch(
-        /--- File: \/test\/project\/src ---[\s\S]*--- File: \/test\/project\/src\/a.md ---[\s\S]*--- File: \/test\/project\/src\/b.md ---/,
+      const normalizedContent = result.content.replace(/\\/g, '/');
+      expect(normalizedContent).toContain('--- File: /test/project/src ---');
+      expect(normalizedContent).toContain(
+        '--- File: /test/project/src/a.md ---',
       );
+      expect(normalizedContent).toContain(
+        '--- File: /test/project/src/b.md ---',
+      );
+
+      // Verify order by checking indices
+      const rootIndex = normalizedContent.indexOf(
+        '--- File: /test/project/src ---',
+      );
+      const aIndex = normalizedContent.indexOf(
+        '--- File: /test/project/src/a.md ---',
+      );
+      const bIndex = normalizedContent.indexOf(
+        '--- File: /test/project/src/b.md ---',
+      );
+
+      expect(rootIndex).toBeLessThan(aIndex);
+      expect(aIndex).toBeLessThan(bIndex);
       expect(result.content).toContain('Root @./a.md');
       expect(result.content).toContain('A @./b.md');
       expect(result.content).toContain('B content');
