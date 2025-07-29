@@ -13,14 +13,41 @@ test('should be able to write a file', async () => {
   await rig.setup('should be able to write a file');
   const prompt = `show me an example of using the write tool. put a dad joke in dad.txt`;
 
-  await rig.run(prompt);
+  const result = await rig.run(prompt);
 
   const foundToolCall = await rig.waitForToolCall('write_file');
+
+  // Add debugging information
+  if (!foundToolCall) {
+    console.error('Test failed - Debug info:');
+    console.error('Result length:', result.length);
+    console.error('Result (first 500 chars):', result.substring(0, 500));
+    console.error('Result (last 500 chars):', result.substring(result.length - 500));
+    
+    // Check what tools were actually called
+    const allTools = rig.readToolLogs();
+    console.error('All tool calls found:', allTools.map(t => t.toolRequest.name));
+  }
 
   assert.ok(foundToolCall, 'Expected to find a write_file tool call');
 
   const newFilePath = 'dad.txt';
 
   const newFileContent = rig.readFile(newFilePath);
-  assert.notEqual(newFileContent, '');
+  
+  // Add debugging for file content
+  if (newFileContent === '') {
+    console.error('File was created but is empty');
+    console.error('Tool calls:', rig.readToolLogs().map(t => ({
+      name: t.toolRequest.name,
+      args: t.toolRequest.args
+    })));
+  }
+  
+  assert.notEqual(newFileContent, '', 'Expected file to have content');
+  
+  // Log success info if verbose
+  if (process.env.VERBOSE === 'true') {
+    console.log('File created successfully with content:', newFileContent.substring(0, 100) + '...');
+  }
 });
