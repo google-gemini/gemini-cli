@@ -53,9 +53,12 @@ test('should be able to list a directory', async () => {
   }
 
   assert.ok(foundToolCall, 'Expected to find a list_directory tool call');
-  
+
   // Check if LLM returned any output at all
-  assert.ok(result && result.trim().length > 0, 'Expected LLM to return some output');
+  assert.ok(
+    result && result.trim().length > 0,
+    'Expected LLM to return some output',
+  );
 
   const lines = result.split('\n').filter((line) => line.trim() !== '');
 

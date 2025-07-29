@@ -46,9 +46,12 @@ test('should be able to save to memory', async () => {
   }
 
   assert.ok(foundToolCall, 'Expected to find a save_memory tool call');
-  
+
   // Check if LLM returned any output at all
-  assert.ok(result && result.trim().length > 0, 'Expected LLM to return some output');
+  assert.ok(
+    result && result.trim().length > 0,
+    'Expected LLM to return some output',
+  );
 
   // The LLM should ideally show 'blue' in the output, but it's not always consistent
   // We'll make this a warning rather than a failure

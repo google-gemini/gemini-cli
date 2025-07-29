@@ -35,9 +35,12 @@ test('should be able to search the web', async () => {
   }
 
   assert.ok(foundToolCall, 'Expected to find a call to google_web_search');
-  
+
   // Check if LLM returned any output at all
-  assert.ok(result && result.trim().length > 0, 'Expected LLM to return some output');
+  assert.ok(
+    result && result.trim().length > 0,
+    'Expected LLM to return some output',
+  );
 
   // Check if the result mentions weather or London
   const mentionsWeather =

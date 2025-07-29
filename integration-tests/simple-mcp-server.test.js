@@ -203,10 +203,13 @@ describe('simple-mcp-server', () => {
     const foundToolCall = await rig.waitForToolCall('add');
 
     assert.ok(foundToolCall, 'Expected to find an add tool call');
-    
+
     // Check if LLM returned any output at all
-    assert.ok(output && output.trim().length > 0, 'Expected LLM to return some output');
-    
+    assert.ok(
+      output && output.trim().length > 0,
+      'Expected LLM to return some output',
+    );
+
     assert.ok(output.includes('15'), 'Expected output to contain the sum (15)');
   });
 });
