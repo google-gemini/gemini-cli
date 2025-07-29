@@ -26,12 +26,12 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
 
   return (
     <Box flexDirection="row" width={terminalWidth}>
-      <Box flexGrow={1} flexShrink={1} flexBasis="auto" flexDirection="column">
+      <Box flexGrow={1} flexShrink={1} flexBasis="auto" flexDirection="column" paddingX={1}>
         <MarkdownDisplay
           text={`${prefix}${text}`}
           isPending={isPending}
           availableTerminalHeight={availableTerminalHeight}
-          terminalWidth={terminalWidth}
+          terminalWidth={terminalWidth - 2} // Adjust for padding
         />
       </Box>
     </Box>
