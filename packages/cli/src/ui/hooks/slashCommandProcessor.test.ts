@@ -894,7 +894,7 @@ describe('useSlashCommandProcessor', () => {
         await result.current.handleSlashCommand('/la');
       });
       expect(logSlashCommand).toHaveBeenCalledTimes(1);
-      expect(SlashCommandEvent).toHaveBeenCalledWith('la', undefined);
+      expect(SlashCommandEvent).toHaveBeenCalledWith('logalias', undefined);
     });
 
     it('should not log for unknown commands', async () => {

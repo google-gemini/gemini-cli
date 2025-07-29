@@ -536,11 +536,14 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_NAME,
         value: JSON.stringify(event.command),
       },
-      {
+    ];
+
+    if (event.subcommand) {
+      data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_SUBCOMMAND,
         value: JSON.stringify(event.subcommand),
-      },
-    ];
+      });
+    }
 
     this.enqueueLogEvent(this.createLogEvent(slash_command_event_name, data));
     this.flushIfNeeded();
