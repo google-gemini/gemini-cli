@@ -21,10 +21,29 @@ function sanitizeTestName(name) {
     .replace(/-+/g, '-');
 }
 
+// Helper to create detailed error messages
+export function createToolCallErrorMessage(expectedTools, foundTools, result) {
+  const expectedStr = Array.isArray(expectedTools)
+    ? expectedTools.join(' or ')
+    : expectedTools;
+  return (
+    `Expected to find ${expectedStr} tool call(s). ` +
+    `Found: ${foundTools.length > 0 ? foundTools.join(', ') : 'none'}. ` +
+    `Output preview: ${result ? result.substring(0, 200) + '...' : 'no output'}`
+  );
+}
+
 export class TestRig {
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
     this.testDir = null;
+  }
+
+  // Get timeout based on environment
+  getDefaultTimeout() {
+    if (env.CI) return 60000; // 1 minute in CI
+    if (env.GEMINI_SANDBOX) return 30000; // 30s in containers
+    return 15000; // 15s locally
   }
 
   setup(testName, options = {}) {
@@ -195,6 +214,20 @@ export class TestRig {
     return content;
   }
 
+  async cleanup() {
+    // Clean up test directory
+    if (this.testDir && !env.KEEP_OUTPUT) {
+      try {
+        execSync(`rm -rf ${this.testDir}`);
+      } catch (error) {
+        // Ignore cleanup errors
+        if (env.VERBOSE === 'true') {
+          console.warn('Cleanup warning:', error.message);
+        }
+      }
+    }
+  }
+
   async waitForTelemetryReady() {
     // In sandbox mode, telemetry is written to a relative path in the test directory
     const logFilePath =
@@ -221,12 +254,40 @@ export class TestRig {
     );
   }
 
-  async waitForToolCall(toolName, timeout = 5000) {
-    // Since we now wait for CLI to complete first, we don't need the initial wait
+  async waitForToolCall(toolName, timeout) {
+    // Use environment-specific timeout
+    if (!timeout) {
+      timeout = this.getDefaultTimeout();
+    }
+
+    // Wait for telemetry to be ready before polling for tool calls
+    await this.waitForTelemetryReady();
+
     return this.poll(
       () => {
         const toolLogs = this.readToolLogs();
         return toolLogs.some((log) => log.toolRequest.name === toolName);
+      },
+      timeout,
+      100,
+    );
+  }
+
+  async waitForAnyToolCall(toolNames, timeout) {
+    // Use environment-specific timeout
+    if (!timeout) {
+      timeout = this.getDefaultTimeout();
+    }
+
+    // Wait for telemetry to be ready before polling for tool calls
+    await this.waitForTelemetryReady();
+
+    return this.poll(
+      () => {
+        const toolLogs = this.readToolLogs();
+        return toolNames.some((name) =>
+          toolLogs.some((log) => log.toolRequest.name === name),
+        );
       },
       timeout,
       100,

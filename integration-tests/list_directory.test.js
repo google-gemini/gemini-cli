@@ -15,6 +15,9 @@ test('should be able to list a directory', async () => {
   rig.mkdir('subdir');
   rig.sync();
 
+  // Add explicit wait for filesystem changes to propagate in containers
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
   const prompt = `Can you list the files in the current directory. Display them in the style of 'ls'`;
 
   const result = await rig.run(prompt);

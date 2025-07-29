@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import { strict as assert } from 'assert';
-import { TestRig } from './test-helper.js';
+import { TestRig, createToolCallErrorMessage } from './test-helper.js';
 
 test('should be able to write a file', async () => {
   const rig = new TestRig();
@@ -35,7 +35,15 @@ test('should be able to write a file', async () => {
     );
   }
 
-  assert.ok(foundToolCall, 'Expected to find a write_file tool call');
+  const allTools = rig.readToolLogs();
+  assert.ok(
+    foundToolCall,
+    createToolCallErrorMessage(
+      'write_file',
+      allTools.map((t) => t.toolRequest.name),
+      result,
+    ),
+  );
 
   // Check if LLM returned any output at all
   assert.ok(

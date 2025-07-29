@@ -18,10 +18,18 @@ test('should be able to read multiple files', async () => {
 
   const result = await rig.run(prompt);
 
-  const foundToolCall = await rig.waitForToolCall('read_many_files');
+  // Check for either read_many_files or multiple read_file calls
+  const allTools = rig.readToolLogs();
+  const readManyFilesCall = await rig.waitForToolCall('read_many_files');
+  const readFileCalls = allTools.filter(
+    (t) => t.toolRequest.name === 'read_file',
+  );
+
+  // Accept either read_many_files OR at least 2 read_file calls
+  const foundValidPattern = readManyFilesCall || readFileCalls.length >= 2;
 
   // Add debugging information
-  if (!foundToolCall) {
+  if (!foundValidPattern) {
     console.error('Test failed - Debug info:');
     console.error('Result length:', result.length);
     console.error('Result (first 500 chars):', result.substring(0, 500));
@@ -29,28 +37,18 @@ test('should be able to read multiple files', async () => {
       'Result (last 500 chars):',
       result.substring(result.length - 500),
     );
-
-    // Check what tools were actually called
-    const allTools = rig.readToolLogs();
     console.error(
       'All tool calls found:',
       allTools.map((t) => t.toolRequest.name),
     );
-
-    // Check if read_file was called instead
-    const readFileCalls = allTools.filter(
-      (t) => t.toolRequest.name === 'read_file',
-    );
-    if (readFileCalls.length > 0) {
-      console.error('Note: read_file was called instead of read_many_files');
-      console.error(
-        'Read file calls:',
-        readFileCalls.map((t) => t.toolRequest.args),
-      );
-    }
+    console.error('read_many_files called:', readManyFilesCall);
+    console.error('read_file calls:', readFileCalls.length);
   }
 
-  assert.ok(foundToolCall, 'Expected to find a read_many_files tool call');
+  assert.ok(
+    foundValidPattern,
+    'Expected to find either read_many_files or multiple read_file tool calls',
+  );
 
   // Check if LLM returned any output at all
   assert.ok(

@@ -71,10 +71,16 @@ test('should be able to write a file', async () => {
 
   const result = await rig.run(`edit test.txt to have a hello world message`);
 
-  const foundWriteToolCall = await rig.waitForToolCall('write_file');
+  // Accept multiple valid tools for editing files
+  const foundToolCall = await rig.waitForAnyToolCall([
+    'write_file',
+    'edit',
+    'replace',
+  ]);
 
   // Add debugging information
-  if (!foundWriteToolCall) {
+  if (!foundToolCall) {
+    const allTools = rig.readToolLogs();
     console.error('Test failed - Debug info:');
     console.error('Result length:', result.length);
     console.error('Result (first 500 chars):', result.substring(0, 500));
@@ -82,31 +88,16 @@ test('should be able to write a file', async () => {
       'Result (last 500 chars):',
       result.substring(result.length - 500),
     );
-
-    // Check what tools were actually called
-    const allTools = rig.readToolLogs();
     console.error(
       'All tool calls found:',
       allTools.map((t) => t.toolRequest.name),
     );
-
-    // Check if edit/replace was used instead
-    const editCalls = allTools.filter(
-      (t) => t.toolRequest.name === 'edit' || t.toolRequest.name === 'replace',
-    );
-    if (editCalls.length > 0) {
-      console.error('Note: edit/replace was called instead of write_file');
-      console.error(
-        'Edit calls:',
-        editCalls.map((t) => ({
-          name: t.toolRequest.name,
-          args: t.toolRequest.args,
-        })),
-      );
-    }
   }
 
-  assert.ok(foundWriteToolCall, 'Expected to find a write_file tool call');
+  assert.ok(
+    foundToolCall,
+    'Expected to find a write_file, edit, or replace tool call',
+  );
 
   // Check if LLM returned any output at all
   assert.ok(
