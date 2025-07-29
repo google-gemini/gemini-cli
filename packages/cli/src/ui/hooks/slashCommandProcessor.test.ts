@@ -28,6 +28,13 @@ vi.mock('../../services/FileCommandLoader.js', () => ({
   })),
 }));
 
+const mockMcpLoadCommands = vi.fn();
+vi.mock('../../services/McpPromptLoader.js', () => ({
+  McpPromptLoader: vi.fn().mockImplementation(() => ({
+    loadCommands: mockMcpLoadCommands,
+  })),
+}));
+
 vi.mock('../contexts/SessionContext.js', () => ({
   useSessionStats: vi.fn(() => ({ stats: {} })),
 }));
@@ -35,12 +42,18 @@ vi.mock('../contexts/SessionContext.js', () => ({
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
-import { CommandKind, SlashCommand } from '../commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import {
+  CommandContext,
+  CommandKind,
+  ConfirmShellCommandsActionReturn,
+  SlashCommand,
+} from '../commands/types.js';
+import { Config, ToolConfirmationOutcome } from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
+import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 
 const createTestCommand = (
   overrides: Partial<SlashCommand>,
@@ -61,11 +74,12 @@ describe('useSlashCommandProcessor', () => {
   const mockSetQuittingMessages = vi.fn();
 
   const mockConfig = {
-    getProjectRoot: () => '/mock/cwd',
-    getSessionId: () => 'test-session',
-    getGeminiClient: () => ({
+    getProjectRoot: vi.fn(() => '/mock/cwd'),
+    getSessionId: vi.fn(() => 'test-session'),
+    getGeminiClient: vi.fn(() => ({
       setHistory: vi.fn().mockResolvedValue(undefined),
-    }),
+    })),
+    getExtensions: vi.fn(() => []),
   } as unknown as Config;
 
   const mockSettings = {} as LoadedSettings;
@@ -75,14 +89,18 @@ describe('useSlashCommandProcessor', () => {
     (vi.mocked(BuiltinCommandLoader) as Mock).mockClear();
     mockBuiltinLoadCommands.mockResolvedValue([]);
     mockFileLoadCommands.mockResolvedValue([]);
+    mockMcpLoadCommands.mockResolvedValue([]);
   });
 
   const setupProcessorHook = (
     builtinCommands: SlashCommand[] = [],
     fileCommands: SlashCommand[] = [],
+    mcpCommands: SlashCommand[] = [],
+    setIsProcessing = vi.fn(),
   ) => {
     mockBuiltinLoadCommands.mockResolvedValue(Object.freeze(builtinCommands));
     mockFileLoadCommands.mockResolvedValue(Object.freeze(fileCommands));
+    mockMcpLoadCommands.mockResolvedValue(Object.freeze(mcpCommands));
 
     const { result } = renderHook(() =>
       useSlashCommandProcessor(
@@ -100,6 +118,8 @@ describe('useSlashCommandProcessor', () => {
         vi.fn(), // toggleCorgiMode
         mockSetQuittingMessages,
         vi.fn(), // openPrivacyNotice
+        vi.fn(), // toggleVimEnabled
+        setIsProcessing,
       ),
     );
 
@@ -111,6 +131,7 @@ describe('useSlashCommandProcessor', () => {
       setupProcessorHook();
       expect(BuiltinCommandLoader).toHaveBeenCalledWith(mockConfig);
       expect(FileCommandLoader).toHaveBeenCalledWith(mockConfig);
+      expect(McpPromptLoader).toHaveBeenCalledWith(mockConfig);
     });
 
     it('should call loadCommands and populate state after mounting', async () => {
@@ -124,6 +145,7 @@ describe('useSlashCommandProcessor', () => {
       expect(result.current.slashCommands[0]?.name).toBe('test');
       expect(mockBuiltinLoadCommands).toHaveBeenCalledTimes(1);
       expect(mockFileLoadCommands).toHaveBeenCalledTimes(1);
+      expect(mockMcpLoadCommands).toHaveBeenCalledTimes(1);
     });
 
     it('should provide an immutable array of commands to consumers', async () => {
@@ -261,6 +283,32 @@ describe('useSlashCommandProcessor', () => {
         'with args',
       );
     });
+
+    it('should set isProcessing to true during execution and false afterwards', async () => {
+      const mockSetIsProcessing = vi.fn();
+      const command = createTestCommand({
+        name: 'long-running',
+        action: () => new Promise((resolve) => setTimeout(resolve, 50)),
+      });
+
+      const result = setupProcessorHook([command], [], [], mockSetIsProcessing);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      const executionPromise = act(async () => {
+        await result.current.handleSlashCommand('/long-running');
+      });
+
+      // It should be true immediately after starting
+      expect(mockSetIsProcessing).toHaveBeenCalledWith(true);
+      // It should not have been called with false yet
+      expect(mockSetIsProcessing).not.toHaveBeenCalledWith(false);
+
+      await executionPromise;
+
+      // After the promise resolves, it should be called with false
+      expect(mockSetIsProcessing).toHaveBeenCalledWith(false);
+      expect(mockSetIsProcessing).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('Action Result Handling', () => {
@@ -369,6 +417,208 @@ describe('useSlashCommandProcessor', () => {
         expect.any(Number),
       );
     });
+
+    it('should handle "submit_prompt" action returned from a mcp-based command', async () => {
+      const mcpCommand = createTestCommand(
+        {
+          name: 'mcpcmd',
+          description: 'A command from mcp',
+          action: async () => ({
+            type: 'submit_prompt',
+            content: 'The actual prompt from the mcp command.',
+          }),
+        },
+        CommandKind.MCP_PROMPT,
+      );
+
+      const result = setupProcessorHook([], [], [mcpCommand]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      let actionResult;
+      await act(async () => {
+        actionResult = await result.current.handleSlashCommand('/mcpcmd');
+      });
+
+      expect(actionResult).toEqual({
+        type: 'submit_prompt',
+        content: 'The actual prompt from the mcp command.',
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        { type: MessageType.USER, text: '/mcpcmd' },
+        expect.any(Number),
+      );
+    });
+  });
+
+  describe('Shell Command Confirmation Flow', () => {
+    // Use a generic vi.fn() for the action. We will change its behavior in each test.
+    const mockCommandAction = vi.fn();
+
+    const shellCommand = createTestCommand({
+      name: 'shellcmd',
+      action: mockCommandAction,
+    });
+
+    beforeEach(() => {
+      // Reset the mock before each test
+      mockCommandAction.mockClear();
+
+      // Default behavior: request confirmation
+      mockCommandAction.mockResolvedValue({
+        type: 'confirm_shell_commands',
+        commandsToConfirm: ['rm -rf /'],
+        originalInvocation: { raw: '/shellcmd' },
+      } as ConfirmShellCommandsActionReturn);
+    });
+
+    it('should set confirmation request when action returns confirm_shell_commands', async () => {
+      const result = setupProcessorHook([shellCommand]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      // This is intentionally not awaited, because the promise it returns
+      // will not resolve until the user responds to the confirmation.
+      act(() => {
+        result.current.handleSlashCommand('/shellcmd');
+      });
+
+      // We now wait for the state to be updated with the request.
+      await waitFor(() => {
+        expect(result.current.shellConfirmationRequest).not.toBeNull();
+      });
+
+      expect(result.current.shellConfirmationRequest?.commands).toEqual([
+        'rm -rf /',
+      ]);
+    });
+
+    it('should do nothing if user cancels confirmation', async () => {
+      const result = setupProcessorHook([shellCommand]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      act(() => {
+        result.current.handleSlashCommand('/shellcmd');
+      });
+
+      // Wait for the confirmation dialog to be set
+      await waitFor(() => {
+        expect(result.current.shellConfirmationRequest).not.toBeNull();
+      });
+
+      const onConfirm = result.current.shellConfirmationRequest?.onConfirm;
+      expect(onConfirm).toBeDefined();
+
+      // Change the mock action's behavior for a potential second run.
+      // If the test is flawed, this will be called, and we can detect it.
+      mockCommandAction.mockResolvedValue({
+        type: 'message',
+        messageType: 'info',
+        content: 'This should not be called',
+      });
+
+      await act(async () => {
+        onConfirm!(ToolConfirmationOutcome.Cancel, []); // Pass empty array for safety
+      });
+
+      expect(result.current.shellConfirmationRequest).toBeNull();
+      // Verify the action was only called the initial time.
+      expect(mockCommandAction).toHaveBeenCalledTimes(1);
+    });
+
+    it('should re-run command with one-time allowlist on "Proceed Once"', async () => {
+      const result = setupProcessorHook([shellCommand]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      act(() => {
+        result.current.handleSlashCommand('/shellcmd');
+      });
+      await waitFor(() => {
+        expect(result.current.shellConfirmationRequest).not.toBeNull();
+      });
+
+      const onConfirm = result.current.shellConfirmationRequest?.onConfirm;
+
+      // **Change the mock's behavior for the SECOND run.**
+      // This is the key to testing the outcome.
+      mockCommandAction.mockResolvedValue({
+        type: 'message',
+        messageType: 'info',
+        content: 'Success!',
+      });
+
+      await act(async () => {
+        onConfirm!(ToolConfirmationOutcome.ProceedOnce, ['rm -rf /']);
+      });
+
+      expect(result.current.shellConfirmationRequest).toBeNull();
+
+      // The action should have been called twice (initial + re-run).
+      await waitFor(() => {
+        expect(mockCommandAction).toHaveBeenCalledTimes(2);
+      });
+
+      // We can inspect the context of the second call to ensure the one-time list was used.
+      const secondCallContext = mockCommandAction.mock
+        .calls[1][0] as CommandContext;
+      expect(
+        secondCallContext.session.sessionShellAllowlist.has('rm -rf /'),
+      ).toBe(true);
+
+      // Verify the final success message was added.
+      expect(mockAddItem).toHaveBeenCalledWith(
+        { type: MessageType.INFO, text: 'Success!' },
+        expect.any(Number),
+      );
+
+      // Verify the session-wide allowlist was NOT permanently updated.
+      // Re-render the hook by calling a no-op command to get the latest context.
+      await act(async () => {
+        result.current.handleSlashCommand('/no-op');
+      });
+      const finalContext = result.current.commandContext;
+      expect(finalContext.session.sessionShellAllowlist.size).toBe(0);
+    });
+
+    it('should re-run command and update session allowlist on "Proceed Always"', async () => {
+      const result = setupProcessorHook([shellCommand]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      act(() => {
+        result.current.handleSlashCommand('/shellcmd');
+      });
+      await waitFor(() => {
+        expect(result.current.shellConfirmationRequest).not.toBeNull();
+      });
+
+      const onConfirm = result.current.shellConfirmationRequest?.onConfirm;
+      mockCommandAction.mockResolvedValue({
+        type: 'message',
+        messageType: 'info',
+        content: 'Success!',
+      });
+
+      await act(async () => {
+        onConfirm!(ToolConfirmationOutcome.ProceedAlways, ['rm -rf /']);
+      });
+
+      expect(result.current.shellConfirmationRequest).toBeNull();
+      await waitFor(() => {
+        expect(mockCommandAction).toHaveBeenCalledTimes(2);
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        { type: MessageType.INFO, text: 'Success!' },
+        expect.any(Number),
+      );
+
+      // Check that the session-wide allowlist WAS updated.
+      await waitFor(() => {
+        const finalContext = result.current.commandContext;
+        expect(finalContext.session.sessionShellAllowlist.has('rm -rf /')).toBe(
+          true,
+        );
+      });
+    });
   });
 
   describe('Command Parsing and Matching', () => {
@@ -441,6 +691,39 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Command Precedence', () => {
+    it('should override mcp-based commands with file-based commands of the same name', async () => {
+      const mcpAction = vi.fn();
+      const fileAction = vi.fn();
+
+      const mcpCommand = createTestCommand(
+        {
+          name: 'override',
+          description: 'mcp',
+          action: mcpAction,
+        },
+        CommandKind.MCP_PROMPT,
+      );
+      const fileCommand = createTestCommand(
+        { name: 'override', description: 'file', action: fileAction },
+        CommandKind.FILE,
+      );
+
+      const result = setupProcessorHook([], [fileCommand], [mcpCommand]);
+
+      await waitFor(() => {
+        // The service should only return one command with the name 'override'
+        expect(result.current.slashCommands).toHaveLength(1);
+      });
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/override');
+      });
+
+      // Only the file-based command's action should be called.
+      expect(fileAction).toHaveBeenCalledTimes(1);
+      expect(mcpAction).not.toHaveBeenCalled();
+    });
+
     it('should prioritize a command with a primary name over a command with a matching alias', async () => {
       const quitAction = vi.fn();
       const exitAction = vi.fn();
@@ -504,7 +787,7 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Lifecycle', () => {
-    it('should abort command loading when the hook unmounts', async () => {
+    it('should abort command loading when the hook unmounts', () => {
       const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
       const { unmount } = renderHook(() =>
         useSlashCommandProcessor(
@@ -518,10 +801,11 @@ describe('useSlashCommandProcessor', () => {
           vi.fn(), // onDebugMessage
           vi.fn(), // openThemeDialog
           mockOpenAuthDialog,
-          vi.fn(), // openEditorDialog
+          vi.fn(), // openEditorDialog,
           vi.fn(), // toggleCorgiMode
           mockSetQuittingMessages,
           vi.fn(), // openPrivacyNotice
+          vi.fn(), // toggleVimEnabled
         ),
       );
 

@@ -11,6 +11,7 @@ import {
   ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
@@ -30,7 +31,6 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
-import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 import { getProjectTempDir } from '../utils/paths.js';
 import {
   initializeTelemetry,
@@ -46,6 +46,7 @@ import {
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
+import { IdeClient } from '../ide/ide-client.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
@@ -73,12 +74,14 @@ export interface TelemetrySettings {
   target?: TelemetryTarget;
   otlpEndpoint?: string;
   logPrompts?: boolean;
+  outfile?: string;
 }
 
 export interface GeminiCLIExtension {
   name: string;
   version: string;
   isActive: boolean;
+  path: string;
 }
 export interface FileFilteringOptions {
   respectGitIgnore: boolean;
@@ -118,7 +121,13 @@ export class MCPServerConfig {
     readonly extensionName?: string,
     // OAuth configuration
     readonly oauth?: MCPOAuthConfig,
+    readonly authProviderType?: AuthProviderType,
   ) {}
+}
+
+export enum AuthProviderType {
+  DYNAMIC_DISCOVERY = 'dynamic_discovery',
+  GOOGLE_CREDENTIALS = 'google_credentials',
 }
 
 export interface SandboxConfig {
@@ -174,10 +183,12 @@ export interface ConfigParameters {
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideMode?: boolean;
+  ideClient?: IdeClient;
 }
 
 export class Config {
   private toolRegistry!: ToolRegistry;
+  private promptRegistry!: PromptRegistry;
   private readonly sessionId: string;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private readonly embeddingModel: string;
@@ -215,7 +226,8 @@ export class Config {
   private readonly extensionContextFilePaths: string[];
   private readonly noBrowser: boolean;
   private readonly ideMode: boolean;
-  private modelSwitchedDuringSession: boolean = false;
+  private readonly ideClient: IdeClient | undefined;
+  private inFallbackMode = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
   private readonly _extensions: GeminiCLIExtension[];
@@ -255,6 +267,7 @@ export class Config {
       target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
       otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
       logPrompts: params.telemetry?.logPrompts ?? true,
+      outfile: params.telemetry?.outfile,
     };
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
 
@@ -279,6 +292,7 @@ export class Config {
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.ideMode = params.ideMode ?? false;
+    this.ideClient = params.ideClient;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -303,6 +317,7 @@ export class Config {
     if (this.getCheckpointingEnabled()) {
       await this.getGitService();
     }
+    this.promptRegistry = new PromptRegistry();
     this.toolRegistry = await this.createToolRegistry();
   }
 
@@ -316,7 +331,7 @@ export class Config {
     await this.geminiClient.initialize(this.contentGeneratorConfig);
 
     // Reset the session flag since we're explicitly changing auth and using default model
-    this.modelSwitchedDuringSession = false;
+    this.inFallbackMode = false;
   }
 
   getSessionId(): string {
@@ -334,19 +349,15 @@ export class Config {
   setModel(newModel: string): void {
     if (this.contentGeneratorConfig) {
       this.contentGeneratorConfig.model = newModel;
-      this.modelSwitchedDuringSession = true;
     }
   }
 
-  isModelSwitchedDuringSession(): boolean {
-    return this.modelSwitchedDuringSession;
+  isInFallbackMode(): boolean {
+    return this.inFallbackMode;
   }
 
-  resetModelToDefault(): void {
-    if (this.contentGeneratorConfig) {
-      this.contentGeneratorConfig.model = this.model; // Reset to the original default model
-      this.modelSwitchedDuringSession = false;
-    }
+  setFallbackMode(active: boolean): void {
+    this.inFallbackMode = active;
   }
 
   setFlashFallbackHandler(handler: FlashFallbackHandler): void {
@@ -383,6 +394,10 @@ export class Config {
 
   getToolRegistry(): Promise<ToolRegistry> {
     return Promise.resolve(this.toolRegistry);
+  }
+
+  getPromptRegistry(): PromptRegistry {
+    return this.promptRegistry;
   }
 
   getDebugMode(): boolean {
@@ -466,6 +481,10 @@ export class Config {
 
   getTelemetryTarget(): TelemetryTarget {
     return this.telemetrySettings.target ?? DEFAULT_TELEMETRY_TARGET;
+  }
+
+  getTelemetryOutfile(): string | undefined {
+    return this.telemetrySettings.outfile;
   }
 
   getGeminiClient(): GeminiClient {
@@ -563,27 +582,16 @@ export class Config {
     return this.ideMode;
   }
 
+  getIdeClient(): IdeClient | undefined {
+    return this.ideClient;
+  }
+
   async getGitService(): Promise<GitService> {
     if (!this.gitService) {
       this.gitService = new GitService(this.targetDir);
       await this.gitService.initialize();
     }
     return this.gitService;
-  }
-
-  async refreshMemory(): Promise<{ memoryContent: string; fileCount: number }> {
-    const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
-      this.getWorkingDir(),
-      this.getDebugMode(),
-      this.getFileService(),
-      this.getExtensionContextFilePaths(),
-      this.getFileFilteringOptions(),
-    );
-
-    this.setUserMemory(memoryContent);
-    this.setGeminiMdFileCount(fileCount);
-
-    return { memoryContent, fileCount };
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
@@ -634,7 +642,7 @@ export class Config {
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
 
-    await registry.discoverTools();
+    await registry.discoverAllTools();
     return registry;
   }
 }
