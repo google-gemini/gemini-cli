@@ -48,18 +48,21 @@ describe('memoryCommand', () => {
     let showCommand: SlashCommand;
     let mockGetUserMemory: Mock;
     let mockGetGeminiMdFileCount: Mock;
+    let mockGetImportTrees: Mock;
 
     beforeEach(() => {
       showCommand = getSubCommand('show');
 
       mockGetUserMemory = vi.fn();
       mockGetGeminiMdFileCount = vi.fn();
+      mockGetImportTrees = vi.fn();
 
       mockContext = createMockCommandContext({
         services: {
           config: {
             getUserMemory: mockGetUserMemory,
             getGeminiMdFileCount: mockGetGeminiMdFileCount,
+            getImportTrees: mockGetImportTrees,
           },
         },
       });
@@ -89,13 +92,14 @@ describe('memoryCommand', () => {
 
       mockGetUserMemory.mockReturnValue(memoryContent);
       mockGetGeminiMdFileCount.mockReturnValue(1);
+      mockGetImportTrees.mockReturnValue([]);
 
       await showCommand.action(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: `Current memory content from 1 file(s):\n\n---\n${memoryContent}\n---`,
+          text: `Current combined memory content:\n\n---\n${memoryContent}\n---`,
         },
         expect.any(Number),
       );
@@ -149,14 +153,17 @@ describe('memoryCommand', () => {
     let refreshCommand: SlashCommand;
     let mockSetUserMemory: Mock;
     let mockSetGeminiMdFileCount: Mock;
+    let mockSetImportTrees: Mock;
 
     beforeEach(() => {
       refreshCommand = getSubCommand('refresh');
       mockSetUserMemory = vi.fn();
       mockSetGeminiMdFileCount = vi.fn();
+      mockSetImportTrees = vi.fn();
       const mockConfig = {
         setUserMemory: mockSetUserMemory,
         setGeminiMdFileCount: mockSetGeminiMdFileCount,
+        setImportTrees: mockSetImportTrees,
         getWorkingDir: () => '/test/dir',
         getDebugMode: () => false,
         getFileService: () => ({}) as FileDiscoveryService,
@@ -186,6 +193,7 @@ describe('memoryCommand', () => {
       const refreshResult = {
         memoryContent: 'new memory content',
         fileCount: 2,
+        sources: [],
       };
       mockLoadServerHierarchicalMemory.mockResolvedValue(refreshResult);
 
@@ -206,11 +214,12 @@ describe('memoryCommand', () => {
       expect(mockSetGeminiMdFileCount).toHaveBeenCalledWith(
         refreshResult.fileCount,
       );
+      expect(mockSetImportTrees).toHaveBeenCalledWith(refreshResult.sources);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'Memory refreshed successfully. Loaded 18 characters from 2 file(s).',
+          text: `Memory refreshed successfully. Loaded ${refreshResult.memoryContent.length} characters from 2 file(s).`,
         },
         expect.any(Number),
       );
@@ -219,7 +228,7 @@ describe('memoryCommand', () => {
     it('should display success message when memory is refreshed with no content', async () => {
       if (!refreshCommand.action) throw new Error('Command has no action');
 
-      const refreshResult = { memoryContent: '', fileCount: 0 };
+      const refreshResult = { memoryContent: '', fileCount: 0, sources: [] };
       mockLoadServerHierarchicalMemory.mockResolvedValue(refreshResult);
 
       await refreshCommand.action(mockContext, '');
@@ -227,6 +236,7 @@ describe('memoryCommand', () => {
       expect(loadServerHierarchicalMemory).toHaveBeenCalledOnce();
       expect(mockSetUserMemory).toHaveBeenCalledWith('');
       expect(mockSetGeminiMdFileCount).toHaveBeenCalledWith(0);
+      expect(mockSetImportTrees).toHaveBeenCalledWith([]);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {

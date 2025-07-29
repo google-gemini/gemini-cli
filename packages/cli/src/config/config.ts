@@ -20,6 +20,7 @@ import {
   TelemetryTarget,
   FileFilteringOptions,
   IdeClient,
+  MemorySource,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -227,7 +228,11 @@ export async function loadHierarchicalGeminiMemory(
   settings: Settings,
   extensionContextFilePaths: string[] = [],
   fileFilteringOptions?: FileFilteringOptions,
-): Promise<{ memoryContent: string; fileCount: number }> {
+): Promise<{
+  memoryContent: string;
+  fileCount: number;
+  sources: MemorySource[];
+}> {
   if (debugMode) {
     logger.debug(
       `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory}`,
@@ -300,14 +305,15 @@ export async function loadCliConfig(
   };
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
-  const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
-    process.cwd(),
-    debugMode,
-    fileService,
-    settings,
-    extensionContextFilePaths,
-    fileFiltering,
-  );
+  const { memoryContent, fileCount, sources } =
+    await loadHierarchicalGeminiMemory(
+      process.cwd(),
+      debugMode,
+      fileService,
+      settings,
+      extensionContextFilePaths,
+      fileFiltering,
+    );
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
   const excludeTools = mergeExcludeTools(settings, activeExtensions);
@@ -377,6 +383,7 @@ export async function loadCliConfig(
     mcpServers,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
+    importTrees: sources,
     approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
     showMemoryUsage:
       argv.showMemoryUsage ||

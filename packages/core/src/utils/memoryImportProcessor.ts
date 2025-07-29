@@ -6,209 +6,133 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { parseMarkdown } from './markdownParser.js';
 
-// Simple console logger for import processing
+export interface ImportNode {
+  path: string;
+  children: ImportNode[];
+}
+
+export interface ProcessImportsResult {
+  content: string;
+  importTree: ImportNode;
+}
+
+export interface MemorySource {
+  filePath: string;
+  importTree: ImportNode | null;
+}
+
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   debug: (...args: any[]) =>
     console.debug('[DEBUG] [ImportProcessor]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  warn: (...args: any[]) => console.warn('[WARN] [ImportProcessor]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: (...args: any[]) =>
-    console.error('[ERROR] [ImportProcessor]', ...args),
 };
 
-/**
- * Interface for tracking import processing state to prevent circular imports
- */
-interface ImportState {
-  processedFiles: Set<string>;
-  maxDepth: number;
-  currentDepth: number;
-  currentFile?: string; // Track the current file being processed
-}
-
-/**
- * Processes import statements in GEMINI.md content
- * Supports @path/to/file.md syntax for importing content from other files
- *
- * @param content - The content to process for imports
- * @param basePath - The directory path where the current file is located
- * @param debugMode - Whether to enable debug logging
- * @param importState - State tracking for circular import prevention
- * @returns Processed content with imports resolved
- */
-export async function processImports(
-  content: string,
-  basePath: string,
-  debugMode: boolean = false,
-  importState: ImportState = {
-    processedFiles: new Set(),
-    maxDepth: 10,
-    currentDepth: 0,
-  },
+async function _recursiveProcess(
+  filePath: string,
+  rootPath: string,
+  parentNode: ImportNode,
+  processedFiles: Set<string>,
+  depth: number,
+  debugMode: boolean,
 ): Promise<string> {
-  if (importState.currentDepth >= importState.maxDepth) {
+  if (depth > 5) {
     if (debugMode) {
-      logger.warn(
-        `Maximum import depth (${importState.maxDepth}) reached. Stopping import processing.`,
-      );
+      logger.debug(`Max import depth reached for ${filePath}`);
     }
-    return content;
+    return ''; // Silently ignore
   }
 
-  // Regex to match @path/to/file imports (supports any file extension)
-  // Supports both @path/to/file.md and @./path/to/file.md syntax
-  const importRegex = /@([./]?[^\s\n]+\.[^\s\n]+)/g;
-
-  let processedContent = content;
-  let match: RegExpExecArray | null;
-
-  // Process all imports in the content
-  while ((match = importRegex.exec(content)) !== null) {
-    const importPath = match[1];
-
-    // Validate import path to prevent path traversal attacks
-    if (!validateImportPath(importPath, basePath, [basePath])) {
-      processedContent = processedContent.replace(
-        match[0],
-        `<!-- Import failed: ${importPath} - Path traversal attempt -->`,
-      );
-      continue;
+  let fileContent;
+  try {
+    const stats = await fs.stat(filePath);
+    if (!stats.isFile()) {
+      if (debugMode) {
+        logger.debug(`Skipping import of directory: ${filePath}`);
+      }
+      return '';
     }
-
-    // Check if the import is for a non-md file and warn
-    if (!importPath.endsWith('.md')) {
-      logger.warn(
-        `Import processor only supports .md files. Attempting to import non-md file: ${importPath}. This will fail.`,
-      );
-      // Replace the import with a warning comment
-      processedContent = processedContent.replace(
-        match[0],
-        `<!-- Import failed: ${importPath} - Only .md files are supported -->`,
-      );
-      continue;
-    }
-
-    const fullPath = path.resolve(basePath, importPath);
-
+    fileContent = await fs.readFile(filePath, 'utf-8');
+  } catch (e: unknown) {
     if (debugMode) {
-      logger.debug(`Processing import: ${importPath} -> ${fullPath}`);
+      const err = e as Error;
+      logger.debug(`Skipping missing file: ${filePath} (${err.message})`);
     }
+    return ''; // Silently ignore missing files
+  }
 
-    // Check for circular imports - if we're already processing this file
-    if (importState.currentFile === fullPath) {
-      if (debugMode) {
-        logger.warn(`Circular import detected: ${importPath}`);
-      }
-      // Replace the import with a warning comment
-      processedContent = processedContent.replace(
-        match[0],
-        `<!-- Circular import detected: ${importPath} -->`,
-      );
-      continue;
-    }
+  const ast = parseMarkdown(fileContent);
+  const contentParts: string[] = [];
 
-    // Check if we've already processed this file in this import chain
-    if (importState.processedFiles.has(fullPath)) {
-      if (debugMode) {
-        logger.warn(`File already processed in this chain: ${importPath}`);
-      }
-      // Replace the import with a warning comment
-      processedContent = processedContent.replace(
-        match[0],
-        `<!-- File already processed: ${importPath} -->`,
-      );
-      continue;
-    }
+  for (const node of ast) {
+    if (node.type === 'text') {
+      const importRegex = /@((?:[^\s\\]|\\ )+)/g;
+      let lastIndex = 0;
+      let match;
+      const textParts: string[] = [];
 
-    // Check for potential circular imports by looking at the import chain
-    if (importState.currentFile) {
-      const currentFileDir = path.dirname(importState.currentFile);
-      const potentialCircularPath = path.resolve(currentFileDir, importPath);
-      if (potentialCircularPath === importState.currentFile) {
-        if (debugMode) {
-          logger.warn(`Circular import detected: ${importPath}`);
+      while ((match = importRegex.exec(node.content)) !== null) {
+        textParts.push(node.content.slice(lastIndex, match.index));
+        const importPath = match[1].replace(/\\ /g, ' ');
+        const resolvedPath = path.resolve(path.dirname(filePath), importPath);
+
+        if (!resolvedPath.startsWith(rootPath)) {
+          if (debugMode) {
+            logger.debug(
+              `Skipping import outside of project root: ${resolvedPath}`,
+            );
+          }
+          textParts.push('');
+          lastIndex = match.index + match[0].length;
+          continue;
         }
-        // Replace the import with a warning comment
-        processedContent = processedContent.replace(
-          match[0],
-          `<!-- Circular import detected: ${importPath} -->`,
-        );
-        continue;
+
+        if (!processedFiles.has(resolvedPath)) {
+          processedFiles.add(resolvedPath);
+          const childNode: ImportNode = { path: resolvedPath, children: [] };
+
+          const importedContent = await _recursiveProcess(
+            resolvedPath,
+            rootPath,
+            childNode,
+            processedFiles,
+            depth + 1,
+            debugMode,
+          );
+          if (importedContent || childNode.children.length > 0) {
+            parentNode.children.push(childNode);
+          }
+          textParts.push(importedContent);
+        }
+        lastIndex = match.index + match[0].length;
       }
-    }
-
-    try {
-      // Check if the file exists
-      await fs.access(fullPath);
-
-      // Read the imported file content
-      const importedContent = await fs.readFile(fullPath, 'utf-8');
-
-      if (debugMode) {
-        logger.debug(`Successfully read imported file: ${fullPath}`);
-      }
-
-      // Recursively process imports in the imported content
-      const processedImportedContent = await processImports(
-        importedContent,
-        path.dirname(fullPath),
-        debugMode,
-        {
-          ...importState,
-          processedFiles: new Set([...importState.processedFiles, fullPath]),
-          currentDepth: importState.currentDepth + 1,
-          currentFile: fullPath, // Set the current file being processed
-        },
-      );
-
-      // Replace the import statement with the processed content
-      processedContent = processedContent.replace(
-        match[0],
-        `<!-- Imported from: ${importPath} -->\n${processedImportedContent}\n<!-- End of import from: ${importPath} -->`,
-      );
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      if (debugMode) {
-        logger.error(`Failed to import ${importPath}: ${errorMessage}`);
-      }
-
-      // Replace the import with an error comment
-      processedContent = processedContent.replace(
-        match[0],
-        `<!-- Import failed: ${importPath} - ${errorMessage} -->`,
-      );
+      textParts.push(node.content.slice(lastIndex));
+      contentParts.push(textParts.join(''));
+    } else {
+      contentParts.push(node.content);
     }
   }
-
-  return processedContent;
+  return contentParts.join('');
 }
 
-/**
- * Validates import paths to ensure they are safe and within allowed directories
- *
- * @param importPath - The import path to validate
- * @param basePath - The base directory for resolving relative paths
- * @param allowedDirectories - Array of allowed directory paths
- * @returns Whether the import path is valid
- */
-export function validateImportPath(
-  importPath: string,
-  basePath: string,
-  allowedDirectories: string[],
-): boolean {
-  // Reject URLs
-  if (/^(file|https?):\/\//.test(importPath)) {
-    return false;
-  }
+export async function processImports(
+  filePath: string,
+  rootPath: string,
+  debugMode = false,
+): Promise<ProcessImportsResult> {
+  const absoluteFilePath = path.resolve(filePath);
+  const rootNode: ImportNode = { path: absoluteFilePath, children: [] };
+  const processedFiles = new Set<string>([absoluteFilePath]);
 
-  const resolvedPath = path.resolve(basePath, importPath);
+  const content = await _recursiveProcess(
+    absoluteFilePath,
+    rootPath,
+    rootNode,
+    processedFiles,
+    1,
+    debugMode,
+  );
 
-  return allowedDirectories.some((allowedDir) => {
-    const normalizedAllowedDir = path.resolve(allowedDir);
-    return resolvedPath.startsWith(normalizedAllowedDir);
-  });
+  return { content, importTree: rootNode };
 }

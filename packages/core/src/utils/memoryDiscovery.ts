@@ -14,14 +14,16 @@ import {
   getAllGeminiMdFilenames,
 } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { processImports } from './memoryImportProcessor.js';
+import {
+  ImportNode,
+  MemorySource,
+  processImports,
+} from './memoryImportProcessor.js';
 import {
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileFilteringOptions,
 } from '../config/config.js';
 
-// Simple console logger, similar to the one previously in CLI's config.ts
-// TODO: Integrate with a more robust server-side logger if available/appropriate.
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   debug: (...args: any[]) =>
@@ -36,6 +38,7 @@ const logger = {
 interface GeminiFileContent {
   filePath: string;
   content: string | null;
+  importTree: ImportNode | null;
 }
 
 async function findProjectRoot(startDir: string): Promise<string | null> {
@@ -48,16 +51,12 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
         return currentDir;
       }
     } catch (error: unknown) {
-      // Don't log ENOENT errors as they're expected when .git doesn't exist
-      // Also don't log errors in test environments, which often have mocked fs
       const isENOENT =
         typeof error === 'object' &&
         error !== null &&
         'code' in error &&
         (error as { code: string }).code === 'ENOENT';
 
-      // Only log unexpected errors in non-test environments
-      // process.env.NODE_ENV === 'test' or VITEST are common test indicators
       const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
 
       if (!isENOENT && !isTestEnv) {
@@ -68,7 +67,9 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
           );
         } else {
           logger.warn(
-            `Non-standard error checking for .git directory at ${gitPath}: ${String(error)}`,
+            `Non-standard error checking for .git directory at ${gitPath}: ${String(
+              error,
+            )}`,
           );
         }
       }
@@ -128,21 +129,17 @@ async function getGeminiMdFilePathsInternal(
 
     const upwardPaths: string[] = [];
     let currentDir = resolvedCwd;
-    // Determine the directory that signifies the top of the project or user-specific space.
     const ultimateStopDir = projectRoot
       ? path.dirname(projectRoot)
       : path.dirname(resolvedHome);
 
     while (currentDir && currentDir !== path.dirname(currentDir)) {
-      // Loop until filesystem root or currentDir is empty
       if (debugMode) {
         logger.debug(
           `Checking for ${geminiMdFilename} in (upward scan): ${currentDir}`,
         );
       }
 
-      // Skip the global .gemini directory itself during upward scan from CWD,
-      // as global is handled separately and explicitly first.
       if (currentDir === path.join(resolvedHome, GEMINI_CONFIG_DIR)) {
         if (debugMode) {
           logger.debug(
@@ -155,7 +152,6 @@ async function getGeminiMdFilePathsInternal(
       const potentialPath = path.join(currentDir, geminiMdFilename);
       try {
         await fs.access(potentialPath, fsSync.constants.R_OK);
-        // Add to upwardPaths only if it's not the already added globalMemoryPath
         if (potentialPath !== globalMemoryPath) {
           upwardPaths.unshift(potentialPath);
           if (debugMode) {
@@ -172,7 +168,6 @@ async function getGeminiMdFilePathsInternal(
         }
       }
 
-      // Stop condition: if currentDir is the ultimateStopDir, break after this iteration.
       if (currentDir === ultimateStopDir) {
         if (debugMode)
           logger.debug(
@@ -185,7 +180,6 @@ async function getGeminiMdFilePathsInternal(
     }
     upwardPaths.forEach((p) => allPaths.add(p));
 
-    // Merge options with memory defaults, with options taking precedence
     const mergedOptions = {
       ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
       ...fileFilteringOptions,
@@ -196,22 +190,20 @@ async function getGeminiMdFilePathsInternal(
       maxDirs,
       debug: debugMode,
       fileService,
-      fileFilteringOptions: mergedOptions, // Pass merged options as fileFilter
+      fileFilteringOptions: mergedOptions,
     });
-    downwardPaths.sort(); // Sort for consistent ordering, though hierarchy might be more complex
+    downwardPaths.sort();
     if (debugMode && downwardPaths.length > 0)
       logger.debug(
         `Found downward ${geminiMdFilename} files (sorted): ${JSON.stringify(
           downwardPaths,
         )}`,
       );
-    // Add downward paths only if they haven't been included already (e.g. from upward scan)
     for (const dPath of downwardPaths) {
       allPaths.add(dPath);
     }
   }
 
-  // Add extension context file paths
   for (const extensionPath of extensionContextFilePaths) {
     allPaths.add(extensionPath);
   }
@@ -229,24 +221,22 @@ async function getGeminiMdFilePathsInternal(
 
 async function readGeminiMdFiles(
   filePaths: string[],
+  rootPath: string,
   debugMode: boolean,
 ): Promise<GeminiFileContent[]> {
   const results: GeminiFileContent[] = [];
   for (const filePath of filePaths) {
     try {
-      const content = await fs.readFile(filePath, 'utf-8');
-
-      // Process imports in the content
-      const processedContent = await processImports(
-        content,
-        path.dirname(filePath),
+      const { content, importTree } = await processImports(
+        filePath,
+        rootPath,
         debugMode,
       );
 
-      results.push({ filePath, content: processedContent });
+      results.push({ filePath, content, importTree });
       if (debugMode)
         logger.debug(
-          `Successfully read and processed imports: ${filePath} (Length: ${processedContent.length})`,
+          `Successfully read and processed imports: ${filePath} (Length: ${content.length})`,
         );
     } catch (error: unknown) {
       const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
@@ -256,7 +246,7 @@ async function readGeminiMdFiles(
           `Warning: Could not read ${getAllGeminiMdFilenames()} file at ${filePath}. Error: ${message}`,
         );
       }
-      results.push({ filePath, content: null }); // Still include it with null content
+      results.push({ filePath, content: null, importTree: null });
       if (debugMode) logger.debug(`Failed to read: ${filePath}`);
     }
   }
@@ -265,7 +255,6 @@ async function readGeminiMdFiles(
 
 function concatenateInstructions(
   instructionContents: GeminiFileContent[],
-  // CWD is needed to resolve relative paths for display markers
   currentWorkingDirectoryForDisplay: string,
 ): string {
   return instructionContents
@@ -284,10 +273,12 @@ function concatenateInstructions(
     .join('\n\n');
 }
 
-/**
- * Loads hierarchical GEMINI.md files and concatenates their content.
- * This function is intended for use by the server.
- */
+export interface HierarchicalMemory {
+  memoryContent: string;
+  fileCount: number;
+  sources: MemorySource[];
+}
+
 export async function loadServerHierarchicalMemory(
   currentWorkingDirectory: string,
   debugMode: boolean,
@@ -295,14 +286,12 @@ export async function loadServerHierarchicalMemory(
   extensionContextFilePaths: string[] = [],
   fileFilteringOptions?: FileFilteringOptions,
   maxDirs: number = 200,
-): Promise<{ memoryContent: string; fileCount: number }> {
+): Promise<HierarchicalMemory> {
   if (debugMode)
     logger.debug(
       `Loading server hierarchical memory for CWD: ${currentWorkingDirectory}`,
     );
 
-  // For the server, homedir() refers to the server process's home.
-  // This is consistent with how MemoryTool already finds the global path.
   const userHomePath = homedir();
   const filePaths = await getGeminiMdFilePathsInternal(
     currentWorkingDirectory,
@@ -313,23 +302,52 @@ export async function loadServerHierarchicalMemory(
     fileFilteringOptions || DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
     maxDirs,
   );
+
+  const projectRoot = await findProjectRoot(currentWorkingDirectory);
+  if (!projectRoot) {
+    if (debugMode)
+      logger.debug(
+        'Could not determine project root. Using CWD as root for imports.',
+      );
+  }
+  const rootPath = projectRoot || currentWorkingDirectory;
+
   if (filePaths.length === 0) {
     if (debugMode) logger.debug('No GEMINI.md files found in hierarchy.');
-    return { memoryContent: '', fileCount: 0 };
+    return { memoryContent: '', fileCount: 0, sources: [] };
   }
-  const contentsWithPaths = await readGeminiMdFiles(filePaths, debugMode);
-  // Pass CWD for relative path display in concatenated content
+
+  const contentsWithPaths = await readGeminiMdFiles(
+    filePaths,
+    rootPath,
+    debugMode,
+  );
+
   const combinedInstructions = concatenateInstructions(
     contentsWithPaths,
     currentWorkingDirectory,
   );
+
+  const sources: MemorySource[] = contentsWithPaths.map((item) => ({
+    filePath: item.filePath,
+    importTree: item.importTree,
+  }));
+
   if (debugMode)
     logger.debug(
       `Combined instructions length: ${combinedInstructions.length}`,
     );
   if (debugMode && combinedInstructions.length > 0)
     logger.debug(
-      `Combined instructions (snippet): ${combinedInstructions.substring(0, 500)}...`,
+      `Combined instructions (snippet): ${combinedInstructions.substring(
+        0,
+        500,
+      )}...`,
     );
-  return { memoryContent: combinedInstructions, fileCount: filePaths.length };
+
+  return {
+    memoryContent: combinedInstructions,
+    fileCount: filePaths.length,
+    sources,
+  };
 }

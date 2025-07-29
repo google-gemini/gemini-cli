@@ -6,6 +6,7 @@
 
 import {
   getErrorMessage,
+  ImportNode,
   loadServerHierarchicalMemory,
 } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
@@ -15,6 +16,15 @@ import {
   SlashCommandActionReturn,
 } from './types.js';
 
+function renderTree(node: ImportNode, indent = ''): string {
+  let output = `${indent}└─ ${node.path}\n`;
+  node.children.forEach((child: ImportNode, index: number) => {
+    const isLast = index === node.children.length - 1;
+    output += renderTree(child, indent + (isLast ? '    ' : '│   '));
+  });
+  return output;
+}
+
 export const memoryCommand: SlashCommand = {
   name: 'memory',
   description: 'Commands for interacting with memory.',
@@ -22,16 +32,32 @@ export const memoryCommand: SlashCommand = {
   subCommands: [
     {
       name: 'show',
-      description: 'Show the current memory contents.',
+      description: 'Show the current memory contents and import tree.',
       kind: CommandKind.BUILT_IN,
       action: async (context) => {
         const memoryContent = context.services.config?.getUserMemory() || '';
-        const fileCount = context.services.config?.getGeminiMdFileCount() || 0;
+        const sources = context.services.config?.getImportTrees() || [];
 
-        const messageContent =
-          memoryContent.length > 0
-            ? `Current memory content from ${fileCount} file(s):\n\n---\n${memoryContent}\n---`
-            : 'Memory is currently empty.';
+        let messageContent = '';
+
+        if (sources.length > 0) {
+          messageContent += `Memory loaded from ${sources.length} source file(s):\n\n`;
+          sources.forEach((source) => {
+            if (source.importTree) {
+              messageContent += `${source.filePath}\n`;
+              source.importTree.children.forEach((child) => {
+                messageContent += renderTree(child, '');
+              });
+              messageContent += '\n';
+            }
+          });
+        }
+
+        if (memoryContent.length > 0) {
+          messageContent += `Current combined memory content:\n\n---\n${memoryContent}\n---`;
+        } else {
+          messageContent = 'Memory is currently empty.';
+        }
 
         context.ui.addItem(
           {
@@ -86,7 +112,7 @@ export const memoryCommand: SlashCommand = {
         try {
           const config = await context.services.config;
           if (config) {
-            const { memoryContent, fileCount } =
+            const { memoryContent, fileCount, sources } =
               await loadServerHierarchicalMemory(
                 config.getWorkingDir(),
                 config.getDebugMode(),
@@ -97,6 +123,7 @@ export const memoryCommand: SlashCommand = {
               );
             config.setUserMemory(memoryContent);
             config.setGeminiMdFileCount(fileCount);
+            config.setImportTrees(sources);
 
             const successMessage =
               memoryContent.length > 0

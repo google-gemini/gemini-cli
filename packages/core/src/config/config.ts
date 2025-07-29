@@ -27,6 +27,7 @@ import {
   setGeminiMdFilename,
   GEMINI_CONFIG_DIR as GEMINI_DIR,
 } from '../tools/memoryTool.js';
+import { MemorySource } from '../utils/memoryImportProcessor.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
@@ -157,6 +158,7 @@ export interface ConfigParameters {
   mcpServers?: Record<string, MCPServerConfig>;
   userMemory?: string;
   geminiMdFileCount?: number;
+  importTrees?: MemorySource[];
   approvalMode?: ApprovalMode;
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
@@ -205,6 +207,7 @@ export class Config {
   private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
+  private importTrees: MemorySource[];
   private approvalMode: ApprovalMode;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
@@ -259,6 +262,7 @@ export class Config {
     this.mcpServers = params.mcpServers;
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
+    this.importTrees = params.importTrees ?? [];
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
     this.accessibility = params.accessibility ?? {};
@@ -449,6 +453,14 @@ export class Config {
 
   setGeminiMdFileCount(count: number): void {
     this.geminiMdFileCount = count;
+  }
+
+  getImportTrees(): MemorySource[] {
+    return this.importTrees;
+  }
+
+  setImportTrees(trees: MemorySource[]): void {
+    this.importTrees = trees;
   }
 
   getApprovalMode(): ApprovalMode {

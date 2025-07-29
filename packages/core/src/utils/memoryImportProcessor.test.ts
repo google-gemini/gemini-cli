@@ -4,254 +4,156 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { processImports, validateImportPath } from './memoryImportProcessor.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { processImports } from './memoryImportProcessor.js';
+import { vol } from 'memfs';
 
-// Mock fs/promises
-vi.mock('fs/promises');
-const mockedFs = vi.mocked(fs);
-
-// Mock console methods to capture warnings
-const originalConsoleWarn = console.warn;
-const originalConsoleError = console.error;
-const originalConsoleDebug = console.debug;
+vi.mock('fs/promises', async () => {
+  const memfs = await vi.importActual<typeof import('memfs')>('memfs');
+  return memfs.fs.promises;
+});
 
 describe('memoryImportProcessor', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Mock console methods
-    console.warn = vi.fn();
-    console.error = vi.fn();
-    console.debug = vi.fn();
+    vol.reset();
   });
 
-  afterEach(() => {
-    // Restore console methods
-    console.warn = originalConsoleWarn;
-    console.error = originalConsoleError;
-    console.debug = originalConsoleDebug;
-  });
-
-  describe('processImports', () => {
-    it('should process basic md file imports', async () => {
-      const content = 'Some content @./test.md more content';
-      const basePath = '/test/path';
-      const importedContent = '# Imported Content\nThis is imported.';
-
-      mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile.mockResolvedValue(importedContent);
-
-      const result = await processImports(content, basePath, true);
-
-      expect(result).toContain('<!-- Imported from: ./test.md -->');
-      expect(result).toContain(importedContent);
-      expect(result).toContain('<!-- End of import from: ./test.md -->');
-      expect(mockedFs.readFile).toHaveBeenCalledWith(
-        path.resolve(basePath, './test.md'),
-        'utf-8',
-      );
+  it('should process a basic import', async () => {
+    vol.fromJSON({
+      '/project/GEMINI.md': 'Hello @./other.md',
+      '/project/other.md': 'World',
     });
 
-    it('should warn and fail for non-md file imports', async () => {
-      const content = 'Some content @./instructions.txt more content';
-      const basePath = '/test/path';
-
-      const result = await processImports(content, basePath, true);
-
-      expect(console.warn).toHaveBeenCalledWith(
-        '[WARN] [ImportProcessor]',
-        'Import processor only supports .md files. Attempting to import non-md file: ./instructions.txt. This will fail.',
-      );
-      expect(result).toContain(
-        '<!-- Import failed: ./instructions.txt - Only .md files are supported -->',
-      );
-      expect(mockedFs.readFile).not.toHaveBeenCalled();
-    });
-
-    it('should handle circular imports', async () => {
-      const content = 'Content @./circular.md more content';
-      const basePath = '/test/path';
-      const circularContent = 'Circular @./main.md content';
-
-      mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile.mockResolvedValue(circularContent);
-
-      // Set up the import state to simulate we're already processing main.md
-      const importState = {
-        processedFiles: new Set<string>(),
-        maxDepth: 10,
-        currentDepth: 0,
-        currentFile: '/test/path/main.md', // Simulate we're processing main.md
-      };
-
-      const result = await processImports(content, basePath, true, importState);
-
-      // The circular import should be detected when processing the nested import
-      expect(result).toContain('<!-- Circular import detected: ./main.md -->');
-    });
-
-    it('should handle file not found errors', async () => {
-      const content = 'Content @./nonexistent.md more content';
-      const basePath = '/test/path';
-
-      mockedFs.access.mockRejectedValue(new Error('File not found'));
-
-      const result = await processImports(content, basePath, true);
-
-      expect(result).toContain(
-        '<!-- Import failed: ./nonexistent.md - File not found -->',
-      );
-      expect(console.error).toHaveBeenCalledWith(
-        '[ERROR] [ImportProcessor]',
-        'Failed to import ./nonexistent.md: File not found',
-      );
-    });
-
-    it('should respect max depth limit', async () => {
-      const content = 'Content @./deep.md more content';
-      const basePath = '/test/path';
-      const deepContent = 'Deep @./deeper.md content';
-
-      mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile.mockResolvedValue(deepContent);
-
-      const importState = {
-        processedFiles: new Set<string>(),
-        maxDepth: 1,
-        currentDepth: 1,
-      };
-
-      const result = await processImports(content, basePath, true, importState);
-
-      expect(console.warn).toHaveBeenCalledWith(
-        '[WARN] [ImportProcessor]',
-        'Maximum import depth (1) reached. Stopping import processing.',
-      );
-      expect(result).toBe(content);
-    });
-
-    it('should handle nested imports recursively', async () => {
-      const content = 'Main @./nested.md content';
-      const basePath = '/test/path';
-      const nestedContent = 'Nested @./inner.md content';
-      const innerContent = 'Inner content';
-
-      mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile
-        .mockResolvedValueOnce(nestedContent)
-        .mockResolvedValueOnce(innerContent);
-
-      const result = await processImports(content, basePath, true);
-
-      expect(result).toContain('<!-- Imported from: ./nested.md -->');
-      expect(result).toContain('<!-- Imported from: ./inner.md -->');
-      expect(result).toContain(innerContent);
-    });
-
-    it('should handle absolute paths in imports', async () => {
-      const content = 'Content @/absolute/path/file.md more content';
-      const basePath = '/test/path';
-      const importedContent = 'Absolute path content';
-
-      mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile.mockResolvedValue(importedContent);
-
-      const result = await processImports(content, basePath, true);
-
-      expect(result).toContain(
-        '<!-- Import failed: /absolute/path/file.md - Path traversal attempt -->',
-      );
-    });
-
-    it('should handle multiple imports in same content', async () => {
-      const content = 'Start @./first.md middle @./second.md end';
-      const basePath = '/test/path';
-      const firstContent = 'First content';
-      const secondContent = 'Second content';
-
-      mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile
-        .mockResolvedValueOnce(firstContent)
-        .mockResolvedValueOnce(secondContent);
-
-      const result = await processImports(content, basePath, true);
-
-      expect(result).toContain('<!-- Imported from: ./first.md -->');
-      expect(result).toContain('<!-- Imported from: ./second.md -->');
-      expect(result).toContain(firstContent);
-      expect(result).toContain(secondContent);
+    const result = await processImports('/project/GEMINI.md', '/project', true);
+    expect(result.content).toBe('Hello World');
+    expect(result.importTree).toEqual({
+      path: '/project/GEMINI.md',
+      children: [{ path: '/project/other.md', children: [] }],
     });
   });
 
-  describe('validateImportPath', () => {
-    it('should reject URLs', () => {
-      expect(
-        validateImportPath('https://example.com/file.md', '/base', [
-          '/allowed',
-        ]),
-      ).toBe(false);
-      expect(
-        validateImportPath('http://example.com/file.md', '/base', ['/allowed']),
-      ).toBe(false);
-      expect(
-        validateImportPath('file:///path/to/file.md', '/base', ['/allowed']),
-      ).toBe(false);
+  it('should handle nested imports', async () => {
+    vol.fromJSON({
+      '/project/GEMINI.md': '@./level1.md',
+      '/project/level1.md': 'Level 1 imports @./level2.md',
+      '/project/level2.md': 'Level 2 content',
     });
 
-    it('should allow paths within allowed directories', () => {
-      expect(validateImportPath('./file.md', '/base', ['/base'])).toBe(true);
-      expect(validateImportPath('../file.md', '/base', ['/allowed'])).toBe(
-        false,
-      );
-      expect(
-        validateImportPath('/allowed/sub/file.md', '/base', ['/allowed']),
-      ).toBe(true);
+    const result = await processImports('/project/GEMINI.md', '/project');
+    expect(result.content).toBe('Level 1 imports Level 2 content');
+    expect(result.importTree).toEqual({
+      path: '/project/GEMINI.md',
+      children: [
+        {
+          path: '/project/level1.md',
+          children: [{ path: '/project/level2.md', children: [] }],
+        },
+      ],
+    });
+  });
+
+  it('should ignore imports inside code blocks', async () => {
+    vol.fromJSON({
+      '/project/GEMINI.md': '```\n@./ignored.md\n```',
+      '/project/ignored.md': 'SHOULD NOT BE INCLUDED',
     });
 
-    it('should reject paths outside allowed directories', () => {
-      expect(
-        validateImportPath('/forbidden/file.md', '/base', ['/allowed']),
-      ).toBe(false);
-      expect(validateImportPath('../../../file.md', '/base', ['/base'])).toBe(
-        false,
-      );
+    const result = await processImports('/project/GEMINI.md', '/project');
+    expect(result.content).toContain('@./ignored.md');
+    expect(result.content).not.toContain('SHOULD NOT BE INCLUDED');
+    expect(result.importTree.children).toHaveLength(0);
+  });
+
+  it('should ignore imports inside inline code spans', async () => {
+    vol.fromJSON({
+      '/project/GEMINI.md': 'This is some code: `@./ignored.md`',
+      '/project/ignored.md': 'SHOULD NOT BE INCLUDED',
     });
 
-    it('should handle multiple allowed directories', () => {
-      expect(
-        validateImportPath('./file.md', '/base', ['/allowed1', '/allowed2']),
-      ).toBe(false);
-      expect(
-        validateImportPath('/allowed1/file.md', '/base', [
-          '/allowed1',
-          '/allowed2',
-        ]),
-      ).toBe(true);
-      expect(
-        validateImportPath('/allowed2/file.md', '/base', [
-          '/allowed1',
-          '/allowed2',
-        ]),
-      ).toBe(true);
+    const result = await processImports('/project/GEMINI.md', '/project');
+    expect(result.content).toContain('@./ignored.md');
+    expect(result.content).not.toContain('SHOULD NOT BE INCLUDED');
+    expect(result.importTree.children).toHaveLength(0);
+  });
+
+  it('should silently ignore missing files', async () => {
+    vol.fromJSON({
+      '/project/GEMINI.md': 'Hello @./nonexistent.md',
     });
 
-    it('should handle relative paths correctly', () => {
-      expect(validateImportPath('file.md', '/base', ['/base'])).toBe(true);
-      expect(validateImportPath('./file.md', '/base', ['/base'])).toBe(true);
-      expect(validateImportPath('../file.md', '/base', ['/parent'])).toBe(
-        false,
-      );
+    const result = await processImports('/project/GEMINI.md', '/project');
+    expect(result.content).toBe('Hello ');
+    expect(result.importTree.children).toHaveLength(0);
+  });
+
+  it('should silently ignore directories', async () => {
+    vol.fromJSON({
+      '/project/GEMINI.md': 'Hello @./mydir',
+      '/project/mydir/file.txt': 'content',
     });
 
-    it('should handle absolute paths correctly', () => {
-      expect(
-        validateImportPath('/allowed/file.md', '/base', ['/allowed']),
-      ).toBe(true);
-      expect(
-        validateImportPath('/forbidden/file.md', '/base', ['/allowed']),
-      ).toBe(false);
+    const result = await processImports('/project/GEMINI.md', '/project');
+    expect(result.content).toBe('Hello ');
+    expect(result.importTree.children).toHaveLength(0);
+  });
+
+  it('should not import the same file twice', async () => {
+    vol.fromJSON({
+      '/project/GEMINI.md': '@./a.md and @./b.md',
+      '/project/a.md': 'Content A imports @./b.md',
+      '/project/b.md': 'Content B',
     });
+
+    const result = await processImports('/project/GEMINI.md', '/project');
+    expect(result.content).toBe('Content A imports Content B and ');
+    expect(result.importTree).toEqual({
+      path: '/project/GEMINI.md',
+      children: [
+        {
+          path: '/project/a.md',
+          children: [{ path: '/project/b.md', children: [] }],
+        },
+      ],
+    });
+  });
+
+  it('should stop at max depth', async () => {
+    vol.fromJSON({
+      '/project/1.md': '@./2.md',
+      '/project/2.md': '@./3.md',
+      '/project/3.md': '@./4.md',
+      '/project/4.md': '@./5.md',
+      '/project/5.md': 'Level 5 @./6.md',
+      '/project/6.md': 'SHOULD NOT BE INCLUDED',
+    });
+
+    const result = await processImports('/project/1.md', '/project');
+    expect(result.content).toBe('Level 5 ');
+    expect(
+      result.importTree.children[0].children[0].children[0].children[0]
+        .children,
+    ).toHaveLength(0);
+  });
+
+  it('should not allow path traversal', async () => {
+    vol.fromJSON({
+      '/project/GEMINI.md': '@../secret.md',
+      '/secret.md': 'SECRET CONTENT',
+    });
+
+    const result = await processImports('/project/GEMINI.md', '/project');
+    expect(result.content).toBe('');
+    expect(result.importTree.children).toHaveLength(0);
+  });
+
+  it('should handle escaped spaces in paths', async () => {
+    vol.fromJSON({
+      '/project/GEMINI.md': 'Hello @./my\\ file.md',
+      '/project/my file.md': 'World',
+    });
+
+    const result = await processImports('/project/GEMINI.md', '/project');
+    expect(result.content).toBe('Hello World');
+    expect(result.importTree.children[0].path).toBe('/project/my file.md');
   });
 });
