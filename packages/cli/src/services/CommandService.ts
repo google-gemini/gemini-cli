@@ -69,13 +69,13 @@ export class CommandService {
       if (cmd.extensionName && commandMap.has(cmd.name)) {
         let renamedName = `${cmd.extensionName}.${cmd.name}`;
         let suffix = 1;
-        
+
         // Keep trying until we find a name that doesn't conflict
         while (commandMap.has(renamedName)) {
           renamedName = `${cmd.extensionName}.${cmd.name}${suffix}`;
           suffix++;
         }
-        
+
         finalName = renamedName;
       }
 

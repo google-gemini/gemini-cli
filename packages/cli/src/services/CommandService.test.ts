@@ -272,7 +272,7 @@ describe('CommandService', () => {
     // User has both /deploy and /gcp.deploy commands
     const userCommand1 = createMockCommand('deploy', CommandKind.FILE);
     const userCommand2 = createMockCommand('gcp.deploy', CommandKind.FILE);
-    
+
     // Extension also has a deploy command that will conflict with user's /deploy
     const extensionCommand = {
       ...createMockCommand('deploy', CommandKind.FILE),
@@ -319,7 +319,7 @@ describe('CommandService', () => {
     const userCommand1 = createMockCommand('deploy', CommandKind.FILE);
     const userCommand2 = createMockCommand('gcp.deploy', CommandKind.FILE);
     const userCommand3 = createMockCommand('gcp.deploy1', CommandKind.FILE);
-    
+
     // Extension has a deploy command
     const extensionCommand = {
       ...createMockCommand('deploy', CommandKind.FILE),
