@@ -102,8 +102,9 @@ describe('<StatsDisplay />', () => {
 
     expect(output).toContain('gemini-2.5-pro');
     expect(output).toContain('gemini-2.5-flash');
-    expect(output).toContain('1,000');
-    expect(output).toContain('25,000');
+    // Check for either comma or period as thousand separator
+    expect(output).toMatch(/1[.,]000/);
+    expect(output).toMatch(/25[.,]000/);
     expect(output).toMatchSnapshot();
   });
 
