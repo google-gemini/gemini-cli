@@ -93,7 +93,6 @@ export const ToolStatsDisplay: React.FC = () => {
       flexDirection="column"
       paddingY={1}
       paddingX={2}
-      width={70}
     >
       <Text bold color={Colors.AccentPurple}>
         Tool Stats For Nerds

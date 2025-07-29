@@ -15,9 +15,6 @@ import {
 } from '../utils/computeStats.js';
 import { useSessionStats, ModelMetrics } from '../contexts/SessionContext.js';
 
-const METRIC_COL_WIDTH = 28;
-const MODEL_COL_WIDTH = 22;
-
 interface StatRowProps {
   title: string;
   values: Array<string | React.ReactElement>;
@@ -32,13 +29,13 @@ const StatRow: React.FC<StatRowProps> = ({
   isSection = false,
 }) => (
   <Box>
-    <Box width={METRIC_COL_WIDTH}>
+    <Box flexGrow={1} flexBasis={0}>
       <Text bold={isSection} color={isSection ? undefined : Colors.LightBlue}>
         {isSubtle ? `  ↳ ${title}` : title}
       </Text>
     </Box>
     {values.map((value, index) => (
-      <Box width={MODEL_COL_WIDTH} key={index}>
+      <Box flexBasis={22} key={index} justifyContent="flex-end">
         <Text>{value}</Text>
       </Box>
     ))}
@@ -94,11 +91,11 @@ export const ModelStatsDisplay: React.FC = () => {
 
       {/* Header */}
       <Box>
-        <Box width={METRIC_COL_WIDTH}>
+        <Box flexGrow={1} flexBasis={0}>
           <Text bold>Metric</Text>
         </Box>
         {modelNames.map((name) => (
-          <Box width={MODEL_COL_WIDTH} key={name}>
+          <Box flexBasis={22} key={name} justifyContent="flex-end">
             <Text bold>{name}</Text>
           </Box>
         ))}

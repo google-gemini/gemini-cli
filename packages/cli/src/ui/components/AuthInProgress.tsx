@@ -39,7 +39,6 @@ export function AuthInProgress({
       borderColor={Colors.Gray}
       flexDirection="column"
       padding={1}
-      width="100%"
     >
       {timedOut ? (
         <Text color={Colors.AccentRed}>

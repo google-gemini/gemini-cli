@@ -818,7 +818,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
         <Box flexDirection="column" ref={mainControlsRef}>
           {/* Move UpdateNotification to render update notification above input area */}
-          {updateInfo && <UpdateNotification message={updateInfo.message} />}
+          {updateInfo && (
+            <Box flexDirection="column">
+              <UpdateNotification message={updateInfo.message} />
+            </Box>
+          )}
           {startupWarnings.length > 0 && (
             <Box
               borderStyle="round"

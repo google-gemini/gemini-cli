@@ -67,7 +67,6 @@ export const ShellConfirmationDialog: React.FC<
       borderStyle="round"
       borderColor={Colors.AccentYellow}
       padding={1}
-      width="100%"
       marginLeft={1}
     >
       <Box flexDirection="column" marginBottom={1}>

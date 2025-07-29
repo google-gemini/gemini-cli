@@ -433,10 +433,11 @@ export function useCompletion(
         }))
         .filter((s) => {
           if (fileDiscoveryService) {
+            const absolutePath = path.resolve(cwd, s.label);
             return !fileDiscoveryService.shouldIgnoreFile(
-              s.label,
+              absolutePath,
               filterOptions,
-            ); // relative path
+            ); // absolute path
           }
           return true;
         })
