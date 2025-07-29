@@ -23,6 +23,9 @@ import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { StreamingState, ConsoleMessageItem } from './types.js';
 import { Tips } from './components/Tips.js';
+import { checkForUpdates, UpdateObject } from './utils/updateCheck.js';
+import { EventEmitter } from 'events';
+import { updateEventEmitter } from '../utils/updateEventEmitter.js';
 
 // Define a more complete mock server config based on actual Config
 interface MockServerConfig {
@@ -163,6 +166,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     MCPServerConfig: actualCore.MCPServerConfig,
     getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
     ideContext: ideContextMock,
+    isGitRepository: vi.fn(),
   };
 });
 
@@ -219,6 +223,17 @@ vi.mock('./components/Tips.js', () => ({
 vi.mock('./components/Header.js', () => ({
   Header: vi.fn(() => null),
 }));
+
+vi.mock('./utils/updateCheck.js', () => ({
+  checkForUpdates: vi.fn(),
+}));
+
+const mockedCheckForUpdates = vi.mocked(checkForUpdates);
+const { isGitRepository: mockedIsGitRepository } = vi.mocked(
+  await import('@google/gemini-cli-core'),
+);
+
+vi.mock('node:child_process');
 
 describe('App UI', () => {
   let mockConfig: MockServerConfig;
@@ -286,6 +301,169 @@ describe('App UI', () => {
       currentUnmount = undefined;
     }
     vi.clearAllMocks(); // Clear mocks after each test
+  });
+
+  describe('handleAutoUpdate', () => {
+    let spawnEmitter: EventEmitter;
+
+    beforeEach(async () => {
+      const { spawn } = await import('node:child_process');
+      spawnEmitter = new EventEmitter();
+      spawnEmitter.stdout = new EventEmitter();
+      spawnEmitter.stderr = new EventEmitter();
+      (spawn as vi.Mock).mockReturnValue(spawnEmitter);
+    });
+
+    afterEach(() => {
+      delete process.env.GEMINI_CLI_DISABLE_AUTOUPDATER;
+    });
+
+    it('should not start the update process when running from git', async () => {
+      mockedIsGitRepository.mockResolvedValue(true);
+      const info: UpdateObject = {
+        update: {
+          name: '@google/gemini-cli',
+          latest: '1.1.0',
+          current: '1.0.0',
+        },
+        message: 'Gemini CLI update available!',
+      };
+      mockedCheckForUpdates.mockResolvedValue(info);
+      const { spawn } = await import('node:child_process');
+
+      const { unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(spawn).not.toHaveBeenCalled();
+    });
+
+    it('should show a success message when update succeeds', async () => {
+      mockedIsGitRepository.mockResolvedValue(false);
+      const info: UpdateObject = {
+        update: {
+          name: '@google/gemini-cli',
+          latest: '1.1.0',
+          current: '1.0.0',
+        },
+        message: 'Update available',
+      };
+      mockedCheckForUpdates.mockResolvedValue(info);
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      updateEventEmitter.emit('update-success', info);
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(lastFrame()).toContain(
+        'Update successful! The new version will be used on your next run.',
+      );
+    });
+
+    it('should show an error message when update fails', async () => {
+      mockedIsGitRepository.mockResolvedValue(false);
+      const info: UpdateObject = {
+        update: {
+          name: '@google/gemini-cli',
+          latest: '1.1.0',
+          current: '1.0.0',
+        },
+        message: 'Update available',
+      };
+      mockedCheckForUpdates.mockResolvedValue(info);
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      updateEventEmitter.emit('update-failed', info);
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(lastFrame()).toContain(
+        'Automatic update failed. Please try updating manually',
+      );
+    });
+
+    it('should show an error message when spawn fails', async () => {
+      mockedIsGitRepository.mockResolvedValue(false);
+      const info: UpdateObject = {
+        update: {
+          name: '@google/gemini-cli',
+          latest: '1.1.0',
+          current: '1.0.0',
+        },
+        message: 'Update available',
+      };
+      mockedCheckForUpdates.mockResolvedValue(info);
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // We are testing the App's reaction to an `update-failed` event,
+      // which is what should be emitted when a spawn error occurs elsewhere.
+      updateEventEmitter.emit('update-failed', info);
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(lastFrame()).toContain(
+        'Automatic update failed. Please try updating manually',
+      );
+    });
+
+    it('should not auto-update if GEMINI_CLI_DISABLE_AUTOUPDATER is true', async () => {
+      mockedIsGitRepository.mockResolvedValue(false);
+      process.env.GEMINI_CLI_DISABLE_AUTOUPDATER = 'true';
+      const info: UpdateObject = {
+        update: {
+          name: '@google/gemini-cli',
+          latest: '1.1.0',
+          current: '1.0.0',
+        },
+        message: 'Update available',
+      };
+      mockedCheckForUpdates.mockResolvedValue(info);
+      const { spawn } = await import('node:child_process');
+
+      const { unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(spawn).not.toHaveBeenCalled();
+    });
   });
 
   it('should display active file when available', async () => {
