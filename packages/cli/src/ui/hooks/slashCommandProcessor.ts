@@ -13,6 +13,8 @@ import {
   Config,
   GitService,
   Logger,
+  logSlashCommand,
+  SlashCommandEvent,
   ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
@@ -268,6 +270,17 @@ export const useSlashCommandProcessor = (
           const args = parts.slice(pathIndex).join(' ');
 
           if (commandToExecute.action) {
+            if (config) {
+              const resolvedCommandPath = commandPath.slice(0, pathIndex);
+              const event = new SlashCommandEvent(
+                resolvedCommandPath[0],
+                resolvedCommandPath.length > 1
+                  ? resolvedCommandPath.slice(1).join(' ')
+                  : undefined,
+              );
+              logSlashCommand(config, event);
+            }
+
             const fullCommandContext: CommandContext = {
               ...commandContext,
               invocation: {
