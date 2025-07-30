@@ -608,8 +608,12 @@ export class Config {
     this.ideMode = value;
   }
 
-  setIdeClient(client: IdeClient | undefined): void {
-    this.ideClient = client;
+  setIdeClientDisconnected(): void {
+    this.ideClient.setDisconnected();
+  }
+
+  setIdeClientConnected(): void {
+    this.ideClient.reconnect(this.ideMode && this.ideModeFeature);
   }
 
   async getGitService(): Promise<GitService> {

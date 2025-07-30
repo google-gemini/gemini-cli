@@ -130,6 +130,10 @@ export class IdeClient {
     };
   }
 
+  async reconnect(ideMode: boolean) {
+    IdeClient.instance = new IdeClient(ideMode);
+  }
+
   private async establishConnection(port: string) {
     let transport: StreamableHTTPClientTransport | undefined;
     try {
@@ -195,5 +199,9 @@ export class IdeClient {
 
   getDetectedIdeDisplayName(): string | undefined {
     return this.currentIdeDisplayName;
+  }
+
+  setDisconnected() {
+    this.setState(IDEConnectionStatus.Disconnected);
   }
 }

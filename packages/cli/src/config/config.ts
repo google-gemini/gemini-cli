@@ -268,7 +268,7 @@ export async function loadCliConfig(
       (v) => v === 'true' || v === '1',
     );
 
-  const ideMode = settings.ideMode ?? true;
+  const ideMode = settings.ideMode ?? false;
 
   const ideModeFeature =
     (argv.ideModeFeature ?? settings.ideModeFeature ?? false) &&
