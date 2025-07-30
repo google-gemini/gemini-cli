@@ -256,6 +256,7 @@ async function getGeminiMdFileContentsInternal(
       fileService,
       fileFilteringOptions: mergedOptions, // Pass merged options as fileFilter
     });
+    downwardPaths.sort();
     // Read downward files immediately to avoid TOCTOU
     const processedPaths = new Set<string>(
       allContents.map((content) => content.filePath),
