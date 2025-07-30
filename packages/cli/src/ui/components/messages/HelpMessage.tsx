@@ -16,6 +16,28 @@ interface HelpMessageProps {
 export const HelpMessage: React.FC<HelpMessageProps> = ({ content }) => {
   const lines = content.split('\n');
 
+  const renderLineWithColors = (line: string, lineIndex: number) => {
+    // Parse line for bold sections marked with **
+    const parts = line.split(/(\*\*[^*]+\*\*)/g);
+    
+    return (
+      <Text key={lineIndex} color={Colors.Foreground}>
+        {parts.map((part, partIndex) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            // Remove ** markers and render in purple
+            const text = part.slice(2, -2);
+            return (
+              <Text key={partIndex} bold color={Colors.AccentPurple}>
+                {text}
+              </Text>
+            );
+          }
+          return part;
+        })}
+      </Text>
+    );
+  };
+
   return (
     <Box
       flexDirection="column"
@@ -38,16 +60,21 @@ export const HelpMessage: React.FC<HelpMessageProps> = ({ content }) => {
           );
         }
 
-        // Handle command entries
-        if (line.trim().startsWith('**') || line.includes('**')) {
+        // Handle indented lines (subcommands)
+        if (line.startsWith('   ')) {
           return (
-            <Box key={index} marginLeft={line.startsWith('   ') ? 2 : 0}>
-              <RenderInline text={line} />
+            <Box key={index} marginLeft={2}>
+              {renderLineWithColors(line.trim(), index)}
             </Box>
           );
         }
 
-        // Regular text
+        // Handle command entries and regular text with colors
+        if (line.includes('**')) {
+          return renderLineWithColors(line, index);
+        }
+
+        // Regular text without formatting
         return (
           <Text key={index} color={Colors.Foreground}>
             {line}
