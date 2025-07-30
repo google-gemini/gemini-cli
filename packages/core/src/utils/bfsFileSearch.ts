@@ -57,12 +57,17 @@ export async function bfsFileSearch(
     // Fill batch with unvisited directories up to the desired size
     const batchSize = Math.min(PARALLEL_BATCH_SIZE, maxDirs - scannedDirCount);
     const currentBatch = [];
-    while (currentBatch.length < batchSize && queue.length > 0) {
-      const currentDir = queue.shift()!;
+    let head = 0;
+    while (currentBatch.length < batchSize && head < queue.length) {
+      const currentDir = queue[head];
+      head++;
       if (!visited.has(currentDir)) {
         visited.add(currentDir);
         currentBatch.push(currentDir);
       }
+    }
+    if (head > 0) {
+      queue.splice(0, head);
     }
     scannedDirCount += currentBatch.length;
 

@@ -207,25 +207,53 @@ describe('bfsFileSearch', () => {
       }
     }
 
-    // Run single iteration for faster test execution
-    const searchStartTime = performance.now();
-    const result = await bfsFileSearch(testRootDir, {
-      fileName: 'GEMINI.md',
-      maxDirs: 200,
-      debug: false,
-    });
-    const duration = performance.now() - searchStartTime;
-    const foundFiles = result.length;
-    console.log(`📊 Parallel BFS Duration: ${duration.toFixed(2)}ms`);
+    // Run multiple iterations to ensure consistency
+    const iterations = 3;
+    const durations: number[] = [];
+    let foundFiles = 0;
+
+    for (let i = 0; i < iterations; i++) {
+      const searchStartTime = performance.now();
+      const result = await bfsFileSearch(testRootDir, {
+        fileName: 'GEMINI.md',
+        maxDirs: 200,
+        debug: false,
+      });
+      const duration = performance.now() - searchStartTime;
+      durations.push(duration);
+      foundFiles = result.length; // All iterations should find same number
+
+      console.log(`📊 Iteration ${i + 1}: ${duration.toFixed(2)}ms`);
+    }
+
+    const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
+    const maxDuration = Math.max(...durations);
+    const minDuration = Math.min(...durations);
+
+    console.log(`📊 Average Duration: ${avgDuration.toFixed(2)}ms`);
+    console.log(
+      `📊 Min/Max Duration: ${minDuration.toFixed(2)}ms / ${maxDuration.toFixed(2)}ms`,
+    );
     console.log(`📁 Found ${foundFiles} GEMINI.md files`);
     console.log(
-      `🏎️  Processing ~${Math.round(200 / (duration / 1000))} dirs/second`,
+      `🏎️  Processing ~${Math.round(200 / (avgDuration / 1000))} dirs/second`,
     );
 
     // Verify we found the expected files
     expect(foundFiles).toBe(20); // 10 dirs * 2 files each
 
-    // Performance expectation: parallel should be efficient
-    expect(duration).toBeLessThan(1500); // Increased timeout to reduce flakiness on slower machines
+    // Performance expectation: check consistency rather than absolute time
+    const variance = maxDuration - minDuration;
+    const consistencyRatio = variance / avgDuration;
+
+    // Ensure reasonable performance (generous limit for CI environments)
+    expect(avgDuration).toBeLessThan(2000); // Very generous limit
+
+    // Ensure consistency across runs (variance should not be too high)
+    expect(consistencyRatio).toBeLessThan(1.0); // Max variance should be less than 100% of average
+
+    console.log(
+      `✅ Performance test passed: avg=${avgDuration.toFixed(2)}ms, consistency=${(consistencyRatio * 100).toFixed(1)}%`,
+    );
   });
 });
