@@ -118,6 +118,7 @@ export class MCPServerConfig {
     readonly description?: string,
     readonly includeTools?: string[],
     readonly excludeTools?: string[],
+    readonly allowTools?: string[],
     readonly extensionName?: string,
     // OAuth configuration
     readonly oauth?: MCPOAuthConfig,

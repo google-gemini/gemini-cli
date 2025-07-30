@@ -31,10 +31,15 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     readonly serverToolName: string,
     description: string,
     readonly parameterSchemaJson: unknown,
+    readonly allowed?: boolean,
     readonly timeout?: number,
     readonly trust?: boolean,
     nameOverride?: string,
   ) {
+    if (allowed) {
+      const toolAllowListKey = `${serverName}.${serverToolName}`;
+      DiscoveredMCPTool.allowlist.add(toolAllowListKey);
+    }
     super(
       nameOverride ?? generateValidName(serverToolName),
       `${serverToolName} (${serverName} MCP Server)`,
@@ -53,6 +58,7 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
       this.serverToolName,
       this.description,
       this.parameterSchemaJson,
+      this.allowed,
       this.timeout,
       this.trust,
       `${this.serverName}__${this.serverToolName}`,

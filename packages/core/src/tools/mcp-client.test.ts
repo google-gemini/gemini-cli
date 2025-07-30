@@ -10,6 +10,7 @@ import {
   populateMcpServerCommand,
   createTransport,
   isEnabled,
+  isAllowed,
   discoverTools,
   discoverPrompts,
 } from './mcp-client.js';
@@ -349,6 +350,20 @@ describe('mcp-client', () => {
       expect(isEnabled(namelessFuncDecl, serverName, mcpServerConfig)).toBe(
         false,
       );
+    });
+  });
+  describe('isAllowed', () => {
+    const funcDecl = { name: 'myTool' };
+    const serverName = 'myServer';
+
+    it('should return false if the tool is not in allow list', () => {
+      const mcpServerConfig = {};
+      expect(isAllowed(funcDecl, serverName, mcpServerConfig)).toBe(false);
+    });
+
+    it('should return true if the tool is in allow list', () => {
+      const mcpServerConfig = { allowTools: ['myTool'] };
+      expect(isAllowed(funcDecl, serverName, mcpServerConfig)).toBe(true);
     });
   });
 });
