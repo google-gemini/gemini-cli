@@ -269,14 +269,9 @@ export async function loadCliConfig(
     );
 
   const ideMode =
-    (argv.ideMode ?? settings.ideMode ?? false) &&
-    process.env.TERM_PROGRAM === 'vscode' &&
-    !process.env.SANDBOX;
+    (argv.ideMode ?? settings.ideMode ?? false) && !process.env.SANDBOX;
 
-  let ideClient: IdeClient | undefined;
-  if (ideMode) {
-    ideClient = new IdeClient();
-  }
+  const ideClient = IdeClient.getInstance(ideMode);
 
   const allExtensions = annotateActiveExtensions(
     extensions,

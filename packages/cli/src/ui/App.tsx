@@ -967,7 +967,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 </Box>
               </Box>
               {showIDEContextDetail && (
-                <IDEContextDetailDisplay ideContext={ideContextState} />
+                <IDEContextDetailDisplay
+                  ideContext={ideContextState}
+                  detectedIdeDisplay={config
+                    .getIdeClient()
+                    .getDetectedIdeDisplayName()}
+                />
               )}
               {showErrorDetails && (
                 <OverflowProvider>
