@@ -234,20 +234,29 @@ async function readGeminiMdFiles(
   const results: GeminiFileContent[] = [];
   for (const filePath of filePaths) {
     try {
-      const content = await fs.readFile(filePath, 'utf-8');
+      const stats = await fs.stat(filePath); // Get information about the path
 
-      // Process imports in the content
-      const processedContent = await processImports(
-        content,
-        path.dirname(filePath),
-        debugMode,
-      );
+      if (stats.isFile()) {
+        // <<< ADD THIS CHECK
+        const content = await fs.readFile(filePath, 'utf-8');
 
-      results.push({ filePath, content: processedContent });
-      if (debugMode)
-        logger.debug(
-          `Successfully read and processed imports: ${filePath} (Length: ${processedContent.length})`,
+        // Process imports in the content
+        const processedContent = await processImports(
+          content,
+          path.dirname(filePath),
+          debugMode,
         );
+
+        results.push({ filePath, content: processedContent });
+        if (debugMode)
+          logger.debug(
+            `Successfully read and processed imports: ${filePath} (Length: ${processedContent.length})`,
+          );
+      } else {
+        // It's a directory or something else, so just skip it silently.
+        if (debugMode) logger.debug(`Skipping non-file path: ${filePath}`);
+        results.push({ filePath, content: null });
+      }
     } catch (error: unknown) {
       const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
       if (!isTestEnv) {
