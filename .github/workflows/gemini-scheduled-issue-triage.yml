@@ -84,6 +84,10 @@ jobs:
                - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --add-label "label2"`
                - Continue for each label separately
                - IMPORTANT: Label each issue individually, one command per issue, one label at a time if needed.
+               - for labels found in step 6 that no longer apply remove them one at a time using 
+               - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "label-name1"`
+               - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "label-name2"`
+               - IMPORTANT: Label each issue individually, one command per issue, one label at a time if needed.
             9. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5 
             - Anything more than 6 versions older than the most recent should add the status/need-retesting label
             10. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label
