@@ -264,6 +264,7 @@ async function getGeminiMdFileContentsInternal(
     for (const dPath of downwardPaths) {
       // Skip if already processed
       if (!processedPaths.has(dPath)) {
+        processedPaths.add(dPath);
         const downwardContent = await tryReadGeminiFile(
           dPath,
           'downward',
@@ -272,7 +273,6 @@ async function getGeminiMdFileContentsInternal(
         );
         if (downwardContent) {
           allContents.push(downwardContent);
-          processedPaths.add(dPath);
         }
       }
     }
@@ -290,6 +290,7 @@ async function getGeminiMdFileContentsInternal(
       continue;
     }
 
+    finalProcessedPaths.add(extensionPath);
     const extensionContent = await tryReadGeminiFile(
       extensionPath,
       'extension',
@@ -298,7 +299,6 @@ async function getGeminiMdFileContentsInternal(
     );
     if (extensionContent) {
       allContents.push(extensionContent);
-      finalProcessedPaths.add(extensionPath);
     }
   }
 
