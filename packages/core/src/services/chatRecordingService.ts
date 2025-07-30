@@ -162,6 +162,10 @@ export class ChatRecordingService {
       this.queuedThoughts = [];
       this.queuedTokens = null;
     } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+
       if (this.config.getDebugMode()) {
         console.error('Error initializing chat recording service:', error);
       }
@@ -369,7 +373,11 @@ export class ChatRecordingService {
     try {
       this.cachedLastConvData = fs.readFileSync(this.conversationFile!, 'utf8');
       return JSON.parse(this.cachedLastConvData);
-    } catch {
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+
       // Placeholder empty conversation if file doesn't exist.
       return {
         sessionId: this.sessionId,
