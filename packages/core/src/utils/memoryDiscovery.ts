@@ -290,6 +290,7 @@ async function getGeminiMdFileContentsInternal(
     );
     if (extensionContent) {
       allContents.push(extensionContent);
+      finalProcessedPaths.add(extensionPath);
     }
   }
 
