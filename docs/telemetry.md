@@ -19,6 +19,7 @@ The following lists the precedence for applying telemetry settings, with items l
     - `--telemetry-target <local|gcp>`: Overrides `telemetry.target`.
     - `--telemetry-otlp-endpoint <URL>`: Overrides `telemetry.otlpEndpoint`.
     - `--telemetry-log-prompts` / `--no-telemetry-log-prompts`: Overrides `telemetry.logPrompts`.
+    - `--telemetry-outfile <path>`: Redirects telemetry output to a file. See [Exporting to a file](#exporting-to-a-file).
 
 1.  **Environment variables:**
     - `OTEL_EXPORTER_OTLP_ENDPOINT`: Overrides `telemetry.otlpEndpoint`.
@@ -48,6 +49,16 @@ The following code can be added to your workspace (`.gemini/settings.json`) or u
   },
   "sandbox": false
 }
+```
+
+### Exporting to a file
+
+You can export all telemetry data to a file for local inspection.
+
+To enable file export, use the `--telemetry-outfile` flag with a path to your desired output file. This must be run using `--telemetry-target=local`.
+
+```bash
+gemini --telemetry --telemetry-target=local --telemetry-outfile=/path/to/telemetry.log "your prompt"
 ```
 
 ## Running an OTEL Collector
@@ -197,6 +208,11 @@ Logs are timestamped records of specific events. The following events are logged
 - `gemini_cli.flash_fallback`: This event occurs when Gemini CLI switches to flash as fallback.
   - **Attributes**:
     - `auth_type`
+
+- `gemini_cli.slash_command`: This event occurs when a user executes a slash command.
+  - **Attributes**:
+    - `command` (string)
+    - `subcommand` (string, if applicable)
 
 ### Metrics
 

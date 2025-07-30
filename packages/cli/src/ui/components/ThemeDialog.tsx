@@ -36,23 +36,45 @@ export function ThemeDialog({
     SettingScope.User,
   );
 
+  // Track the currently highlighted theme name
+  const [highlightedThemeName, setHighlightedThemeName] = useState<
+    string | undefined
+  >(settings.merged.theme || DEFAULT_THEME.name);
+
+  // Generate theme items filtered by selected scope
+  const customThemes =
+    selectedScope === SettingScope.User
+      ? settings.user.settings.customThemes || {}
+      : settings.merged.customThemes || {};
+  const builtInThemes = themeManager
+    .getAvailableThemes()
+    .filter((theme) => theme.type !== 'custom');
+  const customThemeNames = Object.keys(customThemes);
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   // Generate theme items
-  const themeItems = themeManager.getAvailableThemes().map((theme) => {
-    const typeString = theme.type.charAt(0).toUpperCase() + theme.type.slice(1);
-    return {
+  const themeItems = [
+    ...builtInThemes.map((theme) => ({
       label: theme.name,
       value: theme.name,
       themeNameDisplay: theme.name,
-      themeTypeDisplay: typeString,
-    };
-  });
+      themeTypeDisplay: capitalize(theme.type),
+    })),
+    ...customThemeNames.map((name) => ({
+      label: name,
+      value: name,
+      themeNameDisplay: name,
+      themeTypeDisplay: 'Custom',
+    })),
+  ];
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
 
-  // Determine which radio button should be initially selected in the theme list
-  // This should reflect the theme *saved* for the selected scope, or the default
+  // Find the index of the selected theme, but only if it exists in the list
+  const selectedThemeName = settings.merged.theme || DEFAULT_THEME.name;
   const initialThemeIndex = themeItems.findIndex(
-    (item) => item.value === (settings.merged.theme || DEFAULT_THEME.name),
+    (item) => item.value === selectedThemeName,
   );
+  // If not found, fall back to the first theme
+  const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
 
   const scopeItems = [
     { label: 'User Settings', value: SettingScope.User },
@@ -66,6 +88,11 @@ export function ThemeDialog({
     },
     [onSelect, selectedScope],
   );
+
+  const handleThemeHighlight = (themeName: string) => {
+    setHighlightedThemeName(themeName);
+    onHighlight(themeName);
+  };
 
   const handleScopeHighlight = useCallback((scope: SettingScope) => {
     setSelectedScope(scope);
@@ -158,7 +185,7 @@ export function ThemeDialog({
   }
 
   // Don't focus the scope selection if it is hidden due to height constraints.
-  const currenFocusedSection = !showScopeSelection ? 'theme' : focusedSection;
+  const currentFocusedSection = !showScopeSelection ? 'theme' : focusedSection;
 
   // Vertical space taken by elements other than the two code blocks in the preview pane.
   // Includes "Preview" title, borders, and margin between blocks.
@@ -173,10 +200,16 @@ export function ThemeDialog({
     availableTerminalHeight -
     PREVIEW_PANE_FIXED_VERTICAL_SPACE -
     (includePadding ? 2 : 0) * 2;
-  // Give slightly more space to the code block as it is 3 lines longer.
-  const diffHeight = Math.floor(availableTerminalHeightCodeBlock / 2) - 1;
-  const codeBlockHeight = Math.ceil(availableTerminalHeightCodeBlock / 2) + 1;
 
+  // Subtract margin between code blocks from available height.
+  const availableHeightForPanes = Math.max(
+    0,
+    availableTerminalHeightCodeBlock - 1,
+  );
+
+  // The code block is slightly longer than the diff, so give it more space.
+  const codeBlockHeight = Math.ceil(availableHeightForPanes * 0.6);
+  const diffHeight = Math.floor(availableHeightForPanes * 0.4);
   return (
     <Box
       borderStyle="round"
@@ -191,33 +224,35 @@ export function ThemeDialog({
       <Box flexDirection="row">
         {/* Left Column: Selection */}
         <Box flexDirection="column" width="45%" paddingRight={2}>
-          <Text bold={currenFocusedSection === 'theme'} wrap="truncate">
-            {currenFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
+          <Text bold={currentFocusedSection === 'theme'} wrap="truncate">
+            {currentFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
             <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
           </Text>
           <RadioButtonSelect
             key={selectInputKey}
             items={themeItems}
-            initialIndex={initialThemeIndex}
+            initialIndex={safeInitialThemeIndex}
             onSelect={handleThemeSelect}
-            onHighlight={onHighlight}
-            isFocused={currenFocusedSection === 'theme'}
+            onHighlight={handleThemeHighlight}
+            isFocused={currentFocusedSection === 'theme'}
             maxItemsToShow={8}
             showScrollArrows={true}
+            showNumbers={currentFocusedSection === 'theme'}
           />
 
           {/* Scope Selection */}
           {showScopeSelection && (
             <Box marginTop={1} flexDirection="column">
-              <Text bold={currenFocusedSection === 'scope'} wrap="truncate">
-                {currenFocusedSection === 'scope' ? '> ' : '  '}Apply To
+              <Text bold={currentFocusedSection === 'scope'} wrap="truncate">
+                {currentFocusedSection === 'scope' ? '> ' : '  '}Apply To
               </Text>
               <RadioButtonSelect
                 items={scopeItems}
                 initialIndex={0} // Default to User Settings
                 onSelect={handleScopeSelect}
                 onHighlight={handleScopeHighlight}
-                isFocused={currenFocusedSection === 'scope'}
+                isFocused={currentFocusedSection === 'scope'}
+                showNumbers={currentFocusedSection === 'scope'}
               />
             </Box>
           )}
@@ -226,39 +261,48 @@ export function ThemeDialog({
         {/* Right Column: Preview */}
         <Box flexDirection="column" width="55%" paddingLeft={2}>
           <Text bold>Preview</Text>
-          <Box
-            borderStyle="single"
-            borderColor={Colors.Gray}
-            paddingTop={includePadding ? 1 : 0}
-            paddingBottom={includePadding ? 1 : 0}
-            paddingLeft={1}
-            paddingRight={1}
-            flexDirection="column"
-          >
-            {colorizeCode(
-              `# function
--def fibonacci(n):
--    a, b = 0, 1
--    for _ in range(n):
--        a, b = b, a + b
--    return a`,
-              'python',
-              codeBlockHeight,
-              colorizeCodeWidth,
-            )}
-            <Box marginTop={1} />
-            <DiffRenderer
-              diffContent={`--- a/old_file.txt
--+++ b/new_file.txt
--@@ -1,4 +1,5 @@
-- This is a context line.
---This line was deleted.
--+This line was added.
--`}
-              availableTerminalHeight={diffHeight}
-              terminalWidth={colorizeCodeWidth}
-            />
-          </Box>
+          {/* Get the Theme object for the highlighted theme, fall back to default if not found */}
+          {(() => {
+            const previewTheme =
+              themeManager.getTheme(
+                highlightedThemeName || DEFAULT_THEME.name,
+              ) || DEFAULT_THEME;
+            return (
+              <Box
+                borderStyle="single"
+                borderColor={Colors.Gray}
+                paddingTop={includePadding ? 1 : 0}
+                paddingBottom={includePadding ? 1 : 0}
+                paddingLeft={1}
+                paddingRight={1}
+                flexDirection="column"
+              >
+                {colorizeCode(
+                  `# function
+def fibonacci(n):
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a`,
+                  'python',
+                  codeBlockHeight,
+                  colorizeCodeWidth,
+                )}
+                <Box marginTop={1} />
+                <DiffRenderer
+                  diffContent={`--- a/util.py
++++ b/util.py
+@@ -1,2 +1,2 @@
+- print("Hello, " + name)
++ print(f"Hello, {name}!")
+`}
+                  availableTerminalHeight={diffHeight}
+                  terminalWidth={colorizeCodeWidth}
+                  theme={previewTheme}
+                />
+              </Box>
+            );
+          })()}
         </Box>
       </Box>
       <Box marginTop={1}>

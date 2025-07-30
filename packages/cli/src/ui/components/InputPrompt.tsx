@@ -32,7 +32,7 @@ export interface InputPromptProps {
   userMessages: readonly string[];
   onClearScreen: () => void;
   config: Config;
-  slashCommands: SlashCommand[];
+  slashCommands: readonly SlashCommand[];
   commandContext: CommandContext;
   placeholder?: string;
   focus?: boolean;
@@ -40,6 +40,7 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  vimHandleInput?: (key: Key) => boolean;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -58,10 +59,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  vimHandleInput,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+
   const completion = useCompletion(
-    buffer.text,
+    buffer,
     config.getTargetDir(),
     isAtCommand(buffer.text) || isSlashCommand(buffer.text),
     slashCommands,
@@ -97,7 +100,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const inputHistory = useInputHistory({
     userMessages,
     onSubmit: handleSubmitAndClear,
-    isActive: !completion.showSuggestions && !shellModeActive,
+    isActive:
+      (!completion.showSuggestions || completion.suggestions.length === 1) &&
+      !shellModeActive,
     currentQuery: buffer.text,
     onChange: customSetTextAndResetCompletionSignal,
   });
@@ -235,7 +240,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
-      if (!focus) {
+      /// We want to handle paste even when not focused to support drag and drop.
+      if (!focus && !key.paste) {
+        return;
+      }
+
+      if (vimHandleInput && vimHandleInput(key)) {
         return;
       }
 
@@ -266,14 +276,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // If the command is a perfect match, pressing enter should execute it.
+      if (completion.isPerfectMatch && key.name === 'return') {
+        handleSubmitAndClear(buffer.text);
+        return;
+      }
+
       if (completion.showSuggestions) {
-        if (key.name === 'up') {
-          completion.navigateUp();
-          return;
-        }
-        if (key.name === 'down') {
-          completion.navigateDown();
-          return;
+        if (completion.suggestions.length > 1) {
+          if (key.name === 'up' || (key.ctrl && key.name === 'p')) {
+            completion.navigateUp();
+            return;
+          }
+          if (key.name === 'down' || (key.ctrl && key.name === 'n')) {
+            completion.navigateDown();
+            return;
+          }
         }
 
         if (key.name === 'tab' || (key.name === 'return' && !key.ctrl)) {
@@ -283,66 +301,66 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 ? 0 // Default to the first if none is active
                 : completion.activeSuggestionIndex;
             if (targetIndex < completion.suggestions.length) {
-              handleAutocomplete(targetIndex);
+              completion.handleAutocomplete(targetIndex);
             }
           }
+          return;
+        }
+      }
+
+      if (!shellModeActive) {
+        if (key.ctrl && key.name === 'p') {
+          inputHistory.navigateUp();
+          return;
+        }
+        if (key.ctrl && key.name === 'n') {
+          inputHistory.navigateDown();
+          return;
+        }
+        // Handle arrow-up/down for history on single-line or at edges
+        if (
+          key.name === 'up' &&
+          (buffer.allVisualLines.length === 1 ||
+            (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
+        ) {
+          inputHistory.navigateUp();
+          return;
+        }
+        if (
+          key.name === 'down' &&
+          (buffer.allVisualLines.length === 1 ||
+            buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
+        ) {
+          inputHistory.navigateDown();
           return;
         }
       } else {
-        if (!shellModeActive) {
-          if (key.ctrl && key.name === 'p') {
-            inputHistory.navigateUp();
-            return;
-          }
-          if (key.ctrl && key.name === 'n') {
-            inputHistory.navigateDown();
-            return;
-          }
-          // Handle arrow-up/down for history on single-line or at edges
-          if (
-            key.name === 'up' &&
-            (buffer.allVisualLines.length === 1 ||
-              (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
-          ) {
-            inputHistory.navigateUp();
-            return;
-          }
-          if (
-            key.name === 'down' &&
-            (buffer.allVisualLines.length === 1 ||
-              buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
-          ) {
-            inputHistory.navigateDown();
-            return;
-          }
-        } else {
-          // Shell History Navigation
-          if (key.name === 'up') {
-            const prevCommand = shellHistory.getPreviousCommand();
-            if (prevCommand !== null) buffer.setText(prevCommand);
-            return;
-          }
-          if (key.name === 'down') {
-            const nextCommand = shellHistory.getNextCommand();
-            if (nextCommand !== null) buffer.setText(nextCommand);
-            return;
-          }
-        }
-
-        if (key.name === 'return' && !key.ctrl && !key.meta && !key.paste) {
-          if (buffer.text.trim()) {
-            const [row, col] = buffer.cursor;
-            const line = buffer.lines[row];
-            const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
-            if (charBefore === '\\') {
-              buffer.backspace();
-              buffer.newline();
-            } else {
-              handleSubmitAndClear(buffer.text);
-            }
-          }
+        // Shell History Navigation
+        if (key.name === 'up') {
+          const prevCommand = shellHistory.getPreviousCommand();
+          if (prevCommand !== null) buffer.setText(prevCommand);
           return;
         }
+        if (key.name === 'down') {
+          const nextCommand = shellHistory.getNextCommand();
+          if (nextCommand !== null) buffer.setText(nextCommand);
+          return;
+        }
+      }
+
+      if (key.name === 'return' && !key.ctrl && !key.meta && !key.paste) {
+        if (buffer.text.trim()) {
+          const [row, col] = buffer.cursor;
+          const line = buffer.lines[row];
+          const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
+          if (charBefore === '\\') {
+            buffer.backspace();
+            buffer.newline();
+          } else {
+            handleSubmitAndClear(buffer.text);
+          }
+        }
+        return;
       }
 
       // Newline insertion
@@ -358,6 +376,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       if (key.ctrl && key.name === 'e') {
         buffer.move('end');
+        buffer.moveToOffset(cpLen(buffer.text));
+        return;
+      }
+      // Ctrl+C (Clear input)
+      if (key.ctrl && key.name === 'c') {
+        if (buffer.text.length > 0) {
+          buffer.setText('');
+          resetCompletionState();
+          return;
+        }
         return;
       }
 
@@ -387,7 +415,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Fallback to the text buffer's default input handling for all other keys
+      // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
     },
     [
@@ -398,14 +426,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       setShellModeActive,
       onClearScreen,
       inputHistory,
-      handleAutocomplete,
       handleSubmitAndClear,
       shellHistory,
       handleClipboardImage,
+      resetCompletionState,
+      vimHandleInput,
     ],
   );
 
-  useKeypress(handleInput, { isActive: focus });
+  useKeypress(handleInput, { isActive: true });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
@@ -443,7 +472,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 display = display + ' '.repeat(inputWidth - currentVisualWidth);
               }
 
-              if (visualIdxInRenderedSet === cursorVisualRow) {
+              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
                 const relativeVisualColForHighlight = cursorVisualColAbsolute;
 
                 if (relativeVisualColForHighlight >= 0) {

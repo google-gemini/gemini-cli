@@ -6,6 +6,8 @@
 
 import { Buffer } from 'buffer';
 import * as https from 'https';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+
 import {
   StartSessionEvent,
   EndSessionEvent,
@@ -15,15 +17,19 @@ import {
   ApiResponseEvent,
   ApiErrorEvent,
   FlashFallbackEvent,
+  LoopDetectedEvent,
+  FlashDecidedToContinueEvent,
+  SlashCommandEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
-import { getInstallationId } from '../../utils/user_id.js';
+import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 import {
   getCachedGoogleAccount,
   getLifetimeGoogleAccounts,
 } from '../../utils/user_account.js';
-import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
+import { HttpError, retryWithBackoff } from '../../utils/retry.js';
+import { getInstallationId } from '../../utils/user_id.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -33,6 +39,9 @@ const api_response_event_name = 'api_response';
 const api_error_event_name = 'api_error';
 const end_session_event_name = 'end_session';
 const flash_fallback_event_name = 'flash_fallback';
+const loop_detected_event_name = 'loop_detected';
+const flash_decided_to_continue_event_name = 'flash_decided_to_continue';
+const slash_command_event_name = 'slash_command';
 
 export interface LogResponse {
   nextRequestWaitMs?: number;
@@ -107,60 +116,81 @@ export class ClearcutLogger {
     });
   }
 
-  flushToClearcut(): Promise<LogResponse> {
+  async flushToClearcut(): Promise<LogResponse> {
     if (this.config?.getDebugMode()) {
       console.log('Flushing log events to Clearcut.');
     }
     const eventsToSend = [...this.events];
-    this.events.length = 0;
+    if (eventsToSend.length === 0) {
+      return {};
+    }
 
-    return new Promise<Buffer>((resolve, reject) => {
-      const request = [
-        {
-          log_source_name: 'CONCORD',
-          request_time_ms: Date.now(),
-          log_event: eventsToSend,
+    const flushFn = () =>
+      new Promise<Buffer>((resolve, reject) => {
+        const request = [
+          {
+            log_source_name: 'CONCORD',
+            request_time_ms: Date.now(),
+            log_event: eventsToSend,
+          },
+        ];
+        const body = safeJsonStringify(request);
+        const options = {
+          hostname: 'play.googleapis.com',
+          path: '/log',
+          method: 'POST',
+          headers: { 'Content-Length': Buffer.byteLength(body) },
+        };
+        const bufs: Buffer[] = [];
+        const req = https.request(
+          {
+            ...options,
+            agent: this.getProxyAgent(),
+          },
+          (res) => {
+            if (
+              res.statusCode &&
+              (res.statusCode < 200 || res.statusCode >= 300)
+            ) {
+              const err: HttpError = new Error(
+                `Request failed with status ${res.statusCode}`,
+              );
+              err.status = res.statusCode;
+              res.resume();
+              return reject(err);
+            }
+            res.on('data', (buf) => bufs.push(buf));
+            res.on('end', () => resolve(Buffer.concat(bufs)));
+          },
+        );
+        req.on('error', reject);
+        req.end(body);
+      });
+
+    try {
+      const responseBuffer = await retryWithBackoff(flushFn, {
+        maxAttempts: 3,
+        initialDelayMs: 200,
+        shouldRetry: (err: unknown) => {
+          if (!(err instanceof Error)) return false;
+          const status = (err as HttpError).status as number | undefined;
+          // If status is not available, it's likely a network error
+          if (status === undefined) return true;
+
+          // Retry on 429 (Too many Requests) and 5xx server errors.
+          return status === 429 || (status >= 500 && status < 600);
         },
-      ];
-      const body = safeJsonStringify(request);
-      const options = {
-        hostname: 'play.googleapis.com',
-        path: '/log',
-        method: 'POST',
-        headers: { 'Content-Length': Buffer.byteLength(body) },
-      };
-      const bufs: Buffer[] = [];
-      const req = https.request(options, (res) => {
-        res.on('data', (buf) => bufs.push(buf));
-        res.on('end', () => {
-          resolve(Buffer.concat(bufs));
-        });
       });
-      req.on('error', (e) => {
-        if (this.config?.getDebugMode()) {
-          console.log('Clearcut POST request error: ', e);
-        }
-        // Add the events back to the front of the queue to be retried.
-        this.events.unshift(...eventsToSend);
-        reject(e);
-      });
-      req.end(body);
-    })
-      .then((buf: Buffer) => {
-        try {
-          this.last_flush_time = Date.now();
-          return this.decodeLogResponse(buf) || {};
-        } catch (error: unknown) {
-          console.error('Error flushing log events:', error);
-          return {};
-        }
-      })
-      .catch((error: unknown) => {
-        // Handle all errors to prevent unhandled promise rejections
-        console.error('Error flushing log events:', error);
-        // Return empty response to maintain the Promise<LogResponse> contract
-        return {};
-      });
+
+      this.events.splice(0, eventsToSend.length);
+      this.last_flush_time = Date.now();
+      return this.decodeLogResponse(responseBuffer) || {};
+    } catch (error) {
+      if (this.config?.getDebugMode()) {
+        console.error('Clearcut flush failed after multiple retries.', error);
+      }
+      return {};
+    }
   }
 
   // Visible for testing. Decodes protobuf-encoded response from Clearcut server.
@@ -203,10 +233,15 @@ export class ClearcutLogger {
   }
 
   logStartSessionEvent(event: StartSessionEvent): void {
+    const surface = process.env.SURFACE || 'SURFACE_NOT_SET';
     const data = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
         value: event.model,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
       },
       {
         gemini_cli_key:
@@ -264,7 +299,12 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_START_SESSION_TELEMETRY_LOG_USER_PROMPTS_ENABLED,
         value: event.telemetry_log_user_prompts_enabled.toString(),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
     ];
+
     // Flush start event immediately
     this.enqueueLogEvent(this.createLogEvent(start_session_event_name, data));
     this.flushToClearcut().catch((error) => {
@@ -277,6 +317,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_PROMPT_LENGTH,
         value: JSON.stringify(event.prompt_length),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
@@ -440,6 +484,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
         value: JSON.stringify(event.auth_type),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(flash_fallback_event_name, data));
@@ -448,10 +496,63 @@ export class ClearcutLogger {
     });
   }
 
+  logLoopDetectedEvent(event: LoopDetectedEvent): void {
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: JSON.stringify(event.prompt_id),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_LOOP_DETECTED_TYPE,
+        value: JSON.stringify(event.loop_type),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(loop_detected_event_name, data));
+    this.flushIfNeeded();
+  }
+
+  logFlashDecidedToContinueEvent(event: FlashDecidedToContinueEvent): void {
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: JSON.stringify(event.prompt_id),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(flash_decided_to_continue_event_name, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logSlashCommandEvent(event: SlashCommandEvent): void {
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_NAME,
+        value: JSON.stringify(event.command),
+      },
+    ];
+
+    if (event.subcommand) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_SUBCOMMAND,
+        value: JSON.stringify(event.subcommand),
+      });
+    }
+
+    this.enqueueLogEvent(this.createLogEvent(slash_command_event_name, data));
+    this.flushIfNeeded();
+  }
+
   logEndSessionEvent(event: EndSessionEvent): void {
     const data = [
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_END_SESSION_ID,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
         value: event?.session_id?.toString() ?? '',
       },
     ];
@@ -461,6 +562,18 @@ export class ClearcutLogger {
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
+  }
+
+  getProxyAgent() {
+    const proxyUrl = this.config?.getProxy();
+    if (!proxyUrl) return undefined;
+    // undici which is widely used in the repo can only support http & https proxy protocol,
+    // https://github.com/nodejs/undici/issues/2224
+    if (proxyUrl.startsWith('http')) {
+      return new HttpsProxyAgent(proxyUrl);
+    } else {
+      throw new Error('Unsupported proxy type');
+    }
   }
 
   shutdown() {

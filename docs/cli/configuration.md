@@ -24,7 +24,7 @@ Gemini CLI uses `settings.json` files for persistent configuration. There are th
   - **Location:** `.gemini/settings.json` within your project's root directory.
   - **Scope:** Applies only when running Gemini CLI from that specific project. Project settings override user settings.
 - **System settings file:**
-  - **Location:** `/etc/gemini-cli/settings.json` (Linux), `C:\ProgramData\gemini-cli\settings.json` (Windows) or `/Library/Application Support/GeminiCli/settings.json` (macOS).
+  - **Location:** `/etc/gemini-cli/settings.json` (Linux), `C:\ProgramData\gemini-cli\settings.json` (Windows) or `/Library/Application Support/GeminiCli/settings.json` (macOS). The path can be overridden using the `GEMINI_CLI_SYSTEM_SETTINGS_PATH` environment variable.
   - **Scope:** Applies to all Gemini CLI sessions on the system, for all users. System settings override user and project settings. May be useful for system administrators at enterprises to have controls over users' Gemini CLI setups.
 
 **Note on environment variables in settings:** String values within your `settings.json` files can reference environment variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically resolved when the settings are loaded. For example, if you have an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`.
@@ -81,6 +81,18 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     `excludeTools` for `run_shell_command` are based on simple string matching and can be easily bypassed. This feature is **not a security mechanism** and should not be relied upon to safely execute untrusted code. It is recommended to use `coreTools` to explicitly select commands
     that can be executed.
 
+- **`allowMCPServers`** (array of strings):
+  - **Description:** Allows you to specify a list of MCP server names that should be made available to the model. This can be used to restrict the set of MCP servers to connect to. Note that this will be ignored if `--allowed-mcp-server-names` is set.
+  - **Default:** All MCP servers are available for use by the Gemini model.
+  - **Example:** `"allowMCPServers": ["myPythonServer"]`.
+  - **Security Note:** This uses simple string matching on MCP server names, which can be modified. If you're a system administrator looking to prevent users from bypassing this, consider configuring the `mcpServers` at the system settings level such that the user will not be able to configure any MCP servers of their own. This should not be used as an airtight security mechanism.
+
+- **`excludeMCPServers`** (array of strings):
+  - **Description:** Allows you to specify a list of MCP server names that should be excluded from the model. A server listed in both `excludeMCPServers` and `allowMCPServers` is excluded. Note that this will be ignored if `--allowed-mcp-server-names` is set.
+  - **Default**: No MCP servers excluded.
+  - **Example:** `"excludeMCPServers": ["myNodeServer"]`.
+  - **Security Note:** This uses simple string matching on MCP server names, which can be modified. If you're a system administrator looking to prevent users from bypassing this, consider configuring the `mcpServers` at the system settings level such that the user will not be able to configure any MCP servers of their own. This should not be used as an airtight security mechanism.
+
 - **`autoAccept`** (boolean):
   - **Description:** Controls whether the CLI automatically accepts and executes tool calls that are considered safe (e.g., read-only operations) without explicit user confirmation. If set to `true`, the CLI will bypass the confirmation prompt for tools deemed safe.
   - **Default:** `false`
@@ -90,6 +102,11 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Description:** Sets the visual [theme](./themes.md) for Gemini CLI.
   - **Default:** `"Default"`
   - **Example:** `"theme": "GitHub"`
+
+- **`vimMode`** (boolean):
+  - **Description:** Enables or disables vim mode for input editing. When enabled, the input area supports vim-style navigation and editing commands with NORMAL and INSERT modes. The vim mode status is displayed in the footer and persists between sessions.
+  - **Default:** `false`
+  - **Example:** `"vimMode": true`
 
 - **`sandbox`** (boolean or string):
   - **Description:** Controls whether and how to use sandboxing for tool execution. If set to `true`, Gemini CLI uses a pre-built `gemini-cli-sandbox` Docker image. For more information, see [Sandboxing](#sandboxing).
@@ -120,6 +137,8 @@ In addition to a project settings file, a project's `.gemini` directory can cont
       - `cwd` (string, optional): The working directory in which to start the server.
       - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
       - `trust` (boolean, optional): Trust this server and bypass all tool call confirmations.
+      - `includeTools` (array of strings, optional): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (whitelist behavior). If not specified, all tools from the server are enabled by default.
+      - `excludeTools` (array of strings, optional): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
   - **Example:**
     ```json
     "mcpServers": {
@@ -127,12 +146,14 @@ In addition to a project settings file, a project's `.gemini` directory can cont
         "command": "python",
         "args": ["mcp_server.py", "--port", "8080"],
         "cwd": "./mcp_tools/python",
-        "timeout": 5000
+        "timeout": 5000,
+        "includeTools": ["safe_tool", "file_reader"],
       },
       "myNodeServer": {
         "command": "node",
         "args": ["mcp_server.js"],
-        "cwd": "./mcp_tools/node"
+        "cwd": "./mcp_tools/node",
+        "excludeTools": ["dangerous_tool", "file_deleter"]
       },
       "myDockerServer": {
         "command": "docker",
@@ -206,6 +227,19 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "maxSessionTurns": 10
     ```
 
+- **`summarizeToolOutput`** (object):
+  - **Description:** Enables or disables the summarization of tool output. You can specify the token budget for the summarization using the `tokenBudget` setting.
+  - Note: Currently only the `run_shell_command` tool is supported.
+  - **Default:** `{}` (Disabled by default)
+  - **Example:**
+    ```json
+    "summarizeToolOutput": {
+      "run_shell_command": {
+        "tokenBudget": 2000
+      }
+    }
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -232,7 +266,12 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   "usageStatisticsEnabled": true,
   "hideTips": false,
   "hideBanner": false,
-  "maxSessionTurns": 10
+  "maxSessionTurns": 10,
+  "summarizeToolOutput": {
+    "run_shell_command": {
+      "tokenBudget": 100
+    }
+  }
 }
 ```
 
@@ -310,6 +349,11 @@ Arguments passed directly when running the CLI can override other configurations
   - Example: `npm start -- --model gemini-1.5-pro-latest`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a non-interactive mode.
+- **`--prompt-interactive <your_prompt>`** (**`-i <your_prompt>`**):
+  - Starts an interactive session with the provided prompt as the initial input.
+  - The prompt is processed within the interactive session, not before it.
+  - Cannot be used when piping input from stdin.
+  - Example: `gemini -i "explain this code"`
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
 - **`--sandbox-image`**:
@@ -333,13 +377,16 @@ Arguments passed directly when running the CLI can override other configurations
 - **`--telemetry-log-prompts`**:
   - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md) for more information.
 - **`--checkpointing`**:
-  - Enables [checkpointing](./commands.md#checkpointing-commands).
+  - Enables [checkpointing](../checkpointing.md).
 - **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
   - Specifies a list of extensions to use for the session. If not provided, all available extensions are used.
   - Use the special term `gemini -e none` to disable all extensions.
   - Example: `gemini -e my-extension -e my-other-extension`
 - **`--list-extensions`** (**`-l`**):
   - Lists all available extensions and exits.
+- **`--proxy`**:
+  - Sets the proxy for the CLI.
+  - Example: `--proxy http://localhost:7890`.
 - **`--version`**:
   - Displays the version of the CLI.
 
@@ -392,9 +439,10 @@ This example demonstrates how you can provide general project context, specific 
       - Location: The CLI searches for the configured context file in the current working directory and then in each parent directory up to either the project root (identified by a `.git` folder) or your home directory.
       - Scope: Provides context relevant to the entire project or a significant portion of it.
   3.  **Sub-directory Context Files (Contextual/Local):**
-      - Location: The CLI also scans for the configured context file in subdirectories _below_ the current working directory (respecting common ignore patterns like `node_modules`, `.git`, etc.).
+      - Location: The CLI also scans for the configured context file in subdirectories _below_ the current working directory (respecting common ignore patterns like `node_modules`, `.git`, etc.). The breadth of this search is limited to 200 directories by default, but can be configured with a `memoryDiscoveryMaxDirs` field in your `settings.json` file.
       - Scope: Allows for highly specific instructions relevant to a particular component, module, or subsection of your project.
 - **Concatenation & UI Indication:** The contents of all found context files are concatenated (with separators indicating their origin and path) and provided as part of the system prompt to the Gemini model. The CLI footer displays the count of loaded context files, giving you a quick visual cue about the active instructional context.
+- **Importing Content:** You can modularize your context files by importing other Markdown files using the `@path/to/file.md` syntax. For more details, see the [Memory Import Processor documentation](../core/memport.md).
 - **Commands for Memory Management:**
   - Use `/memory refresh` to force a re-scan and reload of all context files from all configured locations. This updates the AI's instructional context.
   - Use `/memory show` to display the combined instructional context currently loaded, allowing you to verify the hierarchy and content being used by the AI.
