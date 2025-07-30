@@ -31,7 +31,7 @@ export function formatHelpContent(commands: readonly SlashCommand[]): string {
     }
 
     lines.push(
-      ` **/${command.name}**${command.description ? ` - ${command.description}` : ''}`
+      ` **/${command.name}**${command.description ? ` - ${command.description}` : ''}`,
     );
 
     visibleSubCommands.forEach((subCommand) => {
