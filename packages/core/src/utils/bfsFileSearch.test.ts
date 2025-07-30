@@ -189,4 +189,54 @@ describe('bfsFileSearch', () => {
       expect(result.sort()).toEqual([target1, target2].sort());
     });
   });
+
+  it('should perform parallel directory scanning efficiently (performance test)', async () => {
+    // Create a more complex directory structure for performance testing
+    console.log('\n🚀 Testing Parallel BFS Performance...');
+
+    // Create 100 directories with multiple levels for a more realistic test
+    for (let i = 0; i < 100; i++) {
+      await createEmptyDir(`dir${i}`);
+      await createEmptyDir(`dir${i}`, 'subdir1');
+      await createEmptyDir(`dir${i}`, 'subdir2');
+      await createEmptyDir(`dir${i}`, 'subdir1', 'deep');
+      if (i < 20) {
+        // Add target files in some directories
+        await createTestFile('content', `dir${i}`, 'GEMINI.md');
+        await createTestFile('content', `dir${i}`, 'subdir1', 'GEMINI.md');
+      }
+    }
+
+    // Run multiple iterations for more accurate measurement
+    const iterations = 5;
+    let totalDuration = 0;
+    let foundFiles = 0;
+
+    for (let i = 0; i < iterations; i++) {
+      const searchStartTime = performance.now();
+      const result = await bfsFileSearch(testRootDir, {
+        fileName: 'GEMINI.md',
+        maxDirs: 300,
+        debug: false,
+      });
+      const duration = performance.now() - searchStartTime;
+      totalDuration += duration;
+      foundFiles = result.length;
+    }
+
+    const avgDuration = totalDuration / iterations;
+    console.log(
+      `📊 Parallel BFS Average: ${avgDuration.toFixed(2)}ms (${iterations} runs)`,
+    );
+    console.log(`📁 Found ${foundFiles} GEMINI.md files`);
+    console.log(
+      `🏎️  Processing ~${Math.round(300 / (avgDuration / 1000))} dirs/second`,
+    );
+
+    // Verify we found the expected files
+    expect(foundFiles).toBe(40); // 20 dirs * 2 files each
+
+    // Performance expectation: parallel should be efficient
+    expect(avgDuration).toBeLessThan(500); // Should take less than 500ms on average
+  });
 });

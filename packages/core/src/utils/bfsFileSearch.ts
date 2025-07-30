@@ -6,7 +6,6 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Dirent } from 'fs';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { FileFilteringOptions } from '../config/config.js';
 // Simple console logger for now.
@@ -49,43 +48,59 @@ export async function bfsFileSearch(
   let scannedDirCount = 0;
 
   while (queue.length > 0 && scannedDirCount < maxDirs) {
-    const currentDir = queue.shift()!;
-    if (visited.has(currentDir)) {
-      continue;
+    // Process multiple directories in parallel for better performance
+    const batchSize = Math.min(10, queue.length, maxDirs - scannedDirCount);
+    const currentBatch = [];
+
+    for (let i = 0; i < batchSize && queue.length > 0; i++) {
+      const currentDir = queue.shift()!;
+      if (!visited.has(currentDir)) {
+        currentBatch.push(currentDir);
+        visited.add(currentDir);
+        scannedDirCount++;
+      }
     }
-    visited.add(currentDir);
-    scannedDirCount++;
+
+    if (currentBatch.length === 0) continue;
 
     if (debug) {
-      logger.debug(`Scanning [${scannedDirCount}/${maxDirs}]: ${currentDir}`);
+      logger.debug(
+        `Scanning ${currentBatch.length} directories [${scannedDirCount}/${maxDirs}]`,
+      );
     }
 
-    let entries: Dirent[];
-    try {
-      entries = await fs.readdir(currentDir, { withFileTypes: true });
-    } catch {
-      // Ignore errors for directories we can't read (e.g., permissions)
-      continue;
-    }
-
-    for (const entry of entries) {
-      const fullPath = path.join(currentDir, entry.name);
-      if (
-        fileService?.shouldIgnoreFile(fullPath, {
-          respectGitIgnore: options.fileFilteringOptions?.respectGitIgnore,
-          respectGeminiIgnore:
-            options.fileFilteringOptions?.respectGeminiIgnore,
-        })
-      ) {
-        continue;
+    // Read directories in parallel instead of one by one
+    const readPromises = currentBatch.map(async (currentDir) => {
+      try {
+        const entries = await fs.readdir(currentDir, { withFileTypes: true });
+        return { currentDir, entries };
+      } catch {
+        return { currentDir, entries: [] };
       }
+    });
 
-      if (entry.isDirectory()) {
-        if (!ignoreDirs.includes(entry.name)) {
-          queue.push(fullPath);
+    const results = await Promise.all(readPromises);
+
+    for (const { currentDir, entries } of results) {
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+        if (
+          fileService?.shouldIgnoreFile(fullPath, {
+            respectGitIgnore: options.fileFilteringOptions?.respectGitIgnore,
+            respectGeminiIgnore:
+              options.fileFilteringOptions?.respectGeminiIgnore,
+          })
+        ) {
+          continue;
         }
-      } else if (entry.isFile() && entry.name === fileName) {
-        foundFiles.push(fullPath);
+
+        if (entry.isDirectory()) {
+          if (!ignoreDirs.includes(entry.name)) {
+            queue.push(fullPath);
+          }
+        } else if (entry.isFile() && entry.name === fileName) {
+          foundFiles.push(fullPath);
+        }
       }
     }
   }
