@@ -82,6 +82,11 @@ export type HistoryItemInfo = HistoryItemBase & {
   text: string;
 };
 
+export type HistoryItemHelp = HistoryItemBase & {
+  type: 'help';
+  content: string;
+};
+
 export type HistoryItemError = HistoryItemBase & {
   type: 'error';
   text: string;
@@ -140,6 +145,7 @@ export type HistoryItemWithoutId =
   | HistoryItemGemini
   | HistoryItemGeminiContent
   | HistoryItemInfo
+  | HistoryItemHelp
   | HistoryItemError
   | HistoryItemAbout
   | HistoryItemToolGroup
@@ -154,6 +160,7 @@ export type HistoryItem = HistoryItemWithoutId & { id: number };
 // Message types used by internal command feedback (subset of HistoryItem types)
 export enum MessageType {
   INFO = 'info',
+  HELP = 'help',
   ERROR = 'error',
   USER = 'user',
   ABOUT = 'about',
@@ -170,6 +177,11 @@ export type Message =
   | {
       type: MessageType.INFO | MessageType.ERROR | MessageType.USER;
       content: string; // Renamed from text for clarity in this context
+      timestamp: Date;
+    }
+  | {
+      type: MessageType.HELP;
+      content: string;
       timestamp: Date;
     }
   | {

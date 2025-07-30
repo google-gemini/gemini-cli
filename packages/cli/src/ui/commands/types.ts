@@ -66,6 +66,8 @@ export interface CommandContext {
     /** A transient list of shell commands the user has approved for this session. */
     sessionShellAllowlist: Set<string>;
   };
+  // Available slash commands
+  slashCommands: readonly SlashCommand[];
 }
 
 /**
@@ -89,7 +91,7 @@ export interface QuitActionReturn {
  */
 export interface MessageActionReturn {
   type: 'message';
-  messageType: 'info' | 'error';
+  messageType: 'info' | 'error' | 'help';
   content: string;
 }
 
@@ -98,7 +100,7 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy';
+  dialog: 'auth' | 'theme' | 'editor' | 'privacy';
 }
 
 /**

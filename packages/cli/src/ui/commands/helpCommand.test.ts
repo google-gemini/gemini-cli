@@ -4,31 +4,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { helpCommand } from './helpCommand.js';
-import { type CommandContext } from './types.js';
+import { type CommandContext, CommandKind } from './types.js';
 
 describe('helpCommand', () => {
   let mockContext: CommandContext;
 
   beforeEach(() => {
-    mockContext = {} as unknown as CommandContext;
+    mockContext = {
+      slashCommands: [
+        {
+          name: 'test',
+          description: 'Test command',
+          kind: CommandKind.BUILT_IN,
+        },
+        { name: 'help', description: 'Show help', kind: CommandKind.BUILT_IN },
+      ],
+    } as unknown as CommandContext;
   });
 
-  it("should return a dialog action and log a debug message for '/help'", () => {
-    const consoleDebugSpy = vi
-      .spyOn(console, 'debug')
-      .mockImplementation(() => {});
+  it("should return a message action with help content for '/help'", () => {
     if (!helpCommand.action) {
       throw new Error('Help command has no action');
     }
     const result = helpCommand.action(mockContext, '');
 
-    expect(result).toEqual({
-      type: 'dialog',
-      dialog: 'help',
+    expect(result).toMatchObject({
+      type: 'message',
+      messageType: 'help',
     });
-    expect(consoleDebugSpy).toHaveBeenCalledWith('Opening help UI ...');
+    expect(result.content).toContain('**Basics:**');
+    expect(result.content).toContain('**Commands:**');
+    expect(result.content).toContain('**Keyboard Shortcuts:**');
+    expect(result.content).toContain(' **/test** - Test command');
+    expect(result.content).toContain(' **/help** - Show help');
   });
 
   it("should also be triggered by its alternative name '?'", () => {
