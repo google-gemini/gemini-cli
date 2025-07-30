@@ -199,7 +199,8 @@ describe('Gemini Client (client.ts)', () => {
       setQuotaErrorOccurred: vi.fn(),
       getNoBrowser: vi.fn().mockReturnValue(false),
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
-      getIdeMode: vi.fn().mockReturnValue(false),
+      getIdeModeFeature: vi.fn().mockReturnValue(false),
+      getIdeMode: vi.fn().mockReturnValue(true),
       getWorkspaceContext: vi.fn().mockReturnValue({
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
@@ -649,7 +650,7 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   describe('sendMessageStream', () => {
-    it('should include IDE context when ideMode is enabled', async () => {
+    it('should include IDE context when ideModeFeature is enabled', async () => {
       // Arrange
       vi.mocked(ideContext.getIdeContext).mockReturnValue({
         workspaceState: {
@@ -673,7 +674,7 @@ describe('Gemini Client (client.ts)', () => {
         },
       });
 
-      vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
+      vi.spyOn(client['config'], 'getIdeModeFeature').mockReturnValue(true);
 
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Hello' };
@@ -724,7 +725,7 @@ Here are some other files the user has open, with the most recent at the top:
       );
     });
 
-    it('should not add context if ideMode is enabled but no open files', async () => {
+    it('should not add context if ideModeFeature is enabled but no open files', async () => {
       // Arrange
       vi.mocked(ideContext.getIdeContext).mockReturnValue({
         workspaceState: {
@@ -732,7 +733,7 @@ Here are some other files the user has open, with the most recent at the top:
         },
       });
 
-      vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
+      vi.spyOn(client['config'], 'getIdeModeFeature').mockReturnValue(true);
 
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Hello' };
@@ -771,7 +772,7 @@ Here are some other files the user has open, with the most recent at the top:
       );
     });
 
-    it('should add context if ideMode is enabled and there is one active file', async () => {
+    it('should add context if ideModeFeature is enabled and there is one active file', async () => {
       // Arrange
       vi.mocked(ideContext.getIdeContext).mockReturnValue({
         workspaceState: {
@@ -787,7 +788,7 @@ Here are some other files the user has open, with the most recent at the top:
         },
       });
 
-      vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
+      vi.spyOn(client['config'], 'getIdeModeFeature').mockReturnValue(true);
 
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Hello' };
@@ -835,7 +836,7 @@ This is the selected text in the file:
       );
     });
 
-    it('should add context if ideMode is enabled and there are open files but no active file', async () => {
+    it('should add context if ideModeFeature is enabled and there are open files but no active file', async () => {
       // Arrange
       vi.mocked(ideContext.getIdeContext).mockReturnValue({
         workspaceState: {
@@ -852,7 +853,7 @@ This is the selected text in the file:
         },
       });
 
-      vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
+      vi.spyOn(client['config'], 'getIdeModeFeature').mockReturnValue(true);
 
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Hello' };
