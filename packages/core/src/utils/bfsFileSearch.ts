@@ -83,9 +83,7 @@ export async function bfsFileSearch(
         return { currentDir, entries };
       } catch (error) {
         // Warn user that a directory could not be read, as this affects search results.
-        // The `any` type is used here to be pragmatic about what `error` could be.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const message = (error as any)?.message ?? 'Unknown error';
+        const message = (error as Error)?.message ?? 'Unknown error';
         console.warn(
           `[WARN] Skipping unreadable directory: ${currentDir} (${message})`,
         );
