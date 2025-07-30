@@ -109,9 +109,10 @@ async function getGeminiMdFilePathsInternal(
     if (debugMode) logger.debug(`User home directory: ${resolvedHome}`);
 
     try {
-      await fs.access(globalMemoryPath, fsSync.constants.R_OK);
       const stats = await fs.stat(globalMemoryPath);
       if (stats.isFile()) {
+        // Only check access after confirming it's a file
+        await fs.access(globalMemoryPath, fsSync.constants.R_OK);
         allPaths.add(globalMemoryPath);
         if (debugMode)
           logger.debug(
@@ -122,11 +123,18 @@ async function getGeminiMdFilePathsInternal(
           `Path exists but is not a file: ${globalMemoryPath}`,
         );
       }
-    } catch {
-      if (debugMode)
+    } catch (error) {
+      // Check if it's a permission error (file exists but not readable)
+      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'EACCES') {
+        if (debugMode)
+          logger.debug(
+            `Global ${geminiMdFilename} exists but is not readable: ${globalMemoryPath}`,
+          );
+      } else if (debugMode) {
         logger.debug(
-          `Global ${geminiMdFilename} not found or not readable: ${globalMemoryPath}`,
+          `Global ${geminiMdFilename} not found: ${globalMemoryPath}`,
         );
+      }
     }
 
     const projectRoot = await findProjectRoot(resolvedCwd);
@@ -161,9 +169,10 @@ async function getGeminiMdFilePathsInternal(
 
       const potentialPath = path.join(currentDir, geminiMdFilename);
       try {
-        await fs.access(potentialPath, fsSync.constants.R_OK);
         const stats = await fs.stat(potentialPath);
         if (stats.isFile()) {
+          // Only check access after confirming it's a file
+          await fs.access(potentialPath, fsSync.constants.R_OK);
           // Add to upwardPaths only if it's not the already added globalMemoryPath
           if (potentialPath !== globalMemoryPath) {
             upwardPaths.unshift(potentialPath);
@@ -178,10 +187,17 @@ async function getGeminiMdFilePathsInternal(
             `Path exists but is not a file: ${potentialPath}`,
           );
         }
-      } catch {
-        if (debugMode) {
+      } catch (error) {
+        // Check if it's a permission error (file exists but not readable)
+        if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'EACCES') {
+          if (debugMode) {
+            logger.debug(
+              `Upward ${geminiMdFilename} exists but is not readable: ${potentialPath}`,
+            );
+          }
+        } else if (debugMode) {
           logger.debug(
-            `Upward ${geminiMdFilename} not found or not readable in: ${currentDir}`,
+            `Upward ${geminiMdFilename} not found in: ${currentDir}`,
           );
         }
       }
