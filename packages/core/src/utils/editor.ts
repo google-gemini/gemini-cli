@@ -59,9 +59,15 @@ function commandExists(cmd: string, fallbackPath?: string): boolean {
  */
 const editorCommands: Record<
   EditorType,
-  { win32: string[]; default: string[] }
+  { win32: string[]; default: string[]; macOSFallbacks?: string[] }
 > = {
-  vscode: { win32: ['code.cmd'], default: ['code'] },
+  vscode: {
+    win32: ['code.cmd'],
+    default: ['code'],
+    macOSFallbacks: [
+      '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
+    ],
+  },
   vscodium: { win32: ['codium.cmd'], default: ['codium'] },
   windsurf: { win32: ['windsurf'], default: ['windsurf'] },
   cursor: { win32: ['cursor'], default: ['cursor'] },
@@ -74,7 +80,24 @@ export function checkHasEditorType(editor: EditorType): boolean {
   const commandConfig = editorCommands[editor];
   const commands =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
-  return commands.some((cmd) => commandExists(cmd));
+  // First, try the standard commands
+  const hasStandardCommand = commands.some((cmd) => commandExists(cmd));
+  if (hasStandardCommand) {
+    return true;
+  }
+
+  // On macOS, try fallback path for vscode available
+  if (
+    editor === 'vscode' &&
+    process.platform === 'darwin' &&
+    commandConfig.macOSFallbacks
+  ) {
+    return commandConfig.macOSFallbacks.some((fallbackPath) =>
+      existsSync(fallbackPath),
+    );
+  }
+
+  return false;
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
@@ -110,9 +133,25 @@ export function getDiffCommand(
   const commandConfig = editorCommands[editor];
   const commands =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
-  const command =
-    commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
-    commands[commands.length - 1];
+
+  // Try to find an available command
+  let command = commands.find((cmd) => commandExists(cmd));
+
+  // If no standard command found and on macOS, try fallbacks
+  if (
+    !command &&
+    process.platform === 'darwin' &&
+    commandConfig.macOSFallbacks
+  ) {
+    command = commandConfig.macOSFallbacks.find((fallbackPath) =>
+      existsSync(fallbackPath),
+    );
+  }
+
+  // Fallback to the last command in the list if nothing else works
+  if (!command) {
+    command = commands[commands.length - 1];
+  }
 
   switch (editor) {
     case 'vscode':
