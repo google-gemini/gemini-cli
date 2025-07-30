@@ -32,8 +32,8 @@ export function IDEContextDetailDisplay({
       paddingX={1}
     >
       <Text color={Colors.AccentCyan} bold>
-        {detectedIdeDisplay ? `${detectedIdeDisplay} ` : ''}IDE Context (ctrl+e
-        to toggle)
+        {detectedIdeDisplay ? detectedIdeDisplay : 'IDE'} Context (ctrl+e to
+        toggle)
       </Text>
       {openFiles.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
