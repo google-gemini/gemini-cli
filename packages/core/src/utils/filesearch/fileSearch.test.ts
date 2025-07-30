@@ -784,4 +784,144 @@ describe('FileSearch', () => {
       ]);
     });
   });
+
+  describe('hybrid sorting', () => {
+    it('should use fancySort for lists smaller than the threshold', async () => {
+      // This structure is designed to test all aspects of fancySort:
+      // - Directory-first sorting
+      // - Sorting by directory path (e.g., components vs utils)
+      // - Natural numeric sorting (`helper-2.ts` vs `helper-10.ts`)
+      // - Extension length sorting (`Button.ts` vs `Button.test.ts`)
+      // - Grouping of files within the same subdirectory
+      const fancySortStructure = {
+        src: {
+          components: [
+            'Button.ts',
+            'Button.test.ts',
+            'Button.integration.test.ts',
+            'Modal.ts',
+          ],
+          utils: ['helper-10.ts', 'helper-2.ts'],
+          'App.ts': '',
+        },
+        'package.json': '',
+        'README.md': '',
+      };
+
+      tmpDir = await createTmpDir(fancySortStructure);
+      const fileSearch = new FileSearch({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: false,
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        fastSortThreshold: 20,
+      });
+
+      await fileSearch.initialize();
+      const results = await fileSearch.search('');
+
+      // Expected order for fancySort:
+      // 1. Dirs first, sorted by path.
+      // 2. Root files, sorted by name.
+      // 3. Files sorted by dir, then name (numeric), then extension length.
+      expect(results).toEqual([
+        'src/',
+        'src/components/',
+        'src/utils/',
+        'package.json',
+        'README.md',
+        'src/App.ts',
+        'src/components/Button.ts',
+        'src/components/Button.test.ts',
+        'src/components/Button.integration.test.ts',
+        'src/components/Modal.ts',
+        'src/utils/helper-2.ts',
+        'src/utils/helper-10.ts',
+      ]);
+    });
+
+    it('should use fastSort for lists larger than the threshold', async () => {
+      // This structure has > 20 items to trigger fastSort.
+      const fastSortStructure = {
+        docs: ['getting-started.md', 'api-reference.md'],
+        src: {
+          components: [
+            'Button.ts',
+            'Button.test.ts',
+            'Modal.ts',
+            'Modal.test.ts',
+            'Input.ts',
+            'Form.ts',
+          ],
+          hooks: ['use-form.ts', 'use-query.ts'],
+          services: ['api-client.ts', 'auth-service.ts'],
+          utils: ['datetime.ts', 'helper-10.ts', 'helper-2.ts', 'string.ts'],
+          views: ['LoginView.ts', 'DashboardView.ts'],
+          'App.ts': '',
+          'index.ts': '',
+        },
+        assets: ['logo.svg', 'icon.png'],
+        'package.json': '',
+        'README.md': '',
+        'config.js': '',
+      };
+
+      tmpDir = await createTmpDir(fastSortStructure);
+
+      const fileSearch = new FileSearch({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: false,
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        fastSortThreshold: 20,
+      });
+
+      await fileSearch.initialize();
+      const results = await fileSearch.search('');
+
+      // Expected order for fastSort:
+      // 1. Dirs first, sorted lexicographically.
+      // 2. Files next, sorted lexicographically. Note that `helper-10.ts`
+      //    comes before `helper-2.ts` in this sort.
+      expect(results).toEqual([
+        'assets/',
+        'docs/',
+        'src/',
+        'src/components/',
+        'src/hooks/',
+        'src/services/',
+        'src/utils/',
+        'src/views/',
+        'README.md',
+        'assets/icon.png',
+        'assets/logo.svg',
+        'config.js',
+        'docs/api-reference.md',
+        'docs/getting-started.md',
+        'package.json',
+        'src/App.ts',
+        'src/components/Button.test.ts',
+        'src/components/Button.ts',
+        'src/components/Form.ts',
+        'src/components/Input.ts',
+        'src/components/Modal.test.ts',
+        'src/components/Modal.ts',
+        'src/hooks/use-form.ts',
+        'src/hooks/use-query.ts',
+        'src/index.ts',
+        'src/services/api-client.ts',
+        'src/services/auth-service.ts',
+        'src/utils/datetime.ts',
+        'src/utils/helper-10.ts',
+        'src/utils/helper-2.ts',
+        'src/utils/string.ts',
+        'src/views/DashboardView.ts',
+        'src/views/LoginView.ts',
+      ]);
+    });
+  });
 });

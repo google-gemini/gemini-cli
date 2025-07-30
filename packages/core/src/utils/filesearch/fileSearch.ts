@@ -20,6 +20,7 @@ export type FileSearchOptions = {
   cache: boolean;
   cacheTtl: number;
   maxDepth?: number;
+  fastSortThreshold?: number;
 };
 
 export class AbortError extends Error {
@@ -30,16 +31,112 @@ export class AbortError extends Error {
 }
 
 /**
+ * A fast sort for very large lists of files.
+ * @param results The list of paths to sort.
+ * @returns The sorted list of paths.
+ */
+function fastSort(results: string[]): string[] {
+  return results.sort((a, b) => {
+    const aIsDir = a.endsWith('/');
+    const bIsDir = b.endsWith('/');
+
+    if (aIsDir && !bIsDir) return -1;
+    if (!aIsDir && bIsDir) return 1;
+
+    // This is 40% faster than localeCompare and the only thing we would really
+    // gain from localeCompare is case-insensitive sort
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+}
+
+/**
+ * A sophisticated sort that intelligently orders file paths. It applies a
+ * three-level sort: by directory, then by filename (with natural numeric
+ * sorting), and finally by extension length. Directories are always listed
+ * first.
+ *
+ * @param results The list of paths to sort.
+ * @returns The sorted list of paths.
+ */
+function fancySort(results: string[]): string[] {
+  const collator = new Intl.Collator(undefined, { numeric: true });
+
+  // Schwartzian transform with manual parsing to avoid calling path.parse repeatedly.
+  const mapped = results.map((p) => {
+    const isDir = p.endsWith('/');
+    if (isDir) {
+      return { path: p, isDir: true, dir: '', name: '', extLen: 0 };
+    }
+
+    const lastSlashIndex = p.lastIndexOf('/');
+    const dir = lastSlashIndex === -1 ? '' : p.substring(0, lastSlashIndex);
+    const basename = p.substring(lastSlashIndex + 1);
+
+    // Custom rule: split on the first dot in the filename.
+    const firstDotIndex = basename.indexOf('.');
+
+    let name: string;
+    let extLen: number;
+
+    if (firstDotIndex <= 0) {
+      // Handles no dot and dotfiles like '.bashrc'
+      name = basename;
+      extLen = 0;
+    } else {
+      name = basename.substring(0, firstDotIndex);
+      extLen = basename.length - firstDotIndex;
+    }
+
+    return {
+      path: p,
+      isDir: false,
+      dir,
+      name,
+      extLen,
+    };
+  });
+
+  mapped.sort((a, b) => {
+    // Directories first
+    if (a.isDir && !b.isDir) return -1;
+    if (!a.isDir && b.isDir) return 1;
+
+    // If both are directories, sort by their full path
+    if (a.isDir && b.isDir) {
+      return collator.compare(a.path, b.path);
+    }
+
+    // If both are files, then apply the three-level sort
+    // 1. Sort by directory path
+    if (a.dir !== b.dir) {
+      return collator.compare(a.dir, b.dir);
+    }
+
+    // 2. Sort by file root (alphabetical)
+    if (a.name !== b.name) {
+      return collator.compare(a.name, b.name);
+    }
+
+    // 3. Sort by extension length
+    return a.extLen - b.extLen;
+  });
+
+  return mapped.map((p) => p.path);
+}
+
+/**
  * Filters a list of paths based on a given pattern.
  * @param allPaths The list of all paths to filter.
  * @param pattern The picomatch pattern to filter by.
  * @param signal An AbortSignal to cancel the operation.
+ * @param fastSortThreshold The threshold for using the fast sort algorithm.
  * @returns A promise that resolves to the filtered and sorted list of paths.
  */
 export async function filter(
   allPaths: string[],
   pattern: string,
   signal: AbortSignal | undefined,
+  fastSortThreshold: number,
 ): Promise<string[]> {
   const patternFilter = picomatch(pattern, {
     dot: true,
@@ -62,19 +159,11 @@ export async function filter(
     }
   }
 
-  results.sort((a, b) => {
-    const aIsDir = a.endsWith('/');
-    const bIsDir = b.endsWith('/');
+  if (results.length > fastSortThreshold) {
+    return fastSort(results);
+  }
 
-    if (aIsDir && !bIsDir) return -1;
-    if (!aIsDir && bIsDir) return 1;
-
-    // This is 40% faster than localeCompare and the only thing we would really
-    // gain from localeCompare is case-sensitive sort
-    return a < b ? -1 : a > b ? 1 : 0;
-  });
-
-  return results;
+  return fancySort(results);
 }
 
 export type SearchOptions = {
@@ -90,6 +179,7 @@ export type SearchOptions = {
 export class FileSearch {
   private readonly absoluteDir: string;
   private readonly ignore: Ignore = new Ignore();
+  private readonly fastSortThreshold: number;
   private resultCache: ResultCache | undefined;
   private allFiles: string[] = [];
 
@@ -99,6 +189,7 @@ export class FileSearch {
    */
   constructor(private readonly options: FileSearchOptions) {
     this.absoluteDir = path.resolve(options.projectRoot);
+    this.fastSortThreshold = options.fastSortThreshold ?? 20000;
   }
 
   /**
@@ -137,7 +228,12 @@ export class FileSearch {
       filteredCandidates = candidates;
     } else {
       // Apply the user's picomatch pattern filter
-      filteredCandidates = await filter(candidates, pattern, options.signal);
+      filteredCandidates = await filter(
+        candidates,
+        pattern,
+        options.signal,
+        this.fastSortThreshold,
+      );
       this.resultCache!.set(pattern, filteredCandidates);
     }
 
