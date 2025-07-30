@@ -75,8 +75,18 @@ class ThemeManager {
     )) {
       const validation = validateCustomTheme(customThemeConfig);
       if (validation.isValid) {
+        if (validation.warning) {
+          console.warn(`Theme "${name}": ${validation.warning}`);
+        }
+        const themeWithDefaults: CustomTheme = {
+          ...DEFAULT_THEME.colors,
+          ...customThemeConfig,
+          name: customThemeConfig.name || name,
+          type: 'custom',
+        };
+
         try {
-          const theme = createCustomTheme(customThemeConfig);
+          const theme = createCustomTheme(themeWithDefaults);
           this.customThemes.set(name, theme);
         } catch (error) {
           console.warn(`Failed to load custom theme "${name}":`, error);
