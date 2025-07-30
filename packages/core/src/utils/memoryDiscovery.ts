@@ -68,7 +68,7 @@ async function tryReadGeminiFile(
     const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
 
     if (error instanceof Error && 'code' in error) {
-      const fsError = error as { code: string; message: string };
+const fsError = error as NodeJS.ErrnoException;
       // EISDIR and ENOENT are expected conditions, so only log them in debug mode.
       if (fsError.code === 'EISDIR' || fsError.code === 'ENOENT') {
         if (debugMode) {
