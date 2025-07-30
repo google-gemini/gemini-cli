@@ -106,6 +106,15 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
 }
 
 /**
+ * Escapes special glob characters in a string to make it safe for glob patterns.
+ * This is needed when we want to search for literal file paths that contain
+ * special glob characters like brackets, asterisks, etc.
+ */
+function escapeGlobPattern(pattern: string): string {
+  return pattern.replace(/[[\]{}()*+?.\\^$|]/g, '\\$&');
+}
+
+/**
  * Processes user input potentially containing one or more '@<path>' commands.
  * If found, it attempts to read the specified files/directories using the
  * 'read_many_files' tool. The user query is modified to include resolved paths,
@@ -238,9 +247,11 @@ export async function handleAtCommand({
             `Path ${pathName} not found directly, attempting glob search.`,
           );
           try {
+            // Escape the pathName to handle special glob characters like brackets
+            const escapedPathName = escapeGlobPattern(pathName);
             const globResult = await globTool.execute(
               {
-                pattern: `**/*${pathName}*`,
+                pattern: `**/*${escapedPathName}*`,
                 path: config.getTargetDir(),
               },
               signal,

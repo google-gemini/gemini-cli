@@ -47,6 +47,10 @@ export async function runAcpPeer(config: Config, settings: LoadedSettings) {
   );
 }
 
+function escapeGlobPattern(pattern: string): string {
+  return pattern.replace(/[[\]{}()*+?.\\^$|]/g, '\\$&');
+}
+
 class GeminiAgent implements Agent {
   chat?: GeminiChat;
   pendingSend?: AbortController;
@@ -408,9 +412,11 @@ class GeminiAgent implements Agent {
               `Path ${pathName} not found directly, attempting glob search.`,
             );
             try {
+              // Escape the pathName to handle special glob characters like brackets
+              const escapedPathName = escapeGlobPattern(pathName);
               const globResult = await globTool.execute(
                 {
-                  pattern: `**/*${pathName}*`,
+                  pattern: `**/*${escapedPathName}*`,
                   path: this.config.getTargetDir(),
                 },
                 abortSignal,

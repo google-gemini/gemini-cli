@@ -26,6 +26,10 @@ import { TextBuffer } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
 
+function escapeGlobPattern(pattern: string): string {
+  return pattern.replace(/[[\]{}()*+?.\\^$|]/g, '\\$&');
+}
+
 export interface UseCompletionReturn {
   suggestions: Suggestion[];
   activeSuggestionIndex: number;
@@ -419,7 +423,9 @@ export function useCompletion(
       },
       maxResults = 50,
     ): Promise<Suggestion[]> => {
-      const globPattern = `**/${searchPrefix}*`;
+      // Escape the searchPrefix to handle special glob characters like brackets
+      const escapedSearchPrefix = escapeGlobPattern(searchPrefix);
+      const globPattern = `**/${escapedSearchPrefix}*`;
       const files = await glob(globPattern, {
         cwd,
         dot: searchPrefix.startsWith('.'),
