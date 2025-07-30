@@ -56,6 +56,15 @@ describe('LoopDetectionService', () => {
     value: content,
   });
 
+  const createRepetitiveContent = (id: number, length: number): string => {
+    const baseString = `This is a unique sentence, id=${id}. `;
+    let content = '';
+    while (content.length < length) {
+      content += baseString;
+    }
+    return content.slice(0, length);
+  };
+
   describe('Tool Call Loop Detection', () => {
     it(`should not detect a loop for fewer than TOOL_CALL_LOOP_THRESHOLD identical calls`, () => {
       const event = createToolCallRequestEvent('testTool', { param: 'value' });
@@ -149,13 +158,11 @@ describe('LoopDetectionService', () => {
 
     it('should detect a loop when a chunk of content repeats consecutively', () => {
       service.reset('');
-      const repeatedContent = 'a'.repeat(CONTENT_CHUNK_SIZE);
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
 
       let isLoop = false;
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
-        for (const char of repeatedContent) {
-          isLoop = service.addAndCheck(createContentEvent(char));
-        }
+        isLoop = service.addAndCheck(createContentEvent(repeatedContent));
       }
       expect(isLoop).toBe(true);
       expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
@@ -163,19 +170,115 @@ describe('LoopDetectionService', () => {
 
     it('should not detect a loop if repetitions are very far apart', () => {
       service.reset('');
-      const repeatedContent = 'b'.repeat(CONTENT_CHUNK_SIZE);
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
       const fillerContent = generateRandomString(500);
 
       let isLoop = false;
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
-        for (const char of repeatedContent) {
-          isLoop = service.addAndCheck(createContentEvent(char));
-        }
-        for (const char of fillerContent) {
-          isLoop = service.addAndCheck(createContentEvent(char));
-        }
+        isLoop = service.addAndCheck(createContentEvent(repeatedContent));
+        isLoop = service.addAndCheck(createContentEvent(fillerContent));
       }
       expect(isLoop).toBe(false);
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Content Loop Detection with Code Blocks', () => {
+    it('should not detect a loop when repetitive content is inside a code block', () => {
+      service.reset('');
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      service.addAndCheck(createContentEvent('```\n'));
+
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        const isLoop = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(isLoop).toBe(false);
+      }
+
+      const isLoop = service.addAndCheck(createContentEvent('\n```'));
+      expect(isLoop).toBe(false);
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should detect a loop when repetitive content is outside a code block', () => {
+      service.reset('');
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      service.addAndCheck(createContentEvent('```'));
+      service.addAndCheck(createContentEvent('\nsome code\n'));
+      service.addAndCheck(createContentEvent('```'));
+
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        isLoop = service.addAndCheck(createContentEvent(repeatedContent));
+      }
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle content with multiple code blocks and no loops', () => {
+      service.reset('');
+      service.addAndCheck(createContentEvent('```\ncode1\n```'));
+      service.addAndCheck(createContentEvent('\nsome text\n'));
+      const isLoop = service.addAndCheck(createContentEvent('```\ncode2\n```'));
+
+      expect(isLoop).toBe(false);
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should handle content with mixed code blocks and looping text', () => {
+      service.reset('');
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      service.addAndCheck(createContentEvent('```'));
+      service.addAndCheck(createContentEvent('\ncode1\n'));
+      service.addAndCheck(createContentEvent('```'));
+
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        isLoop = service.addAndCheck(createContentEvent(repeatedContent));
+      }
+
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not detect a loop for a long code block with some repeating tokens', () => {
+      service.reset('');
+      const repeatingTokens =
+        'for (let i = 0; i < 10; i++) { console.log(i); }';
+
+      service.addAndCheck(createContentEvent('```\n'));
+
+      for (let i = 0; i < 20; i++) {
+        const isLoop = service.addAndCheck(createContentEvent(repeatingTokens));
+        expect(isLoop).toBe(false);
+      }
+
+      const isLoop = service.addAndCheck(createContentEvent('\n```'));
+      expect(isLoop).toBe(false);
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should reset tracking when a code fence is found', () => {
+      service.reset('');
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        service.addAndCheck(createContentEvent(repeatedContent));
+      }
+
+      // This should not trigger a loop because of the reset
+      service.addAndCheck(createContentEvent('```'));
+
+      // We are now in a code block, so loop detection should be off.
+      // Let's add the repeated content again, it should not trigger a loop.
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        isLoop = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(isLoop).toBe(false);
+      }
+
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
   });
