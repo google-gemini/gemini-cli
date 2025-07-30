@@ -17,7 +17,7 @@ export const HelpMessage: React.FC<HelpMessageProps> = ({ content }) => {
 
   const renderLineWithColors = (line: string, lineIndex: number) => {
     // Parse line for bold sections marked with **
-    const parts = line.split(/(\*\*[^*]+\*\*)/g);
+    const parts = line.split(/(\*\*.*?\*\*)/g);
 
     return (
       <Text key={lineIndex} color={Colors.Foreground}>
