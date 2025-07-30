@@ -302,18 +302,27 @@ Use this tool when the user's query implies needing the content of several files
     }
 
     try {
-      const entries = await glob(
-        searchPatterns.map((p) => p.replace(/\\/g, '/')),
-        {
-          cwd: this.config.getTargetDir(),
-          ignore: effectiveExcludes,
-          nodir: true,
-          dot: true,
-          absolute: true,
-          nocase: true,
-          signal,
-        },
-      );
+      const allEntries = new Set<string>();
+      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
+
+      for (const dir of workspaceDirs) {
+        const entriesInDir = await glob(
+          searchPatterns.map((p) => p.replace(/\\/g, '/')),
+          {
+            cwd: dir,
+            ignore: effectiveExcludes,
+            nodir: true,
+            dot: true,
+            absolute: true,
+            nocase: true,
+            signal,
+          },
+        );
+        for (const entry of entriesInDir) {
+          allEntries.add(entry);
+        }
+      }
+      const entries = Array.from(allEntries);
 
       const gitFilteredEntries = fileFilteringOptions.respectGitIgnore
         ? fileDiscovery
@@ -346,11 +355,15 @@ Use this tool when the user's query implies needing the content of several files
       let geminiIgnoredCount = 0;
 
       for (const absoluteFilePath of entries) {
-        // Security check: ensure the glob library didn't return something outside targetDir.
-        if (!absoluteFilePath.startsWith(this.config.getTargetDir())) {
+        // Security check: ensure the glob library didn't return something outside the workspace.
+        if (
+          !this.config
+            .getWorkspaceContext()
+            .isPathWithinWorkspace(absoluteFilePath)
+        ) {
           skippedFiles.push({
             path: absoluteFilePath,
-            reason: `Security: Glob library returned path outside target directory. Base: ${this.config.getTargetDir()}, Path: ${absoluteFilePath}`,
+            reason: `Security: Glob library returned path outside workspace. Path: ${absoluteFilePath}`,
           });
           continue;
         }

@@ -9,9 +9,10 @@ import { partListUnionToString } from '../core/geminiRequest.js';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'; // Removed vi
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { Config } from '../config/config.js';
+import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 
 describe('GlobTool', () => {
   let tempRootDir: string; // This will be the rootDirectory for the GlobTool instance
@@ -23,6 +24,7 @@ describe('GlobTool', () => {
     getFileService: () => new FileDiscoveryService(tempRootDir),
     getFileFilteringRespectGitIgnore: () => true,
     getTargetDir: () => tempRootDir,
+    getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
   } as unknown as Config;
 
   beforeEach(async () => {
@@ -243,7 +245,7 @@ describe('GlobTool', () => {
         path: '../../../../../../../../../../tmp',
       }; // Definitely outside
       expect(specificGlobTool.validateToolParams(paramsOutside)).toContain(
-        "resolves outside the tool's root directory",
+        'resolves outside the allowed workspace directories',
       );
     });
 
@@ -262,6 +264,37 @@ describe('GlobTool', () => {
       expect(globTool.validateToolParams(params)).toContain(
         'Search path is not a directory',
       );
+    });
+  });
+
+  describe('workspace boundary validation', () => {
+    it('should validate search paths are within workspace boundaries', () => {
+      const validPath = { pattern: '*.ts', path: 'sub' };
+      const invalidPath = { pattern: '*.ts', path: '../..' };
+
+      expect(globTool.validateToolParams(validPath)).toBeNull();
+      expect(globTool.validateToolParams(invalidPath)).toContain(
+        'resolves outside the allowed workspace directories',
+      );
+    });
+
+    it('should provide clear error messages when path is outside workspace', () => {
+      const invalidPath = { pattern: '*.ts', path: '/etc' };
+      const error = globTool.validateToolParams(invalidPath);
+
+      expect(error).toContain(
+        'resolves outside the allowed workspace directories',
+      );
+      expect(error).toContain(tempRootDir);
+    });
+
+    it('should work with paths in workspace subdirectories', async () => {
+      const params: GlobToolParams = { pattern: '*.md', path: 'sub' };
+      const result = await globTool.execute(params, abortSignal);
+
+      expect(result.llmContent).toContain('Found 2 file(s)');
+      expect(result.llmContent).toContain('fileC.md');
+      expect(result.llmContent).toContain('FileD.MD');
     });
   });
 });

@@ -13,6 +13,7 @@ import path from 'path';
 import fs from 'fs'; // Actual fs for setup
 import os from 'os';
 import { Config } from '../config/config.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 vi.mock('mime-types', () => {
   const lookup = (filename: string) => {
@@ -48,11 +49,11 @@ describe('ReadManyFilesTool', () => {
   let mockReadFileFn: Mock;
 
   beforeEach(async () => {
-    tempRootDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'read-many-files-root-'),
+    tempRootDir = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'read-many-files-root-')),
     );
-    tempDirOutsideRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'read-many-files-external-'),
+    tempDirOutsideRoot = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'read-many-files-external-')),
     );
     fs.writeFileSync(path.join(tempRootDir, '.geminiignore'), 'foo.*');
     const fileService = new FileDiscoveryService(tempRootDir);
@@ -64,6 +65,8 @@ describe('ReadManyFilesTool', () => {
         respectGeminiIgnore: true,
       }),
       getTargetDir: () => tempRootDir,
+      getWorkspaceDirs: () => [tempRootDir],
+      getWorkspaceContext: () => new WorkspaceContext(tempRootDir),
     } as Partial<Config> as Config;
     tool = new ReadManyFilesTool(mockConfig);
 
@@ -423,6 +426,55 @@ describe('ReadManyFilesTool', () => {
       expect(result.returnDisplay).not.toContain('foo.bar');
       expect(result.returnDisplay).not.toContain('foo.quux');
       expect(result.returnDisplay).toContain('bar.ts');
+    });
+
+    it('should read files from multiple workspace directories', async () => {
+      const tempDir1 = fs.realpathSync(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-dir-1-')),
+      );
+      const tempDir2 = fs.realpathSync(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-dir-2-')),
+      );
+      const fileService = new FileDiscoveryService(tempDir1);
+      const mockConfig = {
+        getFileService: () => fileService,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
+        getWorkspaceContext: () => new WorkspaceContext(tempDir1, [tempDir2]),
+        getTargetDir: () => tempDir1,
+      } as Partial<Config> as Config;
+      tool = new ReadManyFilesTool(mockConfig);
+
+      fs.writeFileSync(path.join(tempDir1, 'file1.txt'), 'Content1');
+      fs.writeFileSync(path.join(tempDir2, 'file2.txt'), 'Content2');
+
+      const params = { paths: ['*.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      const content = result.llmContent as string[];
+      if (!Array.isArray(content)) {
+        throw new Error(`llmContent is not an array: ${content}`);
+      }
+      const expectedPath1 = path.join(tempDir1, 'file1.txt');
+      const expectedPath2 = path.join(tempDir2, 'file2.txt');
+
+      expect(
+        content.some((c) =>
+          c.includes(`--- ${expectedPath1} ---\n\nContent1\n\n`),
+        ),
+      ).toBe(true);
+      expect(
+        content.some((c) =>
+          c.includes(`--- ${expectedPath2} ---\n\nContent2\n\n`),
+        ),
+      ).toBe(true);
+      expect(result.returnDisplay).toContain(
+        'Successfully read and concatenated content from **2 file(s)**',
+      );
+
+      fs.rmSync(tempDir1, { recursive: true, force: true });
+      fs.rmSync(tempDir2, { recursive: true, force: true });
     });
   });
 });

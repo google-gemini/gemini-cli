@@ -26,7 +26,6 @@ import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
-import { isWithinRoot } from '../utils/fileUtils.js';
 
 /**
  * Parameters for the Edit tool
@@ -137,8 +136,10 @@ Expectation for required parameters:
       return `File path must be absolute: ${params.file_path}`;
     }
 
-    if (!isWithinRoot(params.file_path, this.config.getTargetDir())) {
-      return `File path must be within the root directory (${this.config.getTargetDir()}): ${params.file_path}`;
+    const workspaceContext = this.config.getWorkspaceContext();
+    if (!workspaceContext.isPathWithinWorkspace(params.file_path)) {
+      const directories = workspaceContext.getDirectories();
+      return `File path must be within one of the workspace directories: ${directories.join(', ')}`;
     }
 
     return null;

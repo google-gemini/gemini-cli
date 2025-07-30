@@ -31,6 +31,7 @@ import {
   ensureCorrectFileContent,
   CorrectedEditResult,
 } from '../utils/editCorrector.js';
+import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 
 const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
 
@@ -54,6 +55,7 @@ const mockConfigInternal = {
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
   setApprovalMode: vi.fn(),
   getGeminiClient: vi.fn(), // Initialize as a plain mock function
+  getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
   getApiKey: () => 'test-key',
   getModel: () => 'test-model',
   getSandbox: () => false,
@@ -83,6 +85,7 @@ describe('WriteFileTool', () => {
   let tempDir: string;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     // Create a unique temporary directory for files created outside the root
     tempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'write-file-test-external-'),
@@ -97,6 +100,11 @@ describe('WriteFileTool', () => {
       mockConfig,
     ) as Mocked<GeminiClient>;
     vi.mocked(GeminiClient).mockImplementation(() => mockGeminiClientInstance);
+
+    vi.mocked(ensureCorrectEdit).mockImplementation(mockEnsureCorrectEdit);
+    vi.mocked(ensureCorrectFileContent).mockImplementation(
+      mockEnsureCorrectFileContent,
+    );
 
     // Now that mockGeminiClientInstance is initialized, set the mock implementation for getGeminiClient
     mockConfigInternal.getGeminiClient.mockReturnValue(
@@ -177,8 +185,9 @@ describe('WriteFileTool', () => {
         file_path: outsidePath,
         content: 'hello',
       };
-      expect(tool.validateToolParams(params)).toMatch(
-        /File path must be within the root directory/,
+      const error = tool.validateToolParams(params);
+      expect(error).toContain(
+        'File path must be within one of the workspace directories',
       );
     });
 
@@ -427,8 +436,8 @@ describe('WriteFileTool', () => {
       const params = { file_path: outsidePath, content: 'test' };
       const result = await tool.execute(params, abortSignal);
       expect(result.llmContent).toMatch(/Error: Invalid parameters provided/);
-      expect(result.returnDisplay).toMatch(
-        /Error: File path must be within the root directory/,
+      expect(result.returnDisplay).toContain(
+        'Error: File path must be within one of the workspace directories',
       );
     });
 
@@ -614,6 +623,41 @@ describe('WriteFileTool', () => {
       const result = await tool.execute(params, abortSignal);
 
       expect(result.llmContent).not.toMatch(/User modified the `content`/);
+    });
+  });
+
+  describe('workspace boundary validation', () => {
+    it('should validate paths are within workspace root', () => {
+      const params = {
+        file_path: path.join(rootDir, 'file.txt'),
+        content: 'test content',
+      };
+      expect(tool.validateToolParams(params)).toBeNull();
+    });
+
+    it('should reject paths outside workspace root', () => {
+      const params = {
+        file_path: '/etc/passwd',
+        content: 'malicious',
+      };
+      const error = tool.validateToolParams(params);
+      expect(error).toContain(
+        'File path must be within one of the workspace directories',
+      );
+      expect(error).toContain(rootDir);
+    });
+
+    it('should provide clear error message with workspace directories', () => {
+      const outsidePath = path.join(tempDir, 'outside-root.txt');
+      const params = {
+        file_path: outsidePath,
+        content: 'test',
+      };
+      const error = tool.validateToolParams(params);
+      expect(error).toContain(
+        'File path must be within one of the workspace directories',
+      );
+      expect(error).toContain(rootDir);
     });
   });
 });

@@ -124,14 +124,19 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     }
     if (params.directory) {
       if (path.isAbsolute(params.directory)) {
-        return 'Directory cannot be absolute. Must be relative to the project root directory.';
+        return 'Directory cannot be absolute. Please refer to workspace directories by their name.';
       }
-      const directory = path.resolve(
-        this.config.getTargetDir(),
-        params.directory,
+      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
+      const matchingDirs = workspaceDirs.filter(
+        (dir) => path.basename(dir) === params.directory,
       );
-      if (!fs.existsSync(directory)) {
-        return 'Directory must exist.';
+
+      if (matchingDirs.length === 0) {
+        return `Directory '${params.directory}' is not a registered workspace directory.`;
+      }
+
+      if (matchingDirs.length > 1) {
+        return `Directory name '${params.directory}' is ambiguous as it matches multiple workspace directories.`;
       }
     }
     return null;
