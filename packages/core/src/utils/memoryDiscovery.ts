@@ -110,11 +110,18 @@ async function getGeminiMdFilePathsInternal(
 
     try {
       await fs.access(globalMemoryPath, fsSync.constants.R_OK);
-      allPaths.add(globalMemoryPath);
-      if (debugMode)
+      const stats = await fs.stat(globalMemoryPath);
+      if (stats.isFile()) {
+        allPaths.add(globalMemoryPath);
+        if (debugMode)
+          logger.debug(
+            `Found readable global ${geminiMdFilename}: ${globalMemoryPath}`,
+          );
+      } else if (debugMode) {
         logger.debug(
-          `Found readable global ${geminiMdFilename}: ${globalMemoryPath}`,
+          `Path exists but is not a file: ${globalMemoryPath}`,
         );
+      }
     } catch {
       if (debugMode)
         logger.debug(
@@ -155,14 +162,21 @@ async function getGeminiMdFilePathsInternal(
       const potentialPath = path.join(currentDir, geminiMdFilename);
       try {
         await fs.access(potentialPath, fsSync.constants.R_OK);
-        // Add to upwardPaths only if it's not the already added globalMemoryPath
-        if (potentialPath !== globalMemoryPath) {
-          upwardPaths.unshift(potentialPath);
-          if (debugMode) {
-            logger.debug(
-              `Found readable upward ${geminiMdFilename}: ${potentialPath}`,
-            );
+        const stats = await fs.stat(potentialPath);
+        if (stats.isFile()) {
+          // Add to upwardPaths only if it's not the already added globalMemoryPath
+          if (potentialPath !== globalMemoryPath) {
+            upwardPaths.unshift(potentialPath);
+            if (debugMode) {
+              logger.debug(
+                `Found readable upward ${geminiMdFilename}: ${potentialPath}`,
+              );
+            }
           }
+        } else if (debugMode) {
+          logger.debug(
+            `Path exists but is not a file: ${potentialPath}`,
+          );
         }
       } catch {
         if (debugMode) {
