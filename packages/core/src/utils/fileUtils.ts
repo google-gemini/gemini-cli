@@ -304,33 +304,28 @@ export async function processSingleFileContent(
 
         let llmTextContent = '';
         if (contentRangeTruncated) {
-          llmTextContent += `[File content truncated: showing lines ${
-            actualStartLine + 1
-          }-${endLine} of ${originalLineCount} total lines. Use offset/limit parameters to view more.]\n`;
+          llmTextContent += `[File content truncated: showing lines ${actualStartLine + 1}-${endLine} of ${originalLineCount} total lines. Use offset/limit parameters to view more.]\n`;
         } else if (linesWereTruncatedInLength) {
           llmTextContent += `[File content partially truncated: some lines exceeded maximum length of ${MAX_LINE_LENGTH_TEXT_FILE} characters.]\n`;
         }
         llmTextContent += formattedLines.join('\n');
 
-        let returnDisplay = `Read file ${relativePathForDisplay}`;
-        if (isTruncated) {
-          if (contentRangeTruncated) {
-            returnDisplay = `Read lines ${
-              actualStartLine + 1
-            }-${endLine} of ${originalLineCount} from ${relativePathForDisplay} (truncated`;
-            if (linesWereTruncatedInLength) {
-              returnDisplay += ', and some lines were shortened)';
-            } else {
-              returnDisplay += ')';
-            }
-          } else if (linesWereTruncatedInLength) {
-            returnDisplay = `Read all ${originalLineCount} lines from ${relativePathForDisplay} (truncated due to long lines)`;
+        // By default, return nothing to streamline the common case of a successful read_file.
+        let returnDisplay = '';
+        if (contentRangeTruncated) {
+          returnDisplay = `Read lines ${
+            actualStartLine + 1
+          }-${endLine} of ${originalLineCount} from ${relativePathForDisplay}`;
+          if (linesWereTruncatedInLength) {
+            returnDisplay += ' (some lines were shortened)';
           }
+        } else if (linesWereTruncatedInLength) {
+          returnDisplay = `Read all ${originalLineCount} lines from ${relativePathForDisplay} (some lines were shortened)`;
         }
 
         return {
           llmContent: llmTextContent,
-          returnDisplay: isTruncated ? returnDisplay : '',
+          returnDisplay,
           isTruncated,
           originalLineCount,
           linesShown: [actualStartLine + 1, endLine],

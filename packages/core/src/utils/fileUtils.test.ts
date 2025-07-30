@@ -420,9 +420,7 @@ describe('fileUtils', () => {
       expect(result.llmContent).toContain(
         '[File content truncated: showing lines 6-10 of 20 total lines. Use offset/limit parameters to view more.]',
       );
-      expect(result.returnDisplay).toBe(
-        'Read lines 6-10 of 20 from test.txt (truncated)',
-      );
+      expect(result.returnDisplay).toBe('Read lines 6-10 of 20 from test.txt');
       expect(result.isTruncated).toBe(true);
       expect(result.originalLineCount).toBe(20);
       expect(result.linesShown).toEqual([6, 10]);
@@ -468,39 +466,68 @@ describe('fileUtils', () => {
         '[File content partially truncated: some lines exceeded maximum length of 2000 characters.]',
       );
       expect(result.returnDisplay).toBe(
-        'Read all 3 lines from test.txt (truncated due to long lines)',
+        'Read all 3 lines from test.txt (some lines were shortened)',
       );
       expect(result.isTruncated).toBe(true);
     });
 
-    it('should handle both line count and line length truncation', async () => {
-      const longLine = 'b'.repeat(2500);
-      const lines = Array.from({ length: 10 }, (_, i) => `Line ${i + 1}`);
-      lines.push(longLine);
+    it('should truncate when line count exceeds the limit', async () => {
+      const lines = Array.from({ length: 11 }, (_, i) => `Line ${i + 1}`);
       actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
 
+      // Read 5 lines, but there are 11 total
       const result = await processSingleFileContent(
         testTextFilePath,
         tempRootDir,
         0,
         5,
-      ); // Read 5 lines, but there are 11 total
-
-      expect(result.isTruncated).toBe(true);
-      expect(result.returnDisplay).toBe(
-        'Read lines 1-5 of 11 from test.txt (truncated)',
       );
 
-      const result2 = await processSingleFileContent(
+      expect(result.isTruncated).toBe(true);
+      expect(result.returnDisplay).toBe('Read lines 1-5 of 11 from test.txt');
+    });
+
+    it('should truncate when a line length exceeds the character limit', async () => {
+      const longLine = 'b'.repeat(2500);
+      const lines = Array.from({ length: 10 }, (_, i) => `Line ${i + 1}`);
+      lines.push(longLine); // Total 11 lines
+      actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
+
+      // Read all 11 lines, including the long one
+      const result = await processSingleFileContent(
         testTextFilePath,
         tempRootDir,
         0,
         11,
-      ); // Read all 11 lines
+      );
 
-      expect(result2.isTruncated).toBe(true);
-      expect(result2.returnDisplay).toBe(
-        'Read all 11 lines from test.txt (truncated due to long lines)',
+      expect(result.isTruncated).toBe(true);
+      expect(result.returnDisplay).toBe(
+        'Read all 11 lines from test.txt (some lines were shortened)',
+      );
+    });
+
+    it('should truncate both line count and line length when both exceed limits', async () => {
+      const linesWithLongInMiddle = Array.from(
+        { length: 20 },
+        (_, i) => `Line ${i + 1}`,
+      );
+      linesWithLongInMiddle[4] = 'c'.repeat(2500);
+      actualNodeFs.writeFileSync(
+        testTextFilePath,
+        linesWithLongInMiddle.join('\n'),
+      );
+
+      // Read 10 lines out of 20, including the long line
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        0,
+        10,
+      );
+      expect(result.isTruncated).toBe(true);
+      expect(result.returnDisplay).toBe(
+        'Read lines 1-10 of 20 from test.txt (some lines were shortened)',
       );
     });
 
