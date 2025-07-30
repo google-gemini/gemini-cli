@@ -57,6 +57,7 @@ describe('handleAtCommand', () => {
         respectGeminiIgnore: true,
       }),
       getEnableRecursiveFileSearch: vi.fn(() => true),
+      getMcpServers: () => ({}), // Add mock for getMcpServers
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig);
