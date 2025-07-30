@@ -47,6 +47,9 @@ export async function bfsFileSearch(
   const visited = new Set<string>();
   let scannedDirCount = 0;
 
+  // Convert ignoreDirs array to Set for O(1) lookup performance
+  const ignoreDirsSet = new Set(ignoreDirs);
+
   // Process directories in parallel batches for maximum performance
   const PARALLEL_BATCH_SIZE = 15; // Parallel processing batch size for optimal performance
 
@@ -97,7 +100,7 @@ export async function bfsFileSearch(
         }
 
         if (entry.isDirectory()) {
-          if (!ignoreDirs.includes(entry.name)) {
+          if (!ignoreDirsSet.has(entry.name)) {
             queue.push(fullPath);
           }
         } else if (entry.isFile() && entry.name === fileName) {
