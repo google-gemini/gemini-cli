@@ -32,6 +32,15 @@ function getResponseText(response: GenerateContentResponse): string | null {
       // We are running in headless mode so we don't need to return thoughts to STDOUT.
       const thoughtPart = candidate.content.parts[0];
       if (thoughtPart?.thought) {
+        const rawText = thoughtPart.text ?? '';
+        const subjectStringMatches = rawText.match(/\*\*(.*?)\*\*/s);
+        const subject = subjectStringMatches
+          ? subjectStringMatches[1].trim()
+          : '';
+        const description = rawText.replace(/\*\*(.*?)\*\*/s, '').trim();
+        process.stdout.write(
+          `\n> Thought: ${subject}\n> ${description.replace('\n', '\n> ')}`,
+        );
         return null;
       }
       return candidate.content.parts
@@ -76,6 +85,8 @@ export async function runNonInteractive(
         );
         return;
       }
+      process.stdout.write(`\n\n# Turn ${turnCount}`);
+
       const functionCalls: FunctionCall[] = [];
 
       const responseStream = await chat.sendMessageStream(
@@ -91,6 +102,7 @@ export async function runNonInteractive(
         prompt_id,
       );
 
+      let prefix = '\n✦ ';
       for await (const resp of responseStream) {
         if (abortController.signal.aborted) {
           console.error('Operation cancelled.');
@@ -98,7 +110,12 @@ export async function runNonInteractive(
         }
         const textPart = getResponseText(resp);
         if (textPart) {
-          process.stdout.write(textPart);
+          if (prefix) {
+            process.stdout.write(prefix);
+            prefix = ''; // Clear prefix after first use
+          }
+          // Replace newlines with indented newlines for better readability
+          process.stdout.write(textPart.replace(/\n/g, '\n  '));
         }
         if (resp.functionCalls) {
           functionCalls.push(...resp.functionCalls);
@@ -118,6 +135,7 @@ export async function runNonInteractive(
             prompt_id,
           };
 
+          process.stdout.write(`\n$ Calling tool: ${fc.name}`);
           const toolResponse = await executeToolCall(
             config,
             requestInfo,
@@ -135,6 +153,9 @@ export async function runNonInteractive(
             if (!isToolNotFound) {
               process.exit(1);
             }
+          } else if (typeof toolResponse.resultDisplay === 'string') {
+            process.stdout.write('\n');
+            process.stdout.write(toolResponse.resultDisplay);
           }
 
           if (toolResponse.responseParts) {
