@@ -48,18 +48,17 @@ export async function bfsFileSearch(
   let scannedDirCount = 0;
 
   while (queue.length > 0 && scannedDirCount < maxDirs) {
-    // Process multiple directories in parallel for better performance
-    const batchSize = Math.min(10, queue.length, maxDirs - scannedDirCount);
+    // Fill batch with unvisited directories up to the desired size
+    const batchSize = Math.min(10, maxDirs - scannedDirCount);
     const currentBatch = [];
-
-    for (let i = 0; i < batchSize && queue.length > 0; i++) {
+    while (currentBatch.length < batchSize && queue.length > 0) {
       const currentDir = queue.shift()!;
       if (!visited.has(currentDir)) {
-        currentBatch.push(currentDir);
         visited.add(currentDir);
-        scannedDirCount++;
+        currentBatch.push(currentDir);
       }
     }
+    scannedDirCount += currentBatch.length;
 
     if (currentBatch.length === 0) continue;
 

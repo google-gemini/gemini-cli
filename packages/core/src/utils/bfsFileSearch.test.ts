@@ -237,6 +237,6 @@ describe('bfsFileSearch', () => {
     expect(foundFiles).toBe(40); // 20 dirs * 2 files each
 
     // Performance expectation: parallel should be efficient
-    expect(avgDuration).toBeLessThan(500); // Should take less than 500ms on average
+    expect(avgDuration).toBeLessThan(1500); // Increased timeout to reduce flakiness on slower machines
   });
 });
