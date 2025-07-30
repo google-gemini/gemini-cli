@@ -18,6 +18,19 @@ import {
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
+import { IdeClient } from '../ide/ide-client.js';
+
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn().mockReturnValue(true),
+    statSync: vi.fn().mockReturnValue({
+      isDirectory: vi.fn().mockReturnValue(true),
+    }),
+    realpathSync: vi.fn((path) => path),
+  };
+});
 
 // Mock dependencies that might be called during Config construction or createServerConfig
 vi.mock('../tools/tool-registry', () => {
@@ -107,6 +120,7 @@ describe('Server Config (config.ts)', () => {
     telemetry: TELEMETRY_SETTINGS,
     sessionId: SESSION_ID,
     model: MODEL,
+    ideClient: IdeClient.getInstance(false),
   };
 
   beforeEach(() => {
@@ -217,6 +231,23 @@ describe('Server Config (config.ts)', () => {
     };
     const config = new Config(paramsWithFileFiltering);
     expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
+  });
+
+  it('should initialize WorkspaceContext with includeDirectories', () => {
+    const includeDirectories = ['/path/to/dir1', '/path/to/dir2'];
+    const paramsWithIncludeDirs: ConfigParameters = {
+      ...baseParams,
+      includeDirectories,
+    };
+    const config = new Config(paramsWithIncludeDirs);
+    const workspaceContext = config.getWorkspaceContext();
+    const directories = workspaceContext.getDirectories();
+
+    // Should include the target directory plus the included directories
+    expect(directories).toHaveLength(3);
+    expect(directories).toContain(path.resolve(baseParams.targetDir));
+    expect(directories).toContain('/path/to/dir1');
+    expect(directories).toContain('/path/to/dir2');
   });
 
   it('Config constructor should set telemetry to true when provided as true', () => {
