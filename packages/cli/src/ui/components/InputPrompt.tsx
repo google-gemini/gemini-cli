@@ -50,7 +50,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   config,
   slashCommands,
   commandContext,
-  placeholder = process.platform === 'win32' 
+  placeholder = process.platform === 'win32'
     ? '  Type your message or @path/to/file (Alt+V to paste image)'
     : '  Type your message or @path/to/file',
   focus = true,
@@ -229,7 +229,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
     } catch (error) {
-      // Ignore clipboard image errors
+      console.error('Error handling clipboard image:', error);
     }
   }, [buffer, config]);
 
@@ -378,14 +378,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Ctrl+V for clipboard image paste
-      if (key.ctrl && key.name === 'v') {
-        handleClipboardImage();
-        return;
-      }
-
-      // Alt+V for clipboard image paste(Windows)
-      if (process.platform === 'win32' && key.meta && key.name === 'v') {
+      // Ctrl+V for clipboard image paste (or Alt+V on Windows)
+      if (
+        (key.ctrl && key.name === 'v') ||
+        (process.platform === 'win32' && key.meta && key.name === 'v')
+      ) {
         handleClipboardImage();
         return;
       }
