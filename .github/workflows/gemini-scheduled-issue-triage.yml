@@ -75,7 +75,9 @@ jobs:
             3. Review the issue title, body and any comments provided in the environment variables.
             4. Ignore any existing priorities or tags on the issue.
             5. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. 
-            6. For area/* and kind/* limit yourself to only the single most applicable label in each case. If there is an existing area/ or kind/ label remove it after you apply the new recommendation. 
+            6. For area/* and kind/* limit yourself to only the single most applicable label in each case. 
+              - Get the list of labels already on the issue using `gh issue view ISSUE_NUMBER --repo ${{ github.repository }} --json labels -t '{{range .labels}}{{.name}}{{"\n"}}{{end}}'
+              - If there is an existing area/ or kind/ label remove it after you apply the new recommendation. 
             7. Give me a single short paragraph about why you are selecting each label in the process. use the format Issue ID: , Title, Label applied: Reason 
             8. Parse the JSON array from step 2 and for EACH INDIVIDUAL issue, apply appropriate labels using separate commands:
                - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --add-label "label1"`
