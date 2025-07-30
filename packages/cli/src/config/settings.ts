@@ -106,6 +106,14 @@ export interface Settings {
   disableAutoUpdate?: boolean;
 
   memoryDiscoveryMaxDirs?: number;
+
+  // Research communication opt-in settings
+  researchOptIn?: {
+    enabled?: boolean;
+    email?: string;
+    allowUserResearch?: boolean;
+    allowFeedbackCollection?: boolean;
+  };
 }
 
 export interface SettingsError {

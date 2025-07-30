@@ -26,6 +26,7 @@ import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
+import { useResearchDialog } from './hooks/useResearchDialog.js';
 import { Header } from './components/Header.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
 import { AutoAcceptIndicator } from './components/AutoAcceptIndicator.js';
@@ -90,6 +91,7 @@ import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
+import { ResearchOptInDialog } from './components/ResearchOptInDialog.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -150,6 +152,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [themeError, setThemeError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
+  const [researchError, setResearchError] = useState<string | null>(null);
   const [footerHeight, setFooterHeight] = useState<number>(0);
   const [corgiMode, setCorgiMode] = useState(false);
   const [currentModel, setCurrentModel] = useState(config.getModel());
@@ -257,6 +260,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     handleEditorSelect,
     exitEditorDialog,
   } = useEditorSettings(settings, setEditorError, addItem);
+
+  const {
+    isResearchDialogOpen,
+    openResearchDialog,
+    closeResearchDialog,
+    handleResearchSelect,
+  } = useResearchDialog(settings, setResearchError, addItem);
 
   const toggleCorgiMode = useCallback(() => {
     setCorgiMode((prev) => !prev);
@@ -477,6 +487,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     openPrivacyNotice,
     toggleVimEnabled,
     setIsProcessing,
+    openResearchDialog,
   );
 
   const {
@@ -903,6 +914,19 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 onSelect={handleEditorSelect}
                 settings={settings}
                 onExit={exitEditorDialog}
+              />
+            </Box>
+          ) : isResearchDialogOpen ? (
+            <Box flexDirection="column">
+              {researchError && (
+                <Box marginBottom={1}>
+                  <Text color={Colors.AccentRed}>{researchError}</Text>
+                </Box>
+              )}
+              <ResearchOptInDialog
+                onSelect={handleResearchSelect}
+                settings={settings.merged.researchOptIn || {}}
+                onExit={closeResearchDialog}
               />
             </Box>
           ) : showPrivacyNotice ? (
