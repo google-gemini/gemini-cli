@@ -76,22 +76,22 @@ jobs:
             3. Review the issue title, body and any comments provided in the environment variables.
             4. Ignore any existing priorities or tags on the issue.
             5. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. 
-            6. For area/* and kind/* limit yourself to only the single most applicable label in each case. 
-              - Get the list of labels already on the issue using `gh issue view ISSUE_NUMBER --repo ${{ github.repository }} --json labels -t '{{range .labels}}{{.name}}{{"\n"}}{{end}}'
-              - If there is an existing area/ or kind/ label remove it after you apply the new recommendation. 
-            7. Give me a single short paragraph about why you are selecting each label in the process. use the format Issue ID: , Title, Label applied: Reason 
-            8. Parse the JSON array from step 2 and for EACH INDIVIDUAL issue, apply appropriate labels using separate commands:
+            6. Get the list of labels already on the issue using `gh issue view ISSUE_NUMBER --repo ${{ github.repository }} --json labels -t '{{range .labels}}{{.name}}{{"\n"}}{{end}}'
+            7. For area/* and kind/* limit yourself to only the single most applicable label in each case. (Do not apply kind/duplicate or kind/parent-issue) 
+            8. Give me a single short paragraph about why you are selecting each label in the process. use the format Issue ID: , Title, Label applied:, Label removed, ovearll explanation
+            9. Parse the JSON array from step 2 and for EACH INDIVIDUAL issue, apply appropriate labels using separate commands:
                - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --add-label "label1"`
                - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --add-label "label2"`
                - Continue for each label separately
                - IMPORTANT: Label each issue individually, one command per issue, one label at a time if needed.
-               - for labels found in step 6 that no longer apply remove them one at a time using 
+               - Make sure after you apply labels there is only one area/* and one kind/* label per issue.  
+               - To do this look for labels found in step 6 that no longer apply remove them one at a time using 
                - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "label-name1"`
                - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "label-name2"`
                - IMPORTANT: Remove each label one at a time, one command per issue if needed.
-            9. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5 
+            10. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5 
             - Anything more than 6 versions older than the most recent should add the status/need-retesting label
-            10. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label
+            11. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label
             - After applying appropriate labels to an issue, remove the "status/need-triage" label if present: `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "status/need-triage"`
             - Execute one `gh issue edit` command per issue, wait for success before proceeding to the next
             Process each issue sequentially and confirm each labeling operation before moving to the next issue.
