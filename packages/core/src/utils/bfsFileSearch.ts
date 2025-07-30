@@ -6,7 +6,6 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Dirent } from 'fs';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { FileFilteringOptions } from '../config/config.js';
 // Simple console logger for now.
@@ -47,45 +46,76 @@ export async function bfsFileSearch(
   const queue: string[] = [rootDir];
   const visited = new Set<string>();
   let scannedDirCount = 0;
+  let queueHead = 0; // Pointer-based queue head to avoid expensive splice operations
 
-  while (queue.length > 0 && scannedDirCount < maxDirs) {
-    const currentDir = queue.shift()!;
-    if (visited.has(currentDir)) {
-      continue;
+  // Convert ignoreDirs array to Set for O(1) lookup performance
+  const ignoreDirsSet = new Set(ignoreDirs);
+
+  // Process directories in parallel batches for maximum performance
+  const PARALLEL_BATCH_SIZE = 15; // Parallel processing batch size for optimal performance
+
+  while (queueHead < queue.length && scannedDirCount < maxDirs) {
+    // Fill batch with unvisited directories up to the desired size
+    const batchSize = Math.min(PARALLEL_BATCH_SIZE, maxDirs - scannedDirCount);
+    const currentBatch = [];
+    while (currentBatch.length < batchSize && queueHead < queue.length) {
+      const currentDir = queue[queueHead];
+      queueHead++;
+      if (!visited.has(currentDir)) {
+        visited.add(currentDir);
+        currentBatch.push(currentDir);
+      }
     }
-    visited.add(currentDir);
-    scannedDirCount++;
+    scannedDirCount += currentBatch.length;
+
+    if (currentBatch.length === 0) continue;
 
     if (debug) {
-      logger.debug(`Scanning [${scannedDirCount}/${maxDirs}]: ${currentDir}`);
+      logger.debug(
+        `Scanning [${scannedDirCount}/${maxDirs}]: batch of ${currentBatch.length}`,
+      );
     }
 
-    let entries: Dirent[];
-    try {
-      entries = await fs.readdir(currentDir, { withFileTypes: true });
-    } catch {
-      // Ignore errors for directories we can't read (e.g., permissions)
-      continue;
-    }
-
-    for (const entry of entries) {
-      const fullPath = path.join(currentDir, entry.name);
-      if (
-        fileService?.shouldIgnoreFile(fullPath, {
-          respectGitIgnore: options.fileFilteringOptions?.respectGitIgnore,
-          respectGeminiIgnore:
-            options.fileFilteringOptions?.respectGeminiIgnore,
-        })
-      ) {
-        continue;
-      }
-
-      if (entry.isDirectory()) {
-        if (!ignoreDirs.includes(entry.name)) {
-          queue.push(fullPath);
+    // Read directories in parallel instead of one by one
+    const readPromises = currentBatch.map(async (currentDir) => {
+      try {
+        const entries = await fs.readdir(currentDir, { withFileTypes: true });
+        return { currentDir, entries };
+      } catch (error) {
+        // Warn user that a directory could not be read, as this affects search results.
+        const message = (error as Error)?.message ?? 'Unknown error';
+        console.warn(
+          `[WARN] Skipping unreadable directory: ${currentDir} (${message})`,
+        );
+        if (debug) {
+          logger.debug(`Full error for ${currentDir}:`, error);
         }
-      } else if (entry.isFile() && entry.name === fileName) {
-        foundFiles.push(fullPath);
+        return { currentDir, entries: [] };
+      }
+    });
+
+    const results = await Promise.all(readPromises);
+
+    for (const { currentDir, entries } of results) {
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+        if (
+          fileService?.shouldIgnoreFile(fullPath, {
+            respectGitIgnore: options.fileFilteringOptions?.respectGitIgnore,
+            respectGeminiIgnore:
+              options.fileFilteringOptions?.respectGeminiIgnore,
+          })
+        ) {
+          continue;
+        }
+
+        if (entry.isDirectory()) {
+          if (!ignoreDirsSet.has(entry.name)) {
+            queue.push(fullPath);
+          }
+        } else if (entry.isFile() && entry.name === fileName) {
+          foundFiles.push(fullPath);
+        }
       }
     }
   }
