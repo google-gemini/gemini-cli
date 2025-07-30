@@ -588,6 +588,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     }
   });
 
+  useInput(
+    (input, key) => {
+      if (showHelp && key.ctrl && input === 'l') {
+        handleClearScreen();
+      }
+    },
+    { isActive: showHelp },
+  );
+
   useEffect(() => {
     if (config) {
       setGeminiMdFileCount(config.getGeminiMdFileCount());
