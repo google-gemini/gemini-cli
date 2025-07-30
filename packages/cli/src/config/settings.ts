@@ -101,6 +101,10 @@ export interface Settings {
 
   // Add other settings here.
   ideMode?: boolean;
+
+  // Setting for disabling auto-update.
+  disableAutoUpdate?: boolean;
+
   memoryDiscoveryMaxDirs?: number;
 }
 
