@@ -40,16 +40,19 @@ export class IdeClient {
   private static instance: IdeClient;
   private readonly currentIde: DetectedIde | undefined;
 
-  private constructor() {
+  private constructor(ideMode: boolean) {
+    if (!ideMode) {
+      return;
+    }
     this.currentIde = detectIde();
     this.init().catch((err) => {
       logger.debug('Failed to initialize IdeClient:', err);
     });
   }
 
-  static getInstance(): IdeClient {
+  static getInstance(ideMode: boolean): IdeClient {
     if (!IdeClient.instance) {
-      IdeClient.instance = new IdeClient();
+      IdeClient.instance = new IdeClient(ideMode);
     }
     return IdeClient.instance;
   }

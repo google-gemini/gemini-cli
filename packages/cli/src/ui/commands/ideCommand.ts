@@ -21,7 +21,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
   if (!config?.getIdeMode()) {
     return null;
   }
-  const currentIDE = config.getIdeClient()?.getCurrentIde();
+  const currentIDE = config.getIdeClient().getCurrentIde();
   if (!currentIDE) {
     throw new Error(
       'IDE slash command should not be available if not running in an IDE',
@@ -38,7 +38,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         description: 'check status of IDE integration',
         kind: CommandKind.BUILT_IN,
         action: (_context: CommandContext): SlashCommandActionReturn => {
-          const connection = config.getIdeClient()?.getConnectionStatus();
+          const connection = config.getIdeClient().getConnectionStatus();
           switch (connection?.status) {
             case IDEConnectionStatus.Connected:
               return {
