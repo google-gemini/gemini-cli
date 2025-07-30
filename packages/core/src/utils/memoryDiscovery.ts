@@ -5,7 +5,6 @@
  */
 
 import * as fs from 'fs/promises';
-import * as fsSync from 'fs';
 import * as path from 'path';
 import { homedir } from 'os';
 import { bfsFileSearch } from './bfsFileSearch.js';
@@ -39,36 +38,41 @@ interface GeminiFileContent {
 }
 
 /**
- * Checks if a path is a readable file and handles various filesystem errors.
- * @returns true if the file was successfully verified and is readable, false otherwise
+ * Attempts to read a file and process its content immediately.
+ * This avoids TOCTOU vulnerabilities by combining check and use.
+ * @returns The file content if successful, null otherwise
  */
-async function checkAndAddReadableFile(
+async function tryReadGeminiFile(
   filePath: string,
-  addToCollection: () => void,
   context: string,
   geminiMdFilename: string,
   debugMode: boolean,
-): Promise<boolean> {
+): Promise<GeminiFileContent | null> {
   try {
-    const stats = await fs.stat(filePath);
-    if (stats.isFile()) {
-      // Only check access after confirming it's a file
-      await fs.access(filePath, fsSync.constants.R_OK);
-      addToCollection();
-      if (debugMode)
-        logger.debug(
-          `Found readable ${context} ${geminiMdFilename}: ${filePath}`,
-        );
-      return true;
-    } else if (debugMode) {
+    const content = await fs.readFile(filePath, 'utf-8');
+    
+    // Process imports in the content
+    const processedContent = await processImports(
+      content,
+      path.dirname(filePath),
+      debugMode,
+    );
+    
+    if (debugMode)
       logger.debug(
-        `Path exists but is not a file: ${filePath}`,
+        `Successfully read ${context} ${geminiMdFilename}: ${filePath} (Length: ${processedContent.length})`,
       );
-    }
+    
+    return { filePath, content: processedContent };
   } catch (error) {
     if (error instanceof Error && 'code' in error) {
       const fsError = error as { code: string };
-      if (fsError.code === 'EACCES') {
+      if (fsError.code === 'EISDIR') {
+        if (debugMode)
+          logger.debug(
+            `Path exists but is not a file: ${filePath}`,
+          );
+      } else if (fsError.code === 'EACCES') {
         if (debugMode)
           logger.debug(
             `${context} ${geminiMdFilename} exists but is not readable: ${filePath}`,
@@ -80,16 +84,16 @@ async function checkAndAddReadableFile(
           );
       } else if (debugMode) {
         logger.debug(
-          `Error accessing ${context} ${geminiMdFilename} at ${filePath}: ${fsError.code}`,
+          `Error reading ${context} ${geminiMdFilename} at ${filePath}: ${fsError.code}`,
         );
       }
     } else if (debugMode) {
       logger.debug(
-        `Unexpected error accessing ${context} ${geminiMdFilename} at ${filePath}: ${String(error)}`,
+        `Unexpected error reading ${context} ${geminiMdFilename} at ${filePath}: ${String(error)}`,
       );
     }
   }
-  return false;
+  return null;
 }
 
 async function findProjectRoot(startDir: string): Promise<string | null> {
@@ -135,7 +139,7 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
   }
 }
 
-async function getGeminiMdFilePathsInternal(
+async function getGeminiMdFileContentsInternal(
   currentWorkingDirectory: string,
   userHomePath: string,
   debugMode: boolean,
@@ -143,8 +147,8 @@ async function getGeminiMdFilePathsInternal(
   extensionContextFilePaths: string[] = [],
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
-): Promise<string[]> {
-  const allPaths = new Set<string>();
+): Promise<GeminiFileContent[]> {
+  const allContents: GeminiFileContent[] = [];
   const geminiMdFilenames = getAllGeminiMdFilenames();
 
   for (const geminiMdFilename of geminiMdFilenames) {
@@ -162,19 +166,21 @@ async function getGeminiMdFilePathsInternal(
       );
     if (debugMode) logger.debug(`User home directory: ${resolvedHome}`);
 
-    await checkAndAddReadableFile(
+    const globalContent = await tryReadGeminiFile(
       globalMemoryPath,
-      () => allPaths.add(globalMemoryPath),
       'global',
       geminiMdFilename,
       debugMode,
     );
+    if (globalContent) {
+      allContents.push(globalContent);
+    }
 
     const projectRoot = await findProjectRoot(resolvedCwd);
     if (debugMode)
       logger.debug(`Determined project root: ${projectRoot ?? 'None'}`);
 
-    const upwardPaths: string[] = [];
+    const upwardContents: GeminiFileContent[] = [];
     let currentDir = resolvedCwd;
     // Determine the directory that signifies the top of the project or user-specific space.
     const ultimateStopDir = projectRoot
@@ -201,18 +207,18 @@ async function getGeminiMdFilePathsInternal(
       }
 
       const potentialPath = path.join(currentDir, geminiMdFilename);
-      await checkAndAddReadableFile(
-        potentialPath,
-        () => {
-          // Add to upwardPaths only if it's not the already added globalMemoryPath
-          if (potentialPath !== globalMemoryPath) {
-            upwardPaths.unshift(potentialPath);
-          }
-        },
-        'upward',
-        geminiMdFilename,
-        debugMode,
-      );
+      // Skip if it's the same as global path
+      if (potentialPath !== globalMemoryPath) {
+        const upwardContent = await tryReadGeminiFile(
+          potentialPath,
+          'upward',
+          geminiMdFilename,
+          debugMode,
+        );
+        if (upwardContent) {
+          upwardContents.unshift(upwardContent);
+        }
+      }
 
       // Stop condition: if currentDir is the ultimateStopDir, break after this iteration.
       if (currentDir === ultimateStopDir) {
@@ -225,7 +231,7 @@ async function getGeminiMdFilePathsInternal(
 
       currentDir = path.dirname(currentDir);
     }
-    upwardPaths.forEach((p) => allPaths.add(p));
+    allContents.push(...upwardContents);
 
     // Merge options with memory defaults, with options taking precedence
     const mergedOptions = {
@@ -240,70 +246,48 @@ async function getGeminiMdFilePathsInternal(
       fileService,
       fileFilteringOptions: mergedOptions, // Pass merged options as fileFilter
     });
-    downwardPaths.sort(); // Sort for consistent ordering, though hierarchy might be more complex
-    if (debugMode && downwardPaths.length > 0)
-      logger.debug(
-        `Found downward ${geminiMdFilename} files (sorted): ${JSON.stringify(
-          downwardPaths,
-        )}`,
-      );
-    // Add downward paths only if they haven't been included already (e.g. from upward scan)
+    // Read downward files immediately to avoid TOCTOU
+    const processedPaths = new Set<string>(
+      allContents.map(content => content.filePath)
+    );
+    
     for (const dPath of downwardPaths) {
-      allPaths.add(dPath);
+      // Skip if already processed
+      if (!processedPaths.has(dPath)) {
+        const downwardContent = await tryReadGeminiFile(
+          dPath,
+          'downward',
+          geminiMdFilename,
+          debugMode,
+        );
+        if (downwardContent) {
+          allContents.push(downwardContent);
+        }
+      }
     }
   }
 
-  // Add extension context file paths
+  // Read extension context files
   for (const extensionPath of extensionContextFilePaths) {
-    allPaths.add(extensionPath);
+    const extensionContent = await tryReadGeminiFile(
+      extensionPath,
+      'extension',
+      path.basename(extensionPath),
+      debugMode,
+    );
+    if (extensionContent) {
+      allContents.push(extensionContent);
+    }
   }
-
-  const finalPaths = Array.from(allPaths);
 
   if (debugMode)
     logger.debug(
-      `Final ordered ${getAllGeminiMdFilenames()} paths to read: ${JSON.stringify(
-        finalPaths,
-      )}`,
+      `Successfully read ${allContents.length} ${getAllGeminiMdFilenames()} files`,
     );
-  return finalPaths;
+  return allContents;
 }
 
-async function readGeminiMdFiles(
-  filePaths: string[],
-  debugMode: boolean,
-): Promise<GeminiFileContent[]> {
-  const results: GeminiFileContent[] = [];
-  for (const filePath of filePaths) {
-    try {
-      const content = await fs.readFile(filePath, 'utf-8');
-
-      // Process imports in the content
-      const processedContent = await processImports(
-        content,
-        path.dirname(filePath),
-        debugMode,
-      );
-
-      results.push({ filePath, content: processedContent });
-      if (debugMode)
-        logger.debug(
-          `Successfully read and processed imports: ${filePath} (Length: ${processedContent.length})`,
-        );
-    } catch (error: unknown) {
-      const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
-      if (!isTestEnv) {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.warn(
-          `Warning: Could not read ${getAllGeminiMdFilenames()} file at ${filePath}. Error: ${message}`,
-        );
-      }
-      results.push({ filePath, content: null }); // Still include it with null content
-      if (debugMode) logger.debug(`Failed to read: ${filePath}`);
-    }
-  }
-  return results;
-}
+// This function is no longer needed - reading is done immediately during discovery
 
 function concatenateInstructions(
   instructionContents: GeminiFileContent[],
@@ -346,7 +330,7 @@ export async function loadServerHierarchicalMemory(
   // For the server, homedir() refers to the server process's home.
   // This is consistent with how MemoryTool already finds the global path.
   const userHomePath = homedir();
-  const filePaths = await getGeminiMdFilePathsInternal(
+  const contentsWithPaths = await getGeminiMdFileContentsInternal(
     currentWorkingDirectory,
     userHomePath,
     debugMode,
@@ -355,11 +339,10 @@ export async function loadServerHierarchicalMemory(
     fileFilteringOptions || DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
     maxDirs,
   );
-  if (filePaths.length === 0) {
+  if (contentsWithPaths.length === 0) {
     if (debugMode) logger.debug('No GEMINI.md files found in hierarchy.');
     return { memoryContent: '', fileCount: 0 };
   }
-  const contentsWithPaths = await readGeminiMdFiles(filePaths, debugMode);
   // Pass CWD for relative path display in concatenated content
   const combinedInstructions = concatenateInstructions(
     contentsWithPaths,
@@ -373,5 +356,5 @@ export async function loadServerHierarchicalMemory(
     logger.debug(
       `Combined instructions (snippet): ${combinedInstructions.substring(0, 500)}...`,
     );
-  return { memoryContent: combinedInstructions, fileCount: filePaths.length };
+  return { memoryContent: combinedInstructions, fileCount: contentsWithPaths.length };
 }
