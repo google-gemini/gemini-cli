@@ -50,8 +50,8 @@ export const HelpMessage: React.FC<HelpMessageProps> = ({ content }) => {
           return <Box key={index} height={1} />;
         }
 
-        // Handle section headers (bold text ending with :)
-        if (line.endsWith(':') && line.includes('**')) {
+        // Handle section headers (lines like "**Basics:**" or "**Commands:**")
+        if (line.endsWith(':') && line.startsWith('**') && line.includes('**')) {
           return (
             <Text key={index} bold color={Colors.Foreground}>
               {line.replace(/\*\*/g, '')}
