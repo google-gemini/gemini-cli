@@ -952,9 +952,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     </Text>
                   ) : (
                     <ContextSummaryDisplay
-                      ideContext={
-                        config.getIdeMode() ? ideContextState : undefined
-                      }
+                      ideContext={ideContextState}
                       geminiMdFileCount={geminiMdFileCount}
                       contextFileNames={contextFileNames}
                       mcpServers={config.getMcpServers()}

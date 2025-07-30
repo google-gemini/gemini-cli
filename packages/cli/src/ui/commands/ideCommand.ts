@@ -7,7 +7,6 @@
 import {
   Config,
   IDEConnectionStatus,
-  IdeClient,
   getIdeDisplayName,
   getIdeInstaller,
 } from '@google/gemini-cli-core';
@@ -114,6 +113,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
     action: async (context: CommandContext) => {
       context.services.settings.setValue(SettingScope.User, 'ideMode', true);
       config.setIdeMode(true);
+      config.setIdeClientConnected();
     },
   };
 
