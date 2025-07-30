@@ -211,7 +211,9 @@ export class GeminiClient {
           );
           if (result.llmContent) {
             initialParts.push({
-              text: `\n--- Full File Context ---\n${result.llmContent}`,
+              text: `
+--- Full File Context ---
+${result.llmContent}`,
             });
           } else {
             console.warn(
@@ -451,6 +453,12 @@ export class GeminiClient {
           await this.handleFlashFallback(authType, error),
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
+
+      if (!result) {
+        throw new Error(
+          'API returned a null or invalid response. This may be due to safety filters or a temporary issue.'
+        );
+      }
 
       const text = getResponseText(result);
       if (!text) {
