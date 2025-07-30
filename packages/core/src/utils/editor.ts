@@ -7,10 +7,25 @@
 import { execSync, spawn } from 'child_process';
 import { existsSync } from 'fs';
 
-export type EditorType = 'vscode' | 'windsurf' | 'cursor' | 'vim' | 'zed';
+export type EditorType =
+  | 'vscode'
+  | 'vscodium'
+  | 'windsurf'
+  | 'cursor'
+  | 'vim'
+  | 'neovim'
+  | 'zed';
 
 function isValidEditorType(editor: string): editor is EditorType {
-  return ['vscode', 'windsurf', 'cursor', 'vim', 'zed'].includes(editor);
+  return [
+    'vscode',
+    'vscodium',
+    'windsurf',
+    'cursor',
+    'vim',
+    'neovim',
+    'zed',
+  ].includes(editor);
 }
 
 interface DiffCommand {
@@ -37,34 +52,34 @@ function commandExists(cmd: string, fallbackPath?: string): boolean {
     return false;
   }
 }
-const VSCODE_MACOS_FALLBACK_PATH =
-  '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code';
 
-const editorCommands: Record<EditorType, { win32: string; default: string }> = {
-  vscode: { win32: 'code.cmd', default: 'code' },
-  windsurf: { win32: 'windsurf', default: 'windsurf' },
-  cursor: { win32: 'cursor', default: 'cursor' },
-  vim: { win32: 'vim', default: 'vim' },
-  zed: { win32: 'zed', default: 'zed' },
+/**
+ * Editor command configurations for different platforms.
+ * Each editor can have multiple possible command names, listed in order of preference.
+ */
+const editorCommands: Record<
+  EditorType,
+  { win32: string[]; default: string[] }
+> = {
+  vscode: { win32: ['code.cmd'], default: ['code'] },
+  vscodium: { win32: ['codium.cmd'], default: ['codium'] },
+  windsurf: { win32: ['windsurf'], default: ['windsurf'] },
+  cursor: { win32: ['cursor'], default: ['cursor'] },
+  vim: { win32: ['vim'], default: ['vim'] },
+  neovim: { win32: ['nvim'], default: ['nvim'] },
+  zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
   const commandConfig = editorCommands[editor];
-  const command =
+  const commands =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
-
-  // Special handling for VS Code on macOS
-  if (editor === 'vscode' && process.platform === 'darwin') {
-    const fallbackPath = VSCODE_MACOS_FALLBACK_PATH;
-    return commandExists(command, fallbackPath);
-  }
-
-  return commandExists(command);
+  return commands.some((cmd) => commandExists(cmd));
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   const notUsingSandbox = !process.env.SANDBOX;
-  if (['vscode', 'windsurf', 'cursor', 'zed'].includes(editor)) {
+  if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
     return notUsingSandbox;
   }
   return true;
@@ -76,10 +91,7 @@ export function allowEditorTypeInSandbox(editor: EditorType): boolean {
  */
 export function isEditorAvailable(editor: string | undefined): boolean {
   if (editor && isValidEditorType(editor)) {
-    return (
-      checkHasEditorType(editor as EditorType) &&
-      allowEditorTypeInSandbox(editor as EditorType)
-    );
+    return checkHasEditorType(editor) && allowEditorTypeInSandbox(editor);
   }
   return false;
 }
@@ -96,17 +108,23 @@ export function getDiffCommand(
     return null;
   }
   const commandConfig = editorCommands[editor];
-  const command =
+  const commands =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
+  const command =
+    commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
+    commands[commands.length - 1];
+
   switch (editor) {
     case 'vscode':
+    case 'vscodium':
     case 'windsurf':
     case 'cursor':
     case 'zed':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
     case 'vim':
+    case 'neovim':
       return {
-        command: 'vim',
+        command,
         args: [
           '-d',
           // skip viminfo file to avoid E138 errors
@@ -140,7 +158,7 @@ export function getDiffCommand(
 /**
  * Opens a diff tool to compare two files.
  * Terminal-based editors by default blocks parent process until the editor exits.
- * GUI-based editors requires args such as "--wait" to block parent process.
+ * GUI-based editors require args such as "--wait" to block parent process.
  */
 export async function openDiff(
   oldPath: string,
@@ -156,6 +174,7 @@ export async function openDiff(
   try {
     switch (editor) {
       case 'vscode':
+      case 'vscodium':
       case 'windsurf':
       case 'cursor':
       case 'zed':
@@ -179,7 +198,8 @@ export async function openDiff(
           });
         });
 
-      case 'vim': {
+      case 'vim':
+      case 'neovim': {
         // Use execSync for terminal-based editors
         const command =
           process.platform === 'win32'

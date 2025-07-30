@@ -31,19 +31,17 @@ if (!existsSync(bundleDir)) {
   mkdirSync(bundleDir);
 }
 
-// Copy specific shell files to the root of the bundle directory
-copyFileSync(
-  join(root, 'packages/core/src/tools/shell.md'),
-  join(bundleDir, 'shell.md'),
-);
-copyFileSync(
-  join(root, 'packages/core/src/tools/shell.json'),
-  join(bundleDir, 'shell.json'),
-);
-
 // Find and copy all .sb files from packages to the root of the bundle directory
 const sbFiles = glob.sync('packages/**/*.sb', { cwd: root });
 for (const file of sbFiles) {
+  copyFileSync(join(root, file), join(bundleDir, basename(file)));
+}
+
+// Find and copy all .vsix files from packages to the root of the bundle directory
+const vsixFiles = glob.sync('packages/vscode-ide-companion/*.vsix', {
+  cwd: root,
+});
+for (const file of vsixFiles) {
   copyFileSync(join(root, file), join(bundleDir, basename(file)));
 }
 

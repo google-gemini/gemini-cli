@@ -23,7 +23,8 @@ import {
   ToolCallResponseInfo,
   ToolCall, // Import from core
   Status as ToolCallStatusType,
-  ApprovalMode, // Import from core
+  ApprovalMode,
+  Icon,
 } from '@google/gemini-cli-core';
 import {
   HistoryItemWithoutId,
@@ -56,6 +57,8 @@ const mockTool: Tool = {
   name: 'mockTool',
   displayName: 'Mock Tool',
   description: 'A mock tool for testing',
+  icon: Icon.Hammer,
+  toolLocations: vi.fn(),
   isOutputMarkdown: false,
   canUpdateOutput: false,
   schema: {},
@@ -85,6 +88,8 @@ const mockToolRequiresConfirmation: Tool = {
       onConfirm: mockOnUserConfirmForToolConfirmation,
       fileName: 'mockToolRequiresConfirmation.ts',
       fileDiff: 'Mock tool requires confirmation',
+      originalContent: 'Original content',
+      newContent: 'New content',
     }),
   ),
 };
@@ -128,6 +133,7 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     (mockToolRequiresConfirmation.execute as Mock).mockResolvedValue({
       llmContent: expectedOutput,
       returnDisplay: 'YOLO Formatted tool output',
+      summary: 'YOLO summary',
     } as ToolResult);
 
     const { result } = renderSchedulerInYoloMode();
@@ -280,6 +286,7 @@ describe('useReactToolScheduler', () => {
     (mockTool.execute as Mock).mockResolvedValue({
       llmContent: 'Tool output',
       returnDisplay: 'Formatted tool output',
+      summary: 'Formatted summary',
     } as ToolResult);
     (mockTool.shouldConfirmExecute as Mock).mockResolvedValue(null);
 
@@ -334,7 +341,7 @@ describe('useReactToolScheduler', () => {
     const schedule = result.current[1];
     const request: ToolCallRequestInfo = {
       callId: 'call1',
-      name: 'nonExistentTool',
+      name: 'nonexistentTool',
       args: {},
     };
 
@@ -354,7 +361,7 @@ describe('useReactToolScheduler', () => {
         request,
         response: expect.objectContaining({
           error: expect.objectContaining({
-            message: 'Tool "nonExistentTool" not found in registry.',
+            message: 'Tool "nonexistentTool" not found in registry.',
           }),
         }),
       }),
@@ -442,6 +449,7 @@ describe('useReactToolScheduler', () => {
     (mockToolRequiresConfirmation.execute as Mock).mockResolvedValue({
       llmContent: expectedOutput,
       returnDisplay: 'Confirmed display',
+      summary: 'Confirmed summary',
     } as ToolResult);
 
     const { result } = renderScheduler();
@@ -560,8 +568,8 @@ describe('useReactToolScheduler', () => {
 
     (mockToolWithLiveOutput.execute as Mock).mockImplementation(
       async (
-        _args: any,
-        _signal: any,
+        _args: Record<string, unknown>,
+        _signal: AbortSignal,
         updateFn: ((output: string) => void) | undefined,
       ) => {
         liveUpdateFn = updateFn;
@@ -608,6 +616,7 @@ describe('useReactToolScheduler', () => {
       resolveExecutePromise({
         llmContent: 'Final output',
         returnDisplay: 'Final display',
+        summary: 'Final summary',
       } as ToolResult);
     });
     await act(async () => {
@@ -644,6 +653,7 @@ describe('useReactToolScheduler', () => {
       execute: vi.fn().mockResolvedValue({
         llmContent: 'Output 1',
         returnDisplay: 'Display 1',
+        summary: 'Summary 1',
       } as ToolResult),
       shouldConfirmExecute: vi.fn().mockResolvedValue(null),
     };
@@ -654,6 +664,7 @@ describe('useReactToolScheduler', () => {
       execute: vi.fn().mockResolvedValue({
         llmContent: 'Output 2',
         returnDisplay: 'Display 2',
+        summary: 'Summary 2',
       } as ToolResult),
       shouldConfirmExecute: vi.fn().mockResolvedValue(null),
     };
@@ -733,7 +744,12 @@ describe('useReactToolScheduler', () => {
     mockToolRegistry.getTool.mockReturnValue(mockTool);
     const longExecutePromise = new Promise<ToolResult>((resolve) =>
       setTimeout(
-        () => resolve({ llmContent: 'done', returnDisplay: 'done display' }),
+        () =>
+          resolve({
+            llmContent: 'done',
+            returnDisplay: 'done display',
+            summary: 'done summary',
+          }),
         50,
       ),
     );
@@ -796,6 +812,8 @@ describe('mapToDisplay', () => {
     isOutputMarkdown: false,
     canUpdateOutput: false,
     schema: {},
+    icon: Icon.Hammer,
+    toolLocations: vi.fn(),
     validateToolParams: vi.fn(),
     execute: vi.fn(),
     shouldConfirmExecute: vi.fn(),
@@ -814,6 +832,7 @@ describe('mapToDisplay', () => {
       } as PartUnion,
     ],
     resultDisplay: 'Test display output',
+    summary: 'Test summary',
     error: undefined,
   };
 
@@ -873,6 +892,8 @@ describe('mapToDisplay', () => {
           toolDisplayName: 'Test Tool Display',
           fileName: 'test.ts',
           fileDiff: 'Test diff',
+          originalContent: 'Original content',
+          newContent: 'New content',
         } as ToolCallConfirmationDetails,
       },
       expectedStatus: ToolCallStatus.Confirming,

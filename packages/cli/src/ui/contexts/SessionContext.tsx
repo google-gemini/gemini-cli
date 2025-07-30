@@ -6,42 +6,50 @@
 
 import React, {
   createContext,
+  useCallback,
   useContext,
   useState,
   useMemo,
-  useCallback,
+  useEffect,
 } from 'react';
 
-import { type GenerateContentResponseUsageMetadata } from '@google/genai';
+import {
+  uiTelemetryService,
+  SessionMetrics,
+  ModelMetrics,
+} from '@google/gemini-cli-core';
 
 // --- Interface Definitions ---
 
-export interface CumulativeStats {
-  turnCount: number;
-  promptTokenCount: number;
-  candidatesTokenCount: number;
-  totalTokenCount: number;
-  cachedContentTokenCount: number;
-  toolUsePromptTokenCount: number;
-  thoughtsTokenCount: number;
-  apiTimeMs: number;
+export type { SessionMetrics, ModelMetrics };
+
+export interface SessionStatsState {
+  sessionStartTime: Date;
+  metrics: SessionMetrics;
+  lastPromptTokenCount: number;
+  promptCount: number;
 }
 
-interface SessionStatsState {
-  sessionStartTime: Date;
-  cumulative: CumulativeStats;
-  currentTurn: CumulativeStats;
-  currentResponse: CumulativeStats;
+export interface ComputedSessionStats {
+  totalApiTime: number;
+  totalToolTime: number;
+  agentActiveTime: number;
+  apiTimePercent: number;
+  toolTimePercent: number;
+  cacheEfficiency: number;
+  totalDecisions: number;
+  successRate: number;
+  agreementRate: number;
+  totalCachedTokens: number;
+  totalPromptTokens: number;
 }
 
 // Defines the final "value" of our context, including the state
 // and the functions to update it.
 interface SessionStatsContextValue {
   stats: SessionStatsState;
-  startNewTurn: () => void;
-  addUsage: (
-    metadata: GenerateContentResponseUsageMetadata & { apiTimeMs?: number },
-  ) => void;
+  startNewPrompt: () => void;
+  getPromptCount: () => number;
 }
 
 // --- Context Definition ---
@@ -50,27 +58,6 @@ const SessionStatsContext = createContext<SessionStatsContextValue | undefined>(
   undefined,
 );
 
-// --- Helper Functions ---
-
-/**
- * A small, reusable helper function to sum token counts.
- * It unconditionally adds all token values from the source to the target.
- * @param target The object to add the tokens to (e.g., cumulative, currentTurn).
- * @param source The metadata object from the API response.
- */
-const addTokens = (
-  target: CumulativeStats,
-  source: GenerateContentResponseUsageMetadata & { apiTimeMs?: number },
-) => {
-  target.candidatesTokenCount += source.candidatesTokenCount ?? 0;
-  target.thoughtsTokenCount += source.thoughtsTokenCount ?? 0;
-  target.totalTokenCount += source.totalTokenCount ?? 0;
-  target.apiTimeMs += source.apiTimeMs ?? 0;
-  target.promptTokenCount += source.promptTokenCount ?? 0;
-  target.cachedContentTokenCount += source.cachedContentTokenCount ?? 0;
-  target.toolUsePromptTokenCount += source.toolUsePromptTokenCount ?? 0;
-};
-
 // --- Provider Component ---
 
 export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -78,110 +65,57 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [stats, setStats] = useState<SessionStatsState>({
     sessionStartTime: new Date(),
-    cumulative: {
-      turnCount: 0,
-      promptTokenCount: 0,
-      candidatesTokenCount: 0,
-      totalTokenCount: 0,
-      cachedContentTokenCount: 0,
-      toolUsePromptTokenCount: 0,
-      thoughtsTokenCount: 0,
-      apiTimeMs: 0,
-    },
-    currentTurn: {
-      turnCount: 0,
-      promptTokenCount: 0,
-      candidatesTokenCount: 0,
-      totalTokenCount: 0,
-      cachedContentTokenCount: 0,
-      toolUsePromptTokenCount: 0,
-      thoughtsTokenCount: 0,
-      apiTimeMs: 0,
-    },
-    currentResponse: {
-      turnCount: 0,
-      promptTokenCount: 0,
-      candidatesTokenCount: 0,
-      totalTokenCount: 0,
-      cachedContentTokenCount: 0,
-      toolUsePromptTokenCount: 0,
-      thoughtsTokenCount: 0,
-      apiTimeMs: 0,
-    },
+    metrics: uiTelemetryService.getMetrics(),
+    lastPromptTokenCount: 0,
+    promptCount: 0,
   });
 
-  // A single, internal worker function to handle all metadata aggregation.
-  const aggregateTokens = useCallback(
-    (
-      metadata: GenerateContentResponseUsageMetadata & { apiTimeMs?: number },
-    ) => {
-      setStats((prevState) => {
-        const newCumulative = { ...prevState.cumulative };
-        const newCurrentTurn = { ...prevState.currentTurn };
-        const newCurrentResponse = {
-          turnCount: 0,
-          promptTokenCount: 0,
-          candidatesTokenCount: 0,
-          totalTokenCount: 0,
-          cachedContentTokenCount: 0,
-          toolUsePromptTokenCount: 0,
-          thoughtsTokenCount: 0,
-          apiTimeMs: 0,
-        };
+  useEffect(() => {
+    const handleUpdate = ({
+      metrics,
+      lastPromptTokenCount,
+    }: {
+      metrics: SessionMetrics;
+      lastPromptTokenCount: number;
+    }) => {
+      setStats((prevState) => ({
+        ...prevState,
+        metrics,
+        lastPromptTokenCount,
+      }));
+    };
 
-        // Add all tokens to the current turn's stats as well as cumulative stats.
-        addTokens(newCurrentTurn, metadata);
-        addTokens(newCumulative, metadata);
-        addTokens(newCurrentResponse, metadata);
+    uiTelemetryService.on('update', handleUpdate);
+    // Set initial state
+    handleUpdate({
+      metrics: uiTelemetryService.getMetrics(),
+      lastPromptTokenCount: uiTelemetryService.getLastPromptTokenCount(),
+    });
 
-        return {
-          ...prevState,
-          cumulative: newCumulative,
-          currentTurn: newCurrentTurn,
-          currentResponse: newCurrentResponse,
-        };
-      });
-    },
-    [],
-  );
+    return () => {
+      uiTelemetryService.off('update', handleUpdate);
+    };
+  }, []);
 
-  const startNewTurn = useCallback(() => {
+  const startNewPrompt = useCallback(() => {
     setStats((prevState) => ({
       ...prevState,
-      cumulative: {
-        ...prevState.cumulative,
-        turnCount: prevState.cumulative.turnCount + 1,
-      },
-      currentTurn: {
-        turnCount: 0, // Reset for the new turn's accumulation.
-        promptTokenCount: 0,
-        candidatesTokenCount: 0,
-        totalTokenCount: 0,
-        cachedContentTokenCount: 0,
-        toolUsePromptTokenCount: 0,
-        thoughtsTokenCount: 0,
-        apiTimeMs: 0,
-      },
-      currentResponse: {
-        turnCount: 0,
-        promptTokenCount: 0,
-        candidatesTokenCount: 0,
-        totalTokenCount: 0,
-        cachedContentTokenCount: 0,
-        toolUsePromptTokenCount: 0,
-        thoughtsTokenCount: 0,
-        apiTimeMs: 0,
-      },
+      promptCount: prevState.promptCount + 1,
     }));
   }, []);
+
+  const getPromptCount = useCallback(
+    () => stats.promptCount,
+    [stats.promptCount],
+  );
 
   const value = useMemo(
     () => ({
       stats,
-      startNewTurn,
-      addUsage: aggregateTokens,
+      startNewPrompt,
+      getPromptCount,
     }),
-    [stats, startNewTurn, aggregateTokens],
+    [stats, startNewPrompt, getPromptCount],
   );
 
   return (

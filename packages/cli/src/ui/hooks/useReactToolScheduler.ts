@@ -128,7 +128,7 @@ export function useReactToolScheduler(
         }),
       );
     },
-    [],
+    [setToolCallsForDisplay],
   );
 
   const scheduler = useMemo(
@@ -138,7 +138,6 @@ export function useReactToolScheduler(
         outputUpdateHandler,
         onAllToolCallsComplete: allToolCallsCompleteHandler,
         onToolCallsUpdate: toolCallsUpdateHandler,
-        approvalMode: config.getApprovalMode(),
         getPreferredEditor,
         config,
       }),
@@ -152,7 +151,7 @@ export function useReactToolScheduler(
   );
 
   const schedule: ScheduleFn = useCallback(
-    async (
+    (
       request: ToolCallRequestInfo | ToolCallRequestInfo[],
       signal: AbortSignal,
     ) => {

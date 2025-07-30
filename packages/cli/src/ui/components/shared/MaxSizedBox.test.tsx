@@ -13,8 +13,8 @@ import { describe, it, expect } from 'vitest';
 describe('<MaxSizedBox />', () => {
   // Make sure MaxSizedBox logs errors on invalid configurations.
   // This is useful for debugging issues with the component.
-  // It should be set to false in production for perfornance and to avoid
-  // cluttering the console if there are ignoreable issues.
+  // It should be set to false in production for performance and to avoid
+  // cluttering the console if there are ignorable issues.
   setMaxSizedBoxDebugging(true);
 
   it('renders children without truncation when they fit', () => {
@@ -246,6 +246,89 @@ Line 3`);
     expect(lastFrame()).equals(`🐶🐶
 🐶🐶
 🐶`);
+  });
+
+  it('falls back to an ellipsis when width is extremely small', () => {
+    const { lastFrame } = render(
+      <OverflowProvider>
+        <MaxSizedBox maxWidth={2} maxHeight={2}>
+          <Box>
+            <Text>No</Text>
+            <Text wrap="wrap">wrap</Text>
+          </Box>
+        </MaxSizedBox>
+      </OverflowProvider>,
+    );
+
+    expect(lastFrame()).equals('N…');
+  });
+
+  it('truncates long non-wrapping text with ellipsis', () => {
+    const { lastFrame } = render(
+      <OverflowProvider>
+        <MaxSizedBox maxWidth={3} maxHeight={2}>
+          <Box>
+            <Text>ABCDE</Text>
+            <Text wrap="wrap">wrap</Text>
+          </Box>
+        </MaxSizedBox>
+      </OverflowProvider>,
+    );
+
+    expect(lastFrame()).equals('AB…');
+  });
+
+  it('truncates non-wrapping text containing line breaks', () => {
+    const { lastFrame } = render(
+      <OverflowProvider>
+        <MaxSizedBox maxWidth={3} maxHeight={2}>
+          <Box>
+            <Text>{'A\nBCDE'}</Text>
+            <Text wrap="wrap">wrap</Text>
+          </Box>
+        </MaxSizedBox>
+      </OverflowProvider>,
+    );
+
+    expect(lastFrame()).equals(`A\n…`);
+  });
+
+  it('truncates emoji characters correctly with ellipsis', () => {
+    const { lastFrame } = render(
+      <OverflowProvider>
+        <MaxSizedBox maxWidth={3} maxHeight={2}>
+          <Box>
+            <Text>🐶🐶🐶</Text>
+            <Text wrap="wrap">wrap</Text>
+          </Box>
+        </MaxSizedBox>
+      </OverflowProvider>,
+    );
+
+    expect(lastFrame()).equals(`🐶…`);
+  });
+
+  it('shows ellipsis for multiple rows with long non-wrapping text', () => {
+    const { lastFrame } = render(
+      <OverflowProvider>
+        <MaxSizedBox maxWidth={3} maxHeight={3}>
+          <Box>
+            <Text>AAA</Text>
+            <Text wrap="wrap">first</Text>
+          </Box>
+          <Box>
+            <Text>BBB</Text>
+            <Text wrap="wrap">second</Text>
+          </Box>
+          <Box>
+            <Text>CCC</Text>
+            <Text wrap="wrap">third</Text>
+          </Box>
+        </MaxSizedBox>
+      </OverflowProvider>,
+    );
+
+    expect(lastFrame()).equals(`AA…\nBB…\nCC…`);
   });
 
   it('accounts for additionalHiddenLinesCount', () => {
