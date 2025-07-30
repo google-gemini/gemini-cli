@@ -43,7 +43,8 @@ describe('ideCommand', () => {
     } as unknown as CommandContext;
 
     mockConfig = {
-      getIdeModeFeature: vi.fn(),
+      getIdeModeFeature: vi.fn(),      
+      getIdeMode: vi.fn(),
       getIdeClient: vi.fn(),
     } as unknown as Config;
 
