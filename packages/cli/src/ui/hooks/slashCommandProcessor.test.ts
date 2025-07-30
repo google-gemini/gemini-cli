@@ -101,6 +101,7 @@ describe('useSlashCommandProcessor', () => {
       setHistory: vi.fn().mockResolvedValue(undefined),
     })),
     getExtensions: vi.fn(() => []),
+    getIdeMode: vi.fn(() => false),
   } as unknown as Config;
 
   const mockSettings = {} as LoadedSettings;
