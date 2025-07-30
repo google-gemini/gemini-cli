@@ -42,12 +42,12 @@ export class IdeClient {
   private readonly currentIdeDisplayName: string | undefined;
 
   constructor(ideMode: boolean) {
-    if (!ideMode) {
-      return;
-    }
     this.currentIde = detectIde();
     if (this.currentIde) {
       this.currentIdeDisplayName = getIdeDisplayName(this.currentIde);
+    }
+    if (!ideMode) {
+      return;
     }
     this.init().catch((err) => {
       logger.debug('Failed to initialize IdeClient:', err);

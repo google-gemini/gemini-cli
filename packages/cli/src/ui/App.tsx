@@ -973,7 +973,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               </Box>
               {showIDEContextDetail && (
                 <IDEContextDetailDisplay
-                  ideContext={config.getIdeMode() ? ideContextState : undefined}
+                  ideContext={ideContextState}
                   detectedIdeDisplay={config
                     .getIdeClient()
                     .getDetectedIdeDisplayName()}

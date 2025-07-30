@@ -24,9 +24,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
   }
   const currentIDE = config.getIdeClient().getCurrentIde();
   if (!currentIDE) {
-    throw new Error(
-      'IDE slash command should not be available if not running in an IDE',
-    );
+    return null;
   }
 
   const ideSlashCommand: SlashCommand = {
