@@ -201,6 +201,9 @@ describe('Gemini Client (client.ts)', () => {
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
       getIdeModeFeature: vi.fn().mockReturnValue(false),
       getIdeMode: vi.fn().mockReturnValue(true),
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        getDirectories: vi.fn().mockReturnValue(['/test/dir']),
+      }),
       getGeminiClient: vi.fn(),
       setFallbackMode: vi.fn(),
     };

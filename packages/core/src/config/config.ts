@@ -50,6 +50,7 @@ import { IdeClient } from '../ide/ide-client.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -172,6 +173,7 @@ export interface ConfigParameters {
   proxy?: string;
   cwd: string;
   fileDiscoveryService?: FileDiscoveryService;
+  includeDirectories?: string[];
   bugCommand?: BugCommandSettings;
   model: string;
   extensionContextFilePaths?: string[];
@@ -184,7 +186,7 @@ export interface ConfigParameters {
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideModeFeature?: boolean;
   ideMode?: boolean;
-  ideClient?: IdeClient;
+  ideClient: IdeClient;
 }
 
 export class Config {
@@ -195,6 +197,7 @@ export class Config {
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
   private readonly targetDir: string;
+  private readonly workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
   private readonly fullContext: boolean;
@@ -228,7 +231,7 @@ export class Config {
   private readonly noBrowser: boolean;
   private readonly ideModeFeature: boolean;
   private ideMode: boolean;
-  private ideClient: IdeClient | undefined;
+  private ideClient: IdeClient;
   private inFallbackMode = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
@@ -250,6 +253,10 @@ export class Config {
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.sandbox = params.sandbox;
     this.targetDir = path.resolve(params.targetDir);
+    this.workspaceContext = new WorkspaceContext(
+      this.targetDir,
+      params.includeDirectories ?? [],
+    );
     this.debugMode = params.debugMode;
     this.question = params.question;
     this.fullContext = params.fullContext ?? false;
@@ -393,6 +400,10 @@ export class Config {
 
   getProjectRoot(): string {
     return this.targetDir;
+  }
+
+  getWorkspaceContext(): WorkspaceContext {
+    return this.workspaceContext;
   }
 
   getToolRegistry(): Promise<ToolRegistry> {
@@ -585,7 +596,7 @@ export class Config {
     return this.ideModeFeature;
   }
 
-  getIdeClient(): IdeClient | undefined {
+  getIdeClient(): IdeClient {
     return this.ideClient;
   }
 
