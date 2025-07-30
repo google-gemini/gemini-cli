@@ -211,6 +211,7 @@ describe('bfsFileSearch', () => {
     const iterations = 3;
     const durations: number[] = [];
     let foundFiles = 0;
+    let firstResultSorted: string[] | undefined;
 
     for (let i = 0; i < iterations; i++) {
       const searchStartTime = performance.now();
@@ -221,7 +222,14 @@ describe('bfsFileSearch', () => {
       });
       const duration = performance.now() - searchStartTime;
       durations.push(duration);
-      foundFiles = result.length; // All iterations should find same number
+
+      // Verify consistency: all iterations should find the exact same files
+      if (firstResultSorted === undefined) {
+        foundFiles = result.length;
+        firstResultSorted = result.sort();
+      } else {
+        expect(result.sort()).toEqual(firstResultSorted);
+      }
 
       console.log(`📊 Iteration ${i + 1}: ${duration.toFixed(2)}ms`);
     }
