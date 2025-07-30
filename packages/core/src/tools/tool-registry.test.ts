@@ -30,6 +30,7 @@ import {
   Schema,
 } from '@google/genai';
 import { spawn } from 'node:child_process';
+import { IdeClient } from '../ide/ide-client.js';
 import fs from 'node:fs';
 
 vi.mock('node:fs');
@@ -139,6 +140,7 @@ const baseConfigParams: ConfigParameters = {
   geminiMdFileCount: 0,
   approvalMode: ApprovalMode.DEFAULT,
   sessionId: 'test-session-id',
+  ideClient: IdeClient.getInstance(false),
 };
 
 describe('ToolRegistry', () => {
