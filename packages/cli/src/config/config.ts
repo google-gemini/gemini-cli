@@ -274,7 +274,7 @@ export async function loadCliConfig(
     (argv.ideModeFeature ?? settings.ideModeFeature ?? false) &&
     !process.env.SANDBOX;
 
-  const ideClient = IdeClient.getInstance(ideMode);
+  const ideClient = IdeClient.getInstance(ideMode && ideModeFeature);
 
   const allExtensions = annotateActiveExtensions(
     extensions,
