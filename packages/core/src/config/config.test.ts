@@ -18,13 +18,12 @@ import {
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
-import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 
 // Mock dependencies that might be called during Config construction or createServerConfig
 vi.mock('../tools/tool-registry', () => {
   const ToolRegistryMock = vi.fn();
   ToolRegistryMock.prototype.registerTool = vi.fn();
-  ToolRegistryMock.prototype.discoverTools = vi.fn();
+  ToolRegistryMock.prototype.discoverAllTools = vi.fn();
   ToolRegistryMock.prototype.getAllTools = vi.fn(() => []); // Mock methods if needed
   ToolRegistryMock.prototype.getTool = vi.fn();
   ToolRegistryMock.prototype.getFunctionDeclarations = vi.fn(() => []);
@@ -153,6 +152,10 @@ describe('Server Config (config.ts)', () => {
 
       (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
 
+      // Set fallback mode to true to ensure it gets reset
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
+
       await config.refreshAuth(authType);
 
       expect(createContentGeneratorConfig).toHaveBeenCalledWith(
@@ -164,6 +167,8 @@ describe('Server Config (config.ts)', () => {
       expect(config.getContentGeneratorConfig().model).toBe(newModel);
       expect(config.getModel()).toBe(newModel); // getModel() should return the updated model
       expect(GeminiClient).toHaveBeenCalledWith(config);
+      // Verify that fallback mode is reset
+      expect(config.isInFallbackMode()).toBe(false);
     });
   });
 
@@ -311,41 +316,6 @@ describe('Server Config (config.ts)', () => {
       delete paramsWithoutTelemetry.telemetry;
       const config = new Config(paramsWithoutTelemetry);
       expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
-    });
-  });
-
-  describe('refreshMemory', () => {
-    it('should update memory and file count on successful refresh', async () => {
-      const config = new Config(baseParams);
-      const mockMemoryData = {
-        memoryContent: 'new memory content',
-        fileCount: 5,
-      };
-
-      (loadServerHierarchicalMemory as Mock).mockResolvedValue(mockMemoryData);
-
-      const result = await config.refreshMemory();
-
-      expect(loadServerHierarchicalMemory).toHaveBeenCalledWith(
-        config.getWorkingDir(),
-        config.getDebugMode(),
-        config.getFileService(),
-        config.getExtensionContextFilePaths(),
-        config.getFileFilteringOptions(),
-      );
-
-      expect(config.getUserMemory()).toBe(mockMemoryData.memoryContent);
-      expect(config.getGeminiMdFileCount()).toBe(mockMemoryData.fileCount);
-      expect(result).toEqual(mockMemoryData);
-    });
-
-    it('should propagate errors from loadServerHierarchicalMemory', async () => {
-      const config = new Config(baseParams);
-      const testError = new Error('Failed to load memory');
-
-      (loadServerHierarchicalMemory as Mock).mockRejectedValue(testError);
-
-      await expect(config.refreshMemory()).rejects.toThrow(testError);
     });
   });
 });

@@ -7,8 +7,7 @@
 import React from 'react';
 import { Text } from 'ink';
 import { Colors } from '../colors.js';
-import { type ActiveFile, type MCPServerConfig } from '@google/gemini-cli-core';
-import path from 'path';
+import { type IdeContext, type MCPServerConfig } from '@google/gemini-cli-core';
 
 interface ContextSummaryDisplayProps {
   geminiMdFileCount: number;
@@ -16,7 +15,7 @@ interface ContextSummaryDisplayProps {
   mcpServers?: Record<string, MCPServerConfig>;
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   showToolDescriptions?: boolean;
-  activeFile?: ActiveFile;
+  ideContext?: IdeContext;
 }
 
 export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
@@ -25,25 +24,28 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   mcpServers,
   blockedMcpServers,
   showToolDescriptions,
-  activeFile,
+  ideContext,
 }) => {
   const mcpServerCount = Object.keys(mcpServers || {}).length;
   const blockedMcpServerCount = blockedMcpServers?.length || 0;
+  const openFileCount = ideContext?.workspaceState?.openFiles?.length ?? 0;
 
   if (
     geminiMdFileCount === 0 &&
     mcpServerCount === 0 &&
     blockedMcpServerCount === 0 &&
-    !activeFile?.filePath
+    openFileCount === 0
   ) {
     return <Text> </Text>; // Render an empty space to reserve height
   }
 
-  const activeFileText = (() => {
-    if (!activeFile?.filePath) {
+  const openFilesText = (() => {
+    if (openFileCount === 0) {
       return '';
     }
-    return `Open File (${path.basename(activeFile.filePath)})`;
+    return `${openFileCount} open file${
+      openFileCount > 1 ? 's' : ''
+    } (ctrl+e to view)`;
   })();
 
   const geminiMdText = (() => {
@@ -51,8 +53,8 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
       return '';
     }
     const allNamesTheSame = new Set(contextFileNames).size < 2;
-    const name = allNamesTheSame ? contextFileNames[0] : 'Context';
-    return `${geminiMdFileCount} ${name} File${
+    const name = allNamesTheSame ? contextFileNames[0] : 'context';
+    return `${geminiMdFileCount} ${name} file${
       geminiMdFileCount > 1 ? 's' : ''
     }`;
   })();
@@ -65,14 +67,14 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     const parts = [];
     if (mcpServerCount > 0) {
       parts.push(
-        `${mcpServerCount} MCP Server${mcpServerCount > 1 ? 's' : ''}`,
+        `${mcpServerCount} MCP server${mcpServerCount > 1 ? 's' : ''}`,
       );
     }
 
     if (blockedMcpServerCount > 0) {
       let blockedText = `${blockedMcpServerCount} Blocked`;
       if (mcpServerCount === 0) {
-        blockedText += ` MCP Server${blockedMcpServerCount > 1 ? 's' : ''}`;
+        blockedText += ` MCP server${blockedMcpServerCount > 1 ? 's' : ''}`;
       }
       parts.push(blockedText);
     }
@@ -81,8 +83,8 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
 
   let summaryText = 'Using: ';
   const summaryParts = [];
-  if (activeFileText) {
-    summaryParts.push(activeFileText);
+  if (openFilesText) {
+    summaryParts.push(openFilesText);
   }
   if (geminiMdText) {
     summaryParts.push(geminiMdText);

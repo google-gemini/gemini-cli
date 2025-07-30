@@ -17,7 +17,7 @@ vi.mock('child_process', () => ({
     on: (event: string, cb: (...args: unknown[]) => void) => {
       if (event === 'error' || event === 'close') {
         // Simulate command not found or error for git grep and system grep
-        // to force fallback to JS implementation.
+        // to force it to fall back to JS implementation.
         setTimeout(() => cb(1), 0); // cb(1) for error/close
       }
     },
@@ -125,7 +125,9 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain('File: fileA.txt');
       expect(result.llmContent).toContain('L1: hello world');
       expect(result.llmContent).toContain('L2: second line with world');
-      expect(result.llmContent).toContain('File: sub/fileC.txt');
+      expect(result.llmContent).toContain(
+        `File: ${path.join('sub', 'fileC.txt')}`,
+      );
       expect(result.llmContent).toContain('L1: another world in sub dir');
       expect(result.returnDisplay).toBe('Found 3 matches');
     });
@@ -235,7 +237,7 @@ describe('GrepTool', () => {
     it('should generate correct description with pattern and path', () => {
       const params: GrepToolParams = {
         pattern: 'testPattern',
-        path: 'src/app',
+        path: path.join('src', 'app'),
       };
       // The path will be relative to the tempRootDir, so we check for containment.
       expect(grepTool.getDescription(params)).toContain("'testPattern' within");
@@ -248,12 +250,14 @@ describe('GrepTool', () => {
       const params: GrepToolParams = {
         pattern: 'testPattern',
         include: '*.ts',
-        path: 'src/app',
+        path: path.join('src', 'app'),
       };
       expect(grepTool.getDescription(params)).toContain(
         "'testPattern' in *.ts within",
       );
-      expect(grepTool.getDescription(params)).toContain('src/app');
+      expect(grepTool.getDescription(params)).toContain(
+        path.join('src', 'app'),
+      );
     });
 
     it('should use ./ for root path in description', () => {

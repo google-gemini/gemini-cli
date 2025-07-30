@@ -200,7 +200,7 @@ describe('commandUtils', () => {
         expect(mockChild.stdin.end).toHaveBeenCalled();
       });
 
-      it('should fallback to xsel when xclip fails', async () => {
+      it('should fall back to xsel when xclip fails', async () => {
         const testText = 'Hello, world!';
         let callCount = 0;
 

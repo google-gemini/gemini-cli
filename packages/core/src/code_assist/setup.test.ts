@@ -65,7 +65,10 @@ describe('setupUser', () => {
       expect.any(Object),
       undefined,
     );
-    expect(projectId).toBe('server-project');
+    expect(projectId).toEqual({
+      projectId: 'server-project',
+      userTier: 'standard-tier',
+    });
   });
 
   it('should throw ProjectIdRequiredError when no project ID is available', async () => {
