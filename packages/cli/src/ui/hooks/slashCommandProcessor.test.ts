@@ -4,15 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+vi.mock('@google/gemini-cli-core', async () => {
+  const actual = await vi.importActual('@google/gemini-cli-core');
+  return {
+    ...actual,
+    getIdeInstaller: vi.fn().mockReturnValue(null),
+  };
+});
+
 const { mockProcessExit } = vi.hoisted(() => ({
   mockProcessExit: vi.fn((_code?: number): never => undefined as never),
 }));
 
-vi.mock('node:process', () => ({
-  default: {
+vi.mock('node:process', () => {
+  const mockProcess = {
     exit: mockProcessExit,
-  },
-}));
+    platform: 'test-platform',
+  };
+  return {
+    ...mockProcess,
+    default: mockProcess,
+  };
+});
 
 const mockBuiltinLoadCommands = vi.fn();
 vi.mock('../../services/BuiltinCommandLoader.js', () => ({
