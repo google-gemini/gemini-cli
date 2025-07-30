@@ -39,7 +39,7 @@ function getResponseText(response: GenerateContentResponse): string | null {
           : '';
         const description = rawText.replace(/\*\*(.*?)\*\*/s, '').trim();
         process.stdout.write(
-          `\n> Thought: ${subject}\n> ${description.replace('\n', '\n> ')}`,
+          `\n> Thought: ${subject}\n> ${description.replace(/\n/g, '\n> ')}`,
         );
         return null;
       }
