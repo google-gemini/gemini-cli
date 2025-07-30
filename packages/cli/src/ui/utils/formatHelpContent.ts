@@ -21,16 +21,23 @@ export function formatHelpContent(commands: readonly SlashCommand[]): string {
 
   // Commands
   lines.push('**Commands:**');
-  commands
-    .filter((command) => command.description)
-    .forEach((command: SlashCommand) => {
-      lines.push(` **/${command.name}** - ${command.description}`);
-      if (command.subCommands) {
-        command.subCommands.forEach((subCommand) => {
-          lines.push(`   **${subCommand.name}** - ${subCommand.description}`);
-        });
-      }
+  commands.forEach((command: SlashCommand) => {
+    const visibleSubCommands =
+      command.subCommands?.filter((sc) => sc.description) ?? [];
+
+    // Don't show command if it and its subcommands are undocumented.
+    if (!command.description && visibleSubCommands.length === 0) {
+      return;
+    }
+
+    lines.push(
+      ` **/${command.name}**${command.description ? ` - ${command.description}` : ''}`
+    );
+
+    visibleSubCommands.forEach((subCommand) => {
+      lines.push(`   **${subCommand.name}** - ${subCommand.description}`);
     });
+  });
   lines.push(' **!** - shell command');
   lines.push('');
 
