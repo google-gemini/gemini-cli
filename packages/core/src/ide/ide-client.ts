@@ -39,12 +39,16 @@ export class IdeClient {
   };
   private static instance: IdeClient;
   private readonly currentIde: DetectedIde | undefined;
+  private readonly currentIdeDisplayName: string | undefined;
 
   private constructor(ideMode: boolean) {
     if (!ideMode) {
       return;
     }
     this.currentIde = detectIde();
+    if (this.currentIde) {
+      this.currentIdeDisplayName = getIdeDisplayName(this.currentIde);
+    }
     this.init().catch((err) => {
       logger.debug('Failed to initialize IdeClient:', err);
     });
@@ -164,7 +168,11 @@ export class IdeClient {
       return;
     }
     if (!this.currentIde) {
-      throw new Error('Not running in a supported IDE, skipping connection.');
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        'Not running in a supported IDE, skipping connection.',
+      );
+      return;
     }
 
     this.setState(IDEConnectionStatus.Connecting);
@@ -182,10 +190,6 @@ export class IdeClient {
   }
 
   getDetectedIdeDisplayName(): string | undefined {
-    const currentIde = this.getCurrentIde();
-    if (currentIde) {
-      return getIdeDisplayName(currentIde);
-    }
-    return;
+    return this.currentIdeDisplayName;
   }
 }

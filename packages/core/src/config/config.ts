@@ -579,7 +579,7 @@ export class Config {
   }
 
   getIdeMode(): boolean {
-    return this.ideMode && !!this.ideClient;
+    return this.ideMode;
   }
 
   getIdeClient(): IdeClient {
