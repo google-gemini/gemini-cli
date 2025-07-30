@@ -1089,10 +1089,15 @@ export function isAllowed(
     );
     return false;
   }
+  
   const { allowTools } = mcpServerConfig;
-
-  if (allowTools && allowTools.includes(funcDecl.name)) {
-    return true;
+  if (allowTools) {
+    if (Array.isArray(allowTools)) {
+      return allowTools.includes(funcDecl.name);
+    }
+    console.warn(
+      `Configuration warning: 'allowTools' for MCP server '${mcpServerName}' is not an array. Skipping allowlist check.`,
+    );
   }
 
   return false;
