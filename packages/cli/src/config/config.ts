@@ -15,14 +15,15 @@ import {
   ApprovalMode,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
   TelemetryTarget,
-  MCPServerConfig,
-  IDE_SERVER_NAME,
+  FileFilteringOptions,
+  IdeClient,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
-import { Extension, filterActiveExtensions } from './extension.js';
+import { Extension, annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 
@@ -53,6 +54,7 @@ export interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  telemetryOutfile: string | undefined;
   allowedMcpServerNames: string[] | undefined;
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
@@ -157,6 +159,10 @@ export async function parseArguments(): Promise<CliArgs> {
       description:
         'Enable or disable logging of user prompts for telemetry. Overrides settings files.',
     })
+    .option('telemetry-outfile', {
+      type: 'string',
+      description: 'Redirect all telemetry output to the specified file.',
+    })
     .option('checkpointing', {
       alias: 'c',
       type: 'boolean',
@@ -218,13 +224,16 @@ export async function loadHierarchicalGeminiMemory(
   currentWorkingDirectory: string,
   debugMode: boolean,
   fileService: FileDiscoveryService,
+  settings: Settings,
   extensionContextFilePaths: string[] = [],
+  fileFilteringOptions?: FileFilteringOptions,
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode) {
     logger.debug(
       `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory}`,
     );
   }
+
   // Directly call the server function.
   // The server function will use its own homedir() for the global path.
   return loadServerHierarchicalMemory(
@@ -232,6 +241,8 @@ export async function loadHierarchicalGeminiMemory(
     debugMode,
     fileService,
     extensionContextFilePaths,
+    fileFilteringOptions,
+    settings.memoryDiscoveryMaxDirs,
   );
 }
 
@@ -252,9 +263,18 @@ export async function loadCliConfig(
     process.env.TERM_PROGRAM === 'vscode' &&
     !process.env.SANDBOX;
 
-  const activeExtensions = filterActiveExtensions(
+  let ideClient: IdeClient | undefined;
+  if (ideMode) {
+    ideClient = new IdeClient();
+  }
+
+  const allExtensions = annotateActiveExtensions(
     extensions,
     argv.extensions || [],
+  );
+
+  const activeExtensions = extensions.filter(
+    (_, i) => allExtensions[i].isActive,
   );
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
@@ -273,16 +293,25 @@ export async function loadCliConfig(
   );
 
   const fileService = new FileDiscoveryService(process.cwd());
+
+  const fileFiltering = {
+    ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+    ...settings.fileFiltering,
+  };
+
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
     process.cwd(),
     debugMode,
     fileService,
+    settings,
     extensionContextFilePaths,
+    fileFiltering,
   );
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
   const excludeTools = mergeExcludeTools(settings, activeExtensions);
+  const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
 
   if (!argv.allowedMcpServerNames) {
     if (settings.allowMCPServers) {
@@ -308,41 +337,25 @@ export async function loadCliConfig(
     const allowedNames = new Set(argv.allowedMcpServerNames.filter(Boolean));
     if (allowedNames.size > 0) {
       mcpServers = Object.fromEntries(
-        Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
+        Object.entries(mcpServers).filter(([key, server]) => {
+          const isAllowed = allowedNames.has(key);
+          if (!isAllowed) {
+            blockedMcpServers.push({
+              name: key,
+              extensionName: server.extensionName || '',
+            });
+          }
+          return isAllowed;
+        }),
       );
     } else {
+      blockedMcpServers.push(
+        ...Object.entries(mcpServers).map(([key, server]) => ({
+          name: key,
+          extensionName: server.extensionName || '',
+        })),
+      );
       mcpServers = {};
-    }
-  }
-
-  if (ideMode) {
-    if (mcpServers[IDE_SERVER_NAME]) {
-      logger.warn(
-        `Ignoring user-defined MCP server config for "${IDE_SERVER_NAME}" as it is a reserved name.`,
-      );
-    }
-    const companionPort = process.env.GEMINI_CLI_IDE_SERVER_PORT;
-    if (companionPort) {
-      const httpUrl = `http://localhost:${companionPort}/mcp`;
-      mcpServers[IDE_SERVER_NAME] = new MCPServerConfig(
-        undefined, // command
-        undefined, // args
-        undefined, // env
-        undefined, // cwd
-        undefined, // url
-        httpUrl, // httpUrl
-        undefined, // headers
-        undefined, // tcp
-        undefined, // timeout
-        false, // trust
-        'IDE connection', // description
-        undefined, // includeTools
-        undefined, // excludeTools
-      );
-    } else {
-      logger.warn(
-        'Could not connect to IDE. Make sure you have the companion VS Code extension installed from the marketplace or via /ide install.',
-      );
     }
   }
 
@@ -380,11 +393,13 @@ export async function loadCliConfig(
         process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
         settings.telemetry?.otlpEndpoint,
       logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
+      outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
     },
     usageStatisticsEnabled: settings.usageStatisticsEnabled ?? true,
     // Git-aware file filtering settings
     fileFiltering: {
       respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
+      respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
       enableRecursiveFileSearch:
         settings.fileFiltering?.enableRecursiveFileSearch,
     },
@@ -403,13 +418,12 @@ export async function loadCliConfig(
     maxSessionTurns: settings.maxSessionTurns ?? -1,
     experimentalAcp: argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,
-    activeExtensions: activeExtensions.map((e) => ({
-      name: e.config.name,
-      version: e.config.version,
-    })),
+    extensions: allExtensions,
+    blockedMcpServers,
     noBrowser: !!process.env.NO_BROWSER,
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
+    ideClient,
   });
 }
 
@@ -424,7 +438,10 @@ function mergeMcpServers(settings: Settings, extensions: Extension[]) {
           );
           return;
         }
-        mcpServers[key] = server;
+        mcpServers[key] = {
+          ...server,
+          extensionName: extension.config.name,
+        };
       },
     );
   }

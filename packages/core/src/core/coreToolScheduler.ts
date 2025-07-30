@@ -11,6 +11,7 @@ import {
   Tool,
   ToolCallConfirmationDetails,
   ToolResult,
+  ToolResultDisplay,
   ToolRegistry,
   ApprovalMode,
   EditorType,
@@ -218,7 +219,6 @@ interface CoreToolSchedulerOptions {
   outputUpdateHandler?: OutputUpdateHandler;
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
-  approvalMode?: ApprovalMode;
   getPreferredEditor: () => EditorType | undefined;
   config: Config;
 }
@@ -229,7 +229,6 @@ export class CoreToolScheduler {
   private outputUpdateHandler?: OutputUpdateHandler;
   private onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
-  private approvalMode: ApprovalMode;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
 
@@ -239,7 +238,6 @@ export class CoreToolScheduler {
     this.outputUpdateHandler = options.outputUpdateHandler;
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
-    this.approvalMode = options.approvalMode ?? ApprovalMode.DEFAULT;
     this.getPreferredEditor = options.getPreferredEditor;
   }
 
@@ -335,6 +333,22 @@ export class CoreToolScheduler {
           const durationMs = existingStartTime
             ? Date.now() - existingStartTime
             : undefined;
+
+          // Preserve diff for cancelled edit operations
+          let resultDisplay: ToolResultDisplay | undefined = undefined;
+          if (currentCall.status === 'awaiting_approval') {
+            const waitingCall = currentCall as WaitingToolCall;
+            if (waitingCall.confirmationDetails.type === 'edit') {
+              resultDisplay = {
+                fileDiff: waitingCall.confirmationDetails.fileDiff,
+                fileName: waitingCall.confirmationDetails.fileName,
+                originalContent:
+                  waitingCall.confirmationDetails.originalContent,
+                newContent: waitingCall.confirmationDetails.newContent,
+              };
+            }
+          }
+
           return {
             request: currentCall.request,
             tool: toolInstance,
@@ -350,7 +364,7 @@ export class CoreToolScheduler {
                   },
                 },
               },
-              resultDisplay: undefined,
+              resultDisplay,
               error: undefined,
             },
             durationMs,
@@ -445,7 +459,7 @@ export class CoreToolScheduler {
 
       const { request: reqInfo, tool: toolInstance } = toolCall;
       try {
-        if (this.approvalMode === ApprovalMode.YOLO) {
+        if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
           this.setStatusInternal(reqInfo.callId, 'scheduled');
         } else {
           const confirmationDetails = await toolInstance.shouldConfirmExecute(

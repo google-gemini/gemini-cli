@@ -78,6 +78,17 @@ export async function getOauthClient(
     },
   });
 
+  if (
+    process.env.GOOGLE_GENAI_USE_GCA &&
+    process.env.GOOGLE_CLOUD_ACCESS_TOKEN
+  ) {
+    client.setCredentials({
+      access_token: process.env.GOOGLE_CLOUD_ACCESS_TOKEN,
+    });
+    await fetchAndCacheUserInfo(client);
+    return client;
+  }
+
   client.on('tokens', async (tokens: Credentials) => {
     await cacheCredentials(tokens);
   });
@@ -121,7 +132,7 @@ export async function getOauthClient(
     }
   }
 
-  if (config.getNoBrowser()) {
+  if (config.isBrowserLaunchSuppressed()) {
     let success = false;
     const maxRetries = 2;
     for (let i = 0; !success && i < maxRetries; i++) {
@@ -156,15 +167,17 @@ export async function getOauthClient(
       // causing the entire Node.js process to crash.
       childProcess.on('error', (_) => {
         console.error(
-          'Failed to open browser automatically. Please open the URL manually:',
+          'Failed to open browser automatically. Please try running again with NO_BROWSER=true set.',
         );
-        console.error(webLogin.authUrl);
+        process.exit(1);
       });
     } catch (err) {
       console.error(
         'An unexpected error occurred while trying to open the browser:',
         err,
+        '\nPlease try running again with NO_BROWSER=true set.',
       );
+      process.exit(1);
     }
     console.log('Waiting for authentication...');
 
@@ -175,7 +188,7 @@ export async function getOauthClient(
 }
 
 async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
-  const redirectUri = 'https://sdk.cloud.google.com/authcode_cloudcode.html';
+  const redirectUri = 'https://codeassist.google.com/authcode';
   const codeVerifier = await client.generateCodeVerifierAsync();
   const state = crypto.randomBytes(32).toString('hex');
   const authUrl: string = client.generateAuthUrl({

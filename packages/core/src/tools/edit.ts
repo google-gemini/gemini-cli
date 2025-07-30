@@ -209,7 +209,7 @@ Expectation for required parameters:
       // Creating a new file
       isNewFile = true;
     } else if (!fileExists) {
-      // Trying to edit a non-existent file (and old_string is not empty)
+      // Trying to edit a nonexistent file (and old_string is not empty)
       error = {
         display: `File not found. Cannot apply edit. Use an empty old_string to create a new file.`,
         raw: `File not found: ${params.file_path}`,
@@ -239,12 +239,17 @@ Expectation for required parameters:
           raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
         };
       } else if (occurrences !== expectedReplacements) {
-        const occurenceTerm =
+        const occurrenceTerm =
           expectedReplacements === 1 ? 'occurrence' : 'occurrences';
 
         error = {
-          display: `Failed to edit, expected ${expectedReplacements} ${occurenceTerm} but found ${occurrences}.`,
-          raw: `Failed to edit, Expected ${expectedReplacements} ${occurenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
+          display: `Failed to edit, expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences}.`,
+          raw: `Failed to edit, Expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
+        };
+      } else if (finalOldString === finalNewString) {
+        error = {
+          display: `No changes to apply. The old_string and new_string are identical.`,
+          raw: `No changes to apply. The old_string and new_string are identical in file: ${params.file_path}`,
         };
       }
     } else {

@@ -58,10 +58,13 @@ describe('ReadManyFilesTool', () => {
     const fileService = new FileDiscoveryService(tempRootDir);
     const mockConfig = {
       getFileService: () => fileService,
-      getFileFilteringRespectGitIgnore: () => true,
+
+      getFileFilteringOptions: () => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
       getTargetDir: () => tempRootDir,
     } as Partial<Config> as Config;
-
     tool = new ReadManyFilesTool(mockConfig);
 
     mockReadFileFn = mockControl.mockReadFile;
@@ -269,7 +272,7 @@ describe('ReadManyFilesTool', () => {
       );
     });
 
-    it('should handle non-existent specific files gracefully', async () => {
+    it('should handle nonexistent specific files gracefully', async () => {
       const params = { paths: ['nonexistent-file.txt'] };
       const result = await tool.execute(params, new AbortController().signal);
       expect(result.llmContent).toEqual([

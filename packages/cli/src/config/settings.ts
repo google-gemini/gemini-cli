@@ -19,12 +19,16 @@ import {
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
+import { CustomTheme } from '../ui/themes/theme.js';
 
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 
-function getSystemSettingsPath(): string {
+export function getSystemSettingsPath(): string {
+  if (process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH) {
+    return process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
+  }
   if (platform() === 'darwin') {
     return '/Library/Application Support/GeminiCli/settings.json';
   } else if (platform() === 'win32') {
@@ -33,8 +37,6 @@ function getSystemSettingsPath(): string {
     return '/etc/gemini-cli/settings.json';
   }
 }
-
-export const SYSTEM_SETTINGS_PATH = getSystemSettingsPath();
 
 export enum SettingScope {
   User = 'User',
@@ -56,6 +58,7 @@ export interface AccessibilitySettings {
 
 export interface Settings {
   theme?: string;
+  customThemes?: Record<string, CustomTheme>;
   selectedAuthType?: AuthType;
   sandbox?: boolean | string;
   coreTools?: string[];
@@ -79,11 +82,12 @@ export interface Settings {
   // Git-aware file filtering settings
   fileFiltering?: {
     respectGitIgnore?: boolean;
+    respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
   };
 
-  // UI setting. Does not display the ANSI-controlled terminal title.
   hideWindowTitle?: boolean;
+
   hideTips?: boolean;
   hideBanner?: boolean;
 
@@ -93,8 +97,15 @@ export interface Settings {
   // A map of tool names to their summarization settings.
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
 
+  vimMode?: boolean;
+
   // Add other settings here.
   ideMode?: boolean;
+
+  // Setting for disabling auto-update.
+  disableAutoUpdate?: boolean;
+
+  memoryDiscoveryMaxDirs?: number;
 }
 
 export interface SettingsError {
@@ -132,10 +143,24 @@ export class LoadedSettings {
   }
 
   private computeMergedSettings(): Settings {
+    const system = this.system.settings;
+    const user = this.user.settings;
+    const workspace = this.workspace.settings;
+
     return {
-      ...this.user.settings,
-      ...this.workspace.settings,
-      ...this.system.settings,
+      ...user,
+      ...workspace,
+      ...system,
+      customThemes: {
+        ...(user.customThemes || {}),
+        ...(workspace.customThemes || {}),
+        ...(system.customThemes || {}),
+      },
+      mcpServers: {
+        ...(user.mcpServers || {}),
+        ...(workspace.mcpServers || {}),
+        ...(system.mcpServers || {}),
+      },
     };
   }
 
@@ -152,13 +177,12 @@ export class LoadedSettings {
     }
   }
 
-  setValue(
+  setValue<K extends keyof Settings>(
     scope: SettingScope,
-    key: keyof Settings,
-    value: string | Record<string, MCPServerConfig> | undefined,
+    key: K,
+    value: Settings[K],
   ): void {
     const settingsFile = this.forScope(scope);
-    // @ts-expect-error - value can be string | Record<string, MCPServerConfig>
     settingsFile.settings[key] = value;
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
@@ -280,11 +304,11 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};
   const settingsErrors: SettingsError[] = [];
-
+  const systemSettingsPath = getSystemSettingsPath();
   // Load system settings
   try {
-    if (fs.existsSync(SYSTEM_SETTINGS_PATH)) {
-      const systemContent = fs.readFileSync(SYSTEM_SETTINGS_PATH, 'utf-8');
+    if (fs.existsSync(systemSettingsPath)) {
+      const systemContent = fs.readFileSync(systemSettingsPath, 'utf-8');
       const parsedSystemSettings = JSON.parse(
         stripJsonComments(systemContent),
       ) as Settings;
@@ -293,7 +317,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   } catch (error: unknown) {
     settingsErrors.push({
       message: getErrorMessage(error),
-      path: SYSTEM_SETTINGS_PATH,
+      path: systemSettingsPath,
     });
   }
 
@@ -351,7 +375,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
 
   return new LoadedSettings(
     {
-      path: SYSTEM_SETTINGS_PATH,
+      path: systemSettingsPath,
       settings: systemSettings,
     },
     {

@@ -210,35 +210,31 @@ describe('ToolRegistry', () => {
       const mcpTool1_c = new DiscoveredMCPTool(
         mockCallable,
         server1Name,
-        `${server1Name}__zebra-tool`,
+        'zebra-tool',
         'd1',
         {},
-        'zebra-tool',
       );
       const mcpTool1_a = new DiscoveredMCPTool(
         mockCallable,
         server1Name,
-        `${server1Name}__apple-tool`,
+        'apple-tool',
         'd2',
         {},
-        'apple-tool',
       );
       const mcpTool1_b = new DiscoveredMCPTool(
         mockCallable,
         server1Name,
-        `${server1Name}__banana-tool`,
+        'banana-tool',
         'd3',
         {},
-        'banana-tool',
       );
 
       const mcpTool2 = new DiscoveredMCPTool(
         mockCallable,
         server2Name,
-        'server2Name__tool-on-server2',
+        'tool-on-server2',
         'd4',
         {},
-        'tool-on-server2',
       );
       const nonMcpTool = new MockTool('regular-tool');
 
@@ -253,11 +249,7 @@ describe('ToolRegistry', () => {
 
       // Assert that the array has the correct tools and is sorted by name
       expect(toolsFromServer1).toHaveLength(3);
-      expect(toolNames).toEqual([
-        `${server1Name}__apple-tool`,
-        `${server1Name}__banana-tool`,
-        `${server1Name}__zebra-tool`,
-      ]);
+      expect(toolNames).toEqual(['apple-tool', 'banana-tool', 'zebra-tool']);
 
       // Assert that all returned tools are indeed from the correct server
       for (const tool of toolsFromServer1) {
@@ -320,7 +312,7 @@ describe('ToolRegistry', () => {
         return mockChildProcess as any;
       });
 
-      await toolRegistry.discoverTools();
+      await toolRegistry.discoverAllTools();
 
       const discoveredTool = toolRegistry.getTool('tool-with-bad-format');
       expect(discoveredTool).toBeDefined();
@@ -346,12 +338,13 @@ describe('ToolRegistry', () => {
       };
       vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
 
-      await toolRegistry.discoverTools();
+      await toolRegistry.discoverAllTools();
 
       expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
         mcpServerConfigVal,
         undefined,
         toolRegistry,
+        undefined,
         false,
       );
     });
@@ -368,12 +361,13 @@ describe('ToolRegistry', () => {
       };
       vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
 
-      await toolRegistry.discoverTools();
+      await toolRegistry.discoverAllTools();
 
       expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
         mcpServerConfigVal,
         undefined,
         toolRegistry,
+        undefined,
         false,
       );
     });

@@ -14,32 +14,40 @@ import {
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Server as HTTPServer } from 'node:http';
+import { OpenFilesManager } from './open-files-manager.js';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 
-function sendActiveFileChangedNotification(
+function sendIdeContextUpdateNotification(
   transport: StreamableHTTPServerTransport,
-  logger: vscode.OutputChannel,
+  log: (message: string) => void,
+  openFilesManager: OpenFilesManager,
 ) {
-  const editor = vscode.window.activeTextEditor;
-  const filePath = editor ? editor.document.uri.fsPath : '';
-  logger.appendLine(`Sending active file changed notification: ${filePath}`);
+  const ideContext = openFilesManager.state;
+
   const notification: JSONRPCNotification = {
     jsonrpc: '2.0',
-    method: 'ide/activeFileChanged',
-    params: { filePath },
+    method: 'ide/contextUpdate',
+    params: ideContext,
   };
+  log(
+    `Sending IDE context update notification: ${JSON.stringify(
+      notification,
+      null,
+      2,
+    )}`,
+  );
   transport.send(notification);
 }
 
 export class IDEServer {
   private server: HTTPServer | undefined;
   private context: vscode.ExtensionContext | undefined;
-  private logger: vscode.OutputChannel;
+  private log: (message: string) => void;
 
-  constructor(logger: vscode.OutputChannel) {
-    this.logger = logger;
+  constructor(log: (message: string) => void) {
+    this.log = log;
   }
 
   async start(context: vscode.ExtensionContext) {
@@ -52,12 +60,17 @@ export class IDEServer {
     app.use(express.json());
     const mcpServer = createMcpServer();
 
-    const disposable = vscode.window.onDidChangeActiveTextEditor((_editor) => {
+    const openFilesManager = new OpenFilesManager(context);
+    const onDidChangeSubscription = openFilesManager.onDidChange(() => {
       for (const transport of Object.values(transports)) {
-        sendActiveFileChangedNotification(transport, this.logger);
+        sendIdeContextUpdateNotification(
+          transport,
+          this.log.bind(this),
+          openFilesManager,
+        );
       }
     });
-    context.subscriptions.push(disposable);
+    context.subscriptions.push(onDidChangeSubscription);
 
     app.post('/mcp', async (req: Request, res: Response) => {
       const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
@@ -71,20 +84,33 @@ export class IDEServer {
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (newSessionId) => {
-            this.logger.appendLine(`New session initialized: ${newSessionId}`);
+            this.log(`New session initialized: ${newSessionId}`);
             transports[newSessionId] = transport;
           },
         });
+
+        const keepAlive = setInterval(() => {
+          try {
+            transport.send({ jsonrpc: '2.0', method: 'ping' });
+          } catch (e) {
+            this.log(
+              'Failed to send keep-alive ping, cleaning up interval.' + e,
+            );
+            clearInterval(keepAlive);
+          }
+        }, 60000); // 60 sec
+
         transport.onclose = () => {
+          clearInterval(keepAlive);
           if (transport.sessionId) {
-            this.logger.appendLine(`Session closed: ${transport.sessionId}`);
+            this.log(`Session closed: ${transport.sessionId}`);
             sessionsWithInitialNotification.delete(transport.sessionId);
             delete transports[transport.sessionId];
           }
         };
         mcpServer.connect(transport);
       } else {
-        this.logger.appendLine(
+        this.log(
           'Bad Request: No valid session ID provided for non-initialize request.',
         );
         res.status(400).json({
@@ -104,7 +130,7 @@ export class IDEServer {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
-        this.logger.appendLine(`Error handling MCP request: ${errorMessage}`);
+        this.log(`Error handling MCP request: ${errorMessage}`);
         if (!res.headersSent) {
           res.status(500).json({
             jsonrpc: '2.0' as const,
@@ -123,7 +149,7 @@ export class IDEServer {
         | string
         | undefined;
       if (!sessionId || !transports[sessionId]) {
-        this.logger.appendLine('Invalid or missing session ID');
+        this.log('Invalid or missing session ID');
         res.status(400).send('Invalid or missing session ID');
         return;
       }
@@ -134,16 +160,18 @@ export class IDEServer {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
-        this.logger.appendLine(
-          `Error handling session request: ${errorMessage}`,
-        );
+        this.log(`Error handling session request: ${errorMessage}`);
         if (!res.headersSent) {
           res.status(400).send('Bad Request');
         }
       }
 
       if (!sessionsWithInitialNotification.has(sessionId)) {
-        sendActiveFileChangedNotification(transport, this.logger);
+        sendIdeContextUpdateNotification(
+          transport,
+          this.log.bind(this),
+          openFilesManager,
+        );
         sessionsWithInitialNotification.add(sessionId);
       }
     };
@@ -158,7 +186,7 @@ export class IDEServer {
           IDE_SERVER_PORT_ENV_VAR,
           port.toString(),
         );
-        this.logger.appendLine(`IDE server listening on port ${port}`);
+        this.log(`IDE server listening on port ${port}`);
       }
     });
   }
@@ -168,12 +196,10 @@ export class IDEServer {
       await new Promise<void>((resolve, reject) => {
         this.server!.close((err?: Error) => {
           if (err) {
-            this.logger.appendLine(
-              `Error shutting down IDE server: ${err.message}`,
-            );
+            this.log(`Error shutting down IDE server: ${err.message}`);
             return reject(err);
           }
-          this.logger.appendLine(`IDE server shut down`);
+          this.log(`IDE server shut down`);
           resolve();
         });
       });
@@ -193,32 +219,6 @@ const createMcpServer = () => {
       version: '1.0.0',
     },
     { capabilities: { logging: {} } },
-  );
-  server.registerTool(
-    'getActiveFile',
-    {
-      description:
-        '(IDE Tool) Get the path of the file currently active in VS Code.',
-      inputSchema: {},
-    },
-    async () => {
-      const activeEditor = vscode.window.activeTextEditor;
-      const filePath = activeEditor ? activeEditor.document.uri.fsPath : '';
-      if (filePath) {
-        return {
-          content: [{ type: 'text', text: `Active file: ${filePath}` }],
-        };
-      } else {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'No file is currently active in the editor.',
-            },
-          ],
-        };
-      }
-    },
   );
   return server;
 };
