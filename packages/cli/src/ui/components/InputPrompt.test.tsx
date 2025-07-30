@@ -171,6 +171,10 @@ describe('InputPrompt', () => {
       config: {
         getProjectRoot: () => path.join('test', 'project'),
         getTargetDir: () => path.join('test', 'project', 'src'),
+        getVimMode: () => false,
+        getWorkspaceContext: () => ({
+          getDirectories: () => ['/test/project/src'],
+        }),
       } as unknown as Config,
       slashCommands: mockSlashCommands,
       commandContext: mockCommandContext,
@@ -730,6 +734,7 @@ describe('InputPrompt', () => {
       // Verify useCompletion was called with correct signature
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -755,6 +760,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -780,6 +786,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -805,6 +812,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -830,6 +838,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -856,6 +865,7 @@ describe('InputPrompt', () => {
       // Verify useCompletion was called with the buffer
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -881,6 +891,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -907,6 +918,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -933,6 +945,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -959,6 +972,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -985,6 +999,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -1013,6 +1028,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -1039,6 +1055,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -1067,12 +1084,88 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
         expect.any(Object),
       );
 
+      unmount();
+    });
+  });
+
+  describe('vim mode', () => {
+    it('should not call buffer.handleInput when vim mode is enabled and vim handles the input', async () => {
+      props.vimModeEnabled = true;
+      props.vimHandleInput = vi.fn().mockReturnValue(true); // Mock that vim handled it.
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('i');
+      await wait();
+
+      expect(props.vimHandleInput).toHaveBeenCalled();
+      expect(mockBuffer.handleInput).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should call buffer.handleInput when vim mode is enabled but vim does not handle the input', async () => {
+      props.vimModeEnabled = true;
+      props.vimHandleInput = vi.fn().mockReturnValue(false); // Mock that vim did NOT handle it.
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('i');
+      await wait();
+
+      expect(props.vimHandleInput).toHaveBeenCalled();
+      expect(mockBuffer.handleInput).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should call handleInput when vim mode is disabled', async () => {
+      // Mock vimHandleInput to return false (vim didn't handle the input)
+      props.vimHandleInput = vi.fn().mockReturnValue(false);
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('i');
+      await wait();
+
+      expect(props.vimHandleInput).toHaveBeenCalled();
+      expect(mockBuffer.handleInput).toHaveBeenCalled();
+      unmount();
+    });
+  });
+
+  describe('unfocused paste', () => {
+    it('should handle bracketed paste when not focused', async () => {
+      props.focus = false;
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x1B[200~pasted text\x1B[201~');
+      await wait();
+
+      expect(mockBuffer.handleInput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paste: true,
+          sequence: 'pasted text',
+        }),
+      );
+      unmount();
+    });
+
+    it('should ignore regular keypresses when not focused', async () => {
+      props.focus = false;
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('a');
+      await wait();
+
+      expect(mockBuffer.handleInput).not.toHaveBeenCalled();
       unmount();
     });
   });
