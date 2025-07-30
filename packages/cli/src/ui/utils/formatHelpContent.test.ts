@@ -105,7 +105,9 @@ describe('formatHelpContent', () => {
     }
 
     if (process.platform === 'darwin') {
-      expect(content).toContain('**Ctrl+X / Meta+Enter** - Open input in external editor');
+      expect(content).toContain(
+        '**Ctrl+X / Meta+Enter** - Open input in external editor',
+      );
     } else {
       expect(content).toContain('**Ctrl+X** - Open input in external editor');
     }
