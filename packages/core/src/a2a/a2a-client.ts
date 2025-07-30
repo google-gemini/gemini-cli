@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { A2AClient, Agent, AgentCard, Task, Message } from './types.js';
+import {MessageSendParams} from '@a2a-js/sdk';
+import { A2AClient, AgentCard, Task, Message } from './types.js';
+import { v4 as uuidv4 } from 'uuid';
+import {textResponse} from './utils.js';
+
+const AGENT_CARD_WELL_KNOWN_PATH = '/.well-known/agent-card.json'
+
 
 /**
  * Manages the A2A client and caches loaded agent information.
@@ -12,13 +18,7 @@ import { A2AClient, Agent, AgentCard, Task, Message } from './types.js';
  */
 export class A2AClientManager {
   private static instance: A2AClientManager;
-  private client: A2AClient;
-  private agentCardCache = new Map<string, AgentCard>();
-  private connectedAgentsCache = new Map<string, Agent>();
-
-  private constructor() {
-    this.client = new A2AClient();
-  }
+  private registeredAgents = new Map<string, A2AClient>();
 
   /**
    * Gets the singleton instance of the A2AClientManager.
@@ -27,36 +27,65 @@ export class A2AClientManager {
     if (!A2AClientManager.instance) {
       A2AClientManager.instance = new A2AClientManager();
     }
+    console.error("created new A2AClientManager instance")
     return A2AClientManager.instance;
   }
 
   /**
    * Initializes the A2A client.
-   * This method can be expanded later to handle startup logic.
    */
   public async initialize(): Promise<void> {
-    // Placeholder for any future initialization logic.
-    // For now, the client is instantiated in the constructor.
     return Promise.resolve();
   }
 
   /**
-   * Fetches and caches an agent's card.
+   * InitializedFetches and caches an agent's card.
    * @param url The URL of the agent.
    * @returns The agent's card.
    */
-  public async loadAgent(url: string): Promise<AgentCard> {
-    const agentCard = await this.client.getAgentCard(url);
-    this.agentCardCache.set(url, agentCard);
-    return agentCard;
+  public async loadAgent(url: string, agent_card_path?: string): Promise<AgentCard> {
+    console.error(`Loading agent from URL: ${url}`);
+
+    // Typescript SDK throws unrecoverable error if not located at well-known/agent.json
+    // const a2aClient = new A2AClient(url);
+    // this.registeredAgents.set(url, a2aClient!);
+
+    // TODO: service now has wrong url so uncomment later
+    // return await a2aClient.getAgentCard();
+    const getAgentCard = async (agentBaseUrl: string, agent_card_path: string): Promise<AgentCard> => {
+        const specificAgentBaseUrl = agentBaseUrl.replace(/\/$/, "");
+
+        // Just for ServiceNow, correct is
+        const agentCardUrl = `${specificAgentBaseUrl}${agent_card_path}`;
+        console.error(`Fetching agent card from: ${agentCardUrl}`);
+        const response = await fetch((agentCardUrl), {
+          headers: { 'Accept': 'application/json' },
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to fetch Agent Card from ${agentCardUrl}: ${response.status} ${response.statusText}`);
+        }
+        const agentCard = await response.json() as AgentCard;
+        console.error('Successfully fetched agent card:', agentCard);
+        return agentCard;
+    }
+
+    // return agent_card_path ? await getAgentCard(url, agent_card_path) : a2aClient.getAgentCard();
+    return await getAgentCard(url, agent_card_path || AGENT_CARD_WELL_KNOWN_PATH);
   }
 
   /**
    * Lists all cached agent cards.
    * @returns An array of loaded agent cards.
    */
-  public listAgents(): AgentCard[] {
-    return Array.from(this.agentCardCache.values());
+  public async listAgents(): Promise<AgentCard[]> {
+    console.error('Listing all registered agents.');
+    const agentCardsPromises = Array.from(this.registeredAgents.values()).map(
+      (agentClient) => agentClient.getAgentCard(),
+    );
+    // Wait for all the promises to resolve
+    const agentCards = await Promise.all(agentCardsPromises);
+    console.error('Returning agent cards:', agentCards);
+    return agentCards;
   }
 
   /**
@@ -65,42 +94,52 @@ export class A2AClientManager {
    * @param message The message to send.
    * @returns The task representing the message exchange.
    */
-  public async sendMessage(
-    agentUrl: string,
-    message: Message,
-  ): Promise<Task> {
-    if (!this.agentCardCache.has(agentUrl)) {
-      throw new Error(
-        `Agent at ${agentUrl} is not loaded. Please run load_agent first.`,
-      );
-    }
-    const agent = await this.client.connect(agentUrl);
-    this.connectedAgentsCache.set(agentUrl, agent); // Cache the connection
-    return agent.sendMessage(message);
-  }
+  // public async sendMessage(
+  //   agentUrl: string,
+  //   message: string,
+  // ): Promise<Task> {
+
+  //   // TODO: make type Message later
+
+  //   const a2aClient = this.registeredAgents.get(agentUrl);
+  //   if (!a2aClient) {
+  //     throw new Error(
+  //       `Agent at ${agentUrl} is not registered. Please run load_agent first.`,
+  //     );
+  //   }
+
+  //   // Support more than just text
+  //   const messageParams : MessageSendParams = {
+  //     message: {
+  //       kind: "message",
+  //       role: "user",
+  //       messageId: uuidv4(),
+  //       parts: [
+  //         {
+  //           kind: "text",
+  //           text: message,
+  //         },
+  //       ]
+  //     }
+  //   }
+
+  //   const sendMessageResponse = await a2aClient.sendMessage(messageParams);
+  //   if ('error' in sendMessageResponse) {
+
+  //   }
+
+  //   return await a2aClient.sendMessage(messageParams);
+  // }
 
   /**
    * Retrieves a task by its ID.
    * @param taskId The ID of the task.
    * @returns The task object.
    */
-  public async getTask(taskId: string): Promise<Task> {
-    // The SDK does not currently have a top-level `getTask` method.
-    // This assumes we would need to iterate through connected agents
-    // that have a `getTask` capability. This is a placeholder.
-    // A real implementation would need a more robust way to track tasks.
-    for (const agent of this.connectedAgentsCache.values()) {
-      try {
-        // This is a hypothetical method call
-        const task = await agent.getTask(taskId);
-        if (task) {
-          return task;
-        }
-      } catch (e) {
-        // Ignore errors if an agent doesn't have the task.
-      }
-    }
-    throw new Error(`Task with ID ${taskId} not found on any connected agent.`);
+  public getTask(agentUrl: string, taskId: string): string {
+    const a2aClient = this.registeredAgents.get(agentUrl)
+
+    return "Unimplemented";
   }
 
   /**
@@ -108,18 +147,10 @@ export class A2AClientManager {
    * @param taskId The ID of the task.
    */
   public async cancelTask(taskId: string): Promise<void> {
-    // This is also a hypothetical implementation detail.
-    for (const agent of this.connectedAgentsCache.values()) {
-      try {
-        // This is a hypothetical method call
-        await agent.cancelTask(taskId);
-        return; // Assume success on the first agent that has the task
-      } catch (e) {
-        // Ignore errors
-      }
-    }
+    // This functionality is not directly supported by the SDK in a simple way.
+    // This is a placeholder for future, more complex implementation.
     throw new Error(
-      `Could not cancel task with ID ${taskId} on any connected agent.`,
+      `'cancel_task' is not yet implemented. Cannot cancel task with ID: ${taskId}`,
     );
   }
 }
