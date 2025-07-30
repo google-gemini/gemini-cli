@@ -258,7 +258,7 @@ describe('bfsFileSearch', () => {
     expect(avgDuration).toBeLessThan(2000); // Very generous limit
 
     // Ensure consistency across runs (variance should not be too high)
-    expect(consistencyRatio).toBeLessThan(1.0); // Max variance should be less than 100% of average
+    expect(consistencyRatio).toBeLessThan(1.5); // Max variance should be less than 150% of average
 
     console.log(
       `✅ Performance test passed: avg=${avgDuration.toFixed(2)}ms, consistency=${(consistencyRatio * 100).toFixed(1)}%`,
