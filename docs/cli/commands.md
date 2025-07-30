@@ -112,7 +112,7 @@ Slash commands provide meta-level control over the CLI itself.
   - **Status indicator:** When enabled, shows `[NORMAL]` or `[INSERT]` in the footer
 
 - **`/init`**
-  - **Description:** To help users easily create a GEMINI.md.This command analyzes the current directory and generates a tailored context file, making it simpler for users to provide project-specific instructions to the Gemini agent.
+  - **Description:** To help users easily create a `GEMINI.md` file, this command analyzes the current directory and generates a tailored context file, making it simpler for them to provide project-specific instructions to the Gemini agent.
 
 ### Custom Commands
 
