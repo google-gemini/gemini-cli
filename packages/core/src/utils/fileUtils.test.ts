@@ -416,10 +416,7 @@ describe('fileUtils', () => {
       ); // Read lines 6-10
       const expectedContent = lines.slice(5, 10).join('\n');
 
-      expect(result.llmContent).toContain(expectedContent);
-      expect(result.llmContent).toContain(
-        '[File content truncated: showing lines 6-10 of 20 total lines. Use offset/limit parameters to view more.]',
-      );
+      expect(result.llmContent).toBe(expectedContent);
       expect(result.returnDisplay).toBe('Read lines 6-10 of 20 from test.txt');
       expect(result.isTruncated).toBe(true);
       expect(result.originalLineCount).toBe(20);
@@ -462,9 +459,6 @@ describe('fileUtils', () => {
         longLine.substring(0, 2000) + '... [truncated]',
       );
       expect(result.llmContent).toContain('Another short line');
-      expect(result.llmContent).toContain(
-        '[File content partially truncated: some lines exceeded maximum length of 2000 characters.]',
-      );
       expect(result.returnDisplay).toBe(
         'Read all 3 lines from test.txt (some lines were shortened)',
       );
