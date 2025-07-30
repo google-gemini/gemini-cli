@@ -46,6 +46,7 @@ export async function bfsFileSearch(
   const queue: string[] = [rootDir];
   const visited = new Set<string>();
   let scannedDirCount = 0;
+  let queueHead = 0; // Pointer-based queue head to avoid expensive splice operations
 
   // Convert ignoreDirs array to Set for O(1) lookup performance
   const ignoreDirsSet = new Set(ignoreDirs);
@@ -53,21 +54,17 @@ export async function bfsFileSearch(
   // Process directories in parallel batches for maximum performance
   const PARALLEL_BATCH_SIZE = 15; // Parallel processing batch size for optimal performance
 
-  while (queue.length > 0 && scannedDirCount < maxDirs) {
+  while (queueHead < queue.length && scannedDirCount < maxDirs) {
     // Fill batch with unvisited directories up to the desired size
     const batchSize = Math.min(PARALLEL_BATCH_SIZE, maxDirs - scannedDirCount);
     const currentBatch = [];
-    let head = 0;
-    while (currentBatch.length < batchSize && head < queue.length) {
-      const currentDir = queue[head];
-      head++;
+    while (currentBatch.length < batchSize && queueHead < queue.length) {
+      const currentDir = queue[queueHead];
+      queueHead++;
       if (!visited.has(currentDir)) {
         visited.add(currentDir);
         currentBatch.push(currentDir);
       }
-    }
-    if (head > 0) {
-      queue.splice(0, head);
     }
     scannedDirCount += currentBatch.length;
 
