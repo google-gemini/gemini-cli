@@ -61,6 +61,7 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   ideMode: boolean | undefined;
   proxy: string | undefined;
+  includeDirectories: string[] | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -199,6 +200,15 @@ export async function parseArguments(): Promise<CliArgs> {
       description:
         'Proxy for gemini client, like schema://user:password@host:port',
     })
+    .option('include-directories', {
+      type: 'array',
+      string: true,
+      description:
+        'Additional directories to include in the workspace (comma-separated or multiple --include-directories)',
+      coerce: (dirs: string[]) =>
+        // Handle comma-separated values
+        dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -259,14 +269,9 @@ export async function loadCliConfig(
     );
 
   const ideMode =
-    (argv.ideMode ?? settings.ideMode ?? false) &&
-    process.env.TERM_PROGRAM === 'vscode' &&
-    !process.env.SANDBOX;
+    (argv.ideMode ?? settings.ideMode ?? false) && !process.env.SANDBOX;
 
-  let ideClient: IdeClient | undefined;
-  if (ideMode) {
-    ideClient = new IdeClient();
-  }
+  const ideClient = IdeClient.getInstance(ideMode);
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -366,6 +371,7 @@ export async function loadCliConfig(
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: process.cwd(),
+    includeDirectories: argv.includeDirectories,
     debugMode,
     question: argv.promptInteractive || argv.prompt || '',
     fullContext: argv.allFiles || argv.all_files || false,
