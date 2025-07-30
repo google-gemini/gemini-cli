@@ -26,6 +26,7 @@ import {
   UnauthorizedError,
   UserPromptEvent,
   DEFAULT_GEMINI_FLASH_MODEL,
+  Storage,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import {
@@ -110,6 +111,13 @@ export const useGeminiStream = (
       return;
     }
     return new GitService(config.getProjectRoot());
+  }, [config]);
+
+  const storage = useMemo(() => {
+    if (!config.getProjectRoot()) {
+      return;
+    }
+    return new Storage(config.getProjectRoot());
   }, [config]);
 
   const [toolCalls, scheduleToolCalls, markToolsAsSubmitted] =
@@ -860,8 +868,8 @@ export const useGeminiStream = (
       );
 
       if (restorableToolCalls.length > 0) {
-        const checkpointDir = config.getProjectTempDir()
-          ? path.join(config.getProjectTempDir(), 'checkpoints')
+        const checkpointDir = storage?.getProjectTempDir()
+          ? path.join(storage.getProjectTempDir(), 'checkpoints')
           : undefined;
 
         if (!checkpointDir) {
@@ -945,7 +953,15 @@ export const useGeminiStream = (
       }
     };
     saveRestorableToolCalls();
-  }, [toolCalls, config, onDebugMessage, gitService, history, geminiClient]);
+  }, [
+    toolCalls,
+    config,
+    onDebugMessage,
+    gitService,
+    history,
+    geminiClient,
+    storage,
+  ]);
 
   return {
     streamingState,

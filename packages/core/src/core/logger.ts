@@ -7,7 +7,7 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { Content } from '@google/genai';
-import { getProjectTempDir } from '../utils/paths.js';
+import { Storage } from '../config/storage.js';
 
 const LOG_FILE_NAME = 'logs.json';
 
@@ -24,6 +24,7 @@ export interface LogEntry {
 }
 
 export class Logger {
+  private storage: Storage;
   private geminiDir: string | undefined;
   private logFilePath: string | undefined;
   private sessionId: string | undefined;
@@ -33,6 +34,7 @@ export class Logger {
 
   constructor(sessionId: string) {
     this.sessionId = sessionId;
+    this.storage = new Storage(process.cwd());
   }
 
   private async _readLogFile(): Promise<LogEntry[]> {
@@ -94,7 +96,7 @@ export class Logger {
       return;
     }
 
-    this.geminiDir = getProjectTempDir(process.cwd());
+    this.geminiDir = this.storage.getProjectTempDir();
     this.logFilePath = path.join(this.geminiDir, LOG_FILE_NAME);
 
     try {
