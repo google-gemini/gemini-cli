@@ -33,11 +33,24 @@ if (!versionType) {
 
 // 2. Bump the version in the root and all workspace package.json files.
 run(`npm version ${versionType} --no-git-tag-version --allow-same-version`);
-run(
-  `npm version ${versionType} --workspaces --no-git-tag-version --allow-same-version`,
+
+// 3. Get all workspaces and filter out the one we don't want to version.
+const workspacesToExclude = ['gemini-cli-vscode-ide-companion'];
+const lsOutput = JSON.parse(
+  execSync('npm ls --workspaces --json --depth=0').toString(),
+);
+const allWorkspaces = Object.keys(lsOutput.dependencies || {});
+const workspacesToVersion = allWorkspaces.filter(
+  (wsName) => !workspacesToExclude.includes(wsName),
 );
 
-// 3. Get the new version number from the root package.json
+for (const workspaceName of workspacesToVersion) {
+  run(
+    `npm version ${versionType} --workspace ${workspaceName} --no-git-tag-version --allow-same-version`,
+  );
+}
+
+// 4. Get the new version number from the root package.json
 const rootPackageJsonPath = resolve(process.cwd(), 'package.json');
 const newVersion = readJson(rootPackageJsonPath).version;
 
