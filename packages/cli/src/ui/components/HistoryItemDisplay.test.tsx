@@ -109,4 +109,17 @@ describe('<HistoryItemDisplay />', () => {
     );
     expect(lastFrame()).toContain('Agent powering down. Goodbye!');
   });
+
+  it('renders HelpMessage for "help" type', () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: 'help',
+      content: '**Basics:**\n\nTest help content with **commands**',
+    };
+    const { lastFrame } = render(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    expect(lastFrame()).toContain('Basics:');
+    expect(lastFrame()).toContain('Test help content');
+  });
 });
