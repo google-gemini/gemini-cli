@@ -92,22 +92,23 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
   /**
    * Checks if a path is within the root directory and resolves it.
    * @param relativePath Path relative to the root directory (or undefined for root).
-   * @returns The absolute path if valid and exists.
+   * @returns The absolute path if valid and exists, or null if no path specified (to search all directories).
    * @throws {Error} If path is outside root, doesn't exist, or isn't a directory.
    */
-  private resolveAndValidatePath(relativePath?: string): string {
-    const targetPath = path.resolve(
-      this.config.getTargetDir(),
-      relativePath || '.',
-    );
+  private resolveAndValidatePath(relativePath?: string): string | null {
+    // If no path specified, return null to indicate searching all workspace directories
+    if (!relativePath) {
+      return null;
+    }
 
-    // Security Check: Ensure the resolved path is still within the root directory.
-    if (
-      !targetPath.startsWith(this.config.getTargetDir()) &&
-      targetPath !== this.config.getTargetDir()
-    ) {
+    const targetPath = path.resolve(this.config.getTargetDir(), relativePath);
+
+    // Security Check: Ensure the resolved path is within workspace boundaries
+    const workspaceContext = this.config.getWorkspaceContext();
+    if (!workspaceContext.isPathWithinWorkspace(targetPath)) {
+      const directories = workspaceContext.getDirectories();
       throw new Error(
-        `Path validation failed: Attempted path "${relativePath || '.'}" resolves outside the allowed root directory "${this.config.getTargetDir()}".`,
+        `Path validation failed: Attempted path "${relativePath}" resolves outside the allowed workspace directories: ${directories.join(', ')}`,
       );
     }
 
@@ -146,10 +147,13 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
       return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
     }
 
-    try {
-      this.resolveAndValidatePath(params.path);
-    } catch (error) {
-      return getErrorMessage(error);
+    // Only validate path if one is provided
+    if (params.path) {
+      try {
+        this.resolveAndValidatePath(params.path);
+      } catch (error) {
+        return getErrorMessage(error);
+      }
     }
 
     return null; // Parameters are valid
@@ -174,44 +178,78 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
       };
     }
 
-    let searchDirAbs: string;
     try {
-      searchDirAbs = this.resolveAndValidatePath(params.path);
+      const workspaceContext = this.config.getWorkspaceContext();
+      const searchDirAbs = this.resolveAndValidatePath(params.path);
       const searchDirDisplay = params.path || '.';
 
-      const matches: GrepMatch[] = await this.performGrepSearch({
-        pattern: params.pattern,
-        path: searchDirAbs,
-        include: params.include,
-        signal,
-      });
+      // Determine which directories to search
+      let searchDirectories: readonly string[];
+      if (searchDirAbs === null) {
+        // No path specified - search all workspace directories
+        searchDirectories = workspaceContext.getDirectories();
+      } else {
+        // Specific path provided - search only that directory
+        searchDirectories = [searchDirAbs];
+      }
 
-      if (matches.length === 0) {
-        const noMatchMsg = `No matches found for pattern "${params.pattern}" in path "${searchDirDisplay}"${params.include ? ` (filter: "${params.include}")` : ''}.`;
+      // Collect matches from all search directories
+      let allMatches: GrepMatch[] = [];
+      for (const searchDir of searchDirectories) {
+        const matches = await this.performGrepSearch({
+          pattern: params.pattern,
+          path: searchDir,
+          include: params.include,
+          signal,
+        });
+
+        // Add directory prefix if searching multiple directories
+        if (searchDirectories.length > 1) {
+          const dirName = path.basename(searchDir);
+          matches.forEach((match) => {
+            match.filePath = path.join(dirName, match.filePath);
+          });
+        }
+
+        allMatches = allMatches.concat(matches);
+      }
+
+      let searchLocationDescription: string;
+      if (searchDirAbs === null) {
+        const numDirs = workspaceContext.getDirectories().length;
+        searchLocationDescription =
+          numDirs > 1
+            ? `across ${numDirs} workspace directories`
+            : `in the workspace directory`;
+      } else {
+        searchLocationDescription = `in path "${searchDirDisplay}"`;
+      }
+
+      if (allMatches.length === 0) {
+        const noMatchMsg = `No matches found for pattern "${params.pattern}" ${searchLocationDescription}${params.include ? ` (filter: "${params.include}")` : ''}.`;
         return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
       }
 
-      const matchesByFile = matches.reduce(
+      // Group matches by file
+      const matchesByFile = allMatches.reduce(
         (acc, match) => {
-          const relativeFilePath =
-            path.relative(
-              searchDirAbs,
-              path.resolve(searchDirAbs, match.filePath),
-            ) || path.basename(match.filePath);
-          if (!acc[relativeFilePath]) {
-            acc[relativeFilePath] = [];
+          const fileKey = match.filePath;
+          if (!acc[fileKey]) {
+            acc[fileKey] = [];
           }
-          acc[relativeFilePath].push(match);
-          acc[relativeFilePath].sort((a, b) => a.lineNumber - b.lineNumber);
+          acc[fileKey].push(match);
+          acc[fileKey].sort((a, b) => a.lineNumber - b.lineNumber);
           return acc;
         },
         {} as Record<string, GrepMatch[]>,
       );
 
-      const matchCount = matches.length;
+      const matchCount = allMatches.length;
       const matchTerm = matchCount === 1 ? 'match' : 'matches';
 
-      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${params.pattern}" in path "${searchDirDisplay}"${params.include ? ` (filter: "${params.include}")` : ''}:\n---\n`;
+      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${params.pattern}" ${searchLocationDescription}${params.include ? ` (filter: "${params.include}")` : ''}:
+---
+`;
 
       for (const filePath in matchesByFile) {
         llmContent += `File: ${filePath}\n`;
@@ -333,6 +371,13 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
           this.config.getTargetDir(),
         );
         description += ` within ${shortenPath(relativePath)}`;
+      }
+    } else {
+      // When no path is specified, indicate searching all workspace directories
+      const workspaceContext = this.config.getWorkspaceContext();
+      const directories = workspaceContext.getDirectories();
+      if (directories.length > 1) {
+        description += ` across all workspace directories`;
       }
     }
     return description;
