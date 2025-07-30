@@ -262,13 +262,26 @@ async function getGeminiMdFileContentsInternal(
         );
         if (downwardContent) {
           allContents.push(downwardContent);
+          processedPaths.add(dPath);
         }
       }
     }
   }
 
   // Read extension context files
+  // Create a final set of all processed paths to avoid duplicates
+  const finalProcessedPaths = new Set(allContents.map(c => c.filePath));
   for (const extensionPath of extensionContextFilePaths) {
+    // Skip if already processed
+    if (finalProcessedPaths.has(extensionPath)) {
+      if (debugMode) {
+        logger.debug(
+          `Skipping duplicate extension path: ${extensionPath}`,
+        );
+      }
+      continue;
+    }
+
     const extensionContent = await tryReadGeminiFile(
       extensionPath,
       'extension',
