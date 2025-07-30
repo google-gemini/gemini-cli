@@ -59,7 +59,6 @@ export interface CommandContext {
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
     toggleVimEnabled: () => Promise<boolean>;
-    refreshConfig: () => Promise<void>;
   };
   // Session-specific data
   session: {
@@ -157,6 +156,9 @@ export interface SlashCommand {
   description: string;
 
   kind: CommandKind;
+
+  // Optional metadata for extension commands
+  extensionName?: string;
 
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (

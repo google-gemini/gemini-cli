@@ -39,12 +39,8 @@ import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
 import { Colors } from './colors.js';
 import { Help } from './components/Help.js';
-import {
-  loadHierarchicalGeminiMemory,
-  loadCliConfig,
-  parseArguments,
-} from '../config/config.js';
-import { LoadedSettings, loadSettings } from '../config/settings.js';
+import { loadHierarchicalGeminiMemory } from '../config/config.js';
+import { LoadedSettings } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup } from '../utils/cleanup.js';
@@ -66,7 +62,6 @@ import {
   AuthType,
   type IdeContext,
   ideContext,
-  sessionId,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -88,13 +83,13 @@ import {
   isGenericQuotaExceededError,
   UserTierId,
 } from '@google/gemini-cli-core';
-import { checkForUpdates } from './utils/updateCheck.js';
+import { UpdateObject } from './utils/updateCheck.js';
 import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
-import { loadExtensions } from '../config/extension.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -113,20 +108,19 @@ export const AppWrapper = (props: AppProps) => (
   </SessionStatsProvider>
 );
 
-const App = (props: AppProps) => {
-  const [config, setConfig] = useState<Config>(props.config);
-  const [settings, setSettings] = useState<LoadedSettings>(props.settings);
+const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const isFocused = useFocus();
   useBracketedPaste();
-  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
   const { stdout } = useStdout();
-  const nightly = props.version.includes('nightly');
+  const nightly = version.includes('nightly');
+  const { history, addItem, clearItems, loadHistory } = useHistory();
 
   useEffect(() => {
-    checkForUpdates().then(setUpdateMessage);
-  }, []);
+    const cleanup = setUpdateHandler(addItem, setUpdateInfo);
+    return cleanup;
+  }, [addItem]);
 
-  const { history, addItem, clearItems, loadHistory } = useHistory();
   const {
     consoleMessages,
     handleNewMessage,
@@ -315,22 +309,6 @@ const App = (props: AppProps) => {
     }
   }, [config, addItem, settings.merged]);
 
-  const refreshConfig = useCallback(async () => {
-    const newSettings = loadSettings(process.cwd());
-    const newExtensions = loadExtensions(process.cwd());
-    const argv = await parseArguments();
-    const newConfig = await loadCliConfig(
-      newSettings.merged,
-      newExtensions,
-      sessionId,
-      argv,
-    );
-    await newConfig.initialize();
-    setConfig(newConfig);
-    setSettings(newSettings);
-    setGeminiMdFileCount(newConfig.getGeminiMdFileCount());
-  }, []);
-
   // Watch for model changes (e.g., from Flash fallback)
   useEffect(() => {
     const checkModelChange = () => {
@@ -422,6 +400,7 @@ const App = (props: AppProps) => {
 
       // Switch model for future use but return false to stop current retry
       config.setModel(fallbackModel);
+      config.setFallbackMode(true);
       logFlashFallback(
         config,
         new FlashFallbackEvent(config.getContentGeneratorConfig().authType!),
@@ -498,7 +477,6 @@ const App = (props: AppProps) => {
     openPrivacyNotice,
     toggleVimEnabled,
     setIsProcessing,
-    refreshConfig,
   );
 
   const {
@@ -781,9 +759,6 @@ const App = (props: AppProps) => {
   return (
     <StreamingContext.Provider value={streamingState}>
       <Box flexDirection="column" width="90%">
-        {/* Move UpdateNotification outside Static so it can re-render when updateMessage changes */}
-        {updateMessage && <UpdateNotification message={updateMessage} />}
-
         {/*
          * The Static component is an Ink intrinsic in which there can only be 1 per application.
          * Because of this restriction we're hacking it slightly by having a 'header' item here to
@@ -802,7 +777,7 @@ const App = (props: AppProps) => {
               {!settings.merged.hideBanner && (
                 <Header
                   terminalWidth={terminalWidth}
-                  version={props.version}
+                  version={version}
                   nightly={nightly}
                 />
               )}
@@ -846,7 +821,9 @@ const App = (props: AppProps) => {
         {showHelp && <Help commands={slashCommands} />}
 
         <Box flexDirection="column" ref={mainControlsRef}>
-          {props.startupWarnings && props.startupWarnings.length > 0 && (
+          {/* Move UpdateNotification to render update notification above input area */}
+          {updateInfo && <UpdateNotification message={updateInfo.message} />}
+          {startupWarnings.length > 0 && (
             <Box
               borderStyle="round"
               borderColor={Colors.AccentYellow}
@@ -854,7 +831,7 @@ const App = (props: AppProps) => {
               marginY={1}
               flexDirection="column"
             >
-              {props.startupWarnings.map((warning, index) => (
+              {startupWarnings.map((warning, index) => (
                 <Text key={index} color={Colors.AccentYellow}>
                   {warning}
                 </Text>

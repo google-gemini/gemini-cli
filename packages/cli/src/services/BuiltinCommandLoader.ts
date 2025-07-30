@@ -20,6 +20,7 @@ import { editorCommand } from '../ui/commands/editorCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
+import { initCommand } from '../ui/commands/initCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
@@ -29,7 +30,6 @@ import { statsCommand } from '../ui/commands/statsCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
-import { configCommand } from '../ui/commands/configCommand.js';
 
 /**
  * Loads the core, hard-coded slash commands that are an integral part
@@ -55,15 +55,15 @@ export class BuiltinCommandLoader implements ICommandLoader {
       compressCommand,
       copyCommand,
       corgiCommand,
-      configCommand,
       docsCommand,
       editorCommand,
       extensionsCommand,
       helpCommand,
       ideCommand(this.config),
+      initCommand,
+      mcpCommand,
       memoryCommand,
       privacyCommand,
-      mcpCommand,
       quitCommand,
       restoreCommand(this.config),
       statsCommand,
