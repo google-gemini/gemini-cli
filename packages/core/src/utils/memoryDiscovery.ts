@@ -125,14 +125,26 @@ async function getGeminiMdFilePathsInternal(
       }
     } catch (error) {
       // Check if it's a permission error (file exists but not readable)
-      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'EACCES') {
-        if (debugMode)
+      if (error instanceof Error && 'code' in error) {
+        const fsError = error as { code: string };
+        if (fsError.code === 'EACCES') {
+          if (debugMode)
+            logger.debug(
+              `Global ${geminiMdFilename} exists but is not readable: ${globalMemoryPath}`,
+            );
+        } else if (fsError.code === 'ENOENT') {
+          if (debugMode)
+            logger.debug(
+              `Global ${geminiMdFilename} not found: ${globalMemoryPath}`,
+            );
+        } else if (debugMode) {
           logger.debug(
-            `Global ${geminiMdFilename} exists but is not readable: ${globalMemoryPath}`,
+            `Error accessing global ${geminiMdFilename} at ${globalMemoryPath}: ${fsError.code}`,
           );
+        }
       } else if (debugMode) {
         logger.debug(
-          `Global ${geminiMdFilename} not found: ${globalMemoryPath}`,
+          `Unexpected error accessing global ${geminiMdFilename} at ${globalMemoryPath}: ${String(error)}`,
         );
       }
     }
@@ -189,15 +201,28 @@ async function getGeminiMdFilePathsInternal(
         }
       } catch (error) {
         // Check if it's a permission error (file exists but not readable)
-        if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'EACCES') {
-          if (debugMode) {
+        if (error instanceof Error && 'code' in error) {
+          const fsError = error as { code: string };
+          if (fsError.code === 'EACCES') {
+            if (debugMode) {
+              logger.debug(
+                `Upward ${geminiMdFilename} exists but is not readable: ${potentialPath}`,
+              );
+            }
+          } else if (fsError.code === 'ENOENT') {
+            if (debugMode) {
+              logger.debug(
+                `Upward ${geminiMdFilename} not found in: ${currentDir}`,
+              );
+            }
+          } else if (debugMode) {
             logger.debug(
-              `Upward ${geminiMdFilename} exists but is not readable: ${potentialPath}`,
+              `Error accessing upward ${geminiMdFilename} at ${potentialPath}: ${fsError.code}`,
             );
           }
         } else if (debugMode) {
           logger.debug(
-            `Upward ${geminiMdFilename} not found in: ${currentDir}`,
+            `Unexpected error accessing upward ${geminiMdFilename} at ${potentialPath}: ${String(error)}`,
           );
         }
       }
