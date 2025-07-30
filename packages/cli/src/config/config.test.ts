@@ -916,7 +916,7 @@ describe('loadCliConfig extensions', () => {
   });
 });
 
-describe('loadCliConfig ideMode', () => {
+describe('loadCliConfig ideModeFeature', () => {
   const originalArgv = process.argv;
   const originalEnv = { ...process.env };
 
@@ -939,16 +939,16 @@ describe('loadCliConfig ideMode', () => {
     const settings: Settings = {};
     const argv = await parseArguments();
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
+    expect(config.getIdeModeFeature()).toBe(false);
   });
 
-  it('should be false when settings.ideMode is true, but SANDBOX is set', async () => {
+  it('should be false when settings.ideModeFeature is true, but SANDBOX is set', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
     process.env.SANDBOX = 'true';
-    const settings: Settings = { ideMode: true };
+    const settings: Settings = { ideModeFeature: true };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
+    expect(config.getIdeModeFeature()).toBe(false);
   });
 });

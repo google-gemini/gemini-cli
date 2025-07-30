@@ -185,6 +185,8 @@ export const useSlashCommandProcessor = (
     ],
   );
 
+  const ideMode = config?.getIdeMode();
+
   useEffect(() => {
     const controller = new AbortController();
     const load = async () => {
@@ -205,7 +207,7 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config]);
+  }, [config, ideMode]);
 
   // Define legacy commands
   // This list contains all commands that have NOT YET been migrated to the
