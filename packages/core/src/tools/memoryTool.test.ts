@@ -15,6 +15,7 @@ import {
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+import { ToolConfirmationOutcome } from './tools.js';
 
 // Mock dependencies
 vi.mock('fs/promises');
@@ -260,6 +261,151 @@ describe('MemoryTool', () => {
       expect(result.returnDisplay).toBe(
         `Error saving memory: ${underlyingError.message}`,
       );
+    });
+  });
+
+  describe('shouldConfirmExecute', () => {
+    let memoryTool: MemoryTool;
+
+    beforeEach(() => {
+      memoryTool = new MemoryTool();
+      // Clear the allowlist before each test
+      (MemoryTool as unknown as { allowlist: Set<string> }).allowlist.clear();
+      // Mock fs.readFile to return empty string (file doesn't exist)
+      vi.mocked(fs.readFile).mockResolvedValue('');
+    });
+
+    it('should return confirmation details when memory file is not allowlisted', async () => {
+      const params = { fact: 'Test fact' };
+      const result = await memoryTool.shouldConfirmExecute(
+        params,
+        mockAbortSignal,
+      );
+
+      expect(result).toBeDefined();
+      expect(result).not.toBe(false);
+
+      if (result && result.type === 'edit') {
+        expect(result.title).toBe('Confirm Memory Save: ~/.gemini/GEMINI.md');
+        expect(result.fileName).toContain('/mock/home/.gemini/');
+        expect(result.fileName).toContain('GEMINI.md');
+        expect(result.fileDiff).toContain('Index: GEMINI.md');
+        expect(result.fileDiff).toContain('+## Gemini Added Memories');
+        expect(result.fileDiff).toContain('+- Test fact');
+        expect(result.originalContent).toBe('');
+        expect(result.newContent).toContain('## Gemini Added Memories');
+        expect(result.newContent).toContain('- Test fact');
+      }
+    });
+
+    it('should return false when memory file is already allowlisted', async () => {
+      const params = { fact: 'Test fact' };
+      const memoryFilePath = path.join(
+        '/mock/home',
+        '.gemini',
+        getCurrentGeminiMdFilename(),
+      );
+
+      // Add the memory file to the allowlist
+      (MemoryTool as unknown as { allowlist: Set<string> }).allowlist.add(
+        memoryFilePath,
+      );
+
+      const result = await memoryTool.shouldConfirmExecute(
+        params,
+        mockAbortSignal,
+      );
+
+      expect(result).toBe(false);
+    });
+
+    it('should add memory file to allowlist when ProceedAlways is confirmed', async () => {
+      const params = { fact: 'Test fact' };
+      const memoryFilePath = path.join(
+        '/mock/home',
+        '.gemini',
+        getCurrentGeminiMdFilename(),
+      );
+
+      const result = await memoryTool.shouldConfirmExecute(
+        params,
+        mockAbortSignal,
+      );
+
+      expect(result).toBeDefined();
+      expect(result).not.toBe(false);
+
+      if (result && result.type === 'edit') {
+        // Simulate the onConfirm callback
+        await result.onConfirm(ToolConfirmationOutcome.ProceedAlways);
+
+        // Check that the memory file was added to the allowlist
+        expect(
+          (MemoryTool as unknown as { allowlist: Set<string> }).allowlist.has(
+            memoryFilePath,
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('should not add memory file to allowlist when other outcomes are confirmed', async () => {
+      const params = { fact: 'Test fact' };
+      const memoryFilePath = path.join(
+        '/mock/home',
+        '.gemini',
+        getCurrentGeminiMdFilename(),
+      );
+
+      const result = await memoryTool.shouldConfirmExecute(
+        params,
+        mockAbortSignal,
+      );
+
+      expect(result).toBeDefined();
+      expect(result).not.toBe(false);
+
+      if (result && result.type === 'edit') {
+        // Simulate the onConfirm callback with different outcomes
+        await result.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+        expect(
+          (MemoryTool as unknown as { allowlist: Set<string> }).allowlist.has(
+            memoryFilePath,
+          ),
+        ).toBe(false);
+
+        await result.onConfirm(ToolConfirmationOutcome.Cancel);
+        expect(
+          (MemoryTool as unknown as { allowlist: Set<string> }).allowlist.has(
+            memoryFilePath,
+          ),
+        ).toBe(false);
+      }
+    });
+
+    it('should handle existing memory file with content', async () => {
+      const params = { fact: 'New fact' };
+      const existingContent =
+        'Some existing content.\n\n## Gemini Added Memories\n- Old fact\n';
+
+      // Mock fs.readFile to return existing content
+      vi.mocked(fs.readFile).mockResolvedValue(existingContent);
+
+      const result = await memoryTool.shouldConfirmExecute(
+        params,
+        mockAbortSignal,
+      );
+
+      expect(result).toBeDefined();
+      expect(result).not.toBe(false);
+
+      if (result && result.type === 'edit') {
+        expect(result.title).toBe('Confirm Memory Save: ~/.gemini/GEMINI.md');
+        expect(result.fileDiff).toContain('Index: GEMINI.md');
+        expect(result.fileDiff).toContain('+- New fact');
+        expect(result.originalContent).toBe(existingContent);
+        expect(result.newContent).toContain('- Old fact');
+        expect(result.newContent).toContain('- New fact');
+      }
     });
   });
 });
