@@ -47,9 +47,12 @@ export async function bfsFileSearch(
   const visited = new Set<string>();
   let scannedDirCount = 0;
 
+  // Process directories in parallel batches for maximum performance
+  const PARALLEL_BATCH_SIZE = 15; // Parallel processing batch size for optimal performance
+
   while (queue.length > 0 && scannedDirCount < maxDirs) {
     // Fill batch with unvisited directories up to the desired size
-    const batchSize = Math.min(10, maxDirs - scannedDirCount);
+    const batchSize = Math.min(PARALLEL_BATCH_SIZE, maxDirs - scannedDirCount);
     const currentBatch = [];
     while (currentBatch.length < batchSize && queue.length > 0) {
       const currentDir = queue.shift()!;
@@ -64,7 +67,7 @@ export async function bfsFileSearch(
 
     if (debug) {
       logger.debug(
-        `Scanning ${currentBatch.length} directories [${scannedDirCount}/${maxDirs}]`,
+        `Scanning [${scannedDirCount}/${maxDirs}]: batch of ${currentBatch.length}`,
       );
     }
 

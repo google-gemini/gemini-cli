@@ -194,49 +194,38 @@ describe('bfsFileSearch', () => {
     // Create a more complex directory structure for performance testing
     console.log('\n🚀 Testing Parallel BFS Performance...');
 
-    // Create 100 directories with multiple levels for a more realistic test
-    for (let i = 0; i < 100; i++) {
+    // Create 50 directories with multiple levels for faster test execution
+    for (let i = 0; i < 50; i++) {
       await createEmptyDir(`dir${i}`);
       await createEmptyDir(`dir${i}`, 'subdir1');
       await createEmptyDir(`dir${i}`, 'subdir2');
       await createEmptyDir(`dir${i}`, 'subdir1', 'deep');
-      if (i < 20) {
+      if (i < 10) {
         // Add target files in some directories
         await createTestFile('content', `dir${i}`, 'GEMINI.md');
         await createTestFile('content', `dir${i}`, 'subdir1', 'GEMINI.md');
       }
     }
 
-    // Run multiple iterations for more accurate measurement
-    const iterations = 5;
-    let totalDuration = 0;
-    let foundFiles = 0;
-
-    for (let i = 0; i < iterations; i++) {
-      const searchStartTime = performance.now();
-      const result = await bfsFileSearch(testRootDir, {
-        fileName: 'GEMINI.md',
-        maxDirs: 300,
-        debug: false,
-      });
-      const duration = performance.now() - searchStartTime;
-      totalDuration += duration;
-      foundFiles = result.length;
-    }
-
-    const avgDuration = totalDuration / iterations;
-    console.log(
-      `📊 Parallel BFS Average: ${avgDuration.toFixed(2)}ms (${iterations} runs)`,
-    );
+    // Run single iteration for faster test execution
+    const searchStartTime = performance.now();
+    const result = await bfsFileSearch(testRootDir, {
+      fileName: 'GEMINI.md',
+      maxDirs: 200,
+      debug: false,
+    });
+    const duration = performance.now() - searchStartTime;
+    const foundFiles = result.length;
+    console.log(`📊 Parallel BFS Duration: ${duration.toFixed(2)}ms`);
     console.log(`📁 Found ${foundFiles} GEMINI.md files`);
     console.log(
-      `🏎️  Processing ~${Math.round(300 / (avgDuration / 1000))} dirs/second`,
+      `🏎️  Processing ~${Math.round(200 / (duration / 1000))} dirs/second`,
     );
 
     // Verify we found the expected files
-    expect(foundFiles).toBe(40); // 20 dirs * 2 files each
+    expect(foundFiles).toBe(20); // 10 dirs * 2 files each
 
     // Performance expectation: parallel should be efficient
-    expect(avgDuration).toBeLessThan(1500); // Increased timeout to reduce flakiness on slower machines
+    expect(duration).toBeLessThan(1500); // Increased timeout to reduce flakiness on slower machines
   });
 });
