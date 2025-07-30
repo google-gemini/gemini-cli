@@ -670,19 +670,36 @@ export class CoreToolScheduler {
               return;
             }
 
-            const response = convertToFunctionResponse(
-              toolName,
-              callId,
-              toolResult.llmContent,
-            );
-            const successResponse: ToolCallResponseInfo = {
-              callId,
-              responseParts: response,
-              resultDisplay: toolResult.returnDisplay,
-              error: undefined,
-            };
-
-            this.setStatusInternal(callId, 'success', successResponse);
+            if (toolResult.error === undefined) {
+              const response = convertToFunctionResponse(
+                toolName,
+                callId,
+                toolResult.llmContent,
+              );
+              const successResponse: ToolCallResponseInfo = {
+                callId,
+                responseParts: response,
+                resultDisplay: toolResult.returnDisplay,
+                error: undefined,
+              };
+              this.setStatusInternal(callId, 'success', successResponse);
+            } else {
+              // This is now a failure case.
+              const error = new Error(toolResult.error.message);
+              const errorResponse: ToolCallResponseInfo = {
+                callId,
+                responseParts: {
+                  functionResponse: {
+                    id: callId,
+                    name: toolName,
+                    response: { error: error.message },
+                  },
+                },
+                resultDisplay: toolResult.returnDisplay,
+                error,
+              };
+              this.setStatusInternal(callId, 'error', errorResponse);
+            }
           })
           .catch((executionError: Error) => {
             this.setStatusInternal(

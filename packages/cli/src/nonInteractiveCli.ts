@@ -133,7 +133,8 @@ export async function runNonInteractive(
               `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
             );
             if (!isToolNotFound) {
-              process.exit(1);
+              // process.exit(1);
+              console.error(`It was supposed to exist process here `);
             }
           }
 

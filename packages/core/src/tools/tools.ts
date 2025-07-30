@@ -210,6 +210,14 @@ export interface ToolResult {
   llmContent: PartListUnion;
 
   /**
+   * If this property is present, the tool call is considered a failure.
+   */
+  error?: {
+    message: string; // The user-facing error message.
+    type?: string; // An optional machine-readable error type (e.g., 'FILE_NOT_FOUND').
+  };
+
+  /**
    * Markdown string for user display.
    * This provides a user-friendly summary or visualization of the result.
    * NOTE: This might also be considered UI-specific and could potentially be

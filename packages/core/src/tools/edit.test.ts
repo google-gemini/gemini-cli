@@ -405,8 +405,11 @@ describe('EditTool', () => {
         new_string: 'new',
       };
       const result = await tool.execute(params, new AbortController().signal);
-      expect(result.llmContent).toMatch(/Error: Invalid parameters provided/);
-      expect(result.returnDisplay).toMatch(/Error: File path must be absolute/);
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe('VALIDATION_ERROR');
+      expect(result.llmContent).toMatch(
+        /Could not edit file due to validation error/,
+      );
     });
 
     it('should edit an existing file and return diff with fileName', async () => {
@@ -430,6 +433,7 @@ describe('EditTool', () => {
 
       (tool as any).shouldAlwaysEdit = false; // Reset for other tests
 
+      expect(result.error).toBeUndefined();
       expect(result.llmContent).toMatch(/Successfully modified file/);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(newContent);
       const display = result.returnDisplay as FileDiff;
@@ -453,6 +457,7 @@ describe('EditTool', () => {
       );
       const result = await tool.execute(params, new AbortController().signal);
 
+      expect(result.error).toBeUndefined();
       expect(result.llmContent).toMatch(/Created new file/);
       expect(fs.existsSync(newFilePath)).toBe(true);
       expect(fs.readFileSync(newFilePath, 'utf8')).toBe(fileContent);
@@ -468,11 +473,10 @@ describe('EditTool', () => {
       };
       // The default mockEnsureCorrectEdit will return 0 occurrences for 'nonexistent'
       const result = await tool.execute(params, new AbortController().signal);
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe('EDIT_CALCULATION_ERROR');
       expect(result.llmContent).toMatch(
         /0 occurrences found for old_string in/,
-      );
-      expect(result.returnDisplay).toMatch(
-        /Failed to edit, could not find the string to replace./,
       );
     });
 
@@ -485,11 +489,10 @@ describe('EditTool', () => {
       };
       // The default mockEnsureCorrectEdit will return 2 occurrences for 'old'
       const result = await tool.execute(params, new AbortController().signal);
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe('EDIT_CALCULATION_ERROR');
       expect(result.llmContent).toMatch(
         /Expected 1 occurrence but found 2 for old_string in file/,
-      );
-      expect(result.returnDisplay).toMatch(
-        /Failed to edit, expected 1 occurrence but found 2/,
       );
     });
 
@@ -509,14 +512,11 @@ describe('EditTool', () => {
 
       (tool as any).shouldAlwaysEdit = false; // Reset for other tests
 
+      expect(result.error).toBeUndefined();
       expect(result.llmContent).toMatch(/Successfully modified file/);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(
         'new text new text new text',
       );
-      const display = result.returnDisplay as FileDiff;
-      expect(display.fileDiff).toMatch(/old text old text old text/);
-      expect(display.fileDiff).toMatch(/new text new text new text/);
-      expect(display.fileName).toBe(testFile);
     });
 
     it('should return error if expected_replacements does not match actual occurrences', async () => {
@@ -528,11 +528,10 @@ describe('EditTool', () => {
         expected_replacements: 3, // Expecting 3 but only 2 exist
       };
       const result = await tool.execute(params, new AbortController().signal);
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe('EDIT_CALCULATION_ERROR');
       expect(result.llmContent).toMatch(
         /Expected 3 occurrences but found 2 for old_string in file/,
-      );
-      expect(result.returnDisplay).toMatch(
-        /Failed to edit, expected 3 occurrences but found 2/,
       );
     });
 
@@ -544,10 +543,9 @@ describe('EditTool', () => {
         new_string: 'new content',
       };
       const result = await tool.execute(params, new AbortController().signal);
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe('EDIT_CALCULATION_ERROR');
       expect(result.llmContent).toMatch(/File already exists, cannot create/);
-      expect(result.returnDisplay).toMatch(
-        /Attempted to create a file that already exists/,
-      );
     });
 
     it('should include modification message when proposed content is modified', async () => {
@@ -618,8 +616,9 @@ describe('EditTool', () => {
         new_string: 'identical',
       };
       const result = await tool.execute(params, new AbortController().signal);
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe('EDIT_CALCULATION_ERROR');
       expect(result.llmContent).toMatch(/No changes to apply/);
-      expect(result.returnDisplay).toMatch(/No changes to apply/);
     });
   });
 

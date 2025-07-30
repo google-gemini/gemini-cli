@@ -172,6 +172,46 @@ describe('executeToolCall', () => {
     ]);
   });
 
+  it('should return an error if tool returns a result with an error property', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call-error-prop',
+      name: 'testTool',
+      args: { param1: 'value1' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-error-prop',
+    };
+    const toolResult: ToolResult = {
+      llmContent: 'Something went wrong.',
+      returnDisplay: 'A user-friendly error.',
+      error: {
+        message: 'A detailed machine-readable error.',
+        type: 'TEST_ERROR',
+      },
+    };
+    vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
+    vi.mocked(mockTool.execute).mockResolvedValue(toolResult);
+
+    const response = await executeToolCall(
+      mockConfig,
+      request,
+      mockToolRegistry,
+      abortController.signal,
+    );
+
+    expect(response.callId).toBe('call-error-prop');
+    expect(response.error).toBeInstanceOf(Error);
+    expect(response.error?.message).toBe('A detailed machine-readable error.');
+    expect(response.resultDisplay).toBe('A user-friendly error.');
+    // The llmContent from the tool result is still passed back in the response.
+    expect(response.responseParts).toEqual({
+      functionResponse: {
+        name: 'testTool',
+        id: 'call-error-prop',
+        response: { output: 'Something went wrong.' },
+      },
+    });
+  });
+
   it('should handle cancellation during tool execution', async () => {
     const request: ToolCallRequestInfo = {
       callId: 'call4',
