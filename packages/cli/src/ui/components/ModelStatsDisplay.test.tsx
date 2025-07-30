@@ -10,6 +10,13 @@ import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import { SessionMetrics } from '../contexts/SessionContext.js';
 
+vi.spyOn(Number.prototype, 'toLocaleString').mockImplementation(function (
+  this: number,
+) {
+  // Use a stable 'en-US' format for test consistency.
+  return new Intl.NumberFormat('en-US').format(this);
+});
+
 // Mock the context to provide controlled data for testing
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
   const actual = await importOriginal<typeof SessionContext>();
