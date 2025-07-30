@@ -14,7 +14,7 @@ import {
   ToolLocation,
   ToolResult,
 } from './tools.js';
-import { Type } from '@google/genai';
+import { PartUnion, Type } from '@google/genai';
 import {
   processSingleFileContent,
   getSpecificMimeType,
@@ -84,6 +84,24 @@ class ReadFileToolInvocation
       };
     }
 
+    let llmContent: PartUnion;
+    if (result.isTruncated) {
+      const [start, end] = result.linesShown!;
+      const total = result.originalLineCount!;
+      const nextOffset = this.params.offset
+        ? this.params.offset + end - start + 1
+        : end;
+      llmContent = `
+IMPORTANT: The file content has been truncated.
+Status: Showing lines ${start}-${end} of ${total} total lines.
+Action: To read more of the file, you can use the 'offset' and 'limit' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use offset: ${nextOffset}.
+
+--- FILE CONTENT (truncated) ---
+${result.llmContent}`;
+    } else {
+      llmContent = result.llmContent || '';
+    }
+
     const lines =
       typeof result.llmContent === 'string'
         ? result.llmContent.split('\n').length
@@ -98,7 +116,7 @@ class ReadFileToolInvocation
     );
 
     return {
-      llmContent: result.llmContent || '',
+      llmContent,
       returnDisplay: result.returnDisplay || '',
     };
   }
@@ -117,7 +135,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
     super(
       ReadFileTool.Name,
       'ReadFile',
-      'Reads and returns the content of a specified file from the local filesystem. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.',
+      `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.`,
       Icon.FileSearch,
       {
         properties: {
