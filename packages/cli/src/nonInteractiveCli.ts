@@ -58,6 +58,8 @@ export async function runNonInteractive(
         );
         return;
       }
+      process.stdout.write(`\n\n# Turn ${turnCount}`);
+
       const functionCalls: FunctionCall[] = [];
 
       const responseStream = geminiClient.sendMessageStream(
@@ -66,6 +68,7 @@ export async function runNonInteractive(
         prompt_id,
       );
 
+      let prefix = '\n✦ ';
       for await (const event of responseStream) {
         if (abortController.signal.aborted) {
           console.error('Operation cancelled.');
@@ -98,6 +101,7 @@ export async function runNonInteractive(
             prompt_id,
           };
 
+          process.stdout.write(`\n$ Calling tool: ${fc.name}`);
           const toolResponse = await executeToolCall(
             config,
             requestInfo,
