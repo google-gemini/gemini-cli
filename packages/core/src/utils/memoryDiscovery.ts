@@ -50,47 +50,57 @@ async function tryReadGeminiFile(
 ): Promise<GeminiFileContent | null> {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
-    
+
     // Process imports in the content
     const processedContent = await processImports(
       content,
       path.dirname(filePath),
       debugMode,
     );
-    
+
     if (debugMode)
       logger.debug(
         `Successfully read ${context} ${geminiMdFilename}: ${filePath} (Length: ${processedContent.length})`,
       );
-    
+
     return { filePath, content: processedContent };
   } catch (error) {
+    const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
+
     if (error instanceof Error && 'code' in error) {
-      const fsError = error as { code: string };
-      if (fsError.code === 'EISDIR') {
-        if (debugMode)
+      const fsError = error as { code: string; message: string };
+      // EISDIR and ENOENT are expected conditions, so only log them in debug mode.
+      if (fsError.code === 'EISDIR' || fsError.code === 'ENOENT') {
+        if (debugMode) {
           logger.debug(
-            `Path exists but is not a file: ${filePath}`,
+            `Skipping path during file read (${fsError.code}): ${filePath}`,
           );
-      } else if (fsError.code === 'EACCES') {
-        if (debugMode)
+        }
+      } else {
+        // For other errors like EACCES, it's useful to warn the user.
+        if (!isTestEnv) {
+          logger.warn(
+            `Could not read ${context} ${geminiMdFilename} at ${filePath}. Error: ${fsError.message}`,
+          );
+        }
+        if (debugMode) {
           logger.debug(
-            `${context} ${geminiMdFilename} exists but is not readable: ${filePath}`,
+            `Error reading ${context} ${geminiMdFilename} at ${filePath}: ${fsError.code}`,
           );
-      } else if (fsError.code === 'ENOENT') {
-        if (debugMode)
-          logger.debug(
-            `${context} ${geminiMdFilename} not found: ${filePath}`,
-          );
-      } else if (debugMode) {
-        logger.debug(
-          `Error reading ${context} ${geminiMdFilename} at ${filePath}: ${fsError.code}`,
+        }
+      }
+    } else {
+      // Also log unexpected, non-fs errors
+      if (!isTestEnv) {
+        logger.warn(
+          `Unexpected error reading ${context} ${geminiMdFilename} at ${filePath}: ${String(error)}`,
         );
       }
-    } else if (debugMode) {
-      logger.debug(
-        `Unexpected error reading ${context} ${geminiMdFilename} at ${filePath}: ${String(error)}`,
-      );
+      if (debugMode) {
+        logger.debug(
+          `Unexpected error reading ${context} ${geminiMdFilename} at ${filePath}: ${String(error)}`,
+        );
+      }
     }
   }
   return null;
@@ -248,9 +258,9 @@ async function getGeminiMdFileContentsInternal(
     });
     // Read downward files immediately to avoid TOCTOU
     const processedPaths = new Set<string>(
-      allContents.map(content => content.filePath)
+      allContents.map((content) => content.filePath),
     );
-    
+
     for (const dPath of downwardPaths) {
       // Skip if already processed
       if (!processedPaths.has(dPath)) {
@@ -270,14 +280,12 @@ async function getGeminiMdFileContentsInternal(
 
   // Read extension context files
   // Create a final set of all processed paths to avoid duplicates
-  const finalProcessedPaths = new Set(allContents.map(c => c.filePath));
+  const finalProcessedPaths = new Set(allContents.map((c) => c.filePath));
   for (const extensionPath of extensionContextFilePaths) {
     // Skip if already processed
     if (finalProcessedPaths.has(extensionPath)) {
       if (debugMode) {
-        logger.debug(
-          `Skipping duplicate extension path: ${extensionPath}`,
-        );
+        logger.debug(`Skipping duplicate extension path: ${extensionPath}`);
       }
       continue;
     }
@@ -370,5 +378,8 @@ export async function loadServerHierarchicalMemory(
     logger.debug(
       `Combined instructions (snippet): ${combinedInstructions.substring(0, 500)}...`,
     );
-  return { memoryContent: combinedInstructions, fileCount: contentsWithPaths.length };
+  return {
+    memoryContent: combinedInstructions,
+    fileCount: contentsWithPaths.length,
+  };
 }
