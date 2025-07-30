@@ -59,7 +59,7 @@ export interface CliArgs {
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
-  ideMode: boolean | undefined;
+  ideModeFeature: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
 }
@@ -191,7 +191,7 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'List all available extensions and exit.',
     })
-    .option('ide-mode', {
+    .option('ide-mode-feature', {
       type: 'boolean',
       description: 'Run in IDE mode?',
     })
@@ -268,10 +268,13 @@ export async function loadCliConfig(
       (v) => v === 'true' || v === '1',
     );
 
-  const ideMode =
-    (argv.ideMode ?? settings.ideMode ?? false) && !process.env.SANDBOX;
+  const ideMode = settings.ideMode ?? false;
 
-  const ideClient = IdeClient.getInstance(ideMode);
+  const ideModeFeature =
+    (argv.ideModeFeature ?? settings.ideModeFeature ?? false) &&
+    !process.env.SANDBOX;
+
+  const ideClient = IdeClient.getInstance(ideMode && ideModeFeature);
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -429,6 +432,7 @@ export async function loadCliConfig(
     noBrowser: !!process.env.NO_BROWSER,
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
+    ideModeFeature,
     ideClient,
   });
 }
