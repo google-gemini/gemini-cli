@@ -81,7 +81,10 @@ export async function bfsFileSearch(
       try {
         const entries = await fs.readdir(currentDir, { withFileTypes: true });
         return { currentDir, entries };
-      } catch {
+      } catch (error) {
+        if (debug) {
+          logger.debug(`Failed to read directory ${currentDir}:`, error);
+        }
         return { currentDir, entries: [] };
       }
     });
