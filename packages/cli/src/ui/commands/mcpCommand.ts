@@ -473,8 +473,17 @@ const refreshCommand: SlashCommand = {
   action: async (
     context: CommandContext,
   ): Promise<SlashCommandActionReturn> => {
-    const { config } = context.services;
-    if (!config) {
+    context.ui.addItem(
+      {
+        type: 'info',
+        text: 'Refreshing configurations, MCP servers, and tools...',
+      },
+      Date.now(),
+    );
+
+    const newConfig = await context.ui.refreshConfig();
+
+    if (!newConfig) {
       return {
         type: 'message',
         messageType: 'error',
@@ -482,7 +491,8 @@ const refreshCommand: SlashCommand = {
       };
     }
 
-    const toolRegistry = await config.getToolRegistry();
+    // Use the newConfig directly instead of the one from the stale context.
+    const toolRegistry = await newConfig.getToolRegistry();
     if (!toolRegistry) {
       return {
         type: 'message',
@@ -491,23 +501,23 @@ const refreshCommand: SlashCommand = {
       };
     }
 
-    context.ui.addItem(
-      {
-        type: 'info',
-        text: 'Refreshing MCP servers and tools...',
-      },
-      Date.now(),
-    );
-
     await toolRegistry.discoverMcpTools();
 
     // Update the client with the new tools
-    const geminiClient = config.getGeminiClient();
+    const geminiClient = newConfig.getGeminiClient();
     if (geminiClient) {
       await geminiClient.setTools();
     }
 
-    return getMcpStatus(context, false, false, false);
+    // Pass an updated context to getMcpStatus to show the new state.
+    const newContext = {
+      ...context,
+      services: {
+        ...context.services,
+        config: newConfig,
+      },
+    };
+    return getMcpStatus(newContext, false, false, false);
   },
 };
 

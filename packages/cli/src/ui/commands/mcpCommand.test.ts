@@ -992,19 +992,33 @@ describe('mcpCommand', () => {
         setTools: vi.fn(),
       };
 
+      const mockNewConfig = {
+        getMcpServers: vi.fn().mockReturnValue({ server1: {} }),
+        getBlockedMcpServers: vi.fn().mockReturnValue([]),
+        getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
+        getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+        getPromptRegistry: vi.fn().mockResolvedValue({
+          getPromptsByServer: vi.fn().mockReturnValue([]),
+        }),
+      };
+
       const context = createMockCommandContext({
         services: {
+          // This is the *old* config
           config: {
-            getMcpServers: vi.fn().mockReturnValue({ server1: {} }),
+            getMcpServers: vi.fn().mockReturnValue({}),
             getBlockedMcpServers: vi.fn().mockReturnValue([]),
-            getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
-            getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+            getToolRegistry: vi.fn().mockResolvedValue({
+              getAllTools: vi.fn().mockReturnValue([]),
+            }),
             getPromptRegistry: vi.fn().mockResolvedValue({
               getPromptsByServer: vi.fn().mockReturnValue([]),
             }),
           },
         },
       });
+      // Ensure the mock returns the new config
+      context.ui.refreshConfig.mockResolvedValue(mockNewConfig);
 
       const refreshCommand = mcpCommand.subCommands?.find(
         (cmd) => cmd.name === 'refresh',
@@ -1016,26 +1030,30 @@ describe('mcpCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         {
           type: 'info',
-          text: 'Refreshing MCP servers and tools...',
+          text: 'Refreshing configurations, MCP servers, and tools...',
         },
         expect.any(Number),
       );
+      expect(context.ui.refreshConfig).toHaveBeenCalled();
       expect(mockToolRegistry.discoverMcpTools).toHaveBeenCalled();
       expect(mockGeminiClient.setTools).toHaveBeenCalled();
 
       expect(isMessageAction(result)).toBe(true);
       if (isMessageAction(result)) {
         expect(result.messageType).toBe('info');
+        // Check that the status reflects the *new* config
         expect(result.content).toContain('Configured MCP servers:');
+        expect(result.content).toContain('server1');
       }
     });
 
-    it('should show an error if config is not available', async () => {
+    it('should show an error if config is not available after refresh', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
           config: null,
         },
       });
+      contextWithoutConfig.ui.refreshConfig.mockResolvedValue(null);
 
       const refreshCommand = mcpCommand.subCommands?.find(
         (cmd) => cmd.name === 'refresh',
@@ -1050,7 +1068,10 @@ describe('mcpCommand', () => {
     });
 
     it('should show an error if tool registry is not available', async () => {
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue(undefined);
+      const mockNewConfig = {
+        getToolRegistry: vi.fn().mockResolvedValue(undefined),
+      };
+      mockContext.ui.refreshConfig.mockResolvedValue(mockNewConfig);
 
       const refreshCommand = mcpCommand.subCommands?.find(
         (cmd) => cmd.name === 'refresh',

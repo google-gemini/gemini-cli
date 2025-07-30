@@ -307,7 +307,24 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       );
       console.error('Error refreshing memory:', error);
     }
-  }, [config, addItem, settings.merged]);
+  }, [config, addItem, settings.merged])
+  
+  const refreshConfig = useCallback(async (): Promise<Config> => {
+    const newSettings = loadSettings(process.cwd());
+    const newExtensions = loadExtensions(process.cwd());
+    const argv = await parseArguments();
+    const newConfig = await loadCliConfig(
+      newSettings.merged,
+      newExtensions,
+      sessionId,
+      argv,
+    );
+    await newConfig.initialize();
+    setConfig(newConfig);
+    setSettings(newSettings);
+    setGeminiMdFileCount(newConfig.getGeminiMdFileCount());
+    return newConfig;
+  }, []);
 
   // Watch for model changes (e.g., from Flash fallback)
   useEffect(() => {
