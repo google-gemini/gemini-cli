@@ -200,6 +200,7 @@ describe('Gemini Client (client.ts)', () => {
       getNoBrowser: vi.fn().mockReturnValue(false),
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
       getIdeModeFeature: vi.fn().mockReturnValue(false),
+      getIdeMode: vi.fn().mockReturnValue(true),
       getGeminiClient: vi.fn(),
       setFallbackMode: vi.fn(),
     };
