@@ -38,6 +38,60 @@ interface GeminiFileContent {
   content: string | null;
 }
 
+/**
+ * Checks if a path is a readable file and handles various filesystem errors.
+ * @returns true if the file was successfully verified and is readable, false otherwise
+ */
+async function checkAndAddReadableFile(
+  filePath: string,
+  addToCollection: () => void,
+  context: string,
+  geminiMdFilename: string,
+  debugMode: boolean,
+): Promise<boolean> {
+  try {
+    const stats = await fs.stat(filePath);
+    if (stats.isFile()) {
+      // Only check access after confirming it's a file
+      await fs.access(filePath, fsSync.constants.R_OK);
+      addToCollection();
+      if (debugMode)
+        logger.debug(
+          `Found readable ${context} ${geminiMdFilename}: ${filePath}`,
+        );
+      return true;
+    } else if (debugMode) {
+      logger.debug(
+        `Path exists but is not a file: ${filePath}`,
+      );
+    }
+  } catch (error) {
+    if (error instanceof Error && 'code' in error) {
+      const fsError = error as { code: string };
+      if (fsError.code === 'EACCES') {
+        if (debugMode)
+          logger.debug(
+            `${context} ${geminiMdFilename} exists but is not readable: ${filePath}`,
+          );
+      } else if (fsError.code === 'ENOENT') {
+        if (debugMode)
+          logger.debug(
+            `${context} ${geminiMdFilename} not found: ${filePath}`,
+          );
+      } else if (debugMode) {
+        logger.debug(
+          `Error accessing ${context} ${geminiMdFilename} at ${filePath}: ${fsError.code}`,
+        );
+      }
+    } else if (debugMode) {
+      logger.debug(
+        `Unexpected error accessing ${context} ${geminiMdFilename} at ${filePath}: ${String(error)}`,
+      );
+    }
+  }
+  return false;
+}
+
 async function findProjectRoot(startDir: string): Promise<string | null> {
   let currentDir = path.resolve(startDir);
   while (true) {
@@ -108,46 +162,13 @@ async function getGeminiMdFilePathsInternal(
       );
     if (debugMode) logger.debug(`User home directory: ${resolvedHome}`);
 
-    try {
-      const stats = await fs.stat(globalMemoryPath);
-      if (stats.isFile()) {
-        // Only check access after confirming it's a file
-        await fs.access(globalMemoryPath, fsSync.constants.R_OK);
-        allPaths.add(globalMemoryPath);
-        if (debugMode)
-          logger.debug(
-            `Found readable global ${geminiMdFilename}: ${globalMemoryPath}`,
-          );
-      } else if (debugMode) {
-        logger.debug(
-          `Path exists but is not a file: ${globalMemoryPath}`,
-        );
-      }
-    } catch (error) {
-      // Check if it's a permission error (file exists but not readable)
-      if (error instanceof Error && 'code' in error) {
-        const fsError = error as { code: string };
-        if (fsError.code === 'EACCES') {
-          if (debugMode)
-            logger.debug(
-              `Global ${geminiMdFilename} exists but is not readable: ${globalMemoryPath}`,
-            );
-        } else if (fsError.code === 'ENOENT') {
-          if (debugMode)
-            logger.debug(
-              `Global ${geminiMdFilename} not found: ${globalMemoryPath}`,
-            );
-        } else if (debugMode) {
-          logger.debug(
-            `Error accessing global ${geminiMdFilename} at ${globalMemoryPath}: ${fsError.code}`,
-          );
-        }
-      } else if (debugMode) {
-        logger.debug(
-          `Unexpected error accessing global ${geminiMdFilename} at ${globalMemoryPath}: ${String(error)}`,
-        );
-      }
-    }
+    await checkAndAddReadableFile(
+      globalMemoryPath,
+      () => allPaths.add(globalMemoryPath),
+      'global',
+      geminiMdFilename,
+      debugMode,
+    );
 
     const projectRoot = await findProjectRoot(resolvedCwd);
     if (debugMode)
@@ -180,52 +201,18 @@ async function getGeminiMdFilePathsInternal(
       }
 
       const potentialPath = path.join(currentDir, geminiMdFilename);
-      try {
-        const stats = await fs.stat(potentialPath);
-        if (stats.isFile()) {
-          // Only check access after confirming it's a file
-          await fs.access(potentialPath, fsSync.constants.R_OK);
+      await checkAndAddReadableFile(
+        potentialPath,
+        () => {
           // Add to upwardPaths only if it's not the already added globalMemoryPath
           if (potentialPath !== globalMemoryPath) {
             upwardPaths.unshift(potentialPath);
-            if (debugMode) {
-              logger.debug(
-                `Found readable upward ${geminiMdFilename}: ${potentialPath}`,
-              );
-            }
           }
-        } else if (debugMode) {
-          logger.debug(
-            `Path exists but is not a file: ${potentialPath}`,
-          );
-        }
-      } catch (error) {
-        // Check if it's a permission error (file exists but not readable)
-        if (error instanceof Error && 'code' in error) {
-          const fsError = error as { code: string };
-          if (fsError.code === 'EACCES') {
-            if (debugMode) {
-              logger.debug(
-                `Upward ${geminiMdFilename} exists but is not readable: ${potentialPath}`,
-              );
-            }
-          } else if (fsError.code === 'ENOENT') {
-            if (debugMode) {
-              logger.debug(
-                `Upward ${geminiMdFilename} not found in: ${currentDir}`,
-              );
-            }
-          } else if (debugMode) {
-            logger.debug(
-              `Error accessing upward ${geminiMdFilename} at ${potentialPath}: ${fsError.code}`,
-            );
-          }
-        } else if (debugMode) {
-          logger.debug(
-            `Unexpected error accessing upward ${geminiMdFilename} at ${potentialPath}: ${String(error)}`,
-          );
-        }
-      }
+        },
+        'upward',
+        geminiMdFilename,
+        debugMode,
+      );
 
       // Stop condition: if currentDir is the ultimateStopDir, break after this iteration.
       if (currentDir === ultimateStopDir) {
