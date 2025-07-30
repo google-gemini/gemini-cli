@@ -42,7 +42,6 @@ export const useSlashCommandProcessor = (
   clearItems: UseHistoryManagerReturn['clearItems'],
   loadHistory: UseHistoryManagerReturn['loadHistory'],
   refreshStatic: () => void,
-  setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   onDebugMessage: (message: string) => void,
   openThemeDialog: () => void,
   openAuthDialog: () => void,
@@ -128,6 +127,11 @@ export const useSlashCommandProcessor = (
           type: 'compression',
           compression: message.compression,
         };
+      } else if (message.type === MessageType.HELP) {
+        historyItemContent = {
+          type: 'help',
+          content: message.content,
+        };
       } else {
         historyItemContent = {
           type: message.type,
@@ -165,6 +169,7 @@ export const useSlashCommandProcessor = (
         stats: session.stats,
         sessionShellAllowlist,
       },
+      slashCommands: commands,
     }),
     [
       config,
@@ -182,6 +187,7 @@ export const useSlashCommandProcessor = (
       toggleCorgiMode,
       toggleVimEnabled,
       sessionShellAllowlist,
+      commands,
     ],
   );
 
@@ -318,22 +324,26 @@ export const useSlashCommandProcessor = (
                     toolArgs: result.toolArgs,
                   };
                 case 'message':
-                  addItem(
-                    {
-                      type:
-                        result.messageType === 'error'
-                          ? MessageType.ERROR
-                          : MessageType.INFO,
-                      text: result.content,
-                    },
-                    Date.now(),
-                  );
+                  if (result.messageType === 'help') {
+                    addItem(
+                      {
+                        type: 'help',
+                        content: result.content,
+                      } as HistoryItemWithoutId,
+                      Date.now(),
+                    );
+                  } else {
+                    addItem(
+                      {
+                        type: result.messageType === 'error' ? 'error' : 'info',
+                        text: result.content,
+                      },
+                      Date.now(),
+                    );
+                  }
                   return { type: 'handled' };
                 case 'dialog':
                   switch (result.dialog) {
-                    case 'help':
-                      setShowHelp(true);
-                      return { type: 'handled' };
                     case 'auth':
                       openAuthDialog();
                       return { type: 'handled' };
@@ -460,7 +470,6 @@ export const useSlashCommandProcessor = (
     [
       config,
       addItem,
-      setShowHelp,
       openAuthDialog,
       commands,
       commandContext,

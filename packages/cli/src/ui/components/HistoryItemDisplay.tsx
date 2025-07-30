@@ -10,6 +10,7 @@ import { UserMessage } from './messages/UserMessage.js';
 import { UserShellMessage } from './messages/UserShellMessage.js';
 import { GeminiMessage } from './messages/GeminiMessage.js';
 import { InfoMessage } from './messages/InfoMessage.js';
+import { HelpMessage } from './messages/HelpMessage.js';
 import { ErrorMessage } from './messages/ErrorMessage.js';
 import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
@@ -60,6 +61,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       />
     )}
     {item.type === 'info' && <InfoMessage text={item.text} />}
+    {item.type === 'help' && <HelpMessage content={item.content} />}
     {item.type === 'error' && <ErrorMessage text={item.text} />}
     {item.type === 'about' && (
       <AboutBox
