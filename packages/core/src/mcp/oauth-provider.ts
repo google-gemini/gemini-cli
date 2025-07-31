@@ -22,6 +22,7 @@ export interface MCPOAuthConfig {
   authorizationUrl?: string;
   tokenUrl?: string;
   scopes?: string[];
+  audiences?: string[];
   redirectUri?: string;
   tokenParamName?: string; // For SSE connections, specifies the query parameter name for the token
 }
@@ -295,6 +296,10 @@ export class MCPOAuthProvider {
 
     if (config.scopes && config.scopes.length > 0) {
       params.append('scope', config.scopes.join(' '));
+    }
+
+    if (config.audiences && config.audiences.length > 0) {
+      params.append('audience', config.audiences.join(' '));
     }
 
     // Add resource parameter for MCP OAuth spec compliance
