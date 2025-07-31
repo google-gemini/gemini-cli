@@ -105,7 +105,16 @@ const getMcpStatus = async (
     const promptRegistry = await config.getPromptRegistry();
     const serverPrompts = promptRegistry.getPromptsByServer(serverName) || [];
 
-    const status = getMCPServerStatus(serverName);
+    let status = getMCPServerStatus(serverName);
+    const originalStatus = status;
+
+    // If the server is "disconnected" but has cached tools or prompts, display Ready
+    if (
+      status === MCPServerStatus.DISCONNECTED &&
+      (serverTools.length > 0 || serverPrompts.length > 0)
+    ) {
+      status = MCPServerStatus.CONNECTED;
+    }
 
     // Add status indicator with descriptive text
     let statusIndicator = '';
@@ -271,11 +280,14 @@ const getMcpStatus = async (
       message += '  No tools or prompts available\n';
     } else if (serverTools.length === 0) {
       message += '  No tools available';
-      if (status === MCPServerStatus.DISCONNECTED && needsAuthHint) {
+      if (originalStatus === MCPServerStatus.DISCONNECTED && needsAuthHint) {
         message += ` ${COLOR_GREY}(type: "/mcp auth ${serverName}" to authenticate this server)${RESET_COLOR}`;
       }
       message += '\n';
-    } else if (status === MCPServerStatus.DISCONNECTED && needsAuthHint) {
+    } else if (
+      originalStatus === MCPServerStatus.DISCONNECTED &&
+      needsAuthHint
+    ) {
       // This case is for when serverTools.length > 0
       message += `  ${COLOR_GREY}(type: "/mcp auth ${serverName}" to authenticate this server)${RESET_COLOR}\n`;
     }
