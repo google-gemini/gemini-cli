@@ -145,7 +145,7 @@ export function getDiffCommand(
           newPath,
         ],
       };
-      case 'emacs':
+    case 'emacs':
       return {
         command: 'emacs',
         args: ['--eval', `(ediff "${oldPath}" "${newPath}")`],
