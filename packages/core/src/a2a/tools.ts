@@ -6,7 +6,7 @@
 
 import { z } from 'zod';
 import { A2AClientManager } from './a2a-client.js';
-import { Message } from './types.js';
+import { Message } from '@a2a-js/sdk';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { textResponse } from './utils.js';
 
@@ -75,14 +75,13 @@ export class A2AToolFunctions {
     return textResponse(output);
   }
 
-  // async send_message(
-  //   args: z.infer<typeof SendMessageInputSchema>,
-  // ): Promise<CallToolResult> {
-  //   const { agent_url, message } = args;
-  //   // TODO: Construct a full A2A Message
-  //   const task = await this.clientManager.sendMessage(agent_url, message);
-  //   return { output: `Message sent. Task ID: ${task.id}` };
-  // }
+  async send_message(
+    args: z.infer<typeof SendMessageInputSchema>,
+  ): Promise<CallToolResult> {
+    const { agent_url, message } = args;
+    // TODO: Construct a full A2A Message
+    return textResponse(await this.clientManager.sendMessage(agent_url, message));
+  }
 
   async get_task(
     args: z.infer<typeof GetTaskInputSchema>,

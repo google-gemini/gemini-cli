@@ -5,9 +5,10 @@
  */
 
 import {MessageSendParams} from '@a2a-js/sdk';
-import { A2AClient, AgentCard, Task, Message } from './types.js';
+import { AgentCard, Message, Task, TaskState, Message1 } from '@a2a-js/sdk';
+import { A2AClient } from '@a2a-js/sdk/client';
 import { v4 as uuidv4 } from 'uuid';
-import {textResponse} from './utils.js';
+import {extractMessageText, extractTaskText} from './utils.js';
 
 const AGENT_CARD_WELL_KNOWN_PATH = '/.well-known/agent-card.json'
 
@@ -47,30 +48,10 @@ export class A2AClientManager {
     console.error(`Loading agent from URL: ${url}`);
 
     // Typescript SDK throws unrecoverable error if not located at well-known/agent.json
-    // const a2aClient = new A2AClient(url);
-    // this.registeredAgents.set(url, a2aClient!);
+    const a2aClient = new A2AClient(url, agent_card_path || AGENT_CARD_WELL_KNOWN_PATH);
+    this.registeredAgents.set(url, a2aClient!);
 
-    // TODO: service now has wrong url so uncomment later
-    // return await a2aClient.getAgentCard();
-    const getAgentCard = async (agentBaseUrl: string, agent_card_path: string): Promise<AgentCard> => {
-        const specificAgentBaseUrl = agentBaseUrl.replace(/\/$/, "");
-
-        // Just for ServiceNow, correct is
-        const agentCardUrl = `${specificAgentBaseUrl}${agent_card_path}`;
-        console.error(`Fetching agent card from: ${agentCardUrl}`);
-        const response = await fetch((agentCardUrl), {
-          headers: { 'Accept': 'application/json' },
-        });
-        if (!response.ok) {
-          throw new Error(`Failed to fetch Agent Card from ${agentCardUrl}: ${response.status} ${response.statusText}`);
-        }
-        const agentCard = await response.json() as AgentCard;
-        console.error('Successfully fetched agent card:', agentCard);
-        return agentCard;
-    }
-
-    // return agent_card_path ? await getAgentCard(url, agent_card_path) : a2aClient.getAgentCard();
-    return await getAgentCard(url, agent_card_path || AGENT_CARD_WELL_KNOWN_PATH);
+    return await a2aClient.getAgentCard()
   }
 
   /**
@@ -94,42 +75,45 @@ export class A2AClientManager {
    * @param message The message to send.
    * @returns The task representing the message exchange.
    */
-  // public async sendMessage(
-  //   agentUrl: string,
-  //   message: string,
-  // ): Promise<Task> {
+  public async sendMessage(
+    agentUrl: string,
+    message: string,
+  ): Promise<string> { // Support All SendMessageREsponse types
 
-  //   // TODO: make type Message later
 
-  //   const a2aClient = this.registeredAgents.get(agentUrl);
-  //   if (!a2aClient) {
-  //     throw new Error(
-  //       `Agent at ${agentUrl} is not registered. Please run load_agent first.`,
-  //     );
-  //   }
+    const a2aClient = this.registeredAgents.get(agentUrl);
+    if (!a2aClient) {
+      throw new Error(
+        `Agent at ${agentUrl} is not registered. Please run load_agent first.`,
+      );
+    }
 
-  //   // Support more than just text
-  //   const messageParams : MessageSendParams = {
-  //     message: {
-  //       kind: "message",
-  //       role: "user",
-  //       messageId: uuidv4(),
-  //       parts: [
-  //         {
-  //           kind: "text",
-  //           text: message,
-  //         },
-  //       ]
-  //     }
-  //   }
+    // TODO: Support more than just text
+    const messageParams : MessageSendParams = {
+      message: {
+        kind: "message",
+        role: "user",
+        messageId: uuidv4(),
+        parts: [
+          {
+            kind: "text",
+            text: message,
+          },
+        ]
+      }
+    }
 
-  //   const sendMessageResponse = await a2aClient.sendMessage(messageParams);
-  //   if ('error' in sendMessageResponse) {
-
-  //   }
-
-  //   return await a2aClient.sendMessage(messageParams);
-  // }
+    const sendMessageResponse = await a2aClient.sendMessage(messageParams);
+    if ('error' in sendMessageResponse) {
+      return `There was an error getting a response from ${(await a2aClient.getAgentCard()).name}: ${sendMessageResponse.error.message};`
+    } else if (sendMessageResponse.result.kind === "message") {
+      return extractMessageText(sendMessageResponse.result)
+    } else if (sendMessageResponse.result.kind === "task") {
+      return extractTaskText(sendMessageResponse.result)
+    } else {
+      return "sendMessageResponse does not contain message or task, this should not happen."
+    }
+  }
 
   /**
    * Retrieves a task by its ID.

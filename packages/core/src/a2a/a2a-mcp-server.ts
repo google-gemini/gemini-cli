@@ -52,16 +52,16 @@ async function main() {
   );
 
   // TODO: this will eventually have to take in Part[]. Then Message type from a2a-js will have to be constructed in sendMessage().
-  // server.registerTool(
-  //   'send_message',
-  //   {
-  //     description:
-  //       'Connects to a known A2A agent, sends a message, and returns a task ID.',
-  //     inputSchema: SendMessageInputSchema.shape,
-  //     outputSchema: StringOutputSchema.shape,
-  //   },
-  //   toolImplementations.send_message.bind(toolImplementations),
-  // );
+  server.registerTool(
+    'send_message',
+    {
+      description:
+        'Connects to a known A2A agent, sends a message, and returns a task ID.',
+      inputSchema: SendMessageInputSchema.shape,
+      // outputSchema: StringOutputSchema.shape,
+    },
+    toolImplementations.send_message.bind(toolImplementations),
+  );
 
   server.registerTool(
     'get_task',
