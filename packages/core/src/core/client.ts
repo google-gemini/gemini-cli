@@ -528,7 +528,7 @@ export class GeminiClient {
       const suffix = '```';
       if (text.startsWith(prefix) && text.endsWith(suffix)) {
         ClearcutLogger.getInstance(this.config)?.logMalformedJsonResponseEvent(
-          new MalformedJsonResponseEvent(model || ''),
+          new MalformedJsonResponseEvent(modelToUse),
         );
         text = text
           .substring(prefix.length, text.length - suffix.length)
