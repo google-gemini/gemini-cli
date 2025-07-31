@@ -627,6 +627,94 @@ describe('EditTool', () => {
     });
   });
 
+  describe('Error Scenarios', () => {
+    const testFile = 'error_test.txt';
+    let filePath: string;
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, testFile);
+    });
+
+    it('should return FILE_NOT_FOUND error', async () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'any',
+        new_string: 'new',
+      };
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.error?.type).toBe('FILE_NOT_FOUND');
+    });
+
+    it('should return ATTEMPT_TO_CREATE_EXISTING_FILE error', async () => {
+      fs.writeFileSync(filePath, 'existing content', 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: '',
+        new_string: 'new content',
+      };
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.error?.type).toBe('ATTEMPT_TO_CREATE_EXISTING_FILE');
+    });
+
+    it('should return NO_OCCURRENCE_FOUND error', async () => {
+      fs.writeFileSync(filePath, 'content', 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'not-found',
+        new_string: 'new',
+      };
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.error?.type).toBe('NO_OCCURRENCE_FOUND');
+    });
+
+    it('should return EXPECTED_OCCURRENCE_MISMATCH error', async () => {
+      fs.writeFileSync(filePath, 'one one two', 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'one',
+        new_string: 'new',
+        expected_replacements: 3,
+      };
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.error?.type).toBe('EXPECTED_OCCURRENCE_MISMATCH');
+    });
+
+    it('should return NO_CHANGE error', async () => {
+      fs.writeFileSync(filePath, 'content', 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'content',
+        new_string: 'content',
+      };
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.error?.type).toBe('NO_CHANGE');
+    });
+
+    it('should return INVALID_PARAMETERS error for relative path', async () => {
+      const params: EditToolParams = {
+        file_path: 'relative/path.txt',
+        old_string: 'a',
+        new_string: 'b',
+      };
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.error?.type).toBe('INVALID_PARAMETERS');
+    });
+
+    it('should return FILE_WRITE_FAILURE on write error', async () => {
+      fs.writeFileSync(filePath, 'content', 'utf8');
+      // Make file readonly to trigger a write error
+      fs.chmodSync(filePath, '444');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'content',
+        new_string: 'new content',
+      };
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.error?.type).toBe('FILE_WRITE_FAILURE');
+    });
+  });
+
   describe('getDescription', () => {
     it('should return "No file changes to..." if old_string and new_string are the same', () => {
       const testFileName = 'test.txt';

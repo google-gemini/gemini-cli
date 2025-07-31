@@ -217,6 +217,14 @@ export interface ToolResult {
    * For now, we keep it as the core logic in ReadFileTool currently produces it.
    */
   returnDisplay: ToolResultDisplay;
+
+  /**
+   * If this property is present, the tool call is considered a failure.
+   */
+  error?: {
+    message: string; // raw error message
+    type?: string; // An optional machine-readable error type (e.g., 'FILE_NOT_FOUND').
+  };
 }
 
 export type ToolResultDisplay = string | FileDiff;

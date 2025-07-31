@@ -201,6 +201,7 @@ export function convertToFunctionResponse(
 const createErrorResponse = (
   request: ToolCallRequestInfo,
   error: Error,
+  errorType: string | undefined,
 ): ToolCallResponseInfo => ({
   callId: request.callId,
   error,
@@ -212,6 +213,7 @@ const createErrorResponse = (
     },
   },
   resultDisplay: error.message,
+  errorType,
 });
 
 interface CoreToolSchedulerOptions {
@@ -366,6 +368,7 @@ export class CoreToolScheduler {
               },
               resultDisplay,
               error: undefined,
+              errorType: undefined,
             },
             durationMs,
             outcome,
@@ -436,6 +439,7 @@ export class CoreToolScheduler {
             response: createErrorResponse(
               reqInfo,
               new Error(`Tool "${reqInfo.name}" not found in registry.`),
+              'TOOL_NOT_REGISTERED',
             ),
             durationMs: 0,
           };
@@ -499,6 +503,7 @@ export class CoreToolScheduler {
           createErrorResponse(
             reqInfo,
             error instanceof Error ? error : new Error(String(error)),
+            'GENERIC_EXCEPTION',
           ),
         );
       }
@@ -670,19 +675,30 @@ export class CoreToolScheduler {
               return;
             }
 
-            const response = convertToFunctionResponse(
-              toolName,
-              callId,
-              toolResult.llmContent,
-            );
-            const successResponse: ToolCallResponseInfo = {
-              callId,
-              responseParts: response,
-              resultDisplay: toolResult.returnDisplay,
-              error: undefined,
-            };
-
-            this.setStatusInternal(callId, 'success', successResponse);
+            if (toolResult.error === undefined) {
+              const response = convertToFunctionResponse(
+                toolName,
+                callId,
+                toolResult.llmContent,
+              );
+              const successResponse: ToolCallResponseInfo = {
+                callId,
+                responseParts: response,
+                resultDisplay: toolResult.returnDisplay,
+                error: undefined,
+                errorType: undefined,
+              };
+              this.setStatusInternal(callId, 'success', successResponse);
+            } else {
+              // It is a failure
+              const error = new Error(toolResult.error.message);
+              const errorResponse = createErrorResponse(
+                scheduledCall.request,
+                error,
+                toolResult.error.type,
+              );
+              this.setStatusInternal(callId, 'error', errorResponse);
+            }
           })
           .catch((executionError: Error) => {
             this.setStatusInternal(
@@ -693,6 +709,7 @@ export class CoreToolScheduler {
                 executionError instanceof Error
                   ? executionError
                   : new Error(String(executionError)),
+                'GENERIC_EXCEPTION',
               ),
             );
           });

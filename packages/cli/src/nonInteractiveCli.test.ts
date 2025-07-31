@@ -121,6 +121,7 @@ describe('runNonInteractive', () => {
       responseParts: [toolResponsePart],
       resultDisplay: 'Tool success display',
       error: undefined,
+      errorType: undefined,
     });
 
     const stream1 = (async function* () {
@@ -175,6 +176,7 @@ describe('runNonInteractive', () => {
       responseParts: [errorResponsePart],
       resultDisplay: 'Tool execution failed badly',
       error: new Error('Tool failed'),
+      errorType: 'GENERIC_EXCEPTION',
     });
 
     const stream1 = (async function* () {
@@ -248,6 +250,7 @@ describe('runNonInteractive', () => {
       responseParts: [errorResponsePart],
       resultDisplay: 'Tool "nonexistentTool" not found in registry.',
       error: new Error('Tool "nonexistentTool" not found in registry.'),
+      errorType: 'TOOL_NOT_REGISTERED',
     });
 
     const stream1 = (async function* () {
@@ -321,6 +324,7 @@ describe('runNonInteractive', () => {
       responseParts: [toolResponsePart],
       resultDisplay: 'Still looping',
       error: undefined,
+      errorType: undefined,
     });
 
     const stream = (async function* () {
@@ -332,7 +336,7 @@ describe('runNonInteractive', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
-    await runNonInteractive(mockConfig, 'Trigger loop');
+    await runNonInteractive(mockConfig, 'Trigger loop', 'id1234');
 
     expect(mockChat.sendMessageStream).toHaveBeenCalledTimes(1);
     expect(consoleErrorSpy).toHaveBeenCalledWith(
