@@ -11,7 +11,6 @@ import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
-import { isWithinRoot } from '../utils/fileUtils.js';
 
 /**
  * Parameters for the LS tool
@@ -129,8 +128,11 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
     if (!path.isAbsolute(params.path)) {
       return `Path must be absolute: ${params.path}`;
     }
-    if (!isWithinRoot(params.path, this.config.getTargetDir())) {
-      return `Path must be within the root directory (${this.config.getTargetDir()}): ${params.path}`;
+
+    const workspaceContext = this.config.getWorkspaceContext();
+    if (!workspaceContext.isPathWithinWorkspace(params.path)) {
+      const directories = workspaceContext.getDirectories();
+      return `Path must be within one of the workspace directories: ${directories.join(', ')}`;
     }
     return null;
   }
