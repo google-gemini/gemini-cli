@@ -542,9 +542,12 @@ export async function start_sandbox(
   const containerName = `${imageName}-${index}`;
   args.push('--name', containerName, '--hostname', containerName);
 
-  // copy GEMINI_API_KEY(s)
+  // copy GEMINI_API_KEY(s) and base URL
   if (process.env.GEMINI_API_KEY) {
     args.push('--env', `GEMINI_API_KEY=${process.env.GEMINI_API_KEY}`);
+  }
+  if (process.env.GEMINI_API_BASE_URL) {
+    args.push('--env', `GEMINI_API_BASE_URL=${process.env.GEMINI_API_BASE_URL}`);
   }
   if (process.env.GOOGLE_API_KEY) {
     args.push('--env', `GOOGLE_API_KEY=${process.env.GOOGLE_API_KEY}`);
