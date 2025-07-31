@@ -136,7 +136,9 @@ const App = ({
     resumedSessionData,
   );
 
-  const { history, addItem, clearItems, loadHistory } = useHistory();
+  const { history, addItem, clearItems, loadHistory } = useHistory({
+    chatRecordingService
+  });
 
   useEffect(() => {
     const cleanup = setUpdateHandler(addItem, setUpdateInfo);
