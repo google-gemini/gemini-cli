@@ -17,6 +17,11 @@ Slash commands provide meta-level control over the CLI itself.
     - **`save`**
       - **Description:** Saves the current conversation history. You must add a `<tag>` for identifying the conversation state.
       - **Usage:** `/chat save <tag>`
+      - **Details on Checkpoint Location:** The default locations for saved chat checkpoints are:
+        - Linux/macOS: `~/.config/google-generative-ai/checkpoints/`
+        - Windows: `C:\Users\<YourUsername>\AppData\Roaming\google-generative-ai\checkpoints\`
+        - When you run `/chat list`, the CLI only scans these specific directories to find available checkpoints.
+        - **Note:** These checkpoints are for manually saving and resuming conversation states. For automatic checkpoints created before file modifications, see the [Checkpointing documentation](../checkpointing.md).
     - **`resume`**
       - **Description:** Resumes a conversation from a previous save.
       - **Usage:** `/chat resume <tag>`
@@ -105,6 +110,9 @@ Slash commands provide meta-level control over the CLI itself.
     - **Repeat last command:** Use `.` to repeat the last editing operation
     - **Persistent setting:** Vim mode preference is saved to `~/.gemini/settings.json` and restored between sessions
   - **Status indicator:** When enabled, shows `[NORMAL]` or `[INSERT]` in the footer
+
+- **`/init`**
+  - **Description:** To help users easily create a `GEMINI.md` file, this command analyzes the current directory and generates a tailored context file, making it simpler for them to provide project-specific instructions to the Gemini agent.
 
 ### Custom Commands
 
