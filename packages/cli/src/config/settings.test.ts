@@ -1110,33 +1110,42 @@ describe('Settings Loading and Merging', () => {
       );
 
       // Mock findEnvFile to return a project .env file
-      const originalFindEnvFile = (loadSettings as any).findEnvFile;
-      (loadSettings as any).findEnvFile = () => '/mock/project/.env';
+      const originalFindEnvFile = (
+        loadSettings as unknown as { findEnvFile: () => string }
+      ).findEnvFile;
+      (loadSettings as unknown as { findEnvFile: () => string }).findEnvFile =
+        () => '/mock/project/.env';
 
       // Mock fs.readFileSync for .env file content
       const originalReadFileSync = fs.readFileSync;
-      (fs.readFileSync as Mock).mockImplementation((p: fs.PathOrFileDescriptor) => {
-        if (p === '/mock/project/.env') {
-          return 'DEBUG=true\nDEBUG_MODE=1\nGEMINI_API_KEY=test-key';
-        }
-        if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
-          return JSON.stringify(workspaceSettingsContent);
-        }
-        return '{}';
-      });
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === '/mock/project/.env') {
+            return 'DEBUG=true\nDEBUG_MODE=1\nGEMINI_API_KEY=test-key';
+          }
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
+            return JSON.stringify(workspaceSettingsContent);
+          }
+          return '{}';
+        },
+      );
 
       try {
         // This will call loadEnvironment internally with the merged settings
         const settings = loadSettings(MOCK_WORKSPACE_DIR);
-        
+
         // Verify the settings were loaded correctly
-        expect(settings.merged.excludedProjectEnvVars).toEqual(['DEBUG', 'DEBUG_MODE']);
-        
+        expect(settings.merged.excludedProjectEnvVars).toEqual([
+          'DEBUG',
+          'DEBUG_MODE',
+        ]);
+
         // Note: We can't directly test process.env changes here because the mocking
         // prevents the actual file system operations, but we can verify the settings
         // are correctly merged and passed to loadEnvironment
       } finally {
-        (loadSettings as any).findEnvFile = originalFindEnvFile;
+        (loadSettings as unknown as { findEnvFile: () => string }).findEnvFile =
+          originalFindEnvFile;
         (fs.readFileSync as Mock).mockImplementation(originalReadFileSync);
       }
     });
@@ -1159,8 +1168,14 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.user.settings.excludedProjectEnvVars).toEqual(['NODE_ENV', 'DEBUG']);
-      expect(settings.merged.excludedProjectEnvVars).toEqual(['NODE_ENV', 'DEBUG']);
+      expect(settings.user.settings.excludedProjectEnvVars).toEqual([
+        'NODE_ENV',
+        'DEBUG',
+      ]);
+      expect(settings.merged.excludedProjectEnvVars).toEqual([
+        'NODE_ENV',
+        'DEBUG',
+      ]);
     });
 
     it('should merge excludedProjectEnvVars with workspace taking precedence', () => {

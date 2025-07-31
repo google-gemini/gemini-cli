@@ -24,6 +24,7 @@ import { CustomTheme } from '../ui/themes/theme.js';
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
+export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
 export function getSystemSettingsPath(): string {
   if (process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH) {
@@ -266,13 +267,6 @@ function findEnvFile(startDir: string): string | null {
   }
 }
 
-/**
- * Get default excluded environment variables that should not be loaded from project .env files
- */
-function getDefaultExcludedEnvVars(): string[] {
-  return ['DEBUG', 'DEBUG_MODE'];
-}
-
 export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
   // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
@@ -299,11 +293,8 @@ export function loadEnvironment(settings?: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
   // Cloud Shell environment variable handling
-  if (process.env.CLOUDSHELL_ENVIRONMENT) {
-    const cloudShellProject = process.env.GOOGLE_CLOUD_PROJECT;
-    if (cloudShellProject) {
-      process.env.GOOGLE_CLOUD_PROJECT = cloudShellProject;
-    }
+  if (process.env.CLOUD_SHELL === 'true') {
+    setUpCloudShellEnvironment(envFilePath);
   }
 
   if (envFilePath) {
@@ -314,23 +305,23 @@ export function loadEnvironment(settings?: Settings): void {
       const parsedEnv = dotenv.parse(envFileContent);
 
       const excludedVars =
-        settings?.excludedProjectEnvVars || getDefaultExcludedEnvVars();
+        settings?.excludedProjectEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
       const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
 
       for (const key in parsedEnv) {
-        if (Object.prototype.hasOwnProperty.call(parsedEnv, key)) {
+        if (Object.hasOwn(parsedEnv, key)) {
           // If it's a project .env file, skip loading excluded variables.
           if (isProjectEnvFile && excludedVars.includes(key)) {
             continue;
           }
 
           // Load variable only if it's not already set in the environment.
-          if (!Object.prototype.hasOwnProperty.call(process.env, key)) {
+          if (!Object.hasOwn(process.env, key)) {
             process.env[key] = parsedEnv[key];
           }
         }
       }
-    } catch (e) {
+    } catch (_e) {
       // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
     }
   }
@@ -415,17 +406,8 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     });
   }
 
-  // Create temporary merged settings for environment loading
-  const tempMergedSettings = {
-    ...systemSettings,
-    ...userSettings,
-    ...workspaceSettings,
-  };
-
-  // Load environment with settings-aware exclusion
-  loadEnvironment(tempMergedSettings);
-
-  return new LoadedSettings(
+  // Create LoadedSettings first
+  const loadedSettings = new LoadedSettings(
     {
       path: systemSettingsPath,
       settings: systemSettings,
@@ -440,6 +422,11 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     },
     settingsErrors,
   );
+
+  // Load environment with merged settings
+  loadEnvironment(loadedSettings.merged);
+
+  return loadedSettings;
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {
