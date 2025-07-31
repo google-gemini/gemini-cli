@@ -89,12 +89,8 @@ export async function runNonInteractive(
             prompt_id,
           };
 
-          if (config.getShowToolUsage()) {
-            console.error(
-              `[INFO] Using tool: ${fc.name} with args: ${JSON.stringify(
-                fc.args,
-              )}`,
-            );
+          if (config.getShowNonInteractiveToolInfo()) {
+            console.error(`[INFO] Using tool: ${fc.name}`);
           }
 
           const toolResponse = await executeToolCall(
@@ -104,7 +100,7 @@ export async function runNonInteractive(
             abortController.signal,
           );
 
-          if (config.getShowToolUsage()) {
+          if (config.getShowNonInteractiveToolInfo()) {
             if (toolResponse.error) {
               console.error(
                 `[INFO] Tool ${fc.name} failed with error: ${

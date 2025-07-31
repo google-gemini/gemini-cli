@@ -70,7 +70,7 @@ export interface Settings {
   allowMCPServers?: string[];
   excludeMCPServers?: string[];
   showMemoryUsage?: boolean;
-  showToolUsage?: boolean;
+  showNonInteractiveToolInfo?: boolean;
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
   telemetry?: TelemetrySettings;

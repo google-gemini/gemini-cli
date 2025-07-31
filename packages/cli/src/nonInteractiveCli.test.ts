@@ -44,10 +44,10 @@ describe('runNonInteractive', () => {
     mockCoreExecuteToolCall = vi.mocked(executeToolCall);
     mockShutdownTelemetry = vi.mocked(shutdownTelemetry);
 
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     processExitSpy = vi
       .spyOn(process, 'exit')
-      .mockImplementation((() => { }) as (code?: number) => never);
+      .mockImplementation((() => {}) as (code?: number) => never);
     processStdoutSpy = vi
       .spyOn(process.stdout, 'write')
       .mockImplementation(() => true);
@@ -66,6 +66,7 @@ describe('runNonInteractive', () => {
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
       getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
       getMaxSessionTurns: vi.fn().mockReturnValue(10),
+      getShowNonInteractiveToolInfo: vi.fn().mockReturnValue(false),
       getIdeMode: vi.fn().mockReturnValue(false),
       getFullContext: vi.fn().mockReturnValue(false),
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
@@ -240,54 +241,75 @@ describe('runNonInteractive', () => {
     );
   });
 
-  it('should log tool usage when showToolUsage is enabled', async () => {
-    const functionCall: FunctionCall = {
-      id: 'fc1',
-      name: 'testTool',
-      args: { p: 'v' },
-    };
-    const toolResponsePart: Part = {
-      functionResponse: {
+  it('should log tool usage when showNonInteractiveToolInfo is enabled', async () => {
+    const toolCallEvent: ServerGeminiStreamEvent = {
+      type: GeminiEventType.ToolCallRequest,
+      value: {
+        callId: 'tool-1',
         name: 'testTool',
-        id: 'fc1',
-        response: { result: 'tool success' },
+        args: { p: 'v' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-6',
       },
     };
-
-    vi.mocked(mockConfig.getShowToolUsage).mockReturnValue(true);
-    const { executeToolCall: mockCoreExecuteToolCall } = await import(
-      '@google/gemini-cli-core'
-    );
-    vi.mocked(mockCoreExecuteToolCall).mockResolvedValue({
-      callId: 'fc1',
-      responseParts: [toolResponsePart],
+    const toolResponse: Part[] = [{ text: 'Tool response' }];
+    mockCoreExecuteToolCall.mockResolvedValue({
+      responseParts: toolResponse,
       resultDisplay: 'Tool success display',
-      error: undefined,
     });
+    vi.mocked(mockConfig.getShowNonInteractiveToolInfo).mockReturnValue(true);
 
-    const stream1 = (async function*() {
-      yield { functionCalls: [functionCall] } as GenerateContentResponse;
-    })();
-    const stream2 = (async function*() {
-      yield {
-        candidates: [{ content: { parts: [{ text: 'Final answer' }] } }],
-      } as GenerateContentResponse;
-    })();
-    mockChat.sendMessageStream
-      .mockResolvedValueOnce(stream1)
-      .mockResolvedValueOnce(stream2);
+    const firstCallEvents: ServerGeminiStreamEvent[] = [toolCallEvent];
+    const secondCallEvents: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Final answer' },
+    ];
 
-    const consoleErrorSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => { });
+    mockGeminiClient.sendMessageStream
+      .mockReturnValueOnce(createStreamFromEvents(firstCallEvents))
+      .mockReturnValueOnce(createStreamFromEvents(secondCallEvents));
 
     await runNonInteractive(mockConfig, 'Use a tool', 'prompt-id-6');
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[INFO] Using tool: testTool with args: {"p":"v"}',
-    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith('[INFO] Using tool: testTool');
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       '[INFO] Tool testTool output: Tool success display',
+    );
+  });
+
+  it('should not log tool usage when showNonInteractiveToolInfo is disabled', async () => {
+    const toolCallEvent: ServerGeminiStreamEvent = {
+      type: GeminiEventType.ToolCallRequest,
+      value: {
+        callId: 'tool-1',
+        name: 'testTool',
+        args: { p: 'v' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-7',
+      },
+    };
+    const toolResponse: Part[] = [{ text: 'Tool response' }];
+    mockCoreExecuteToolCall.mockResolvedValue({
+      responseParts: toolResponse,
+      resultDisplay: 'Tool success display',
+    });
+    vi.mocked(mockConfig.getShowNonInteractiveToolInfo).mockReturnValue(false);
+
+    const firstCallEvents: ServerGeminiStreamEvent[] = [toolCallEvent];
+    const secondCallEvents: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Final answer' },
+    ];
+
+    mockGeminiClient.sendMessageStream
+      .mockReturnValueOnce(createStreamFromEvents(firstCallEvents))
+      .mockReturnValueOnce(createStreamFromEvents(secondCallEvents));
+
+    await runNonInteractive(mockConfig, 'Use a tool', 'prompt-id-7');
+
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('[INFO] Using tool:'),
+    );
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('[INFO] Tool testTool output:'),
     );
   });
 });
