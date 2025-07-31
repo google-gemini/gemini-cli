@@ -1,4 +1,6 @@
-# Multi File Read Tool (`read_many_files`)
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/tools/multi-file.md)
+
+# Multi-file Tool
 
 This document describes the `read_many_files` tool for the Gemini CLI.
 

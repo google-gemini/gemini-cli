@@ -1,4 +1,6 @@
-# Gemini CLI: Terms of Service and Privacy Notice
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/tos-privacy.md)
+
+# Terms of Service and Privacy Policy
 
 Gemini CLI is an open-source tool that lets you interact with Google's powerful language models directly from your command-line interface. The Terms of Service and Privacy Notices that apply to your usage of the Gemini CLI depend on the type of account you use to authenticate with Google.
 

@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/deployment.md)
+
 # Gemini CLI Execution and Deployment
 
 This document describes how to run Gemini CLI and explains the deployment architecture that Gemini CLI uses.

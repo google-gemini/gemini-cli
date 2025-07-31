@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/cli/tutorials.md)
+
 # Tutorials
 
 This page contains tutorials for interacting with Gemini CLI.

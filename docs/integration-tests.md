@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/integration-tests.md)
+
 # Integration Tests
 
 This document provides information about the integration testing framework used in this project.

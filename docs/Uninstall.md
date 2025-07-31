@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/Uninstall.md)
+
 # Uninstalling the CLI
 
 Your uninstall method depends on how you ran the CLI. Follow the instructions for either npx or a global npm installation.

@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/tools/shell.md)
+
 # Shell Tool (`run_shell_command`)
 
 This document describes the `run_shell_command` tool for the Gemini CLI.

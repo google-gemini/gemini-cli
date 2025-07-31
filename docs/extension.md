@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/extension.md)
+
 # Gemini CLI Extensions
 
 Gemini CLI supports extensions that can be used to configure and extend its functionality.

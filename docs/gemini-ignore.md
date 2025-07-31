@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/gemini-ignore.md)
+
 # Ignoring Files
 
 This document provides an overview of the Gemini Ignore (`.geminiignore`) feature of the Gemini CLI.
