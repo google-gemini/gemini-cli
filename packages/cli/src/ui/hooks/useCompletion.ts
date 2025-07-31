@@ -22,7 +22,10 @@ import {
   Suggestion,
 } from '../components/SuggestionsDisplay.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
-import { logicalPosToOffset, TextBuffer } from '../components/shared/text-buffer.js';
+import {
+  logicalPosToOffset,
+  TextBuffer,
+} from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
 
@@ -335,7 +338,8 @@ export function useCompletion(
     const pathStart = commandIndex + 1;
     const partialPath = currentLine.substring(pathStart, completionEnd.current);
     const lastSlashIndex = partialPath.lastIndexOf('/');
-    completionStart.current = lastSlashIndex === -1 ? pathStart : pathStart + lastSlashIndex + 1;
+    completionStart.current =
+      lastSlashIndex === -1 ? pathStart : pathStart + lastSlashIndex + 1;
     const baseDirRelative =
       lastSlashIndex === -1
         ? '.'

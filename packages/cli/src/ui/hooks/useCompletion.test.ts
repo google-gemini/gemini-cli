@@ -1148,7 +1148,7 @@ describe('useCompletion', () => {
               name: 'show',
               description: 'Show memory',
             },
-            { 
+            {
               name: 'add',
               description: 'Add to memory',
             },
