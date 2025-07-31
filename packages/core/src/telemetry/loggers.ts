@@ -15,7 +15,7 @@ import {
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
-  EVENT_FLASH_DECIDED_TO_CONTINUE,
+  EVENT_NEXT_SPEAKER_CHECK,
   SERVICE_NAME,
   EVENT_SLASH_COMMAND,
 } from './constants.js';
@@ -27,7 +27,7 @@ import {
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
-  FlashDecidedToContinueEvent,
+  NextSpeakerCheckEvent,
   LoopDetectedEvent,
   SlashCommandEvent,
 } from './types.js';
@@ -314,22 +314,22 @@ export function logLoopDetected(
   logger.emit(logRecord);
 }
 
-export function logFlashDecidedToContinue(
+export function logNextSpeakerCheck(
   config: Config,
-  event: FlashDecidedToContinueEvent,
+  event: NextSpeakerCheckEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logFlashDecidedToContinueEvent(event);
+  ClearcutLogger.getInstance(config)?.logNextSpeakerCheck(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     ...event,
-    'event.name': EVENT_FLASH_DECIDED_TO_CONTINUE,
+    'event.name': EVENT_NEXT_SPEAKER_CHECK,
   };
 
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Flash decided to continue.`,
+    body: `Next speaker check.`,
     attributes,
   };
   logger.emit(logRecord);

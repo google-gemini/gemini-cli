@@ -43,8 +43,8 @@ import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ideContext } from '../ide/ideContext.js';
-import { logFlashDecidedToContinue } from '../telemetry/loggers.js';
-import { FlashDecidedToContinueEvent } from '../telemetry/types.js';
+import { logNextSpeakerCheck } from '../telemetry/loggers.js';
+import { NextSpeakerCheckEvent } from '../telemetry/types.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -172,7 +172,6 @@ export class GeminiClient {
   }
 
   private async getEnvironment(): Promise<Part[]> {
-    const cwd = this.config.getWorkingDir();
     const today = new Date().toLocaleDateString(undefined, {
       weekday: 'long',
       year: 'numeric',
@@ -180,14 +179,35 @@ export class GeminiClient {
       day: 'numeric',
     });
     const platform = process.platform;
-    const folderStructure = await getFolderStructure(cwd, {
-      fileService: this.config.getFileService(),
-    });
+
+    const workspaceContext = this.config.getWorkspaceContext();
+    const workspaceDirectories = workspaceContext.getDirectories();
+
+    const folderStructures = await Promise.all(
+      workspaceDirectories.map((dir) =>
+        getFolderStructure(dir, {
+          fileService: this.config.getFileService(),
+        }),
+      ),
+    );
+
+    const folderStructure = folderStructures.join('\n');
+
+    let workingDirPreamble: string;
+    if (workspaceDirectories.length === 1) {
+      workingDirPreamble = `I'm currently working in the directory: ${workspaceDirectories[0]}`;
+    } else {
+      const dirList = workspaceDirectories
+        .map((dir) => `  - ${dir}`)
+        .join('\n');
+      workingDirPreamble = `I'm currently working in the following directories:\n${dirList}`;
+    }
+
     const context = `
   This is the Gemini CLI. We are setting up the context for our chat.
   Today's date is ${today}.
   My operating system is: ${platform}
-  I'm currently working in the directory: ${cwd}
+  ${workingDirPreamble}
   ${folderStructure}
           `.trim();
 
@@ -319,7 +339,7 @@ export class GeminiClient {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
 
-    if (this.config.getIdeMode()) {
+    if (this.config.getIdeModeFeature() && this.config.getIdeMode()) {
       const ideContextState = ideContext.getIdeContext();
       const openFiles = ideContextState?.workspaceState?.openFiles;
 
@@ -395,11 +415,15 @@ export class GeminiClient {
         this,
         signal,
       );
+      logNextSpeakerCheck(
+        this.config,
+        new NextSpeakerCheckEvent(
+          prompt_id,
+          turn.finishReason?.toString() || '',
+          nextSpeakerCheck?.next_speaker || '',
+        ),
+      );
       if (nextSpeakerCheck?.next_speaker === 'model') {
-        logFlashDecidedToContinue(
-          this.config,
-          new FlashDecidedToContinueEvent(prompt_id),
-        );
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
