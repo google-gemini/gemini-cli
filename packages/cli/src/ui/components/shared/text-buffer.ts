@@ -271,26 +271,23 @@ export const replaceRangeInternal = (
     .replace(/\r/g, '\n');
   const replacementParts = normalisedReplacement.split('\n');
 
-  // Replace the content
-  if (startRow === endRow) {
-    newLines[startRow] = prefix + normalisedReplacement + suffix;
+  // The combined first line of the new text
+  const firstLine = prefix + replacementParts[0];
+
+  if (replacementParts.length === 1) {
+    // No newlines in replacement: combine prefix, replacement, and suffix on one line.
+    newLines.splice(startRow, endRow - startRow + 1, firstLine + suffix);
   } else {
-    const firstLine = prefix + replacementParts[0];
-    if (replacementParts.length === 1) {
-      // Single line of replacement text, but spanning multiple original lines
-      newLines.splice(startRow, endRow - startRow + 1, firstLine + suffix);
-    } else {
-      // Multi-line replacement text
-      const lastLine = replacementParts[replacementParts.length - 1] + suffix;
-      const middleLines = replacementParts.slice(1, -1);
-      newLines.splice(
-        startRow,
-        endRow - startRow + 1,
-        firstLine,
-        ...middleLines,
-        lastLine,
-      );
-    }
+    // Newlines in replacement: create new lines.
+    const lastLine = replacementParts[replacementParts.length - 1] + suffix;
+    const middleLines = replacementParts.slice(1, -1);
+    newLines.splice(
+      startRow,
+      endRow - startRow + 1,
+      firstLine,
+      ...middleLines,
+      lastLine,
+    );
   }
 
   const finalCursorRow = startRow + replacementParts.length - 1;
