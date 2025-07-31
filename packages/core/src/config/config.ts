@@ -197,7 +197,7 @@ export class Config {
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
   private readonly targetDir: string;
-  private readonly workspaceContext: WorkspaceContext;
+  private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
   private readonly fullContext: boolean;
@@ -392,6 +392,17 @@ export class Config {
 
   getSandbox(): SandboxConfig | undefined {
     return this.sandbox;
+  }
+
+  isRestrictiveSandbox(): boolean {
+    const sandboxConfig = this.getSandbox();
+    const seatbeltProfile = process.env.SEATBELT_PROFILE;
+    return (
+      !!sandboxConfig &&
+      sandboxConfig.command === 'sandbox-exec' &&
+      !!seatbeltProfile &&
+      seatbeltProfile.startsWith('restrictive-')
+    );
   }
 
   getTargetDir(): string {
