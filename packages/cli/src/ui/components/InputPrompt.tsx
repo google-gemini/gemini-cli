@@ -107,8 +107,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
-      onSubmit(submittedValue);
       resetCompletionState();
+      onSubmit(submittedValue);
     },
     [onSubmit, buffer, resetCompletionState, shellModeActive, shellHistory],
   );
