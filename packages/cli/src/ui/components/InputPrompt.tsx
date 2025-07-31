@@ -324,9 +324,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             }
             isSubmittingRef.current = true;
             imeTimeoutRef.current = setTimeout(() => {
-              handleSubmitAndClear(bufferRef.current.text);
-              imeTimeoutRef.current = null;
-              isSubmittingRef.current = false;
+              try {
+                handleSubmitAndClear(bufferRef.current.text);
+              } finally {
+                imeTimeoutRef.current = null;
+                isSubmittingRef.current = false;
+              }
             }, 50);
           }
         }
