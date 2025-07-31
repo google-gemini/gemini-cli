@@ -10,7 +10,7 @@ import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { TextBuffer } from './shared/text-buffer.js';
-import { cpSlice, cpLen } from '../utils/textUtils.js';
+import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
@@ -18,6 +18,7 @@ import { useCompletion } from '../hooks/useCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
+import { Settings } from '../../config/settings.js';
 import {
   clipboardHasImage,
   saveClipboardImage,
@@ -31,6 +32,7 @@ export interface InputPromptProps {
   userMessages: readonly string[];
   onClearScreen: () => void;
   config: Config;
+  settings: Settings;
   slashCommands: readonly SlashCommand[];
   commandContext: CommandContext;
   placeholder?: string;
@@ -48,6 +50,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   userMessages,
   onClearScreen,
   config,
+  settings,
   slashCommands,
   commandContext,
   placeholder = '  Type your message or @path/to/file',
@@ -77,6 +80,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     slashCommands,
     commandContext,
     config,
+    settings,
   );
 
   const resetCompletionState = completion.resetCompletionState;
@@ -126,6 +130,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     resetCompletionState,
     setJustNavigatedHistory,
   ]);
+
+  const handleAutocomplete = useCallback(
+    (indexToUse: number) => {
+      completion.handleAutocomplete(indexToUse);
+    },
+    [completion.handleAutocomplete],
+  );
+
 
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
@@ -245,6 +257,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
+      if (key.name === 'tab' && !completion.showSuggestions && completion.promptCompletion.text) {
+        completion.promptCompletion.accept();
+        return;
+      }
+
       if (!shellModeActive) {
         if (key.ctrl && key.name === 'p') {
           inputHistory.navigateUp();
@@ -351,6 +368,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
+
+      // Clear ghost text when user types regular characters (not navigation/control keys)
+      if (completion.promptCompletion.text && key.sequence && key.sequence.length === 1 && !key.ctrl && !key.meta) {
+        completion.promptCompletion.clear();
+      }
+
     },
     [
       focus,
@@ -374,6 +397,78 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
     buffer.visualCursor;
   const scrollVisualRow = buffer.visualScrollRow;
+
+  const getGhostTextLines = useCallback(() => {
+    if (!completion.promptCompletion.text || !buffer.text || !completion.promptCompletion.text.startsWith(buffer.text)) {
+      return { inlineGhost: '', additionalLines: [], debugData: null };
+    }
+    
+    const ghostSuffix = completion.promptCompletion.text.slice(buffer.text.length);
+    if (!ghostSuffix) {
+      return { inlineGhost: '', additionalLines: [], debugData: null };
+    }
+    
+    const currentLineContent = buffer.allVisualLines[cursorVisualRowAbsolute] || '';
+    const currentLineWidth = stringWidth(currentLineContent);
+    const remainingWidth = inputWidth - currentLineWidth;
+    
+    let inlineGhost = '';
+    const ghostCodePoints = toCodePoints(ghostSuffix);
+    let usedWidth = 0;
+    let inlineEndIndex = 0;
+    
+    for (let i = 0; i < ghostCodePoints.length; i++) {
+      const char = ghostCodePoints[i];
+      if (char === '\n') {
+        break;
+      }
+      
+      const charWidth = stringWidth(char);
+      if (usedWidth + charWidth > remainingWidth) {
+        break;
+      }
+      
+      inlineGhost += char;
+      usedWidth += charWidth;
+      inlineEndIndex = i + 1;
+    }
+    
+    const remainingGhostText = ghostCodePoints.slice(inlineEndIndex).join('');
+    
+    const additionalLines = [];
+    if (remainingGhostText) {
+      const remainingCodePoints = toCodePoints(remainingGhostText);
+      let currentLine = '';
+      let currentWidth = 0;
+      
+      for (const char of remainingCodePoints) {
+        if (char === '\n') {
+          if (currentLine) additionalLines.push(currentLine);
+          currentLine = '';
+          currentWidth = 0;
+          continue;
+        }
+        
+        const charWidth = stringWidth(char);
+        if (currentWidth + charWidth > inputWidth) {
+          if (currentLine) additionalLines.push(currentLine);
+          currentLine = char;
+          currentWidth = charWidth;
+        } else {
+          currentLine += char;
+          currentWidth += charWidth;
+        }
+      }
+      
+      if (currentLine) {
+        additionalLines.push(currentLine);
+      }
+    }
+    
+    return { inlineGhost, additionalLines };
+  }, [completion.promptCompletion.text, buffer.text, buffer.allVisualLines, inputWidth, cursorVisualRowAbsolute]);
+
+  const { inlineGhost, additionalLines } = getGhostTextLines();
 
   return (
     <>
@@ -402,8 +497,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
               let display = cpSlice(lineText, 0, inputWidth);
               const currentVisualWidth = stringWidth(display);
-              if (currentVisualWidth < inputWidth) {
-                display = display + ' '.repeat(inputWidth - currentVisualWidth);
+              
+              const isOnCursorLine = focus && visualIdxInRenderedSet === cursorVisualRow;
+              const currentLineGhost = isOnCursorLine ? inlineGhost : '';
+              
+              const totalWidth = Math.max(inputWidth, currentVisualWidth + stringWidth(currentLineGhost));
+              const padding = totalWidth - currentVisualWidth - stringWidth(currentLineGhost);
+              
+              if (padding > 0) {
+                display = display + ' '.repeat(padding);
               }
 
               if (focus && visualIdxInRenderedSet === cursorVisualRow) {
@@ -430,10 +532,26 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   }
                 }
               }
+              
               return (
-                <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
+                <Text key={`line-${visualIdxInRenderedSet}`}>
+                  {display}
+                  {currentLineGhost && (
+                    <Text color={Colors.Gray}>{currentLineGhost}</Text>
+                  )}
+                </Text>
               );
-            })
+            }).concat(
+              additionalLines.map((ghostLine, index) => {
+                const padding = Math.max(0, inputWidth - stringWidth(ghostLine));
+                return (
+                  <Text key={`ghost-line-${index}`} color={Colors.Gray}>
+                    {ghostLine}
+                    {' '.repeat(padding)}
+                  </Text>
+                );
+              })
+            )
           )}
         </Box>
       </Box>
