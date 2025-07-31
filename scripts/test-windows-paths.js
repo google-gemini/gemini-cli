@@ -9,33 +9,34 @@ import { fileURLToPath } from 'url';
 
 // Test how paths are normalized
 function testPathNormalization() {
-  const unixPath = '/test/project/src/file.md';
-  const windowsPath = 'C:\\test\\project\\src\\file.md';
+  // Use platform-agnostic path construction instead of hardcoded paths
+  const testPath = path.join('test', 'project', 'src', 'file.md');
+  const absoluteTestPath = path.resolve('test', 'project', 'src', 'file.md');
 
   console.log('Testing path normalization:');
-  console.log('Unix path:', unixPath);
-  console.log('Windows path:', windowsPath);
+  console.log('Relative path:', testPath);
+  console.log('Absolute path:', absoluteTestPath);
 
-  // Test path.join
-  const joinedPath = path.join('C:', 'test', 'project', 'src', 'file.md');
+  // Test path.join with different segments
+  const joinedPath = path.join('test', 'project', 'src', 'file.md');
   console.log('Joined path:', joinedPath);
 
   // Test path.normalize
-  console.log('Normalized Windows path:', path.normalize(windowsPath));
-  console.log('Normalized Unix path:', path.normalize(unixPath));
+  console.log('Normalized relative path:', path.normalize(testPath));
+  console.log('Normalized absolute path:', path.normalize(absoluteTestPath));
 
   // Test how the test would see these paths
-  const testContent = `--- File: ${windowsPath} ---\nContent\n--- End of File: ${windowsPath} ---`;
-  console.log('\nTest content with Windows paths:');
+  const testContent = `--- File: ${absoluteTestPath} ---\nContent\n--- End of File: ${absoluteTestPath} ---`;
+  console.log('\nTest content with platform-agnostic paths:');
   console.log(testContent);
 
   // Try to match with different patterns
-  const marker = `--- File: ${windowsPath} ---`;
+  const marker = `--- File: ${absoluteTestPath} ---`;
   console.log('\nTrying to match:', marker);
   console.log('Direct match:', testContent.includes(marker));
 
   // Test with normalized path in marker
-  const normalizedMarker = `--- File: ${path.normalize(windowsPath)} ---`;
+  const normalizedMarker = `--- File: ${path.normalize(absoluteTestPath)} ---`;
   console.log(
     'Normalized marker match:',
     testContent.includes(normalizedMarker),

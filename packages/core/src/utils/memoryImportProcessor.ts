@@ -233,25 +233,36 @@ export async function processImports(
   if (importFormat === 'flat') {
     // Use a queue to process files in order of first encounter, and a set to avoid duplicates
     const flatFiles: Array<{ path: string; content: string }> = [];
+    // Track processed files across the entire operation
+    const processedFiles = new Set<string>();
+
     // Helper to recursively process imports
     async function processFlat(
       fileContent: string,
       fileBasePath: string,
       filePath: string,
-      processedFiles: Set<string>,
       depth: number,
     ) {
-      if (processedFiles.has(filePath)) return;
-      processedFiles.add(filePath);
+      // Normalize the file path to ensure consistent comparison
+      const normalizedPath = path.normalize(filePath);
+
+      // Skip if already processed
+      if (processedFiles.has(normalizedPath)) return;
+
+      // Mark as processed before processing to prevent infinite recursion
+      processedFiles.add(normalizedPath);
+
       // Add this file to the flat list
-      flatFiles.push({ path: filePath, content: fileContent });
-      // Find imports in this file using non-regex approach
+      flatFiles.push({ path: normalizedPath, content: fileContent });
+
+      // Find imports in this file
       const codeRegions = findCodeRegions(fileContent);
       const imports = findImports(fileContent);
 
       // Process imports in reverse order to handle indices correctly
       for (let i = imports.length - 1; i >= 0; i--) {
         const { start, _end, path: importPath } = imports[i];
+
         // Skip if inside a code region
         if (
           codeRegions.some(
@@ -261,32 +272,48 @@ export async function processImports(
         ) {
           continue;
         }
+
+        // Validate import path
         if (
           !validateImportPath(importPath, fileBasePath, [projectRoot || ''])
         ) {
           continue;
         }
+
         const fullPath = path.resolve(fileBasePath, importPath);
-        if (processedFiles.has(fullPath)) continue;
+        const normalizedFullPath = path.normalize(fullPath);
+
+        // Skip if already processed
+        if (processedFiles.has(normalizedFullPath)) continue;
+
         try {
           await fs.access(fullPath);
           const importedContent = await fs.readFile(fullPath, 'utf-8');
+
+          // Process the imported file
           await processFlat(
             importedContent,
             path.dirname(fullPath),
-            fullPath,
-            processedFiles,
+            normalizedFullPath,
             depth + 1,
           );
-        } catch {
-          // Ignore failed imports in flat mode
+        } catch (error) {
+          if (debugMode) {
+            logger.warn(
+              `Failed to import ${fullPath}: ${hasMessage(error) ? error.message : 'Unknown error'}`,
+            );
+          }
+          // Continue with other imports even if one fails
         }
       }
     }
+
     // Start with the root file (current file)
-    const rootPath = importState.currentFile || path.resolve(basePath);
-    const processedFiles = new Set<string>();
-    await processFlat(content, basePath, rootPath, processedFiles, 0);
+    const rootPath = path.normalize(
+      importState.currentFile || path.resolve(basePath),
+    );
+    await processFlat(content, basePath, rootPath, 0);
+
     // Concatenate all unique files in order, Claude-style
     const flatContent = flatFiles
       .map(
@@ -294,6 +321,7 @@ export async function processImports(
           `--- File: ${f.path} ---\n${f.content.trim()}\n--- End of File: ${f.path} ---`,
       )
       .join('\n\n');
+
     return {
       content: flatContent,
       importTree: { path: rootPath }, // Tree not meaningful in flat mode

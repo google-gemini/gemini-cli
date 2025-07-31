@@ -59,6 +59,7 @@ export interface CliArgs {
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
+  ideMode?: boolean | undefined;
   ideModeFeature: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
@@ -277,10 +278,7 @@ export async function loadCliConfig(
   const memoryImportFormat = settings.memoryImportFormat || 'tree';
   const ideMode =
     (argv.ideMode ?? settings.ideMode ?? false) &&
-    process.env.TERM_PROGRAM === 'vscode' &&
-    );
-
-  const ideMode = settings.ideMode ?? false;
+    process.env.TERM_PROGRAM === 'vscode';
 
   const ideModeFeature =
     (argv.ideModeFeature ?? settings.ideModeFeature ?? false) &&
