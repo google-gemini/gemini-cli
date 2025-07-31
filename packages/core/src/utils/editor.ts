@@ -13,7 +13,8 @@ export type EditorType =
   | 'cursor'
   | 'vim'
   | 'neovim'
-  | 'zed';
+  | 'zed'
+  | 'emacs';
 
 function isValidEditorType(editor: string): editor is EditorType {
   return [
@@ -24,6 +25,7 @@ function isValidEditorType(editor: string): editor is EditorType {
     'vim',
     'neovim',
     'zed',
+    'emacs',
   ].includes(editor);
 }
 
@@ -59,6 +61,7 @@ const editorCommands: Record<
   vim: { win32: ['vim'], default: ['vim'] },
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
+  emacs: { win32: ['emacs.exe'], default: ['emacs'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
@@ -73,6 +76,7 @@ export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
     return notUsingSandbox;
   }
+  // For terminal-based editors like vim and emacs, allow in sandbox.
   return true;
 }
 
@@ -141,6 +145,11 @@ export function getDiffCommand(
           newPath,
         ],
       };
+    case 'emacs':
+      return {
+        command: 'emacs',
+        args: ['--eval', `(ediff "${oldPath}" "${newPath}")`],
+      };
     default:
       return null;
   }
@@ -190,6 +199,7 @@ export async function openDiff(
         });
 
       case 'vim':
+      case 'emacs':
       case 'neovim': {
         // Use execSync for terminal-based editors
         const command =
