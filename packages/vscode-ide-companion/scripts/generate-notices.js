@@ -1,10 +1,16 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import fs from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 const projectRoot = path.resolve(
-  path.join(import.meta.dirname, '..', '..', '..'),
+  path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..'),
 );
-
 async function main() {
   const packagePath = path.join(
     projectRoot,
@@ -43,7 +49,9 @@ async function main() {
     try {
       licenseContent = await fs.readFile(licenseFile, 'utf-8');
     } catch (e) {
-      // ignore
+      if (e.code !== 'ENOENT') {
+        console.warn(`Warning: Failed to read license file ${licenseFile}`, e);
+      }
     }
 
     noticeText +=
