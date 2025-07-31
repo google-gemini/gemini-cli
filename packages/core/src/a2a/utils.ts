@@ -23,7 +23,9 @@ export const textResponse = (message: string): CallToolResult => {
   };
 };
 
-export function extractMessageText(message: Message | Message1 | Message2 | undefined): string {
+export function extractMessageText(
+  message: Message | Message1 | Message2 | undefined,
+): string {
   if (!message) {
     return '';
   }
@@ -73,7 +75,7 @@ export function extractMessageText(message: Message | Message1 | Message2 | unde
   return '[unknown message part]';
 }
 
-export function extractTaskText(task: Task) : string {
+export function extractTaskText(task: Task): string {
   let output = `ID:      ${task.id}\n`;
   output += `State:   ${task.status.state}\n`;
   const messageText = extractMessageText(task.status.message);

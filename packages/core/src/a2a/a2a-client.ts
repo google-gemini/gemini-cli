@@ -4,14 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {MessageSendParams} from '@a2a-js/sdk';
+import { MessageSendParams } from '@a2a-js/sdk';
 import { AgentCard, Message, Task, TaskState, Message1 } from '@a2a-js/sdk';
 import { A2AClient } from '@a2a-js/sdk/client';
 import { v4 as uuidv4 } from 'uuid';
-import {extractMessageText, extractTaskText} from './utils.js';
+import { extractMessageText, extractTaskText } from './utils.js';
 
-const AGENT_CARD_WELL_KNOWN_PATH = '/.well-known/agent-card.json'
-
+const AGENT_CARD_WELL_KNOWN_PATH = '/.well-known/agent-card.json';
 
 /**
  * Manages the A2A client and caches loaded agent information.
@@ -28,7 +27,7 @@ export class A2AClientManager {
     if (!A2AClientManager.instance) {
       A2AClientManager.instance = new A2AClientManager();
     }
-    console.error("created new A2AClientManager instance")
+    console.error('created new A2AClientManager instance');
     return A2AClientManager.instance;
   }
 
@@ -44,14 +43,21 @@ export class A2AClientManager {
    * @param url The URL of the agent.
    * @returns The agent's card.
    */
-  public async loadAgent(url: string, agent_card_path?: string): Promise<AgentCard> {
+  public async loadAgent(
+    url: string,
+    agent_card_path?: string,
+  ): Promise<AgentCard> {
     console.error(`Loading agent from URL: ${url}`);
 
     // Typescript SDK throws unrecoverable error if not located at well-known/agent.json
-    const a2aClient = new A2AClient(url, agent_card_path || AGENT_CARD_WELL_KNOWN_PATH);
-    this.registeredAgents.set(url, a2aClient!);
+    const a2aClient = new A2AClient(
+      url,
+      agent_card_path || AGENT_CARD_WELL_KNOWN_PATH,
+    );
+    const agentCard = await a2aClient.getAgentCard();
+    this.registeredAgents.set(agentCard.name, a2aClient!);
 
-    return await a2aClient.getAgentCard()
+    return agentCard;
   }
 
   /**
@@ -71,47 +77,47 @@ export class A2AClientManager {
 
   /**
    * Connects to an agent and sends a message.
-   * @param agentUrl The URL of the agent.
+   * @param agentName The name of the agent.
    * @param message The message to send.
    * @returns The task representing the message exchange.
    */
   public async sendMessage(
-    agentUrl: string,
+    agentName: string,
     message: string,
-  ): Promise<string> { // Support All SendMessageREsponse types
+  ): Promise<string> {
+    // Support All SendMessageREsponse types
 
-
-    const a2aClient = this.registeredAgents.get(agentUrl);
+    const a2aClient = this.registeredAgents.get(agentName);
     if (!a2aClient) {
       throw new Error(
-        `Agent at ${agentUrl} is not registered. Please run load_agent first.`,
+        `Agent with name ${agentName} is not registered. Please run load_agent first.`,
       );
     }
 
     // TODO: Support more than just text
-    const messageParams : MessageSendParams = {
+    const messageParams: MessageSendParams = {
       message: {
-        kind: "message",
-        role: "user",
+        kind: 'message',
+        role: 'user',
         messageId: uuidv4(),
         parts: [
           {
-            kind: "text",
+            kind: 'text',
             text: message,
           },
-        ]
-      }
-    }
+        ],
+      },
+    };
 
     const sendMessageResponse = await a2aClient.sendMessage(messageParams);
     if ('error' in sendMessageResponse) {
-      return `There was an error getting a response from ${(await a2aClient.getAgentCard()).name}: ${sendMessageResponse.error.message};`
-    } else if (sendMessageResponse.result.kind === "message") {
-      return extractMessageText(sendMessageResponse.result)
-    } else if (sendMessageResponse.result.kind === "task") {
-      return extractTaskText(sendMessageResponse.result)
+      return `There was an error getting a response from ${(await a2aClient.getAgentCard()).name}: ${sendMessageResponse.error.message};`;
+    } else if (sendMessageResponse.result.kind === 'message') {
+      return extractMessageText(sendMessageResponse.result);
+    } else if (sendMessageResponse.result.kind === 'task') {
+      return extractTaskText(sendMessageResponse.result);
     } else {
-      return "sendMessageResponse does not contain message or task, this should not happen."
+      return 'sendMessageResponse does not contain message or task, this should not happen.';
     }
   }
 
@@ -120,10 +126,10 @@ export class A2AClientManager {
    * @param taskId The ID of the task.
    * @returns The task object.
    */
-  public getTask(agentUrl: string, taskId: string): string {
-    const a2aClient = this.registeredAgents.get(agentUrl)
+  public getTask(agentName: string, taskId: string): string {
+    const a2aClient = this.registeredAgents.get(agentName);
 
-    return "Unimplemented";
+    return 'Unimplemented';
   }
 
   /**

@@ -22,18 +22,18 @@ export const LoadAgentInputSchema = z.object({
 });
 
 export const SendMessageInputSchema = z.object({
-  agent_url: z.string().describe('The URL of the target agent.'),
+  agent_name: z.string().describe('The name of the target agent.'),
   message: z.string().describe('The text message to send to the agent.'),
 });
 
-// TODO create a map of taskId to agent_url so this doesn't neeed to be passed
+// TODO create a map of taskId to agent_name so this doesn't neeed to be passed
 export const GetTaskInputSchema = z.object({
-  agent_url: z.string().describe('The URL of the target agent.'),
+  agent_name: z.string().describe('The name of the target agent.'),
   taskId: z.string().describe('The ID of the task to query.'),
 });
 
 export const CancelTaskInputSchema = z.object({
-  agent_url: z.string().describe('The URL of the target agent.'),
+  agent_name: z.string().describe('The name of the target agent.'),
   taskId: z.string().describe('The ID of the task to cancel.'),
 });
 
@@ -78,16 +78,18 @@ export class A2AToolFunctions {
   async send_message(
     args: z.infer<typeof SendMessageInputSchema>,
   ): Promise<CallToolResult> {
-    const { agent_url, message } = args;
+    const { agent_name, message } = args;
     // TODO: Construct a full A2A Message
-    return textResponse(await this.clientManager.sendMessage(agent_url, message));
+    return textResponse(
+      await this.clientManager.sendMessage(agent_name, message),
+    );
   }
 
   async get_task(
     args: z.infer<typeof GetTaskInputSchema>,
   ): Promise<CallToolResult> {
     const unimplementedString = await this.clientManager.getTask(
-      args.agent_url,
+      args.agent_name,
       args.taskId,
     );
     return textResponse(
