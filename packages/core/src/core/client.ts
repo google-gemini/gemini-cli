@@ -417,7 +417,11 @@ export class GeminiClient {
       );
       logNextSpeakerCheck(
         this.config,
-        new NextSpeakerCheckEvent(prompt_id, turn.finishReason?.toString() || '', nextSpeakerCheck?.next_speaker || "")
+        new NextSpeakerCheckEvent(
+          prompt_id,
+          turn.finishReason?.toString() || '',
+          nextSpeakerCheck?.next_speaker || '',
+        ),
       );
       if (nextSpeakerCheck?.next_speaker === 'model') {
         const nextRequest = [{ text: 'Please continue.' }];

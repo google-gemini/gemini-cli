@@ -522,9 +522,7 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESPONSE_FINISH_REASON,
         value: JSON.stringify(event.finish_reason),
       },
-      {
-
-      },
+      {},
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
         value: this.config?.getSessionId() ?? '',

@@ -316,7 +316,7 @@ export function logLoopDetected(
 
 export function logNextSpeakerCheck(
   config: Config,
-  event: NextSpeakerCheckEvent
+  event: NextSpeakerCheckEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logNextSpeakerCheck(event);
   if (!isTelemetrySdkInitialized()) return;
