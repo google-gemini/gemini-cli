@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/core/memport.md)
+
 # Memory Import Processor
 
 The Memory Import Processor is a feature that allows you to modularize your GEMINI.md files by importing content from other markdown files using the `@file.md` syntax.

@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/sandbox.md)
+
 # Sandboxing in the Gemini CLI
 
 This document provides a guide to sandboxing in the Gemini CLI, including prerequisites, quickstart, and configuration.

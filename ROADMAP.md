@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/ROADMAP.md)
+
 # Gemini CLI Roadmap
 
 The [Official Gemini CLI Roadmap](https://github.com/orgs/google-gemini/projects/11/)

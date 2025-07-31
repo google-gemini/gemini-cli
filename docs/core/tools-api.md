@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/core/tools-api.md)
+
 # Gemini CLI Core: Tools API
 
 The Gemini CLI core (`packages/core`) features a robust system for defining, registering, and executing tools. These tools extend the capabilities of the Gemini model, allowing it to interact with the local environment, fetch web content, and perform various actions beyond simple text generation.

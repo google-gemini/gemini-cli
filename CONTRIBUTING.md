@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/CONTRIBUTING.md)
+
 # How to Contribute
 
 We would love to accept your patches and contributions to this project.

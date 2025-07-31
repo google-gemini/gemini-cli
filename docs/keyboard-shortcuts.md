@@ -1,4 +1,6 @@
-# Gemini CLI Keyboard Shortcuts
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/keyboard-shortcuts.md)
+
+# Keyboard Shortcuts
 
 This document lists the available keyboard shortcuts in the Gemini CLI.
 

@@ -1,4 +1,6 @@
-# Web Fetch Tool (`web_fetch`)
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/tools/web-fetch.md)
+
+# Web Fetch Tool (`web_fetch`) (`web_fetch`)
 
 This document describes the `web_fetch` tool for the Gemini CLI.
 

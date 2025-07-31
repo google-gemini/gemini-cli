@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/troubleshooting.md)
+
 # Troubleshooting Guide
 
 This guide provides solutions to common issues and debugging tips.

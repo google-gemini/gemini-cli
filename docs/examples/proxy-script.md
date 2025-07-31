@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/examples/proxy-script.md)
+
 # Example Proxy Script
 
 The following is an example of a proxy script that can be used with the `GEMINI_SANDBOX_PROXY_COMMAND` environment variable. This script only allows `HTTPS` connections to `example.com:443` and declines all other requests.

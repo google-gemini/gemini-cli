@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/architecture.md)
+
 # Gemini CLI Architecture Overview
 
 This document provides a high-level overview of the Gemini CLI's architecture.

@@ -1,3 +1,5 @@
+[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/core/index.md)
+
 # Gemini CLI Core
 
 Gemini CLI's core package (`packages/core`) is the backend portion of Gemini CLI, handling communication with the Gemini API, managing tools, and processing requests sent from `packages/cli`. For a general overview of Gemini CLI, see the [main documentation page](../index.md).
