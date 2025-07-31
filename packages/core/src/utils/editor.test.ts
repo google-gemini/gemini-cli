@@ -55,23 +55,23 @@ describe('editor utils', () => {
       commands: string[];
       win32Commands: string[];
     }> = [
-      { editor: 'vscode', commands: ['code'], win32Commands: ['code.cmd'] },
-      {
-        editor: 'vscodium',
-        commands: ['codium'],
-        win32Commands: ['codium.cmd'],
-      },
-      {
-        editor: 'windsurf',
-        commands: ['windsurf'],
-        win32Commands: ['windsurf'],
-      },
-      { editor: 'cursor', commands: ['cursor'], win32Commands: ['cursor'] },
-      { editor: 'vim', commands: ['vim'], win32Commands: ['vim'] },
-      { editor: 'neovim', commands: ['nvim'], win32Commands: ['nvim'] },
-      { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
-      { editor: 'emacs', command: 'emacs', win32Command: 'emacs.exe' },
-    ];
+        { editor: 'vscode', commands: ['code'], win32Commands: ['code.cmd'] },
+        {
+          editor: 'vscodium',
+          commands: ['codium'],
+          win32Commands: ['codium.cmd'],
+        },
+        {
+          editor: 'windsurf',
+          commands: ['windsurf'],
+          win32Commands: ['windsurf'],
+        },
+        { editor: 'cursor', commands: ['cursor'], win32Commands: ['cursor'] },
+        { editor: 'vim', commands: ['vim'], win32Commands: ['vim'] },
+        { editor: 'neovim', commands: ['nvim'], win32Commands: ['nvim'] },
+        { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
+        { editor: 'emacs', command: 'emacs', win32Command: 'emacs.exe' },
+      ];
 
     for (const { editor, commands, win32Commands } of testCases) {
       describe(`${editor}`, () => {
@@ -157,20 +157,20 @@ describe('editor utils', () => {
       commands: string[];
       win32Commands: string[];
     }> = [
-      { editor: 'vscode', commands: ['code'], win32Commands: ['code.cmd'] },
-      {
-        editor: 'vscodium',
-        commands: ['codium'],
-        win32Commands: ['codium.cmd'],
-      },
-      {
-        editor: 'windsurf',
-        commands: ['windsurf'],
-        win32Commands: ['windsurf'],
-      },
-      { editor: 'cursor', commands: ['cursor'], win32Commands: ['cursor'] },
-      { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
-    ];
+        { editor: 'vscode', commands: ['code'], win32Commands: ['code.cmd'] },
+        {
+          editor: 'vscodium',
+          commands: ['codium'],
+          win32Commands: ['codium.cmd'],
+        },
+        {
+          editor: 'windsurf',
+          commands: ['windsurf'],
+          win32Commands: ['windsurf'],
+        },
+        { editor: 'cursor', commands: ['cursor'], win32Commands: ['cursor'] },
+        { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
+      ];
 
     for (const { editor, commands, win32Commands } of guiEditors) {
       // Non-windows tests
@@ -266,9 +266,9 @@ describe('editor utils', () => {
       editor: EditorType;
       command: string;
     }> = [
-      { editor: 'vim', command: 'vim' },
-      { editor: 'neovim', command: 'nvim' },
-    ];
+        { editor: 'vim', command: 'vim' },
+        { editor: 'neovim', command: 'nvim' },
+      ];
 
     for (const { editor, command } of terminalEditors) {
       it(`should return the correct command for ${editor}`, () => {
@@ -388,9 +388,8 @@ describe('editor utils', () => {
         await openDiff('old.txt', 'new.txt', editor);
         expect(execSync).toHaveBeenCalledTimes(1);
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
-        const expectedCommand = `${
-          diffCommand.command
-        } ${diffCommand.args.map((arg) => `"${arg}"`).join(' ')}`;
+        const expectedCommand = `${diffCommand.command
+          } ${diffCommand.args.map((arg) => `"${arg}"`).join(' ')}`;
         expect(execSync).toHaveBeenCalledWith(expectedCommand, {
           stdio: 'inherit',
           encoding: 'utf8',
@@ -415,7 +414,7 @@ describe('editor utils', () => {
     it('should log an error if diff command is not available', async () => {
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
-        .mockImplementation(() => {});
+        .mockImplementation(() => { });
       // @ts-expect-error Testing unsupported editor
       await openDiff('old.txt', 'new.txt', 'foobar');
       expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -513,10 +512,12 @@ describe('editor utils', () => {
       process.env.SANDBOX = 'sandbox';
       expect(isEditorAvailable('emacs')).toBe(true);
 
-    it('should return true for neovim when installed and in sandbox mode', () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/nvim'));
-      process.env.SANDBOX = 'sandbox';
-      expect(isEditorAvailable('neovim')).toBe(true);
+      it('should return true for neovim when installed and in sandbox mode', () => {
+        (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/nvim'));
+        process.env.SANDBOX = 'sandbox';
+        expect(isEditorAvailable('neovim')).toBe(true);
+      });
     });
   });
 });
+ 
