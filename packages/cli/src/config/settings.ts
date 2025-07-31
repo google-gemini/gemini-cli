@@ -99,7 +99,9 @@ export interface Settings {
 
   vimMode?: boolean;
 
-  // Add other settings here.
+  // Flag to be removed post-launch.
+  ideModeFeature?: boolean;
+  /// IDE mode setting configured via slash command toggle.
   ideMode?: boolean;
 
   // Setting for disabling auto-update.
