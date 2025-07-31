@@ -347,6 +347,10 @@ export class MCPOAuthProvider {
       params.append('client_secret', config.clientSecret);
     }
 
+    if (config.audiences && config.audiences.length > 0) {
+      params.append('audience', config.audiences.join(' '));
+    }
+
     // Add resource parameter for MCP OAuth spec compliance
     // Use the MCP server URL if provided, otherwise fall back to token URL
     const resourceUrl = mcpServerUrl || config.tokenUrl!;
@@ -403,6 +407,10 @@ export class MCPOAuthProvider {
 
     if (config.scopes && config.scopes.length > 0) {
       params.append('scope', config.scopes.join(' '));
+    }
+
+    if (config.audiences && config.audiences.length > 0) {
+      params.append('audience', config.audiences.join(' '));
     }
 
     // Add resource parameter for MCP OAuth spec compliance
