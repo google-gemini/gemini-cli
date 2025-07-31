@@ -66,15 +66,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     bufferRef.current = buffer;
   }, [buffer]);
 
- useEffect(
-   () => () => {
-     // Always clear the timeout on unmount to prevent state updates on an unmounted component.
-     if (imeTimeoutRef.current) {
-       clearTimeout(imeTimeoutRef.current);
-     }
-   },
-   [],
- );
+  useEffect(
+    () => () => {
+      // Always clear the timeout on unmount to prevent state updates on an unmounted component.
+      if (imeTimeoutRef.current) {
+        clearTimeout(imeTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -193,6 +193,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      // If a submission is in progress, ignore all keypresses.
+      if (isSubmittingRef.current) {
+        return;
+      }
+
       /// We want to handle paste even when not focused to support drag and drop.
       if (!focus && !key.paste) {
         return;
