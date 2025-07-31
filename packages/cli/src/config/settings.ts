@@ -298,28 +298,40 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
 export function loadEnvironment(settings?: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
-  if (process.env.CLOUD_SHELL === 'true') {
-    setUpCloudShellEnvironment(envFilePath);
+  // Cloud Shell environment variable handling
+  if (process.env.CLOUDSHELL_ENVIRONMENT) {
+    const cloudShellProject = process.env.GOOGLE_CLOUD_PROJECT;
+    if (cloudShellProject) {
+      process.env.GOOGLE_CLOUD_PROJECT = cloudShellProject;
+    }
   }
 
   if (envFilePath) {
-    // Load environment variables from .env file
-    const envConfig = dotenv.config({ path: envFilePath, quiet: true });
+    // Manually parse and load environment variables to handle exclusions correctly.
+    // This avoids modifying environment variables that were already set from the shell.
+    try {
+      const envFileContent = fs.readFileSync(envFilePath, 'utf-8');
+      const parsedEnv = dotenv.parse(envFileContent);
 
-    // Filter out excluded environment variables if they came from a project .env file
-    const excludedVars =
-      settings?.excludedProjectEnvVars || getDefaultExcludedEnvVars();
-    if (envConfig.parsed && excludedVars.length > 0) {
+      const excludedVars =
+        settings?.excludedProjectEnvVars || getDefaultExcludedEnvVars();
       const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
 
-      if (isProjectEnvFile) {
-        // Remove excluded variables from process.env if they were loaded from project .env
-        excludedVars.forEach((varName) => {
-          if (envConfig.parsed![varName] !== undefined) {
-            delete process.env[varName];
+      for (const key in parsedEnv) {
+        if (Object.prototype.hasOwnProperty.call(parsedEnv, key)) {
+          // If it's a project .env file, skip loading excluded variables.
+          if (isProjectEnvFile && excludedVars.includes(key)) {
+            continue;
           }
-        });
+
+          // Load variable only if it's not already set in the environment.
+          if (!Object.prototype.hasOwnProperty.call(process.env, key)) {
+            process.env[key] = parsedEnv[key];
+          }
+        }
       }
+    } catch (e) {
+      // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
     }
   }
 }
