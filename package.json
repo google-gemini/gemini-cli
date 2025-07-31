@@ -58,6 +58,7 @@
     "LICENSE"
   ],
   "devDependencies": {
+    "@types/marked": "^5.0.2",
     "@types/micromatch": "^4.0.9",
     "@types/mime-types": "^3.0.1",
     "@types/minimatch": "^5.1.2",
