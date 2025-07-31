@@ -715,6 +715,28 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+   it('should call buffer.move("home") on home key', async () => {
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\u001b[H'); // Home key
+    await wait();
+
+    expect(mockBuffer.move).toHaveBeenCalledWith('home');
+    unmount();
+  });
+
+  it('should call buffer.move("end") on end key', async () => {
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\u001b[F'); // End key
+    await wait();
+
+    expect(mockBuffer.move).toHaveBeenCalledWith('end');
+    unmount();
+  });
+  
   describe('cursor-based completion trigger', () => {
     it('should trigger completion when cursor is after @ without spaces', async () => {
       // Set up buffer state
