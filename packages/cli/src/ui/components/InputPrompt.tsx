@@ -61,13 +61,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const bufferRef = useRef(buffer);
   const imeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSubmittingRef = useRef(false);
   useEffect(() => {
     bufferRef.current = buffer;
   }, [buffer]);
 
   useEffect(
     () => () => {
-      if (imeTimeoutRef.current) {
+      // Only clear the timeout if we are not in the process of submitting.
+      // This prevents losing the submission if the component unmounts.
+      if (imeTimeoutRef.current && !isSubmittingRef.current) {
         clearTimeout(imeTimeoutRef.current);
       }
     },
@@ -315,8 +318,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             if (imeTimeoutRef.current) {
               clearTimeout(imeTimeoutRef.current);
             }
+            isSubmittingRef.current = true;
             imeTimeoutRef.current = setTimeout(() => {
               handleSubmitAndClear(bufferRef.current.text);
+              imeTimeoutRef.current = null;
+              isSubmittingRef.current = false;
             }, 50);
           }
         }
