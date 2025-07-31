@@ -58,6 +58,10 @@ describe('handleAtCommand', () => {
       }),
       getEnableRecursiveFileSearch: vi.fn(() => true),
       getMcpServers: () => ({}), // Add mock for getMcpServers
+      getWorkspaceContext: () => ({
+        isPathWithinWorkspace: () => true,
+        getDirectories: () => [testRootDir],
+      }),
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig);
