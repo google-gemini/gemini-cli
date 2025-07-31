@@ -339,7 +339,7 @@ export class GeminiClient {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
 
-    if (this.config.getIdeMode()) {
+    if (this.config.getIdeModeFeature() && this.config.getIdeMode()) {
       const ideContextState = ideContext.getIdeContext();
       const openFiles = ideContextState?.workspaceState?.openFiles;
 
