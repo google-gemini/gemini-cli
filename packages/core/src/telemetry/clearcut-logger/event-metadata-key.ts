@@ -173,6 +173,16 @@ export enum EventMetadataKey {
 
   // Logs the subcommand of the slash command.
   GEMINI_CLI_SLASH_COMMAND_SUBCOMMAND = 42,
+
+  // ==========================================================================
+  // Next Speaker Check Event Keys
+  // ===========================================================================
+
+  // Logs the finish reason of the previous streamGenerateContent response
+  GEMINI_CLI_RESPONSE_FINISH_REASON = 43,
+
+  // Logs the result of the next speaker check
+  GEMINI_CLI_NEXT_SPEAKER_CHECK_RESULT = 44,
 }
 
 export function getEventMetadataKey(
