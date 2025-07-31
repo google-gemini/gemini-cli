@@ -1,7 +1,7 @@
 This file contains third-party software notices and license terms.
 
 ============================================================
-@modelcontextprotocol/sdk@1.15.1
+@modelcontextprotocol/sdk@^1.15.1
 (git+https://github.com/modelcontextprotocol/typescript-sdk.git)
 
 MIT License
@@ -28,7 +28,7 @@ SOFTWARE.
 
 
 ============================================================
-cors@2.8.5
+cors@^2.8.5
 (No repository found)
 
 (The MIT License)
@@ -56,7 +56,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-express@5.1.0
+express@^5.1.0
 (No repository found)
 
 (The MIT License)
@@ -86,7 +86,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-zod@3.25.76
+zod@^3.25.76
 (git+https://github.com/colinhacks/zod.git)
 
 MIT License

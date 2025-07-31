@@ -11,60 +11,83 @@ import { fileURLToPath } from 'url';
 const projectRoot = path.resolve(
   path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..'),
 );
-async function main() {
-  const packagePath = path.join(
-    projectRoot,
-    'packages',
-    'vscode-ide-companion',
-  );
+const packagePath = path.join(projectRoot, 'packages', 'vscode-ide-companion');
+const noticeFilePath = path.join(packagePath, 'NOTICES.txt');
 
-  const packageJsonPath = path.join(packagePath, 'package.json');
-  const packageJsonContent = await fs.readFile(packageJsonPath, 'utf-8');
-  const packageJson = JSON.parse(packageJsonContent);
+async function getDependencyLicense(depName, depVersion) {
+  let depPackageJsonPath;
+  let licenseContent = 'License text not found.';
+  let repositoryUrl = 'No repository found';
 
-  const dependencies = packageJson.dependencies || {};
-  const dependencyNames = Object.keys(dependencies);
+  try {
+    // Try to find the dependency's package.json
+    // This handles both hoisted (monorepo root) and local node_modules
+    depPackageJsonPath = path.join(projectRoot, 'node_modules', depName, 'package.json');
+    if (!await fs.stat(depPackageJsonPath).catch(() => false)) {
+        depPackageJsonPath = path.join(packagePath, 'node_modules', depName, 'package.json');
+    }
 
-  let noticeText =
-    'This file contains third-party software notices and license terms.\n\n';
-
-  for (const depName of dependencyNames) {
-    const depPackageJsonPath = path.join(
-      projectRoot,
-      'node_modules',
-      depName,
-      'package.json',
-    );
-    const depPackageJsonContent = await fs.readFile(
-      depPackageJsonPath,
-      'utf-8',
-    );
+    const depPackageJsonContent = await fs.readFile(depPackageJsonPath, 'utf-8');
     const depPackageJson = JSON.parse(depPackageJsonContent);
+
+    repositoryUrl = depPackageJson.repository?.url || repositoryUrl;
 
     const licenseFile = depPackageJson.licenseFile
       ? path.join(path.dirname(depPackageJsonPath), depPackageJson.licenseFile)
       : path.join(path.dirname(depPackageJsonPath), 'LICENSE');
 
-    let licenseContent = 'License text not found.';
     try {
       licenseContent = await fs.readFile(licenseFile, 'utf-8');
     } catch (e) {
       if (e.code !== 'ENOENT') {
-        console.warn(`Warning: Failed to read license file ${licenseFile}`, e);
+        console.warn(`Warning: Failed to read license file for ${depName}: ${e.message}`);
       }
+      // licenseContent remains 'License text not found.'
     }
-
-    noticeText +=
-      '============================================================\n';
-    noticeText += `${depPackageJson.name}@${depPackageJson.version}\n`;
-    noticeText += `(${depPackageJson.repository?.url || 'No repository found'})\n\n`;
-    noticeText += `${licenseContent}\n\n`;
+  } catch (e) {
+    console.warn(`Warning: Could not find package.json for ${depName}@${depVersion}. It may be a devDependency or not installed.`);
   }
 
-  const noticeFilePath = path.join(packagePath, 'NOTICES.txt');
-  await fs.writeFile(noticeFilePath, noticeText);
+  return {
+    name: depName,
+    version: depVersion,
+    repository: repositoryUrl,
+    license: licenseContent,
+  };
+}
 
-  console.log(`NOTICES.txt generated at ${noticeFilePath}`);
+async function main() {
+  try {
+    const packageJsonPath = path.join(packagePath, 'package.json');
+    const packageJsonContent = await fs.readFile(packageJsonPath, 'utf-8');
+    const packageJson = JSON.parse(packageJsonContent);
+
+    const dependencies = packageJson.dependencies || {};
+    const dependencyEntries = Object.entries(dependencies);
+
+    const licensePromises = dependencyEntries.map(([depName, depVersion]) =>
+      getDependencyLicense(depName, depVersion)
+    );
+
+    const dependencyLicenses = await Promise.all(licensePromises);
+
+    let noticeText =
+      'This file contains third-party software notices and license terms.\n\n';
+
+    for (const dep of dependencyLicenses) {
+      noticeText +=
+        '============================================================\n';
+      noticeText += `${dep.name}@${dep.version}\n`;
+      noticeText += `(${dep.repository})\n\n`;
+      noticeText += `${dep.license}\n\n`;
+    }
+
+    await fs.writeFile(noticeFilePath, noticeText);
+    console.log(`NOTICES.txt generated at ${noticeFilePath}`);
+  } catch (error) {
+    console.error('Error generating NOTICES.txt:', error);
+    process.exit(1);
+  }
 }
 
 main().catch(console.error);
