@@ -105,10 +105,15 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
     let url = urls[0];
 
     // Convert GitHub blob URL to raw URL
-    if (url.includes('github.com') && url.includes('/blob/')) {
-      url = url
-        .replace('github.com', 'raw.githubusercontent.com')
-        .replace('/blob/', '/');
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.host === 'github.com' && url.includes('/blob/')) {
+        url = url
+          .replace('github.com', 'raw.githubusercontent.com')
+          .replace('/blob/', '/');
+      }
+    } catch (error) {
+      throw new Error(`Invalid URL: ${url}`);
     }
 
     try {
@@ -195,10 +200,16 @@ ${textContent}
     // Perform GitHub URL conversion here to differentiate between user-provided
     // URL and the actual URL to be fetched.
     const urls = extractUrls(params.prompt).map((url) => {
-      if (url.includes('github.com') && url.includes('/blob/')) {
-        return url
-          .replace('github.com', 'raw.githubusercontent.com')
-          .replace('/blob/', '/');
+      try {
+        const parsedUrl = new URL(url);
+        if (parsedUrl.hostname === 'github.com' && url.includes('/blob/')) {
+          return url
+            .replace('github.com', 'raw.githubusercontent.com')
+            .replace('/blob/', '/');
+        }
+      } catch (e) {
+        // If URL parsing fails, ignore this URL
+        console.error(`Invalid URL encountered: ${url}`);
       }
       return url;
     });
