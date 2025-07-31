@@ -18,7 +18,7 @@ import {
   ApiErrorEvent,
   FlashFallbackEvent,
   LoopDetectedEvent,
-  FlashDecidedToContinueEvent,
+  NextSpeakerCheckEvent,
   SlashCommandEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
@@ -40,7 +40,7 @@ const api_error_event_name = 'api_error';
 const end_session_event_name = 'end_session';
 const flash_fallback_event_name = 'flash_fallback';
 const loop_detected_event_name = 'loop_detected';
-const flash_decided_to_continue_event_name = 'flash_decided_to_continue';
+const next_speaker_check_event_name = 'next_speaker_check';
 const slash_command_event_name = 'slash_command';
 
 export interface LogResponse {
@@ -512,11 +512,19 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
-  logFlashDecidedToContinueEvent(event: FlashDecidedToContinueEvent): void {
+  logNextSpeakerCheck(event: NextSpeakerCheckEvent): void {
     const data = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
         value: JSON.stringify(event.prompt_id),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESPONSE_FINISH_REASON,
+        value: JSON.stringify(event.finish_reason),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_NEXT_SPEAKER_CHECK_RESULT,
+        value: JSON.stringify(event.result),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
@@ -525,7 +533,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(flash_decided_to_continue_event_name, data),
+      this.createLogEvent(next_speaker_check_event_name, data),
     );
     this.flushIfNeeded();
   }
