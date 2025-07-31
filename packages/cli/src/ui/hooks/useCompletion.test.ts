@@ -22,6 +22,7 @@ describe('useCompletion', () => {
 
   // A minimal mock is sufficient for these tests.
   const mockCommandContext = {} as CommandContext;
+  let testDirs: string[];
 
   async function createEmptyDir(...pathSegments: string[]) {
     const fullPath = path.join(testRootDir, ...pathSegments);
@@ -51,8 +52,12 @@ describe('useCompletion', () => {
     testRootDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'completion-unit-test-'),
     );
+    testDirs = [testRootDir];
     mockConfig = {
       getTargetDir: () => testRootDir,
+      getWorkspaceContext: () => ({
+        getDirectories: () => testDirs,
+      }),
       getProjectRoot: () => testRootDir,
       getFileFilteringOptions: vi.fn(() => ({
         respectGitIgnore: true,
@@ -79,6 +84,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest(''),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -108,6 +114,7 @@ describe('useCompletion', () => {
             const textBuffer = useTextBufferForTest(text);
             return useCompletion(
               textBuffer,
+              testDirs,
               testRootDir,
               slashCommands,
               mockCommandContext,
@@ -138,6 +145,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/help'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -170,6 +178,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest(''),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -191,6 +200,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest(''),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -215,6 +225,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/h'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -242,6 +253,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/h'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -270,6 +282,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -315,6 +328,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/command'),
+            testDirs,
             testRootDir,
             largeMockCommands,
             mockCommandContext,
@@ -372,6 +386,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -380,7 +395,13 @@ describe('useCompletion', () => {
 
         expect(result.current.suggestions.length).toBe(slashCommands.length);
         expect(result.current.suggestions.map((s) => s.label)).toEqual(
-          expect.arrayContaining(['help', 'clear', 'memory', 'resume', 'stats']),
+          expect.arrayContaining([
+            'help',
+            'clear',
+            'memory',
+            'resume',
+            'stats',
+          ]),
         );
       });
 
@@ -394,6 +415,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/mem'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -417,6 +439,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/usag'), // part of the word "usage"
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -443,6 +466,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/clear'), // No trailing space
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -474,6 +498,7 @@ describe('useCompletion', () => {
           const { result } = renderHook(() =>
             useCompletion(
               useTextBufferForTest(query),
+              testDirs,
               testRootDir,
               mockSlashCommands,
               mockCommandContext,
@@ -494,6 +519,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/clear '),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -514,6 +540,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/unknown-command'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -547,6 +574,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/memory'), // Note: no trailing space
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -584,6 +612,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/memory'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -619,6 +648,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/memory a'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -650,6 +680,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/memory dothisnow'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -684,7 +715,8 @@ describe('useCompletion', () => {
 
         const { result } = renderHook(() =>
           useCompletion(
-            useTextBufferForTest('/resume my-ch'),
+            useTextBufferForTest('/resume'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -721,6 +753,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/resume '),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -748,6 +781,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/resume '),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -775,6 +809,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('@s'),
+            testDirs,
             testRootDir,
             [],
             mockCommandContext,
@@ -808,6 +843,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('@src/comp'),
+            testDirs,
             testRootDir,
             [],
             mockCommandContext,
@@ -833,6 +869,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('@.'),
+            testDirs,
             testRootDir,
             [],
             mockCommandContext,
@@ -864,6 +901,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('@d'),
+            testDirs,
             testRootDir,
             [],
             mockCommandContext,
@@ -889,6 +927,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('@'),
+            testDirs,
             testRootDir,
             [],
             mockCommandContext,
@@ -923,6 +962,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('@'),
+            testDirs,
             testRootDir,
             [],
             mockCommandContext,
@@ -953,6 +993,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('@d'),
+            testDirs,
             testRootDir,
             [],
             mockCommandContext,
@@ -986,6 +1027,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('@'),
+            testDirs,
             testRootDir,
             [],
             mockCommandContext,
@@ -1018,6 +1060,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('@t'),
+            testDirs,
             testRootDir,
             [],
             mockCommandContext,
@@ -1064,6 +1107,7 @@ describe('useCompletion', () => {
       const { result } = renderHook(() =>
         useCompletion(
           mockBuffer,
+          testDirs,
           testRootDir,
           slashCommands,
           mockCommandContext,
@@ -1107,6 +1151,7 @@ describe('useCompletion', () => {
       const { result } = renderHook(() =>
         useCompletion(
           mockBuffer,
+          testDirs,
           testRootDir,
           slashCommands,
           mockCommandContext,
@@ -1152,6 +1197,7 @@ describe('useCompletion', () => {
       const { result } = renderHook(() =>
         useCompletion(
           mockBuffer,
+          testDirs,
           testRootDir,
           slashCommands,
           mockCommandContext,
@@ -1200,6 +1246,7 @@ describe('useCompletion', () => {
       const { result } = renderHook(() =>
         useCompletion(
           mockBuffer,
+          testDirs,
           testRootDir,
           slashCommands,
           mockCommandContext,

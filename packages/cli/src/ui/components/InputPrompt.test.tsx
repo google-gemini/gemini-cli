@@ -164,6 +164,9 @@ describe('InputPrompt', () => {
         getProjectRoot: () => path.join('test', 'project'),
         getTargetDir: () => path.join('test', 'project', 'src'),
         getVimMode: () => false,
+        getWorkspaceContext: () => ({
+          getDirectories: () => ['/test/project/src'],
+        }),
       } as unknown as Config,
       slashCommands: mockSlashCommands,
       commandContext: mockCommandContext,
@@ -723,6 +726,7 @@ describe('InputPrompt', () => {
       // Verify useCompletion was called with correct signature
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -748,6 +752,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -773,6 +778,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -798,6 +804,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -823,6 +830,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -849,6 +857,7 @@ describe('InputPrompt', () => {
       // Verify useCompletion was called with the buffer
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -874,6 +883,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -900,6 +910,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -926,6 +937,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -952,6 +964,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -978,6 +991,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -1006,6 +1020,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -1032,6 +1047,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -1060,6 +1076,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
