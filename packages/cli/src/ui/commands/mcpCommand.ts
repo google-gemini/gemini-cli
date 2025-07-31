@@ -108,7 +108,7 @@ const getMcpStatus = async (
     let status = getMCPServerStatus(serverName);
     const originalStatus = status;
 
-    // If the server is "disconnected" but has cached tools or prompts, display Ready
+    // If the server is "disconnected" but has prompts or cached tools, display Ready
     if (
       status === MCPServerStatus.DISCONNECTED &&
       (serverTools.length > 0 || serverPrompts.length > 0)
