@@ -110,7 +110,7 @@ describe('secure-browser-launcher', () => {
           '-WindowStyle',
           'Hidden',
           '-Command',
-          `Start-Process "${maliciousUrl}"`,
+          `Start-Process '${maliciousUrl.replace(/'/g, "''")}'`,
         ],
         expect.any(Object),
       );
@@ -138,6 +138,28 @@ describe('secure-browser-launcher', () => {
         );
       }
     });
+
+    it('should properly escape single quotes in URLs on Windows', async () => {
+      setPlatform('win32');
+
+      const urlWithSingleQuotes =
+        "http://example.com/path?name=O'Brien&test='value'";
+      await openBrowserSecurely(urlWithSingleQuotes);
+
+      // Verify that single quotes are escaped by doubling them
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-WindowStyle',
+          'Hidden',
+          '-Command',
+          `Start-Process 'http://example.com/path?name=O''Brien&test=''value'''`,
+        ],
+        expect.any(Object),
+      );
+    });
   });
 
   describe('Platform-specific behavior', () => {
@@ -158,7 +180,7 @@ describe('secure-browser-launcher', () => {
         'powershell.exe',
         expect.arrayContaining([
           '-Command',
-          'Start-Process "https://example.com"',
+          `Start-Process 'https://example.com'`,
         ]),
         expect.any(Object),
       );

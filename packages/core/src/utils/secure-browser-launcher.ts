@@ -76,7 +76,7 @@ export async function openBrowserSecurely(url: string): Promise<void> {
         '-WindowStyle',
         'Hidden',
         '-Command',
-        `Start-Process "${url}"`,
+        `Start-Process '${url.replace(/'/g, "''")}'`,
       ];
       break;
 
