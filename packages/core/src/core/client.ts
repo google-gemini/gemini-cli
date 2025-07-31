@@ -43,7 +43,10 @@ import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ideContext } from '../ide/ideContext.js';
-import { logFlashDecidedToContinue } from '../telemetry/loggers.js';
+import {
+  logFlashDecidedToContinue,
+  recordMemoryCompressionMetric,
+} from '../telemetry/loggers.js';
 import { FlashDecidedToContinueEvent } from '../telemetry/types.js';
 
 function isThinkingSupported(model: string) {
@@ -699,6 +702,12 @@ export class GeminiClient {
       return null;
     }
 
+    recordMemoryCompressionMetric(
+      this.config,
+      originalTokenCount,
+      newTokenCount,
+    );
+
     return {
       originalTokenCount,
       newTokenCount,
@@ -737,7 +746,6 @@ export class GeminiClient {
         );
         if (accepted !== false && accepted !== null) {
           this.config.setModel(fallbackModel);
-          this.config.setFallbackMode(true);
           return fallbackModel;
         }
         // Check if the model was switched manually in the handler
