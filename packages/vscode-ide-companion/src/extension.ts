@@ -58,10 +58,10 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('gemini-cli.showNotices', async () => {
       const noticePath = vscode.Uri.joinPath(
         context.extensionUri,
-        'NOTICES.txt'
+        'NOTICES.txt',
       );
       await vscode.window.showTextDocument(noticePath);
-    })
+    }),
   );
 }
 

@@ -1,13 +1,15 @@
 import fs from 'fs/promises';
 import path from 'path';
 
-const projectRoot = path.resolve(path.join(import.meta.dirname, '..', '..', '..'));
+const projectRoot = path.resolve(
+  path.join(import.meta.dirname, '..', '..', '..'),
+);
 
 async function main() {
   const packagePath = path.join(
     projectRoot,
     'packages',
-    'vscode-ide-companion'
+    'vscode-ide-companion',
   );
 
   const packageJsonPath = path.join(packagePath, 'package.json');
@@ -25,11 +27,11 @@ async function main() {
       projectRoot,
       'node_modules',
       depName,
-      'package.json'
+      'package.json',
     );
     const depPackageJsonContent = await fs.readFile(
       depPackageJsonPath,
-      'utf-8'
+      'utf-8',
     );
     const depPackageJson = JSON.parse(depPackageJsonContent);
 
@@ -44,7 +46,8 @@ async function main() {
       // ignore
     }
 
-    noticeText += '============================================================\n';
+    noticeText +=
+      '============================================================\n';
     noticeText += `${depPackageJson.name}@${depPackageJson.version}\n`;
     noticeText += `(${depPackageJson.repository?.url || 'No repository found'})\n\n`;
     noticeText += `${licenseContent}\n\n`;
