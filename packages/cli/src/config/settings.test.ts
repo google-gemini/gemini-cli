@@ -320,6 +320,86 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.contextFileName).toBe('PROJECT_SPECIFIC.md');
     });
 
+    it('should handle excludedProjectEnvVars correctly when only in user settings', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const userSettingsContent = {
+        excludedProjectEnvVars: ['DEBUG', 'NODE_ENV', 'CUSTOM_VAR'],
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.excludedProjectEnvVars).toEqual([
+        'DEBUG',
+        'NODE_ENV',
+        'CUSTOM_VAR',
+      ]);
+    });
+
+    it('should handle excludedProjectEnvVars correctly when only in workspace settings', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+      const workspaceSettingsContent = {
+        excludedProjectEnvVars: ['WORKSPACE_DEBUG', 'WORKSPACE_VAR'],
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.excludedProjectEnvVars).toEqual([
+        'WORKSPACE_DEBUG',
+        'WORKSPACE_VAR',
+      ]);
+    });
+
+    it('should merge excludedProjectEnvVars with workspace taking precedence over user', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        excludedProjectEnvVars: ['DEBUG', 'NODE_ENV', 'USER_VAR'],
+      };
+      const workspaceSettingsContent = {
+        excludedProjectEnvVars: ['WORKSPACE_DEBUG', 'WORKSPACE_VAR'],
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.user.settings.excludedProjectEnvVars).toEqual([
+        'DEBUG',
+        'NODE_ENV',
+        'USER_VAR',
+      ]);
+      expect(settings.workspace.settings.excludedProjectEnvVars).toEqual([
+        'WORKSPACE_DEBUG',
+        'WORKSPACE_VAR',
+      ]);
+      expect(settings.merged.excludedProjectEnvVars).toEqual([
+        'WORKSPACE_DEBUG',
+        'WORKSPACE_VAR',
+      ]);
+    });
+
     it('should default contextFileName to undefined if not in any settings file', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = { theme: 'dark' };

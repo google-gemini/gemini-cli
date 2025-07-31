@@ -109,6 +109,9 @@ export interface Settings {
   disableAutoUpdate?: boolean;
 
   memoryDiscoveryMaxDirs?: number;
+
+  // Environment variables to exclude from project .env files
+  excludedProjectEnvVars?: string[];
 }
 
 export interface SettingsError {
@@ -263,6 +266,13 @@ function findEnvFile(startDir: string): string | null {
   }
 }
 
+/**
+ * Get default excluded environment variables that should not be loaded from project .env files
+ */
+function getDefaultExcludedEnvVars(): string[] {
+  return ['DEBUG', 'DEBUG_MODE'];
+}
+
 export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
   // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
@@ -285,7 +295,7 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   }
 }
 
-export function loadEnvironment(): void {
+export function loadEnvironment(settings?: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
   if (process.env.CLOUD_SHELL === 'true') {
@@ -293,7 +303,24 @@ export function loadEnvironment(): void {
   }
 
   if (envFilePath) {
-    dotenv.config({ path: envFilePath, quiet: true });
+    // Load environment variables from .env file
+    const envConfig = dotenv.config({ path: envFilePath, quiet: true });
+
+    // Filter out excluded environment variables if they came from a project .env file
+    const excludedVars =
+      settings?.excludedProjectEnvVars || getDefaultExcludedEnvVars();
+    if (envConfig.parsed && excludedVars.length > 0) {
+      const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
+
+      if (isProjectEnvFile) {
+        // Remove excluded variables from process.env if they were loaded from project .env
+        excludedVars.forEach((varName) => {
+          if (envConfig.parsed![varName] !== undefined) {
+            delete process.env[varName];
+          }
+        });
+      }
+    }
   }
 }
 
@@ -302,12 +329,12 @@ export function loadEnvironment(): void {
  * Project settings override user settings.
  */
 export function loadSettings(workspaceDir: string): LoadedSettings {
-  loadEnvironment();
   let systemSettings: Settings = {};
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};
   const settingsErrors: SettingsError[] = [];
   const systemSettingsPath = getSystemSettingsPath();
+
   // Load system settings
   try {
     if (fs.existsSync(systemSettingsPath)) {
@@ -375,6 +402,16 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
       path: workspaceSettingsPath,
     });
   }
+
+  // Create temporary merged settings for environment loading
+  const tempMergedSettings = {
+    ...systemSettings,
+    ...userSettings,
+    ...workspaceSettings,
+  };
+
+  // Load environment with settings-aware exclusion
+  loadEnvironment(tempMergedSettings);
 
   return new LoadedSettings(
     {
