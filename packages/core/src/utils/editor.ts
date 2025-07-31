@@ -61,7 +61,7 @@ const editorCommands: Record<
   vim: { win32: ['vim'], default: ['vim'] },
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
-  emacs: { win32: 'emacs.exe', default: 'emacs' },
+  emacs: { win32: ['emacs.exe'], default: ['emacs'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
