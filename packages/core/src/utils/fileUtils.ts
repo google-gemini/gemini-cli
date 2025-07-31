@@ -310,9 +310,22 @@ export async function processSingleFileContent(
         }
         llmTextContent += formattedLines.join('\n');
 
+        // By default, return nothing to streamline the common case of a successful read_file.
+        let returnDisplay = '';
+        if (contentRangeTruncated) {
+          returnDisplay = `Read lines ${
+            actualStartLine + 1
+          }-${endLine} of ${originalLineCount} from ${relativePathForDisplay}`;
+          if (linesWereTruncatedInLength) {
+            returnDisplay += ' (some lines were shortened)';
+          }
+        } else if (linesWereTruncatedInLength) {
+          returnDisplay = `Read all ${originalLineCount} lines from ${relativePathForDisplay} (some lines were shortened)`;
+        }
+
         return {
           llmContent: llmTextContent,
-          returnDisplay: isTruncated ? '(truncated)' : '',
+          returnDisplay,
           isTruncated,
           originalLineCount,
           linesShown: [actualStartLine + 1, endLine],

@@ -222,7 +222,7 @@ describe('ReadFileTool', () => {
           'Line 7',
           'Line 8',
         ].join('\n'),
-        returnDisplay: '(truncated)',
+        returnDisplay: 'Read lines 6-8 of 20 from paginated.txt',
       });
     });
 
