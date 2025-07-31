@@ -21,11 +21,14 @@ import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { AuthProviderType } from '../config/config.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 
+import { DiscoveredMCPTool } from './mcp-tool.js';
+
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 vi.mock('@google/genai');
 vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
+vi.mock('./mcp-tool.js');
 
 describe('mcp-client', () => {
   afterEach(() => {
@@ -49,6 +52,52 @@ describe('mcp-client', () => {
 
       expect(tools.length).toBe(1);
       expect(mockedMcpToTool).toHaveBeenCalledOnce();
+    });
+
+    it('should log an error if there is an error discovering a tool', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {
+          // no-op
+        });
+
+      const testError = new Error('Invalid tool name');
+      vi.mocked(DiscoveredMCPTool).mockImplementation(
+        (
+          _mcpCallableTool: GenAiLib.CallableTool,
+          _serverName: string,
+          name: string,
+        ) => {
+          if (name === 'invalid tool name') {
+            throw testError;
+          }
+          return { name: 'validTool' } as DiscoveredMCPTool;
+        },
+      );
+
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'validTool',
+              },
+              {
+                name: 'invalid tool name', // this will fail validation
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(tools[0].name).toBe('validTool');
+      expect(consoleErrorSpy).toHaveBeenCalledOnce();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        `Error discovering tool: 'invalid tool name' from MCP server 'test-server': ${testError.message}`,
+      );
     });
   });
 
