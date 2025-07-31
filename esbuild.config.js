@@ -21,7 +21,7 @@ esbuild
     outfile: 'bundle/gemini.js',
     platform: 'node',
     format: 'esm',
-    external: [],
+    external: ['fast-uri'],
     alias: {
       'is-in-ci': path.resolve(
         __dirname,

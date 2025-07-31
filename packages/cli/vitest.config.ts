@@ -32,5 +32,6 @@ export default defineConfig({
         ['json-summary', { outputFile: 'coverage-summary.json' }],
       ],
     },
+
   },
 });
