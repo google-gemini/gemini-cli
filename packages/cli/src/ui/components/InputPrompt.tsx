@@ -66,16 +66,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     bufferRef.current = buffer;
   }, [buffer]);
 
-  useEffect(
-    () => () => {
-      // Only clear the timeout if we are not in the process of submitting.
-      // This prevents losing the submission if the component unmounts.
-      if (imeTimeoutRef.current && !isSubmittingRef.current) {
-        clearTimeout(imeTimeoutRef.current);
-      }
-    },
-    [],
-  );
+ useEffect(
+   () => () => {
+     // Always clear the timeout on unmount to prevent state updates on an unmounted component.
+     if (imeTimeoutRef.current) {
+       clearTimeout(imeTimeoutRef.current);
+     }
+   },
+   [],
+ );
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
