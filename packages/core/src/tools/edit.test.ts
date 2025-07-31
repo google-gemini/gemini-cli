@@ -491,7 +491,7 @@ describe('EditTool', () => {
       // The default mockEnsureCorrectEdit will return 2 occurrences for 'old'
       const result = await tool.execute(params, new AbortController().signal);
       expect(result.llmContent).toMatch(
-        /Expected 1 occurrence but found 2 for old_string in file/,
+        /Expected 1 occurrence but found 2 for old_string in .* with mode 'corrector'/,
       );
       expect(result.returnDisplay).toMatch(
         /Failed to edit, expected 1 occurrence but found 2/,
@@ -534,7 +534,7 @@ describe('EditTool', () => {
       };
       const result = await tool.execute(params, new AbortController().signal);
       expect(result.llmContent).toMatch(
-        /Expected 3 occurrences but found 2 for old_string in file/,
+        /Expected 3 occurrences but found 2 for old_string in .* with mode 'corrector'/,
       );
       expect(result.returnDisplay).toMatch(
         /Failed to edit, expected 3 occurrences but found 2/,

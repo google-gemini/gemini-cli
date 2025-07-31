@@ -23,10 +23,27 @@ import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { Config, ApprovalMode } from '../config/config.js';
-import { ensureCorrectEdit } from '../utils/editCorrector.js';
+import { ensureCorrectEdit, countOccurrences } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
+import { GeminiClient } from '../core/client.js';
+
+/**
+ * Defines the available strategies for the edit tool.
+ */
+export enum EditMode {
+  /** Strict, exact string replacement. */
+  EXACT = 'exact',
+  /** Uses the AI-powered corrector to find the best match. This is the default. */
+  CORRECTOR = 'corrector',
+  /** A flexible, line-by-line match that ignores whitespace. */
+  FUZZY = 'fuzzy',
+  /** A modified version of the fuzzy match with different indentation handling. */
+  MODIFIED_FUZZY = 'modified_fuzzy',
+  /** Tries all strategies from strictest to most lenient, stopping at the first success. */
+  ALL = 'all',
+}
 
 /**
  * Parameters for the Edit tool
@@ -66,6 +83,332 @@ interface CalculatedEdit {
   error?: { display: string; raw: string; type: ToolErrorType };
   isNewFile: boolean;
 }
+
+// --- Edit Strategy Implementation ---
+
+interface EditStrategyContext {
+  params: EditToolParams;
+  currentContent: string;
+  geminiClient: GeminiClient;
+  abortSignal: AbortSignal;
+}
+
+interface EditStrategyResult {
+  newContent: string;
+  occurrences: number;
+  finalOldString: string;
+  finalNewString: string;
+}
+
+interface EditStrategy {
+  readonly mode: EditMode;
+  performEdit(context: EditStrategyContext): Promise<EditStrategyResult>;
+}
+
+class ExactStrategy implements EditStrategy {
+  readonly mode = EditMode.EXACT;
+  async performEdit(context: EditStrategyContext): Promise<EditStrategyResult> {
+    const { currentContent, params } = context;
+    const finalOldString = params.old_string.replace(/\r\n/g, '\n');
+    const finalNewString = params.new_string.replace(/\r\n/g, '\n');
+    const occurrences = countOccurrences(currentContent, finalOldString);
+    const newContent = currentContent.replaceAll(
+      finalOldString,
+      finalNewString,
+    );
+    return { newContent, occurrences, finalOldString, finalNewString };
+  }
+}
+
+class CorrectorStrategy implements EditStrategy {
+  readonly mode = EditMode.CORRECTOR;
+  async performEdit(context: EditStrategyContext): Promise<EditStrategyResult> {
+    const { currentContent, params, geminiClient, abortSignal } = context;
+    const correctedEdit = await ensureCorrectEdit(
+      params.file_path,
+      currentContent,
+      params,
+      geminiClient,
+      abortSignal,
+    );
+    const {
+      params: { old_string: finalOldString, new_string: finalNewString },
+      occurrences,
+    } = correctedEdit;
+    const newContent = currentContent.replaceAll(
+      finalOldString,
+      finalNewString,
+    );
+    return { newContent, occurrences, finalOldString, finalNewString };
+  }
+}
+
+class FuzzyStrategy implements EditStrategy {
+  readonly mode = EditMode.FUZZY;
+  async performEdit(context: EditStrategyContext): Promise<EditStrategyResult> {
+    const { currentContent, params } = context;
+    const { old_string, new_string } = params;
+    const hadTrailingNewline = currentContent.endsWith('\n');
+
+    const normalizedCode = currentContent;
+    const normalizedSearch = old_string.replace(/\r\n/g, '\n');
+    const normalizedReplace = new_string.replace(/\r\n/g, '\n');
+
+    if (normalizedSearch === '') {
+      return {
+        newContent: currentContent,
+        occurrences: 0,
+        finalOldString: normalizedSearch,
+        finalNewString: normalizedReplace,
+      };
+    }
+
+    const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
+    if (exactOccurrences > 0) {
+      let modifiedCode = normalizedCode.replaceAll(
+        normalizedSearch,
+        normalizedReplace,
+      );
+      if (hadTrailingNewline && !modifiedCode.endsWith('\n')) {
+        modifiedCode += '\n';
+      } else if (!hadTrailingNewline && modifiedCode.endsWith('\n')) {
+        modifiedCode = modifiedCode.replace(/\n$/, '');
+      }
+      return {
+        newContent: modifiedCode,
+        occurrences: exactOccurrences,
+        finalOldString: normalizedSearch,
+        finalNewString: normalizedReplace,
+      };
+    }
+
+    const sourceLines = normalizedCode.match(/.*(?:\n|$)/g)?.slice(0, -1) ?? [];
+    const searchLinesStripped = normalizedSearch
+      .split('\n')
+      .map((line) => line.trim());
+    const replaceLines = normalizedReplace.split('\n');
+
+    let flexibleOccurrences = 0;
+    let i = 0;
+    while (i <= sourceLines.length - searchLinesStripped.length) {
+      const window = sourceLines.slice(i, i + searchLinesStripped.length);
+      const windowStripped = window.map((line) => line.trim());
+      const isMatch = windowStripped.every(
+        (line, index) => line === searchLinesStripped[index],
+      );
+
+      if (isMatch) {
+        flexibleOccurrences++;
+        const firstLineInMatch = window[0];
+        const indentationMatch = firstLineInMatch.match(/^(\s*)/);
+        const indentation = indentationMatch ? indentationMatch[1] : '';
+        const newBlockWithIndent = replaceLines.map(
+          (line) => `${indentation}${line}`,
+        );
+        sourceLines.splice(
+          i,
+          searchLinesStripped.length,
+          ...newBlockWithIndent,
+        );
+        i += replaceLines.length;
+      } else {
+        i++;
+      }
+    }
+
+    if (flexibleOccurrences > 0) {
+      let modifiedCode = sourceLines.join('');
+      if (hadTrailingNewline && !modifiedCode.endsWith('\n')) {
+        modifiedCode += '\n';
+      } else if (!hadTrailingNewline && modifiedCode.endsWith('\n')) {
+        modifiedCode = modifiedCode.replace(/\n$/, '');
+      }
+      return {
+        newContent: modifiedCode,
+        occurrences: flexibleOccurrences,
+        finalOldString: normalizedSearch,
+        finalNewString: normalizedReplace,
+      };
+    }
+
+    return {
+      newContent: currentContent,
+      occurrences: 0,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+    };
+  }
+}
+
+class ModifiedFuzzyStrategy implements EditStrategy {
+  readonly mode = EditMode.MODIFIED_FUZZY;
+  async performEdit(context: EditStrategyContext): Promise<EditStrategyResult> {
+    const { currentContent, params } = context;
+    const { old_string, new_string } = params;
+
+    const content = currentContent;
+    const normalizedOld = old_string.replace(/\r\n/g, '\n');
+    const normalizedNew = new_string.replace(/\r\n/g, '\n');
+
+    if (normalizedOld !== '') {
+      const exactOccurrences = content.split(normalizedOld).length - 1;
+      if (exactOccurrences > 0) {
+        const newContent = content.replaceAll(normalizedOld, normalizedNew);
+        return {
+          newContent,
+          occurrences: exactOccurrences,
+          finalOldString: normalizedOld,
+          finalNewString: normalizedNew,
+        };
+      }
+    }
+
+    const oldLines = normalizedOld.split('\n');
+    const contentLines = content.split('\n');
+    let occurrences = 0;
+
+    for (let i = 0; i <= contentLines.length - oldLines.length; i++) {
+      const potentialMatch = contentLines.slice(i, i + oldLines.length);
+      const isMatch = oldLines.every(
+        (oldLine, j) => oldLine.trim() === potentialMatch[j].trim(),
+      );
+
+      if (isMatch) {
+        occurrences++;
+        const originalIndent = contentLines[i].match(/^\s*/)?.[0] || '';
+        const newLines = normalizedNew.split('\n').map((line, j) => {
+          if (j === 0) return originalIndent + line.trimStart();
+          const oldIndent = oldLines[j]?.match(/^\s*/)?.[0] || '';
+          const newIndent = line.match(/^\s*/)?.[0] || '';
+          if (oldIndent && newIndent) {
+            const relativeIndent = newIndent.length - oldIndent.length;
+            return (
+              originalIndent +
+              ' '.repeat(Math.max(0, relativeIndent)) +
+              line.trimStart()
+            );
+          }
+          return line;
+        });
+
+        contentLines.splice(i, oldLines.length, ...newLines);
+        i += newLines.length - 1;
+      }
+    }
+
+    if (occurrences > 0) {
+      const newContent = contentLines.join('\n');
+      return {
+        newContent,
+        occurrences,
+        finalOldString: normalizedOld,
+        finalNewString: normalizedNew,
+      };
+    }
+
+    return {
+      newContent: currentContent,
+      occurrences: 0,
+      finalOldString: normalizedOld,
+      finalNewString: normalizedNew,
+    };
+  }
+}
+
+interface ValidationContext {
+  occurrences: number;
+  expectedReplacements: number;
+  finalOldString: string;
+  finalNewString: string;
+  mode: EditMode;
+  filePath: string;
+}
+
+function validateEditResult(
+  context: ValidationContext,
+): CalculatedEdit['error'] | undefined {
+  const {
+    occurrences,
+    expectedReplacements,
+    finalOldString,
+    finalNewString,
+    mode,
+    filePath,
+  } = context;
+
+  if (occurrences === 0) {
+    return {
+      display: `Failed to edit, could not find the string to replace using mode '${mode}'.`,
+      raw: `Failed to edit, 0 occurrences found for old_string in ${filePath} with mode '${mode}'. No edits made.`,
+      type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
+    };
+  }
+  if (occurrences !== expectedReplacements) {
+    const term = expectedReplacements === 1 ? 'occurrence' : 'occurrences';
+    return {
+      display: `Failed to edit, expected ${expectedReplacements} ${term} but found ${occurrences} using mode '${mode}'.`,
+      raw: `Expected ${expectedReplacements} ${term} but found ${occurrences} for old_string in ${filePath} with mode '${mode}'.`,
+      type: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+    };
+  }
+  if (finalOldString === finalNewString) {
+    return {
+      display: `No changes to apply. The old_string and new_string are identical.`,
+      raw: `No changes to apply. The old_string and new_string are identical in file: ${filePath}`,
+      type: ToolErrorType.EDIT_NO_CHANGE,
+    };
+  }
+  return undefined;
+}
+
+class AllStrategy implements EditStrategy {
+  readonly mode = EditMode.ALL;
+  private strategies: EditStrategy[] = [
+    new ExactStrategy(),
+    new CorrectorStrategy(),
+    new ModifiedFuzzyStrategy(),
+    new FuzzyStrategy(),
+  ];
+
+  async performEdit(context: EditStrategyContext): Promise<EditStrategyResult> {
+    const { params } = context;
+    const expectedReplacements = params.expected_replacements ?? 1;
+
+    for (const strategy of this.strategies) {
+      try {
+        const result = await strategy.performEdit(context);
+        const validationError = validateEditResult({
+          ...result,
+          expectedReplacements,
+          mode: strategy.mode,
+          filePath: params.file_path,
+        });
+
+        if (!validationError) {
+          return result; // Found a successful and valid strategy
+        }
+      } catch (_e) {
+        // Ignore errors and try the next strategy
+      }
+    }
+
+    // If no strategy succeeded, return a failure state
+    return {
+      newContent: context.currentContent,
+      occurrences: 0,
+      finalOldString: params.old_string,
+      finalNewString: params.new_string,
+    };
+  }
+}
+
+const editStrategies: Record<EditMode, EditStrategy> = {
+  [EditMode.EXACT]: new ExactStrategy(),
+  [EditMode.CORRECTOR]: new CorrectorStrategy(),
+  [EditMode.FUZZY]: new FuzzyStrategy(),
+  [EditMode.MODIFIED_FUZZY]: new ModifiedFuzzyStrategy(),
+  [EditMode.ALL]: new AllStrategy(),
+};
 
 /**
  * Implementation of the Edit tool logic
@@ -186,15 +529,11 @@ Expectation for required parameters:
     abortSignal: AbortSignal,
   ): Promise<CalculatedEdit> {
     const expectedReplacements = params.expected_replacements ?? 1;
+    const mode = EditMode.CORRECTOR;
     let currentContent: string | null = null;
     let fileExists = false;
     let isNewFile = false;
-    let finalNewString = params.new_string;
-    let finalOldString = params.old_string;
-    let occurrences = 0;
-    let error:
-      | { display: string; raw: string; type: ToolErrorType }
-      | undefined = undefined;
+    let error: CalculatedEdit['error'];
 
     try {
       currentContent = fs.readFileSync(params.file_path, 'utf8');
@@ -212,76 +551,70 @@ Expectation for required parameters:
     if (params.old_string === '' && !fileExists) {
       // Creating a new file
       isNewFile = true;
-    } else if (!fileExists) {
+      return {
+        currentContent,
+        newContent: params.new_string,
+        occurrences: 0,
+        isNewFile,
+      };
+    }
+
+    if (!fileExists) {
       // Trying to edit a nonexistent file (and old_string is not empty)
       error = {
         display: `File not found. Cannot apply edit. Use an empty old_string to create a new file.`,
         raw: `File not found: ${params.file_path}`,
         type: ToolErrorType.FILE_NOT_FOUND,
       };
-    } else if (currentContent !== null) {
-      // Editing an existing file
-      const correctedEdit = await ensureCorrectEdit(
-        params.file_path,
-        currentContent,
-        params,
-        this.config.getGeminiClient(),
-        abortSignal,
-      );
-      finalOldString = correctedEdit.params.old_string;
-      finalNewString = correctedEdit.params.new_string;
-      occurrences = correctedEdit.occurrences;
-
-      if (params.old_string === '') {
-        // Error: Trying to create a file that already exists
-        error = {
-          display: `Failed to edit. Attempted to create a file that already exists.`,
-          raw: `File already exists, cannot create: ${params.file_path}`,
-          type: ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
-        };
-      } else if (occurrences === 0) {
-        error = {
-          display: `Failed to edit, could not find the string to replace.`,
-          raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
-          type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
-        };
-      } else if (occurrences !== expectedReplacements) {
-        const occurrenceTerm =
-          expectedReplacements === 1 ? 'occurrence' : 'occurrences';
-
-        error = {
-          display: `Failed to edit, expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences}.`,
-          raw: `Failed to edit, Expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
-          type: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
-        };
-      } else if (finalOldString === finalNewString) {
-        error = {
-          display: `No changes to apply. The old_string and new_string are identical.`,
-          raw: `No changes to apply. The old_string and new_string are identical in file: ${params.file_path}`,
-          type: ToolErrorType.EDIT_NO_CHANGE,
-        };
-      }
-    } else {
+    } else if (currentContent === null) {
       // Should not happen if fileExists and no exception was thrown, but defensively:
       error = {
         display: `Failed to read content of file.`,
         raw: `Failed to read content of existing file: ${params.file_path}`,
         type: ToolErrorType.READ_CONTENT_FAILURE,
       };
+    } else if (params.old_string === '') {
+      // Error: Trying to create a file that already exists
+      error = {
+        display: `Failed to edit. Attempted to create a file that already exists.`,
+        raw: `File already exists, cannot create: ${params.file_path}`,
+        type: ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
+      };
     }
 
-    const newContent = this._applyReplacement(
-      currentContent,
-      finalOldString,
-      finalNewString,
-      isNewFile,
-    );
+    if (error) {
+      return {
+        currentContent,
+        newContent: currentContent ?? '',
+        occurrences: 0,
+        error,
+        isNewFile,
+      };
+    }
+
+    // Editing an existing file
+    const strategy = editStrategies[mode];
+    const strategyContext: EditStrategyContext = {
+      params,
+      currentContent: currentContent!,
+      geminiClient: this.config.getGeminiClient(),
+      abortSignal,
+    };
+
+    const result = await strategy.performEdit(strategyContext);
+
+    const validationError = validateEditResult({
+      ...result,
+      expectedReplacements,
+      mode: strategy.mode,
+      filePath: params.file_path,
+    });
 
     return {
       currentContent,
-      newContent,
-      occurrences,
-      error,
+      newContent: result.newContent,
+      occurrences: result.occurrences,
+      error: validationError,
       isNewFile,
     };
   }
