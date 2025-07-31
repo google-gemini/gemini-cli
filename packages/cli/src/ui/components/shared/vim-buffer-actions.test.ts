@@ -36,7 +36,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(2);
         expect(result.preferredCol).toBeNull();
       });
@@ -49,7 +49,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(0);
       });
 
@@ -61,7 +61,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(0);
         expect(result.cursorCol).toBe(4); // On last character '1' of 'line1'
       });
@@ -74,7 +74,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(0);
         expect(result.cursorCol).toBe(1); // On 'b' after 5 left movements
       });
@@ -88,6 +88,7 @@ describe('vim-buffer-actions', () => {
           type: 'vim_move_right' as const,
           payload: { count: 1 },
         });
+        expect(state).toHaveOnlyValidCharacters();
         expect(state.cursorRow).toBe(1);
         expect(state.cursorCol).toBe(0); // Should be on 'f'
 
@@ -96,6 +97,7 @@ describe('vim-buffer-actions', () => {
           type: 'vim_move_left' as const,
           payload: { count: 1 },
         });
+        expect(state).toHaveOnlyValidCharacters();
         expect(state.cursorRow).toBe(0);
         expect(state.cursorCol).toBe(10); // Should be on 'd', not past it
       });
@@ -110,7 +112,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(5);
       });
 
@@ -122,7 +124,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(4); // Last character of 'hello'
       });
 
@@ -134,7 +136,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(1);
         expect(result.cursorCol).toBe(0);
       });
@@ -146,7 +148,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_move_up' as const, payload: { count: 2 } };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(0);
         expect(result.cursorCol).toBe(3);
       });
@@ -156,7 +158,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_move_up' as const, payload: { count: 5 } };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(0);
       });
 
@@ -165,7 +167,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_move_up' as const, payload: { count: 1 } };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(0);
         expect(result.cursorCol).toBe(5); // End of 'short'
       });
@@ -180,7 +182,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(2);
         expect(result.cursorCol).toBe(2);
       });
@@ -193,7 +195,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(1);
       });
     });
@@ -207,7 +209,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(6); // Start of 'world'
       });
 
@@ -219,7 +221,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(12); // Start of 'test'
       });
 
@@ -231,7 +233,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(5); // Start of ','
       });
     });
@@ -245,7 +247,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(6); // Start of 'world'
       });
 
@@ -257,7 +259,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(0); // Start of 'hello'
       });
     });
@@ -271,7 +273,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(4); // End of 'hello'
       });
 
@@ -283,7 +285,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(10); // End of 'world'
       });
     });
@@ -294,7 +296,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_move_to_line_start' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(0);
       });
 
@@ -303,7 +305,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_move_to_line_end' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(10); // Last character of 'hello world'
       });
 
@@ -312,7 +314,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_move_to_first_nonwhitespace' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(3); // Position of 'h'
       });
 
@@ -321,7 +323,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_move_to_first_line' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(0);
         expect(result.cursorCol).toBe(0);
       });
@@ -331,7 +333,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_move_to_last_line' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(2);
         expect(result.cursorCol).toBe(0);
       });
@@ -344,7 +346,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(1); // 0-indexed
         expect(result.cursorCol).toBe(0);
       });
@@ -357,7 +359,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(1); // Last line
       });
     });
@@ -373,7 +375,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hllo');
         expect(result.cursorCol).toBe(1);
       });
@@ -386,7 +388,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('ho');
         expect(result.cursorCol).toBe(1);
       });
@@ -399,7 +401,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hel');
         expect(result.cursorCol).toBe(3);
       });
@@ -412,7 +414,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hello');
         expect(result.cursorCol).toBe(5);
       });
@@ -427,7 +429,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('world test');
         expect(result.cursorCol).toBe(0);
       });
@@ -440,7 +442,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('test');
         expect(result.cursorCol).toBe(0);
       });
@@ -453,7 +455,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hello ');
         expect(result.cursorCol).toBe(6);
       });
@@ -468,7 +470,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hello test');
         expect(result.cursorCol).toBe(6);
       });
@@ -481,7 +483,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('test');
         expect(result.cursorCol).toBe(0);
       });
@@ -496,7 +498,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines).toEqual(['line1', 'line3']);
         expect(result.cursorRow).toBe(1);
         expect(result.cursorCol).toBe(0);
@@ -510,7 +512,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines).toEqual(['line3']);
         expect(result.cursorRow).toBe(0);
         expect(result.cursorCol).toBe(0);
@@ -524,7 +526,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines).toEqual(['']);
         expect(result.cursorRow).toBe(0);
         expect(result.cursorCol).toBe(0);
@@ -537,7 +539,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_delete_to_end_of_line' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hello');
         expect(result.cursorCol).toBe(5);
       });
@@ -547,7 +549,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_delete_to_end_of_line' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hello');
       });
     });
@@ -560,7 +562,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_insert_at_cursor' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(0);
         expect(result.cursorCol).toBe(2);
       });
@@ -572,7 +574,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_append_at_cursor' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(3);
       });
 
@@ -581,7 +583,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_append_at_cursor' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(5);
       });
     });
@@ -592,7 +594,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_append_at_line_end' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(11);
       });
     });
@@ -603,7 +605,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_insert_at_line_start' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(2);
       });
 
@@ -612,34 +614,32 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_insert_at_line_start' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(3);
       });
     });
 
     describe('vim_open_line_below', () => {
-      it('should insert newline at end of current line', () => {
+      it('should insert a new line below the current one', () => {
         const state = createTestState(['hello world'], 0, 5);
         const action = { type: 'vim_open_line_below' as const };
 
         const result = handleVimAction(state, action);
-
-        // The implementation inserts newline at end of current line and cursor moves to column 0
-        expect(result.lines[0]).toBe('hello world\n');
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(0); // Cursor position after replaceRangeInternal
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines).toEqual(['hello world', '']);
+        expect(result.cursorRow).toBe(1);
+        expect(result.cursorCol).toBe(0);
       });
     });
 
     describe('vim_open_line_above', () => {
-      it('should insert newline before current line', () => {
+      it('should insert a new line above the current one', () => {
         const state = createTestState(['hello', 'world'], 1, 2);
         const action = { type: 'vim_open_line_above' as const };
 
         const result = handleVimAction(state, action);
-
-        // The implementation inserts newline at beginning of current line
-        expect(result.lines).toEqual(['hello', '\nworld']);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines).toEqual(['hello', '', 'world']);
         expect(result.cursorRow).toBe(1);
         expect(result.cursorCol).toBe(0);
       });
@@ -651,7 +651,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_escape_insert_mode' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(2);
       });
 
@@ -660,7 +660,7 @@ describe('vim-buffer-actions', () => {
         const action = { type: 'vim_escape_insert_mode' as const };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(0);
       });
     });
@@ -676,7 +676,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('world test');
         expect(result.cursorCol).toBe(0);
       });
@@ -691,7 +691,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('');
         expect(result.cursorCol).toBe(0);
       });
@@ -706,7 +706,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hel world');
         expect(result.cursorCol).toBe(3);
       });
@@ -719,7 +719,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hellorld'); // Deletes ' wo' (3 chars to the right)
         expect(result.cursorCol).toBe(5);
       });
@@ -732,7 +732,7 @@ describe('vim-buffer-actions', () => {
         };
 
         const result = handleVimAction(state, action);
-
+        expect(result).toHaveOnlyValidCharacters();
         // The movement 'j' with count 2 changes 2 lines starting from cursor row
         // Since we're at cursor position 2, it changes lines starting from current row
         expect(result.lines).toEqual(['line1', 'line2', 'line3']); // No change because count > available lines
@@ -751,7 +751,7 @@ describe('vim-buffer-actions', () => {
       };
 
       const result = handleVimAction(state, action);
-
+      expect(result).toHaveOnlyValidCharacters();
       expect(result.cursorRow).toBe(0);
       expect(result.cursorCol).toBe(0);
     });
@@ -761,7 +761,7 @@ describe('vim-buffer-actions', () => {
       const action = { type: 'vim_move_to_line_end' as const };
 
       const result = handleVimAction(state, action);
-
+      expect(result).toHaveOnlyValidCharacters();
       expect(result.cursorCol).toBe(0); // Should be last character position
     });
 
@@ -773,7 +773,7 @@ describe('vim-buffer-actions', () => {
       };
 
       const result = handleVimAction(state, action);
-
+      expect(result).toHaveOnlyValidCharacters();
       // Should move to next line with content
       expect(result.cursorRow).toBe(2);
       expect(result.cursorCol).toBe(0);
@@ -789,7 +789,7 @@ describe('vim-buffer-actions', () => {
       };
 
       const result = handleVimAction(state, action);
-
+      expect(result).toHaveOnlyValidCharacters();
       expect(result.undoStack).toHaveLength(2); // Original plus new snapshot
     });
   });
