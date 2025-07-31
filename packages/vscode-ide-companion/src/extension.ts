@@ -5,8 +5,8 @@
  */
 
 import * as vscode from 'vscode';
-import { IDEServer } from './ide-server';
-import { createLogger } from './utils/logger';
+import { IDEServer } from './ide-server.js';
+import { createLogger } from './utils/logger.js';
 
 const IDE_WORKSPACE_PATH_ENV_VAR = 'GEMINI_CLI_IDE_WORKSPACE_PATH';
 
@@ -55,6 +55,13 @@ export async function activate(context: vscode.ExtensionContext) {
       terminal.show();
       terminal.sendText(geminiCmd);
     }),
+    vscode.commands.registerCommand('gemini-cli.showNotices', async () => {
+      const noticePath = vscode.Uri.joinPath(
+        context.extensionUri,
+        'NOTICES.txt'
+      );
+      await vscode.window.showTextDocument(noticePath);
+    })
   );
 }
 
