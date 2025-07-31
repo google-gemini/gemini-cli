@@ -7,7 +7,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { Config, GeminiClient, ToolRegistry } from '@google/gemini-cli-core';
+import {
+  Config,
+  GeminiClient,
+  ToolRegistry,
+  ToolErrorType,
+} from '@google/gemini-cli-core';
 import { GenerateContentResponse, Part, FunctionCall } from '@google/genai';
 
 // Mock dependencies
@@ -176,7 +181,7 @@ describe('runNonInteractive', () => {
       responseParts: [errorResponsePart],
       resultDisplay: 'Tool execution failed badly',
       error: new Error('Tool failed'),
-      errorType: 'GENERIC_EXCEPTION',
+      errorType: ToolErrorType.UNHANDLED_EXCEPTION,
     });
 
     const stream1 = (async function* () {
@@ -250,7 +255,7 @@ describe('runNonInteractive', () => {
       responseParts: [errorResponsePart],
       resultDisplay: 'Tool "nonexistentTool" not found in registry.',
       error: new Error('Tool "nonexistentTool" not found in registry.'),
-      errorType: 'TOOL_NOT_REGISTERED',
+      errorType: ToolErrorType.TOOL_NOT_REGISTERED,
     });
 
     const stream1 = (async function* () {
