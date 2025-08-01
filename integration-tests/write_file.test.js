@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import { strict as assert } from 'assert';
-import { TestRig, createToolCallErrorMessage } from './test-helper.js';
+import { TestRig, createToolCallErrorMessage, printDebugInfo, validateModelOutput } from './test-helper.js';
 
 test('should be able to write a file', async () => {
   const rig = new TestRig();
@@ -19,20 +19,7 @@ test('should be able to write a file', async () => {
 
   // Add debugging information
   if (!foundToolCall) {
-    console.error('Test failed - Debug info:');
-    console.error('Result length:', result.length);
-    console.error('Result (first 500 chars):', result.substring(0, 500));
-    console.error(
-      'Result (last 500 chars):',
-      result.substring(result.length - 500),
-    );
-
-    // Check what tools were actually called
-    const allTools = rig.readToolLogs();
-    console.error(
-      'All tool calls found:',
-      allTools.map((t) => t.toolRequest.name),
-    );
+    printDebugInfo(rig, result);
   }
 
   const allTools = rig.readToolLogs();
@@ -45,11 +32,8 @@ test('should be able to write a file', async () => {
     ),
   );
 
-  // Check if LLM returned any output at all
-  assert.ok(
-    result && result.trim().length > 0,
-    'Expected LLM to return some output',
-  );
+  // Validate model output - will throw if no output, warn if missing expected content
+  validateModelOutput(result, 'dad.txt', 'Write file test');
 
   const newFilePath = 'dad.txt';
 

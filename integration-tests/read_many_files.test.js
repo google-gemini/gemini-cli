@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import { strict as assert } from 'assert';
-import { TestRig } from './test-helper.js';
+import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
 test('should be able to read multiple files', async () => {
   const rig = new TestRig();
@@ -30,19 +30,10 @@ test('should be able to read multiple files', async () => {
 
   // Add debugging information
   if (!foundValidPattern) {
-    console.error('Test failed - Debug info:');
-    console.error('Result length:', result.length);
-    console.error('Result (first 500 chars):', result.substring(0, 500));
-    console.error(
-      'Result (last 500 chars):',
-      result.substring(result.length - 500),
-    );
-    console.error(
-      'All tool calls found:',
-      allTools.map((t) => t.toolRequest.name),
-    );
-    console.error('read_many_files called:', readManyFilesCall);
-    console.error('read_file calls:', readFileCalls.length);
+    printDebugInfo(rig, result, {
+      'read_many_files called': readManyFilesCall,
+      'read_file calls': readFileCalls.length,
+    });
   }
 
   assert.ok(
@@ -50,30 +41,6 @@ test('should be able to read multiple files', async () => {
     'Expected to find either read_many_files or multiple read_file tool calls',
   );
 
-  // Check if LLM returned any output at all
-  assert.ok(
-    result && result.trim().length > 0,
-    'Expected LLM to return some output',
-  );
-
-  // Check if the content was displayed
-  const showsContent1 = result.includes('file 1 content');
-  const showsContent2 = result.includes('file 2 content');
-
-  if (!showsContent1 || !showsContent2) {
-    console.warn('Warning: LLM did not include all file contents in response.');
-    console.warn(
-      `Missing content from: ${!showsContent1 ? 'file1.txt ' : ''}${!showsContent2 ? 'file2.txt' : ''}`,
-    );
-    console.warn(
-      'The read_many_files tool was called successfully, which is the main requirement.',
-    );
-  } else {
-    // Log success info if verbose
-    if (process.env.VERBOSE === 'true') {
-      console.log(
-        'Multiple files read successfully. Both file contents shown in output.',
-      );
-    }
-  }
+  // Validate model output - will throw if no output, warn if missing expected content
+  validateModelOutput(result, ['file 1 content', 'file 2 content'], 'Read many files test');
 });

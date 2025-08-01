@@ -12,7 +12,7 @@
 
 import { test, describe, before } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { TestRig } from './test-helper.js';
+import { TestRig, validateModelOutput } from './test-helper.js';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { writeFileSync } from 'fs';
@@ -204,12 +204,8 @@ describe('simple-mcp-server', () => {
 
     assert.ok(foundToolCall, 'Expected to find an add tool call');
 
-    // Check if LLM returned any output at all
-    assert.ok(
-      output && output.trim().length > 0,
-      'Expected LLM to return some output',
-    );
-
+    // Validate model output - will throw if no output, fail if missing expected content
+    validateModelOutput(output, '15', 'MCP server test');
     assert.ok(output.includes('15'), 'Expected output to contain the sum (15)');
   });
 });

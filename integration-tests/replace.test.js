@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import { strict as assert } from 'assert';
-import { TestRig } from './test-helper.js';
+import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
 test('should be able to replace content in a file', async () => {
   const rig = new TestRig();
@@ -25,29 +25,13 @@ test('should be able to replace content in a file', async () => {
 
   // Add debugging information
   if (!foundToolCall) {
-    console.error('Test failed - Debug info:');
-    console.error('Result length:', result.length);
-    console.error('Result (first 500 chars):', result.substring(0, 500));
-    console.error(
-      'Result (last 500 chars):',
-      result.substring(result.length - 500),
-    );
-
-    // Check what tools were actually called
-    const allTools = rig.readToolLogs();
-    console.error(
-      'All tool calls found:',
-      allTools.map((t) => t.toolRequest.name),
-    );
+    printDebugInfo(rig, result);
   }
 
   assert.ok(foundToolCall, 'Expected to find a replace tool call');
 
-  // Check if LLM returned any output at all
-  assert.ok(
-    result && result.trim().length > 0,
-    'Expected LLM to return some output',
-  );
+  // Validate model output - will throw if no output, warn if missing expected content
+  validateModelOutput(result, ['replaced', 'file_to_replace.txt'], 'Replace content test');
 
   const newFileContent = rig.readFile(fileName);
 

@@ -33,6 +33,68 @@ export function createToolCallErrorMessage(expectedTools, foundTools, result) {
   );
 }
 
+// Helper to print debug information when tests fail
+export function printDebugInfo(rig, result, context = {}) {
+  console.error('Test failed - Debug info:');
+  console.error('Result length:', result.length);
+  console.error('Result (first 500 chars):', result.substring(0, 500));
+  console.error(
+    'Result (last 500 chars):',
+    result.substring(result.length - 500),
+  );
+  
+  // Print any additional context provided
+  Object.entries(context).forEach(([key, value]) => {
+    console.error(`${key}:`, value);
+  });
+
+  // Check what tools were actually called
+  const allTools = rig.readToolLogs();
+  console.error(
+    'All tool calls found:',
+    allTools.map((t) => t.toolRequest.name),
+  );
+  
+  return allTools;
+}
+
+// Helper to validate model output and warn about unexpected content
+export function validateModelOutput(result, expectedContent = null, testName = '') {
+  // First, check if there's any output at all (this should fail the test if missing)
+  if (!result || result.trim().length === 0) {
+    throw new Error('Expected LLM to return some output');
+  }
+  
+  // If expectedContent is provided, check for it and warn if missing
+  if (expectedContent) {
+    const contents = Array.isArray(expectedContent) ? expectedContent : [expectedContent];
+    const missingContent = contents.filter(content => {
+      if (typeof content === 'string') {
+        return !result.toLowerCase().includes(content.toLowerCase());
+      } else if (content instanceof RegExp) {
+        return !content.test(result);
+      }
+      return false;
+    });
+    
+    if (missingContent.length > 0) {
+      console.warn(
+        `Warning: LLM did not include expected content in response: ${missingContent.join(', ')}.`,
+        'This is not ideal but not a test failure.'
+      );
+      console.warn(
+        'The tool was called successfully, which is the main requirement.'
+      );
+      return false;
+    } else if (process.env.VERBOSE === 'true') {
+      console.log(`${testName}: Model output validated successfully.`);
+    }
+    return true;
+  }
+  
+  return true;
+}
+
 export class TestRig {
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
