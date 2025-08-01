@@ -26,7 +26,7 @@ test('should be able to list a directory', async () => {
       return existsSync(file1Path) && existsSync(subdirPath);
     },
     1000, // 1 second max wait
-    50,   // check every 50ms
+    50, // check every 50ms
   );
 
   const prompt = `Can you list the files in the current directory. Display them in the style of 'ls'`;
