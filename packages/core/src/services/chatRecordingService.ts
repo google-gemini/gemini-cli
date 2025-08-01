@@ -56,7 +56,7 @@ export interface ToolCallRecord {
  */
 export type ConversationRecordExtra =
   | {
-      type: 'user' | 'system' | 'error';
+      type: 'user';
     }
   | {
       type: 'gemini';
@@ -162,13 +162,8 @@ export class ChatRecordingService {
       this.queuedThoughts = [];
       this.queuedTokens = null;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw error;
-      }
-
-      if (this.config.getDebugMode()) {
-        console.error('Error initializing chat recording service:', error);
-      }
+      console.error('Error initializing chat recording service:', error);
+      throw error;
     }
   }
 
@@ -228,9 +223,8 @@ export class ChatRecordingService {
         }
       });
     } catch (error) {
-      if (this.config.getDebugMode()) {
-        console.error('Error saving message:', error);
-      }
+      console.error('Error saving message:', error);
+      throw error;
     }
   }
 
@@ -248,6 +242,7 @@ export class ChatRecordingService {
     } catch (error) {
       if (this.config.getDebugMode()) {
         console.error('Error saving thought:', error);
+        throw error;
       }
     }
   }
@@ -278,9 +273,8 @@ export class ChatRecordingService {
         }
       });
     } catch (error) {
-      if (this.config.getDebugMode()) {
-        console.error('Error updating message tokens:', error);
-      }
+      console.error('Error updating message tokens:', error);
+      throw error;
     }
   }
 
@@ -360,9 +354,8 @@ export class ChatRecordingService {
         }
       });
     } catch (error) {
-      if (this.config.getDebugMode()) {
-        console.error('Error adding tool call to message:', error);
-      }
+      console.error('Error adding tool call to message:', error);
+      throw error;
     }
   }
 
@@ -375,6 +368,7 @@ export class ChatRecordingService {
       return JSON.parse(this.cachedLastConvData);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.error('Error reading conversation file:', error);
         throw error;
       }
 
@@ -406,9 +400,8 @@ export class ChatRecordingService {
         fs.writeFileSync(this.conversationFile, newContent);
       }
     } catch (error) {
-      if (this.config.getDebugMode()) {
-        console.error('Error writing conversation file:', error);
-      }
+      console.error('Error writing conversation file:', error);
+      throw error;
     }
   }
 
@@ -433,9 +426,7 @@ export class ChatRecordingService {
       const sessionPath = path.join(chatsDir, `${sessionId}.json`);
       fs.unlinkSync(sessionPath);
     } catch (error) {
-      if (this.config.getDebugMode()) {
-        console.error('Error deleting session:', error);
-      }
+      console.error('Error deleting session:', error);
       throw error;
     }
   }
