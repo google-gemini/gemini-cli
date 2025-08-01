@@ -39,6 +39,10 @@ export function getSystemSettingsPath(): string {
   }
 }
 
+export function getWorkspaceSettingsPath(workspaceDir: string): string {
+  return path.join(workspaceDir, SETTINGS_DIRECTORY_NAME, 'settings.json');
+}
+
 export enum SettingScope {
   User = 'User',
   Workspace = 'Workspace',
@@ -297,6 +301,26 @@ export function loadEnvironment(settings?: Settings): void {
     setUpCloudShellEnvironment(envFilePath);
   }
 
+  // If no settings provided, try to load workspace settings for exclusions
+  let resolvedSettings = settings;
+  if (!resolvedSettings) {
+    const workspaceSettingsPath = getWorkspaceSettingsPath(process.cwd());
+    try {
+      if (fs.existsSync(workspaceSettingsPath)) {
+        const workspaceContent = fs.readFileSync(
+          workspaceSettingsPath,
+          'utf-8',
+        );
+        const parsedWorkspaceSettings = JSON.parse(
+          stripJsonComments(workspaceContent),
+        ) as Settings;
+        resolvedSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
+      }
+    } catch (_e) {
+      // Ignore errors loading workspace settings
+    }
+  }
+
   if (envFilePath) {
     // Manually parse and load environment variables to handle exclusions correctly.
     // This avoids modifying environment variables that were already set from the shell.
@@ -305,7 +329,7 @@ export function loadEnvironment(settings?: Settings): void {
       const parsedEnv = dotenv.parse(envFileContent);
 
       const excludedVars =
-        settings?.excludedProjectEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
+        resolvedSettings?.excludedProjectEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
       const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
 
       for (const key in parsedEnv) {
@@ -337,6 +361,8 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   let workspaceSettings: Settings = {};
   const settingsErrors: SettingsError[] = [];
   const systemSettingsPath = getSystemSettingsPath();
+
+  const workspaceSettingsPath = getWorkspaceSettingsPath(workspaceDir);
 
   // Load system settings
   try {
@@ -376,13 +402,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     });
   }
 
-  const workspaceSettingsPath = path.join(
-    workspaceDir,
-    SETTINGS_DIRECTORY_NAME,
-    'settings.json',
-  );
-
-  // Load workspace settings
+  // Load workspace settings (reuse the path from above)
   try {
     if (fs.existsSync(workspaceSettingsPath)) {
       const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
