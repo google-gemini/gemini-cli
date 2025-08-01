@@ -113,7 +113,7 @@ npm run build
 
 ### 启用沙盒
 
-强烈建议使用[沙盒](#sandboxing)，并且至少需要在 `~/.env` 中设置 `GEMINI_SANDBOX=true` 并确保沙盒提供程序（例如 `macOS Seatbelt`、`docker` 或 `podman`）可用。有关详细信息，请参阅[沙盒](#sandboxing)。
+强烈建议使用[沙盒](#沙盒)，并且至少需要在 `~/.env` 中设置 `GEMINI_SANDBOX=true` 并确保沙盒提供程序（例如 `macOS Seatbelt`、`docker` 或 `podman`）可用。有关详细信息，请参阅[沙盒](#沙盒)。
 
 要同时构建 `gemini` CLI 实用程序和沙盒容器，请从根目录运行 `build:all`：
 
@@ -204,9 +204,8 @@ npm run lint
 ### 编码约定
 
 - 请遵守整个现有代码库中使用的编码风格、模式和约定。
-- 有关与 AI 辅助开发相关的特定说明，包括 React、注释和 Git 使用的约定，请参阅 [GEMINI.md](https://github.com/google-gemini/gemini-cli/blob/main/GEMINI.md)（通常位于项目根目录中）。
+ - 有关与 AI 辅助开发相关的特定说明，包括 React、注释和 Git 使用的约定，请参阅 [GEMINI.md](./GEMINI.md)（通常位于项目根目录中）。
 - **导入：** 请特别注意导入路径。该项目使用 ESLint 来强制执行包之间相对导入的限制。
-
 ### 项目结构
 
 - `packages/`：包含项目的各个子包。
@@ -215,7 +214,7 @@ npm run lint
 - `docs/`：包含所有项目文档。
 - `scripts/`：用于构建、测试和开发任务的实用程序脚本。
 
-有关更详细的体系结构，请参阅 `docs/architecture.md`。
+有关更详细的体系结构，请参阅[架构文档](./docs/architecture.md)。
 
 ## 调试
 

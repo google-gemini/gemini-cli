@@ -38,7 +38,7 @@ Gemini CLI 使用 `settings.json` 文件进行持久配置。这些文件有三�
 
 除了项目设置文件外，项目的 `.gemini` 目录还可以包含与 Gemini CLI 操作相关的其他特定于项目的文件，例如：
 
-- [自定义沙盒配置文件](#sandboxing)（例如 `.gemini/sandbox-macos-custom.sb`、`.gemini/sandbox.Dockerfile`）。
+- [自定义沙盒配置文件](#沙盒)（例如 `.gemini/sandbox-macos-custom.sb`、`.gemini/sandbox.Dockerfile`）。
 
 ### `settings.json` 中的可用设置：
 
@@ -74,7 +74,7 @@ Gemini CLI 使用 `settings.json` 文件进行持久配置。这些文件有三�
     ```
 
 - **`coreTools`** (array of strings):
-  - **说明：** 允许您指定应提供给模型的核心工具名称列表。这可用于限制内置工具集。有关核心工具列表，请参阅[内置工具](../core/tools-api.md#built-in-tools)。您还可以为支持它的工具指定特定于命令的限制，例如 `ShellTool`。例如，`"coreTools": ["ShellTool(ls -l)"]` 将只允许执行 `ls -l` 命令。
+  - **说明：** 允许您指定应提供给模型的核心工具名称列表。这可用于限制内置工具集。有关核心工具列表，请参阅[内置工具](../core/tools-api.md#内置工具)。您还可以为支持它的工具指定特定于命令的限制，例如 `ShellTool`。例如，`"coreTools": ["ShellTool(ls -l)"]` 将只允许执行 `ls -l` 命令。
   - **默认值：** Gemini 模型可使用所有工具。
   - **示例：** `"coreTools": ["ReadFileTool", "GlobTool", "ShellTool(ls)"]`。
 
@@ -112,7 +112,7 @@ Gemini CLI 使用 `settings.json` 文件进行持久配置。这些文件有三�
   - **示例：** `"vimMode": true`
 
 - **`sandbox`** (boolean or string):
-  - **说明：** 控制是否以及如何使用沙盒进行工具执行。如果设置为 `true`，Gemini CLI 将使用预构建的 `gemini-cli-sandbox` Docker 映像。有关更多信息，请参阅[沙盒](#sandboxing)。
+  - **说明：** 控制是否以及如何使用沙盒进行工具执行。如果设置为 `true`，Gemini CLI 将使用预构建的 `gemini-cli-sandbox` Docker 映像。有关更多信息，请参阅[沙盒](#沙盒)。
   - **默认值：** `false`
   - **示例：** `"sandbox": "docker"`
 
@@ -197,7 +197,7 @@ Gemini CLI 使用 `settings.json` 文件进行持久配置。这些文件有三�
     }
     ```
 - **`usageStatisticsEnabled`** (boolean):
-  - **说明：** 启用或禁用使用情况统计信息的收集。有关更多信息，请参阅[使用情况统计信息](#usage-statistics)。
+  - **说明：** 启用或禁用使用情况统计信息的收集。有关更多信息，请参阅[使用情况统计信息](#使用情况统计)。
   - **默认值：** `true`
   - **示例：**
     ```json

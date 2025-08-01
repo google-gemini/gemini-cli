@@ -131,7 +131,7 @@ TypeScript 的强大之处在于它能够提供静态类型检查，在代码运
 
 通过始终如一地应用这些原则，我们可以维护一个不仅高效、高性能，而且在现在和将来都令人愉快地使用的代码库。
 
-## React (mirrored and adjusted from [react-mcp-server](https://github.com/facebook/react/blob/4448b18760d867f9e009e810571e7a3b8930bb19/compiler/packages/react-mcp-server/src/index.ts#L376C1-L441C94))
+## React (复制并调整自 [react-mcp-server](https://github.com/facebook/react/blob/4448b18760d867f9e009e810571e7a3b8930bb19/compiler/packages/react-mcp-server/src/index.ts#L376C1-L441C94))
 
 ### 角色
 

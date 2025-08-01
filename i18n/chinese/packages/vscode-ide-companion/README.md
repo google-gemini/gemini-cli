@@ -1,7 +1,7 @@
 # Gemini VS Code IDE 伴侣
 
 <p align="center">
-  简体中文 | <a href="../../../packages/vscode-ide-companion/README.md">🌐 English</a>
+  简体中文 | <a href="../../../../packages/vscode-ide-companion/README.md">🌐 English</a>
 </p>
 
 Gemini CLI 伴侣扩展将 [Gemini CLI](https://github.com/google-gemini/gemini-cli) 无缝集成到您的 VS Code 环境中。这种集成使 Gemini CLI 能够访问您打开的文件等活动信息。
@@ -21,4 +21,4 @@ Gemini CLI 伴侣扩展将 [Gemini CLI](https://github.com/google-gemini/gemini-
 
 # 服务条款和隐私声明
 
-安装此扩展即表示您同意[服务条款](https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md)。
+安装此扩展即表示您同意[服务条款](../../docs/tos-privacy.md)。

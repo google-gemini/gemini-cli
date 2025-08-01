@@ -34,7 +34,7 @@ Gemini CLI 以交互式读取-求值-打印循环 (REPL) 环境将 Gemini 模型
   - **[Web 抓取工具](./tools/web-fetch.md)：** `web_fetch` 工具的文档。
   - **[Web 搜索工具](./tools/web-search.md)：** `google_web_search` 工具的文档。
   - **[内存工具](./tools/memory.md)：** `save_memory` 工具的文档。
-- **[贡献和开发指南](../CONTRIBUTING.md)：** 面向贡献者和开发人员的信息，包括设置、构建、测试和编码约定。
+- **[贡献和开发指南](../../CONTRIBUTING.md)：** 面向贡献者和开发人员的信息，包括设置、构建、测试和编码约定。
 - **[NPM 工作区和发布](./npm.md)：** 有关如何管理和发布项目包的详细信息。
 - **[故障排除指南](./troubleshooting.md)：** 查找常见问题和常见问题解答的解决方案。
 - **[服务条款和隐私声明](./tos-privacy.md)：** 有关适用于您使用 Gemini CLI 的服务条款和隐私声明的信息。

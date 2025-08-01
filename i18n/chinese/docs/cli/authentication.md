@@ -38,7 +38,7 @@ Gemini CLI 要求您向 Google 的 AI 服务进行身份验证。在首次启动
         ```bash
         export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
         ```
-      - 对于重复使用，您可以将环境变量添加到您的 [.env 文件](#persisting-environment-variables-with-env-files)中。
+      - 对于重复使用，您可以将环境变量添加到您的 [.env 文件](#使用-env-文件持久化环境变量)中。
 
       - 或者，您可以从 shell 的配置文件（如 `~/.bashrc`、`~/.zshrc` 或 `~/.profile`）中导出 API 密钥。例如，以下命令将环境变量添加到 `~/.bashrc` 文件中：
 

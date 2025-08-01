@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/.github/pull_request_template.md)
+[查看英文版](../../../.github/pull_request_template.md)
 
 ## 摘要
 
