@@ -188,6 +188,8 @@ export class ToolRegistry {
       }
     }
 
+    this.config.getPromptRegistry().clear();
+
     // discover tools using MCP servers, if configured
     await discoverMcpTools(
       this.config.getMcpServers() ?? {},
