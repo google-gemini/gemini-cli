@@ -186,7 +186,10 @@ export async function main() {
       : [];
     const sandboxConfig = config.getSandbox();
     if (sandboxConfig) {
-      if (settings.merged.selectedAuthType) {
+      if (
+        settings.merged.selectedAuthType &&
+        !settings.merged.useExternalAuth
+      ) {
         // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
         try {
           const err = validateAuthMethod(settings.merged.selectedAuthType);
@@ -344,6 +347,7 @@ async function loadNonInteractiveConfig(
 
   return await validateNonInteractiveAuth(
     settings.merged.selectedAuthType,
+    settings.merged.useExternalAuth,
     finalConfig,
   );
 }
