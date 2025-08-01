@@ -137,7 +137,7 @@ export class ToolCallEvent {
       ? getDecisionFromOutcome(call.outcome)
       : undefined;
     this.error = call.response.error?.message;
-    this.error_type = call.response.error?.name;
+    this.error_type = call.response.errorType;
     this.prompt_id = call.request.prompt_id;
   }
 }
@@ -296,6 +296,18 @@ export class SlashCommandEvent {
   }
 }
 
+export class MalformedJsonResponseEvent {
+  'event.name': 'malformed_json_response';
+  'event.timestamp': string; // ISO 8601
+  model: string;
+
+  constructor(model: string) {
+    this['event.name'] = 'malformed_json_response';
+    this['event.timestamp'] = new Date().toISOString();
+    this.model = model;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -307,4 +319,5 @@ export type TelemetryEvent =
   | FlashFallbackEvent
   | LoopDetectedEvent
   | NextSpeakerCheckEvent
-  | SlashCommandEvent;
+  | SlashCommandEvent
+  | MalformedJsonResponseEvent;
