@@ -4,26 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
-import { SuggestionsDisplay } from './SuggestionsDisplay.js';
-import { useInputHistory } from '../hooks/useInputHistory.js';
-import { TextBuffer } from './shared/text-buffer.js';
-import { cpSlice, cpLen } from '../utils/textUtils.js';
-import chalk from 'chalk';
-import stringWidth from 'string-width';
-import { useShellHistory } from '../hooks/useShellHistory.js';
-import { useCompletion } from '../hooks/useCompletion.js';
-import { useKeypress, Key } from '../hooks/useKeypress.js';
-import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
+import chalk from 'chalk';
+import { Box, Text } from 'ink';
+import * as path from 'path';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import stringWidth from 'string-width';
+import { Colors } from '../colors.js';
+import { CommandContext, SlashCommand } from '../commands/types.js';
+import { useCompletion } from '../hooks/useCompletion.js';
+import { useInputHistory } from '../hooks/useInputHistory.js';
+import { Key, useKeypress } from '../hooks/useKeypress.js';
+import { useShellHistory } from '../hooks/useShellHistory.js';
 import {
+  cleanupOldClipboardImages,
   clipboardHasImage,
   saveClipboardImage,
-  cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
-import * as path from 'path';
+import { cpLen, cpSlice } from '../utils/textUtils.js';
+import { TextBuffer } from './shared/text-buffer.js';
+import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -59,6 +59,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   vimHandleInput,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const bufferRef = useRef(buffer);
+  const imeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSubmittingRef = useRef(false);
+  useEffect(() => {
+    bufferRef.current = buffer;
+  }, [buffer]);
+
+  useEffect(
+    () => () => {
+      // Always clear the timeout on unmount to prevent state updates on an unmounted component.
+      if (imeTimeoutRef.current) {
+        clearTimeout(imeTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -90,8 +106,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
-      onSubmit(submittedValue);
       resetCompletionState();
+      onSubmit(submittedValue);
     },
     [onSubmit, buffer, resetCompletionState, shellModeActive, shellHistory],
   );
@@ -177,6 +193,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      // If a submission is in progress, ignore all keypresses.
+      if (isSubmittingRef.current) {
+        return;
+      }
+
       /// We want to handle paste even when not focused to support drag and drop.
       if (!focus && !key.paste) {
         return;
@@ -294,7 +315,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.backspace();
             buffer.newline();
           } else {
-            handleSubmitAndClear(buffer.text);
+            // HACK: Defer submission to allow IME to finalize.
+            // This is a workaround for terminals that don't support
+            // proper IME composition events. The ref ensures we
+            // get the latest buffer text after the IME has updated it.
+            if (imeTimeoutRef.current) {
+              clearTimeout(imeTimeoutRef.current);
+            }
+            isSubmittingRef.current = true;
+            imeTimeoutRef.current = setTimeout(() => {
+              try {
+                handleSubmitAndClear(bufferRef.current.text);
+              } finally {
+                imeTimeoutRef.current = null;
+                isSubmittingRef.current = false;
+              }
+            }, 50);
           }
         }
         return;
