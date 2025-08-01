@@ -308,7 +308,14 @@ export class MCPOAuthProvider {
       );
     }
 
-    return `${config.authorizationUrl}?${params.toString()}`;
+    // Parse the authorizationUrl and merge parameters
+    const url = new URL(config.authorizationUrl!);
+    // Add/overwrite parameters from params
+    for (const [key, value] of params.entries()) {
+      url.searchParams.set(key, value);
+    }
+
+    return url.toString();
   }
 
   /**
