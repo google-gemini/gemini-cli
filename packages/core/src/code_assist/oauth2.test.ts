@@ -177,6 +177,12 @@ describe('oauth2', () => {
 
     // Verify the getCachedGoogleAccount function works
     expect(getCachedGoogleAccount()).toBe('test-google-account@gmail.com');
+
+    // Verify the credentials file was created with the correct permissions
+    const credsPath = path.join(tempHomeDir, '.gemini', 'oauth_creds.json');
+    const stats = fs.statSync(credsPath);
+    // Check for 0o600 permissions
+    expect(stats.mode & 0o777).toBe(0o600);
   });
 
   it('should perform login with user code', async () => {
