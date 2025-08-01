@@ -32,6 +32,7 @@ import fs from 'fs';
 import os from 'os';
 import { ApprovalMode, Config } from '../config/config.js';
 import { Content, Part, SchemaUnion } from '@google/genai';
+import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 
 describe('EditTool', () => {
   let tool: EditTool;
@@ -41,6 +42,7 @@ describe('EditTool', () => {
   let geminiClient: any;
 
   beforeEach(() => {
+    vi.restoreAllMocks();
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
@@ -54,6 +56,7 @@ describe('EditTool', () => {
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
+      getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
       // Add other properties/methods of Config if EditTool uses them
       // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
@@ -215,8 +218,9 @@ describe('EditTool', () => {
         old_string: 'old',
         new_string: 'new',
       };
-      expect(tool.validateToolParams(params)).toMatch(
-        /File path must be within the root directory/,
+      const error = tool.validateToolParams(params);
+      expect(error).toContain(
+        'File path must be within one of the workspace directories',
       );
     });
   });
@@ -608,6 +612,19 @@ describe('EditTool', () => {
         /User modified the `new_string` content/,
       );
     });
+
+    it('should return error if old_string and new_string are identical', async () => {
+      const initialContent = 'This is some identical text.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'identical',
+        new_string: 'identical',
+      };
+      const result = await tool.execute(params, new AbortController().signal);
+      expect(result.llmContent).toMatch(/No changes to apply/);
+      expect(result.returnDisplay).toMatch(/No changes to apply/);
+    });
   });
 
   describe('getDescription', () => {
@@ -660,6 +677,30 @@ describe('EditTool', () => {
       expect(tool.getDescription(params)).toBe(
         `${testFileName}: this is a very long old string... => this is a very long new string...`,
       );
+    });
+  });
+
+  describe('workspace boundary validation', () => {
+    it('should validate paths are within workspace root', () => {
+      const validPath = {
+        file_path: path.join(rootDir, 'file.txt'),
+        old_string: 'old',
+        new_string: 'new',
+      };
+      expect(tool.validateToolParams(validPath)).toBeNull();
+    });
+
+    it('should reject paths outside workspace root', () => {
+      const invalidPath = {
+        file_path: '/etc/passwd',
+        old_string: 'root',
+        new_string: 'hacked',
+      };
+      const error = tool.validateToolParams(invalidPath);
+      expect(error).toContain(
+        'File path must be within one of the workspace directories',
+      );
+      expect(error).toContain(rootDir);
     });
   });
 });

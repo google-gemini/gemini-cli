@@ -30,6 +30,13 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ...actual,
     getMCPServerStatus: vi.fn(),
     getMCPDiscoveryState: vi.fn(),
+    MCPOAuthProvider: {
+      authenticate: vi.fn(),
+    },
+    MCPOAuthTokenStorage: {
+      getToken: vi.fn(),
+      isTokenExpired: vi.fn(),
+    },
   };
 });
 
@@ -64,6 +71,7 @@ describe('mcpCommand', () => {
     getToolRegistry: ReturnType<typeof vi.fn>;
     getMcpServers: ReturnType<typeof vi.fn>;
     getBlockedMcpServers: ReturnType<typeof vi.fn>;
+    getPromptRegistry: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -85,6 +93,10 @@ describe('mcpCommand', () => {
       }),
       getMcpServers: vi.fn().mockReturnValue({}),
       getBlockedMcpServers: vi.fn().mockReturnValue([]),
+      getPromptRegistry: vi.fn().mockResolvedValue({
+        getAllPrompts: vi.fn().mockReturnValue([]),
+        getPromptsByServer: vi.fn().mockReturnValue([]),
+      }),
     };
 
     mockContext = createMockCommandContext({
@@ -216,7 +228,7 @@ describe('mcpCommand', () => {
 
         // Server 2 - Connected
         expect(message).toContain(
-          '🟢 \u001b[1mserver2\u001b[0m - Ready (1 tools)',
+          '🟢 \u001b[1mserver2\u001b[0m - Ready (1 tool)',
         );
         expect(message).toContain('server2_tool1');
 
@@ -358,13 +370,13 @@ describe('mcpCommand', () => {
       if (isMessageAction(result)) {
         const message = result.content;
         expect(message).toContain(
-          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tools)',
+          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tool)',
         );
         expect(message).toContain('\u001b[36mserver1_tool1\u001b[0m');
         expect(message).toContain(
           '🔴 \u001b[1mserver2\u001b[0m - Disconnected (0 tools cached)',
         );
-        expect(message).toContain('No tools available');
+        expect(message).toContain('No tools or prompts available');
       }
     });
 
@@ -414,10 +426,10 @@ describe('mcpCommand', () => {
 
         // Check server statuses
         expect(message).toContain(
-          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tools)',
+          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tool)',
         );
         expect(message).toContain(
-          '🔄 \u001b[1mserver2\u001b[0m - Starting... (first startup may take longer) (tools will appear when ready)',
+          '🔄 \u001b[1mserver2\u001b[0m - Starting... (first startup may take longer) (tools and prompts will appear when ready)',
         );
       }
     });
@@ -808,6 +820,248 @@ describe('mcpCommand', () => {
         expect(message).toContain('server_with_underscores');
         expect(message).toContain('server.with.dots');
       }
+    });
+  });
+
+  describe('auth subcommand', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should list OAuth-enabled servers when no server name is provided', async () => {
+      const context = createMockCommandContext({
+        services: {
+          config: {
+            getMcpServers: vi.fn().mockReturnValue({
+              'oauth-server': { oauth: { enabled: true } },
+              'regular-server': {},
+              'another-oauth': { oauth: { enabled: true } },
+            }),
+          },
+        },
+      });
+
+      const authCommand = mcpCommand.subCommands?.find(
+        (cmd) => cmd.name === 'auth',
+      );
+      expect(authCommand).toBeDefined();
+
+      const result = await authCommand!.action!(context, '');
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        expect(result.messageType).toBe('info');
+        expect(result.content).toContain('oauth-server');
+        expect(result.content).toContain('another-oauth');
+        expect(result.content).not.toContain('regular-server');
+        expect(result.content).toContain('/mcp auth <server-name>');
+      }
+    });
+
+    it('should show message when no OAuth servers are configured', async () => {
+      const context = createMockCommandContext({
+        services: {
+          config: {
+            getMcpServers: vi.fn().mockReturnValue({
+              'regular-server': {},
+            }),
+          },
+        },
+      });
+
+      const authCommand = mcpCommand.subCommands?.find(
+        (cmd) => cmd.name === 'auth',
+      );
+      const result = await authCommand!.action!(context, '');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        expect(result.messageType).toBe('info');
+        expect(result.content).toBe(
+          'No MCP servers configured with OAuth authentication.',
+        );
+      }
+    });
+
+    it('should authenticate with a specific server', async () => {
+      const mockToolRegistry = {
+        discoverToolsForServer: vi.fn(),
+      };
+      const mockGeminiClient = {
+        setTools: vi.fn(),
+      };
+
+      const context = createMockCommandContext({
+        services: {
+          config: {
+            getMcpServers: vi.fn().mockReturnValue({
+              'test-server': {
+                url: 'http://localhost:3000',
+                oauth: { enabled: true },
+              },
+            }),
+            getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
+            getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+          },
+        },
+      });
+
+      const { MCPOAuthProvider } = await import('@google/gemini-cli-core');
+
+      const authCommand = mcpCommand.subCommands?.find(
+        (cmd) => cmd.name === 'auth',
+      );
+      const result = await authCommand!.action!(context, 'test-server');
+
+      expect(MCPOAuthProvider.authenticate).toHaveBeenCalledWith(
+        'test-server',
+        { enabled: true },
+        'http://localhost:3000',
+      );
+      expect(mockToolRegistry.discoverToolsForServer).toHaveBeenCalledWith(
+        'test-server',
+      );
+      expect(mockGeminiClient.setTools).toHaveBeenCalled();
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        expect(result.messageType).toBe('info');
+        expect(result.content).toContain('Successfully authenticated');
+      }
+    });
+
+    it('should handle authentication errors', async () => {
+      const context = createMockCommandContext({
+        services: {
+          config: {
+            getMcpServers: vi.fn().mockReturnValue({
+              'test-server': { oauth: { enabled: true } },
+            }),
+          },
+        },
+      });
+
+      const { MCPOAuthProvider } = await import('@google/gemini-cli-core');
+      (
+        MCPOAuthProvider.authenticate as ReturnType<typeof vi.fn>
+      ).mockRejectedValue(new Error('Auth failed'));
+
+      const authCommand = mcpCommand.subCommands?.find(
+        (cmd) => cmd.name === 'auth',
+      );
+      const result = await authCommand!.action!(context, 'test-server');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        expect(result.messageType).toBe('error');
+        expect(result.content).toContain('Failed to authenticate');
+        expect(result.content).toContain('Auth failed');
+      }
+    });
+
+    it('should handle non-existent server', async () => {
+      const context = createMockCommandContext({
+        services: {
+          config: {
+            getMcpServers: vi.fn().mockReturnValue({
+              'existing-server': {},
+            }),
+          },
+        },
+      });
+
+      const authCommand = mcpCommand.subCommands?.find(
+        (cmd) => cmd.name === 'auth',
+      );
+      const result = await authCommand!.action!(context, 'non-existent');
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        expect(result.messageType).toBe('error');
+        expect(result.content).toContain("MCP server 'non-existent' not found");
+      }
+    });
+  });
+
+  describe('refresh subcommand', () => {
+    it('should refresh the list of tools and display the status', async () => {
+      const mockToolRegistry = {
+        discoverMcpTools: vi.fn(),
+        getAllTools: vi.fn().mockReturnValue([]),
+      };
+      const mockGeminiClient = {
+        setTools: vi.fn(),
+      };
+
+      const context = createMockCommandContext({
+        services: {
+          config: {
+            getMcpServers: vi.fn().mockReturnValue({ server1: {} }),
+            getBlockedMcpServers: vi.fn().mockReturnValue([]),
+            getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
+            getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+            getPromptRegistry: vi.fn().mockResolvedValue({
+              getPromptsByServer: vi.fn().mockReturnValue([]),
+            }),
+          },
+        },
+      });
+
+      const refreshCommand = mcpCommand.subCommands?.find(
+        (cmd) => cmd.name === 'refresh',
+      );
+      expect(refreshCommand).toBeDefined();
+
+      const result = await refreshCommand!.action!(context, '');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: 'info',
+          text: 'Refreshing MCP servers and tools...',
+        },
+        expect.any(Number),
+      );
+      expect(mockToolRegistry.discoverMcpTools).toHaveBeenCalled();
+      expect(mockGeminiClient.setTools).toHaveBeenCalled();
+
+      expect(isMessageAction(result)).toBe(true);
+      if (isMessageAction(result)) {
+        expect(result.messageType).toBe('info');
+        expect(result.content).toContain('Configured MCP servers:');
+      }
+    });
+
+    it('should show an error if config is not available', async () => {
+      const contextWithoutConfig = createMockCommandContext({
+        services: {
+          config: null,
+        },
+      });
+
+      const refreshCommand = mcpCommand.subCommands?.find(
+        (cmd) => cmd.name === 'refresh',
+      );
+      const result = await refreshCommand!.action!(contextWithoutConfig, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Config not loaded.',
+      });
+    });
+
+    it('should show an error if tool registry is not available', async () => {
+      mockConfig.getToolRegistry = vi.fn().mockResolvedValue(undefined);
+
+      const refreshCommand = mcpCommand.subCommands?.find(
+        (cmd) => cmd.name === 'refresh',
+      );
+      const result = await refreshCommand!.action!(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Could not retrieve tool registry.',
+      });
     });
   });
 });

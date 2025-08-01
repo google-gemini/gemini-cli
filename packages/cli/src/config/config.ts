@@ -15,10 +15,11 @@ import {
   ApprovalMode,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
   TelemetryTarget,
-  MCPServerConfig,
-  IDE_SERVER_NAME,
+  FileFilteringOptions,
+  IdeClient,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -53,12 +54,15 @@ export interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  telemetryOutfile: string | undefined;
   allowedMcpServerNames: string[] | undefined;
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
-  ideMode: boolean | undefined;
+  ideMode?: boolean | undefined;
+  ideModeFeature: boolean | undefined;
   proxy: string | undefined;
+  includeDirectories: string[] | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -157,6 +161,10 @@ export async function parseArguments(): Promise<CliArgs> {
       description:
         'Enable or disable logging of user prompts for telemetry. Overrides settings files.',
     })
+    .option('telemetry-outfile', {
+      type: 'string',
+      description: 'Redirect all telemetry output to the specified file.',
+    })
     .option('checkpointing', {
       alias: 'c',
       type: 'boolean',
@@ -184,7 +192,7 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'List all available extensions and exit.',
     })
-    .option('ide-mode', {
+    .option('ide-mode-feature', {
       type: 'boolean',
       description: 'Run in IDE mode?',
     })
@@ -192,6 +200,15 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'string',
       description:
         'Proxy for gemini client, like schema://user:password@host:port',
+    })
+    .option('include-directories', {
+      type: 'array',
+      string: true,
+      description:
+        'Additional directories to include in the workspace (comma-separated or multiple --include-directories)',
+      coerce: (dirs: string[]) =>
+        // Handle comma-separated values
+        dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
@@ -208,7 +225,11 @@ export async function parseArguments(): Promise<CliArgs> {
     });
 
   yargsInstance.wrap(yargsInstance.terminalWidth());
-  return yargsInstance.argv;
+  const result = yargsInstance.parseSync();
+
+  // The import format is now only controlled by settings.memoryImportFormat
+  // We no longer accept it as a CLI argument
+  return result as CliArgs;
 }
 
 // This function is now a thin wrapper around the server's implementation.
@@ -218,13 +239,17 @@ export async function loadHierarchicalGeminiMemory(
   currentWorkingDirectory: string,
   debugMode: boolean,
   fileService: FileDiscoveryService,
+  settings: Settings,
   extensionContextFilePaths: string[] = [],
+  memoryImportFormat: 'flat' | 'tree' = 'tree',
+  fileFilteringOptions?: FileFilteringOptions,
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode) {
     logger.debug(
-      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory}`,
+      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory} (memoryImportFormat: ${memoryImportFormat})`,
     );
   }
+
   // Directly call the server function.
   // The server function will use its own homedir() for the global path.
   return loadServerHierarchicalMemory(
@@ -232,6 +257,9 @@ export async function loadHierarchicalGeminiMemory(
     debugMode,
     fileService,
     extensionContextFilePaths,
+    memoryImportFormat,
+    fileFilteringOptions,
+    settings.memoryDiscoveryMaxDirs,
   );
 }
 
@@ -245,12 +273,18 @@ export async function loadCliConfig(
     argv.debug ||
     [process.env.DEBUG, process.env.DEBUG_MODE].some(
       (v) => v === 'true' || v === '1',
-    );
-
+    ) ||
+    false;
+  const memoryImportFormat = settings.memoryImportFormat || 'tree';
   const ideMode =
     (argv.ideMode ?? settings.ideMode ?? false) &&
-    process.env.TERM_PROGRAM === 'vscode' &&
+    process.env.TERM_PROGRAM === 'vscode';
+
+  const ideModeFeature =
+    (argv.ideModeFeature ?? settings.ideModeFeature ?? false) &&
     !process.env.SANDBOX;
+
+  const ideClient = IdeClient.getInstance(ideMode && ideModeFeature);
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -277,12 +311,21 @@ export async function loadCliConfig(
   );
 
   const fileService = new FileDiscoveryService(process.cwd());
+
+  const fileFiltering = {
+    ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+    ...settings.fileFiltering,
+  };
+
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
     process.cwd(),
     debugMode,
     fileService,
+    settings,
     extensionContextFilePaths,
+    memoryImportFormat,
+    fileFiltering,
   );
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
@@ -335,37 +378,6 @@ export async function loadCliConfig(
     }
   }
 
-  if (ideMode) {
-    if (mcpServers[IDE_SERVER_NAME]) {
-      logger.warn(
-        `Ignoring user-defined MCP server config for "${IDE_SERVER_NAME}" as it is a reserved name.`,
-      );
-    }
-    const companionPort = process.env.GEMINI_CLI_IDE_SERVER_PORT;
-    if (companionPort) {
-      const httpUrl = `http://localhost:${companionPort}/mcp`;
-      mcpServers[IDE_SERVER_NAME] = new MCPServerConfig(
-        undefined, // command
-        undefined, // args
-        undefined, // env
-        undefined, // cwd
-        undefined, // url
-        httpUrl, // httpUrl
-        undefined, // headers
-        undefined, // tcp
-        undefined, // timeout
-        false, // trust
-        'IDE connection', // description
-        undefined, // includeTools
-        undefined, // excludeTools
-      );
-    } else {
-      logger.warn(
-        'Could not connect to IDE. Make sure you have the companion VS Code extension installed from the marketplace or via /ide install.',
-      );
-    }
-  }
-
   const sandboxConfig = await loadSandboxConfig(settings, argv);
 
   return new Config({
@@ -373,6 +385,7 @@ export async function loadCliConfig(
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: process.cwd(),
+    includeDirectories: argv.includeDirectories,
     debugMode,
     question: argv.promptInteractive || argv.prompt || '',
     fullContext: argv.allFiles || argv.all_files || false,
@@ -400,11 +413,13 @@ export async function loadCliConfig(
         process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
         settings.telemetry?.otlpEndpoint,
       logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
+      outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
     },
     usageStatisticsEnabled: settings.usageStatisticsEnabled ?? true,
     // Git-aware file filtering settings
     fileFiltering: {
       respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
+      respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
       enableRecursiveFileSearch:
         settings.fileFiltering?.enableRecursiveFileSearch,
     },
@@ -428,6 +443,8 @@ export async function loadCliConfig(
     noBrowser: !!process.env.NO_BROWSER,
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
+    ideModeFeature,
+    ideClient,
   });
 }
 
