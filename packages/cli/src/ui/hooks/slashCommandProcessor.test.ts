@@ -311,21 +311,6 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Action Result Handling', () => {
-    it('should handle "dialog: help" action', async () => {
-      const command = createTestCommand({
-        name: 'helpcmd',
-        action: vi.fn().mockResolvedValue({ type: 'dialog', dialog: 'help' }),
-      });
-      const result = setupProcessorHook([command]);
-      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
-
-      await act(async () => {
-        await result.current.handleSlashCommand('/helpcmd');
-      });
-
-      expect(mockSetShowHelp).toHaveBeenCalledWith(true);
-    });
-
     it('should handle "load_history" action', async () => {
       const command = createTestCommand({
         name: 'load',

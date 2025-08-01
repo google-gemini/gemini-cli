@@ -4,31 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { helpCommand } from './helpCommand.js';
-import { type CommandContext } from './types.js';
+import { type CommandContext, SlashCommand } from './types.js';
 
 describe('helpCommand', () => {
   let mockContext: CommandContext;
 
   beforeEach(() => {
-    mockContext = {} as unknown as CommandContext;
+    const commands: readonly SlashCommand[] = [
+      { name: 'test', description: 'A test command' },
+      { name: 'another', description: 'Another test command' },
+    ] as readonly SlashCommand[];
+
+    mockContext = {
+      commands,
+    } as unknown as CommandContext;
   });
 
-  it("should return a dialog action and log a debug message for '/help'", () => {
-    const consoleDebugSpy = vi
-      .spyOn(console, 'debug')
-      .mockImplementation(() => {});
+  it("should return a message with a list of commands for '/help'", () => {
     if (!helpCommand.action) {
       throw new Error('Help command has no action');
     }
     const result = helpCommand.action(mockContext, '');
 
     expect(result).toEqual({
-      type: 'dialog',
-      dialog: 'help',
+      type: 'message',
+      messageType: 'info',
+      content: `Available commands:\n/test - A test command\n/another - Another test command`,
     });
-    expect(consoleDebugSpy).toHaveBeenCalledWith('Opening help UI ...');
   });
 
   it("should also be triggered by its alternative name '?'", () => {

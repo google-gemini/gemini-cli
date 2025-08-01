@@ -4,18 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandKind, OpenDialogActionReturn, SlashCommand } from './types.js';
-
+import { CommandKind, MessageActionReturn, SlashCommand } from './types.js';
 export const helpCommand: SlashCommand = {
   name: 'help',
   altNames: ['?'],
   description: 'for help on gemini-cli',
   kind: CommandKind.BUILT_IN,
-  action: (_context, _args): OpenDialogActionReturn => {
-    console.debug('Opening help UI ...');
+  action: (context, _args): MessageActionReturn => {
+    const commandList = context.commands;
+    if (!commandList) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Could not load commands.',
+      };
+    }
+    const helpText = commandList
+      .map((cmd: SlashCommand) => `/${cmd.name} - ${cmd.description}`)
+      .join('\n');
     return {
-      type: 'dialog',
-      dialog: 'help',
+      type: 'message',
+      messageType: 'info',
+      content: `Available commands:\n${helpText}`,
     };
   },
 };

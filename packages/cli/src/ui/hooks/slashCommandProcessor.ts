@@ -139,6 +139,7 @@ export const useSlashCommandProcessor = (
 
   const commandContext = useMemo(
     (): CommandContext => ({
+      commands,
       services: {
         config,
         settings,
@@ -180,6 +181,7 @@ export const useSlashCommandProcessor = (
       toggleCorgiMode,
       toggleVimEnabled,
       sessionShellAllowlist,
+      commands,
     ],
   );
 
@@ -316,9 +318,6 @@ export const useSlashCommandProcessor = (
                   return { type: 'handled' };
                 case 'dialog':
                   switch (result.dialog) {
-                    case 'help':
-                      setShowHelp(true);
-                      return { type: 'handled' };
                     case 'auth':
                       openAuthDialog();
                       return { type: 'handled' };
@@ -445,7 +444,6 @@ export const useSlashCommandProcessor = (
     [
       config,
       addItem,
-      setShowHelp,
       openAuthDialog,
       commands,
       commandContext,

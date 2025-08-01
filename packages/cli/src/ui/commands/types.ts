@@ -14,6 +14,7 @@ import { SessionStatsState } from '../contexts/SessionContext.js';
 
 // Grouped dependencies for clarity and easier mocking
 export interface CommandContext {
+  commands: readonly SlashCommand[];
   // Invocation properties for when commands are called.
   invocation?: {
     /** The raw, untrimmed input string from the user. */
@@ -98,7 +99,7 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy';
+  dialog: 'auth' | 'theme' | 'editor' | 'privacy';
 }
 
 /**
