@@ -312,6 +312,22 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   let workspaceSettings: Settings = {};
   const settingsErrors: SettingsError[] = [];
   const systemSettingsPath = getSystemSettingsPath();
+
+  // FIX: Resolve paths to their canonical representation to handle symlinks
+  const resolvedWorkspaceDir = path.resolve(workspaceDir);
+  const resolvedHomeDir = path.resolve(homedir());
+
+  let realWorkspaceDir = resolvedWorkspaceDir;
+  try {
+    // fs.realpathSync gets the "true" path, resolving any symlinks
+    realWorkspaceDir = fs.realpathSync(resolvedWorkspaceDir);
+  } catch (_e) {
+    // This is okay. The path might not exist yet, and that's a valid state.
+  }
+
+  // We expect homedir to always exist and be resolvable.
+  const realHomeDir = fs.realpathSync(resolvedHomeDir);
+
   // Load system settings
   try {
     if (fs.existsSync(systemSettingsPath)) {
@@ -356,28 +372,31 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     'settings.json',
   );
 
-  // Load workspace settings
-  try {
-    if (fs.existsSync(workspaceSettingsPath)) {
-      const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
-      const parsedWorkspaceSettings = JSON.parse(
-        stripJsonComments(projectContent),
-      ) as Settings;
-      workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
-      if (workspaceSettings.theme && workspaceSettings.theme === 'VS') {
-        workspaceSettings.theme = DefaultLight.name;
-      } else if (
-        workspaceSettings.theme &&
-        workspaceSettings.theme === 'VS2015'
-      ) {
-        workspaceSettings.theme = DefaultDark.name;
+  // This comparison is now much more reliable.
+  if (realWorkspaceDir !== realHomeDir) {
+    // Load workspace settings
+    try {
+      if (fs.existsSync(workspaceSettingsPath)) {
+        const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
+        const parsedWorkspaceSettings = JSON.parse(
+          stripJsonComments(projectContent),
+        ) as Settings;
+        workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
+        if (workspaceSettings.theme && workspaceSettings.theme === 'VS') {
+          workspaceSettings.theme = DefaultLight.name;
+        } else if (
+          workspaceSettings.theme &&
+          workspaceSettings.theme === 'VS2015'
+        ) {
+          workspaceSettings.theme = DefaultDark.name;
+        }
       }
+    } catch (error: unknown) {
+      settingsErrors.push({
+        message: getErrorMessage(error),
+        path: workspaceSettingsPath,
+      });
     }
-  } catch (error: unknown) {
-    settingsErrors.push({
-      message: getErrorMessage(error),
-      path: workspaceSettingsPath,
-    });
   }
 
   return new LoadedSettings(
