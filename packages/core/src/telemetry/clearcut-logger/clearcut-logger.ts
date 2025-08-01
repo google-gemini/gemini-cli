@@ -235,10 +235,10 @@ export class ClearcutLogger {
   }
 
   logStartSessionEvent(event: StartSessionEvent): void {
-    let surface = process.env.SURFACE || 'SURFACE_NOT_SET';
-    if (process.env.CLOUD_SHELL === 'true') {
-      surface = 'CLOUD_SHELL';
-    }
+    const surface =
+      process.env.CLOUD_SHELL === 'true'
+        ? 'CLOUD_SHELL'
+        : process.env.SURFACE || 'SURFACE_NOT_SET';
 
     const data = [
       {
