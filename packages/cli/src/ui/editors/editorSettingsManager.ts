@@ -31,7 +31,9 @@ class EditorSettingsManager {
   private readonly availableEditors: EditorDisplay[];
 
   constructor() {
-    const editorTypes = Object.keys(EDITOR_DISPLAY_NAMES).sort() as EditorType[];
+    const editorTypes = Object.keys(
+      EDITOR_DISPLAY_NAMES,
+    ).sort() as EditorType[];
     this.availableEditors = [
       {
         name: 'None',
