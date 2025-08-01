@@ -380,17 +380,51 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Kill line commands - also clear preserved text if entire buffer gets cleared
       if (key.ctrl && key.name === 'k') {
+        const { cursor, lines } = buffer;
+        const [cursorRow, cursorCol] = cursor;
+        const currentLine = lines[cursorRow] || '';
+        const currentLineLen = cpLen(currentLine);
+        
+        // Simulate the exact killLineRight logic from TextBuffer reducer
+        const simulatedLines = [...lines];
+        if (cursorCol < currentLineLen) {
+          // Case 1: Delete from cursor to end of current line
+          simulatedLines[cursorRow] = cpSlice(currentLine, 0, cursorCol);
+        } else if (cursorRow < lines.length - 1) {
+          // Case 2: Join current line with next line (act as delete)
+          const nextLineContent = lines[cursorRow + 1] || '';
+          simulatedLines[cursorRow] = currentLine + nextLineContent;
+          simulatedLines.splice(cursorRow + 1, 1);
+        }
+        // Case 3: No change if at end of last line
+        
         buffer.killLineRight();
-        // If buffer becomes empty after kill-right, clear preserved text
-        if (buffer.text.trim() === '') {
+
+        // Only clear preserved text if the simulated result would be completely empty
+        const simulatedText = simulatedLines.join('\n');
+        if (simulatedText.trim() === '') {
           preservedTextRef.current = '';
         }
         return;
       }
       if (key.ctrl && key.name === 'u') {
+        const { cursor, lines } = buffer;
+        const [cursorRow, cursorCol] = cursor;
+        const currentLine = lines[cursorRow] || '';
+        
+        // Simulate the exact killLineLeft logic from TextBuffer reducer
+        const simulatedLines = [...lines];
+        if (cursorCol > 0) {
+          // Case 1: Delete from start of line to cursor position
+          simulatedLines[cursorRow] = cpSlice(currentLine, cursorCol);
+        }
+        // Case 2: No change if cursor is at column 0
+        
         buffer.killLineLeft();
-        // If buffer becomes empty after kill-left, clear preserved text
-        if (buffer.text.trim() === '') {
+
+        // Only clear preserved text if the simulated result would be completely empty
+        const simulatedText = simulatedLines.join('\n');
+        if (simulatedText.trim() === '') {
           preservedTextRef.current = '';
         }
         return;
