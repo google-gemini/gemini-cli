@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../../docs/tools/web-search.md)
-
 # Google 网页搜索工具 (`google_web_search`)
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/tools/web-search.md">🌐 English</a>
+</p>
 
 `google_web_search` 工具允许模型使用 Google 搜索在网络上查找信息。
 

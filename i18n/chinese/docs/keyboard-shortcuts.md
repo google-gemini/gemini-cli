@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/keyboard-shortcuts.md)
-
 # 键盘快捷键
+
+<p align="center">
+  简体中文 | <a href="../../../docs/keyboard-shortcuts.md">🌐 English</a>
+</p>
 
 Gemini CLI 支持多种键盘快捷键，可帮助您更高效地工作。
 

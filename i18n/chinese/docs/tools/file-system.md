@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../../docs/tools/file-system.md)
-
 # Gemini CLI 文件系统工具
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/tools/file-system.md">🌐 English</a>
+</p>
 
 Gemini CLI 提供了一套全面的工具，用于与本地文件系统进行交互。这些工具允许 Gemini 模型读取、写入、列出、搜索和修改文件和目录，所有这些都在您的控制之下，并且通常会对敏感操作进行确认。
 

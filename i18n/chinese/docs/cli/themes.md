@@ -1,6 +1,9 @@
-🌐 [查看英文版](../../../../docs/cli/themes.md)
 
 # 主题
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/cli/themes.md">🌐 English</a>
+</p>
 
 Gemini CLI 支持多种主题来自定义其配色方案和外观。您可以通过 `/theme` 命令或 `"theme":` 配置设置来更改主题以适合您的偏好。
 

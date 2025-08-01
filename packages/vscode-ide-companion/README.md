@@ -1,6 +1,8 @@
-🌐 [查看中文版](../../i18n/chinese/packages/vscode-ide-companion/README.md)
-
 # Gemini VS Code IDE Companion
+
+<p align="center">
+  <a href="../../i18n/chinese/packages/vscode-ide-companion/README.md">🌐 简体中文</a> | English
+</p>
 
 The Gemini CLI Companion extension seamlessly integrates [Gemini CLI](https://github.com/google-gemini/gemini-cli) into your VS Code environment. This integration enables Gemini CLI to access active information like your open files.
 

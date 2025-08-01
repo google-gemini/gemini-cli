@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../../docs/core/memport.md)
-
 # 内存导入处理器
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/core/memport.md">🌐 English</a>
+</p>
 
 内存导入处理器是一项功能，允许您通过使用 `@file.md` 语法从其他 markdown 文件导入内容来模块化您的 GEMINI.md 文件。
 

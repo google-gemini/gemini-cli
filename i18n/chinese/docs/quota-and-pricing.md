@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/quota-and-pricing.md)
-
 # 配额和定价
+
+<p align="center">
+  简体中文 | <a href="../../../docs/quota-and-pricing.md">🌐 English</a>
+</p>
 
 ## 配额
 

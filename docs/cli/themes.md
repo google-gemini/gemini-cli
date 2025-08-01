@@ -1,6 +1,9 @@
-🌐 [查看中文版](../../i18n/chinese/docs/cli/themes.md)
 
 # Themes
+
+<p align="center">
+  <a href="../../i18n/chinese/docs/cli/themes.md">🌐 简体中文</a> | English
+</p>
 
 Gemini CLI supports a variety of themes to customize its color scheme and appearance. You can change the theme to suit your preferences via the `/theme` command or `"theme":` configuration setting.
 

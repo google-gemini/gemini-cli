@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/tos-privacy.md)
-
 # 服务条款和隐私政策
+
+<p align="center">
+  简体中文 | <a href="../../../docs/tos-privacy.md">🌐 English</a>
+</p>
 
 ## 服务条款
 

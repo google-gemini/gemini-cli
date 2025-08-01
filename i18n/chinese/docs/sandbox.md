@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/sandbox.md)
-
 # 沙盒
+
+<p align="center">
+  简体中文 | <a href="../../../docs/sandbox.md">🌐 English</a>
+</p>
 
 Gemini CLI 包含一个沙盒环境，用于安全地执行模型生成的代码。沙盒旨在将代码与您的本地文件系统和网络隔离开来，防止意外或恶意的操作。
 

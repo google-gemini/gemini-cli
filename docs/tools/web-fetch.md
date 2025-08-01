@@ -1,6 +1,8 @@
-🌐 [查看中文版](../../i18n/chinese/docs/tools/web-fetch.md)
-
 # Web Fetch Tool (`web_fetch`)
+
+<p align="center">
+  <a href="../../i18n/chinese/docs/tools/web-fetch.md">简体中文</a> | English
+</p>
 
 This document describes the `web_fetch` tool for the Gemini CLI.
 

@@ -1,6 +1,8 @@
-🌐 [查看中文版](../i18n/chinese/docs/quota-and-pricing.md)
+# Gemini CLI: Quotas and Pricing
 
-# Quota and Pricing
+<p align="center">
+  <a href="../i18n/chinese/docs/quota-and-pricing.md">🌐 简体中文</a> | English
+</p>
 
 Your Gemini CLI quotas and pricing depend on the type of account you use to authenticate with Google. Additionally, both quotas and pricing may be calculated differently based on the model version, requests, and tokens used. A summary of model usage is available through the `/stats` command and presented on exit at the end of a session. See [privacy and terms](./tos-privacy.md) for details on Privacy policy and Terms of Service. Note: published prices are list price; additional negotiated commercial discounting may apply.
 

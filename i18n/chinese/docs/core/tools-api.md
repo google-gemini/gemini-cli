@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../../docs/core/tools-api.md)
-
 # Gemini CLI 核心：工具 API
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/core/tools-api.md">🌐 English</a>
+</p>
 
 Gemini CLI 核心 (`packages/core`) 具有一个强大的系统，用于定义、注册和执行工具。这些工具扩展了 Gemini 模型的功能，使其能够与本地环境交互、获取 Web 内容并执行除简单文本生成之外的各种操作。
 

@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../README.md)
-
 # Gemini CLI
+
+<p align="center">
+  简体中文 | <a href="../../README.md">🌐 English</a>
+</p>
 
 [![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
 

@@ -1,6 +1,8 @@
-🌐 [查看中文版](./i18n/chinese/GEMINI.md)
-
 ## Building and running
+
+<p align="center">
+  <a href="./i18n/chinese/GEMINI.md">🌐 简体中文</a> | English
+</p>
 
 Before submitting any changes, it is crucial to validate them by running the full preflight check. This command will build the repository, run all tests, check for type errors, and lint the code.
 

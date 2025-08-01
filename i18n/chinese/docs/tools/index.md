@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../../docs/tools/index.md)
-
 # 工具
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/tools/index.md">🌐 English</a>
+</p>
 
 Gemini CLI 提供了一套强大的工具，使模型能够与您的本地环境进行交互。这些工具旨在安全可靠，默认情况下在沙箱环境中运行。
 

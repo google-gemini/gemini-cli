@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/gemini-ignore.md)
-
 # 忽略文件
+
+<p align="center">
+  简体中文 | <a href="../../../docs/gemini-ignore.md">🌐 English</a>
+</p>
 
 本文档概述了 Gemini CLI 的 Gemini Ignore (`.geminiignore`) 功能。
 

@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../CONTRIBUTING.md)
-
 # 如何贡献
+
+<p align="center">
+  简体中文 | <a href="../../CONTRIBUTING.md">🌐 English</a>
+</p>
 
 我们非常乐意接受您对此项目的补丁和贡献。
 

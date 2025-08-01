@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/telemetry.md)
-
 # 遥测
+
+<p align="center">
+  简体中文 | <a href="../../../docs/telemetry.md">🌐 English</a>
+</p>
 
 Gemini CLI 收集匿名的使用数据，以帮助我们改进产品。我们只收集有关您如何使用该工具的信息，而不会收集您的任何个人信息或代码。
 

@@ -1,6 +1,9 @@
-🌐 [查看英文版](../../../../docs/cli/authentication.md)
 
 # 身份验证设置
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/cli/authentication.md">🌐 English</a>
+</p>
 
 Gemini CLI 要求您向 Google 的 AI 服务进行身份验证。在首次启动时，您需要配置以下身份验证方法之一：
 

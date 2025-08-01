@@ -1,6 +1,8 @@
-🌐 [查看中文版](../../i18n/chinese/docs/tools/multi-file.md)
+# Multi-file Read Tool
 
-# Multi-file Tool
+<p align="center">
+  <a href="../../i18n/chinese/docs/tools/multi-file.md">简体中文</a> | English
+</p>
 
 This document describes the `read_many_files` tool for the Gemini CLI.
 

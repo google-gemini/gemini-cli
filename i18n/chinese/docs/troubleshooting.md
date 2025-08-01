@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/troubleshooting.md)
-
 # 疑难解答
+
+<p align="center">
+  简体中文 | <a href="../../../docs/troubleshooting.md">🌐 English</a>
+</p>
 
 本文档提供了在使用 Gemini CLI 时可能遇到的常见问题的解决方案。
 

@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/index.md)
-
 # 欢迎来到 Gemini CLI 文档
+
+<p align="center">
+  简体中文 | <a href="../../../docs/index.md">🌐 English</a>
+</p>
 
 本文档提供了安装、使用和开发 Gemini CLI 的综合指南。该工具可让您通过命令行界面与 Gemini 模型进行交互。
 

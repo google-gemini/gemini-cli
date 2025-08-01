@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../../docs/tools/memory.md)
-
 # 内存工具
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/tools/memory.md">🌐 English</a>
+</p>
 
 `save_memory` 工具允许模型在对话中存储和检索信息。
 

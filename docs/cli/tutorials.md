@@ -1,6 +1,9 @@
-🌐 [查看中文版](../../i18n/chinese/docs/cli/tutorials.md)
 
 # Tutorials
+
+<p align="center">
+  <a href="../../i18n/chinese/docs/cli/tutorials.md">🌐 简体中文</a> | English
+</p>
 
 This page contains tutorials for interacting with Gemini CLI.
 

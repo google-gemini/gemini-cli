@@ -1,6 +1,9 @@
-🌐 [查看中文版](../i18n/chinese/docs/gemini-ignore.md)
 
 # Ignoring Files
+
+<p align="center">
+  <a href="../i18n/chinese/docs/gemini-ignore.md">🌐 简体中文</a> | English
+</p>
 
 This document provides an overview of the Gemini Ignore (`.geminiignore`) feature of the Gemini CLI.
 

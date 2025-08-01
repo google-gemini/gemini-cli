@@ -1,6 +1,9 @@
-🌐 [查看英文版](../../../../docs/cli/tutorials.md)
 
 # 教程
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/cli/tutorials.md">🌐 English</a>
+</p>
 
 本页包含与 Gemini CLI 交互的教程。
 

@@ -1,6 +1,8 @@
-🌐 [查看中文版](../i18n/chinese/docs/sandbox.md)
-
 # Sandboxing in the Gemini CLI
+
+<p align="center">
+  <a href="../i18n/chinese/docs/sandbox.md">🌐 简体中文</a> | English
+</p>
 
 This document provides a guide to sandboxing in the Gemini CLI, including prerequisites, quickstart, and configuration.
 

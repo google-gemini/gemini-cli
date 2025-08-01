@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../../docs/examples/proxy-script.md)
-
 # 示例代理脚本
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/examples/proxy-script.md">🌐 English</a>
+</p>
 
 以下是可与 `GEMINI_SANDBOX_PROXY_COMMAND` 环境变量一起使用的代理脚本示例。此脚本仅允许到 `example.com:443` 的 `HTTPS` 连接，并拒绝所有其他请求。
 

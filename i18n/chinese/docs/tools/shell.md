@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../../docs/tools/shell.md)
-
 # Shell 工具
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/tools/shell.md">🌐 English</a>
+</p>
 
 `run_shell_command` 工具允许模型在用户的本地机器上执行 shell 命令。
 

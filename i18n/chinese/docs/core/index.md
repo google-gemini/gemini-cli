@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../../docs/core/index.md)
-
 # Gemini CLI 核心
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/core/index.md">🌐 English</a>
+</p>
 
 Gemini CLI 的核心包 (`packages/core`) 是 Gemini CLI 的后端部分，负责处理与 Gemini API 的通信、管理工具以及处理从 `packages/cli` 发送的请求。有关 Gemini CLI 的一般概述，请参阅[主要文档页面](../index.md)。
 

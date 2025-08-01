@@ -1,6 +1,8 @@
-🌐 [查看中文版](../i18n/chinese/docs/telemetry.md)
+# Gemini CLI Observability Guide
 
-# Telemetry
+<p align="center">
+  <a href="../i18n/chinese/docs/telemetry.md">🌐 简体中文</a> | English
+</p>
 
 Telemetry provides data about Gemini CLI's performance, health, and usage. By enabling it, you can monitor operations, debug issues, and optimize tool usage through traces, metrics, and structured logs.
 

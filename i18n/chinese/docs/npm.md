@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/npm.md)
-
 # NPM 集成
+
+<p align="center">
+  简体中文 | <a href="../../../docs/npm.md">🌐 English</a>
+</p>
 
 Gemini CLI 可以作为 NPM 包安装，从而可以轻松地将其集成到您现有的 Node.js 项目中。
 

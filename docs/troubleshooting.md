@@ -1,6 +1,8 @@
-🌐 [查看中文版](../i18n/chinese/docs/troubleshooting.md)
-
 # Troubleshooting Guide
+
+<p align="center">
+  <a href="../i18n/chinese/docs/troubleshooting.md">🌐 简体中文</a> | English
+</p>
 
 This guide provides solutions to common issues and debugging tips.
 

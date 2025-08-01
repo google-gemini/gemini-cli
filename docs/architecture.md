@@ -1,6 +1,8 @@
-🌐 [查看中文版](../i18n/chinese/docs/architecture.md)
-
 # Gemini CLI Architecture Overview
+
+<p align="center">
+  <a href="../i18n/chinese/docs/architecture.md">🌐 简体中文</a> | English
+</p>
 
 This document provides a high-level overview of the Gemini CLI's architecture.
 

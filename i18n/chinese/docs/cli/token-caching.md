@@ -1,6 +1,9 @@
-🌐 [查看英文版](../../../../docs/cli/token-caching.md)
 
 # 令牌缓存和成本优化
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/cli/token-caching.md">🌐 English</a>
+</p>
 
 当使用 API 密钥身份验证（Gemini API 密钥或 Vertex AI）时，Gemini CLI 会通过令牌缓存自动优化 API 成本。此功能会重用以前的系统指令和上下文，以减少后续请求中处理的令牌数量。
 

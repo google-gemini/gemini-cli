@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../../docs/cli/commands.md)
+# 命令
 
-# CLI 命令
+<p align="center">
+  简体中文 | <a href="../../../../docs/cli/commands.md">🌐 English</a>
+</p>
 
 Gemini CLI 支持多种内置命令，可帮助您管理会话、自定义界面和控制其行为。这些命令以正斜杠 (`/`)、at 符号 (`@`) 或感叹号 (`!`) 为前缀。
 

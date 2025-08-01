@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/integration-tests.md)
-
 # 集成测试
+
+<p align="center">
+  简体中文 | <a href="../../../docs/integration-tests.md">🌐 English</a>
+</p>
 
 本文档提供有关此项目中使用的集成测试框架的信息。
 

@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/checkpointing.md)
-
 # 检查点
+
+<p align="center">
+  简体中文 | <a href="../../../docs/checkpointing.md">🌐 English</a>
+</p>
 
 Gemini CLI 包含一个检查点功能，可在 AI 驱动的工具进行任何文件修改之前自动保存项目状态的快照。这使您可以安全地试验和应用代码更改，因为您知道可以立即恢复到运行该工具之前的状态。
 

@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../../docs/tools/multi-file.md)
-
 # 多文件工具
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/tools/multi-file.md">🌐 English</a>
+</p>
 
 `read_many_files` 工具允许模型一次性读取多个文件的内容。
 

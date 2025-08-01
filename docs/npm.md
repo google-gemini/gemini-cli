@@ -1,6 +1,9 @@
-🌐 [查看中文版](../i18n/chinese/docs/npm.md)
 
 # Package Overview
+
+<p align="center">
+  <a href="../i18n/chinese/docs/npm.md">🌐 简体中文</a> | English
+</p>
 
 This monorepo contains two main packages: `@google/gemini-cli` and `@google/gemini-cli-core`.
 

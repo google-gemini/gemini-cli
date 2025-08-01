@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/extension.md)
-
 # Gemini CLI 扩展
+
+<p align="center">
+  简体中文 | <a href="../../../docs/extension.md">🌐 English</a>
+</p>
 
 Gemini CLI 支持可用于配置和扩展其功能的扩展。
 

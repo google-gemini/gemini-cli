@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/deployment.md)
-
 # Gemini CLI 执行和部署
+
+<p align="center">
+  简体中文 | <a href="../../../docs/deployment.md">🌐 English</a>
+</p>
 
 本文档介绍如何运行 Gemini CLI 并说明 Gemini CLI 使用的部署架构。
 

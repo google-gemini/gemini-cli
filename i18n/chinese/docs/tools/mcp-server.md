@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../../docs/tools/mcp-server.md)
-
 # MCP 服务器工具
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/tools/mcp-server.md">🌐 English</a>
+</p>
 
 `mcp_server` 工具允许模型与模型上下文协议 (MCP) 服务器进行交互。
 

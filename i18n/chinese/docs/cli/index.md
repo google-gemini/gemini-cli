@@ -1,6 +1,9 @@
-🌐 [查看英文版](../../../../docs/cli/index.md)
 
 # Gemini CLI
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/cli/index.md">🌐 English</a>
+</p>
 
 在 Gemini CLI 中，`packages/cli` 是用户发送和接收来自 Gemini AI 模型及其相关工具的提示的前端。有关 Gemini CLI 的一般概述，请参阅[主要文档页面](../index.md)。
 

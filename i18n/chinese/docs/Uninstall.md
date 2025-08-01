@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/Uninstall.md)
-
 # 卸载 CLI
+
+<p align="center">
+  简体中文 | <a href="../../../docs/Uninstall.md">🌐 English</a>
+</p>
 
 您的卸载方法取决于您如何运行 CLI。请按照 npx 或全局 npm 安装的说明进行操作。
 

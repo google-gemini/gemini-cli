@@ -1,6 +1,9 @@
-🌐 [查看英文版](../../../../docs/cli/configuration.md)
 
 # Gemini CLI 配置
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/cli/configuration.md">🌐 English</a>
+</p>
 
 Gemini CLI 提供了多种配置其行为的方法，包括环境变量、命令行参数和设置文件。本文档概述了不同的配置方法和可用的设置。
 

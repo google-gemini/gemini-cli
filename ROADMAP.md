@@ -1,6 +1,8 @@
-🌐 [查看中文版](./i18n/chinese/ROADMAP.md)
-
 # Gemini CLI Roadmap
+
+<p align="center">
+  <a href="./i18n/chinese/ROADMAP.md">🌐 简体中文</a> | English
+</p>
 
 The [Official Gemini CLI Roadmap](https://github.com/orgs/google-gemini/projects/11/)
 

@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../ROADMAP.md)
-
 # Gemini CLI 路线图
+
+<p align="center">
+  简体中文 | <a href="../../ROADMAP.md">🌐 English</a>
+</p>
 
 [官方 Gemini CLI 路线图](https://github.com/orgs/google-gemini/projects/11/)
 

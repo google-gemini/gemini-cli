@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../docs/architecture.md)
-
 # Gemini CLI 架构概述
+
+<p align="center">
+  简体中文 | <a href="../../../docs/architecture.md">🌐 English</a>
+</p>
 
 本文档提供了 Gemini CLI 架构的高级概述。
 

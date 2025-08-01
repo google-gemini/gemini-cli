@@ -1,6 +1,8 @@
-🌐 [查看英文版](../../../../docs/tools/web-fetch.md)
-
 # 网页抓取工具 (`web_fetch`)
+
+<p align="center">
+  简体中文 | <a href="../../../../docs/tools/web-fetch.md">🌐 English</a>
+</p>
 
 `web_fetch` 工具允许模型从给定的 URL 抓取内容。
 
