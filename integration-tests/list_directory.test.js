@@ -35,7 +35,7 @@ test('should be able to list a directory', async () => {
       'Contains file1.txt': result.includes('file1.txt'),
       'Contains subdir': result.includes('subdir'),
     });
-    
+
     console.error(
       'List directory calls:',
       allTools

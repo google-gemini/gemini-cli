@@ -30,7 +30,11 @@ test('should be able to run a shell command', async () => {
 
   // Validate model output - will throw if no output, warn if missing expected content
   // Model often reports exit code instead of showing output
-  validateModelOutput(result, ['hello-world', 'exit code 0'], 'Shell command test');
+  validateModelOutput(
+    result,
+    ['hello-world', 'exit code 0'],
+    'Shell command test',
+  );
 });
 
 test('should be able to run a shell command via stdin', async () => {

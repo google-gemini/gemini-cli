@@ -68,7 +68,7 @@ test('should be able to write a file', async () => {
       .readToolLogs()
       .filter((t) => t.toolRequest.name === 'write_file')
       .map((t) => t.toolRequest.args);
-    
+
     printDebugInfo(rig, result, {
       'File content mismatch': true,
       'Expected to contain': 'hello',

@@ -42,7 +42,7 @@ export function printDebugInfo(rig, result, context = {}) {
     'Result (last 500 chars):',
     result.substring(result.length - 500),
   );
-  
+
   // Print any additional context provided
   Object.entries(context).forEach(([key, value]) => {
     console.error(`${key}:`, value);
@@ -54,21 +54,27 @@ export function printDebugInfo(rig, result, context = {}) {
     'All tool calls found:',
     allTools.map((t) => t.toolRequest.name),
   );
-  
+
   return allTools;
 }
 
 // Helper to validate model output and warn about unexpected content
-export function validateModelOutput(result, expectedContent = null, testName = '') {
+export function validateModelOutput(
+  result,
+  expectedContent = null,
+  testName = '',
+) {
   // First, check if there's any output at all (this should fail the test if missing)
   if (!result || result.trim().length === 0) {
     throw new Error('Expected LLM to return some output');
   }
-  
+
   // If expectedContent is provided, check for it and warn if missing
   if (expectedContent) {
-    const contents = Array.isArray(expectedContent) ? expectedContent : [expectedContent];
-    const missingContent = contents.filter(content => {
+    const contents = Array.isArray(expectedContent)
+      ? expectedContent
+      : [expectedContent];
+    const missingContent = contents.filter((content) => {
       if (typeof content === 'string') {
         return !result.toLowerCase().includes(content.toLowerCase());
       } else if (content instanceof RegExp) {
@@ -76,14 +82,14 @@ export function validateModelOutput(result, expectedContent = null, testName = '
       }
       return false;
     });
-    
+
     if (missingContent.length > 0) {
       console.warn(
         `Warning: LLM did not include expected content in response: ${missingContent.join(', ')}.`,
-        'This is not ideal but not a test failure.'
+        'This is not ideal but not a test failure.',
       );
       console.warn(
-        'The tool was called successfully, which is the main requirement.'
+        'The tool was called successfully, which is the main requirement.',
       );
       return false;
     } else if (process.env.VERBOSE === 'true') {
@@ -91,7 +97,7 @@ export function validateModelOutput(result, expectedContent = null, testName = '
     }
     return true;
   }
-  
+
   return true;
 }
 

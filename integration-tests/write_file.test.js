@@ -6,7 +6,12 @@
 
 import { test } from 'node:test';
 import { strict as assert } from 'assert';
-import { TestRig, createToolCallErrorMessage, printDebugInfo, validateModelOutput } from './test-helper.js';
+import {
+  TestRig,
+  createToolCallErrorMessage,
+  printDebugInfo,
+  validateModelOutput,
+} from './test-helper.js';
 
 test('should be able to write a file', async () => {
   const rig = new TestRig();

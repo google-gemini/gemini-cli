@@ -25,7 +25,7 @@ test('should be able to save to memory', async () => {
       'Found tool call': foundToolCall,
       'Contains blue': result.toLowerCase().includes('blue'),
     });
-    
+
     console.error(
       'Memory tool calls:',
       allTools

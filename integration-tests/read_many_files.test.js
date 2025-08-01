@@ -42,5 +42,9 @@ test('should be able to read multiple files', async () => {
   );
 
   // Validate model output - will throw if no output, warn if missing expected content
-  validateModelOutput(result, ['file 1 content', 'file 2 content'], 'Read many files test');
+  validateModelOutput(
+    result,
+    ['file 1 content', 'file 2 content'],
+    'Read many files test',
+  );
 });

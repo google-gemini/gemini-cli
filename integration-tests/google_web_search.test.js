@@ -53,8 +53,12 @@ test('should be able to search the web', async () => {
   assert.ok(foundToolCall, 'Expected to find a call to google_web_search');
 
   // Validate model output - will throw if no output, warn if missing expected content
-  const hasExpectedContent = validateModelOutput(result, ['weather', 'london'], 'Google web search test');
-  
+  const hasExpectedContent = validateModelOutput(
+    result,
+    ['weather', 'london'],
+    'Google web search test',
+  );
+
   // If content was missing, log the search queries used
   if (!hasExpectedContent) {
     const searchCalls = rig

@@ -31,7 +31,11 @@ test('should be able to replace content in a file', async () => {
   assert.ok(foundToolCall, 'Expected to find a replace tool call');
 
   // Validate model output - will throw if no output, warn if missing expected content
-  validateModelOutput(result, ['replaced', 'file_to_replace.txt'], 'Replace content test');
+  validateModelOutput(
+    result,
+    ['replaced', 'file_to_replace.txt'],
+    'Replace content test',
+  );
 
   const newFileContent = rig.readFile(fileName);
 
