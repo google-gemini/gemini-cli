@@ -229,14 +229,6 @@ In addition to a project settings file, a project's `.gemini` directory can cont
 
 - **`summarizeToolOutput`** (object):
   - **Description:** Enables or disables the summarization of tool output. You can specify the token budget for the summarization using the `tokenBudget` setting.
-
-- **`baseUrl`** (string):
-  - **Description:** Specifies a custom base URL for API requests. This is useful for enterprise deployments, proxy setups, or when using Gemini-compatible API services.
-  - **Example:** `"baseUrl": "https://your-proxy.example.com/api"`
-
-- **`apiKeyHeader`** (string):
-  - **Description:** Specifies a custom header name for sending the API key. When using custom API endpoints, you may need to use a different header name than the default.
-  - **Example:** `"apiKeyHeader": "X-Custom-Authorization"`
   - **Note:** If not specified, the default header will be used based on the authentication type.
   - Note: Currently only the `run_shell_command` tool is supported.
   - **Default:** `{}` (Disabled by default)
@@ -248,6 +240,14 @@ In addition to a project settings file, a project's `.gemini` directory can cont
       }
     }
     ```
+
+- **`baseUrl`** (string):
+  - **Description:** Specifies a custom base URL for API requests. This is useful for enterprise deployments, proxy setups, or when using Gemini-compatible API services.
+  - **Example:** `"baseUrl": "https://your-proxy.example.com/api"`
+
+- **`apiKeyHeader`** (string):
+  - **Description:** Specifies a custom header name for sending the API key. When using custom API endpoints, you may need to use a different header name than the default.
+  - **Example:** `"apiKeyHeader": "X-Custom-Authorization"`
 
 ### Example `settings.json`:
 
