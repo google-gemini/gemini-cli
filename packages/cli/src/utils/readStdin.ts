@@ -6,7 +6,7 @@
 
 export async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) {
-    return Promise.resolve('');
+    return '';
   }
   return new Promise((resolve, reject) => {
     let data = '';
