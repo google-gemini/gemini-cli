@@ -28,6 +28,7 @@ import { editorCommand } from '../ui/commands/editorCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
+import { exportConversationCommand } from '../ui/commands/exportConversationCommand.js';
 
 // Mock the command modules to isolate the service from the command implementations.
 vi.mock('../ui/commands/memoryCommand.js', () => ({
@@ -87,9 +88,12 @@ vi.mock('../ui/commands/quitCommand.js', () => ({
 vi.mock('../ui/commands/restoreCommand.js', () => ({
   restoreCommand: vi.fn(),
 }));
+vi.mock('../ui/commands/exportConversationCommand.js', () => ({
+  exportConversationCommand: { name: 'export', description: 'Mock Export' },
+}));
 
 describe('CommandService', () => {
-  const subCommandLen = 18;
+  const subCommandLen = 19;
   let mockConfig: Mocked<Config>;
 
   beforeEach(() => {
@@ -209,6 +213,7 @@ describe('CommandService', () => {
           corgiCommand,
           docsCommand,
           editorCommand,
+          exportConversationCommand,
           extensionsCommand,
           helpCommand,
           mcpCommand,
