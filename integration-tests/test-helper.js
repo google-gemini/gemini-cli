@@ -389,8 +389,9 @@ export class TestRig {
 
     // The console output from Podman is JavaScript object notation, not JSON
     // Look for tool call events in the output
+    // Updated regex to handle tool names with hyphens and underscores
     const toolCallPattern =
-      /body:\s*'Tool call:\s*(\w+)\..*?Success:\s*(\w+)\..*?Duration:\s*(\d+)ms\.'/g;
+      /body:\s*'Tool call:\s*([\w-]+)\..*?Success:\s*(\w+)\..*?Duration:\s*(\d+)ms\.'/g;
     const matches = [...stdout.matchAll(toolCallPattern)];
 
     for (const match of matches) {
@@ -412,7 +413,8 @@ export class TestRig {
       }
 
       // Also try to find function_name to double-check
-      const nameMatch = context.match(/function_name:\s*'(\w+)'/);
+      // Updated regex to handle tool names with hyphens and underscores
+      const nameMatch = context.match(/function_name:\s*'([\w-]+)'/);
       const actualToolName = nameMatch ? nameMatch[1] : toolName;
 
       logs.push({

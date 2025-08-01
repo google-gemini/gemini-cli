@@ -7,6 +7,8 @@
 import { test } from 'node:test';
 import { strict as assert } from 'assert';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import { existsSync } from 'fs';
+import { join } from 'path';
 
 test('should be able to list a directory', async () => {
   const rig = new TestRig();
@@ -15,8 +17,17 @@ test('should be able to list a directory', async () => {
   rig.mkdir('subdir');
   rig.sync();
 
-  // Add explicit wait for filesystem changes to propagate in containers
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  // Poll for filesystem changes to propagate in containers
+  await rig.poll(
+    () => {
+      // Check if the files exist in the test directory
+      const file1Path = join(rig.testDir, 'file1.txt');
+      const subdirPath = join(rig.testDir, 'subdir');
+      return existsSync(file1Path) && existsSync(subdirPath);
+    },
+    1000, // 1 second max wait
+    50,   // check every 50ms
+  );
 
   const prompt = `Can you list the files in the current directory. Display them in the style of 'ls'`;
 
