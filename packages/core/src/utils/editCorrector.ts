@@ -17,14 +17,14 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { GrepTool } from '../tools/grep.js';
 import { LruCache } from './LruCache.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../config/models.js';
 import {
   isFunctionResponse,
   isFunctionCall,
 } from '../utils/messageInspectors.js';
 import * as fs from 'fs';
 
-const EditModel = DEFAULT_GEMINI_FLASH_MODEL;
+const EditModel = DEFAULT_GEMINI_FLASH_LITE_MODEL;
 const EditConfig: GenerateContentConfig = {
   thinkingConfig: {
     thinkingBudget: 0,

@@ -59,7 +59,21 @@ const MOCK_WORKSPACE_SETTINGS_PATH = pathActual.join(
   'settings.json',
 );
 
-vi.mock('fs');
+vi.mock('fs', async (importOriginal) => {
+  // Get all the functions from the real 'fs' module
+  const actualFs = await importOriginal<typeof fs>();
+
+  return {
+    ...actualFs, // Keep all the real functions
+    // Now, just override the ones we need for the test
+    existsSync: vi.fn(),
+    readFileSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    mkdirSync: vi.fn(),
+    realpathSync: (p: string) => p,
+  };
+});
+
 vi.mock('strip-json-comments', () => ({
   default: vi.fn((content) => content),
 }));
