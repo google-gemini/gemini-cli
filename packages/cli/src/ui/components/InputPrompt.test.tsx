@@ -24,10 +24,6 @@ import {
   UseSlashCompletionReturn,
 } from '../hooks/useSlashCompletion.js';
 import {
-  useReverseSearchCompletion,
-  UseReverseSearchCompletionReturn,
-} from '../hooks/useReverseSearchCompletion.js';
-import {
   useInputHistory,
   UseInputHistoryReturn,
 } from '../hooks/useInputHistory.js';
@@ -38,7 +34,6 @@ vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useSlashCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
 vi.mock('../utils/clipboardUtils.js');
-vi.mock('../hooks/useReverseSearchCompletion.js');
 
 const mockSlashCommands: SlashCommand[] = [
   {
@@ -92,17 +87,12 @@ describe('InputPrompt', () => {
   let props: InputPromptProps;
   let mockShellHistory: UseShellHistoryReturn;
   let mockSlashCompletion: UseSlashCompletionReturn;
-  let mockReverseSearchCompletion: UseReverseSearchCompletionReturn;
   let mockInputHistory: UseInputHistoryReturn;
   let mockBuffer: TextBuffer;
   let mockCommandContext: CommandContext;
 
   const mockedUseShellHistory = vi.mocked(useShellHistory);
   const mockedUseSlashCompletion = vi.mocked(useSlashCompletion);
-  const mockedUseReverseSearchCompletion = vi.mocked(
-    useReverseSearchCompletion,
-  );
-
   const mockedUseInputHistory = vi.mocked(useInputHistory);
 
   beforeEach(() => {
@@ -128,7 +118,9 @@ describe('InputPrompt', () => {
       visualScrollRow: 0,
       handleInput: vi.fn(),
       move: vi.fn(),
-      moveToOffset: vi.fn(),
+      moveToOffset: (offset: number) => {
+        mockBuffer.cursor = [0, offset];
+      },
       killLineRight: vi.fn(),
       killLineLeft: vi.fn(),
       openInExternalEditor: vi.fn(),
@@ -169,22 +161,6 @@ describe('InputPrompt', () => {
       handleAutocomplete: vi.fn(),
     };
     mockedUseSlashCompletion.mockReturnValue(mockSlashCompletion);
-
-    mockReverseSearchCompletion = {
-      suggestions: [],
-      activeSuggestionIndex: -1,
-
-      visibleStartIndex: 0,
-      showSuggestions: false,
-      isLoadingSuggestions: false,
-      resetCompletionState: vi.fn(),
-      navigateUp: vi.fn(),
-      navigateDown: vi.fn(),
-      handleAutocomplete: vi.fn(),
-    };
-    mockedUseReverseSearchCompletion.mockReturnValue(
-      mockReverseSearchCompletion,
-    );
 
     mockInputHistory = {
       navigateUp: vi.fn(),
@@ -1124,6 +1100,7 @@ describe('InputPrompt', () => {
 
   describe('vim mode', () => {
     it('should not call buffer.handleInput when vim mode is enabled and vim handles the input', async () => {
+      props.vimModeEnabled = true;
       props.vimHandleInput = vi.fn().mockReturnValue(true); // Mock that vim handled it.
       const { stdin, unmount } = render(<InputPrompt {...props} />);
       await wait();
@@ -1137,6 +1114,7 @@ describe('InputPrompt', () => {
     });
 
     it('should call buffer.handleInput when vim mode is enabled but vim does not handle the input', async () => {
+      props.vimModeEnabled = true;
       props.vimHandleInput = vi.fn().mockReturnValue(false); // Mock that vim did NOT handle it.
       const { stdin, unmount } = render(<InputPrompt {...props} />);
       await wait();
@@ -1191,6 +1169,94 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockBuffer.handleInput).not.toHaveBeenCalled();
+      unmount();
+    });
+  });
+
+  describe('reverse search', () => {
+    beforeEach(async () => {
+      props.shellModeActive = true;
+
+      vi.mocked(useShellHistory).mockReturnValue({
+        history: ['echo hello', 'echo world', 'ls'],
+        getPreviousCommand: vi.fn(),
+        getNextCommand: vi.fn(),
+        addCommandToHistory: vi.fn(),
+        resetHistoryPosition: vi.fn(),
+      });
+    });
+
+    it('invokes reverse search on Ctrl+R', async () => {
+      const { stdin, stdout, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x12');
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain('(r:)');
+      expect(frame).toContain('echo hello');
+      expect(frame).toContain('echo world');
+      expect(frame).toContain('ls');
+
+      unmount();
+    });
+
+    it('resets reverse search state on Escape', async () => {
+      const { stdin, stdout, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x12');
+      await wait();
+      stdin.write('\x1B');
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).not.toContain('(r:)');
+      expect(frame).not.toContain('echo hello');
+
+      unmount();
+    });
+
+    it('completes the highlighted entry on Tab and exits reverse-search', async () => {
+      const { stdin, stdout, unmount } = render(<InputPrompt {...props} />);
+      stdin.write('\x12');
+      await wait();
+      stdin.write('\t');
+      await wait();
+
+      expect(stdout.lastFrame()).not.toContain('(r:)');
+      expect(props.buffer.setText).toHaveBeenCalledWith('echo hello');
+      unmount();
+    });
+
+    it('submits the highlighted entry on Enter and exits reverse-search', async () => {
+      const { stdin, stdout, unmount } = render(<InputPrompt {...props} />);
+      stdin.write('\x12');
+      await wait();
+      expect(stdout.lastFrame()).toContain('(r:)');
+      stdin.write('\r');
+      await wait();
+
+      expect(stdout.lastFrame()).not.toContain('(r:)');
+      expect(props.onSubmit).toHaveBeenCalledWith('echo hello');
+      unmount();
+    });
+
+    it('text and cursor position should be restored after reverse search', async () => {
+      props.buffer.setText('initial text');
+      props.buffer.cursor = [0, 3];
+      const { stdin, stdout, unmount } = render(<InputPrompt {...props} />);
+      stdin.write('\x12');
+      await wait();
+      expect(stdout.lastFrame()).toContain('(r:)');
+      stdin.write('\x1B');
+      await wait();
+
+      expect(stdout.lastFrame()).not.toContain('(r:)');
+      expect(props.buffer.text).toBe('initial text');
+      expect(props.buffer.cursor).toEqual([0, 3]);
+
       unmount();
     });
   });

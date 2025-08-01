@@ -9,7 +9,7 @@ import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import { TextBuffer } from './shared/text-buffer.js';
+import { TextBuffer, logicalPosToOffset } from './shared/text-buffer.js';
 import { cpSlice, cpLen } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
@@ -62,6 +62,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [textBeforeReverseSearch, setTextBeforeReverseSearch] = useState('');
+  const [cursorPosition, setCursorPosition] = useState<[number, number]>([
+    0, 0,
+  ]);
   const shellHistory = useShellHistory(config.getProjectRoot());
   const historyData = shellHistory.history;
 
@@ -212,6 +215,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           setReverseSearchActive(false);
           reverseSearchCompletion.resetCompletionState();
           buffer.setText(textBeforeReverseSearch);
+          const offset = logicalPosToOffset(
+            buffer.lines,
+            cursorPosition[0],
+            cursorPosition[1],
+          );
+          buffer.moveToOffset(offset);
           return;
         }
 
@@ -229,6 +238,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (shellModeActive && key.ctrl && key.name === 'r') {
         setReverseSearchActive(true);
         setTextBeforeReverseSearch(buffer.text);
+        setCursorPosition(buffer.cursor);
         return;
       }
 
@@ -257,6 +267,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
           if (key.name === 'tab') {
             reverseSearchCompletion.handleAutocomplete(activeSuggestionIndex);
+            reverseSearchCompletion.resetCompletionState();
+            setReverseSearchActive(false);
             return;
           }
         }
@@ -431,6 +443,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       vimHandleInput,
       reverseSearchActive,
       textBeforeReverseSearch,
+      cursorPosition,
     ],
   );
 

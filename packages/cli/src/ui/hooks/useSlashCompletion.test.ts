@@ -49,7 +49,7 @@ describe('useSlashCompletion', () => {
 
   beforeEach(async () => {
     testRootDir = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'completion-unit-test-'),
+      path.join(os.tmpdir(), 'slash-completion-unit-test-'),
     );
     mockConfig = {
       getTargetDir: () => testRootDir,

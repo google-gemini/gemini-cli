@@ -6,6 +6,7 @@
 
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
+import { PrepareLabel } from './PrepareLabel.js';
 export interface Suggestion {
   label: string;
   value: string;
@@ -59,45 +60,25 @@ export function SuggestionsDisplay({
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
         const textColor = isActive ? Colors.AccentPurple : Colors.Gray;
+        const labelElement = (
+          <PrepareLabel
+            label={suggestion.label}
+            matchedIndex={suggestion.matchedIndex}
+            userInput={userInput}
+            textColor={textColor}
+          />
+        );
 
-        // Helper to render label with matched part highlighted
-        const renderLabel = () => {
-          if (
-            suggestion.matchedIndex !== undefined &&
-            suggestion.matchedIndex >= 0 &&
-            userInput.length > 0
-          ) {
-            const start = suggestion.label.slice(0, suggestion.matchedIndex);
-            const match = suggestion.label.slice(
-              suggestion.matchedIndex,
-              suggestion.matchedIndex + userInput.length,
-            );
-            const end = suggestion.label.slice(
-              suggestion.matchedIndex + userInput.length,
-            );
-            return (
-              <Text>
-                <Text color={textColor}>{start}</Text>
-                <Text color="black" bold backgroundColor={Colors.AccentYellow}>
-                  {match}
-                </Text>
-                <Text color={textColor}>{end}</Text>
-              </Text>
-            );
-          }
-          return <Text color={textColor}>{suggestion.label}</Text>;
-        };
         return (
           <Box key={`${suggestion.value}-${originalIndex}`} width={width}>
             <Box flexDirection="row">
               {userInput.startsWith('/') ? (
                 // only use box model for (/) command mode
                 <Box width={20} flexShrink={0}>
-                  {renderLabel()}
+                  {labelElement}
                 </Box>
               ) : (
-                // use regular text for other modes (@ context)
-                renderLabel()
+                labelElement
               )}
               {suggestion.description ? (
                 <Box flexGrow={1}>
