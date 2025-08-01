@@ -239,7 +239,7 @@ export class ClearcutLogger {
     if (process.env.CLOUD_SHELL === 'true') {
       surface = 'CLOUD_SHELL';
     }
-    
+
     const data = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
