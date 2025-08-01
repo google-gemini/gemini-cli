@@ -18,6 +18,10 @@ export interface Key {
   sequence: string;
 }
 
+const CTRL_BACKSPACE_SEQUENCES = {
+  win32: '\x7f',
+  default: '\x08',
+} as const;
 /**
  * A hook that listens for keypress events from stdin, providing a
  * key object that mirrors the one from Node's `readline` module,
@@ -30,10 +34,14 @@ export interface Key {
  * @param onKeypress - The callback function to execute on each keypress.
  * @param options - Options to control the hook's behavior.
  * @param options.isActive - Whether the hook should be actively listening for input.
+ * @param options.ctrlBackspaceModeFix - Whether to apply a fix for terminals that do not correctly report the Ctrl modified for Backspace, which can affect word deletion.
  */
 export function useKeypress(
   onKeypress: (key: Key) => void,
-  { isActive }: { isActive: boolean },
+  {
+    isActive,
+    ctrlBackspaceModeFix,
+  }: { isActive: boolean; ctrlBackspaceModeFix?: boolean },
 ) {
   const { stdin, setRawMode } = useStdin();
   const onKeypressRef = useRef(onKeypress);
@@ -87,6 +95,19 @@ export function useKeypress(
           if (key.name === 'return' && key.sequence === '\x1B\r') {
             key.meta = true;
           }
+
+          // readline doesn't set the ctrl flag for byte sequences x7f and x08
+          // so we need to set it up manually when needed
+          if (key.name === 'backspace' && !key.ctrl && ctrlBackspaceModeFix) {
+            const expectedSequence =
+              process.platform === 'win32'
+                ? CTRL_BACKSPACE_SEQUENCES.win32
+                : CTRL_BACKSPACE_SEQUENCES.default;
+            if (key.sequence === expectedSequence) {
+              key.ctrl = true;
+            }
+          }
+
           onKeypressRef.current({ ...key, paste: isPaste });
         }
       }
@@ -167,7 +188,7 @@ export function useKeypress(
       } else {
         stdin.removeListener('keypress', handleKeypress);
       }
-      rl.close();
+      rl?.close();
       setRawMode(false);
 
       // If we are in the middle of a paste, send what we have.
@@ -183,5 +204,5 @@ export function useKeypress(
         pasteBuffer = Buffer.alloc(0);
       }
     };
-  }, [isActive, stdin, setRawMode]);
+  }, [isActive, stdin, setRawMode, ctrlBackspaceModeFix]);
 }

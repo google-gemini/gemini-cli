@@ -109,6 +109,8 @@ export interface Settings {
   disableAutoUpdate?: boolean;
 
   memoryDiscoveryMaxDirs?: number;
+
+  ctrlBackspaceModeFix?: boolean;
 }
 
 export interface SettingsError {

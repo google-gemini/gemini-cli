@@ -1004,6 +1004,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   userMessages={userMessages}
                   onClearScreen={handleClearScreen}
                   config={config}
+                  settings={settings}
                   slashCommands={slashCommands}
                   commandContext={commandContext}
                   shellModeActive={shellModeActive}
