@@ -212,4 +212,29 @@ describe('validateNonInterActiveAuth', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith('Auth error!');
     expect(processExitSpy).toHaveBeenCalledWith(1);
   });
+
+  it('skips validation if useExternalAuth is true', async () => {
+    // Mock validateAuthMethod to return error to ensure it's not being called
+    const mod = await import('./config/auth.js');
+    const validateAuthMethodSpy = vi
+      .spyOn(mod, 'validateAuthMethod')
+      .mockReturnValue('Auth error!');
+    const nonInteractiveConfig: NonInteractiveConfig = {
+      refreshAuth: refreshAuthMock,
+    };
+
+    // Even with an invalid auth type, it should not exit
+    // because validation is skipped.
+    await validateNonInteractiveAuth(
+      'invalid-auth-type' as AuthType,
+      true, // useExternalAuth = true
+      nonInteractiveConfig,
+    );
+
+    expect(validateAuthMethodSpy).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(processExitSpy).not.toHaveBeenCalled();
+    // We still expect refreshAuth to be called with the (invalid) type
+    expect(refreshAuthMock).toHaveBeenCalledWith('invalid-auth-type');
+  });
 });

@@ -232,6 +232,10 @@ vi.mock('./utils/updateCheck.js', () => ({
   checkForUpdates: vi.fn(),
 }));
 
+vi.mock('./config/auth.js', () => ({
+  validateAuthMethod: vi.fn(),
+}));
+
 const mockedCheckForUpdates = vi.mocked(checkForUpdates);
 const { isGitRepository: mockedIsGitRepository } = vi.mocked(
   await import('@google/gemini-cli-core'),
@@ -1003,6 +1007,54 @@ describe('App UI', () => {
 
       // Total error count should be 1 + 3 + 1 = 5
       expect(lastFrame()).toContain('5 errors');
+    });
+  });
+
+  describe('auth validation', () => {
+    it('should call validateAuthMethod when useExternalAuth is false', async () => {
+      const auth = await import('../config/auth.js');
+      const validateAuthMethodSpy = vi.spyOn(auth, 'validateAuthMethod');
+      mockSettings = createMockSettings({
+        workspace: {
+          selectedAuthType: 'USE_GEMINI' as AuthType,
+          useExternalAuth: false,
+          theme: 'Default',
+        },
+      });
+
+      const { unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      expect(validateAuthMethodSpy).toHaveBeenCalledWith('USE_GEMINI');
+    });
+
+    it('should NOT call validateAuthMethod when useExternalAuth is true', async () => {
+      const auth = await import('../config/auth.js');
+      const validateAuthMethodSpy = vi.spyOn(auth, 'validateAuthMethod');
+      mockSettings = createMockSettings({
+        workspace: {
+          selectedAuthType: 'USE_GEMINI' as AuthType,
+          useExternalAuth: true,
+          theme: 'Default',
+        },
+      });
+
+      const { unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      expect(validateAuthMethodSpy).not.toHaveBeenCalled();
     });
   });
 });
