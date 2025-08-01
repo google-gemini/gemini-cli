@@ -20,14 +20,25 @@ async function getDependencyLicense(depName, depVersion) {
   let repositoryUrl = 'No repository found';
 
   try {
-    // Try to find the dependency's package.json
-    // This handles both hoisted (monorepo root) and local node_modules
-    depPackageJsonPath = path.join(projectRoot, 'node_modules', depName, 'package.json');
-    if (!await fs.stat(depPackageJsonPath).catch(() => false)) {
-        depPackageJsonPath = path.join(packagePath, 'node_modules', depName, 'package.json');
+    depPackageJsonPath = path.join(
+      projectRoot,
+      'node_modules',
+      depName,
+      'package.json',
+    );
+    if (!(await fs.stat(depPackageJsonPath).catch(() => false))) {
+      depPackageJsonPath = path.join(
+        packagePath,
+        'node_modules',
+        depName,
+        'package.json',
+      );
     }
 
-    const depPackageJsonContent = await fs.readFile(depPackageJsonPath, 'utf-8');
+    const depPackageJsonContent = await fs.readFile(
+      depPackageJsonPath,
+      'utf-8',
+    );
     const depPackageJson = JSON.parse(depPackageJsonContent);
 
     repositoryUrl = depPackageJson.repository?.url || repositoryUrl;
@@ -39,13 +50,14 @@ async function getDependencyLicense(depName, depVersion) {
     try {
       licenseContent = await fs.readFile(licenseFile, 'utf-8');
     } catch (e) {
-      if (e.code !== 'ENOENT') {
-        console.warn(`Warning: Failed to read license file for ${depName}: ${e.message}`);
-      }
-      // licenseContent remains 'License text not found.'
+      console.warn(
+        `Warning: Failed to read license file for ${depName}: ${e.message}`,
+      );
     }
   } catch (e) {
-    console.warn(`Warning: Could not find package.json for ${depName}@${depVersion}. It may be a devDependency or not installed.`);
+    console.warn(
+      `Warning: Could not find package.json for ${depName}: ${e.message}`,
+    );
   }
 
   return {
@@ -66,7 +78,7 @@ async function main() {
     const dependencyEntries = Object.entries(dependencies);
 
     const licensePromises = dependencyEntries.map(([depName, depVersion]) =>
-      getDependencyLicense(depName, depVersion)
+      getDependencyLicense(depName, depVersion),
     );
 
     const dependencyLicenses = await Promise.all(licensePromises);
