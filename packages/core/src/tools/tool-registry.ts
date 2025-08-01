@@ -163,6 +163,8 @@ export class ToolRegistry {
       }
     }
 
+    this.config.getPromptRegistry().clear();
+
     await this.discoverAndRegisterToolsFromCommand();
 
     // discover tools using MCP servers, if configured
@@ -188,6 +190,8 @@ export class ToolRegistry {
       }
     }
 
+    this.config.getPromptRegistry().clear();
+
     // discover tools using MCP servers, if configured
     await discoverMcpTools(
       this.config.getMcpServers() ?? {},
@@ -209,6 +213,8 @@ export class ToolRegistry {
         this.tools.delete(name);
       }
     }
+
+    this.config.getPromptRegistry().removePromptsByServer(serverName);
 
     const mcpServers = this.config.getMcpServers() ?? {};
     const serverConfig = mcpServers[serverName];
