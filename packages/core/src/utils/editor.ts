@@ -59,12 +59,12 @@ function commandExists(cmd: string, fallbackPath?: string): boolean {
  */
 const editorCommands: Record<
   EditorType,
-  { win32: string[]; default: string[]; macOSFallbacks?: string[] }
+  { win32: string[]; default: string[]; fallbackPaths?: string[] }
 > = {
   vscode: {
     win32: ['code.cmd'],
     default: ['code'],
-    macOSFallbacks: [
+    fallbackPaths: [
       '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
     ],
   },
@@ -86,13 +86,9 @@ export function checkHasEditorType(editor: EditorType): boolean {
     return true;
   }
 
-  // On macOS, try fallback path for vscode available
-  if (
-    editor === 'vscode' &&
-    process.platform === 'darwin' &&
-    commandConfig.macOSFallbacks
-  ) {
-    return commandConfig.macOSFallbacks.some((fallbackPath) =>
+  // Try fallback paths
+  if (commandConfig.fallbackPaths) {
+    return commandConfig.fallbackPaths.some((fallbackPath) =>
       existsSync(fallbackPath),
     );
   }
@@ -141,9 +137,9 @@ export function getDiffCommand(
   if (
     !command &&
     process.platform === 'darwin' &&
-    commandConfig.macOSFallbacks
+    commandConfig.fallbackPaths
   ) {
-    command = commandConfig.macOSFallbacks.find((fallbackPath) =>
+    command = commandConfig.fallbackPaths.find((fallbackPath) =>
       existsSync(fallbackPath),
     );
   }
