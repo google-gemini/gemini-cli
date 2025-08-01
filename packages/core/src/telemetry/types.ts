@@ -137,7 +137,7 @@ export class ToolCallEvent {
       ? getDecisionFromOutcome(call.outcome)
       : undefined;
     this.error = call.response.error?.message;
-    this.error_type = call.response.error?.name;
+    this.error_type = call.response.errorType;
     this.prompt_id = call.request.prompt_id;
   }
 }

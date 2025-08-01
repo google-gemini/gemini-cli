@@ -22,6 +22,7 @@ import {
   ErroredToolCall,
   SuccessfulToolCall,
 } from '../core/coreToolScheduler.js';
+import { ToolErrorType } from '../tools/tool-error.js';
 import { Tool, ToolConfirmationOutcome } from '../tools/tools.js';
 
 const createFakeCompletedToolCall = (
@@ -54,6 +55,7 @@ const createFakeCompletedToolCall = (
           },
         },
         error: undefined,
+        errorType: undefined,
         resultDisplay: 'Success!',
       },
       durationMs: duration,
@@ -73,6 +75,7 @@ const createFakeCompletedToolCall = (
           },
         },
         error: error || new Error('Tool failed'),
+        errorType: ToolErrorType.UNKNOWN,
         resultDisplay: 'Failure!',
       },
       durationMs: duration,
