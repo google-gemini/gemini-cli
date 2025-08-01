@@ -22,10 +22,15 @@ import {
   type EditorType,
 } from './editor.js';
 import { execSync, spawn } from 'child_process';
+import * as fs from 'fs';
 
 vi.mock('child_process', () => ({
   execSync: vi.fn(),
   spawn: vi.fn(),
+}));
+
+vi.mock('fs', () => ({
+  existsSync: vi.fn(),
 }));
 
 const originalPlatform = process.platform;
@@ -105,9 +110,37 @@ describe('editor utils', () => {
           (execSync as Mock).mockImplementation(() => {
             throw new Error(); // all commands not found
           });
+          (fs.existsSync as unknown as Mock).mockReturnValue(false); // no fallback paths exist
           expect(checkHasEditorType(editor)).toBe(false);
           expect(execSync).toHaveBeenCalledTimes(commands.length);
         });
+
+        // Fallback path tests (for any editor that has fallback paths configured)
+        if (editor === 'vscode') {
+          it('should return true when command not found but fallback path exists', () => {
+            Object.defineProperty(process, 'platform', { value: 'linux' });
+            (execSync as Mock).mockImplementation(() => {
+              throw new Error(); // command not found
+            });
+            (fs.existsSync as unknown as Mock).mockReturnValue(true); // fallback exists
+            expect(checkHasEditorType(editor)).toBe(true);
+            expect(fs.existsSync).toHaveBeenCalledWith(
+              '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
+            );
+          });
+
+          it('should return false when command not found and fallback path does not exist', () => {
+            Object.defineProperty(process, 'platform', { value: 'linux' });
+            (execSync as Mock).mockImplementation(() => {
+              throw new Error(); // command not found
+            });
+            (fs.existsSync as unknown as Mock).mockReturnValue(false); // fallback doesn't exist
+            expect(checkHasEditorType(editor)).toBe(false);
+            expect(fs.existsSync).toHaveBeenCalledWith(
+              '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
+            );
+          });
+        }
 
         // Windows tests
         it(`should return true if first command "${win32Commands[0]}" exists on windows`, () => {
@@ -208,6 +241,7 @@ describe('editor utils', () => {
         (execSync as Mock).mockImplementation(() => {
           throw new Error(); // all commands not found
         });
+        (fs.existsSync as unknown as Mock).mockReturnValue(false); // no fallback paths exist
 
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({
@@ -215,6 +249,24 @@ describe('editor utils', () => {
           args: ['--wait', '--diff', 'old.txt', 'new.txt'],
         });
       });
+
+      // Fallback path tests (for any editor that has fallback paths configured)
+      if (editor === 'vscode') {
+        it('should use fallback when command not found but fallback exists', () => {
+          Object.defineProperty(process, 'platform', { value: 'linux' });
+          (execSync as Mock).mockImplementation(() => {
+            throw new Error(); // command not found
+          });
+          (fs.existsSync as unknown as Mock).mockReturnValue(true); // fallback exists
+
+          const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+          expect(diffCommand).toEqual({
+            command:
+              '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
+            args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          });
+        });
+      }
 
       // Windows tests
       it(`should use first command "${win32Commands[0]}" when it exists on windows`, () => {
@@ -385,13 +437,21 @@ describe('editor utils', () => {
     for (const editor of execSyncEditors) {
       it(`should call execSync for ${editor} on non-windows`, async () => {
         Object.defineProperty(process, 'platform', { value: 'linux' });
+        (execSync as Mock).mockReturnValue(
+          Buffer.from(`/usr/bin/${editor === 'vim' ? 'vim' : 'nvim'}`),
+        );
+
         await openDiff('old.txt', 'new.txt', editor);
-        expect(execSync).toHaveBeenCalledTimes(1);
+        // execSync is called once by commandExists() in getDiffCommand and once by openDiff
+        expect(execSync).toHaveBeenCalledTimes(2);
+
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
         const expectedCommand = `${
           diffCommand.command
         } ${diffCommand.args.map((arg) => `"${arg}"`).join(' ')}`;
-        expect(execSync).toHaveBeenCalledWith(expectedCommand, {
+
+        // Check the second call (the openDiff call, not the commandExists call)
+        expect(execSync).toHaveBeenNthCalledWith(2, expectedCommand, {
           stdio: 'inherit',
           encoding: 'utf8',
         });
@@ -399,13 +459,23 @@ describe('editor utils', () => {
 
       it(`should call execSync for ${editor} on windows`, async () => {
         Object.defineProperty(process, 'platform', { value: 'win32' });
+        (execSync as Mock).mockReturnValue(
+          Buffer.from(
+            `C:\\Program Files\\...\\${editor === 'vim' ? 'vim' : 'nvim'}`,
+          ),
+        );
+
         await openDiff('old.txt', 'new.txt', editor);
-        expect(execSync).toHaveBeenCalledTimes(1);
+        // execSync is called once by commandExists() in getDiffCommand and once by openDiff
+        expect(execSync).toHaveBeenCalledTimes(2);
+
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
         const expectedCommand = `${diffCommand.command} ${diffCommand.args.join(
           ' ',
         )}`;
-        expect(execSync).toHaveBeenCalledWith(expectedCommand, {
+
+        // Check the second call (the openDiff call, not the commandExists call)
+        expect(execSync).toHaveBeenNthCalledWith(2, expectedCommand, {
           stdio: 'inherit',
           encoding: 'utf8',
         });
@@ -490,10 +560,21 @@ describe('editor utils', () => {
     });
 
     it('should return false for vscode when not installed and not in sandbox mode', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
       (execSync as Mock).mockImplementation(() => {
         throw new Error();
       });
+      (fs.existsSync as unknown as Mock).mockReturnValue(false);
       expect(isEditorAvailable('vscode')).toBe(false);
+    });
+
+    it('should return true for vscode when fallback path exists', () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+      (execSync as Mock).mockImplementation(() => {
+        throw new Error(); // command not found
+      });
+      (fs.existsSync as unknown as Mock).mockReturnValue(true); // fallback exists
+      expect(isEditorAvailable('vscode')).toBe(true);
     });
 
     it('should return false for vscode when installed and in sandbox mode', () => {
