@@ -109,14 +109,15 @@ describe('editor utils', () => {
           (execSync as Mock).mockImplementation(() => {
             throw new Error(); // all commands not found
           });
+          (fs.existsSync as unknown as Mock).mockReturnValue(false); // no fallback paths exist
           expect(checkHasEditorType(editor)).toBe(false);
           expect(execSync).toHaveBeenCalledTimes(commands.length);
         });
 
-        // macOS fallback tests (only for vscode)
+        // Fallback path tests (for any editor that has fallback paths configured)
         if (editor === 'vscode') {
-          it('should return true when command not found but macOS fallback exists', () => {
-            Object.defineProperty(process, 'platform', { value: 'darwin' });
+          it('should return true when command not found but fallback path exists', () => {
+            Object.defineProperty(process, 'platform', { value: 'linux' });
             (execSync as Mock).mockImplementation(() => {
               throw new Error(); // command not found
             });
@@ -127,8 +128,8 @@ describe('editor utils', () => {
             );
           });
 
-          it('should return false when command not found and macOS fallback does not exist', () => {
-            Object.defineProperty(process, 'platform', { value: 'darwin' });
+          it('should return false when command not found and fallback path does not exist', () => {
+            Object.defineProperty(process, 'platform', { value: 'linux' });
             (execSync as Mock).mockImplementation(() => {
               throw new Error(); // command not found
             });
@@ -239,6 +240,7 @@ describe('editor utils', () => {
         (execSync as Mock).mockImplementation(() => {
           throw new Error(); // all commands not found
         });
+        (fs.existsSync as unknown as Mock).mockReturnValue(false); // no fallback paths exist
 
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({
@@ -247,10 +249,10 @@ describe('editor utils', () => {
         });
       });
 
-      // macOS fallback tests (only for vscode)
+      // Fallback path tests (for any editor that has fallback paths configured)
       if (editor === 'vscode') {
-        it('should use macOS fallback when command not found but fallback exists', () => {
-          Object.defineProperty(process, 'platform', { value: 'darwin' });
+        it('should use fallback when command not found but fallback exists', () => {
+          Object.defineProperty(process, 'platform', { value: 'linux' });
           (execSync as Mock).mockImplementation(() => {
             throw new Error(); // command not found
           });
@@ -548,8 +550,8 @@ describe('editor utils', () => {
       expect(isEditorAvailable('vscode')).toBe(false);
     });
 
-    it('should return true for vscode when fallback path exists on macOS', () => {
-      Object.defineProperty(process, 'platform', { value: 'darwin' });
+    it('should return true for vscode when fallback path exists', () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
       (execSync as Mock).mockImplementation(() => {
         throw new Error(); // command not found
       });

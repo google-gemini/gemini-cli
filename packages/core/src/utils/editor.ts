@@ -42,11 +42,7 @@ function commandExists(cmd: string, fallbackPath?: string): boolean {
     return true;
   } catch {
     // On macOS, check fallback path if provided
-    if (
-      fallbackPath &&
-      process.platform === 'darwin' &&
-      existsSync(fallbackPath)
-    ) {
+    if (fallbackPath && existsSync(fallbackPath)) {
       return true;
     }
     return false;
@@ -134,11 +130,7 @@ export function getDiffCommand(
   let command = commands.find((cmd) => commandExists(cmd));
 
   // If no standard command found and on macOS, try fallbacks
-  if (
-    !command &&
-    process.platform === 'darwin' &&
-    commandConfig.fallbackPaths
-  ) {
+  if (!command && commandConfig.fallbackPaths) {
     command = commandConfig.fallbackPaths.find((fallbackPath) =>
       existsSync(fallbackPath),
     );
