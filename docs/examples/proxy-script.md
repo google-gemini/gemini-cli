@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/examples/proxy-script.md)
+🌐 [查看中文版](../../i18n/chinese/docs/examples/proxy-script.md)
 
 # Example Proxy Script
 

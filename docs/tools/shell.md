@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/tools/shell.md)
+🌐 [查看中文版](../../i18n/chinese/docs/tools/shell.md)
 
 # Shell Tool (`run_shell_command`)
 

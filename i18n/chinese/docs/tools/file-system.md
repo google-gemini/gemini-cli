@@ -1,4 +1,4 @@
-[查看英文版](../../../../docs/tools/file-system.md)
+🌐 [查看英文版](../../../../docs/tools/file-system.md)
 
 # Gemini CLI 文件系统工具
 

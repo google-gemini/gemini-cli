@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/tools/web-search.md)
+🌐 [查看中文版](../../i18n/chinese/docs/tools/web-search.md)
 
 # Google Web Search Tool (`google_web_search`)
 

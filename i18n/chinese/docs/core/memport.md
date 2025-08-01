@@ -1,4 +1,4 @@
-[查看英文版](../../../../docs/core/memport.md)
+🌐 [查看英文版](../../../../docs/core/memport.md)
 
 # 内存导入处理器
 

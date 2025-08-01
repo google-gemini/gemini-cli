@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/CONTRIBUTING.md)
+🌐 [查看中文版](./i18n/chinese/CONTRIBUTING.md)
 
 # How to Contribute
 

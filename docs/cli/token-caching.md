@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/cli/token-caching.md)
+🌐 [查看中文版](../../i18n/chinese/docs/cli/token-caching.md)
 
 # Token Caching and Cost Optimization
 

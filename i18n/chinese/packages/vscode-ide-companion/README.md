@@ -1,4 +1,4 @@
-[查看英文版](../../../packages/vscode-ide-companion/README.md)
+🌐 [查看英文版](../../../packages/vscode-ide-companion/README.md)
 
 # Gemini VS Code IDE 伴侣
 

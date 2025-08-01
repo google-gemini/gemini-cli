@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/troubleshooting.md)
+🌐 [查看中文版](../i18n/chinese/docs/troubleshooting.md)
 
 # Troubleshooting Guide
 

@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/cli/commands.md)
+🌐 [查看中文版](../../i18n/chinese/docs/cli/commands.md)
 
 # CLI Commands
 

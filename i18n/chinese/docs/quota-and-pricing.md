@@ -1,4 +1,4 @@
-[查看英文版](../../../docs/quota-and-pricing.md)
+🌐 [查看英文版](../../../docs/quota-and-pricing.md)
 
 # 配额和定价
 

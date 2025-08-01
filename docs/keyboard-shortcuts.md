@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/keyboard-shortcuts.md)
+🌐 [查看中文版](../i18n/chinese/docs/keyboard-shortcuts.md)
 
 # Keyboard Shortcuts
 

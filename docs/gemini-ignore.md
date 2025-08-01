@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/gemini-ignore.md)
+🌐 [查看中文版](../i18n/chinese/docs/gemini-ignore.md)
 
 # Ignoring Files
 

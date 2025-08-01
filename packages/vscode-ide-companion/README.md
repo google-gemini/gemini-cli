@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/packages/vscode-ide-companion/README.md)
+🌐 [查看中文版](../../i18n/chinese/packages/vscode-ide-companion/README.md)
 
 # Gemini VS Code IDE Companion
 

@@ -1,4 +1,4 @@
-[查看英文版](../../../docs/troubleshooting.md)
+🌐 [查看英文版](../../../docs/troubleshooting.md)
 
 # 疑难解答
 

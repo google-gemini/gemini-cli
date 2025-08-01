@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/quota-and-pricing.md)
+🌐 [查看中文版](../i18n/chinese/docs/quota-and-pricing.md)
 
 # Quota and Pricing
 

@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/tools/multi-file.md)
+🌐 [查看中文版](../../i18n/chinese/docs/tools/multi-file.md)
 
 # Multi-file Tool
 

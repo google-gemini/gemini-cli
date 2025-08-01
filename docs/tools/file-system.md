@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/tools/file-system.md)
+🌐 [查看中文版](../../i18n/chinese/docs/tools/file-system.md)
 
 # Gemini CLI file system tools
 

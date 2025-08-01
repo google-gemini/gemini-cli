@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/GEMINI.md)
+🌐 [查看中文版](./i18n/chinese/GEMINI.md)
 
 ## Building and running
 

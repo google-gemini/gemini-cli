@@ -1,4 +1,4 @@
-[查看英文版](../../../docs/integration-tests.md)
+🌐 [查看英文版](../../../docs/integration-tests.md)
 
 # 集成测试
 

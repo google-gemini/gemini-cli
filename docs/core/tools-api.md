@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/core/tools-api.md)
+🌐 [查看中文版](../../i18n/chinese/docs/core/tools-api.md)
 
 # Gemini CLI Core: Tools API
 

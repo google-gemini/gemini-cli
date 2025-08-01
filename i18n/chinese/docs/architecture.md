@@ -1,4 +1,4 @@
-[查看英文版](../../../docs/architecture.md)
+🌐 [查看英文版](../../../docs/architecture.md)
 
 # Gemini CLI 架构概述
 

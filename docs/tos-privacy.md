@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/tos-privacy.md)
+🌐 [查看中文版](../i18n/chinese/docs/tos-privacy.md)
 
 # Terms of Service and Privacy Policy
 

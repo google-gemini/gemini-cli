@@ -1,4 +1,4 @@
-[查看英文版](../../../docs/checkpointing.md)
+🌐 [查看英文版](../../../docs/checkpointing.md)
 
 # 检查点
 

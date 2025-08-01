@@ -1,4 +1,4 @@
-[查看英文版](../../../docs/tos-privacy.md)
+🌐 [查看英文版](../../../docs/tos-privacy.md)
 
 # 服务条款和隐私政策
 

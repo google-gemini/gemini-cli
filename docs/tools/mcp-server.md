@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/tools/mcp-server.md)
+🌐 [查看中文版](../../i18n/chinese/docs/tools/mcp-server.md)
 
 # MCP servers with the Gemini CLI
 

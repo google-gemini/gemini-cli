@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/extension.md)
+🌐 [查看中文版](../i18n/chinese/docs/extension.md)
 
 # Gemini CLI Extensions
 

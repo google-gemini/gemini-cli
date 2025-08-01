@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/sandbox.md)
+🌐 [查看中文版](../i18n/chinese/docs/sandbox.md)
 
 # Sandboxing in the Gemini CLI
 

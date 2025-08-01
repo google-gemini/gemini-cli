@@ -1,4 +1,4 @@
-[查看英文版](../../../docs/keyboard-shortcuts.md)
+🌐 [查看英文版](../../../docs/keyboard-shortcuts.md)
 
 # 键盘快捷键
 

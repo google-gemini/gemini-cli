@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/deployment.md)
+🌐 [查看中文版](../i18n/chinese/docs/deployment.md)
 
 # Gemini CLI Execution and Deployment
 

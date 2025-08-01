@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/tools/web-fetch.md)
+🌐 [查看中文版](../../i18n/chinese/docs/tools/web-fetch.md)
 
 # Web Fetch Tool (`web_fetch`)
 

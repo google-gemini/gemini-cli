@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/cli/configuration.md)
+🌐 [查看中文版](../../i18n/chinese/docs/cli/configuration.md)
 
 # Gemini CLI Configuration
 

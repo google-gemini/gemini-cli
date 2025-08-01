@@ -1,4 +1,4 @@
-[查看英文版](../../../../docs/cli/configuration.md)
+🌐 [查看英文版](../../../../docs/cli/configuration.md)
 
 # Gemini CLI 配置
 

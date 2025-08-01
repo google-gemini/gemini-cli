@@ -1,4 +1,4 @@
-[查看英文版](../../../docs/extension.md)
+🌐 [查看英文版](../../../docs/extension.md)
 
 # Gemini CLI 扩展
 

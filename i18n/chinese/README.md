@@ -1,4 +1,4 @@
-[查看英文版](../../README.md)
+🌐 [查看英文版](../../README.md)
 
 # Gemini CLI
 
@@ -118,10 +118,10 @@ gemini
 
 - 了解如何[贡献或从源代码构建](./CONTRIBUTING.md)。
 - 浏览可用的 **[CLI 命令](./docs/cli/commands.md)**。
-- 如果遇到任何问题，请查阅**[故障排除指南](./docs/troubleshooting.md)**。
+- 如果遇到任何问题，请查阅 **[故障排除指南](./docs/troubleshooting.md)**。
 - 如需更全面的文档，请参阅[完整文档](./docs/index.md)。
 - 查看一些[热门任务](#popular-tasks)以获取更多灵感。
-- 查看我们的**[官方路线图](./ROADMAP.md)**。
+- 查看我们的 **[官方路线图](./ROADMAP.md)**。
 
 ### 故障排除
 
@@ -207,4 +207,4 @@ gemini
 
 ## 服务条款和隐私声明
 
-有关适用于您使用 Gemini CLI 的服务条款和隐私声明的详细信息，请参阅[服务条款和隐私声明](../../docs/tos-privacy.md)。
+有关适用于您使用 Gemini CLI 的服务条款和隐私声明的详细信息，请参阅[服务条款和隐私声明](./docs/tos-privacy.md)。

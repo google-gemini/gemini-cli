@@ -1,4 +1,4 @@
-[查看中文版](./i18n/chinese/docs/telemetry.md)
+🌐 [查看中文版](../i18n/chinese/docs/telemetry.md)
 
 # Telemetry
 
