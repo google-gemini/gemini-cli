@@ -13,8 +13,6 @@ import {
   Text,
   useStdin,
   useStdout,
-  useInput,
-  type Key as InkKeyType,
 } from 'ink';
 import { StreamingState, type HistoryItem, MessageType } from './types.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
@@ -76,6 +74,7 @@ import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useVimMode, VimModeProvider } from './contexts/VimModeContext.js';
 import { useVim } from './hooks/vim.js';
+import { useKeypress, Key } from './hooks/useKeypress.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
 import {
@@ -553,7 +552,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     [handleSlashCommand],
   );
 
-  useInput((input: string, key: InkKeyType) => {
+  const handleGlobalKeypress = useCallback((key: Key) => {
     let enteringConstrainHeightMode = false;
     if (!constrainHeight) {
       // Automatically re-enter constrain height mode if the user types
@@ -564,9 +563,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       setConstrainHeight(true);
     }
 
-    if (key.ctrl && input === 'o') {
+    if (key.ctrl && key.name === 'o') {
       setShowErrorDetails((prev) => !prev);
-    } else if (key.ctrl && input === 't') {
+    } else if (key.ctrl && key.name === 't') {
       const newValue = !showToolDescriptions;
       setShowToolDescriptions(newValue);
 
@@ -576,23 +575,43 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       }
     } else if (
       key.ctrl &&
-      input === 'e' &&
+      key.name === 'e' &&
       config.getIdeMode() &&
       ideContextState
     ) {
       setShowIDEContextDetail((prev) => !prev);
-    } else if (key.ctrl && (input === 'c' || input === 'C')) {
+    } else if (key.ctrl && (key.name === 'c' || key.name === 'C')) {
       handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
-    } else if (key.ctrl && (input === 'd' || input === 'D')) {
+    } else if (key.ctrl && (key.name === 'd' || key.name === 'D')) {
       if (buffer.text.length > 0) {
         // Do nothing if there is text in the input.
         return;
       }
       handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
-    } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
+    } else if (key.ctrl && key.name === 's' && !enteringConstrainHeightMode) {
       setConstrainHeight(false);
     }
-  });
+  }, [
+    constrainHeight,
+    setConstrainHeight,
+    setShowErrorDetails,
+    showToolDescriptions,
+    setShowToolDescriptions,
+    config,
+    ideContextState,
+    setShowIDEContextDetail,
+    handleExit,
+    ctrlCPressedOnce,
+    setCtrlCPressedOnce,
+    ctrlCTimerRef,
+    buffer.text.length,
+    ctrlDPressedOnce,
+    setCtrlDPressedOnce,
+    ctrlDTimerRef,
+    handleSlashCommand,
+  ]);
+
+  useKeypress(handleGlobalKeypress, { isActive: true });
 
   useEffect(() => {
     if (config) {
