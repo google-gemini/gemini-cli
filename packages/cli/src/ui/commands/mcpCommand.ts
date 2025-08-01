@@ -105,16 +105,15 @@ const getMcpStatus = async (
     const promptRegistry = await config.getPromptRegistry();
     const serverPrompts = promptRegistry.getPromptsByServer(serverName) || [];
 
-    let status = getMCPServerStatus(serverName);
-    const originalStatus = status;
+    const originalStatus = getMCPServerStatus(serverName);
+    const hasCachedItems = serverTools.length > 0 || serverPrompts.length > 0;
 
-    // If the server is "disconnected" but has prompts or cached tools, display Ready
-    if (
-      status === MCPServerStatus.DISCONNECTED &&
-      (serverTools.length > 0 || serverPrompts.length > 0)
-    ) {
-      status = MCPServerStatus.CONNECTED;
-    }
+    // If the server is "disconnected" but has prompts or cached tools, display it as Ready
+    // by using CONNECTED as the display status.
+    const status =
+      originalStatus === MCPServerStatus.DISCONNECTED && hasCachedItems
+        ? MCPServerStatus.CONNECTED
+        : originalStatus;
 
     // Add status indicator with descriptive text
     let statusIndicator = '';
