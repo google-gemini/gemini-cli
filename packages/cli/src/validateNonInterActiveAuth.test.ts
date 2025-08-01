@@ -10,6 +10,7 @@ import {
   NonInteractiveConfig,
 } from './validateNonInterActiveAuth.js';
 import { AuthType } from '@google/gemini-cli-core';
+import * as auth from './config/auth.js';
 
 describe('validateNonInterActiveAuth', () => {
   let originalEnvGeminiApiKey: string | undefined;
@@ -194,8 +195,7 @@ describe('validateNonInterActiveAuth', () => {
 
   it('exits if validateAuthMethod returns error', async () => {
     // Mock validateAuthMethod to return error
-    const mod = await import('./config/auth.js');
-    vi.spyOn(mod, 'validateAuthMethod').mockReturnValue('Auth error!');
+    vi.spyOn(auth, 'validateAuthMethod').mockReturnValue('Auth error!');
     const nonInteractiveConfig: NonInteractiveConfig = {
       refreshAuth: refreshAuthMock,
     };
@@ -215,9 +215,8 @@ describe('validateNonInterActiveAuth', () => {
 
   it('skips validation if useExternalAuth is true', async () => {
     // Mock validateAuthMethod to return error to ensure it's not being called
-    const mod = await import('./config/auth.js');
     const validateAuthMethodSpy = vi
-      .spyOn(mod, 'validateAuthMethod')
+      .spyOn(auth, 'validateAuthMethod')
       .mockReturnValue('Auth error!');
     const nonInteractiveConfig: NonInteractiveConfig = {
       refreshAuth: refreshAuthMock,

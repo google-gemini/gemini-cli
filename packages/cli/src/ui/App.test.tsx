@@ -26,6 +26,7 @@ import { Tips } from './components/Tips.js';
 import { checkForUpdates, UpdateObject } from './utils/updateCheck.js';
 import { EventEmitter } from 'events';
 import { updateEventEmitter } from '../utils/updateEventEmitter.js';
+import * as auth from '../config/auth.js';
 
 // Define a more complete mock server config based on actual Config
 interface MockServerConfig {
@@ -1012,7 +1013,6 @@ describe('App UI', () => {
 
   describe('auth validation', () => {
     it('should call validateAuthMethod when useExternalAuth is false', async () => {
-      const auth = await import('../config/auth.js');
       const validateAuthMethodSpy = vi.spyOn(auth, 'validateAuthMethod');
       mockSettings = createMockSettings({
         workspace: {
@@ -1035,7 +1035,6 @@ describe('App UI', () => {
     });
 
     it('should NOT call validateAuthMethod when useExternalAuth is true', async () => {
-      const auth = await import('../config/auth.js');
       const validateAuthMethodSpy = vi.spyOn(auth, 'validateAuthMethod');
       mockSettings = createMockSettings({
         workspace: {
