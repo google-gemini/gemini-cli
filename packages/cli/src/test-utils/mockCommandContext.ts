@@ -51,8 +51,10 @@ export const createMockCommandContext = (
       setPendingItem: vi.fn(),
       loadHistory: vi.fn(),
       toggleCorgiMode: vi.fn(),
+      toggleVimEnabled: vi.fn(),
     },
     session: {
+      sessionShellAllowlist: new Set<string>(),
       stats: {
         sessionStartTime: new Date(),
         lastPromptTokenCount: 0,

@@ -355,6 +355,7 @@ const App = ({
         config.getFileService(),
         settings.merged,
         config.getExtensionContextFilePaths(),
+        settings.merged.memoryImportFormat || 'tree', // Use setting or default to 'tree'
         config.getFileFilteringOptions(),
       );
 

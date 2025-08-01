@@ -14,38 +14,12 @@ import {
   ChatRecordingService,
   ToolCallRecord,
   ResumedSessionData,
+  GeminiEventType,
 } from '@google/gemini-cli-core';
-import {
-  Content,
-  Part,
-  FunctionCall,
-  GenerateContentResponse,
-} from '@google/genai';
+import { Content, Part, FunctionCall } from '@google/genai';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
 import { convertSessionToHistoryFormats } from './ui/hooks/useSessionBrowser.js';
-
-function getResponseText(response: GenerateContentResponse): string | null {
-  if (response.candidates && response.candidates.length > 0) {
-    const candidate = response.candidates[0];
-    if (
-      candidate.content &&
-      candidate.content.parts &&
-      candidate.content.parts.length > 0
-    ) {
-      // We are running in headless mode so we don't need to return thoughts to STDOUT.
-      const thoughtPart = candidate.content.parts[0];
-      if (thoughtPart?.thought) {
-        return null;
-      }
-      return candidate.content.parts
-        .filter((part) => part.text)
-        .map((part) => part.text)
-        .join('');
-    }
-  }
-  return null;
-}
 
 export async function runNonInteractive(
   config: Config,
@@ -77,7 +51,6 @@ export async function runNonInteractive(
         .clientHistory,
     );
   }
-  const chat = await geminiClient.getChat();
 
   const abortController = new AbortController();
   let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
@@ -86,7 +59,7 @@ export async function runNonInteractive(
     while (true) {
       turnCount++;
       if (
-        config.getMaxSessionTurns() > 0 &&
+        config.getMaxSessionTurns() >= 0 &&
         turnCount > config.getMaxSessionTurns()
       ) {
         console.error(
@@ -97,40 +70,37 @@ export async function runNonInteractive(
       const functionCalls: FunctionCall[] = [];
       let fullResponseText = '';
 
-      const responseStream = await chat.sendMessageStream(
-        {
-          message: currentMessages[0]?.parts || [], // Ensure parts are always provided
-          config: {
-            abortSignal: abortController.signal,
-            tools: [
-              { functionDeclarations: toolRegistry.getFunctionDeclarations() },
-            ],
-          },
-        },
+      const responseStream = geminiClient.sendMessageStream(
+        currentMessages[0]?.parts || [],
+        abortController.signal,
         prompt_id,
       );
 
-      for await (const resp of responseStream) {
+      for await (const event of responseStream) {
         if (abortController.signal.aborted) {
           console.error('Operation cancelled.');
           return;
         }
-        const textPart = getResponseText(resp);
-        if (textPart) {
-          process.stdout.write(textPart);
-          fullResponseText += textPart;
-        }
-        if (resp.functionCalls) {
-          functionCalls.push(...resp.functionCalls);
-        }
-        if (resp.usageMetadata) {
+
+        if (event.type === GeminiEventType.Content) {
+          process.stdout.write(event.value);
+          fullResponseText += event.value;
+        } else if (event.type === GeminiEventType.ToolCallRequest) {
+          const toolCallRequest = event.value;
+          const fc: FunctionCall = {
+            name: toolCallRequest.name,
+            args: toolCallRequest.args,
+            id: toolCallRequest.callId,
+          };
+          functionCalls.push(fc);
+        } else if (event.type === GeminiEventType.Finished) {
           chatRecordingService.recordMessageTokens({
-            input: resp.usageMetadata.promptTokenCount ?? 0,
-            output: resp.usageMetadata.candidatesTokenCount ?? 0,
-            cached: resp.usageMetadata.cachedContentTokenCount ?? 0,
-            thoughts: resp.usageMetadata.thoughtsTokenCount ?? 0,
-            tool: resp.usageMetadata.toolUsePromptTokenCount ?? 0,
-            total: resp.usageMetadata.totalTokenCount ?? 0,
+            input: event.value.usageMetadata?.promptTokenCount ?? 0,
+            output: event.value.usageMetadata?.candidatesTokenCount ?? 0,
+            cached: event.value.usageMetadata?.cachedContentTokenCount ?? 0,
+            thoughts: event.value.usageMetadata?.thoughtsTokenCount ?? 0,
+            tool: event.value.usageMetadata?.toolUsePromptTokenCount ?? 0,
+            total: event.value.usageMetadata?.totalTokenCount ?? 0,
           });
         }
       }

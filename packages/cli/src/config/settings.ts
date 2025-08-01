@@ -114,6 +114,7 @@ export interface Settings {
   sessionRetention?: SessionRetentionSettings;
 
   vimMode?: boolean;
+  memoryImportFormat?: 'tree' | 'flat';
 
   // Flag to be removed post-launch.
   ideModeFeature?: boolean;
