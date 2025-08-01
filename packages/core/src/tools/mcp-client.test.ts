@@ -117,7 +117,12 @@ describe('mcp-client', () => {
         request: mockRequest,
       } as unknown as ClientLib.Client;
 
-      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
+      await discoverPrompts(
+        'test-server',
+        mockedClient,
+        mockedPromptRegistry,
+        {},
+      );
 
       expect(mockRequest).toHaveBeenCalledWith(
         { method: 'prompts/list', params: {} },
@@ -139,7 +144,12 @@ describe('mcp-client', () => {
           // no-op
         });
 
-      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
+      await discoverPrompts(
+        'test-server',
+        mockedClient,
+        mockedPromptRegistry,
+        {},
+      );
 
       expect(mockRequest).toHaveBeenCalledOnce();
       expect(consoleLogSpy).not.toHaveBeenCalled();
@@ -161,7 +171,12 @@ describe('mcp-client', () => {
           // no-op
         });
 
-      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
+      await discoverPrompts(
+        'test-server',
+        mockedClient,
+        mockedPromptRegistry,
+        {},
+      );
 
       expect(mockRequest).toHaveBeenCalledOnce();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -169,6 +184,52 @@ describe('mcp-client', () => {
       );
 
       consoleErrorSpy.mockRestore();
+    });
+
+    it('should exclude prompts from the github MCP server', async () => {
+      const mockRequest = vi.fn().mockResolvedValue({
+        prompts: [
+          { name: 'AssignCodingAgent', description: 'desc1' },
+          { name: 'github_AssignCodingAgent' },
+        ],
+      });
+      const mockedClient = {
+        request: mockRequest,
+      } as unknown as ClientLib.Client;
+
+      await discoverPrompts('github', mockedClient, mockedPromptRegistry, {
+        excludeTools: ['AssignCodingAgent'],
+      });
+
+      expect(mockedPromptRegistry.registerPrompt).toHaveBeenCalledTimes(1);
+      expect(mockedPromptRegistry.registerPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'github_AssignCodingAgent',
+        }),
+      );
+    });
+
+    it('should exclude prompts from the excludeTools list', async () => {
+      const mockRequest = vi.fn().mockResolvedValue({
+        prompts: [
+          { name: 'prompt1', description: 'desc1' },
+          { name: 'prompt2' },
+        ],
+      });
+      const mockedClient = {
+        request: mockRequest,
+      } as unknown as ClientLib.Client;
+
+      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry, {
+        excludeTools: ['prompt1'],
+      });
+
+      expect(mockedPromptRegistry.registerPrompt).toHaveBeenCalledTimes(1);
+      expect(mockedPromptRegistry.registerPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'prompt2',
+        }),
+      );
     });
   });
 
