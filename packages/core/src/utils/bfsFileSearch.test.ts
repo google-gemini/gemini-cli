@@ -258,10 +258,12 @@ describe('bfsFileSearch', () => {
     expect(avgDuration).toBeLessThan(2000); // Very generous limit
 
     // Ensure consistency across runs (variance should not be too high)
-    expect(consistencyRatio).toBeLessThan(1.5); // Max variance should be less than 150% of average
+    // More tolerant in CI environments where performance can be variable
+    const maxConsistencyRatio = process.env.CI ? 3.0 : 1.5;
+    expect(consistencyRatio).toBeLessThan(maxConsistencyRatio); // Max variance should be reasonable
 
     console.log(
-      `✅ Performance test passed: avg=${avgDuration.toFixed(2)}ms, consistency=${(consistencyRatio * 100).toFixed(1)}%`,
+      `✅ Performance test passed: avg=${avgDuration.toFixed(2)}ms, consistency=${(consistencyRatio * 100).toFixed(1)}% (threshold: ${(maxConsistencyRatio * 100).toFixed(0)}%)`,
     );
   });
 });

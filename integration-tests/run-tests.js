@@ -101,6 +101,7 @@ async function main() {
           KEEP_OUTPUT: keepOutput.toString(),
           VERBOSE: verbose.toString(),
           TEST_FILE_NAME: testFileName,
+          TELEMETRY_LOG_FILE: join(testFileDir, 'telemetry.log'),
         },
       });
 
