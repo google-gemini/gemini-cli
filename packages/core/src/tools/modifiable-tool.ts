@@ -8,7 +8,7 @@ import { EditorType, openDiff } from '../utils/editor.js';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
-import * as Diff from 'diff';
+import { createPatch } from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { isNodeError } from '../utils/errors.js';
 import { Tool } from './tools.js';
@@ -103,7 +103,7 @@ function getUpdatedParams<ToolParams>(
     newContent,
     originalParams,
   );
-  const updatedDiff = Diff.createPatch(
+  const updatedDiff = createPatch(
     path.basename(modifyContext.getFilePath(originalParams)),
     oldContent,
     newContent,

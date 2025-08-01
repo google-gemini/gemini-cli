@@ -15,7 +15,7 @@ import { FunctionDeclaration, Type } from '@google/genai';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { homedir } from 'os';
-import * as Diff from 'diff';
+import { createPatch } from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { tildeifyPath } from '../utils/paths.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
@@ -207,7 +207,7 @@ export class MemoryTool
     const newContent = this.computeNewContent(currentContent, params.fact);
 
     const fileName = path.basename(memoryFilePath);
-    const fileDiff = Diff.createPatch(
+    const fileDiff = createPatch(
       fileName,
       currentContent,
       newContent,
