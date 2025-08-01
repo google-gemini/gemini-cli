@@ -140,7 +140,7 @@ describe('OAuthUtils', () => {
   describe('parseWWWAuthenticateHeader', () => {
     it('should parse resource metadata URI from WWW-Authenticate header', () => {
       const header =
-        'Bearer realm="example", resource_metadata_uri="https://example.com/.well-known/oauth-protected-resource"';
+        'Bearer realm="example", resource_metadata="https://example.com/.well-known/oauth-protected-resource"';
       const result = OAuthUtils.parseWWWAuthenticateHeader(header);
       expect(result).toBe(
         'https://example.com/.well-known/oauth-protected-resource',
