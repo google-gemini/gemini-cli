@@ -32,6 +32,7 @@ describe('textBufferReducer', () => {
   it('should return the initial state if state is undefined', () => {
     const action = { type: 'unknown_action' } as unknown as TextBufferAction;
     const state = textBufferReducer(initialState, action);
+    expect(state).toHaveOnlyValidCharacters();
     expect(state).toEqual(initialState);
   });
 
@@ -42,6 +43,7 @@ describe('textBufferReducer', () => {
         payload: 'hello\nworld',
       };
       const state = textBufferReducer(initialState, action);
+      expect(state).toHaveOnlyValidCharacters();
       expect(state.lines).toEqual(['hello', 'world']);
       expect(state.cursorRow).toBe(1);
       expect(state.cursorCol).toBe(5);
@@ -55,6 +57,7 @@ describe('textBufferReducer', () => {
         pushToUndo: false,
       };
       const state = textBufferReducer(initialState, action);
+      expect(state).toHaveOnlyValidCharacters();
       expect(state.lines).toEqual(['no undo']);
       expect(state.undoStack.length).toBe(0);
     });
@@ -64,6 +67,7 @@ describe('textBufferReducer', () => {
     it('should insert a character', () => {
       const action: TextBufferAction = { type: 'insert', payload: 'a' };
       const state = textBufferReducer(initialState, action);
+      expect(state).toHaveOnlyValidCharacters();
       expect(state.lines).toEqual(['a']);
       expect(state.cursorCol).toBe(1);
     });
@@ -72,6 +76,7 @@ describe('textBufferReducer', () => {
       const stateWithText = { ...initialState, lines: ['hello'] };
       const action: TextBufferAction = { type: 'insert', payload: '\n' };
       const state = textBufferReducer(stateWithText, action);
+      expect(state).toHaveOnlyValidCharacters();
       expect(state.lines).toEqual(['', 'hello']);
       expect(state.cursorRow).toBe(1);
       expect(state.cursorCol).toBe(0);
@@ -88,6 +93,7 @@ describe('textBufferReducer', () => {
       };
       const action: TextBufferAction = { type: 'backspace' };
       const state = textBufferReducer(stateWithText, action);
+      expect(state).toHaveOnlyValidCharacters();
       expect(state.lines).toEqual(['']);
       expect(state.cursorCol).toBe(0);
     });
@@ -101,6 +107,7 @@ describe('textBufferReducer', () => {
       };
       const action: TextBufferAction = { type: 'backspace' };
       const state = textBufferReducer(stateWithText, action);
+      expect(state).toHaveOnlyValidCharacters();
       expect(state.lines).toEqual(['helloworld']);
       expect(state.cursorRow).toBe(0);
       expect(state.cursorCol).toBe(5);
@@ -115,12 +122,14 @@ describe('textBufferReducer', () => {
         payload: 'test',
       };
       const stateAfterInsert = textBufferReducer(initialState, insertAction);
+      expect(stateAfterInsert).toHaveOnlyValidCharacters();
       expect(stateAfterInsert.lines).toEqual(['test']);
       expect(stateAfterInsert.undoStack.length).toBe(1);
 
       // 2. Undo
       const undoAction: TextBufferAction = { type: 'undo' };
       const stateAfterUndo = textBufferReducer(stateAfterInsert, undoAction);
+      expect(stateAfterUndo).toHaveOnlyValidCharacters();
       expect(stateAfterUndo.lines).toEqual(['']);
       expect(stateAfterUndo.undoStack.length).toBe(0);
       expect(stateAfterUndo.redoStack.length).toBe(1);
@@ -128,6 +137,7 @@ describe('textBufferReducer', () => {
       // 3. Redo
       const redoAction: TextBufferAction = { type: 'redo' };
       const stateAfterRedo = textBufferReducer(stateAfterUndo, redoAction);
+      expect(stateAfterRedo).toHaveOnlyValidCharacters();
       expect(stateAfterRedo.lines).toEqual(['test']);
       expect(stateAfterRedo.undoStack.length).toBe(1);
       expect(stateAfterRedo.redoStack.length).toBe(0);
@@ -144,6 +154,7 @@ describe('textBufferReducer', () => {
       };
       const action: TextBufferAction = { type: 'create_undo_snapshot' };
       const state = textBufferReducer(stateWithText, action);
+      expect(state).toHaveOnlyValidCharacters();
 
       expect(state.lines).toEqual(['hello']);
       expect(state.cursorRow).toBe(0);
@@ -157,16 +168,19 @@ describe('textBufferReducer', () => {
 });
 
 // Helper to get the state from the hook
-const getBufferState = (result: { current: TextBuffer }) => ({
-  text: result.current.text,
-  lines: [...result.current.lines], // Clone for safety
-  cursor: [...result.current.cursor] as [number, number],
-  allVisualLines: [...result.current.allVisualLines],
-  viewportVisualLines: [...result.current.viewportVisualLines],
-  visualCursor: [...result.current.visualCursor] as [number, number],
-  visualScrollRow: result.current.visualScrollRow,
-  preferredCol: result.current.preferredCol,
-});
+const getBufferState = (result: { current: TextBuffer }) => {
+  expect(result.current).toHaveOnlyValidCharacters();
+  return {
+    text: result.current.text,
+    lines: [...result.current.lines], // Clone for safety
+    cursor: [...result.current.cursor] as [number, number],
+    allVisualLines: [...result.current.allVisualLines],
+    viewportVisualLines: [...result.current.viewportVisualLines],
+    visualCursor: [...result.current.visualCursor] as [number, number],
+    visualScrollRow: result.current.visualScrollRow,
+    preferredCol: result.current.preferredCol,
+  };
+};
 
 describe('useTextBuffer', () => {
   let viewport: Viewport;
@@ -1152,6 +1166,22 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(state.text).toBe('fiXrd');
       expect(state.cursor).toEqual([0, 3]); // After 'X'
     });
+
+    it('should replace a single-line range with multi-line text', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'one two three',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+      // Replace "two" with "new\nline"
+      act(() => result.current.replaceRange(0, 4, 0, 7, 'new\nline'));
+      const state = getBufferState(result);
+      expect(state.lines).toEqual(['one new', 'line three']);
+      expect(state.text).toBe('one new\nline three');
+      expect(state.cursor).toEqual([1, 4]); // cursor after 'line'
+    });
   });
 
   describe('Input Sanitization', () => {
@@ -1159,7 +1189,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
-      const textWithAnsi = '\x1B[31mHello\x1B[0m';
+      const textWithAnsi = '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m';
       act(() =>
         result.current.handleInput({
           name: '',
@@ -1170,7 +1200,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           sequence: textWithAnsi,
         }),
       );
-      expect(getBufferState(result).text).toBe('Hello');
+      expect(getBufferState(result).text).toBe('Hello World');
     });
 
     it('should strip control characters from input', () => {
@@ -1425,6 +1455,7 @@ describe('textBufferReducer vim operations', () => {
       };
 
       const result = textBufferReducer(initialState, action);
+      expect(result).toHaveOnlyValidCharacters();
 
       // After deleting line2, we should have line1 and line3, with cursor on line3 (now at index 1)
       expect(result.lines).toEqual(['line1', 'line3']);
@@ -1452,6 +1483,7 @@ describe('textBufferReducer vim operations', () => {
       };
 
       const result = textBufferReducer(initialState, action);
+      expect(result).toHaveOnlyValidCharacters();
 
       // Should delete line2 and line3, leaving line1 and line4
       expect(result.lines).toEqual(['line1', 'line4']);
@@ -1479,6 +1511,7 @@ describe('textBufferReducer vim operations', () => {
       };
 
       const result = textBufferReducer(initialState, action);
+      expect(result).toHaveOnlyValidCharacters();
 
       // Should clear the line content but keep the line
       expect(result.lines).toEqual(['']);
@@ -1506,6 +1539,7 @@ describe('textBufferReducer vim operations', () => {
       };
 
       const result = textBufferReducer(initialState, action);
+      expect(result).toHaveOnlyValidCharacters();
 
       // Should delete the last line completely, not leave empty line
       expect(result.lines).toEqual(['line1']);
@@ -1534,6 +1568,7 @@ describe('textBufferReducer vim operations', () => {
       };
 
       const afterDelete = textBufferReducer(initialState, deleteAction);
+      expect(afterDelete).toHaveOnlyValidCharacters();
 
       // After deleting all lines, should have one empty line
       expect(afterDelete.lines).toEqual(['']);
@@ -1547,6 +1582,7 @@ describe('textBufferReducer vim operations', () => {
       };
 
       const afterPaste = textBufferReducer(afterDelete, pasteAction);
+      expect(afterPaste).toHaveOnlyValidCharacters();
 
       // All lines including the first one should be present
       expect(afterPaste.lines).toEqual(['new1', 'new2', 'new3', 'new4']);

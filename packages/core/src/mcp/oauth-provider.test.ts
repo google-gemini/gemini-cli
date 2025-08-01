@@ -7,7 +7,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
-import open from 'open';
 import {
   MCPOAuthProvider,
   MCPOAuthConfig,
@@ -17,7 +16,10 @@ import {
 import { MCPOAuthTokenStorage, MCPOAuthToken } from './oauth-token-storage.js';
 
 // Mock dependencies
-vi.mock('open');
+const mockOpenBrowserSecurely = vi.hoisted(() => vi.fn());
+vi.mock('../utils/secure-browser-launcher.js', () => ({
+  openBrowserSecurely: mockOpenBrowserSecurely,
+}));
 vi.mock('node:crypto');
 vi.mock('./oauth-token-storage.js');
 
@@ -64,6 +66,7 @@ describe('MCPOAuthProvider', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockOpenBrowserSecurely.mockClear();
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -145,7 +148,9 @@ describe('MCPOAuthProvider', () => {
         expiresAt: expect.any(Number),
       });
 
-      expect(open).toHaveBeenCalledWith(expect.stringContaining('authorize'));
+      expect(mockOpenBrowserSecurely).toHaveBeenCalledWith(
+        expect.stringContaining('authorize'),
+      );
       expect(MCPOAuthTokenStorage.saveToken).toHaveBeenCalledWith(
         'test-server',
         expect.objectContaining({ accessToken: 'access_token_123' }),
@@ -672,13 +677,10 @@ describe('MCPOAuthProvider', () => {
   describe('Authorization URL building', () => {
     it('should build correct authorization URL with all parameters', async () => {
       // Mock to capture the URL that would be opened
-      let capturedUrl: string;
-      vi.mocked(open).mockImplementation((url) => {
+      let capturedUrl: string | undefined;
+      mockOpenBrowserSecurely.mockImplementation((url: string) => {
         capturedUrl = url;
-        // Return a minimal mock ChildProcess
-        return Promise.resolve({
-          pid: 1234,
-        } as unknown as import('child_process').ChildProcess);
+        return Promise.resolve();
       });
 
       let callbackHandler: unknown;
@@ -711,6 +713,7 @@ describe('MCPOAuthProvider', () => {
 
       await MCPOAuthProvider.authenticate('test-server', mockConfig);
 
+      expect(capturedUrl).toBeDefined();
       expect(capturedUrl!).toContain('response_type=code');
       expect(capturedUrl!).toContain('client_id=test-client-id');
       expect(capturedUrl!).toContain('code_challenge=code_challenge_mock');

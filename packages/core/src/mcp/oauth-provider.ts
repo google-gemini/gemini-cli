@@ -7,7 +7,7 @@
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import { URL } from 'node:url';
-import open from 'open';
+import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { MCPOAuthToken, MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { OAuthUtils } from './oauth-utils.js';
@@ -593,9 +593,9 @@ export class MCPOAuthProvider {
     // Start callback server
     const callbackPromise = this.startCallbackServer(pkceParams.state);
 
-    // Open browser
+    // Open browser securely
     try {
-      await open(authUrl);
+      await openBrowserSecurely(authUrl);
     } catch (error) {
       console.warn(
         'Failed to open browser automatically:',

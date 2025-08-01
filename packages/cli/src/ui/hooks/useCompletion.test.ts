@@ -14,7 +14,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
-import { useTextBuffer, TextBuffer } from '../components/shared/text-buffer.js';
+import { useTextBuffer } from '../components/shared/text-buffer.js';
 
 describe('useCompletion', () => {
   let testRootDir: string;
@@ -38,10 +38,10 @@ describe('useCompletion', () => {
   }
 
   // Helper to create real TextBuffer objects within renderHook
-  function useTextBufferForTest(text: string) {
+  function useTextBufferForTest(text: string, cursorOffset?: number) {
     return useTextBuffer({
       initialText: text,
-      initialCursorOffset: text.length,
+      initialCursorOffset: cursorOffset ?? text.length,
       viewport: { width: 80, height: 20 },
       isValidPath: () => false,
       onChange: () => {},
@@ -1113,22 +1113,19 @@ describe('useCompletion', () => {
           ],
         },
       ] as unknown as SlashCommand[];
-      // Create a mock buffer that we can spy on directly
-      const mockBuffer = {
-        text: '/mem',
-        setText: vi.fn(),
-      } as unknown as TextBuffer;
 
-      const { result } = renderHook(() =>
-        useCompletion(
-          mockBuffer,
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('/mem');
+        const completion = useCompletion(
+          textBuffer,
           testDirs,
           testRootDir,
           slashCommands,
           mockCommandContext,
           mockConfig,
-        ),
-      );
+        );
+        return { ...completion, textBuffer };
+      });
 
       expect(result.current.suggestions.map((s) => s.value)).toEqual([
         'memory',
@@ -1138,14 +1135,10 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(mockBuffer.setText).toHaveBeenCalledWith('/memory ');
+      expect(result.current.textBuffer.text).toBe('/memory ');
     });
 
     it('should append a sub-command when the parent is complete', () => {
-      const mockBuffer = {
-        text: '/memory',
-        setText: vi.fn(),
-      } as unknown as TextBuffer;
       const slashCommands = [
         {
           name: 'memory',
@@ -1163,16 +1156,18 @@ describe('useCompletion', () => {
         },
       ] as unknown as SlashCommand[];
 
-      const { result } = renderHook(() =>
-        useCompletion(
-          mockBuffer,
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('/memory');
+        const completion = useCompletion(
+          textBuffer,
           testDirs,
           testRootDir,
           slashCommands,
           mockCommandContext,
           mockConfig,
-        ),
-      );
+        );
+        return { ...completion, textBuffer };
+      });
 
       // Suggestions are populated by useEffect
       expect(result.current.suggestions.map((s) => s.value)).toEqual([
@@ -1184,14 +1179,10 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(1); // index 1 is 'add'
       });
 
-      expect(mockBuffer.setText).toHaveBeenCalledWith('/memory add ');
+      expect(result.current.textBuffer.text).toBe('/memory add ');
     });
 
     it('should complete a command with an alternative name', () => {
-      const mockBuffer = {
-        text: '/?',
-        setText: vi.fn(),
-      } as unknown as TextBuffer;
       const slashCommands = [
         {
           name: 'memory',
@@ -1209,16 +1200,18 @@ describe('useCompletion', () => {
         },
       ] as unknown as SlashCommand[];
 
-      const { result } = renderHook(() =>
-        useCompletion(
-          mockBuffer,
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('/?');
+        const completion = useCompletion(
+          textBuffer,
           testDirs,
           testRootDir,
           slashCommands,
           mockCommandContext,
           mockConfig,
-        ),
-      );
+        );
+        return { ...completion, textBuffer };
+      });
 
       result.current.suggestions.push({
         label: 'help',
@@ -1230,44 +1223,22 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(mockBuffer.setText).toHaveBeenCalledWith('/help ');
+      expect(result.current.textBuffer.text).toBe('/help ');
     });
 
-    it('should complete a file path', async () => {
-      const mockBuffer = {
-        text: '@src/fi',
-        lines: ['@src/fi'],
-        cursor: [0, 7],
-        setText: vi.fn(),
-        replaceRangeByOffset: vi.fn(),
-      } as unknown as TextBuffer;
-      const slashCommands = [
-        {
-          name: 'memory',
-          description: 'Manage memory',
-          subCommands: [
-            {
-              name: 'show',
-              description: 'Show memory',
-            },
-            {
-              name: 'add',
-              description: 'Add to memory',
-            },
-          ],
-        },
-      ] as unknown as SlashCommand[];
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          mockBuffer,
+    it('should complete a file path', () => {
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('@src/fi');
+        const completion = useCompletion(
+          textBuffer,
           testDirs,
           testRootDir,
-          slashCommands,
+          [],
           mockCommandContext,
           mockConfig,
-        ),
-      );
+        );
+        return { ...completion, textBuffer };
+      });
 
       result.current.suggestions.push({
         label: 'file1.txt',
@@ -1278,11 +1249,64 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalledWith(
-        5, // after '@src/'
-        mockBuffer.text.length,
-        'file1.txt',
-      );
+      expect(result.current.textBuffer.text).toBe('@src/file1.txt');
+    });
+
+    it('should complete a file path when cursor is not at the end of the line', () => {
+      const text = '@src/fi le.txt';
+      const cursorOffset = 7; // after "i"
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest(text, cursorOffset);
+        const completion = useCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      result.current.suggestions.push({
+        label: 'file1.txt',
+        value: 'file1.txt',
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('@src/file1.txt le.txt');
+    });
+
+    it('should complete the correct file path with multiple @-commands', () => {
+      const text = '@file1.txt @src/fi';
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest(text);
+        const completion = useCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      result.current.suggestions.push({
+        label: 'file2.txt',
+        value: 'file2.txt',
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('@file1.txt @src/file2.txt');
     });
   });
 });
