@@ -53,6 +53,7 @@ describe('Circular Reference Handling', () => {
       responseParts: [{ text: 'test result' }],
       resultDisplay: undefined,
       error: undefined, // undefined means success
+      errorType: undefined,
     };
 
     const mockCompletedToolCall: CompletedToolCall = {
@@ -100,6 +101,7 @@ describe('Circular Reference Handling', () => {
       responseParts: [{ text: 'test result' }],
       resultDisplay: undefined,
       error: undefined, // undefined means success
+      errorType: undefined,
     };
 
     const mockCompletedToolCall: CompletedToolCall = {
