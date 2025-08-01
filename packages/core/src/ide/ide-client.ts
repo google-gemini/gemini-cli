@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {
+  detectIde,
+  DetectedIde,
+  getIdeDisplayName,
+} from '../ide/detect-ide.js';
 import { ideContext, IdeContextNotificationSchema } from '../ide/ideContext.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -32,11 +37,32 @@ export class IdeClient {
   private state: IDEConnectionState = {
     status: IDEConnectionStatus.Disconnected,
   };
+  private static instance: IdeClient;
+  private readonly currentIde: DetectedIde | undefined;
+  private readonly currentIdeDisplayName: string | undefined;
 
-  constructor() {
+  constructor(ideMode: boolean) {
+    this.currentIde = detectIde();
+    if (this.currentIde) {
+      this.currentIdeDisplayName = getIdeDisplayName(this.currentIde);
+    }
+    if (!ideMode) {
+      return;
+    }
     this.init().catch((err) => {
       logger.debug('Failed to initialize IdeClient:', err);
     });
+  }
+
+  static getInstance(ideMode: boolean): IdeClient {
+    if (!IdeClient.instance) {
+      IdeClient.instance = new IdeClient(ideMode);
+    }
+    return IdeClient.instance;
+  }
+
+  getCurrentIde(): DetectedIde | undefined {
+    return this.currentIde;
   }
 
   getConnectionStatus(): IDEConnectionState {
@@ -104,6 +130,10 @@ export class IdeClient {
     };
   }
 
+  async reconnect(ideMode: boolean) {
+    IdeClient.instance = new IdeClient(ideMode);
+  }
+
   private async establishConnection(port: string) {
     let transport: StreamableHTTPClientTransport | undefined;
     try {
@@ -141,6 +171,14 @@ export class IdeClient {
     if (this.state.status === IDEConnectionStatus.Connected) {
       return;
     }
+    if (!this.currentIde) {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        'Not running in a supported IDE, skipping connection.',
+      );
+      return;
+    }
+
     this.setState(IDEConnectionStatus.Connecting);
 
     if (!this.validateWorkspacePath()) {
@@ -153,5 +191,17 @@ export class IdeClient {
     }
 
     await this.establishConnection(port);
+  }
+
+  dispose() {
+    this.client?.close();
+  }
+
+  getDetectedIdeDisplayName(): string | undefined {
+    return this.currentIdeDisplayName;
+  }
+
+  setDisconnected() {
+    this.setState(IDEConnectionStatus.Disconnected);
   }
 }
