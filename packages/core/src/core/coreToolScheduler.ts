@@ -28,7 +28,7 @@ import {
   ModifyContext,
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
-import * as Diff from 'diff';
+import { createPatch } from 'diff';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -613,7 +613,7 @@ export class CoreToolScheduler {
       payload.newContent,
       toolCall.request.args,
     );
-    const updatedDiff = Diff.createPatch(
+    const updatedDiff = createPatch(
       modifyContext.getFilePath(toolCall.request.args),
       currentContent,
       payload.newContent,

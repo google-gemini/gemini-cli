@@ -6,7 +6,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import * as Diff from 'diff';
+import { createPatch } from 'diff';
 import {
   BaseTool,
   Icon,
@@ -320,7 +320,7 @@ Expectation for required parameters:
     }
 
     const fileName = path.basename(params.file_path);
-    const fileDiff = Diff.createPatch(
+    const fileDiff = createPatch(
       fileName,
       editData.currentContent ?? '',
       editData.newContent,
@@ -427,7 +427,7 @@ Expectation for required parameters:
         // Generate diff for display, even though core logic doesn't technically need it
         // The CLI wrapper will use this part of the ToolResult
         const fileName = path.basename(params.file_path);
-        const fileDiff = Diff.createPatch(
+        const fileDiff = createPatch(
           fileName,
           editData.currentContent ?? '', // Should not be null here if not isNewFile
           editData.newContent,

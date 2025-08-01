@@ -6,7 +6,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import * as Diff from 'diff';
+import { createPatch } from 'diff';
 import { Config, ApprovalMode } from '../config/config.js';
 import {
   BaseTool,
@@ -175,7 +175,7 @@ export class WriteFileTool
     );
     const fileName = path.basename(params.file_path);
 
-    const fileDiff = Diff.createPatch(
+    const fileDiff = createPatch(
       fileName,
       originalContent, // Original content (empty if new file or unreadable)
       correctedContent, // Content after potential correction
@@ -256,7 +256,7 @@ export class WriteFileTool
         ? '' // Or some indicator of unreadable content
         : originalContent;
 
-      const fileDiff = Diff.createPatch(
+      const fileDiff = createPatch(
         fileName,
         currentContentForDiff,
         fileContent,
