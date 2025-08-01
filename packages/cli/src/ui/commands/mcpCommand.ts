@@ -21,7 +21,6 @@ import {
   mcpServerRequiresOAuth,
   getErrorMessage,
 } from '@google/gemini-cli-core';
-import open from 'open';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
@@ -60,21 +59,11 @@ const getMcpStatus = async (
 
   if (serverNames.length === 0 && blockedMcpServers.length === 0) {
     const docsUrl = 'https://goo.gle/gemini-cli-docs-mcp';
-    if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: `No MCP servers configured. Please open the following URL in your browser to view documentation:\n${docsUrl}`,
-      };
-    } else {
-      // Open the URL in the browser
-      await open(docsUrl);
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: `No MCP servers configured. Opening documentation in your browser: ${docsUrl}`,
-      };
-    }
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `No MCP servers configured. Please view MCP documentation in your browser: ${docsUrl} or use the cli /docs command`,
+    };
   }
 
   // Check if any servers are still connecting
