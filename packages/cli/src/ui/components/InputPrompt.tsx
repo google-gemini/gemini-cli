@@ -243,28 +243,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
 
-        // Handle text restoration for any command (streaming or non-streaming)
-        if (preservedTextRef.current.trim()) {
-          // If we're currently streaming, cancel the request first
-          if (streamingState === StreamingState.Responding) {
-            cancelCurrentRequest();
-          }
-
-          // Restore the preserved text (works for all command types)
-          const textToRestore = preservedTextRef.current;
-          preservedTextRef.current = ''; // Clear preserved text immediately to handle multiple ESC
-          buffer.setText(textToRestore);
-          return;
-        }
-
-        // If no preserved text but we're streaming, still cancel the request
+        // Phase 1: Always handle stream cancellation if currently streaming
         if (streamingState === StreamingState.Responding) {
           cancelCurrentRequest();
-          return;
         }
 
-        // If ESC pressed with no preserved text and not streaming, do nothing
-        // (This handles multiple ESC presses gracefully)
+        // Phase 2: Handle text restoration only if buffer is empty to prevent data loss
+        if (preservedTextRef.current.trim() && buffer.text.length === 0) {
+          const textToRestore = preservedTextRef.current;
+          buffer.setText(textToRestore);
+        }
+
+        // Phase 3: Always clear preserved text to prevent state corruption
+        preservedTextRef.current = '';
       }
 
       if (key.ctrl && key.name === 'l') {

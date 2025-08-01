@@ -183,6 +183,9 @@ describe('InputPrompt', () => {
       inputWidth: 80,
       suggestionsWidth: 80,
       focus: true,
+      streamingState: 'idle',
+      cancelCurrentRequest: vi.fn(),
+      vimHandleInput: vi.fn().mockReturnValue(false),
     };
   });
 
@@ -1135,6 +1138,184 @@ describe('InputPrompt', () => {
 
       expect(props.vimHandleInput).toHaveBeenCalled();
       expect(mockBuffer.handleInput).toHaveBeenCalled();
+      unmount();
+    });
+  });
+
+  describe('ESC key handling', () => {
+    it('should restore preserved text when buffer is empty', async () => {
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      // Simulate submitting a prompt (which preserves it)
+      mockBuffer.text = 'analyze this file';
+      stdin.write('\r'); // Enter key
+      await wait();
+
+      // Clear buffer to simulate empty state
+      mockBuffer.text = '';
+
+      // Press ESC
+      stdin.write('\x1B'); // ESC key
+      await wait();
+
+      expect(mockBuffer.setText).toHaveBeenCalledWith('analyze this file');
+      unmount();
+    });
+
+    it('should not restore preserved text when buffer has content', async () => {
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      // Simulate submitting a prompt (which preserves it)
+      mockBuffer.text = 'analyze this file';
+      stdin.write('\r'); // Enter key
+      await wait();
+
+      // User starts typing new text
+      mockBuffer.text = 'help me with';
+
+      // Press ESC
+      stdin.write('\x1B'); // ESC key
+      await wait();
+
+      // Should not overwrite current text
+      expect(mockBuffer.setText).not.toHaveBeenCalledWith('analyze this file');
+      unmount();
+    });
+
+    it('should cancel streaming request when ESC is pressed', async () => {
+      props.streamingState = 'responding';
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      // Press ESC
+      stdin.write('\x1B'); // ESC key
+      await wait();
+
+      expect(props.cancelCurrentRequest).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should cancel streaming and restore text when buffer is empty', async () => {
+      props.streamingState = 'responding';
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      // Simulate submitting a prompt (which preserves it)
+      mockBuffer.text = 'analyze this file';
+      stdin.write('\r'); // Enter key
+      await wait();
+
+      // Clear buffer
+      mockBuffer.text = '';
+
+      // Press ESC
+      stdin.write('\x1B'); // ESC key
+      await wait();
+
+      expect(props.cancelCurrentRequest).toHaveBeenCalled();
+      expect(mockBuffer.setText).toHaveBeenCalledWith('analyze this file');
+      unmount();
+    });
+
+    it('should cancel streaming but not restore text when buffer has content', async () => {
+      props.streamingState = 'responding';
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      // Simulate submitting a prompt (which preserves it)
+      mockBuffer.text = 'analyze this file';
+      stdin.write('\r'); // Enter key
+      await wait();
+
+      // User starts typing new text
+      mockBuffer.text = 'help me';
+
+      // Press ESC
+      stdin.write('\x1B'); // ESC key
+      await wait();
+
+      expect(props.cancelCurrentRequest).toHaveBeenCalled();
+      expect(mockBuffer.setText).not.toHaveBeenCalledWith('analyze this file');
+      unmount();
+    });
+
+    it('should handle multiple ESC presses gracefully', async () => {
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      // Simulate submitting a prompt (which preserves it)
+      mockBuffer.text = 'analyze this file';
+      stdin.write('\r'); // Enter key
+      await wait();
+
+      // Clear buffer
+      mockBuffer.text = '';
+
+      // Press ESC twice
+      stdin.write('\x1B'); // First ESC
+      await wait();
+      stdin.write('\x1B'); // Second ESC
+      await wait();
+
+      // First ESC should restore text, second should do nothing
+      expect(mockBuffer.setText).toHaveBeenCalledTimes(2); // Once for enter, once for first ESC
+      expect(mockBuffer.setText).toHaveBeenNthCalledWith(2, 'analyze this file');
+      unmount();
+    });
+
+    it('should exit shell mode when ESC is pressed in shell mode', async () => {
+      props.shellModeActive = true;
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      // Press ESC
+      stdin.write('\x1B'); // ESC key
+      await wait();
+
+      expect(props.setShellModeActive).toHaveBeenCalledWith(false);
+      unmount();
+    });
+
+    it('should hide suggestions when ESC is pressed with suggestions showing', async () => {
+      mockCompletion.showSuggestions = true;
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      // Press ESC
+      stdin.write('\x1B'); // ESC key
+      await wait();
+
+      expect(mockCompletion.resetCompletionState).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should clear preserved text even when not restoring', async () => {
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      // Simulate submitting a prompt (which preserves it)
+      mockBuffer.text = 'analyze this file';
+      stdin.write('\r'); // Enter key
+      await wait();
+
+      // User types new text (so restoration won't happen)
+      mockBuffer.text = 'help me';
+
+      // Press ESC
+      stdin.write('\x1B'); // ESC key
+      await wait();
+
+      // Even though text wasn't restored, preserved text should be cleared
+      // This prevents state corruption on subsequent ESC presses
+      // We can verify this by pressing ESC again and ensuring no restoration occurs
+      mockBuffer.text = '';
+      stdin.write('\x1B'); // Second ESC with empty buffer
+      await wait();
+
+      // Should not restore the old text since it was cleared
+      expect(mockBuffer.setText).toHaveBeenCalledTimes(1); // Only the initial enter call
       unmount();
     });
   });
