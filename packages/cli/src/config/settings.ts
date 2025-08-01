@@ -38,6 +38,8 @@ export function getSystemSettingsPath(): string {
   }
 }
 
+export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
+
 export enum SettingScope {
   User = 'User',
   Workspace = 'Workspace',
@@ -110,6 +112,7 @@ export interface Settings {
   disableAutoUpdate?: boolean;
 
   memoryDiscoveryMaxDirs?: number;
+  dnsResolutionOrder?: DnsResolutionOrder;
 }
 
 export interface SettingsError {
