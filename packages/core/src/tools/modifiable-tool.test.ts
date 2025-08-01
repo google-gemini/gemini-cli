@@ -19,14 +19,14 @@ import * as path from 'path';
 
 // Mock dependencies
 const mockOpenDiff = vi.hoisted(() => vi.fn());
-const mockCreatePatch = vi.hoisted(() => vi.fn());
+const mockCreateTwoFilesPatch = vi.hoisted(() => vi.fn());
 
 vi.mock('../utils/editor.js', () => ({
   openDiff: mockOpenDiff,
 }));
 
 vi.mock('diff', () => ({
-  createPatch: mockCreatePatch,
+  createTwoFilesPatch: mockCreateTwoFilesPatch,
 }));
 
 interface TestParams {
@@ -77,7 +77,7 @@ describe('modifyWithEditor', () => {
       await fsp.writeFile(newPath, modifiedContent, 'utf8');
     });
 
-    mockCreatePatch.mockReturnValue('mock diff content');
+    mockCreateTwoFilesPatch.mockReturnValue('mock diff content');
   });
 
   afterEach(async () => {
@@ -113,7 +113,8 @@ describe('modifyWithEditor', () => {
         mockParams,
       );
 
-      expect(mockCreatePatch).toHaveBeenCalledWith(
+      expect(mockCreateTwoFilesPatch).toHaveBeenCalledWith(
+        path.basename(mockParams.filePath),
         path.basename(mockParams.filePath),
         currentContent,
         modifiedContent,
@@ -185,7 +186,8 @@ describe('modifyWithEditor', () => {
       abortSignal,
     );
 
-    expect(mockCreatePatch).toHaveBeenCalledWith(
+    expect(mockCreateTwoFilesPatch).toHaveBeenCalledWith(
+      path.basename(mockParams.filePath),
       path.basename(mockParams.filePath),
       '',
       modifiedContent,
@@ -213,7 +215,8 @@ describe('modifyWithEditor', () => {
       abortSignal,
     );
 
-    expect(mockCreatePatch).toHaveBeenCalledWith(
+    expect(mockCreateTwoFilesPatch).toHaveBeenCalledWith(
+      path.basename(mockParams.filePath),
       path.basename(mockParams.filePath),
       currentContent,
       '',
