@@ -45,6 +45,7 @@ import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ideContext } from '../ide/ideContext.js';
 import { logFlashDecidedToContinue } from '../telemetry/loggers.js';
 import { FlashDecidedToContinueEvent } from '../telemetry/types.js';
+import { jsonFromText } from 'extract-json-from-text';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -458,7 +459,7 @@ export class GeminiClient {
         throw error;
       }
       try {
-        return JSON.parse(text);
+        return jsonFromText(text);
       } catch (parseError) {
         await reportError(
           parseError,

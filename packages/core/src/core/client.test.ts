@@ -425,6 +425,200 @@ describe('Gemini Client (client.ts)', () => {
         contents,
       });
     });
+
+    it('should parse JSON response wrapped in code blocks', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const schema = { type: 'object' };
+      const abortSignal = new AbortController().signal;
+
+      const jsonObject = {
+        reasoning: "The last response ended with a direct question specifically addressed to the user ('Are you looking for help with...?'), which falls under Rule 2 (Question to User).",
+        next_speaker: "user"
+      };
+
+      // Mock response with JSON wrapped in code blocks
+      const wrappedResponse = `\`\`\`json\n${JSON.stringify(jsonObject, null, 2)}\n\`\`\``;
+
+      const mockResponse = {
+        candidates: [
+          {
+            content: {
+              parts: [{ text: wrappedResponse }],
+            },
+          },
+        ],
+      };
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
+        generateContent: vi.fn().mockResolvedValue(mockResponse),
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      const result = await client.generateJson(contents, schema, abortSignal);
+
+      expect(result).toEqual(jsonObject);
+    });
+
+    it('should parse plain JSON response without code blocks', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const schema = { type: 'object' };
+      const abortSignal = new AbortController().signal;
+
+      const jsonObject = { message: "Hello world" };
+      const jsonString = JSON.stringify(jsonObject);
+
+      const mockResponse = {
+        candidates: [
+          {
+            content: {
+              parts: [{ text: jsonString }],
+            },
+          },
+        ],
+      };
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
+        generateContent: vi.fn().mockResolvedValue(mockResponse),
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      const result = await client.generateJson(contents, schema, abortSignal);
+
+      expect(result).toEqual(jsonObject);
+    });
+
+    it('should extract JSON from response with extra text around code blocks', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const schema = { type: 'object' };
+      const abortSignal = new AbortController().signal;
+
+      const jsonObject = { status: "success", data: "test" };
+      const responseWithExtraText = `Here's the JSON response:
+
+\`\`\`json
+${JSON.stringify(jsonObject, null, 2)}
+\`\`\`
+
+That's the complete response.`;
+
+      const mockResponse = {
+        candidates: [
+          {
+            content: {
+              parts: [{ text: responseWithExtraText }],
+            },
+          },
+        ],
+      };
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
+        generateContent: vi.fn().mockResolvedValue(mockResponse),
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      const result = await client.generateJson(contents, schema, abortSignal);
+
+      expect(result).toEqual(jsonObject);
+    });
+
+    it('should extract JSON object from text with arbitrary prefixes', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const schema = { type: 'object' };
+      const abortSignal = new AbortController().signal;
+
+      const jsonObject = { answer: "42", question: "What is the meaning of life?" };
+      const responseWithArbitraryPrefix = `Looking at your request, I need to analyze the data carefully. After processing, here's what I found: ${JSON.stringify(jsonObject)} - this should answer your question completely.`;
+
+      const mockResponse = {
+        candidates: [
+          {
+            content: {
+              parts: [{ text: responseWithArbitraryPrefix }],
+            },
+          },
+        ],
+      };
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
+        generateContent: vi.fn().mockResolvedValue(mockResponse),
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      const result = await client.generateJson(contents, schema, abortSignal);
+
+      expect(result).toEqual(jsonObject);
+    });
+
+    it('should find JSON object within mixed text content', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const schema = { type: 'object' };
+      const abortSignal = new AbortController().signal;
+
+      const jsonObject = { result: "found", confidence: 0.95 };
+      const mixedContent = `The analysis shows that we found the following data: ${JSON.stringify(jsonObject)} which indicates a successful match.`;
+
+      const mockResponse = {
+        candidates: [
+          {
+            content: {
+              parts: [{ text: mixedContent }],
+            },
+          },
+        ],
+      };
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
+        generateContent: vi.fn().mockResolvedValue(mockResponse),
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      const result = await client.generateJson(contents, schema, abortSignal);
+
+      expect(result).toEqual(jsonObject);
+    });
+
+    it('should handle complex nested JSON with brackets in strings', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const schema = { type: 'object' };
+      const abortSignal = new AbortController().signal;
+
+      const jsonObject = {
+        reasoning: "The response contains brackets like [example] and {sample} in text",
+        next_speaker: "user",
+        data: {
+          nested: {
+            array: [1, 2, { key: "value with } bracket" }]
+          }
+        }
+      };
+
+      const complexResponse = `Based on the analysis, the decision process involves multiple factors. The final result is: ${JSON.stringify(jsonObject)} Please note that this contains all the necessary information.`;
+
+      const mockResponse = {
+        candidates: [
+          {
+            content: {
+              parts: [{ text: complexResponse }],
+            },
+          },
+        ],
+      };
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
+        generateContent: vi.fn().mockResolvedValue(mockResponse),
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      const result = await client.generateJson(contents, schema, abortSignal);
+
+      expect(result).toEqual(jsonObject);
+    });
   });
 
   describe('addHistory', () => {

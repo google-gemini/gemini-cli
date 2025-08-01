@@ -159,6 +159,18 @@ export async function main() {
         'selectedAuthType',
         AuthType.CLOUD_SHELL,
       );
+    } else if (process.env.OPENAI_API_KEY && process.env.OPENAI_BASE_URL) {
+      settings.setValue(
+        SettingScope.User,
+        'selectedAuthType',
+        AuthType.USE_OPENAI,
+      );
+    } else if (process.env.DEEPSEEK_API_KEY) {
+      settings.setValue(
+        SettingScope.User,
+        'selectedAuthType',
+        AuthType.USE_DEEPSEEK,
+      );
     }
   }
 

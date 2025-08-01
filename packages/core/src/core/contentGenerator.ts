@@ -14,10 +14,12 @@ import {
   GoogleGenAI,
 } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
-import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import { DEFAULT_GEMINI_MODEL, DEFAULT_OPENAI_MODEL, DEFAULT_DEEPSEEK_MODEL } from '../config/models.js';
 import { Config } from '../config/config.js';
 import { getEffectiveModel } from './modelCheck.js';
 import { UserTierId } from '../code_assist/types.js';
+import { OpenAIContentGenerator } from './openaiContentGenerator.js';
+import { DeepSeekContentGenerator } from './deepseekContentGenerator.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -41,6 +43,8 @@ export interface ContentGenerator {
 export enum AuthType {
   LOGIN_WITH_GOOGLE = 'oauth-personal',
   USE_GEMINI = 'gemini-api-key',
+  USE_OPENAI = 'openai-api-key',
+  USE_DEEPSEEK = 'deepseek-api-key',
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
 }
@@ -48,6 +52,7 @@ export enum AuthType {
 export type ContentGeneratorConfig = {
   model: string;
   apiKey?: string;
+  baseUrl?: string;
   vertexai?: boolean;
   authType?: AuthType | undefined;
   proxy?: string | undefined;
@@ -61,6 +66,11 @@ export function createContentGeneratorConfig(
   const googleApiKey = process.env.GOOGLE_API_KEY || undefined;
   const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT || undefined;
   const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION || undefined;
+  const openaiApiKey = process.env.OPENAI_API_KEY || undefined;
+  const openaiBaseUrl = process.env.OPENAI_BASE_URL || undefined;
+  const openaiModel = process.env.OPENAI_MODEL || undefined;
+  const deepseekApiKey = process.env.DEEPSEEK_API_KEY || undefined;
+  const deepseekModel = process.env.DEEPSEEK_MODEL || undefined;
 
   // Use runtime model from config if available; otherwise, fall back to parameter or default
   const effectiveModel = config.getModel() || DEFAULT_GEMINI_MODEL;
@@ -87,6 +97,21 @@ export function createContentGeneratorConfig(
       contentGeneratorConfig.model,
       contentGeneratorConfig.proxy,
     );
+
+    return contentGeneratorConfig;
+  }
+
+  if (authType === AuthType.USE_OPENAI && openaiApiKey && openaiBaseUrl) {
+    contentGeneratorConfig.apiKey = openaiApiKey;
+    contentGeneratorConfig.baseUrl = openaiBaseUrl;
+    contentGeneratorConfig.model = openaiModel || DEFAULT_OPENAI_MODEL;
+
+    return contentGeneratorConfig;
+  }
+
+  if (authType === AuthType.USE_DEEPSEEK && deepseekApiKey) {
+    contentGeneratorConfig.apiKey = deepseekApiKey;
+    contentGeneratorConfig.model = deepseekModel || DEFAULT_DEEPSEEK_MODEL;
 
     return contentGeneratorConfig;
   }
@@ -138,6 +163,20 @@ export async function createContentGenerator(
     });
 
     return googleGenAI.models;
+  }
+
+  if (config.authType === AuthType.USE_OPENAI) {
+    if (!config.apiKey || !config.baseUrl) {
+      throw new Error('OpenAI API configuration is required');
+    }
+    return new OpenAIContentGenerator(config.apiKey, config.baseUrl, config.model);
+  }
+
+  if (config.authType === AuthType.USE_DEEPSEEK) {
+    if (!config.apiKey) {
+      throw new Error('DeepSeek API key is required');
+    }
+    return new DeepSeekContentGenerator(config.apiKey, config.model);
   }
 
   throw new Error(
