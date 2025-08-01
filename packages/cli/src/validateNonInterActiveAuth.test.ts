@@ -59,7 +59,11 @@ describe('validateNonInterActiveAuth', () => {
       refreshAuth: refreshAuthMock,
     };
     try {
-      await validateNonInteractiveAuth(undefined, nonInteractiveConfig);
+      await validateNonInteractiveAuth(
+        undefined,
+        undefined,
+        nonInteractiveConfig,
+      );
       expect.fail('Should have exited');
     } catch (e) {
       expect((e as Error).message).toContain('process.exit(1) called');
@@ -75,7 +79,11 @@ describe('validateNonInterActiveAuth', () => {
     const nonInteractiveConfig: NonInteractiveConfig = {
       refreshAuth: refreshAuthMock,
     };
-    await validateNonInteractiveAuth(undefined, nonInteractiveConfig);
+    await validateNonInteractiveAuth(
+      undefined,
+      undefined,
+      nonInteractiveConfig,
+    );
     expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
   });
 
@@ -84,7 +92,11 @@ describe('validateNonInterActiveAuth', () => {
     const nonInteractiveConfig: NonInteractiveConfig = {
       refreshAuth: refreshAuthMock,
     };
-    await validateNonInteractiveAuth(undefined, nonInteractiveConfig);
+    await validateNonInteractiveAuth(
+      undefined,
+      undefined,
+      nonInteractiveConfig,
+    );
     expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.USE_GEMINI);
   });
 
@@ -95,7 +107,11 @@ describe('validateNonInterActiveAuth', () => {
     const nonInteractiveConfig: NonInteractiveConfig = {
       refreshAuth: refreshAuthMock,
     };
-    await validateNonInteractiveAuth(undefined, nonInteractiveConfig);
+    await validateNonInteractiveAuth(
+      undefined,
+      undefined,
+      nonInteractiveConfig,
+    );
     expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.USE_VERTEX_AI);
   });
 
@@ -105,7 +121,11 @@ describe('validateNonInterActiveAuth', () => {
     const nonInteractiveConfig: NonInteractiveConfig = {
       refreshAuth: refreshAuthMock,
     };
-    await validateNonInteractiveAuth(undefined, nonInteractiveConfig);
+    await validateNonInteractiveAuth(
+      undefined,
+      undefined,
+      nonInteractiveConfig,
+    );
     expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.USE_VERTEX_AI);
   });
 
@@ -118,7 +138,11 @@ describe('validateNonInterActiveAuth', () => {
     const nonInteractiveConfig: NonInteractiveConfig = {
       refreshAuth: refreshAuthMock,
     };
-    await validateNonInteractiveAuth(undefined, nonInteractiveConfig);
+    await validateNonInteractiveAuth(
+      undefined,
+      undefined,
+      nonInteractiveConfig,
+    );
     expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
   });
 
@@ -130,7 +154,11 @@ describe('validateNonInterActiveAuth', () => {
     const nonInteractiveConfig: NonInteractiveConfig = {
       refreshAuth: refreshAuthMock,
     };
-    await validateNonInteractiveAuth(undefined, nonInteractiveConfig);
+    await validateNonInteractiveAuth(
+      undefined,
+      undefined,
+      nonInteractiveConfig,
+    );
     expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.USE_VERTEX_AI);
   });
 
@@ -142,7 +170,11 @@ describe('validateNonInterActiveAuth', () => {
     const nonInteractiveConfig: NonInteractiveConfig = {
       refreshAuth: refreshAuthMock,
     };
-    await validateNonInteractiveAuth(undefined, nonInteractiveConfig);
+    await validateNonInteractiveAuth(
+      undefined,
+      undefined,
+      nonInteractiveConfig,
+    );
     expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.USE_GEMINI);
   });
 
@@ -152,7 +184,11 @@ describe('validateNonInterActiveAuth', () => {
     const nonInteractiveConfig: NonInteractiveConfig = {
       refreshAuth: refreshAuthMock,
     };
-    await validateNonInteractiveAuth(AuthType.USE_GEMINI, nonInteractiveConfig);
+    await validateNonInteractiveAuth(
+      AuthType.USE_GEMINI,
+      undefined,
+      nonInteractiveConfig,
+    );
     expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.USE_GEMINI);
   });
 
@@ -166,6 +202,7 @@ describe('validateNonInterActiveAuth', () => {
     try {
       await validateNonInteractiveAuth(
         AuthType.USE_GEMINI,
+        undefined,
         nonInteractiveConfig,
       );
       expect.fail('Should have exited');
