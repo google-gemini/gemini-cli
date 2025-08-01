@@ -118,6 +118,8 @@ export interface LoadHistoryActionReturn {
 export interface SubmitPromptActionReturn {
   type: 'submit_prompt';
   content: string;
+  promptName?: string;
+  promptArgs?: Record<string, unknown>;
 }
 
 /**

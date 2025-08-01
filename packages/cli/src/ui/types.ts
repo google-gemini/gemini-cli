@@ -60,6 +60,7 @@ export interface CompressionProps {
 
 export interface HistoryItemBase {
   text?: string; // Text content for user/gemini/info/error messages
+  details?: string;
 }
 
 export type HistoryItemUser = HistoryItemBase & {
@@ -224,6 +225,8 @@ export interface ConsoleMessageItem {
 export interface SubmitPromptResult {
   type: 'submit_prompt';
   content: string;
+  promptName?: string;
+  promptArgs?: Record<string, unknown>;
 }
 
 /**

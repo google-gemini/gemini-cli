@@ -14,13 +14,15 @@ interface DetailedMessagesDisplayProps {
   messages: ConsoleMessageItem[];
   maxHeight: number | undefined;
   width: number;
+  title: string;
+  shortcut: string;
   // debugMode is not needed here if App.tsx filters debug messages before passing them.
   // If DetailedMessagesDisplay should handle filtering, add debugMode prop.
 }
 
 export const DetailedMessagesDisplay: React.FC<
   DetailedMessagesDisplayProps
-> = ({ messages, maxHeight, width }) => {
+> = ({ messages, maxHeight, width, title, shortcut }) => {
   if (messages.length === 0) {
     return null; // Don't render anything if there are no messages
   }
@@ -37,7 +39,7 @@ export const DetailedMessagesDisplay: React.FC<
     >
       <Box marginBottom={1}>
         <Text bold color={Colors.Foreground}>
-          Debug Console <Text color={Colors.Gray}>(ctrl+o to close)</Text>
+          {title} <Text color={Colors.Gray}>({shortcut})</Text>
         </Text>
       </Box>
       <MaxSizedBox maxHeight={maxHeight} maxWidth={width - borderAndPadding}>
@@ -56,7 +58,7 @@ export const DetailedMessagesDisplay: React.FC<
               break;
             case 'debug':
               textColor = Colors.Gray; // Or Colors.Gray
-              icon = '\u1F50D'; // Left-pointing magnifying glass (????)
+              icon = '';
               break;
             case 'log':
             default:

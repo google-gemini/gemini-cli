@@ -11,6 +11,7 @@ import { Colors } from '../../colors.js';
 
 interface GeminiMessageProps {
   text: string;
+  details?: string;
   isPending: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
@@ -18,6 +19,7 @@ interface GeminiMessageProps {
 
 export const GeminiMessage: React.FC<GeminiMessageProps> = ({
   text,
+  details,
   isPending,
   availableTerminalHeight,
   terminalWidth,
@@ -37,6 +39,11 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
         />
+        {details && !isPending && (
+          <Box marginTop={1}>
+            <Text dimColor>(Press ctrl+s to view prompt)</Text>
+          </Box>
+        )}
       </Box>
     </Box>
   );
