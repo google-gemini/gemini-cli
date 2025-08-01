@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { quote } from 'shell-quote';
+import { quote, parse } from 'shell-quote';
 import {
   USER_SETTINGS_DIR,
   SETTINGS_DIRECTORY_NAME,
@@ -401,9 +401,8 @@ export async function start_sandbox(
 
   // add custom flags from SANDBOX_FLAGS
   if (process.env.SANDBOX_FLAGS) {
-    const { parse } = require('shell-quote');
     const flags = parse(process.env.SANDBOX_FLAGS, process.env).filter(
-      (f:string): f is string => typeof f === 'string'
+      (f): f is string => typeof f === 'string',
     );
     args.push(...flags);
   }
