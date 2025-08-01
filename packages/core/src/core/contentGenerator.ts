@@ -92,9 +92,6 @@ export function createContentGeneratorConfig(
       contentGeneratorConfig.proxy,
     );
 
-    contentGeneratorConfig.baseUrl = customBaseUrl;
-    contentGeneratorConfig.apiKeyHeader = customApiKeyHeader;
-
     return contentGeneratorConfig;
   }
 
@@ -106,6 +103,14 @@ export function createContentGeneratorConfig(
     contentGeneratorConfig.vertexai = true;
 
     return contentGeneratorConfig;
+  }
+
+  if (
+    authType === AuthType.USE_GEMINI ||
+    authType === AuthType.USE_VERTEX_AI
+  ) {
+    contentGeneratorConfig.baseUrl = customBaseUrl;
+    contentGeneratorConfig.apiKeyHeader = customApiKeyHeader;
   }
 
   return contentGeneratorConfig;
