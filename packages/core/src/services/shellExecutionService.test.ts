@@ -91,9 +91,9 @@ describe('ShellExecutionService', () => {
       });
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        'bash',
-        ['-c', 'ls -l'],
-        expect.any(Object),
+        'ls -l',
+        [],
+        expect.objectContaining({ shell: 'bash' }),
       );
       expect(result.exitCode).toBe(0);
       expect(result.signal).toBeNull();
@@ -334,23 +334,31 @@ describe('ShellExecutionService', () => {
   describe('Platform-Specific Behavior', () => {
     it('should use cmd.exe on Windows', async () => {
       mockPlatform.mockReturnValue('win32');
-      await simulateExecution('dir', (cp) => cp.emit('exit', 0, null));
+      await simulateExecution('dir "foo bar"', (cp) =>
+        cp.emit('exit', 0, null),
+      );
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        'cmd.exe',
-        ['/c', 'dir'],
-        expect.objectContaining({ detached: false }),
+        'dir "foo bar"',
+        [],
+        expect.objectContaining({
+          shell: true,
+          detached: false,
+        }),
       );
     });
 
     it('should use bash and detached process group on Linux', async () => {
       mockPlatform.mockReturnValue('linux');
-      await simulateExecution('ls', (cp) => cp.emit('exit', 0, null));
+      await simulateExecution('ls "foo bar"', (cp) => cp.emit('exit', 0, null));
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        'bash',
-        ['-c', 'ls'],
-        expect.objectContaining({ detached: true }),
+        'ls "foo bar"',
+        [],
+        expect.objectContaining({
+          shell: 'bash',
+          detached: true,
+        }),
       );
     });
   });
