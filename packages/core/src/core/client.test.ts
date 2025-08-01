@@ -214,7 +214,9 @@ describe('Gemini Client (client.ts)', () => {
 
     // We can instantiate the client here since Config is mocked
     // and the constructor will use the mocked GoogleGenAI
-    client = new GeminiClient(new Config({} as never));
+    client = new GeminiClient(
+      new Config({ sessionId: 'test-session-id' } as never),
+    );
     mockConfigObject.getGeminiClient.mockReturnValue(client);
 
     await client.initialize(contentGeneratorConfig);
@@ -353,16 +355,19 @@ describe('Gemini Client (client.ts)', () => {
 
       await client.generateContent(contents, generationConfig, abortSignal);
 
-      expect(mockGenerateContentFn).toHaveBeenCalledWith({
-        model: 'test-model',
-        config: {
-          abortSignal,
-          systemInstruction: getCoreSystemPrompt(''),
-          temperature: 0.5,
-          topP: 1,
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        {
+          model: 'test-model',
+          config: {
+            abortSignal,
+            systemInstruction: getCoreSystemPrompt(''),
+            temperature: 0.5,
+            topP: 1,
+          },
+          contents,
         },
-        contents,
-      });
+        'test-session-id',
+      );
     });
   });
 
@@ -381,18 +386,21 @@ describe('Gemini Client (client.ts)', () => {
 
       await client.generateJson(contents, schema, abortSignal);
 
-      expect(mockGenerateContentFn).toHaveBeenCalledWith({
-        model: 'test-model', // Should use current model from config
-        config: {
-          abortSignal,
-          systemInstruction: getCoreSystemPrompt(''),
-          temperature: 0,
-          topP: 1,
-          responseSchema: schema,
-          responseMimeType: 'application/json',
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        {
+          model: 'test-model', // Should use current model from config
+          config: {
+            abortSignal,
+            systemInstruction: getCoreSystemPrompt(''),
+            temperature: 0,
+            topP: 1,
+            responseSchema: schema,
+            responseMimeType: 'application/json',
+          },
+          contents,
         },
-        contents,
-      });
+        'test-session-id',
+      );
     });
 
     it('should allow overriding model and config', async () => {
@@ -416,19 +424,22 @@ describe('Gemini Client (client.ts)', () => {
         customConfig,
       );
 
-      expect(mockGenerateContentFn).toHaveBeenCalledWith({
-        model: customModel,
-        config: {
-          abortSignal,
-          systemInstruction: getCoreSystemPrompt(''),
-          temperature: 0.9,
-          topP: 1, // from default
-          topK: 20,
-          responseSchema: schema,
-          responseMimeType: 'application/json',
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        {
+          model: customModel,
+          config: {
+            abortSignal,
+            systemInstruction: getCoreSystemPrompt(''),
+            temperature: 0.9,
+            topP: 1, // from default
+            topK: 20,
+            responseSchema: schema,
+            responseMimeType: 'application/json',
+          },
+          contents,
         },
-        contents,
-      });
+        'test-session-id',
+      );
     });
   });
 
@@ -1196,11 +1207,14 @@ Here are some files the user has open, with the most recent at the top:
         config: expect.any(Object),
         contents,
       });
-      expect(mockGenerateContentFn).toHaveBeenCalledWith({
-        model: currentModel,
-        config: expect.any(Object),
-        contents,
-      });
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        {
+          model: currentModel,
+          config: expect.any(Object),
+          contents,
+        },
+        'test-session-id',
+      );
     });
   });
 
