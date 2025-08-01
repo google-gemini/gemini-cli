@@ -31,16 +31,7 @@ class EditorSettingsManager {
   private readonly availableEditors: EditorDisplay[];
 
   constructor() {
-    const editorTypes: EditorType[] = [
-      'cursor',
-      'emacs',
-      'neovim',
-      'vim',
-      'vscode',
-      'vscodium',
-      'windsurf',
-      'zed',
-    ];
+    const editorTypes = Object.keys(EDITOR_DISPLAY_NAMES).sort() as EditorType[];
     this.availableEditors = [
       {
         name: 'None',
