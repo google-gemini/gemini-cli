@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md)
+[查看英文版](../../../../docs/tools/mcp-server.md)
 
 # MCP 服务器工具
 

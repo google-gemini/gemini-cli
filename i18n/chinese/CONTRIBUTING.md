@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md)
+[查看英文版](../../CONTRIBUTING.md)
 
 # 如何贡献
 

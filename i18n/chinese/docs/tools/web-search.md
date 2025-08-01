@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/web-search.md)
+[查看英文版](../../../../docs/tools/web-search.md)
 
 # Google 网页搜索工具 (`google_web_search`)
 

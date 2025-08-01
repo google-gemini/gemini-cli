@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/deployment.md)
+[查看英文版](../../../docs/deployment.md)
 
 # Gemini CLI 执行和部署
 

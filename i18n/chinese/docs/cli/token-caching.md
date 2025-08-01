@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/token-caching.md)
+[查看英文版](../../../../docs/cli/token-caching.md)
 
 # 令牌缓存和成本优化
 

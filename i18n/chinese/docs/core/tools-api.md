@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/core/tools-api.md)
+[查看英文版](../../../../docs/core/tools-api.md)
 
 # Gemini CLI 核心：工具 API
 

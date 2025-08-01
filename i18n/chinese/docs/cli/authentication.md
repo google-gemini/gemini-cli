@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/authentication.md)
+[查看英文版](../../../../docs/cli/authentication.md)
 
 # 身份验证设置
 

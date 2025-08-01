@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md)
+[查看英文版](../../../docs/tos-privacy.md)
 
 # 服务条款和隐私政策
 

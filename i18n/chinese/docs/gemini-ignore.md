@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/gemini-ignore.md)
+[查看英文版](../../../docs/gemini-ignore.md)
 
 # 忽略文件
 

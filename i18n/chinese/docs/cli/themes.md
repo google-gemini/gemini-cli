@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/themes.md)
+[查看英文版](../../../../docs/cli/themes.md)
 
 # 主题
 

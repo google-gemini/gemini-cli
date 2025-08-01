@@ -1,4 +1,4 @@
-[查看中文版](https://github.com/google-gemini/gemini-cli/blob/main/i18n/chinese/docs/tools/memory.md)
+[查看中文版](./i18n/chinese/docs/tools/memory.md)
 
 # Memory Tool (`save_memory`)
 

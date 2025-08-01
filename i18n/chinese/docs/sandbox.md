@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/sandbox.md)
+[查看英文版](../../../docs/sandbox.md)
 
 # 沙盒
 

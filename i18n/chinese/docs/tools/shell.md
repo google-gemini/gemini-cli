@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/shell.md)
+[查看英文版](../../../../docs/tools/shell.md)
 
 # Shell 工具
 

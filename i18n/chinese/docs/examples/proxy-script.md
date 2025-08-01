@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/examples/proxy-script.md)
+[查看英文版](../../../../docs/examples/proxy-script.md)
 
 # 示例代理脚本
 

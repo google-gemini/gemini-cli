@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/ROADMAP.md)
+[查看英文版](../../ROADMAP.md)
 
 # Gemini CLI 路线图
 

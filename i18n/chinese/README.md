@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/README.md)
+[查看英文版](../../README.md)
 
 # Gemini CLI
 

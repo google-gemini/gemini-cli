@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/telemetry.md)
+[查看英文版](../../../docs/telemetry.md)
 
 # 遥测
 

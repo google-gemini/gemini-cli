@@ -1,4 +1,4 @@
-[查看英文版](https://github.com/google-gemini/gemini-cli/blob/main/docs/extension.md)
+[查看英文版](../../../docs/extension.md)
 
 # Gemini CLI 扩展
 
