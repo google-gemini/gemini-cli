@@ -586,6 +586,14 @@ export class Config {
     return this.ideClient;
   }
 
+  getBaseUrl(): string | undefined {
+    return this.contentGeneratorConfig?.baseUrl;
+  }
+
+  getApiKeyHeader(): string | undefined {
+    return this.contentGeneratorConfig?.apiKeyHeader;
+  }
+
   async getGitService(): Promise<GitService> {
     if (!this.gitService) {
       this.gitService = new GitService(this.targetDir);

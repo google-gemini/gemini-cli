@@ -60,6 +60,174 @@ describe('createContentGenerator', () => {
     });
     expect(generator).toBe((mockGenerator as GoogleGenAI).models);
   });
+
+  it('should create a GoogleGenAI content generator with custom baseUrl and apiKeyHeader', async () => {
+    const mockGenerator = {
+      models: {},
+    } as unknown;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    const generator = await createContentGenerator(
+      {
+        model: 'test-model',
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+        baseUrl: 'https://custom.api.example.com',
+        apiKeyHeader: 'X-Custom-API-Key',
+      },
+      mockConfig,
+    );
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: undefined,
+      httpOptions: {
+        baseUrl: 'https://custom.api.example.com',
+        headers: {
+          'User-Agent': expect.any(String),
+          'X-Custom-API-Key': 'test-api-key',
+        },
+      },
+    });
+    expect(generator).toBe((mockGenerator as GoogleGenAI).models);
+  });
+
+  it('should handle empty apiKey with custom headers', async () => {
+    const mockGenerator = {
+      models: {},
+    } as unknown;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    const generator = await createContentGenerator(
+      {
+        model: 'test-model',
+        apiKey: '',
+        authType: AuthType.USE_GEMINI,
+        baseUrl: 'https://custom.api.example.com',
+        apiKeyHeader: 'X-Custom-API-Key',
+      },
+      mockConfig,
+    );
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: undefined,
+      vertexai: undefined,
+      httpOptions: {
+        baseUrl: 'https://custom.api.example.com',
+        headers: {
+          'User-Agent': expect.any(String),
+          'X-Custom-API-Key': '',
+        },
+      },
+    });
+    expect(generator).toBe((mockGenerator as GoogleGenAI).models);
+  });
+
+  it('should correctly set header with special characters in header name and value', async () => {
+    const mockGenerator = {
+      models: {},
+    } as unknown;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    const generator = await createContentGenerator(
+      {
+        model: 'test-model',
+        apiKey: 'test-key-with-special-chars!@#$%',
+        authType: AuthType.USE_GEMINI,
+        apiKeyHeader: 'X-Custom-Header-Name',
+      },
+      mockConfig,
+    );
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-key-with-special-chars!@#$%',
+      vertexai: undefined,
+      httpOptions: {
+        headers: {
+          'User-Agent': expect.any(String),
+          'X-Custom-Header-Name': 'test-key-with-special-chars!@#$%',
+        },
+      },
+    });
+    expect(generator).toBe((mockGenerator as GoogleGenAI).models);
+  });
+
+  it('should not set custom header when apiKeyHeader is undefined', async () => {
+    const mockGenerator = {
+      models: {},
+    } as unknown;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    const generator = await createContentGenerator(
+      {
+        model: 'test-model',
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+        baseUrl: 'https://custom.api.example.com',
+        // apiKeyHeader is undefined
+      },
+      mockConfig,
+    );
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: undefined,
+      httpOptions: {
+        baseUrl: 'https://custom.api.example.com',
+        headers: {
+          'User-Agent': expect.any(String),
+          // No custom header should be added
+        },
+      },
+    });
+    expect(generator).toBe((mockGenerator as GoogleGenAI).models);
+  });
+
+  it('should handle header value with special characters correctly', async () => {
+    const mockGenerator = {
+      models: {},
+    } as unknown;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    const generator = await createContentGenerator(
+      {
+        model: 'test-model',
+        apiKey: 'api-key-with-special-chars-123',
+        authType: AuthType.USE_GEMINI,
+        apiKeyHeader: 'Authorization',
+      },
+      mockConfig,
+    );
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'api-key-with-special-chars-123',
+      vertexai: undefined,
+      httpOptions: {
+        headers: {
+          'User-Agent': expect.any(String),
+          'Authorization': 'api-key-with-special-chars-123',
+        },
+      },
+    });
+    expect(generator).toBe((mockGenerator as GoogleGenAI).models);
+  });
+
+  it('should handle header value with quotes correctly', async () => {
+    const mockGenerator = {
+      models: {},
+    } as unknown;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    const generator = await createContentGenerator(
+      {
+        model: 'test-model',
+        apiKey: 'api-key-with-"quotes"-and-other-chars',
+        authType: AuthType.USE_GEMINI,
+        apiKeyHeader: 'Authorization',
+      },
+      mockConfig,
+    );
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'api-key-with-"quotes"-and-other-chars',
+      vertexai: undefined,
+      httpOptions: {
+        headers: {
+          'User-Agent': expect.any(String),
+          'Authorization': 'api-key-with-"quotes"-and-other-chars',
+        },
+      },
+    });
+    expect(generator).toBe((mockGenerator as GoogleGenAI).models);
+  });
 });
 
 describe('createContentGeneratorConfig', () => {
@@ -135,5 +303,178 @@ describe('createContentGeneratorConfig', () => {
     );
     expect(config.apiKey).toBeUndefined();
     expect(config.vertexai).toBeUndefined();
+  });
+
+  it('should configure custom baseUrl from BASE_URL environment variable for Gemini', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    process.env.BASE_URL = 'https://custom.gemini.example.com';
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_GEMINI,
+    );
+    expect(config.baseUrl).toBe('https://custom.gemini.example.com');
+    expect(config.apiKey).toBe('test-key');
+    expect(config.vertexai).toBe(false);
+  });
+
+  it('should configure custom apiKeyHeader from API_KEY_HEADER environment variable for Gemini', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    process.env.API_KEY_HEADER = 'X-Custom-Auth';
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_GEMINI,
+    );
+    expect(config.apiKeyHeader).toBe('X-Custom-Auth');
+    expect(config.apiKey).toBe('test-key');
+    expect(config.vertexai).toBe(false);
+  });
+
+  it('should configure both custom baseUrl and apiKeyHeader for Gemini', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    process.env.BASE_URL = 'https://custom.gemini.example.com';
+    process.env.API_KEY_HEADER = 'X-Custom-Auth';
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_GEMINI,
+    );
+    expect(config.baseUrl).toBe('https://custom.gemini.example.com');
+    expect(config.apiKeyHeader).toBe('X-Custom-Auth');
+    expect(config.apiKey).toBe('test-key');
+    expect(config.vertexai).toBe(false);
+  });
+
+  it('should not set baseUrl or apiKeyHeader if environment variables are not set', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    delete process.env.BASE_URL;
+    delete process.env.API_KEY_HEADER;
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_GEMINI,
+    );
+    expect(config.baseUrl).toBeUndefined();
+    expect(config.apiKeyHeader).toBeUndefined();
+    expect(config.apiKey).toBe('test-key');
+    expect(config.vertexai).toBe(false);
+  });
+
+  it('should not set custom configuration for LOGIN_WITH_GOOGLE auth type', async () => {
+    process.env.BASE_URL = 'https://custom.example.com';
+    process.env.API_KEY_HEADER = 'X-Custom-Auth';
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+    expect(config.baseUrl).toBeUndefined();
+    expect(config.apiKeyHeader).toBeUndefined();
+    expect(config.apiKey).toBeUndefined();
+    expect(config.vertexai).toBeUndefined();
+  });
+});
+
+describe('custom header validation', () => {
+  const mockConfig = {} as unknown as Config;
+
+  it('should validate that custom header is correctly applied to httpOptions', async () => {
+    const mockGenerator = {
+      models: {},
+    } as unknown;
+    vi.mocked(GoogleGenAI).mockImplementation((options) => {
+      // Validate that the httpOptions contain the expected custom header
+      const expectedHeaders = {
+        'User-Agent': expect.any(String),
+        'X-Custom-Authorization': 'bearer-token-123',
+      };
+      expect(options?.httpOptions?.headers).toEqual(expectedHeaders);
+      return mockGenerator as never;
+    });
+
+    await createContentGenerator(
+      {
+        model: 'test-model',
+        apiKey: 'bearer-token-123',
+        authType: AuthType.USE_GEMINI,
+        apiKeyHeader: 'X-Custom-Authorization',
+      },
+      mockConfig,
+    );
+  });
+
+  it('should validate that multiple custom configurations are applied correctly', async () => {
+    const mockGenerator = {
+      models: {},
+    } as unknown;
+    vi.mocked(GoogleGenAI).mockImplementation((options) => {
+      // Validate that both baseUrl and custom header are applied
+      expect(options?.httpOptions?.baseUrl).toBe('https://api.custom.endpoint');
+      const expectedHeaders = {
+        'User-Agent': expect.any(String),
+        'X-API-Key': 'custom-api-key-xyz',
+      };
+      expect(options?.httpOptions?.headers).toEqual(expectedHeaders);
+      return mockGenerator as never;
+    });
+
+    await createContentGenerator(
+      {
+        model: 'test-model',
+        apiKey: 'custom-api-key-xyz',
+        authType: AuthType.USE_GEMINI,
+        baseUrl: 'https://api.custom.endpoint',
+        apiKeyHeader: 'X-API-Key',
+      },
+      mockConfig,
+    );
+  });
+
+  it('should validate header JSON parsing with complex header names', async () => {
+    const mockGenerator = {
+      models: {},
+    } as unknown;
+    vi.mocked(GoogleGenAI).mockImplementation((options) => {
+      const expectedHeaders = {
+        'User-Agent': expect.any(String),
+        'X-Complex-Header-Name-With-Dashes': 'test-value',
+      };
+      expect(options?.httpOptions?.headers).toEqual(expectedHeaders);
+      return mockGenerator as never;
+    });
+
+    await createContentGenerator(
+      {
+        model: 'test-model',
+        apiKey: 'test-value',
+        authType: AuthType.USE_GEMINI,
+        apiKeyHeader: 'X-Complex-Header-Name-With-Dashes',
+      },
+      mockConfig,
+    );
+  });
+
+  it('should validate that User-Agent header is preserved when custom header is added', async () => {
+    const mockGenerator = {
+      models: {},
+    } as unknown;
+    let capturedHeaders: Record<string, string> = {};
+    
+    vi.mocked(GoogleGenAI).mockImplementation((options) => {
+      capturedHeaders = options?.httpOptions?.headers || {};
+      return mockGenerator as never;
+    });
+
+    await createContentGenerator(
+      {
+        model: 'test-model',
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+        apiKeyHeader: 'Authorization',
+      },
+      mockConfig,
+    );
+
+    // Validate that both User-Agent and custom header exist
+    expect(capturedHeaders).toHaveProperty('User-Agent');
+    expect(capturedHeaders).toHaveProperty('Authorization');
+    expect(capturedHeaders['Authorization']).toBe('test-api-key');
+    expect(capturedHeaders['User-Agent']).toMatch(/GeminiCLI/);
   });
 });

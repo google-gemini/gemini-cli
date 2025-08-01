@@ -318,4 +318,44 @@ describe('Server Config (config.ts)', () => {
       expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
     });
   });
+
+  describe('getBaseUrl and getApiKeyHeader', () => {
+    let config: Config;
+
+    beforeEach(() => {
+      config = new Config(baseParams);
+    });
+
+    it('should return undefined for baseUrl when contentGeneratorConfig is not set', () => {
+      expect(config.getBaseUrl()).toBeUndefined();
+    });
+
+    it('should return undefined for apiKeyHeader when contentGeneratorConfig is not set', () => {
+      expect(config.getApiKeyHeader()).toBeUndefined();
+    });
+
+    it('should return baseUrl from contentGeneratorConfig when set', () => {
+      const mockContentGeneratorConfig = {
+        model: 'test-model',
+        baseUrl: 'https://api.example.com',
+        apiKeyHeader: 'X-Custom-Key',
+      };
+      // @ts-ignore - accessing private property for testing
+      config.contentGeneratorConfig = mockContentGeneratorConfig;
+
+      expect(config.getBaseUrl()).toBe('https://api.example.com');
+    });
+
+    it('should return apiKeyHeader from contentGeneratorConfig when set', () => {
+      const mockContentGeneratorConfig = {
+        model: 'test-model',
+        baseUrl: 'https://api.example.com',
+        apiKeyHeader: 'X-Custom-Key',
+      };
+      // @ts-ignore - accessing private property for testing
+      config.contentGeneratorConfig = mockContentGeneratorConfig;
+
+      expect(config.getApiKeyHeader()).toBe('X-Custom-Key');
+    });
+  });
 });

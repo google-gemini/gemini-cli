@@ -229,6 +229,15 @@ In addition to a project settings file, a project's `.gemini` directory can cont
 
 - **`summarizeToolOutput`** (object):
   - **Description:** Enables or disables the summarization of tool output. You can specify the token budget for the summarization using the `tokenBudget` setting.
+
+- **`baseUrl`** (string):
+  - **Description:** Specifies a custom base URL for API requests. This is useful for enterprise deployments, proxy setups, or when using Gemini-compatible API services.
+  - **Example:** `"baseUrl": "https://your-proxy.example.com/api"`
+
+- **`apiKeyHeader`** (string):
+  - **Description:** Specifies a custom header name for sending the API key. When using custom API endpoints, you may need to use a different header name than the default.
+  - **Example:** `"apiKeyHeader": "X-Custom-Authorization"`
+  - **Note:** If not specified, the default header will be used based on the authentication type.
   - Note: Currently only the `run_shell_command` tool is supported.
   - **Default:** `{}` (Disabled by default)
   - **Example:**
@@ -245,6 +254,8 @@ In addition to a project settings file, a project's `.gemini` directory can cont
 ```json
 {
   "theme": "GitHub",
+  "baseUrl": "https://your-proxy.example.com/api",
+  "apiKeyHeader": "X-Custom-Authorization",
   "sandbox": "docker",
   "toolDiscoveryCommand": "bin/get_tools",
   "toolCallCommand": "bin/call_tool",
@@ -274,6 +285,47 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   }
 }
 ```
+
+## Custom API Endpoints
+
+Gemini CLI supports custom API endpoints, which enables several important use cases:
+
+### Use Cases
+
+- **Enterprise Deployments:** Organizations can route Gemini CLI through their own infrastructure for additional security, logging, or compliance requirements.
+- **Proxy Setups:** Use a proxy server to cache responses, add custom headers, or implement rate limiting.
+- **Gemini-Compatible Services:** Connect to alternative AI services that implement Gemini-compatible APIs.
+- **Development and Testing:** Point to local development servers or staging environments for testing purposes.
+
+### Configuration
+
+Custom API endpoints can be configured through multiple methods:
+
+1. **Environment Variables** (highest priority):
+   ```bash
+   export BASE_URL="https://your-proxy.example.com/api"
+   export API_KEY_HEADER="X-Custom-Authorization"
+   ```
+
+2. **Settings Files** (medium priority):
+   ```json
+   {
+     "baseUrl": "https://your-proxy.example.com/api",
+     "apiKeyHeader": "X-Custom-Authorization"
+   }
+   ```
+
+3. **Default Values** (lowest priority):
+   - Uses the official Gemini API endpoint
+   - Uses the standard API key header for the authentication type
+
+### Security Considerations
+
+When using custom API endpoints:
+- Ensure the endpoint uses HTTPS for secure transmission of API keys
+- Verify that the custom endpoint properly handles and secures API keys
+- Be aware that API keys will be sent to the custom endpoint
+- Consider using environment variables rather than settings files for sensitive configurations
 
 ## Shell History
 
@@ -339,6 +391,15 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 - **`CODE_ASSIST_ENDPOINT`**:
   - Specifies the endpoint for the code assist server.
   - This is useful for development and testing.
+- **`BASE_URL`**:
+  - Specifies a custom base URL for API requests.
+  - This is useful for enterprise deployments, proxy setups, or when using Gemini-compatible API services.
+  - Example: `export BASE_URL="https://your-proxy.example.com/api"`
+- **`API_KEY_HEADER`**:
+  - Specifies a custom header name for sending the API key.
+  - When using custom API endpoints, you may need to use a different header name than the default.
+  - Example: `export API_KEY_HEADER="X-Custom-Authorization"`
+  - If not specified, the default header will be used based on the authentication type.
 
 ## Command-Line Arguments
 
