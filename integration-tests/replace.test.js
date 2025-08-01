@@ -8,15 +8,19 @@ import { test } from 'node:test';
 import { strict as assert } from 'assert';
 import { TestRig } from './test-helper.js';
 
-test('should be able to replace content in a file', async (t) => {
+test('replaces specific text content in a file', async (t) => {
   const rig = new TestRig();
   rig.setup(t.name);
 
-  const fileName = 'file_to_replace.txt';
-  rig.createFile(fileName, 'original content');
-  const prompt = `Can you replace 'original' with 'replaced' in the file 'file_to_replace.txt'`;
+  const targetFile = 'file_to_replace.txt';
+  const originalContent = 'original content';
+  const expectedContent = 'replaced content';
+  const replacementPrompt = `Please replace the word 'original' with 'replaced' in the file '${targetFile}'`;
 
-  await rig.run(prompt);
-  const newFileContent = rig.readFile(fileName);
-  assert.strictEqual(newFileContent, 'replaced content');
+  rig.createFile(targetFile, originalContent);
+
+  await rig.run(replacementPrompt);
+
+  const updatedContent = rig.readFile(targetFile);
+  assert.strictEqual(updatedContent, expectedContent);
 });
