@@ -480,12 +480,23 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setIsProcessing,
   );
 
+  // Create buffer first, before useGeminiStream needs it
+  const buffer = useTextBuffer({
+    initialText: '',
+    viewport: { height: 10, width: inputWidth },
+    stdin,
+    setRawMode,
+    isValidPath,
+    shellModeActive,
+  });
+
   const {
     streamingState,
     submitQuery,
     initError,
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
+    cancelCurrentRequest,
   } = useGeminiStream(
     config.getGeminiClient(),
     history,
@@ -502,7 +513,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setModelSwitchedFromQuotaError,
   );
 
-  // Input handling
+  // Input handling - moved after useGeminiStream to get submitQuery
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
@@ -512,15 +523,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     },
     [submitQuery],
   );
-
-  const buffer = useTextBuffer({
-    initialText: '',
-    viewport: { height: 10, width: inputWidth },
-    stdin,
-    setRawMode,
-    isValidPath,
-    shellModeActive,
-  });
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
   const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
@@ -640,7 +642,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, [history, logger]);
 
   const isInputActive =
-    streamingState === StreamingState.Idle && !initError && !isProcessing;
+    (streamingState === StreamingState.Idle ||
+      streamingState === StreamingState.Responding) &&
+    !initError &&
+    !isProcessing;
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -1011,6 +1016,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   focus={isFocused}
                   vimHandleInput={vimHandleInput}
                   placeholder={placeholder}
+                  streamingState={streamingState}
+                  cancelCurrentRequest={cancelCurrentRequest}
                 />
               )}
             </>

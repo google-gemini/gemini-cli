@@ -8,7 +8,6 @@
 import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useGeminiStream, mergePartListUnions } from './useGeminiStream.js';
-import { useInput } from 'ink';
 import {
   useReactToolScheduler,
   TrackedToolCall,
@@ -26,7 +25,6 @@ import { Part, PartListUnion } from '@google/genai';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import {
   HistoryItem,
-  MessageType,
   SlashCommandProcessorResult,
   StreamingState,
 } from '../types.js';
@@ -71,10 +69,7 @@ vi.mock('./useReactToolScheduler.js', async (importOriginal) => {
   };
 });
 
-vi.mock('ink', async (importOriginal) => {
-  const actualInkModule = (await importOriginal()) as any;
-  return { ...(actualInkModule || {}), useInput: vi.fn() };
-});
+// Note: useInput mock removed since ESC handling moved to InputPrompt component
 
 vi.mock('./shellCommandProcessor.js', () => ({
   useShellCommandProcessor: vi.fn().mockReturnValue({
@@ -865,151 +860,11 @@ describe('useGeminiStream', () => {
     expect(result.current.streamingState).toBe(StreamingState.Responding);
   });
 
-  describe('User Cancellation', () => {
-    let useInputCallback: (input: string, key: any) => void;
-    const mockUseInput = useInput as Mock;
-
-    beforeEach(() => {
-      // Capture the callback passed to useInput
-      mockUseInput.mockImplementation((callback) => {
-        useInputCallback = callback;
-      });
-    });
-
-    const simulateEscapeKeyPress = () => {
-      act(() => {
-        useInputCallback('', { escape: true });
-      });
-    };
-
-    it('should cancel an in-progress stream when escape is pressed', async () => {
-      const mockStream = (async function* () {
-        yield { type: 'content', value: 'Part 1' };
-        // Keep the stream open
-        await new Promise(() => {});
-      })();
-      mockSendMessageStream.mockReturnValue(mockStream);
-
-      const { result } = renderTestHook();
-
-      // Start a query
-      await act(async () => {
-        result.current.submitQuery('test query');
-      });
-
-      // Wait for the first part of the response
-      await waitFor(() => {
-        expect(result.current.streamingState).toBe(StreamingState.Responding);
-      });
-
-      // Simulate escape key press
-      simulateEscapeKeyPress();
-
-      // Verify cancellation message is added
-      await waitFor(() => {
-        expect(mockAddItem).toHaveBeenCalledWith(
-          {
-            type: MessageType.INFO,
-            text: 'Request cancelled.',
-          },
-          expect.any(Number),
-        );
-      });
-
-      // Verify state is reset
-      expect(result.current.streamingState).toBe(StreamingState.Idle);
-    });
-
-    it('should not do anything if escape is pressed when not responding', () => {
-      const { result } = renderTestHook();
-
-      expect(result.current.streamingState).toBe(StreamingState.Idle);
-
-      // Simulate escape key press
-      simulateEscapeKeyPress();
-
-      // No change should happen, no cancellation message
-      expect(mockAddItem).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: 'Request cancelled.',
-        }),
-        expect.any(Number),
-      );
-    });
-
-    it('should prevent further processing after cancellation', async () => {
-      let continueStream: () => void;
-      const streamPromise = new Promise<void>((resolve) => {
-        continueStream = resolve;
-      });
-
-      const mockStream = (async function* () {
-        yield { type: 'content', value: 'Initial' };
-        await streamPromise; // Wait until we manually continue
-        yield { type: 'content', value: ' Canceled' };
-      })();
-      mockSendMessageStream.mockReturnValue(mockStream);
-
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        result.current.submitQuery('long running query');
-      });
-
-      await waitFor(() => {
-        expect(result.current.streamingState).toBe(StreamingState.Responding);
-      });
-
-      // Cancel the request
-      simulateEscapeKeyPress();
-
-      // Allow the stream to continue
-      act(() => {
-        continueStream();
-      });
-
-      // Wait a bit to see if the second part is processed
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // The text should not have been updated with " Canceled"
-      const lastCall = mockAddItem.mock.calls.find(
-        (call) => call[0].type === 'gemini',
-      );
-      expect(lastCall?.[0].text).toBe('Initial');
-
-      // The final state should be idle after cancellation
-      expect(result.current.streamingState).toBe(StreamingState.Idle);
-    });
-
-    it('should not cancel if a tool call is in progress (not just responding)', async () => {
-      const toolCalls: TrackedToolCall[] = [
-        {
-          request: { callId: 'call1', name: 'tool1', args: {} },
-          status: 'executing',
-          responseSubmittedToGemini: false,
-          tool: {
-            name: 'tool1',
-            description: 'desc1',
-            getDescription: vi.fn(),
-          } as any,
-          startTime: Date.now(),
-          liveOutput: '...',
-        } as TrackedExecutingToolCall,
-      ];
-
-      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
-      const { result } = renderTestHook(toolCalls);
-
-      // State is `Responding` because a tool is running
-      expect(result.current.streamingState).toBe(StreamingState.Responding);
-
-      // Try to cancel
-      simulateEscapeKeyPress();
-
-      // Nothing should happen because the state is not `Responding`
-      expect(abortSpy).not.toHaveBeenCalled();
-    });
-  });
+  // NOTE: User Cancellation tests removed because ESC handling moved to InputPrompt component
+  // ESC handling is now tested in InputPrompt component tests, not useGeminiStream
+  // This architectural change improves separation of concerns:
+  // - useGeminiStream: handles Gemini API streaming and request management  
+  // - InputPrompt: handles user input and ESC key interactions
 
   describe('Slash Command Handling', () => {
     it('should schedule a tool call when the command processor returns a schedule_tool action', async () => {
