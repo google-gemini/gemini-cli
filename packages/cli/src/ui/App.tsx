@@ -234,7 +234,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   } = useAuthCommand(settings, setAuthError, config);
 
   useEffect(() => {
-    if (settings.merged.selectedAuthType) {
+    if (settings.merged.selectedAuthType && !settings.merged.disableAuthValidation) {
       const error = validateAuthMethod(settings.merged.selectedAuthType);
       if (error) {
         setAuthError(error);
