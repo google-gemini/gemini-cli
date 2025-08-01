@@ -77,6 +77,7 @@ export function AuthDialog({
       value: AuthType.USE_GEMINI,
     },
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
+    { label: 'Databricks', value: AuthType.USE_DATABRICKS },
   ];
 
   const initialAuthIndex = items.findIndex((item) => {

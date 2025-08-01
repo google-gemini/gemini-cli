@@ -38,5 +38,17 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     return null;
   }
 
+  if (authMethod === AuthType.USE_DATABRICKS) {
+    if (!process.env.DATABRICKS_URL || !process.env.DBX_PAT) {
+      return (
+        'When using Databricks, you must specify:\n' +
+        '• DATABRICKS_URL environment variable (your Databricks workspace URL)\n' +
+        '• DBX_PAT environment variable (your Databricks personal access token)\n' +
+        'Update your environment and try again (no reload needed if using .env)!'
+      );
+    }
+    return null;
+  }
+
   return 'Invalid auth method selected.';
 };

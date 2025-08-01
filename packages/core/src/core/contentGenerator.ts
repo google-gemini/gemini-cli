@@ -14,7 +14,10 @@ import {
   GoogleGenAI,
 } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
-import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_DATABRICKS_MODEL,
+} from '../config/models.js';
 import { Config } from '../config/config.js';
 import { getEffectiveModel } from './modelCheck.js';
 import { UserTierId } from '../code_assist/types.js';
@@ -45,6 +48,7 @@ export enum AuthType {
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
+  USE_DATABRICKS = 'databricks',
 }
 
 export type ContentGeneratorConfig = {
@@ -65,7 +69,11 @@ export function createContentGeneratorConfig(
   const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION || undefined;
 
   // Use runtime model from config if available; otherwise, fall back to parameter or default
-  const effectiveModel = config.getModel() || DEFAULT_GEMINI_MODEL;
+  const effectiveModel =
+    config.getModel() ||
+    (authType === AuthType.USE_DATABRICKS
+      ? DEFAULT_DATABRICKS_MODEL
+      : DEFAULT_GEMINI_MODEL);
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
     model: effectiveModel,
@@ -100,6 +108,11 @@ export function createContentGeneratorConfig(
     contentGeneratorConfig.apiKey = googleApiKey;
     contentGeneratorConfig.vertexai = true;
 
+    return contentGeneratorConfig;
+  }
+
+  if (authType === AuthType.USE_DATABRICKS) {
+    // Databricks configuration is handled in createContentGenerator
     return contentGeneratorConfig;
   }
 
@@ -140,6 +153,21 @@ export async function createContentGenerator(
     });
 
     return googleGenAI.models;
+  }
+
+  if (config.authType === AuthType.USE_DATABRICKS) {
+    const { DatabricksContentGenerator } = await import(
+      '../databricks/index.js'
+    );
+
+    // Extract Databricks configuration from environment or config
+    const databricksConfig = {
+      workspace_host: process.env.DATABRICKS_URL || '',
+      auth_token: process.env.DBX_PAT || '',
+      model: config.model,
+    };
+
+    return new DatabricksContentGenerator(databricksConfig, config.proxy);
   }
 
   throw new Error(

@@ -95,3 +95,6 @@ export { OAuthUtils } from './mcp/oauth-utils.js';
 export * from './telemetry/index.js';
 export { sessionId } from './utils/session.js';
 export * from './utils/browser.js';
+
+// Export Databricks provider
+export * from './databricks/index.js';
