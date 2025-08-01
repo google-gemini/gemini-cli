@@ -59,8 +59,10 @@ export interface CliArgs {
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
-  ideMode: boolean | undefined;
+  ideMode?: boolean | undefined;
+  ideModeFeature: boolean | undefined;
   proxy: string | undefined;
+  includeDirectories: string[] | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -190,7 +192,7 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'boolean',
       description: 'List all available extensions and exit.',
     })
-    .option('ide-mode', {
+    .option('ide-mode-feature', {
       type: 'boolean',
       description: 'Run in IDE mode?',
     })
@@ -198,6 +200,15 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'string',
       description:
         'Proxy for gemini client, like schema://user:password@host:port',
+    })
+    .option('include-directories', {
+      type: 'array',
+      string: true,
+      description:
+        'Additional directories to include in the workspace (comma-separated or multiple --include-directories)',
+      coerce: (dirs: string[]) =>
+        // Handle comma-separated values
+        dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
     })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
@@ -214,7 +225,11 @@ export async function parseArguments(): Promise<CliArgs> {
     });
 
   yargsInstance.wrap(yargsInstance.terminalWidth());
-  return yargsInstance.argv;
+  const result = yargsInstance.parseSync();
+
+  // The import format is now only controlled by settings.memoryImportFormat
+  // We no longer accept it as a CLI argument
+  return result as CliArgs;
 }
 
 // This function is now a thin wrapper around the server's implementation.
@@ -226,11 +241,12 @@ export async function loadHierarchicalGeminiMemory(
   fileService: FileDiscoveryService,
   settings: Settings,
   extensionContextFilePaths: string[] = [],
+  memoryImportFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
 ): Promise<{ memoryContent: string; fileCount: number }> {
   if (debugMode) {
     logger.debug(
-      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory}`,
+      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory} (memoryImportFormat: ${memoryImportFormat})`,
     );
   }
 
@@ -241,6 +257,7 @@ export async function loadHierarchicalGeminiMemory(
     debugMode,
     fileService,
     extensionContextFilePaths,
+    memoryImportFormat,
     fileFilteringOptions,
     settings.memoryDiscoveryMaxDirs,
   );
@@ -256,17 +273,18 @@ export async function loadCliConfig(
     argv.debug ||
     [process.env.DEBUG, process.env.DEBUG_MODE].some(
       (v) => v === 'true' || v === '1',
-    );
-
+    ) ||
+    false;
+  const memoryImportFormat = settings.memoryImportFormat || 'tree';
   const ideMode =
     (argv.ideMode ?? settings.ideMode ?? false) &&
-    process.env.TERM_PROGRAM === 'vscode' &&
+    process.env.TERM_PROGRAM === 'vscode';
+
+  const ideModeFeature =
+    (argv.ideModeFeature ?? settings.ideModeFeature ?? false) &&
     !process.env.SANDBOX;
 
-  let ideClient: IdeClient | undefined;
-  if (ideMode) {
-    ideClient = new IdeClient();
-  }
+  const ideClient = IdeClient.getInstance(ideMode && ideModeFeature);
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -306,6 +324,7 @@ export async function loadCliConfig(
     fileService,
     settings,
     extensionContextFilePaths,
+    memoryImportFormat,
     fileFiltering,
   );
 
@@ -366,6 +385,7 @@ export async function loadCliConfig(
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: process.cwd(),
+    includeDirectories: argv.includeDirectories,
     debugMode,
     question: argv.promptInteractive || argv.prompt || '',
     fullContext: argv.allFiles || argv.all_files || false,
@@ -423,6 +443,7 @@ export async function loadCliConfig(
     noBrowser: !!process.env.NO_BROWSER,
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
+    ideModeFeature,
     ideClient,
   });
 }

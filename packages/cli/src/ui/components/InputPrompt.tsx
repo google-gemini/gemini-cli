@@ -60,6 +60,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   vimHandleInput,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+
+  const [dirs, setDirs] = useState<readonly string[]>(
+    config.getWorkspaceContext().getDirectories(),
+  );
+  const dirsChanged = config.getWorkspaceContext().getDirectories();
+  useEffect(() => {
+    if (dirs.length !== dirsChanged.length) {
+      setDirs(dirsChanged);
+    }
+  }, [dirs.length, dirsChanged]);
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [textBeforeReverseSearch, setTextBeforeReverseSearch] = useState('');
   const [cursorPosition, setCursorPosition] = useState<[number, number]>([
@@ -70,6 +80,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const completion = useSlashCompletion(
     buffer,
+    dirs,
     config.getTargetDir(),
     slashCommands,
     commandContext,
