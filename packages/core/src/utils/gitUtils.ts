@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -68,6 +69,26 @@ export function findGitRoot(directory: string): string | null {
 
     return null;
   } catch (_error) {
+    return null;
+  }
+}
+
+/**
+ * Fetches the currently active git repository
+ * @returns The currently active git repository
+ */
+export function fetchActiveGitRepository(): string | null {
+  try {
+    const repoPath = execSync('git rev-parse --show-toplevel', {
+      encoding: 'utf-8',
+    }).trim();
+    
+    const repoName = path.basename(repoPath);
+    const parentDir = path.basename(path.dirname(repoPath));
+    
+    return parentDir ? `${parentDir}/${repoName}` : repoName;
+
+  } catch (error) {
     return null;
   }
 }
