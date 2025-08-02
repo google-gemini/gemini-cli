@@ -13,6 +13,7 @@ Gemini CLI comes with a selection of pre-defined themes, which you can list usin
   - `Default`
   - `Dracula`
   - `GitHub`
+  - `Mononoke`
 - **Light Themes:**
   - `ANSI Light`
   - `Ayu Light`
@@ -135,6 +136,10 @@ You can define multiple custom themes by adding more entries to the `customTheme
 ### GitHub
 
 <img src="../assets/theme-github.png" alt="GitHub theme" width="600">
+
+### Mononoke
+
+<img src="../assets/theme-mononoke-dark.png" alt="Mononoke theme" width="600">
 
 ## Light Themes
 
