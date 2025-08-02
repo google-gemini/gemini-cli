@@ -1235,10 +1235,7 @@ export function useTextBuffer({
         visualCursor,
       });
 
-      // Debug: Logs all key properties when POS1 or similar keys are pressed
-      if (DEBUG && (key['pos1'] || key['home'] || key['end'])) {
-        console.log('[TextBuffer] Key debug:', { input, key });
-      }
+    
 
       const beforeText = text;
       const beforeLogicalCursor = [cursorRow, cursorCol];
