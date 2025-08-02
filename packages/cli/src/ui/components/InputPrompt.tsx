@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
@@ -59,6 +59,45 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   vimHandleInput,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+
+  // Memoize highlight ranges for performance.
+  const highlightRanges = useMemo(() => {
+    const ranges: Array<{ start: number; end: number }> = [];
+    // Regex to find words starting with @ or / that are preceded by whitespace or start of string.
+    const regex = /(?<=^|\s)[@/](?:\\ |\S)*/g;
+    let match;
+    while ((match = regex.exec(buffer.text)) !== null) {
+      ranges.push({
+        start: match.index,
+        end: match.index + match[0].length,
+      });
+    }
+    return ranges;
+  }, [buffer.text]);
+
+  // Memoize visual line info to map visual lines back to their offset in the original text.
+  const visualLineInfos = useMemo(() => {
+    const infos: Array<{ text: string; offset: number }> = [];
+    const logicalLines = [...buffer.lines];
+    let currentLogicalLine = logicalLines.shift() || '';
+    let offset = 0;
+
+    for (const visualLine of buffer.allVisualLines) {
+      infos.push({ text: visualLine, offset });
+
+      const visualLen = cpLen(visualLine);
+      const logicalLen = cpLen(currentLogicalLine);
+
+      if (visualLen < logicalLen) {
+        offset += visualLen;
+        currentLogicalLine = cpSlice(currentLogicalLine, visualLen);
+      } else {
+        offset += visualLen + 1; // +1 for newline
+        currentLogicalLine = logicalLines.shift() || '';
+      }
+    }
+    return infos;
+  }, [buffer.lines, buffer.allVisualLines]);
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -399,39 +438,126 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             )
           ) : (
             linesToRender.map((lineText, visualIdxInRenderedSet) => {
-              const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
-              let display = cpSlice(lineText, 0, inputWidth);
-              const currentVisualWidth = stringWidth(display);
-              if (currentVisualWidth < inputWidth) {
-                display = display + ' '.repeat(inputWidth - currentVisualWidth);
-              }
+              const absoluteVisualIndex =
+                visualIdxInRenderedSet + buffer.visualScrollRow;
+              const lineInfo = visualLineInfos[absoluteVisualIndex];
 
-              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
-                const relativeVisualColForHighlight = cursorVisualColAbsolute;
+              // This should not happen, but as a safeguard:
+              if (!lineInfo) return null;
 
-                if (relativeVisualColForHighlight >= 0) {
-                  if (relativeVisualColForHighlight < cpLen(display)) {
-                    const charToHighlight =
-                      cpSlice(
-                        display,
-                        relativeVisualColForHighlight,
-                        relativeVisualColForHighlight + 1,
-                      ) || ' ';
-                    const highlighted = chalk.inverse(charToHighlight);
-                    display =
-                      cpSlice(display, 0, relativeVisualColForHighlight) +
-                      highlighted +
-                      cpSlice(display, relativeVisualColForHighlight + 1);
-                  } else if (
-                    relativeVisualColForHighlight === cpLen(display) &&
-                    cpLen(display) === inputWidth
-                  ) {
-                    display = display + chalk.inverse(' ');
+              const { offset: lineOffset } = lineInfo;
+              const lineEndOffset = lineOffset + cpLen(lineText);
+
+              const parts: Array<{
+                text: string;
+                color?: string;
+                inverse?: boolean;
+              }> = [];
+              let lastIndex = 0;
+
+              // Apply command/path highlighting
+              for (const range of highlightRanges) {
+                const start = Math.max(lineOffset, range.start);
+                const end = Math.min(lineEndOffset, range.end);
+
+                if (start < end) {
+                  const preStart = start - lineOffset;
+                  if (preStart > lastIndex) {
+                    parts.push({
+                      text: cpSlice(lineText, lastIndex, preStart),
+                    });
                   }
+                  parts.push({
+                    text: cpSlice(lineText, preStart, end - lineOffset),
+                    color: Colors.AccentPurple,
+                  });
+                  lastIndex = end - lineOffset;
                 }
               }
+
+              if (lastIndex < cpLen(lineText)) {
+                parts.push({ text: cpSlice(lineText, lastIndex) });
+              }
+
+              // Pad line to full width
+              const currentVisualWidth = stringWidth(lineText);
+              if (currentVisualWidth < inputWidth) {
+                parts.push({
+                  text: ' '.repeat(inputWidth - currentVisualWidth),
+                });
+              }
+
+              let finalParts = parts;
+              const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
+
+              // Apply cursor highlighting
+              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
+                const cursorCol = cursorVisualColAbsolute;
+                let accumulatedWidth = 0;
+                let foundCursor = false;
+
+                const newParts: typeof parts = [];
+
+                for (const part of parts) {
+                  if (foundCursor) {
+                    newParts.push(part);
+                    continue;
+                  }
+
+                  const partWidth = cpLen(part.text);
+                  if (
+                    !foundCursor &&
+                    accumulatedWidth + partWidth > cursorCol
+                  ) {
+                    const colInPart = cursorCol - accumulatedWidth;
+
+                    // Before cursor
+                    if (colInPart > 0) {
+                      newParts.push({
+                        ...part,
+                        text: cpSlice(part.text, 0, colInPart),
+                      });
+                    }
+
+                    // Cursor char
+                    const cursorChar =
+                      cpSlice(part.text, colInPart, colInPart + 1) || ' ';
+                    newParts.push({
+                      ...part,
+                      text: cursorChar,
+                      inverse: true,
+                    });
+
+                    // After cursor
+                    if (colInPart < partWidth - 1) {
+                      newParts.push({
+                        ...part,
+                        text: cpSlice(part.text, colInPart + 1),
+                      });
+                    }
+                    foundCursor = true;
+                  } else {
+                    newParts.push(part);
+                  }
+                  accumulatedWidth += partWidth;
+                }
+
+                // Handle cursor at the very end of the line
+                if (!foundCursor && accumulatedWidth === cursorCol) {
+                  newParts.push({ text: ' ', inverse: true });
+                }
+
+                finalParts = newParts;
+              }
+
               return (
-                <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
+                <Text key={`line-${visualIdxInRenderedSet}`}>
+                  {finalParts.map((part, i) => (
+                    <Text key={i} color={part.color} inverse={part.inverse}>
+                      {part.text}
+                    </Text>
+                  ))}
+                </Text>
               );
             })
           )}
