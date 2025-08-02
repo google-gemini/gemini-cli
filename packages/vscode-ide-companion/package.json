@@ -31,12 +31,41 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "languages": [
+      {
+        "id": "gemini-diff-editable"
+      }
+    ],
     "commands": [
+      {
+        "command": "gemini.diff.accept",
+        "title": "Accept",
+        "icon": "$(check)"
+      },
+      {
+        "command": "gemini.diff.cancel",
+        "title": "Cancel",
+        "icon": "$(close)"
+      },
       {
         "command": "gemini-cli.runGeminiCLI",
         "title": "Gemini CLI: Run"
       }
-    ]
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "gemini.diff.accept",
+          "when": "gemini.diff.isVisible",
+          "group": "navigation"
+        },
+        {
+          "command": "gemini.diff.cancel",
+          "when": "gemini.diff.isVisible",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "main": "./dist/extension.js",
   "scripts": {
