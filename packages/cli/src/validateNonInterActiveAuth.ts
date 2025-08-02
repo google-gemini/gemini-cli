@@ -37,7 +37,7 @@ export async function validateNonInteractiveAuth(
   }
 
   if (!useExternalAuth) {
-    const err = validateAuthMethod(effectiveAuthType, settings.merged.ignoreLocalEnv);
+    const err = validateAuthMethod(effectiveAuthType);
     if (err != null) {
       console.error(err);
       process.exit(1);

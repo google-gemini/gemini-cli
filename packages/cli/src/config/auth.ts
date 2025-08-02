@@ -5,10 +5,8 @@
  */
 
 import { AuthType } from '@google/gemini-cli-core';
-import { loadEnvironment } from './settings.js';
 
-export const validateAuthMethod = (authMethod: string, ignoreLocalEnv: boolean = false): string | null => {
-  loadEnvironment(ignoreLocalEnv);
+export const validateAuthMethod = (authMethod: string): string | null => {
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.CLOUD_SHELL
