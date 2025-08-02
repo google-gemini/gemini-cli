@@ -38,6 +38,7 @@ export * from './utils/retry.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
 export * from './utils/formatters.js';
+export * from './utils/gitUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

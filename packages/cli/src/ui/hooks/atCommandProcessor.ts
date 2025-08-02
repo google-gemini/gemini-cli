@@ -12,6 +12,8 @@ import {
   getErrorMessage,
   isNodeError,
   unescapePath,
+  isGitRepository,
+  findGitRoot,
 } from '@google/gemini-cli-core';
 import {
   HistoryItem,
@@ -19,6 +21,12 @@ import {
   ToolCallStatus,
 } from '../types.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { simpleGit } from 'simple-git';
+
+// Extend globalThis interface for temporary git content storage
+declare global {
+  var _geminiGitContent: Map<string, string> | undefined;
+}
 
 interface HandleAtCommandParams {
   query: string;
@@ -37,6 +45,157 @@ interface HandleAtCommandResult {
 interface AtCommandPart {
   type: 'text' | 'atPath';
   content: string;
+}
+
+interface GitAtCommandResult {
+  success: boolean;
+  content?: string;
+  description?: string;
+  error?: string;
+}
+
+/**
+ * Handles @git commands by extracting git context information
+ */
+async function handleGitAtCommand(
+  gitCommand: string,
+  config: Config,
+  userMessageTimestamp: number,
+  addItem: UseHistoryManagerReturn['addItem'],
+  signal: AbortSignal,
+): Promise<GitAtCommandResult> {
+  try {
+    // Check if we're in a git repository
+    if (!isGitRepository(config.getTargetDir())) {
+      return {
+        success: false,
+        error: 'Not in a git repository',
+      };
+    }
+
+    const gitRoot = findGitRoot(config.getTargetDir());
+    if (!gitRoot) {
+      return {
+        success: false,
+        error: 'Could not find git repository root',
+      };
+    }
+
+    const git = simpleGit(gitRoot);
+
+    // Parse the git command
+    if (gitCommand === 'git') {
+      // Default: show git status
+      const status = await git.status();
+      const content = `Git Status:
+- Branch: ${status.current}
+- Staged: ${status.staged.length} files
+- Modified: ${status.modified.length} files  
+- Untracked: ${status.not_added.length} files
+${status.ahead > 0 ? `- Ahead: ${status.ahead} commits` : ''}
+${status.behind > 0 ? `- Behind: ${status.behind} commits` : ''}`;
+
+      return {
+        success: true,
+        content,
+        description: 'status',
+      };
+    }
+
+    const parts = gitCommand.split(':');
+    if (parts.length < 2) {
+      return {
+        success: false,
+        error: 'Invalid git command format. Use @git:command or @git:command:args',
+      };
+    }
+
+    const command = parts[1];
+    const args = parts.slice(2).join(':');
+
+    switch (command) {
+      case 'diff': {
+        let diff;
+        if (args) {
+          // git diff with specific arguments (e.g., @git:diff:main)
+          diff = await git.diff([args]);
+        } else {
+          // Default: show working directory diff
+          diff = await git.diff();
+        }
+        return {
+          success: true,
+          content: diff || 'No differences found',
+          description: `diff${args ? ` ${args}` : ''}`,
+        };
+      }
+
+      case 'log': {
+        const count = args ? parseInt(args, 10) || 5 : 5;
+        const log = await git.log({ maxCount: count });
+        const content = log.all
+          .map((commit, index) => {
+            const date = new Date(commit.date).toLocaleDateString();
+            return `${index + 1}. ${commit.message} - ${commit.author_name} (${date}) [${commit.hash.substring(0, 8)}]`;
+          })
+          .join('\n');
+
+        return {
+          success: true,
+          content: `Recent commits:\n${content}`,
+          description: `log (${count} commits)`,
+        };
+      }
+
+      case 'status': {
+        const status = await git.status();
+        const content = `Git Status:
+- Branch: ${status.current}
+- Staged files: ${status.staged.join(', ') || 'none'}
+- Modified files: ${status.modified.join(', ') || 'none'}
+- Untracked files: ${status.not_added.join(', ') || 'none'}
+${status.ahead > 0 ? `- Ahead: ${status.ahead} commits` : ''}
+${status.behind > 0 ? `- Behind: ${status.behind} commits` : ''}`;
+
+        return {
+          success: true,
+          content,
+          description: 'detailed status',
+        };
+      }
+
+      case 'branch': {
+        const branches = await git.branch();
+        const content = `Current branch: ${branches.current}\nAll branches:\n${branches.all.map(b => b === branches.current ? `* ${b}` : `  ${b}`).join('\n')}`;
+
+        return {
+          success: true,
+          content,
+          description: 'branches',
+        };
+      }
+
+      case 'staged': {
+        const diff = await git.diff(['--cached']);
+        return {
+          success: true,
+          content: diff || 'No staged changes',
+          description: 'staged changes',
+        };
+      }
+
+      default:
+        return {
+          success: false,
+          error: `Unknown git command: ${command}. Supported: diff, log, status, branch, staged`,
+        };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
 }
 
 /**
@@ -184,6 +343,24 @@ export async function handleAtCommand({
       // Decide if this is a fatal error for the whole command or just skip this @ part
       // For now, let's be strict and fail the command if one @path is malformed.
       return { processedQuery: null, shouldProceed: false };
+    }
+
+    // Handle special @git commands
+    if (pathName.startsWith('git:') || pathName === 'git') {
+      const gitResult = await handleGitAtCommand(pathName, config, userMessageTimestamp, addItem, signal);
+      if (gitResult.success) {
+        // Mark this as a special git command that should be processed later
+        atPathToResolvedSpecMap.set(originalAtPath, `git:${gitResult.description}`);
+        // Store git content in a temporary map for later use
+        if (!globalThis._geminiGitContent) globalThis._geminiGitContent = new Map();
+        globalThis._geminiGitContent.set(originalAtPath, gitResult.content || '');
+        contentLabelsForDisplay.push(`git:${gitResult.description}`);
+        continue;
+      } else {
+        // Git command failed, skip but continue with other commands
+        onDebugMessage(`Git @ command '${pathName}' failed: ${gitResult.error}`);
+        continue;
+      }
     }
 
     // Check if path should be ignored based on filtering options
@@ -369,9 +546,26 @@ export async function handleAtCommand({
     onDebugMessage(message);
   }
 
-  // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
+  // Handle case where we have git content but no files to read
   if (pathSpecsToRead.length === 0) {
     onDebugMessage('No valid file paths found in @ commands to read.');
+    
+    // Check if we have git content to add
+    if (globalThis._geminiGitContent && globalThis._geminiGitContent.size > 0) {
+      const processedQueryParts: PartUnion[] = [{ text: initialQueryText }];
+      processedQueryParts.push({ text: '\n--- Git Context ---' });
+      for (const [atPath, gitContent] of globalThis._geminiGitContent.entries()) {
+        const resolvedSpec = atPathToResolvedSpecMap.get(atPath);
+        processedQueryParts.push({
+          text: `\n${resolvedSpec}:\n${gitContent}\n`,
+        });
+      }
+      processedQueryParts.push({ text: '\n--- End of git context ---' });
+      // Clean up the temporary storage
+      globalThis._geminiGitContent.clear();
+      return { processedQuery: processedQueryParts, shouldProceed: true };
+    }
+    
     if (initialQueryText === '@' && query.trim() === '@') {
       // If the only thing was a lone @, pass original query (which might have spaces)
       return { processedQuery: [{ text: query }], shouldProceed: true };
@@ -439,6 +633,20 @@ export async function handleAtCommand({
       onDebugMessage(
         'read_many_files tool returned no content or empty content.',
       );
+    }
+
+    // Add git content if any
+    if (globalThis._geminiGitContent && globalThis._geminiGitContent.size > 0) {
+      processedQueryParts.push({ text: '\n--- Git Context ---' });
+      for (const [atPath, gitContent] of globalThis._geminiGitContent.entries()) {
+        const resolvedSpec = atPathToResolvedSpecMap.get(atPath);
+        processedQueryParts.push({
+          text: `\n${resolvedSpec}:\n${gitContent}\n`,
+        });
+      }
+      processedQueryParts.push({ text: '\n--- End of git context ---' });
+      // Clean up the temporary storage
+      globalThis._geminiGitContent.clear();
     }
 
     addItem(
