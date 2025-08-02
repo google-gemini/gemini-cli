@@ -82,9 +82,9 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
         },
         required: ['command'],
       },
+      true, // has side effects
       false, // output is not markdown
       true, // output can be updated
-      true, // has side effects
     );
   }
 
