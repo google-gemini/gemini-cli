@@ -66,6 +66,7 @@ export interface CommandContext {
     /** A transient list of shell commands the user has approved for this session. */
     sessionShellAllowlist: Set<string>;
   };
+  commands?: readonly SlashCommand[];
 }
 
 /**
@@ -152,8 +153,11 @@ export enum CommandKind {
 // The standardized contract for any command in the system.
 export interface SlashCommand {
   name: string;
+  displayName?: string;
   altNames?: string[];
   description: string;
+  originalName?: string;
+  serverName?: string;
 
   kind: CommandKind;
 

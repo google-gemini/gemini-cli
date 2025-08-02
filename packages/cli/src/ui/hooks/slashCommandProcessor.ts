@@ -27,7 +27,6 @@ import {
 } from '../types.js';
 import { LoadedSettings } from '../../config/settings.js';
 import { type CommandContext, type SlashCommand } from '../commands/types.js';
-import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
@@ -165,6 +164,7 @@ export const useSlashCommandProcessor = (
         stats: session.stats,
         sessionShellAllowlist,
       },
+      commands,
     }),
     [
       config,
@@ -182,6 +182,7 @@ export const useSlashCommandProcessor = (
       toggleCorgiMode,
       toggleVimEnabled,
       sessionShellAllowlist,
+      commands,
     ],
   );
 
@@ -190,16 +191,49 @@ export const useSlashCommandProcessor = (
   useEffect(() => {
     const controller = new AbortController();
     const load = async () => {
-      const loaders = [
-        new McpPromptLoader(config),
-        new BuiltinCommandLoader(config),
-        new FileCommandLoader(config),
-      ];
-      const commandService = await CommandService.create(
-        loaders,
-        controller.signal,
+      const mcpLoader = new McpPromptLoader(config);
+      const builtinLoader = new BuiltinCommandLoader(config);
+      const fileLoader = new FileCommandLoader(config);
+
+      const [mcpCommands, builtinCommands, fileCommands] = await Promise.all([
+        mcpLoader.loadCommands(controller.signal),
+        builtinLoader.loadCommands(controller.signal),
+        fileLoader.loadCommands(controller.signal),
+      ]);
+
+      const finalCommands: SlashCommand[] = [];
+      const commandNames = new Set<string>();
+
+      // Add builtin and file commands first, collecting their names.
+      for (const cmd of [...builtinCommands, ...fileCommands]) {
+        finalCommands.push(cmd);
+        commandNames.add(cmd.name);
+        cmd.altNames?.forEach((name) => commandNames.add(name));
+      }
+
+      // Process MCP-backed commands, de-duplicating names as needed.
+      for (const cmd of mcpCommands) {
+        const mcpCmd = cmd;
+        const originalName = mcpCmd.name;
+        let newName = originalName;
+
+        // If the name is already taken by any other command, prepend the server name.
+        if (commandNames.has(newName)) {
+          newName = `${mcpCmd.serverName}_${mcpCmd.name}`;
+        }
+
+        commandNames.add(newName);
+        finalCommands.push({
+          ...mcpCmd,
+          name: newName,
+          displayName: originalName,
+        });
+      }
+      setCommands(
+        Object.freeze(
+          finalCommands.sort((a, b) => a.name.localeCompare(b.name)),
+        ),
       );
-      setCommands(commandService.getCommands());
     };
 
     load();
