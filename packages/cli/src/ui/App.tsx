@@ -88,6 +88,7 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { HistorySearch } from './components/HistorySearch.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 
@@ -168,6 +169,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
+  const [isHistorySearchActive, setIsHistorySearchActive] =
+    useState<boolean>(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
@@ -571,6 +574,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
     if (key.ctrl && input === 'o') {
       setShowErrorDetails((prev) => !prev);
+    } else if (key.ctrl && input === 'r') {
+      setIsHistorySearchActive(true);
     } else if (key.ctrl && input === 't') {
       const newValue = !showToolDescriptions;
       setShowToolDescriptions(newValue);
@@ -740,6 +745,18 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     geminiClient,
   ]);
 
+  const handleHistorySelect = useCallback(
+    (text: string) => {
+      buffer.setText(text);
+      setIsHistorySearchActive(false);
+    },
+    [buffer],
+  );
+
+  const handleHistoryExit = useCallback(() => {
+    setIsHistorySearchActive(false);
+  }, []);
+
   if (quittingMessages) {
     return (
       <Box flexDirection="column" marginBottom={1}>
@@ -852,6 +869,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
           {shellConfirmationRequest ? (
             <ShellConfirmationDialog request={shellConfirmationRequest} />
+          ) : isHistorySearchActive ? (
+            <HistorySearch
+              history={history}
+              onSelect={handleHistorySelect}
+              onExit={handleHistoryExit}
+            />
           ) : isThemeDialogOpen ? (
             <Box flexDirection="column">
               {themeError && (
