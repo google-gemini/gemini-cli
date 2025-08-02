@@ -155,6 +155,7 @@ export async function main() {
     extensions,
     sessionId,
     argv,
+    await getCliVersion(),
   );
 
   dns.setDefaultResultOrder(
@@ -364,6 +365,7 @@ async function loadNonInteractiveConfig(
       extensions,
       config.getSessionId(),
       argv,
+      config.getVersion(),
     );
     await finalConfig.initialize();
   }

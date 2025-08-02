@@ -306,6 +306,7 @@ export async function discoverMcpTools(
   toolRegistry: ToolRegistry,
   promptRegistry: PromptRegistry,
   debugMode: boolean,
+  version: string,
 ): Promise<void> {
   mcpDiscoveryState = MCPDiscoveryState.IN_PROGRESS;
   try {
@@ -319,6 +320,7 @@ export async function discoverMcpTools(
           toolRegistry,
           promptRegistry,
           debugMode,
+          version,
         ),
     );
     await Promise.all(discoveryPromises);
@@ -363,6 +365,7 @@ export async function connectAndDiscover(
   toolRegistry: ToolRegistry,
   promptRegistry: PromptRegistry,
   debugMode: boolean,
+  version: string,
 ): Promise<void> {
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
@@ -371,6 +374,7 @@ export async function connectAndDiscover(
       mcpServerName,
       mcpServerConfig,
       debugMode,
+      version,
     );
     try {
       updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
@@ -557,10 +561,11 @@ export async function connectToMcpServer(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
+  version: string,
 ): Promise<Client> {
   const mcpClient = new Client({
-    name: 'gemini-cli-mcp-client',
-    version: '0.0.1',
+    name: 'gemini-cli',
+    version: version,
   });
 
   // patch Client.callTool to use request timeout as genai McpCallTool.callTool does not do it

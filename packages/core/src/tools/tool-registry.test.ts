@@ -141,6 +141,7 @@ const baseConfigParams: ConfigParameters = {
   approvalMode: ApprovalMode.DEFAULT,
   sessionId: 'test-session-id',
   ideClient: IdeClient.getInstance(false),
+  version: '0.1.0-test',
 };
 
 describe('ToolRegistry', () => {
@@ -355,6 +356,7 @@ describe('ToolRegistry', () => {
         toolRegistry,
         undefined,
         false,
+        '0.1.0-test',
       );
     });
 
@@ -378,6 +380,7 @@ describe('ToolRegistry', () => {
         toolRegistry,
         undefined,
         false,
+        '0.1.0-test',
       );
     });
   });

@@ -36,6 +36,7 @@ describe('Flash Fallback Integration', () => {
       cwd: '/test',
       model: 'gemini-2.5-pro',
       ideClient: IdeClient.getInstance(false),
+      version: '0.1.0-test',
     });
 
     // Reset simulation state for each test

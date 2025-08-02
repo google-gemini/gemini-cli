@@ -27,6 +27,7 @@ describe('Flash Model Fallback Configuration', () => {
       cwd: '/test',
       model: DEFAULT_GEMINI_MODEL,
       ideClient: IdeClient.getInstance(false),
+      version: '0.1.0-test',
     });
 
     // Initialize contentGeneratorConfig for testing
@@ -52,6 +53,7 @@ describe('Flash Model Fallback Configuration', () => {
         cwd: '/test',
         model: DEFAULT_GEMINI_MODEL,
         ideClient: IdeClient.getInstance(false),
+        version: '0.1.0-test',
       });
 
       // Should not crash when contentGeneratorConfig is undefined
@@ -76,6 +78,7 @@ describe('Flash Model Fallback Configuration', () => {
         cwd: '/test',
         model: 'custom-model',
         ideClient: IdeClient.getInstance(false),
+        version: '0.1.0-test',
       });
 
       expect(newConfig.getModel()).toBe('custom-model');
@@ -100,7 +103,43 @@ describe('Flash Model Fallback Configuration', () => {
 
       // Should remain true even after getting model
       config.getModel();
+<<<<<<< HEAD
       expect(config.isInFallbackMode()).toBe(true);
+=======
+      expect(config.isModelSwitchedDuringSession()).toBe(true);
+    });
+  });
+
+  describe('resetModelToDefault', () => {
+    it('should reset model to default and clear session switch flag', () => {
+      // Switch to Flash first
+      config.setModel(DEFAULT_GEMINI_FLASH_MODEL);
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+      expect(config.isModelSwitchedDuringSession()).toBe(true);
+
+      // Reset to default
+      config.resetModelToDefault();
+
+      // Should be back to default with flag cleared
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
+      expect(config.isModelSwitchedDuringSession()).toBe(false);
+    });
+
+    it('should handle case where contentGeneratorConfig is not initialized', () => {
+      // Create config without initializing contentGeneratorConfig
+      const newConfig = new Config({
+        sessionId: 'test-session-2',
+        targetDir: '/test',
+        debugMode: false,
+        cwd: '/test',
+        model: DEFAULT_GEMINI_MODEL,
+        ideClient: IdeClient.getInstance(false),
+        version: '0.1.0-test',
+      });
+
+      // Should not crash when contentGeneratorConfig is undefined
+      expect(() => newConfig.resetModelToDefault()).not.toThrow();
+      expect(newConfig.isModelSwitchedDuringSession()).toBe(false);
     });
   });
 });

@@ -31,6 +31,7 @@ describe('telemetry', () => {
       debugMode: false,
       cwd: '/test/dir',
       ideClient: IdeClient.getInstance(false),
+      version: '0.1.0-test',
     });
     vi.spyOn(mockConfig, 'getTelemetryEnabled').mockReturnValue(true);
     vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
