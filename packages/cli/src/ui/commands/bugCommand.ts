@@ -6,6 +6,7 @@
 
 import open from 'open';
 import process from 'node:process';
+import stripAnsi from 'strip-ansi';
 import {
   type CommandContext,
   type SlashCommand,
@@ -37,6 +38,81 @@ export const bugCommand: SlashCommand = {
     const cliVersion = await getCliVersion();
     const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
 
+    const userPrompts = context.ui.history.filter(
+      (item) => item.type === 'user' && !item.text.startsWith('/bug'),
+    );
+    const lastUserPrompt = userPrompts.pop();
+
+    const lastUserPromptIndex = lastUserPrompt
+      ? context.ui.history.lastIndexOf(lastUserPrompt)
+      : -1;
+
+    const subsequentItems =
+      lastUserPromptIndex === -1
+        ? context.ui.history
+        : context.ui.history.slice(lastUserPromptIndex + 1);
+
+    const cliResponses = subsequentItems
+      .reduce((acc, item) => {
+        let responseText = '';
+        switch (item.type) {
+          case 'gemini':
+          case 'gemini_content':
+            responseText = `✦ ${stripAnsi(item.text)}`;
+            break;
+          case 'tool_group':
+            responseText = item.tools
+              .map((tool) => {
+                let output = `Tool Call: ${tool.name}, Status: ${
+                  tool.status
+                }, Description: ${tool.description || 'N/A'}`;
+                if (tool.resultDisplay) {
+                  if (
+                    typeof tool.resultDisplay === 'object' &&
+                    'fileDiff' in tool.resultDisplay
+                  ) {
+                    output += `
+Tool Response: ${tool.resultDisplay.fileDiff}`;
+                  } else if (typeof tool.resultDisplay === 'string') {
+                    output += `
+Tool Response: ${tool.resultDisplay}`;
+                  }
+                }
+                return output;
+              })
+              .join('\n');
+            break;
+          case 'error':
+            responseText = `✕ ${stripAnsi(item.text)}`;
+            break;
+          case 'info':
+            if (item.text.startsWith('To submit your bug report')) {
+              return acc;
+            }
+            responseText = `ℹ ${stripAnsi(item.text)}`;
+            break;
+          default:
+            return acc;
+        }
+        acc.push(responseText);
+        return acc;
+      }, [] as string[])
+      .join('\n\n---\n\n');
+
+    const lastCliResponse = cliResponses.length ? cliResponses : 'N/A';
+
+    const problem = [
+      '**Last User Prompt**',
+      '```',
+      lastUserPrompt?.text || 'N/A',
+      '```',
+      '',
+      '**Last Gemini CLI Response**',
+      '```',
+      lastCliResponse || 'N/A',
+      '```',
+    ].join('\n');
+
     const info = `
 * **CLI Version:** ${cliVersion}
 * **Git Commit:** ${GIT_COMMIT_INFO}
@@ -47,16 +123,93 @@ export const bugCommand: SlashCommand = {
 `;
 
     let bugReportUrl =
-      'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}';
+      'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}&problem={problem}';
 
     const bugCommandSettings = config?.getBugCommand();
     if (bugCommandSettings?.urlTemplate) {
       bugReportUrl = bugCommandSettings.urlTemplate;
     }
 
-    bugReportUrl = bugReportUrl
+    let url = bugReportUrl
       .replace('{title}', encodeURIComponent(bugDescription))
-      .replace('{info}', encodeURIComponent(info));
+      .replace('{info}', encodeURIComponent(info))
+      .replace('{problem}', encodeURIComponent(problem));
+
+    let wasTruncated = false;
+    while (url.length > 8000 && subsequentItems.length > 0) {
+      wasTruncated = true;
+      subsequentItems.shift();
+      const truncatedCliResponses = subsequentItems
+        .reduce((acc, item) => {
+          let responseText = '';
+          switch (item.type) {
+            case 'gemini':
+            case 'gemini_content':
+              responseText = `✦ ${stripAnsi(item.text)}`;
+              break;
+            case 'tool_group':
+              responseText = item.tools
+                .map((tool) => {
+                  let output = `Tool Call: ${tool.name}, Status: ${
+                    tool.status
+                  }, Description: ${tool.description || 'N/A'}`;
+                  if (tool.resultDisplay) {
+                    if (
+                      typeof tool.resultDisplay === 'object' &&
+                      'fileDiff' in tool.resultDisplay
+                    ) {
+                      output += `\nTool Response: ${tool.resultDisplay.fileDiff}`;
+                    } else if (typeof tool.resultDisplay === 'string') {
+                      output += `\nTool Response: ${tool.resultDisplay}`;
+                    }
+                  }
+                  return output;
+                })
+                .join('\n');
+              break;
+            case 'error':
+              responseText = `✕ ${stripAnsi(item.text)}`;
+              break;
+            case 'info':
+              if (item.text.startsWith('To submit your bug report')) {
+                return acc;
+              }
+              responseText = `ℹ ${stripAnsi(item.text)}`;
+              break;
+            default:
+              return acc;
+          }
+          acc.push(responseText);
+          return acc;
+        }, [] as string[])
+        .join('\n\n---\n\n');
+      const truncatedLastCliResponse = truncatedCliResponses.length
+        ? truncatedCliResponses
+        : '... truncated response due to character limit ...';
+
+      const problemText =
+        truncatedCliResponses.length > 0 && wasTruncated
+          ? `... truncated response due to character limit ...\n${truncatedLastCliResponse}`
+          : truncatedLastCliResponse;
+
+      const truncatedProblem = [
+        '**Last User Prompt**',
+        '```',
+        lastUserPrompt?.text || 'N/A',
+        '```',
+        '',
+        '**Last Gemini CLI Response**',
+        '```',
+        problemText,
+        '```',
+      ].join('\n');
+      url = bugReportUrl
+        .replace('{title}', encodeURIComponent(bugDescription))
+        .replace('{info}', encodeURIComponent(info))
+        .replace('{problem}', encodeURIComponent(truncatedProblem));
+    }
+
+    bugReportUrl = url;
 
     context.ui.addItem(
       {
