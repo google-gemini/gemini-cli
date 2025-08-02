@@ -13,6 +13,7 @@ import {
   Config,
   GitService,
   Logger,
+  ChatRecordingService,
   logSlashCommand,
   SlashCommandEvent,
   ToolConfirmationOutcome,
@@ -50,6 +51,8 @@ export const useSlashCommandProcessor = (
   toggleCorgiMode: () => void,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
+  openSessionBrowser: () => void,
+  chatRecordingService: ChatRecordingService | null,
   toggleVimEnabled: () => Promise<boolean>,
   setIsProcessing: (isProcessing: boolean) => void,
 ) => {
@@ -146,6 +149,7 @@ export const useSlashCommandProcessor = (
         settings,
         git: gitService,
         logger,
+        chatRecording: chatRecordingService,
       },
       ui: {
         addItem,
@@ -171,6 +175,7 @@ export const useSlashCommandProcessor = (
       settings,
       gitService,
       logger,
+      chatRecordingService,
       loadHistory,
       addItem,
       clearItems,
@@ -213,6 +218,7 @@ export const useSlashCommandProcessor = (
     async (
       rawQuery: PartListUnion,
       oneTimeShellAllowlist?: Set<string>,
+      addToHistory: boolean = true,
     ): Promise<SlashCommandProcessorResult | false> => {
       setIsProcessing(true);
       try {
@@ -225,11 +231,13 @@ export const useSlashCommandProcessor = (
           return false;
         }
 
-        const userMessageTimestamp = Date.now();
-        addItem(
-          { type: MessageType.USER, text: trimmed },
-          userMessageTimestamp,
-        );
+        if (addToHistory) {
+          const userMessageTimestamp = Date.now();
+          addItem(
+            { type: MessageType.USER, text: trimmed },
+            userMessageTimestamp,
+          );
+        }
 
         const parts = trimmed.substring(1).trim().split(/\s+/);
         const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
@@ -347,6 +355,9 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'privacy':
                       openPrivacyNotice();
+                      return { type: 'handled' };
+                    case 'sessionBrowser':
+                      openSessionBrowser();
                       return { type: 'handled' };
                     default: {
                       const unhandled: never = result.dialog;
@@ -471,6 +482,7 @@ export const useSlashCommandProcessor = (
       openPrivacyNotice,
       openEditorDialog,
       setQuittingMessages,
+      openSessionBrowser,
       setShellConfirmationRequest,
       setSessionShellAllowlist,
       setIsProcessing,

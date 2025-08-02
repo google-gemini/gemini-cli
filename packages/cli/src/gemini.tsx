@@ -38,13 +38,17 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
+  ResumedSessionData,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { runAcpPeer } from './acp/acpPeer.js';
+import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { formatRelativeTime, SessionSelector } from './utils/sessionUtils.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -106,7 +110,82 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   await new Promise((resolve) => child.on('close', resolve));
   process.exit(0);
 }
-import { runAcpPeer } from './acp/acpPeer.js';
+
+async function listSessions(config: Config): Promise<void> {
+  const sessionSelector = new SessionSelector(config);
+  const sessions = await sessionSelector.listSessions();
+
+  if (sessions.length === 0) {
+    console.log('No previous sessions found for this project.');
+    return;
+  }
+
+  console.log(`\nAvailable sessions for this project (${sessions.length}):\n`);
+
+  sessions
+    .sort(
+      (a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+    )
+    .forEach((session, index) => {
+      const current = session.isCurrentSession ? ' (current)' : '';
+      const time = formatRelativeTime(session.lastUpdated);
+      console.log(
+        `  ${index + 1}. ${session.firstUserMessage} (${time}${current})`,
+      );
+    });
+}
+
+async function deleteSession(
+  config: Config,
+  sessionIndex: string,
+): Promise<void> {
+  const sessionSelector = new SessionSelector(config);
+  const sessions = await sessionSelector.listSessions();
+
+  if (sessions.length === 0) {
+    console.error('No sessions found for this project.');
+    return;
+  }
+
+  // Parse session index
+  const index = parseInt(sessionIndex, 10);
+  if (isNaN(index) || index < 1 || index > sessions.length) {
+    console.error(
+      `Invalid session index "${sessionIndex}". Use --list-sessions to see available sessions.`,
+    );
+    return;
+  }
+
+  // Sort sessions by start time to match list-sessions ordering
+  const sortedSessions = sessions.sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+  );
+
+  const sessionToDelete = sortedSessions[index - 1];
+
+  // Prevent deleting the current session
+  if (sessionToDelete.isCurrentSession) {
+    console.error('Cannot delete the current active session.');
+    return;
+  }
+
+  try {
+    // Use ChatRecordingService to delete the session
+    const { ChatRecordingService } = await import('@google/gemini-cli-core');
+    const chatRecordingService = new ChatRecordingService(config);
+    chatRecordingService.deleteSession(sessionToDelete.file);
+
+    const time = formatRelativeTime(sessionToDelete.lastUpdated);
+    console.log(
+      `Deleted session ${index}: ${sessionToDelete.firstUserMessage} (${time})`,
+    );
+  } catch (error) {
+    console.error(
+      `Failed to delete session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+  }
+}
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
@@ -176,6 +255,18 @@ export async function main() {
     process.exit(0);
   }
 
+  // Handle --list-sessions flag
+  if (argv.listSessions) {
+    await listSessions(config);
+    process.exit(0);
+  }
+
+  // Handle --delete-session flag
+  if (argv.deleteSession) {
+    await deleteSession(config, argv.deleteSession);
+    process.exit(0);
+  }
+
   // Set a default auth type if one isn't set.
   if (!settings.merged.selectedAuthType) {
     if (process.env.CLOUD_SHELL === 'true') {
@@ -190,6 +281,16 @@ export async function main() {
   setMaxSizedBoxDebugging(config.getDebugMode());
 
   await config.initialize();
+
+  // Add session cleanup after config initialization
+  try {
+    await cleanupExpiredSessions(config, settings.merged);
+  } catch (error) {
+    // Don't let cleanup failures prevent CLI startup
+    if (config.getDebugMode()) {
+      console.debug('Session cleanup failed:', error);
+    }
+  }
 
   // Load custom themes from settings
   themeManager.loadCustomThemes(settings.merged.customThemes);
@@ -255,8 +356,28 @@ export async function main() {
     ...(await getUserStartupWarnings(workspaceRoot)),
   ];
 
+  // Handle --resume flag
+  let resumedSessionData: ResumedSessionData | undefined = undefined;
+  if (argv.resume) {
+    const sessionSelector = new SessionSelector(config);
+    try {
+      const result = await sessionSelector.resolveSession(argv.resume);
+      resumedSessionData = {
+        conversation: result.sessionData,
+        filePath: result.sessionPath,
+      };
+      // Use the existing session ID to continue recording to the same session
+      config.setSessionId(resumedSessionData.conversation.sessionId);
+    } catch (error) {
+      console.error(
+        `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      process.exit(1);
+    }
+  }
+
   const shouldBeInteractive =
-    !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0);
+    !!argv.promptInteractive || (process.stdin.isTTY && !input);
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (shouldBeInteractive) {
@@ -269,6 +390,7 @@ export async function main() {
           settings={settings}
           startupWarnings={startupWarnings}
           version={version}
+          resumedSessionData={resumedSessionData}
         />
       </React.StrictMode>,
       { exitOnCtrlC: false },
@@ -316,7 +438,12 @@ export async function main() {
     argv,
   );
 
-  await runNonInteractive(nonInteractiveConfig, input, prompt_id);
+  await runNonInteractive(
+    nonInteractiveConfig,
+    input,
+    prompt_id,
+    resumedSessionData,
+  );
   process.exit(0);
 }
 

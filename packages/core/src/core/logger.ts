@@ -6,7 +6,6 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { Content } from '@google/genai';
 import { getProjectTempDir } from '../utils/paths.js';
 
 const LOG_FILE_NAME = 'logs.json';
@@ -228,85 +227,6 @@ export class Logger {
       }
     } catch (_error) {
       // Error already logged by _updateLogFile or _readLogFile
-    }
-  }
-
-  _checkpointPath(tag: string): string {
-    if (!tag.length) {
-      throw new Error('No checkpoint tag specified.');
-    }
-    if (!this.geminiDir) {
-      throw new Error('Checkpoint file path not set.');
-    }
-    // Sanitize tag to prevent directory traversal attacks
-    let sanitizedTag = tag.replace(/[^a-zA-Z0-9-_]/g, '');
-    if (!sanitizedTag) {
-      sanitizedTag = 'default';
-    }
-    return path.join(this.geminiDir, `checkpoint-${sanitizedTag}.json`);
-  }
-
-  async saveCheckpoint(conversation: Content[], tag: string): Promise<void> {
-    if (!this.initialized) {
-      console.error(
-        'Logger not initialized or checkpoint file path not set. Cannot save a checkpoint.',
-      );
-      return;
-    }
-    const path = this._checkpointPath(tag);
-    try {
-      await fs.writeFile(path, JSON.stringify(conversation, null, 2), 'utf-8');
-    } catch (error) {
-      console.error('Error writing to checkpoint file:', error);
-    }
-  }
-
-  async loadCheckpoint(tag: string): Promise<Content[]> {
-    if (!this.initialized) {
-      console.error(
-        'Logger not initialized or checkpoint file path not set. Cannot load checkpoint.',
-      );
-      return [];
-    }
-
-    const path = this._checkpointPath(tag);
-    try {
-      const fileContent = await fs.readFile(path, 'utf-8');
-      const parsedContent = JSON.parse(fileContent);
-      if (!Array.isArray(parsedContent)) {
-        console.warn(
-          `Checkpoint file at ${path} is not a valid JSON array. Returning empty checkpoint.`,
-        );
-        return [];
-      }
-      return parsedContent as Content[];
-    } catch (error) {
-      console.error(`Failed to read or parse checkpoint file ${path}:`, error);
-      return [];
-    }
-  }
-
-  async deleteCheckpoint(tag: string): Promise<boolean> {
-    if (!this.initialized || !this.geminiDir) {
-      console.error(
-        'Logger not initialized or checkpoint file path not set. Cannot delete checkpoint.',
-      );
-      return false;
-    }
-
-    const path = this._checkpointPath(tag);
-
-    try {
-      await fs.unlink(path);
-      return true;
-    } catch (error) {
-      const nodeError = error as NodeJS.ErrnoException;
-      if (nodeError.code === 'ENOENT') {
-        // File doesn't exist, which is fine.
-        return false;
-      }
-      console.error(`Failed to delete checkpoint file ${path}:`, error);
-      throw error;
     }
   }
 

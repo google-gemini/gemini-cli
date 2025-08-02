@@ -292,6 +292,13 @@ describe('Turn', () => {
               finishReason: 'STOP',
             },
           ],
+          usageMetadata: {
+            promptTokenCount: 17,
+            candidatesTokenCount: 50,
+            cachedContentTokenCount: 10,
+            thoughtsTokenCount: 5,
+            toolUsePromptTokenCount: 2,
+          },
         } as unknown as GenerateContentResponse;
       })();
       mockSendMessageStream.mockResolvedValue(mockResponseStream);
@@ -307,7 +314,19 @@ describe('Turn', () => {
 
       expect(events).toEqual([
         { type: GeminiEventType.Content, value: 'Partial response' },
-        { type: GeminiEventType.Finished, value: 'STOP' },
+        {
+          type: GeminiEventType.Finished,
+          value: {
+            finishReason: 'STOP',
+            usageMetadata: {
+              promptTokenCount: 17,
+              candidatesTokenCount: 50,
+              cachedContentTokenCount: 10,
+              thoughtsTokenCount: 5,
+              toolUsePromptTokenCount: 2,
+            },
+          },
+        },
       ]);
     });
 
@@ -342,7 +361,10 @@ describe('Turn', () => {
           type: GeminiEventType.Content,
           value: 'This is a long response that was cut off...',
         },
-        { type: GeminiEventType.Finished, value: 'MAX_TOKENS' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: 'MAX_TOKENS', usageMetadata: undefined },
+        },
       ]);
     });
 
@@ -370,11 +392,14 @@ describe('Turn', () => {
 
       expect(events).toEqual([
         { type: GeminiEventType.Content, value: 'Content blocked' },
-        { type: GeminiEventType.Finished, value: 'SAFETY' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: 'SAFETY', usageMetadata: undefined },
+        },
       ]);
     });
 
-    it('should not yield finished event when there is no finish reason', async () => {
+    it('should yield finished event with undefined reason when there is no finish reason', async () => {
       const mockResponseStream = (async function* () {
         yield {
           candidates: [
@@ -401,8 +426,11 @@ describe('Turn', () => {
           type: GeminiEventType.Content,
           value: 'Response without finish reason',
         },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: undefined },
+        },
       ]);
-      // No Finished event should be emitted
     });
 
     it('should handle multiple responses with different finish reasons', async () => {
@@ -438,7 +466,10 @@ describe('Turn', () => {
       expect(events).toEqual([
         { type: GeminiEventType.Content, value: 'First part' },
         { type: GeminiEventType.Content, value: 'Second part' },
-        { type: GeminiEventType.Finished, value: 'OTHER' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: 'OTHER', usageMetadata: undefined },
+        },
       ]);
     });
   });

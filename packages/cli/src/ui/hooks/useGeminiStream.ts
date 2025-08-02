@@ -26,6 +26,7 @@ import {
   UnauthorizedError,
   UserPromptEvent,
   DEFAULT_GEMINI_FLASH_MODEL,
+  ChatRecordingService,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import {
@@ -94,6 +95,7 @@ export const useGeminiStream = (
   performMemoryRefresh: () => Promise<void>,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
+  chatRecordingService: ChatRecordingService,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -134,6 +136,7 @@ export const useGeminiStream = (
       config,
       setPendingHistoryItem,
       getPreferredEditor,
+      chatRecordingService,
     );
 
   const pendingToolCallGroupDisplay = useMemo(
@@ -445,7 +448,10 @@ export const useGeminiStream = (
 
   const handleFinishedEvent = useCallback(
     (event: ServerGeminiFinishedEvent, userMessageTimestamp: number) => {
-      const finishReason = event.value;
+      const finishReason = event.value.reason;
+      if (!finishReason) {
+        return;
+      }
 
       const finishReasonMessages: Record<FinishReason, string | undefined> = {
         [FinishReason.FINISH_REASON_UNSPECIFIED]: undefined,
@@ -535,6 +541,7 @@ export const useGeminiStream = (
         switch (event.type) {
           case ServerGeminiEventType.Thought:
             setThought(event.value);
+            chatRecordingService.recordThought(event.value);
             break;
           case ServerGeminiEventType.Content:
             geminiMessageBuffer = handleContentEvent(
@@ -593,6 +600,7 @@ export const useGeminiStream = (
       handleChatCompressionEvent,
       handleFinishedEvent,
       handleMaxSessionTurnsEvent,
+      chatRecordingService,
     ],
   );
 
@@ -873,7 +881,9 @@ export const useGeminiStream = (
         } catch (error) {
           if (!isNodeError(error) || error.code !== 'EEXIST') {
             onDebugMessage(
-              `Failed to create checkpoint directory: ${getErrorMessage(error)}`,
+              `Failed to create checkpoint directory: ${getErrorMessage(
+                error,
+              )}`,
             );
             return;
           }

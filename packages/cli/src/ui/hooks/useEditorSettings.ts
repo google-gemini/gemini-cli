@@ -12,6 +12,7 @@ import {
   checkHasEditorType,
   EditorType,
 } from '@google/gemini-cli-core';
+import { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 interface UseEditorSettingsReturn {
   isEditorDialogOpen: boolean;
@@ -26,7 +27,7 @@ interface UseEditorSettingsReturn {
 export const useEditorSettings = (
   loadedSettings: LoadedSettings,
   setEditorError: (error: string | null) => void,
-  addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
+  addItem: UseHistoryManagerReturn['addItem'],
 ): UseEditorSettingsReturn => {
   const [isEditorDialogOpen, setIsEditorDialogOpen] = useState(false);
 

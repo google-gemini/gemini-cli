@@ -65,18 +65,10 @@ const mockSlashCommands: SlashCommand[] = [
     ],
   },
   {
-    name: 'chat',
-    description: 'Manage chats',
+    name: 'resume',
+    description: 'Browse and resume sessions',
     kind: CommandKind.BUILT_IN,
-    subCommands: [
-      {
-        name: 'resume',
-        description: 'Resume a chat',
-        kind: CommandKind.BUILT_IN,
-        action: vi.fn(),
-        completion: async () => ['fix-foo', 'fix-bar'],
-      },
-    ],
+    action: vi.fn(),
   },
 ];
 

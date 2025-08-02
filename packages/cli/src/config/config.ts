@@ -65,6 +65,9 @@ export interface CliArgs {
   ideMode?: boolean | undefined;
   ideModeFeature: boolean | undefined;
   proxy: string | undefined;
+  resume: string | 'latest' | undefined;
+  listSessions: boolean | undefined;
+  deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
 }
 
@@ -204,6 +207,34 @@ export async function parseArguments(): Promise<CliArgs> {
       description:
         'Proxy for gemini client, like schema://user:password@host:port',
     })
+    .option('resume', {
+      alias: 'r',
+      type: 'string',
+      // `skipValidation` so that we can distinguish between it being passed with a value, without
+      // one, and not being passed at all.
+      skipValidation: true,
+      description:
+        'Resume a previous session. Use "latest" for most recent or index number (e.g. --resume 5)',
+      coerce: (value: string): string => {
+        // When --resume passed with a value (`gemini --resume 123`): value = "123" (string)
+        // When --resume passed without a value (`gemini --resume`): value = "" (string)
+        // When --resume not passed at all: this `coerce` function is not called at all, and
+        //   `yargsInstance.argv.resume` is undefined.
+        if (value === '') {
+          return 'latest';
+        }
+        return value;
+      },
+    })
+    .option('list-sessions', {
+      type: 'boolean',
+      description: 'List available sessions for the current project and exit.',
+    })
+    .option('delete-session', {
+      type: 'string',
+      description:
+        'Delete a session by index number (use --list-sessions to see available sessions).',
+    })
     .option('include-directories', {
       type: 'array',
       string: true,
@@ -222,6 +253,11 @@ export async function parseArguments(): Promise<CliArgs> {
       if (argv.prompt && argv.promptInteractive) {
         throw new Error(
           'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
+        );
+      }
+      if (argv.resume && !argv.prompt && !process.stdin.isTTY) {
+        throw new Error(
+          'When resuming a session, you must provide a message via --prompt (-p) or stdin',
         );
       }
       return true;
