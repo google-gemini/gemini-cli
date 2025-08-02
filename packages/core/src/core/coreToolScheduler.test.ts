@@ -31,7 +31,13 @@ class MockTool extends BaseTool<Record<string, unknown>, ToolResult> {
   executeFn = vi.fn();
 
   constructor(name = 'mockTool') {
-    super(name, name, 'A mock tool', Icon.Hammer, {});
+    super({
+      name,
+      displayName: name,
+      description: 'A mock tool',
+      icon: Icon.Hammer,
+      parameterSchema: {},
+    });
   }
 
   async shouldConfirmExecute(
@@ -415,13 +421,13 @@ describe('CoreToolScheduler edit cancellation', () => {
   it('should preserve diff when an edit is cancelled', async () => {
     class MockEditTool extends BaseTool<Record<string, unknown>, ToolResult> {
       constructor() {
-        super(
-          'mockEditTool',
-          'mockEditTool',
-          'A mock edit tool',
-          Icon.Pencil,
-          {},
-        );
+        super({
+          name: 'mockEditTool',
+          displayName: 'mockEditTool',
+          description: 'A mock edit tool',
+          icon: Icon.Pencil,
+          parameterSchema: {},
+        });
       }
 
       async shouldConfirmExecute(
