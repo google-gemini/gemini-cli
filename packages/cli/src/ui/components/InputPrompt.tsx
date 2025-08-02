@@ -16,7 +16,7 @@ import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
-import { keyMatchers } from '../keyBindings.js';
+import { keyMatchers, Command } from '../keyBindings.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
 import {
@@ -197,7 +197,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      if (keyMatchers.escape(key)) {
+      if (keyMatchers[Command.ESCAPE](key)) {
         if (shellModeActive) {
           setShellModeActive(false);
           return;
@@ -209,7 +209,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
-      if (keyMatchers.clearScreen(key)) {
+      if (keyMatchers[Command.CLEAR_SCREEN](key)) {
         onClearScreen();
         return;
       }
@@ -222,17 +222,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (completion.showSuggestions) {
         if (completion.suggestions.length > 1) {
-          if (keyMatchers.navigationUp(key) || keyMatchers.historyUp(key)) {
+          if (keyMatchers[Command.NAVIGATION_UP](key) || keyMatchers[Command.HISTORY_UP](key)) {
             completion.navigateUp();
             return;
           }
-          if (keyMatchers.navigationDown(key) || keyMatchers.historyDown(key)) {
+          if (keyMatchers[Command.NAVIGATION_DOWN](key) || keyMatchers[Command.HISTORY_DOWN](key)) {
             completion.navigateDown();
             return;
           }
         }
 
-        if (keyMatchers.acceptSuggestion(key)) {
+        if (keyMatchers[Command.ACCEPT_SUGGESTION](key)) {
           if (completion.suggestions.length > 0) {
             const targetIndex =
               completion.activeSuggestionIndex === -1
@@ -247,17 +247,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (!shellModeActive) {
-        if (keyMatchers.historyUp(key)) {
+        if (keyMatchers[Command.HISTORY_UP](key)) {
           inputHistory.navigateUp();
           return;
         }
-        if (keyMatchers.historyDown(key)) {
+        if (keyMatchers[Command.HISTORY_DOWN](key)) {
           inputHistory.navigateDown();
           return;
         }
         // Handle arrow-up/down for history on single-line or at edges
         if (
-          keyMatchers.navigationUp(key) &&
+          keyMatchers[Command.NAVIGATION_UP](key) &&
           (buffer.allVisualLines.length === 1 ||
             (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
         ) {
@@ -265,7 +265,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
         if (
-          keyMatchers.navigationDown(key) &&
+          keyMatchers[Command.NAVIGATION_DOWN](key) &&
           (buffer.allVisualLines.length === 1 ||
             buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
         ) {
@@ -274,19 +274,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       } else {
         // Shell History Navigation
-        if (keyMatchers.navigationUp(key)) {
+        if (keyMatchers[Command.NAVIGATION_UP](key)) {
           const prevCommand = shellHistory.getPreviousCommand();
           if (prevCommand !== null) buffer.setText(prevCommand);
           return;
         }
-        if (keyMatchers.navigationDown(key)) {
+        if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
           const nextCommand = shellHistory.getNextCommand();
           if (nextCommand !== null) buffer.setText(nextCommand);
           return;
         }
       }
 
-      if (keyMatchers.submit(key)) {
+      if (keyMatchers[Command.SUBMIT](key)) {
         if (buffer.text.trim()) {
           const [row, col] = buffer.cursor;
           const line = buffer.lines[row];
@@ -302,23 +302,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Newline insertion
-      if (keyMatchers.newline(key)) {
+      if (keyMatchers[Command.NEWLINE](key)) {
         buffer.newline();
         return;
       }
 
       // Ctrl+A (Home) / Ctrl+E (End)
-      if (keyMatchers.home(key)) {
+      if (keyMatchers[Command.HOME](key)) {
         buffer.move('home');
         return;
       }
-      if (keyMatchers.end(key)) {
+      if (keyMatchers[Command.END](key)) {
         buffer.move('end');
         buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
       // Ctrl+C (Clear input)
-      if (keyMatchers.clearInput(key)) {
+      if (keyMatchers[Command.CLEAR_INPUT](key)) {
         if (buffer.text.length > 0) {
           buffer.setText('');
           resetCompletionState();
@@ -328,23 +328,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Kill line commands
-      if (keyMatchers.killLineRight(key)) {
+      if (keyMatchers[Command.KILL_LINE_RIGHT](key)) {
         buffer.killLineRight();
         return;
       }
-      if (keyMatchers.killLineLeft(key)) {
+      if (keyMatchers[Command.KILL_LINE_LEFT](key)) {
         buffer.killLineLeft();
         return;
       }
 
       // External editor
-      if (keyMatchers.openExternalEditor(key)) {
+      if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
         buffer.openInExternalEditor();
         return;
       }
 
       // Ctrl+V for clipboard image paste
-      if (keyMatchers.pasteClipboardImage(key)) {
+      if (keyMatchers[Command.PASTE_CLIPBOARD_IMAGE](key)) {
         handleClipboardImage();
         return;
       }
