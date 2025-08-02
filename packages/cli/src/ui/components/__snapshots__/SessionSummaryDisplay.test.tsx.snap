@@ -1,45 +1,24 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`<SessionSummaryDisplay /> > correctly sums and displays stats from multiple models 1`] = `
-"╭─────────────────────────────────────╮
-│                                     │
-│  Agent powering down. Goodbye!      │
-│                                     │
-│                                     │
-│  Cumulative Stats (15 API calls)    │
-│                                     │
-│  Input Tokens                1,500  │
-│  Output Tokens               3,000  │
-│  Tool Use Tokens               220  │
-│  Thoughts Tokens               350  │
-│  Cached Tokens         600 (12.0%)  │
-│  ─────────────────────────────────  │
-│  Total Tokens                5,000  │
-│                                     │
-│  Total duration (API)        1m 2s  │
-│  Total duration (Tools)         0s  │
-│  Total duration (wall)  1h 23m 45s  │
-│                                     │
-╰─────────────────────────────────────╯"
-`;
-
-exports[`<SessionSummaryDisplay /> > renders zero state correctly 1`] = `
-"╭─────────────────────────────────────╮
-│                                     │
-│  Agent powering down. Goodbye!      │
-│                                     │
-│                                     │
-│  Cumulative Stats (0 API calls)     │
-│                                     │
-│  Input Tokens                    0  │
-│  Output Tokens                   0  │
-│  Thoughts Tokens                 0  │
-│  ─────────────────────────────────  │
-│  Total Tokens                    0  │
-│                                     │
-│  Total duration (API)           0s  │
-│  Total duration (Tools)         0s  │
-│  Total duration (wall)  1h 23m 45s  │
-│                                     │
-╰─────────────────────────────────────╯"
+exports[`<SessionSummaryDisplay /> > renders the summary display with a title 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  Agent powering down. Goodbye!                                                                   │
+│                                                                                                  │
+│  Performance                                                                                     │
+│  Wall Time:                  1h 23m 45s                                                          │
+│  Agent Active:               50.2s                                                               │
+│    » API Time:               50.2s (100.0%)                                                      │
+│    » Tool Time:              0s (0.0%)                                                           │
+│                                                                                                  │
+│                                                                                                  │
+│  Model Usage                  Reqs   Input Tokens  Output Tokens                                 │
+│  ───────────────────────────────────────────────────────────────                                 │
+│  gemini-2.5-pro                 10          1,000          2,000                                 │
+│                                                                                                  │
+│  Savings Highlight: 500 (50.0%) of input tokens were served from the cache, reducing costs.      │
+│                                                                                                  │
+│  » Tip: For a full token breakdown, run \`/stats model\`.                                          │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

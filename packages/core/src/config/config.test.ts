@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { Config, ConfigParameters, SandboxConfig } from './config.js';
 import * as path from 'path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
@@ -12,17 +12,40 @@ import {
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
 } from '../telemetry/index.js';
+import {
+  AuthType,
+  createContentGeneratorConfig,
+} from '../core/contentGenerator.js';
+import { GeminiClient } from '../core/client.js';
+import { GitService } from '../services/gitService.js';
+import { IdeClient } from '../ide/ide-client.js';
+
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn().mockReturnValue(true),
+    statSync: vi.fn().mockReturnValue({
+      isDirectory: vi.fn().mockReturnValue(true),
+    }),
+    realpathSync: vi.fn((path) => path),
+  };
+});
 
 // Mock dependencies that might be called during Config construction or createServerConfig
 vi.mock('../tools/tool-registry', () => {
   const ToolRegistryMock = vi.fn();
   ToolRegistryMock.prototype.registerTool = vi.fn();
-  ToolRegistryMock.prototype.discoverTools = vi.fn();
+  ToolRegistryMock.prototype.discoverAllTools = vi.fn();
   ToolRegistryMock.prototype.getAllTools = vi.fn(() => []); // Mock methods if needed
   ToolRegistryMock.prototype.getTool = vi.fn();
   ToolRegistryMock.prototype.getFunctionDeclarations = vi.fn(() => []);
   return { ToolRegistry: ToolRegistryMock };
 });
+
+vi.mock('../utils/memoryDiscovery.js', () => ({
+  loadServerHierarchicalMemory: vi.fn(),
+}));
 
 // Mock individual tools if their constructors are complex or have side effects
 vi.mock('../tools/ls');
@@ -53,7 +76,7 @@ vi.mock('../core/contentGenerator.js', async (importOriginal) => {
 
 vi.mock('../core/client.js', () => ({
   GeminiClient: vi.fn().mockImplementation(() => ({
-    // Mock any methods on GeminiClient that might be used.
+    initialize: vi.fn().mockResolvedValue(undefined),
   })),
 }));
 
@@ -63,6 +86,12 @@ vi.mock('../telemetry/index.js', async (importOriginal) => {
     ...actual,
     initializeTelemetry: vi.fn(),
   };
+});
+
+vi.mock('../services/gitService.js', () => {
+  const GitServiceMock = vi.fn();
+  GitServiceMock.prototype.initialize = vi.fn();
+  return { GitService: GitServiceMock };
 });
 
 describe('Server Config (config.ts)', () => {
@@ -91,6 +120,7 @@ describe('Server Config (config.ts)', () => {
     telemetry: TELEMETRY_SETTINGS,
     sessionId: SESSION_ID,
     model: MODEL,
+    ideClient: IdeClient.getInstance(false),
   };
 
   beforeEach(() => {
@@ -98,31 +128,63 @@ describe('Server Config (config.ts)', () => {
     vi.clearAllMocks();
   });
 
-  // i can't get vi mocking to import in core. only in cli. can't fix it now.
-  // describe('refreshAuth', () => {
-  //   it('should refresh auth and update config', async () => {
-  //     const config = new Config(baseParams);
-  //     const newModel = 'gemini-ultra';
-  //     const authType = AuthType.USE_GEMINI;
-  //     const mockContentConfig = {
-  //       model: newModel,
-  //       apiKey: 'test-key',
-  //     };
+  describe('initialize', () => {
+    it('should throw an error if checkpointing is enabled and GitService fails', async () => {
+      const gitError = new Error('Git is not installed');
+      (GitService.prototype.initialize as Mock).mockRejectedValue(gitError);
 
-  //     (createContentGeneratorConfig as vi.Mock).mockResolvedValue(
-  //       mockContentConfig,
-  //     );
+      const config = new Config({
+        ...baseParams,
+        checkpointing: true,
+      });
 
-  //     await config.refreshAuth(authType);
+      await expect(config.initialize()).rejects.toThrow(gitError);
+    });
 
-  //     expect(createContentGeneratorConfig).toHaveBeenCalledWith(
-  //       newModel,
-  //       authType,
-  //     );
-  //     expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
-  //     expect(GeminiClient).toHaveBeenCalledWith(config);
-  //   });
-  // });
+    it('should not throw an error if checkpointing is disabled and GitService fails', async () => {
+      const gitError = new Error('Git is not installed');
+      (GitService.prototype.initialize as Mock).mockRejectedValue(gitError);
+
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+      });
+
+      await expect(config.initialize()).resolves.toBeUndefined();
+    });
+  });
+
+  describe('refreshAuth', () => {
+    it('should refresh auth and update config', async () => {
+      const config = new Config(baseParams);
+      const authType = AuthType.USE_GEMINI;
+      const newModel = 'gemini-flash';
+      const mockContentConfig = {
+        model: newModel,
+        apiKey: 'test-key',
+      };
+
+      (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
+
+      // Set fallback mode to true to ensure it gets reset
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
+
+      await config.refreshAuth(authType);
+
+      expect(createContentGeneratorConfig).toHaveBeenCalledWith(
+        config,
+        authType,
+      );
+      // Verify that contentGeneratorConfig is updated with the new model
+      expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
+      expect(config.getContentGeneratorConfig().model).toBe(newModel);
+      expect(config.getModel()).toBe(newModel); // getModel() should return the updated model
+      expect(GeminiClient).toHaveBeenCalledWith(config);
+      // Verify that fallback mode is reset
+      expect(config.isInFallbackMode()).toBe(false);
+    });
+  });
 
   it('Config constructor should store userMemory correctly', () => {
     const config = new Config(baseParams);
@@ -169,6 +231,23 @@ describe('Server Config (config.ts)', () => {
     };
     const config = new Config(paramsWithFileFiltering);
     expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
+  });
+
+  it('should initialize WorkspaceContext with includeDirectories', () => {
+    const includeDirectories = ['/path/to/dir1', '/path/to/dir2'];
+    const paramsWithIncludeDirs: ConfigParameters = {
+      ...baseParams,
+      includeDirectories,
+    };
+    const config = new Config(paramsWithIncludeDirs);
+    const workspaceContext = config.getWorkspaceContext();
+    const directories = workspaceContext.getDirectories();
+
+    // Should include the target directory plus the included directories
+    expect(directories).toHaveLength(3);
+    expect(directories).toContain(path.resolve(baseParams.targetDir));
+    expect(directories).toContain('/path/to/dir1');
+    expect(directories).toContain('/path/to/dir2');
   });
 
   it('Config constructor should set telemetry to true when provided as true', () => {
