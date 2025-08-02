@@ -23,6 +23,7 @@ import {
   TelemetryTarget,
   FileFilteringOptions,
   IdeClient,
+  ReplaceStrategy,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -456,6 +457,7 @@ export async function loadCliConfig(
     ideMode,
     ideModeFeature,
     ideClient,
+    replaceStrategy: process.env.GEMINI_REPLACE_STRATEGY as ReplaceStrategy,
   });
 }
 

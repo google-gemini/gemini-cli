@@ -418,6 +418,7 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
+      getReplaceStrategy: () => 'corrector',
     } as Config;
 
     const mockMetrics = {
