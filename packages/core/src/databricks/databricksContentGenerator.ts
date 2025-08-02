@@ -200,9 +200,13 @@ export class DatabricksContentGenerator implements ContentGenerator {
       const contentsArray = Array.isArray(request.contents)
         ? request.contents
         : [request.contents];
-      
+
       for (const content of contentsArray) {
-        if (typeof content === 'object' && content !== null && 'parts' in content) {
+        if (
+          typeof content === 'object' &&
+          content !== null &&
+          'parts' in content
+        ) {
           const typedContent = content as { parts: Array<{ text?: string }> };
           for (const part of typedContent.parts) {
             if ('text' in part && part.text) {
@@ -235,7 +239,20 @@ export class DatabricksContentGenerator implements ContentGenerator {
 
     // Handle system instruction if provided
     if ('systemInstruction' in request && request.systemInstruction) {
-      systemInstruction = request.systemInstruction;
+      // Ensure systemInstruction has the expected format
+      if (typeof request.systemInstruction === 'string') {
+        systemInstruction = { text: request.systemInstruction };
+      } else if (
+        typeof request.systemInstruction === 'object' &&
+        request.systemInstruction !== null &&
+        'text' in request.systemInstruction &&
+        typeof (request.systemInstruction as { text: unknown }).text ===
+          'string'
+      ) {
+        systemInstruction = {
+          text: (request.systemInstruction as { text: string }).text,
+        };
+      }
     }
 
     if ('contents' in request && request.contents) {
@@ -243,12 +260,20 @@ export class DatabricksContentGenerator implements ContentGenerator {
       const contentsArray = Array.isArray(request.contents)
         ? request.contents
         : [request.contents];
-      
+
       for (const content of contentsArray) {
         // Check if content has the expected structure
-        if (typeof content === 'object' && content !== null && 'role' in content && 'parts' in content) {
-          const typedContent = content as { role: string; parts: Array<{ text?: string }> };
-          
+        if (
+          typeof content === 'object' &&
+          content !== null &&
+          'role' in content &&
+          'parts' in content
+        ) {
+          const typedContent = content as {
+            role: string;
+            parts: Array<{ text?: string }>;
+          };
+
           if (typedContent.role === 'user') {
             for (const part of typedContent.parts) {
               if ('text' in part && part.text) {

@@ -215,7 +215,9 @@ describe('DatabricksContentGenerator - Streaming', () => {
       expect(error?.message).toBe('Stream connection lost');
       // Should have received one chunk before error
       expect(chunks).toHaveLength(1);
-      expect(chunks[0].candidates?.[0]?.content?.parts?.[0]?.text).toBe('Hello');
+      expect(chunks[0].candidates?.[0]?.content?.parts?.[0]?.text).toBe(
+        'Hello',
+      );
     });
 
     it('should handle empty stream chunks', async () => {
@@ -249,7 +251,9 @@ describe('DatabricksContentGenerator - Streaming', () => {
 
       // Should only have one valid chunk
       expect(chunks).toHaveLength(1);
-      expect(chunks[0].candidates?.[0]?.content?.parts?.[0]?.text).toBe('Valid');
+      expect(chunks[0].candidates?.[0]?.content?.parts?.[0]?.text).toBe(
+        'Valid',
+      );
     });
 
     it('should handle multi-line content in streaming', async () => {

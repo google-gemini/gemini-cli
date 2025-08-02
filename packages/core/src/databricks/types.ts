@@ -78,22 +78,26 @@ export interface DatabricksStreamChunk {
 
 // Model mapping from Claude/Anthropic names to Databricks endpoints
 export const DATABRICKS_MODEL_MAPPING: Record<string, string> = {
-  'claude-3-5-sonnet-latest': 'databricks-dbrx-instruct',
+  'claude-3-5-sonnet-latest': 'databricks-claude-3.7-sonnet',
   'claude-3-5-haiku-latest': 'databricks-meta-llama-3-1-70b-instruct',
-  'claude-3-opus-latest': 'databricks-meta-llama-3-1-405b-instruct',
-  // Gemini model mappings
-  'gemini-2.5-pro': 'databricks-dbrx-instruct',
-  'gemini-2.5-flash': 'databricks-meta-llama-3-1-70b-instruct',
-  'gemini-2.5-flash-lite': 'databricks-meta-llama-3-1-8b-instruct',
+  'claude-3-opus-latest': 'databricks-claude-opus-4',
+  'llama-4-maverick': 'databricks-llama-4-maverick',
+  'llama-3-3-70b-instruct': 'databricks-meta-llama-3-3-70b-instruct',
+  'llama-3-1-8b-instruct': 'databricks-meta-llama-3-1-8b-instruct',
 };
 
 // Available Databricks models
 export const DATABRICKS_MODELS = [
-  'databricks-dbrx-instruct',
+  // Chat models
+  'databricks-gemma-3-12b',
+  'databricks-claude-sonnet-4',
+  'databricks-claude-opus-4',
+  'databricks-llama-4-maverick',
+  'databricks-claude-3.7-sonnet',
+  'databricks-meta-llama-3-3-70b-instruct',
   'databricks-meta-llama-3-1-405b-instruct',
-  'databricks-meta-llama-3-1-70b-instruct',
   'databricks-meta-llama-3-1-8b-instruct',
+  // Embedding models
   'databricks-bge-large-en',
   'databricks-gte-large-en',
-  'databricks-llm-mixer',
 ];

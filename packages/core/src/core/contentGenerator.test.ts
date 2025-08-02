@@ -13,6 +13,7 @@ import {
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
 import { Config } from '../config/config.js';
+import { DEFAULT_DATABRICKS_MODEL } from '../config/models.js';
 
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('@google/genai');
@@ -135,5 +136,82 @@ describe('createContentGeneratorConfig', () => {
     );
     expect(config.apiKey).toBeUndefined();
     expect(config.vertexai).toBeUndefined();
+  });
+
+  describe('Databricks model configuration', () => {
+    it('should default to databricks-claude-sonnet-4 when using Databricks auth and no model is configured', async () => {
+      // Given: Databricks environment variables are set
+      process.env.DATABRICKS_URL = 'https://example.databricks.com';
+      process.env.DBX_PAT = 'test-databricks-token';
+
+      // And: No model is configured in the config
+      const mockConfigNoModel = {
+        getModel: vi.fn().mockReturnValue(null),
+        setModel: vi.fn(),
+        flashFallbackHandler: vi.fn(),
+        getProxy: vi.fn(),
+      } as unknown as Config;
+
+      // When: Creating content generator config with Databricks auth
+      const config = await createContentGeneratorConfig(
+        mockConfigNoModel,
+        AuthType.USE_DATABRICKS,
+      );
+
+      // Then: The model should be set to the default Databricks model
+      expect(config.model).toBe('databricks-claude-sonnet-4');
+      expect(config.model).toBe(DEFAULT_DATABRICKS_MODEL);
+      expect(config.authType).toBe(AuthType.USE_DATABRICKS);
+    });
+
+    it('should use configured model when using Databricks auth and model is set', async () => {
+      // Given: Databricks environment variables are set
+      process.env.DATABRICKS_URL = 'https://example.databricks.com';
+      process.env.DBX_PAT = 'test-databricks-token';
+
+      // And: A specific model is configured
+      const customModel = 'databricks-claude-opus-4';
+      const mockConfigWithModel = {
+        getModel: vi.fn().mockReturnValue(customModel),
+        setModel: vi.fn(),
+        flashFallbackHandler: vi.fn(),
+        getProxy: vi.fn(),
+      } as unknown as Config;
+
+      // When: Creating content generator config with Databricks auth
+      const config = await createContentGeneratorConfig(
+        mockConfigWithModel,
+        AuthType.USE_DATABRICKS,
+      );
+
+      // Then: The configured model should be used, not the default
+      expect(config.model).toBe(customModel);
+      expect(config.authType).toBe(AuthType.USE_DATABRICKS);
+    });
+
+    it('should still return config even when Databricks environment variables are missing', async () => {
+      // Given: Databricks environment variables are not set
+      delete process.env.DATABRICKS_URL;
+      delete process.env.DBX_PAT;
+
+      // And: No model is configured
+      const mockConfigNoModel = {
+        getModel: vi.fn().mockReturnValue(null),
+        setModel: vi.fn(),
+        flashFallbackHandler: vi.fn(),
+        getProxy: vi.fn(),
+      } as unknown as Config;
+
+      // When: Creating content generator config with Databricks auth
+      const config = await createContentGeneratorConfig(
+        mockConfigNoModel,
+        AuthType.USE_DATABRICKS,
+      );
+
+      // Then: Config is returned with default model (validation happens later in createContentGenerator)
+      expect(config.model).toBe('databricks-claude-sonnet-4');
+      expect(config.model).toBe(DEFAULT_DATABRICKS_MODEL);
+      expect(config.authType).toBe(AuthType.USE_DATABRICKS);
+    });
   });
 });
