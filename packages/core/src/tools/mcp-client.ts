@@ -440,6 +440,7 @@ export async function discoverTools(
             funcDecl.name!,
             funcDecl.description ?? '',
             funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
+            isAllowed(funcDecl, mcpServerName, mcpServerConfig),
             mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
             mcpServerConfig.trust,
           ),
@@ -1083,4 +1084,29 @@ export function isEnabled(
       (tool) => tool === funcDecl.name || tool.startsWith(`${funcDecl.name}(`),
     )
   );
+}
+
+export function isAllowed(
+  funcDecl: FunctionDeclaration,
+  mcpServerName: string,
+  mcpServerConfig: MCPServerConfig,
+): boolean {
+  if (!funcDecl.name) {
+    console.warn(
+      `Discovered a function declaration without a name from MCP server '${mcpServerName}'. Skipping.`,
+    );
+    return false;
+  }
+  
+  const { allowTools } = mcpServerConfig;
+  if (allowTools) {
+    if (Array.isArray(allowTools)) {
+      return allowTools.includes(funcDecl.name);
+    }
+    console.warn(
+      `Configuration warning: 'allowTools' for MCP server '${mcpServerName}' is not an array. Skipping allowlist check.`,
+    );
+  }
+
+  return false;
 }

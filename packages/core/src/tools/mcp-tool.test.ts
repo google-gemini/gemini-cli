@@ -111,6 +111,7 @@ describe('DiscoveredMCPTool', () => {
         serverToolName,
         baseDescription,
         inputSchema,
+        false,
         customTimeout,
       );
       expect(tool.timeout).toBe(customTimeout);
@@ -198,6 +199,7 @@ describe('DiscoveredMCPTool', () => {
         serverToolName,
         baseDescription,
         inputSchema,
+        false,
         undefined,
         true,
       );
