@@ -1,212 +1,57 @@
 # Gemini CLI
 
 <p align="center">
-  简体中文 | <a href="../../README.md">🌐 English</a>
+  简体中文 | <a href="../README.md">🌐 English</a>
 </p>
 
-[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
+Gemini CLI 是一个命令行工具，可帮助您使用 Google 的 Gemini 模型进行开发。它旨在成为您日常开发工作流程中不可或缺的一部分，提供对 Gemini 强大功能的无缝访问，以帮助您完成各种任务，从代码生成和调试到文档和项目管理。
 
-![Gemini CLI 截图](../../docs/assets/gemini-screenshot.png)
+## 主要特点
 
-此存储库包含 Gemini CLI，这是一个命令行 AI 工作流工具，可连接到您的工具、理解您的代码并加速您的工作流。
-
-使用 Gemini CLI，您可以：
-
-- 在 Gemini 的 1M 令牌上下文窗口内及之外查询和编辑大型代码库。
-- 使用 Gemini 的多模态功能从 PDF 或草图生成新应用。
-- 自动化操作任务，例如查询拉取请求或处理复杂的变基。
-- 使用工具和 MCP 服务器连接新功能，包括[使用 Imagen、Veo 或 Lyria 进行媒体生成](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia)
-- 使用内置于 Gemini 的 [Google 搜索](https://ai.google.dev/gemini-api/docs/grounding)工具来支持您的查询。
+- **AI 辅助开发**：利用 Gemini 模型的功能来生成代码、解释复杂概念、调试问题以及执行各种其他开发任务。
+- **多功能工具集**：Gemini CLI 配备了一套全面的工具，可与您的文件系统、shell 和网络进行交互，使您能够直接从命令行执行 AI 驱动的操作。
+- **可扩展性**：通过自定义工具和集成扩展 CLI 的功能，以适应您独特的开发需求。
+- **安全沙盒**：在一个安全的沙盒环境中执行 AI 生成的代码，以保护您的系统免受潜在风险。
+- **直观的用户界面**：享受一个用户友好的命令行界面，旨在简化您的开发体验。
 
 ## 快速入门
 
-您有两种安装 Gemini CLI 的选项。
+要开始使用 Gemini CLI，请按照以下简单步骤操作：
 
-### 使用 Node
+1.  **安装**：
 
-1. **先决条件：** 确保您已安装 [Node.js 20 版](https://nodejs.org/en/download)或更高版本。
-2. **运行 CLI：** 在您的终端中执行以下命令：
+    ```bash
+    npm install -g @google/gemini-cli
+    ```
 
-   ```bash
-   npx https://github.com/google-gemini/gemini-cli
-   ```
+2.  **配置**：
 
-   或者使用以下命令安装：
+    首次运行 CLI 时，它会引导您完成一个简短的配置过程，包括设置您的身份验证凭据。
 
-   ```bash
-   npm install -g @google/gemini-cli
-   ```
+    ```bash
+    gemini
+    ```
 
-   然后，从任何地方运行 CLI：
+3.  **使用**：
 
-   ```bash
-   gemini
-   ```
+    配置完成后，您就可以开始使用 Gemini CLI 了。尝试运行一个简单的命令：
 
-### 使用 Homebrew
+    ```bash
+    gemini run "写一个 Python 函数来计算斐波那契数列"
+    ```
 
-1. **先决条件：** 确保您已安装 [Homebrew](https://brew.sh/)。
-2. **安装 CLI** 在您的终端中执行以下命令：
+## 文档
 
-   ```bash
-   brew install gemini-cli
-   ```
+有关 Gemini CLI 的更多详细信息，包括高级用法、配置选项和工具参考，请参阅我们的[完整文档](./docs/index.md)。
 
-   然后，从任何地方运行 CLI：
+## 贡献
 
-   ```bash
-   gemini
-   ```
+我们欢迎对 Gemini CLI 的贡献！如果您有兴趣改进该项目，请参阅我们的[贡献指南](./CONTRIBUTING.md)以了解如何开始。
 
-### 通用配置步骤
+## 许可证
 
-3. **选择一个颜色主题**
-4. **进行身份验证：** 出现提示时，使用您的个人 Google 帐户登录。这将授予您使用 Gemini 每分钟最多 60 个模型请求和每天 1,000 个模型请求的权限。
+Gemini CLI 在 Apache 2.0 许可证下发布。有关更多信息，请参阅 [LICENSE](LICENSE) 文件。
 
-您现在可以使用 Gemini CLI 了！
+## 支持
 
-### 使用 Gemini API 密钥：
-
-
-Gemini API 提供了一个免费套餐，使用 Gemini 2.5 Pro [每天 100 个请求](https://ai.google.dev/gemini-api/docs/rate-limits#free-tier)，您可以自主选择使用的模型，并可通过付费计划获得更高的速率限制：
-
-1. 从 [Google AI Studio](https://aistudio.google.com/apikey) 生成一个密钥。
-2. 在您的终端中将其设置为环境变量。将 `YOUR_API_KEY` 替换为您生成的密钥。
-
-   ```bash
-   export GEMINI_API_KEY="YOUR_API_KEY"
-   ```
-
-3. （可选）在 API 密钥页面上将您的 Gemini API 项目升级为付费计划（将自动解锁 [Tier 1 速率限制](https://ai.google.dev/gemini-api/docs/rate-limits#tier-1)）
-
-### 使用 Vertex AI API 密钥：
-
-Vertex AI API 提供了一个[免费套餐](https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview)，可在 Gemini 2.5 Pro 的 express 模式下使用，您可以自主选择模型，并可通过绑定计费账户获得更高的速率限制：
-
-1. 从 [Google Cloud](https://cloud.google.com/vertex-ai/generative-ai/docs/start/api-keys) 生成一个密钥。
-2. 在您的终端中将其设置为环境变量。将 `YOUR_API_KEY` 替换为您生成的密钥，并将 GOOGLE_GENAI_USE_VERTEXAI 设置为 true
-
-   ```bash
-   export GOOGLE_API_KEY="YOUR_API_KEY"
-   export GOOGLE_GENAI_USE_VERTEXAI=true
-   ```
-
-3. （可选）在您的项目上添加一个计费帐户以获得[更高的使用限制](https://cloud.google.com/vertex-ai/generative-ai/docs/quotas)
-
-有关其他身份验证方法，包括 Google Workspace 帐户，请参阅[身份验证](./docs/cli/authentication.md)指南。
-
-## 示例
-
-CLI 运行后，您可以从 shell 开始与 Gemini 进行交互。
-
-您可以从一个新目录开始一个项目：
-
-```sh
-cd new-project/
-gemini
-> 给我写一个 Gemini Discord 机器人，使用我将提供的 FAQ.md 文件来回答问题
-```
-
-或者处理一个现有项目：
-
-```sh
-git clone https://github.com/google-gemini/gemini-cli
-cd gemini-cli
-gemini
-> 给我一个昨天所有更改的摘要
-```
-
-### 后续步骤
-
-- 了解如何[贡献或从源代码构建](./CONTRIBUTING.md)。
-- 浏览可用的 **[CLI 命令](./docs/cli/commands.md)**。
-- 如果遇到任何问题，请查阅 **[故障排除指南](./docs/troubleshooting.md)**。
-- 如需更全面的文档，请参阅[完整文档](./docs/index.md)。
-- 查看一些[热门任务](#popular-tasks)以获取更多灵感。
-- 查看我们的 **[官方路线图](./ROADMAP.md)**。
-
-### 故障排除
-
-如果您遇到问题，请转到[故障排除指南](docs/troubleshooting.md)。
-
-## 热门任务
-
-### 探索新的代码库
-
-首先 `cd` 到一个现有或新克隆的代码仓库并运行 `gemini`。
-
-```text
-> 描述这个系统架构的主要部分。
-```
-
-```text
-> 有哪些安全机制？
-```
-
-```text
-> 为刚接触代码库的开发人员提供一份循序渐进的开发人员入职文档。
-```
-
-```text
-> 总结这个代码库，并突出我可以从中学习的最有趣的模式或技术。
-```
-
-```text
-> 识别此代码库中潜在的改进或重构领域，突出显示看起来脆弱、复杂或难以维护的部分。
-```
-
-```text
-> 这个代码库的哪些部分可能难以扩展或调试？
-```
-
-```text
-> 为 [模块名称] 模块生成一个 README 部分，解释它的作用以及如何使用它。
-```
-
-```text
-> 项目使用什么样的错误处理和日志记录策略？
-```
-
-```text
-> 这个项目使用了哪些工具、库和依赖项？
-```
-
-### 使用您现有的代码
-
-```text
-> 为 GitHub 问题 #123 实现初稿。
-```
-
-```text
-> 帮我将这个代码库迁移到最新版本的 Java。从一个迁移计划开始。
-```
-
-### 自动化您的工作流
-
-使用 MCP 服务器将您的本地系统工具与企业协作套件集成。
-
-```text
-> 给我做一个幻灯片，显示过去 7 天的 git 历史记录，按功能和团队成员分组。
-```
-
-```text
-> 为墙壁显示器制作一个全屏 Web 应用程序，以显示我们互动最多的 GitHub 问题。
-```
-
-### 与您的系统交互
-
-```text
-> 将此目录中的所有图像转换为 png，并根据 exif 数据中的日期重命名。
-```
-
-```text
-> 按支出月份整理我的 PDF 发票。
-```
-
-### 卸载
-
-有关卸载说明，请转到[卸载](docs/Uninstall.md)指南。
-
-## 服务条款和隐私声明
-
-有关适用于您使用 Gemini CLI 的服务条款和隐私声明的详细信息，请参阅[服务条款和隐私声明](./docs/tos-privacy.md)。
+如果您遇到任何问题或有疑问，请随时在我们的 [GitHub Issues](https://github.com/google-gemini/gemini-cli/issues) 页面上提出问题。
