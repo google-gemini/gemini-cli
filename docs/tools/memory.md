@@ -1,7 +1,7 @@
 # Memory Tool (`save_memory`)
 
 <p align="center">
-  <a href="../../i18n/chinese/docs/tools/memory.md">简体中文</a> | English
+  <a href="../../i18n/chinese/docs/tools/memory.md">🌐 简体中文</a> | English
 </p>
 
 This document describes the `save_memory` tool for the Gemini CLI.

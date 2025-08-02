@@ -1,7 +1,7 @@
 # Gemini CLI
 
 <p align="center">
-  简体中文 | <a href="../README.md">🌐 English</a>
+  简体中文 | <a href="../../README.md">🌐 English</a>
 </p>
 
 Gemini CLI 是一个命令行工具，可帮助您使用 Google 的 Gemini 模型进行开发。它旨在成为您日常开发工作流程中不可或缺的一部分，提供对 Gemini 强大功能的无缝访问，以帮助您完成各种任务，从代码生成和调试到文档和项目管理。
@@ -50,7 +50,7 @@ Gemini CLI 是一个命令行工具，可帮助您使用 Google 的 Gemini 模�
 
 ## 许可证
 
-Gemini CLI 在 Apache 2.0 许可证下发布。有关更多信息，请参阅 [LICENSE](LICENSE) 文件。
+Gemini CLI 在 Apache 2.0 许可证下发布。有关更多信息，请参阅 [LICENSE](../../LICENSE) 文件。
 
 ## 支持
 

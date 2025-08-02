@@ -1,7 +1,7 @@
 # Google Web Search Tool
 
 <p align="center">
-  <a href="../../i18n/chinese/docs/tools/web-search.md">简体中文</a> | English
+  <a href="../../i18n/chinese/docs/tools/web-search.md">🌐 简体中文</a> | English
 </p>
 
 This document describes the `google_web_search` tool.

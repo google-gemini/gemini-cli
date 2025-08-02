@@ -1,7 +1,7 @@
 # Gemini CLI file system tools
 
 <p align="center">
-  <a href="../../i18n/chinese/docs/tools/file-system.md">简体中文</a> | English
+  <a href="../../i18n/chinese/docs/tools/file-system.md">🌐 简体中文</a> | English
 </p>
 
 The Gemini CLI provides a comprehensive suite of tools for interacting with the local file system. These tools allow the Gemini model to read from, write to, list, search, and modify files and directories, all under your control and typically with confirmation for sensitive operations.

@@ -1,7 +1,7 @@
 # Shell Tool (`run_shell_command`)
 
 <p align="center">
-  <a href="../../i18n/chinese/docs/tools/shell.md">简体中文</a> | English
+  <a href="../../i18n/chinese/docs/tools/shell.md">🌐 简体中文</a> | English
 </p>
 
 This document describes the `run_shell_command` tool for the Gemini CLI.

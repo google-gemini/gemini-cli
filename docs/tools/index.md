@@ -1,7 +1,7 @@
 # Tools
 
 <p align="center">
-  <a href="../../i18n/chinese/docs/tools/index.md">简体中文</a> | English
+  <a href="../../i18n/chinese/docs/tools/index.md">🌐 简体中文</a> | English
 </p>
 
 The Gemini CLI includes built-in tools that the Gemini model uses to interact with your local environment, access information, and perform actions. These tools enhance the CLI's capabilities, enabling it to go beyond text generation and assist with a wide range of tasks.
