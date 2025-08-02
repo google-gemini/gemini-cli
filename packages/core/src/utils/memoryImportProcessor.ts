@@ -117,13 +117,12 @@ function findImports(
     // Extract the path (everything after @)
     const importPath = content.slice(i + 1, j);
 
-    // Basic validation (starts with ./ or / or letter)
+    // Enhanced validation: only allow file paths, not workspace references
     if (
       importPath.length > 0 &&
-      (importPath[0] === '.' ||
-        importPath[0] === '/' ||
-        isLetter(importPath[0]))
-    ) {
+      (importPath[0] === '.' ||   // Relative paths like ./file.md
+       importPath[0] === '/')) {  // Absolute paths like /path/file.md
+      // Exclude workspace syntax like @workspace/package (no leading ./ or /)
       imports.push({
         start: i,
         _end: j,
