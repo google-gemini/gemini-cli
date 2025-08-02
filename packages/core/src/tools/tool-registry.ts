@@ -20,7 +20,7 @@ export class DiscoveredTool extends BaseTool<ToolParams, ToolResult> {
     private readonly config: Config,
     name: string,
     readonly description: string,
-    readonly parameterSchema: Record<string, unknown>,
+    readonly parameterSchema: Schema,
   ) {
     const discoveryCmd = config.getToolDiscoveryCommand()!;
     const callCommand = config.getToolCallCommand()!;
@@ -45,7 +45,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
       displayName: name,
       description,
       icon: Icon.Hammer,
-      parameterSchema: parameterSchema as Schema,
+      parameterSchema,
       hasSideEffects: true,
       isOutputMarkdown: false,
       canUpdateOutput: false,
@@ -336,7 +336,7 @@ export class ToolRegistry {
             this.config,
             func.name,
             func.description ?? '',
-            parameters as Record<string, unknown>,
+            parameters,
           ),
         );
       }
