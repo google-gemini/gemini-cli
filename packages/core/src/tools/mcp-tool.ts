@@ -42,7 +42,8 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
       icon: Icon.Hammer,
       parameterSchema: { type: Type.OBJECT }, // this is a dummy Schema for MCP, will be not be used to construct the FunctionDeclaration
       hasSideEffects: true,
-      isOutputMarkdown: false,
+      isOutputMarkdown: true,
+      canUpdateOutput: false,
     });
   }
 
