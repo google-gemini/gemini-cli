@@ -169,7 +169,7 @@ describe('vim-buffer-actions', () => {
         const result = handleVimAction(state, action);
         expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(5); // End of 'short'
+        expect(result.cursorCol).toBe(4); // Last character 't' of 'short', not past it
       });
     });
 
@@ -236,6 +236,20 @@ describe('vim-buffer-actions', () => {
         expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(5); // Start of ','
       });
+
+      it('should move across empty lines when starting from within a word', () => {
+        // Testing the exact scenario: cursor on 'w' of 'hello world', w should move to next line
+        const state = createTestState(['hello world', ''], 0, 6); // At 'w' of 'world'
+        const action = {
+          type: 'vim_move_word_forward' as const,
+          payload: { count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.cursorRow).toBe(1); // Should move to empty line
+        expect(result.cursorCol).toBe(0); // Beginning of empty line
+      });
     });
 
     describe('vim_move_word_backward', () => {
@@ -287,6 +301,42 @@ describe('vim-buffer-actions', () => {
         const result = handleVimAction(state, action);
         expect(result).toHaveOnlyValidCharacters();
         expect(result.cursorCol).toBe(10); // End of 'world'
+      });
+
+      it('should move across empty lines when at word end', () => {
+        const state = createTestState(['hello world', '', 'test'], 0, 10); // At 'd' of 'world'
+        const action = {
+          type: 'vim_move_word_end' as const,
+          payload: { count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.cursorRow).toBe(2); // Should move to line with 'test'
+        expect(result.cursorCol).toBe(3); // Should be at 't' (end of 'test')
+      });
+
+      it('should handle consecutive word-end movements across empty lines', () => {
+        // Testing the exact scenario: cursor on 'w' of world, press 'e' twice
+        const state = createTestState(['hello world', ''], 0, 6); // At 'w' of 'world'
+
+        // First 'e' should move to 'd' of 'world'
+        let result = handleVimAction(state, {
+          type: 'vim_move_word_end' as const,
+          payload: { count: 1 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.cursorRow).toBe(0);
+        expect(result.cursorCol).toBe(10); // At 'd' of 'world'
+
+        // Second 'e' should move to the empty line (end of file in this case)
+        result = handleVimAction(result, {
+          type: 'vim_move_word_end' as const,
+          payload: { count: 1 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.cursorRow).toBe(1); // Should move to empty line
+        expect(result.cursorCol).toBe(0); // Empty line has col 0
       });
     });
 

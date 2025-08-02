@@ -33,143 +33,229 @@ function isWordChar(ch: string | undefined): boolean {
   return !/[\s,.;!?]/.test(ch);
 }
 
-// Vim-specific word boundary functions
-export const findNextWordStart = (
-  text: string,
-  currentOffset: number,
-): number => {
-  let i = currentOffset;
+// Helper functions for line-based word navigation
+export const isWordCharStrict = (char: string): boolean => /\w/.test(char);
 
-  if (i >= text.length) return i;
+export const isWhitespace = (char: string): boolean => /\s/.test(char);
 
-  const currentChar = text[i];
+// Find next word start within a line, starting from col
+export const findNextWordStartInLine = (
+  line: string,
+  col: number,
+): number | null => {
+  const chars = [...line]; // Handle Unicode properly
+  let i = col;
+
+  if (i >= chars.length) return null;
+
+  const currentChar = chars[i];
 
   // Skip current word/sequence based on character type
-  if (/\w/.test(currentChar)) {
-    // Skip current word characters
-    while (i < text.length && /\w/.test(text[i])) {
+  if (isWordCharStrict(currentChar)) {
+    while (i < chars.length && isWordCharStrict(chars[i])) {
       i++;
     }
-  } else if (!/\s/.test(currentChar)) {
-    // Skip current non-word, non-whitespace characters (like "/", ".", etc.)
-    while (i < text.length && !/\w/.test(text[i]) && !/\s/.test(text[i])) {
+  } else if (!isWhitespace(currentChar)) {
+    while (
+      i < chars.length &&
+      !isWordCharStrict(chars[i]) &&
+      !isWhitespace(chars[i])
+    ) {
       i++;
     }
   }
 
   // Skip whitespace
-  while (i < text.length && /\s/.test(text[i])) {
+  while (i < chars.length && isWhitespace(chars[i])) {
     i++;
   }
 
-  // If we reached the end of text and there's no next word,
-  // vim behavior for dw is to delete to the end of the current word
-  if (i >= text.length) {
-    // Go back to find the end of the last word
-    let endOfLastWord = text.length - 1;
-    while (endOfLastWord >= 0 && /\s/.test(text[endOfLastWord])) {
-      endOfLastWord--;
-    }
-    // For dw on last word, return position AFTER the last character to delete entire word
-    return Math.max(currentOffset + 1, endOfLastWord + 1);
-  }
-
-  return i;
+  return i < chars.length ? i : null;
 };
 
-export const findPrevWordStart = (
-  text: string,
-  currentOffset: number,
-): number => {
-  let i = currentOffset;
+// Find previous word start within a line
+export const findPrevWordStartInLine = (
+  line: string,
+  col: number,
+): number | null => {
+  const chars = [...line];
+  let i = col;
 
-  // If at beginning of text, return current position
-  if (i <= 0) {
-    return currentOffset;
-  }
+  if (i <= 0) return null;
 
-  // Move back one character to start searching
   i--;
 
   // Skip whitespace moving backwards
-  while (i >= 0 && (text[i] === ' ' || text[i] === '\t' || text[i] === '\n')) {
+  while (i >= 0 && isWhitespace(chars[i])) {
     i--;
   }
 
-  if (i < 0) {
-    return 0; // Reached beginning of text
-  }
+  if (i < 0) return null;
 
-  const charAtI = text[i];
-
-  if (/\w/.test(charAtI)) {
+  if (isWordCharStrict(chars[i])) {
     // We're in a word, move to its beginning
-    while (i >= 0 && /\w/.test(text[i])) {
+    while (i >= 0 && isWordCharStrict(chars[i])) {
       i--;
     }
-    return i + 1; // Return first character of word
+    return i + 1;
   } else {
     // We're in punctuation, move to its beginning
-    while (
-      i >= 0 &&
-      !/\w/.test(text[i]) &&
-      text[i] !== ' ' &&
-      text[i] !== '\t' &&
-      text[i] !== '\n'
-    ) {
+    while (i >= 0 && !isWordCharStrict(chars[i]) && !isWhitespace(chars[i])) {
       i--;
     }
-    return i + 1; // Return first character of punctuation sequence
+    return i + 1;
   }
 };
 
-export const findWordEnd = (text: string, currentOffset: number): number => {
-  let i = currentOffset;
+// Find word end within a line
+export const findWordEndInLine = (line: string, col: number): number | null => {
+  const chars = [...line];
+  let i = col;
 
   // If we're already at the end of a word, advance to next word
   if (
-    i < text.length &&
-    /\w/.test(text[i]) &&
-    (i + 1 >= text.length || !/\w/.test(text[i + 1]))
+    i < chars.length &&
+    isWordCharStrict(chars[i]) &&
+    (i + 1 >= chars.length || !isWordCharStrict(chars[i + 1]))
   ) {
     // We're at the end of a word, move forward to find next word
     i++;
     // Skip whitespace/punctuation to find next word
-    while (i < text.length && !/\w/.test(text[i])) {
+    while (i < chars.length && !isWordCharStrict(chars[i])) {
       i++;
     }
   }
 
   // If we're not on a word character, find the next word
-  if (i < text.length && !/\w/.test(text[i])) {
-    while (i < text.length && !/\w/.test(text[i])) {
+  if (i < chars.length && !isWordCharStrict(chars[i])) {
+    while (i < chars.length && !isWordCharStrict(chars[i])) {
       i++;
     }
   }
 
   // Move to end of current word
-  while (i < text.length && /\w/.test(text[i])) {
+  while (i < chars.length && isWordCharStrict(chars[i])) {
     i++;
   }
 
   // Move back one to be on the last character of the word
-  return Math.max(currentOffset, i - 1);
+  return i > col ? i - 1 : null;
 };
 
-// Helper functions for vim operations
-export const getOffsetFromPosition = (
-  row: number,
-  col: number,
+// Find next word across lines
+export const findNextWordAcrossLines = (
   lines: string[],
-): number => {
-  let offset = 0;
-  for (let i = 0; i < row; i++) {
-    offset += lines[i].length + 1; // +1 for newline
+  cursorRow: number,
+  cursorCol: number,
+  searchForWordStart: boolean,
+): { row: number; col: number } | null => {
+  // First try current line
+  const currentLine = lines[cursorRow] || '';
+  const colInCurrentLine = searchForWordStart
+    ? findNextWordStartInLine(currentLine, cursorCol)
+    : findWordEndInLine(currentLine, cursorCol);
+
+  if (colInCurrentLine !== null) {
+    return { row: cursorRow, col: colInCurrentLine };
   }
-  offset += col;
-  return offset;
+
+  // Search subsequent lines
+  for (let row = cursorRow + 1; row < lines.length; row++) {
+    const line = lines[row] || '';
+    const chars = [...line];
+
+    // For empty lines, if we haven't found any words yet, return the empty line
+    if (chars.length === 0) {
+      // Check if there are any words in remaining lines
+      let hasWordsInLaterLines = false;
+      for (let laterRow = row + 1; laterRow < lines.length; laterRow++) {
+        const laterLine = lines[laterRow] || '';
+        const laterChars = [...laterLine];
+        let firstNonWhitespace = 0;
+        while (
+          firstNonWhitespace < laterChars.length &&
+          isWhitespace(laterChars[firstNonWhitespace])
+        ) {
+          firstNonWhitespace++;
+        }
+        if (firstNonWhitespace < laterChars.length) {
+          hasWordsInLaterLines = true;
+          break;
+        }
+      }
+
+      // If no words in later lines, return the empty line
+      if (!hasWordsInLaterLines) {
+        return { row, col: 0 };
+      }
+      continue;
+    }
+
+    // Find first non-whitespace
+    let firstNonWhitespace = 0;
+    while (
+      firstNonWhitespace < chars.length &&
+      isWhitespace(chars[firstNonWhitespace])
+    ) {
+      firstNonWhitespace++;
+    }
+
+    if (firstNonWhitespace < chars.length) {
+      if (searchForWordStart) {
+        return { row, col: firstNonWhitespace };
+      } else {
+        // For word end, find the end of the first word
+        const endCol = findWordEndInLine(line, firstNonWhitespace);
+        if (endCol !== null) {
+          return { row, col: endCol };
+        }
+      }
+    }
+  }
+
+  return null;
 };
 
+// Find previous word across lines
+export const findPrevWordAcrossLines = (
+  lines: string[],
+  cursorRow: number,
+  cursorCol: number,
+): { row: number; col: number } | null => {
+  // First try current line
+  const currentLine = lines[cursorRow] || '';
+  const colInCurrentLine = findPrevWordStartInLine(currentLine, cursorCol);
+
+  if (colInCurrentLine !== null) {
+    return { row: cursorRow, col: colInCurrentLine };
+  }
+
+  // Search previous lines
+  for (let row = cursorRow - 1; row >= 0; row--) {
+    const line = lines[row] || '';
+    const chars = [...line];
+
+    if (chars.length === 0) continue;
+
+    // Find last word start
+    let lastWordStart = chars.length;
+    while (lastWordStart > 0 && isWhitespace(chars[lastWordStart - 1])) {
+      lastWordStart--;
+    }
+
+    if (lastWordStart > 0) {
+      // Find start of this word
+      const wordStart = findPrevWordStartInLine(line, lastWordStart);
+      if (wordStart !== null) {
+        return { row, col: wordStart };
+      }
+    }
+  }
+
+  return null;
+};
+
+// Helper functions for vim line operations
 export const getPositionFromOffsets = (
   startOffset: number,
   endOffset: number,
