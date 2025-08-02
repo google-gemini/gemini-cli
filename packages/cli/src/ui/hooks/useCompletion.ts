@@ -136,13 +136,14 @@ export function useCompletion(
 
   // Check if cursor is after @ or / without unescaped spaces
   const commandIndex = useMemo(() => {
-    if (isSlashCommand(buffer.text.trim())) {
-      return 0;
+    const currentLine = buffer.lines[cursorRow] || '';
+    if (cursorRow === 0 && isSlashCommand(currentLine.trim())) {
+      return currentLine.indexOf('/');
     }
 
     // For other completions like '@', we search backwards from the cursor.
 
-    const codePoints = toCodePoints(buffer.lines[cursorRow] || '');
+    const codePoints = toCodePoints(currentLine);
     for (let i = cursorCol - 1; i >= 0; i--) {
       const char = codePoints[i];
 
@@ -162,7 +163,7 @@ export function useCompletion(
     }
 
     return -1;
-  }, [buffer.text, cursorRow, cursorCol, buffer.lines]);
+  }, [cursorRow, cursorCol, buffer.lines]);
 
   useEffect(() => {
     if (commandIndex === -1) {
@@ -170,14 +171,15 @@ export function useCompletion(
       return;
     }
 
-    const trimmedQuery = buffer.text.trimStart();
+    const currentLine = buffer.lines[cursorRow] || '';
+    const codePoints = toCodePoints(currentLine);
 
-    if (trimmedQuery.startsWith('/')) {
+    if (codePoints[commandIndex] === '/') {
       // Always reset perfect match at the beginning of processing.
       setIsPerfectMatch(false);
 
-      const fullPath = trimmedQuery.substring(1);
-      const hasTrailingSpace = trimmedQuery.endsWith(' ');
+      const fullPath = currentLine.substring(commandIndex + 1);
+      const hasTrailingSpace = currentLine.endsWith(' ');
 
       // Get all non-empty parts of the command.
       const rawParts = fullPath.split(/\s+/).filter((p) => p);
@@ -217,9 +219,10 @@ export function useCompletion(
         }
       }
 
+      let exactMatchAsParent: SlashCommand | undefined;
       // Handle the Ambiguous Case
       if (!hasTrailingSpace && currentLevel) {
-        const exactMatchAsParent = currentLevel.find(
+        exactMatchAsParent = currentLevel.find(
           (cmd) =>
             (cmd.name === partial || cmd.altNames?.includes(partial)) &&
             cmd.subCommands,
@@ -253,15 +256,33 @@ export function useCompletion(
       }
 
       const depth = commandPathParts.length;
-
-      // Provide Suggestions based on the now-corrected context
-
-      // Argument Completion
-      if (
+      const isArgumentCompletion =
         leafCommand?.completion &&
         (hasTrailingSpace ||
-          (rawParts.length > depth && depth > 0 && partial !== ''))
-      ) {
+          (rawParts.length > depth && depth > 0 && partial !== ''));
+
+      // Set completion range
+      if (hasTrailingSpace || exactMatchAsParent) {
+        completionStart.current = currentLine.length;
+        completionEnd.current = currentLine.length;
+      } else if (partial) {
+        if (isArgumentCompletion) {
+          const commandSoFar = `/${commandPathParts.join(' ')}`;
+          const argStartIndex =
+            commandSoFar.length + (commandPathParts.length > 0 ? 1 : 0);
+          completionStart.current = argStartIndex;
+        } else {
+          completionStart.current = currentLine.length - partial.length;
+        }
+        completionEnd.current = currentLine.length;
+      } else {
+        // e.g. /
+        completionStart.current = commandIndex + 1;
+        completionEnd.current = currentLine.length;
+      }
+
+      // Provide Suggestions based on the now-corrected context
+      if (isArgumentCompletion) {
         const fetchAndSetSuggestions = async () => {
           setIsLoadingSuggestions(true);
           const argString = rawParts.slice(depth).join(' ');
@@ -317,9 +338,6 @@ export function useCompletion(
     }
 
     // Handle At Command Completion
-    const currentLine = buffer.lines[cursorRow] || '';
-    const codePoints = toCodePoints(currentLine);
-
     completionEnd.current = codePoints.length;
     for (let i = cursorCol; i < codePoints.length; i++) {
       if (codePoints[i] === ' ') {
@@ -639,73 +657,34 @@ export function useCompletion(
       if (indexToUse < 0 || indexToUse >= suggestions.length) {
         return;
       }
-      const query = buffer.text;
       const suggestion = suggestions[indexToUse].value;
 
-      if (query.trimStart().startsWith('/')) {
-        const hasTrailingSpace = query.endsWith(' ');
-        const parts = query
-          .trimStart()
-          .substring(1)
-          .split(/\s+/)
-          .filter(Boolean);
-
-        let isParentPath = false;
-        // If there's no trailing space, we need to check if the current query
-        // is already a complete path to a parent command.
-        if (!hasTrailingSpace) {
-          let currentLevel: readonly SlashCommand[] | undefined = slashCommands;
-          for (let i = 0; i < parts.length; i++) {
-            const part = parts[i];
-            const found: SlashCommand | undefined = currentLevel?.find(
-              (cmd) => cmd.name === part || cmd.altNames?.includes(part),
-            );
-
-            if (found) {
-              if (i === parts.length - 1 && found.subCommands) {
-                isParentPath = true;
-              }
-              currentLevel = found.subCommands as
-                | readonly SlashCommand[]
-                | undefined;
-            } else {
-              // Path is invalid, so it can't be a parent path.
-              currentLevel = undefined;
-              break;
-            }
-          }
-        }
-
-        // Determine the base path of the command.
-        // - If there's a trailing space, the whole command is the base.
-        // - If it's a known parent path, the whole command is the base.
-        // - If the last part is a complete argument, the whole command is the base.
-        // - Otherwise, the base is everything EXCEPT the last partial part.
-        const lastPart = parts.length > 0 ? parts[parts.length - 1] : '';
-        const isLastPartACompleteArg =
-          lastPart.startsWith('--') && lastPart.includes('=');
-
-        const basePath =
-          hasTrailingSpace || isParentPath || isLastPartACompleteArg
-            ? parts
-            : parts.slice(0, -1);
-        const newValue = `/${[...basePath, suggestion].join(' ')} `;
-
-        buffer.setText(newValue);
-      } else {
-        if (completionStart.current === -1 || completionEnd.current === -1) {
-          return;
-        }
-
-        buffer.replaceRangeByOffset(
-          logicalPosToOffset(buffer.lines, cursorRow, completionStart.current),
-          logicalPosToOffset(buffer.lines, cursorRow, completionEnd.current),
-          suggestion,
-        );
+      if (completionStart.current === -1 || completionEnd.current === -1) {
+        return;
       }
+
+      const isSlash = (buffer.lines[cursorRow] || '')[commandIndex] === '/';
+      let suggestionText = suggestion;
+      if (isSlash) {
+        // If we are inserting (not replacing), and the preceding character is not a space, add one.
+        if (
+          completionStart.current === completionEnd.current &&
+          completionStart.current > commandIndex + 1 &&
+          (buffer.lines[cursorRow] || '')[completionStart.current - 1] !== ' '
+        ) {
+          suggestionText = ' ' + suggestionText;
+        }
+        suggestionText += ' ';
+      }
+
+      buffer.replaceRangeByOffset(
+        logicalPosToOffset(buffer.lines, cursorRow, completionStart.current),
+        logicalPosToOffset(buffer.lines, cursorRow, completionEnd.current),
+        suggestionText,
+      );
       resetCompletionState();
     },
-    [cursorRow, resetCompletionState, buffer, suggestions, slashCommands],
+    [cursorRow, resetCompletionState, buffer, suggestions, commandIndex],
   );
 
   return {

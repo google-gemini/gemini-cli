@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { quote } from 'shell-quote';
+import { quote, parse } from 'shell-quote';
 import {
   USER_SETTINGS_DIR,
   SETTINGS_DIRECTORY_NAME,
@@ -398,6 +398,14 @@ export async function start_sandbox(
   // use interactive mode and auto-remove container on exit
   // run init binary inside container to forward signals & reap zombies
   const args = ['run', '-i', '--rm', '--init', '--workdir', containerWorkdir];
+
+  // add custom flags from SANDBOX_FLAGS
+  if (process.env.SANDBOX_FLAGS) {
+    const flags = parse(process.env.SANDBOX_FLAGS, process.env).filter(
+      (f): f is string => typeof f === 'string',
+    );
+    args.push(...flags);
+  }
 
   // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container
   if (process.stdin.isTTY) {

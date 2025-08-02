@@ -6,7 +6,11 @@
 
 import stripAnsi from 'strip-ansi';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { main, setupUnhandledRejectionHandler } from './gemini.js';
+import {
+  main,
+  setupUnhandledRejectionHandler,
+  validateDnsResolutionOrder,
+} from './gemini.js';
 import {
   LoadedSettings,
   SettingsFile,
@@ -209,5 +213,40 @@ describe('gemini.tsx main function', () => {
 
     // Avoid the process.exit error from being thrown.
     processExitSpy.mockRestore();
+  });
+});
+
+describe('validateDnsResolutionOrder', () => {
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('should return "ipv4first" when the input is "ipv4first"', () => {
+    expect(validateDnsResolutionOrder('ipv4first')).toBe('ipv4first');
+    expect(consoleWarnSpy).not.toHaveBeenCalled();
+  });
+
+  it('should return "verbatim" when the input is "verbatim"', () => {
+    expect(validateDnsResolutionOrder('verbatim')).toBe('verbatim');
+    expect(consoleWarnSpy).not.toHaveBeenCalled();
+  });
+
+  it('should return the default "ipv4first" when the input is undefined', () => {
+    expect(validateDnsResolutionOrder(undefined)).toBe('ipv4first');
+    expect(consoleWarnSpy).not.toHaveBeenCalled();
+  });
+
+  it('should return the default "ipv4first" and log a warning for an invalid string', () => {
+    expect(validateDnsResolutionOrder('invalid-value')).toBe('ipv4first');
+    expect(consoleWarnSpy).toHaveBeenCalledOnce();
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      'Invalid value for dnsResolutionOrder in settings: "invalid-value". Using default "ipv4first".',
+    );
   });
 });
