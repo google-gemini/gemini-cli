@@ -5,7 +5,7 @@
  */
 
 import { FunctionDeclaration, PartListUnion, Schema } from '@google/genai';
-import { Summarizer, defaultSummarizer } from '../utils/summarizer.js';
+import { ToolErrorType } from './tool-error.js';
 
 /**
  * Interface representing the base Tool functionality
@@ -30,6 +30,11 @@ export interface Tool<
   description: string;
 
   /**
+   * The icon to display when interacting via ACP
+   */
+  icon: Icon;
+
+  /**
    * Function declaration schema from @google/genai
    */
   schema: FunctionDeclaration;
@@ -43,16 +48,6 @@ export interface Tool<
    * Whether the tool supports live (streaming) output
    */
   canUpdateOutput: boolean;
-
-  /**
-   * A function that summarizes the result of the tool execution.
-   */
-  summarizer?: Summarizer;
-
-  /**
-   * Whether the tool's display output should be summarized
-   */
-  shouldSummarizeDisplay?: boolean;
 
   /**
    * Validates the parameters for the tool
@@ -70,6 +65,13 @@ export interface Tool<
    * Optional for backward compatibility
    */
   getDescription(params: TParams): string;
+
+  /**
+   * Determines what file system paths the tool will affect
+   * @param params Parameters for the tool execution
+   * @returns A list of such paths
+   */
+  toolLocations(params: TParams): ToolLocation[];
 
   /**
    * Determines if the tool should prompt for confirmation before execution
@@ -108,19 +110,16 @@ export abstract class BaseTool<
    * @param description Description of what the tool does
    * @param isOutputMarkdown Whether the tool's output should be rendered as markdown
    * @param canUpdateOutput Whether the tool supports live (streaming) output
-   * @param parameterSchema JSON Schema defining the parameters
-   * @param summarizer Function to summarize the tool's output
-   * @param shouldSummarizeDisplay Whether the tool's display output should be summarized
+   * @param parameterSchema Open API 3.0 Schema defining the parameters
    */
   constructor(
     readonly name: string,
     readonly displayName: string,
     readonly description: string,
+    readonly icon: Icon,
     readonly parameterSchema: Schema,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
-    readonly summarizer: Summarizer = defaultSummarizer,
-    readonly shouldSummarizeDisplay: boolean = false,
   ) {}
 
   /**
@@ -174,6 +173,18 @@ export abstract class BaseTool<
   }
 
   /**
+   * Determines what file system paths the tool will affect
+   * @param params Parameters for the tool execution
+   * @returns A list of such paths
+   */
+  toolLocations(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    params: TParams,
+  ): ToolLocation[] {
+    return [];
+  }
+
+  /**
    * Abstract method to execute the tool with the given parameters
    * Must be implemented by derived classes
    * @param params Parameters for the tool execution
@@ -207,6 +218,14 @@ export interface ToolResult {
    * For now, we keep it as the core logic in ReadFileTool currently produces it.
    */
   returnDisplay: ToolResultDisplay;
+
+  /**
+   * If this property is present, the tool call is considered a failure.
+   */
+  error?: {
+    message: string; // raw error message
+    type?: ToolErrorType; // An optional machine-readable error type (e.g., 'FILE_NOT_FOUND').
+  };
 }
 
 export type ToolResultDisplay = string | FileDiff;
@@ -214,6 +233,8 @@ export type ToolResultDisplay = string | FileDiff;
 export interface FileDiff {
   fileDiff: string;
   fileName: string;
+  originalContent: string | null;
+  newContent: string;
 }
 
 export interface ToolEditConfirmationDetails {
@@ -225,6 +246,8 @@ export interface ToolEditConfirmationDetails {
   ) => Promise<void>;
   fileName: string;
   fileDiff: string;
+  originalContent: string | null;
+  newContent: string;
   isModifying?: boolean;
 }
 
@@ -272,4 +295,22 @@ export enum ToolConfirmationOutcome {
   ProceedAlwaysTool = 'proceed_always_tool',
   ModifyWithEditor = 'modify_with_editor',
   Cancel = 'cancel',
+}
+
+export enum Icon {
+  FileSearch = 'fileSearch',
+  Folder = 'folder',
+  Globe = 'globe',
+  Hammer = 'hammer',
+  LightBulb = 'lightBulb',
+  Pencil = 'pencil',
+  Regex = 'regex',
+  Terminal = 'terminal',
+}
+
+export interface ToolLocation {
+  // Absolute path to the file
+  path: string;
+  // Which line (if known)
+  line?: number;
 }

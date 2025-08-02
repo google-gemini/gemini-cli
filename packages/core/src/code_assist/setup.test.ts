@@ -49,8 +49,11 @@ describe('setupUser', () => {
     });
     await setupUser({} as OAuth2Client);
     expect(CodeAssistServer).toHaveBeenCalledWith(
-      expect.any(Object),
+      {},
       'test-project',
+      {},
+      '',
+      undefined,
     );
   });
 
@@ -62,10 +65,16 @@ describe('setupUser', () => {
     });
     const projectId = await setupUser({} as OAuth2Client);
     expect(CodeAssistServer).toHaveBeenCalledWith(
-      expect.any(Object),
+      {},
+      undefined,
+      {},
+      '',
       undefined,
     );
-    expect(projectId).toBe('server-project');
+    expect(projectId).toEqual({
+      projectId: 'server-project',
+      userTier: 'standard-tier',
+    });
   });
 
   it('should throw ProjectIdRequiredError when no project ID is available', async () => {

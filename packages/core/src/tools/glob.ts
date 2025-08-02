@@ -8,7 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { glob } from 'glob';
 import { SchemaValidator } from '../utils/schemaValidator.js';
-import { BaseTool, ToolResult } from './tools.js';
+import { BaseTool, Icon, ToolResult } from './tools.js';
 import { Type } from '@google/genai';
 import { shortenPath, makeRelative } from '../utils/paths.js';
 import { Config } from '../config/config.js';
@@ -79,18 +79,13 @@ export interface GlobToolParams {
  */
 export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
   static readonly Name = 'glob';
-  /**
-   * Creates a new instance of the GlobLogic
-   * @param rootDirectory Root directory to ground this tool in.
-   */
-  constructor(
-    private rootDirectory: string,
-    private config: Config,
-  ) {
+
+  constructor(private config: Config) {
     super(
       GlobTool.Name,
       'FindFiles',
       'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
+      Icon.FileSearch,
       {
         properties: {
           pattern: {
@@ -118,28 +113,6 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
         type: Type.OBJECT,
       },
     );
-
-    this.rootDirectory = path.resolve(rootDirectory);
-  }
-
-  /**
-   * Checks if a given path is within the root directory bounds.
-   * This security check prevents accessing files outside the designated root directory.
-   *
-   * @param pathToCheck The absolute path to validate
-   * @returns True if the path is within the root directory, false otherwise
-   */
-  private isWithinRoot(pathToCheck: string): boolean {
-    const absolutePathToCheck = path.resolve(pathToCheck);
-    const normalizedPath = path.normalize(absolutePathToCheck);
-    const normalizedRoot = path.normalize(this.rootDirectory);
-    const rootWithSep = normalizedRoot.endsWith(path.sep)
-      ? normalizedRoot
-      : normalizedRoot + path.sep;
-    return (
-      normalizedPath === normalizedRoot ||
-      normalizedPath.startsWith(rootWithSep)
-    );
   }
 
   /**
@@ -152,15 +125,17 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
     }
 
     const searchDirAbsolute = path.resolve(
-      this.rootDirectory,
+      this.config.getTargetDir(),
       params.path || '.',
     );
 
-    if (!this.isWithinRoot(searchDirAbsolute)) {
-      return `Search path ("${searchDirAbsolute}") resolves outside the tool's root directory ("${this.rootDirectory}").`;
+    const workspaceContext = this.config.getWorkspaceContext();
+    if (!workspaceContext.isPathWithinWorkspace(searchDirAbsolute)) {
+      const directories = workspaceContext.getDirectories();
+      return `Search path ("${searchDirAbsolute}") resolves outside the allowed workspace directories: ${directories.join(', ')}`;
     }
 
-    const targetDir = searchDirAbsolute || this.rootDirectory;
+    const targetDir = searchDirAbsolute || this.config.getTargetDir();
     try {
       if (!fs.existsSync(targetDir)) {
         return `Search path does not exist ${targetDir}`;
@@ -189,8 +164,11 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
   getDescription(params: GlobToolParams): string {
     let description = `'${params.pattern}'`;
     if (params.path) {
-      const searchDir = path.resolve(this.rootDirectory, params.path || '.');
-      const relativePath = makeRelative(searchDir, this.rootDirectory);
+      const searchDir = path.resolve(
+        this.config.getTargetDir(),
+        params.path || '.',
+      );
+      const relativePath = makeRelative(searchDir, this.config.getTargetDir());
       description += ` within ${shortenPath(relativePath)}`;
     }
     return description;
@@ -212,10 +190,27 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
     }
 
     try {
-      const searchDirAbsolute = path.resolve(
-        this.rootDirectory,
-        params.path || '.',
-      );
+      const workspaceContext = this.config.getWorkspaceContext();
+      const workspaceDirectories = workspaceContext.getDirectories();
+
+      // If a specific path is provided, resolve it and check if it's within workspace
+      let searchDirectories: readonly string[];
+      if (params.path) {
+        const searchDirAbsolute = path.resolve(
+          this.config.getTargetDir(),
+          params.path,
+        );
+        if (!workspaceContext.isPathWithinWorkspace(searchDirAbsolute)) {
+          return {
+            llmContent: `Error: Path "${params.path}" is not within any workspace directory`,
+            returnDisplay: `Path is not within workspace`,
+          };
+        }
+        searchDirectories = [searchDirAbsolute];
+      } else {
+        // Search across all workspace directories
+        searchDirectories = workspaceDirectories;
+      }
 
       // Get centralized file discovery service
       const respectGitIgnore =
@@ -223,17 +218,26 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
         this.config.getFileFilteringRespectGitIgnore();
       const fileDiscovery = this.config.getFileService();
 
-      const entries = (await glob(params.pattern, {
-        cwd: searchDirAbsolute,
-        withFileTypes: true,
-        nodir: true,
-        stat: true,
-        nocase: !params.case_sensitive,
-        dot: true,
-        ignore: ['**/node_modules/**', '**/.git/**'],
-        follow: false,
-        signal,
-      })) as GlobPath[];
+      // Collect entries from all search directories
+      let allEntries: GlobPath[] = [];
+
+      for (const searchDir of searchDirectories) {
+        const entries = (await glob(params.pattern, {
+          cwd: searchDir,
+          withFileTypes: true,
+          nodir: true,
+          stat: true,
+          nocase: !params.case_sensitive,
+          dot: true,
+          ignore: ['**/node_modules/**', '**/.git/**'],
+          follow: false,
+          signal,
+        })) as GlobPath[];
+
+        allEntries = allEntries.concat(entries);
+      }
+
+      const entries = allEntries;
 
       // Apply git-aware filtering if enabled and in git repository
       let filteredEntries = entries;
@@ -241,13 +245,15 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
 
       if (respectGitIgnore) {
         const relativePaths = entries.map((p) =>
-          path.relative(this.rootDirectory, p.fullpath()),
+          path.relative(this.config.getTargetDir(), p.fullpath()),
         );
         const filteredRelativePaths = fileDiscovery.filterFiles(relativePaths, {
           respectGitIgnore,
         });
         const filteredAbsolutePaths = new Set(
-          filteredRelativePaths.map((p) => path.resolve(this.rootDirectory, p)),
+          filteredRelativePaths.map((p) =>
+            path.resolve(this.config.getTargetDir(), p),
+          ),
         );
 
         filteredEntries = entries.filter((entry) =>
@@ -257,7 +263,12 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
       }
 
       if (!filteredEntries || filteredEntries.length === 0) {
-        let message = `No files found matching pattern "${params.pattern}" within ${searchDirAbsolute}.`;
+        let message = `No files found matching pattern "${params.pattern}"`;
+        if (searchDirectories.length === 1) {
+          message += ` within ${searchDirectories[0]}`;
+        } else {
+          message += ` within ${searchDirectories.length} workspace directories`;
+        }
         if (gitIgnoredCount > 0) {
           message += ` (${gitIgnoredCount} files were git-ignored)`;
         }
@@ -284,7 +295,12 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
       const fileListDescription = sortedAbsolutePaths.join('\n');
       const fileCount = sortedAbsolutePaths.length;
 
-      let resultMessage = `Found ${fileCount} file(s) matching "${params.pattern}" within ${searchDirAbsolute}`;
+      let resultMessage = `Found ${fileCount} file(s) matching "${params.pattern}"`;
+      if (searchDirectories.length === 1) {
+        resultMessage += ` within ${searchDirectories[0]}`;
+      } else {
+        resultMessage += ` across ${searchDirectories.length} workspace directories`;
+      }
       if (gitIgnoredCount > 0) {
         resultMessage += ` (${gitIgnoredCount} additional files were git-ignored)`;
       }

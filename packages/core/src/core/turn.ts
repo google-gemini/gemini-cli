@@ -9,12 +9,14 @@ import {
   GenerateContentResponse,
   FunctionCall,
   FunctionDeclaration,
+  FinishReason,
 } from '@google/genai';
 import {
   ToolCallConfirmationDetails,
   ToolResult,
   ToolResultDisplay,
 } from '../tools/tools.js';
+import { ToolErrorType } from '../tools/tool-error.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { reportError } from '../utils/errorReporting.js';
 import {
@@ -49,6 +51,8 @@ export enum GeminiEventType {
   ChatCompressed = 'chat_compressed',
   Thought = 'thought',
   MaxSessionTurns = 'max_session_turns',
+  Finished = 'finished',
+  LoopDetected = 'loop_detected',
 }
 
 export interface StructuredError {
@@ -73,6 +77,7 @@ export interface ToolCallResponseInfo {
   responseParts: PartListUnion;
   resultDisplay: ToolResultDisplay | undefined;
   error: Error | undefined;
+  errorType: ToolErrorType | undefined;
 }
 
 export interface ServerToolCallConfirmationDetails {
@@ -133,6 +138,15 @@ export type ServerGeminiMaxSessionTurnsEvent = {
   type: GeminiEventType.MaxSessionTurns;
 };
 
+export type ServerGeminiFinishedEvent = {
+  type: GeminiEventType.Finished;
+  value: FinishReason;
+};
+
+export type ServerGeminiLoopDetectedEvent = {
+  type: GeminiEventType.LoopDetected;
+};
+
 // The original union type, now composed of the individual types
 export type ServerGeminiStreamEvent =
   | ServerGeminiContentEvent
@@ -143,12 +157,15 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiErrorEvent
   | ServerGeminiChatCompressedEvent
   | ServerGeminiThoughtEvent
-  | ServerGeminiMaxSessionTurnsEvent;
+  | ServerGeminiMaxSessionTurnsEvent
+  | ServerGeminiFinishedEvent
+  | ServerGeminiLoopDetectedEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
   readonly pendingToolCalls: ToolCallRequestInfo[];
   private debugResponses: GenerateContentResponse[];
+  finishReason: FinishReason | undefined;
 
   constructor(
     private readonly chat: GeminiChat,
@@ -156,6 +173,7 @@ export class Turn {
   ) {
     this.pendingToolCalls = [];
     this.debugResponses = [];
+    this.finishReason = undefined;
   }
   // The run method yields simpler events suitable for server logic
   async *run(
@@ -215,6 +233,17 @@ export class Turn {
           if (event) {
             yield event;
           }
+        }
+
+        // Check if response was truncated or stopped for various reasons
+        const finishReason = resp.candidates?.[0]?.finishReason;
+
+        if (finishReason) {
+          this.finishReason = finishReason;
+          yield {
+            type: GeminiEventType.Finished,
+            value: finishReason as FinishReason,
+          };
         }
       }
     } catch (e) {

@@ -44,20 +44,9 @@ export function isProQuotaExceededError(error: unknown): boolean {
   // - "Quota exceeded for quota metric 'Gemini 2.5-preview Pro Requests'"
   // We use string methods instead of regex to avoid ReDoS vulnerabilities
 
-  const checkMessage = (message: string): boolean => {
-    console.log('[DEBUG] isProQuotaExceededError checking message:', message);
-    const result =
-      message.includes("Quota exceeded for quota metric 'Gemini") &&
-      message.includes("Pro Requests'");
-    console.log('[DEBUG] isProQuotaExceededError result:', result);
-    return result;
-  };
-
-  // Log the full error object to understand its structure
-  console.log(
-    '[DEBUG] isProQuotaExceededError - full error object:',
-    JSON.stringify(error, null, 2),
-  );
+  const checkMessage = (message: string): boolean =>
+    message.includes("Quota exceeded for quota metric 'Gemini") &&
+    message.includes("Pro Requests'");
 
   if (typeof error === 'string') {
     return checkMessage(error);
@@ -79,10 +68,6 @@ export function isProQuotaExceededError(error: unknown): boolean {
       };
     };
     if (gaxiosError.response && gaxiosError.response.data) {
-      console.log(
-        '[DEBUG] isProQuotaExceededError - checking response data:',
-        gaxiosError.response.data,
-      );
       if (typeof gaxiosError.response.data === 'string') {
         return checkMessage(gaxiosError.response.data);
       }
@@ -98,11 +83,6 @@ export function isProQuotaExceededError(error: unknown): boolean {
       }
     }
   }
-
-  console.log(
-    '[DEBUG] isProQuotaExceededError - no matching error format for:',
-    error,
-  );
   return false;
 }
 

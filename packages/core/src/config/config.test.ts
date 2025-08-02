@@ -17,13 +17,26 @@ import {
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
-import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
+import { GitService } from '../services/gitService.js';
+import { IdeClient } from '../ide/ide-client.js';
+
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn().mockReturnValue(true),
+    statSync: vi.fn().mockReturnValue({
+      isDirectory: vi.fn().mockReturnValue(true),
+    }),
+    realpathSync: vi.fn((path) => path),
+  };
+});
 
 // Mock dependencies that might be called during Config construction or createServerConfig
 vi.mock('../tools/tool-registry', () => {
   const ToolRegistryMock = vi.fn();
   ToolRegistryMock.prototype.registerTool = vi.fn();
-  ToolRegistryMock.prototype.discoverTools = vi.fn();
+  ToolRegistryMock.prototype.discoverAllTools = vi.fn();
   ToolRegistryMock.prototype.getAllTools = vi.fn(() => []); // Mock methods if needed
   ToolRegistryMock.prototype.getTool = vi.fn();
   ToolRegistryMock.prototype.getFunctionDeclarations = vi.fn(() => []);
@@ -75,6 +88,12 @@ vi.mock('../telemetry/index.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../services/gitService.js', () => {
+  const GitServiceMock = vi.fn();
+  GitServiceMock.prototype.initialize = vi.fn();
+  return { GitService: GitServiceMock };
+});
+
 describe('Server Config (config.ts)', () => {
   const MODEL = 'gemini-pro';
   const SANDBOX: SandboxConfig = {
@@ -101,11 +120,38 @@ describe('Server Config (config.ts)', () => {
     telemetry: TELEMETRY_SETTINGS,
     sessionId: SESSION_ID,
     model: MODEL,
+    ideClient: IdeClient.getInstance(false),
   };
 
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
+  });
+
+  describe('initialize', () => {
+    it('should throw an error if checkpointing is enabled and GitService fails', async () => {
+      const gitError = new Error('Git is not installed');
+      (GitService.prototype.initialize as Mock).mockRejectedValue(gitError);
+
+      const config = new Config({
+        ...baseParams,
+        checkpointing: true,
+      });
+
+      await expect(config.initialize()).rejects.toThrow(gitError);
+    });
+
+    it('should not throw an error if checkpointing is disabled and GitService fails', async () => {
+      const gitError = new Error('Git is not installed');
+      (GitService.prototype.initialize as Mock).mockRejectedValue(gitError);
+
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+      });
+
+      await expect(config.initialize()).resolves.toBeUndefined();
+    });
   });
 
   describe('refreshAuth', () => {
@@ -118,14 +164,16 @@ describe('Server Config (config.ts)', () => {
         apiKey: 'test-key',
       };
 
-      (createContentGeneratorConfig as Mock).mockResolvedValue(
-        mockContentConfig,
-      );
+      (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
+
+      // Set fallback mode to true to ensure it gets reset
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
 
       await config.refreshAuth(authType);
 
       expect(createContentGeneratorConfig).toHaveBeenCalledWith(
-        MODEL, // Should be called with the original model 'gemini-pro'
+        config,
         authType,
       );
       // Verify that contentGeneratorConfig is updated with the new model
@@ -133,6 +181,8 @@ describe('Server Config (config.ts)', () => {
       expect(config.getContentGeneratorConfig().model).toBe(newModel);
       expect(config.getModel()).toBe(newModel); // getModel() should return the updated model
       expect(GeminiClient).toHaveBeenCalledWith(config);
+      // Verify that fallback mode is reset
+      expect(config.isInFallbackMode()).toBe(false);
     });
   });
 
@@ -181,6 +231,23 @@ describe('Server Config (config.ts)', () => {
     };
     const config = new Config(paramsWithFileFiltering);
     expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
+  });
+
+  it('should initialize WorkspaceContext with includeDirectories', () => {
+    const includeDirectories = ['/path/to/dir1', '/path/to/dir2'];
+    const paramsWithIncludeDirs: ConfigParameters = {
+      ...baseParams,
+      includeDirectories,
+    };
+    const config = new Config(paramsWithIncludeDirs);
+    const workspaceContext = config.getWorkspaceContext();
+    const directories = workspaceContext.getDirectories();
+
+    // Should include the target directory plus the included directories
+    expect(directories).toHaveLength(3);
+    expect(directories).toContain(path.resolve(baseParams.targetDir));
+    expect(directories).toContain('/path/to/dir1');
+    expect(directories).toContain('/path/to/dir2');
   });
 
   it('Config constructor should set telemetry to true when provided as true', () => {
@@ -280,40 +347,6 @@ describe('Server Config (config.ts)', () => {
       delete paramsWithoutTelemetry.telemetry;
       const config = new Config(paramsWithoutTelemetry);
       expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
-    });
-  });
-
-  describe('refreshMemory', () => {
-    it('should update memory and file count on successful refresh', async () => {
-      const config = new Config(baseParams);
-      const mockMemoryData = {
-        memoryContent: 'new memory content',
-        fileCount: 5,
-      };
-
-      (loadServerHierarchicalMemory as Mock).mockResolvedValue(mockMemoryData);
-
-      const result = await config.refreshMemory();
-
-      expect(loadServerHierarchicalMemory).toHaveBeenCalledWith(
-        config.getWorkingDir(),
-        config.getDebugMode(),
-        config.getFileService(),
-        config.getExtensionContextFilePaths(),
-      );
-
-      expect(config.getUserMemory()).toBe(mockMemoryData.memoryContent);
-      expect(config.getGeminiMdFileCount()).toBe(mockMemoryData.fileCount);
-      expect(result).toEqual(mockMemoryData);
-    });
-
-    it('should propagate errors from loadServerHierarchicalMemory', async () => {
-      const config = new Config(baseParams);
-      const testError = new Error('Failed to load memory');
-
-      (loadServerHierarchicalMemory as Mock).mockRejectedValue(testError);
-
-      await expect(config.refreshMemory()).rejects.toThrow(testError);
     });
   });
 });

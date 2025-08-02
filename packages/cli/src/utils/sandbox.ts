@@ -9,13 +9,13 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { quote } from 'shell-quote';
+import { quote, parse } from 'shell-quote';
 import {
   USER_SETTINGS_DIR,
   SETTINGS_DIRECTORY_NAME,
 } from '../config/settings.js';
 import { promisify } from 'util';
-import { SandboxConfig } from '@google/gemini-cli-core';
+import { Config, SandboxConfig } from '@google/gemini-cli-core';
 
 const execAsync = promisify(exec);
 
@@ -99,7 +99,7 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
 }
 
 // docker does not allow container names to contain ':' or '/', so we
-// parse those out and make the name a little shorter
+// parse those out to shorten the name
 function parseImageName(image: string): string {
   const [fullName, tag] = image.split(':');
   const name = fullName.split('/').at(-1) ?? 'unknown-image';
@@ -183,11 +183,12 @@ function entrypoint(workdir: string): string[] {
 export async function start_sandbox(
   config: SandboxConfig,
   nodeArgs: string[] = [],
+  cliConfig?: Config,
 ) {
   if (config.command === 'sandbox-exec') {
     // disallow BUILD_SANDBOX
     if (process.env.BUILD_SANDBOX) {
-      console.error('ERROR: cannot BUILD_SANDBOX when using MacOS Seatbelt');
+      console.error('ERROR: cannot BUILD_SANDBOX when using macOS Seatbelt');
       process.exit(1);
     }
     const profile = (process.env.SEATBELT_PROFILE ??= 'permissive-open');
@@ -223,6 +224,38 @@ export async function start_sandbox(
       `HOME_DIR=${fs.realpathSync(os.homedir())}`,
       '-D',
       `CACHE_DIR=${fs.realpathSync(execSync(`getconf DARWIN_USER_CACHE_DIR`).toString().trim())}`,
+    ];
+
+    // Add included directories from the workspace context
+    // Always add 5 INCLUDE_DIR parameters to ensure .sb files can reference them
+    const MAX_INCLUDE_DIRS = 5;
+    const targetDir = fs.realpathSync(cliConfig?.getTargetDir() || '');
+    const includedDirs: string[] = [];
+
+    if (cliConfig) {
+      const workspaceContext = cliConfig.getWorkspaceContext();
+      const directories = workspaceContext.getDirectories();
+
+      // Filter out TARGET_DIR
+      for (const dir of directories) {
+        const realDir = fs.realpathSync(dir);
+        if (realDir !== targetDir) {
+          includedDirs.push(realDir);
+        }
+      }
+    }
+
+    for (let i = 0; i < MAX_INCLUDE_DIRS; i++) {
+      let dirPath = '/dev/null'; // Default to a safe path that won't cause issues
+
+      if (i < includedDirs.length) {
+        dirPath = includedDirs[i];
+      }
+
+      args.push('-D', `INCLUDE_DIR_${i}=${dirPath}`);
+    }
+
+    args.push(
       '-f',
       profileFile,
       'sh',
@@ -232,7 +265,7 @@ export async function start_sandbox(
         `NODE_OPTIONS="${nodeOptions}"`,
         ...process.argv.map((arg) => quote([arg])),
       ].join(' '),
-    ];
+    );
     // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
     const proxyCommand = process.env.GEMINI_SANDBOX_PROXY_COMMAND;
     let proxyProcess: ChildProcess | undefined = undefined;
@@ -365,6 +398,14 @@ export async function start_sandbox(
   // use interactive mode and auto-remove container on exit
   // run init binary inside container to forward signals & reap zombies
   const args = ['run', '-i', '--rm', '--init', '--workdir', containerWorkdir];
+
+  // add custom flags from SANDBOX_FLAGS
+  if (process.env.SANDBOX_FLAGS) {
+    const flags = parse(process.env.SANDBOX_FLAGS, process.env).filter(
+      (f): f is string => typeof f === 'string',
+    );
+    args.push(...flags);
+  }
 
   // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container
   if (process.stdin.isTTY) {
@@ -522,6 +563,14 @@ export async function start_sandbox(
     args.push(
       '--env',
       `GOOGLE_GENAI_USE_VERTEXAI=${process.env.GOOGLE_GENAI_USE_VERTEXAI}`,
+    );
+  }
+
+  // copy GOOGLE_GENAI_USE_GCA
+  if (process.env.GOOGLE_GENAI_USE_GCA) {
+    args.push(
+      '--env',
+      `GOOGLE_GENAI_USE_GCA=${process.env.GOOGLE_GENAI_USE_GCA}`,
     );
   }
 
@@ -847,7 +896,7 @@ async function ensureSandboxImageIsPresent(
 
   console.info(`Sandbox image ${image} not found locally.`);
   if (image === LOCAL_DEV_SANDBOX_IMAGE_NAME) {
-    // user needs to build the image themself
+    // user needs to build the image themselves
     return false;
   }
 

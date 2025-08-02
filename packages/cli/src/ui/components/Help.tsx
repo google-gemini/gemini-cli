@@ -10,7 +10,7 @@ import { Colors } from '../colors.js';
 import { SlashCommand } from '../commands/types.js';
 
 interface Help {
-  commands: SlashCommand[];
+  commands: readonly SlashCommand[];
 }
 
 export const Help: React.FC<Help> = ({ commands }) => (
@@ -103,9 +103,15 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        Enter
+        Alt+Left/Right
       </Text>{' '}
-      - Send message
+      - Jump through words in the input
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Ctrl+C
+      </Text>{' '}
+      - Quit application
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
@@ -117,21 +123,15 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        Up/Down
+        Ctrl+L
       </Text>{' '}
-      - Cycle through your prompt history
+      - Clear the screen
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        Alt+Left/Right
+        {process.platform === 'darwin' ? 'Ctrl+X / Meta+Enter' : 'Ctrl+X'}
       </Text>{' '}
-      - Jump through words in the input
-    </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Shift+Tab
-      </Text>{' '}
-      - Toggle auto-accepting edits
+      - Open input in external editor
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
@@ -141,15 +141,34 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
+        Enter
+      </Text>{' '}
+      - Send message
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
         Esc
       </Text>{' '}
       - Cancel operation
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        Ctrl+C
+        Shift+Tab
       </Text>{' '}
-      - Quit application
+      - Toggle auto-accepting edits
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Up/Down
+      </Text>{' '}
+      - Cycle through your prompt history
+    </Text>
+    <Box height={1} />
+    <Text color={Colors.Foreground}>
+      For a full list of shortcuts, see{' '}
+      <Text bold color={Colors.AccentPurple}>
+        docs/keyboard-shortcuts.md
+      </Text>
     </Text>
   </Box>
 );

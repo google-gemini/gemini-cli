@@ -8,6 +8,7 @@ import {
   logToolCall,
   ToolCallRequestInfo,
   ToolCallResponseInfo,
+  ToolErrorType,
   ToolRegistry,
   ToolResult,
 } from '../index.js';
@@ -56,6 +57,7 @@ export async function executeToolCall(
       ],
       resultDisplay: error.message,
       error,
+      errorType: ToolErrorType.TOOL_NOT_REGISTERED,
     };
   }
 
@@ -68,17 +70,9 @@ export async function executeToolCall(
       // No live output callback for non-interactive mode
     );
 
-    const tool_output = tool.summarizer
-      ? await tool.summarizer(
-          toolResult,
-          config.getGeminiClient(),
-          effectiveAbortSignal,
-        )
-      : toolResult.llmContent;
+    const tool_output = toolResult.llmContent;
 
-    const tool_display = tool.shouldSummarizeDisplay
-      ? (tool_output as string)
-      : toolResult.returnDisplay;
+    const tool_display = toolResult.returnDisplay;
 
     const durationMs = Date.now() - startTime;
     logToolCall(config, {
@@ -87,7 +81,11 @@ export async function executeToolCall(
       function_name: toolCallRequest.name,
       function_args: toolCallRequest.args,
       duration_ms: durationMs,
-      success: true,
+      success: toolResult.error === undefined,
+      error:
+        toolResult.error === undefined ? undefined : toolResult.error.message,
+      error_type:
+        toolResult.error === undefined ? undefined : toolResult.error.type,
       prompt_id: toolCallRequest.prompt_id,
     });
 
@@ -101,7 +99,12 @@ export async function executeToolCall(
       callId: toolCallRequest.callId,
       responseParts: response,
       resultDisplay: tool_display,
-      error: undefined,
+      error:
+        toolResult.error === undefined
+          ? undefined
+          : new Error(toolResult.error.message),
+      errorType:
+        toolResult.error === undefined ? undefined : toolResult.error.type,
     };
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
@@ -114,6 +117,7 @@ export async function executeToolCall(
       duration_ms: durationMs,
       success: false,
       error: error.message,
+      error_type: ToolErrorType.UNHANDLED_EXCEPTION,
       prompt_id: toolCallRequest.prompt_id,
     });
     return {
@@ -129,6 +133,7 @@ export async function executeToolCall(
       ],
       resultDisplay: error.message,
       error,
+      errorType: ToolErrorType.UNHANDLED_EXCEPTION,
     };
   }
 }
