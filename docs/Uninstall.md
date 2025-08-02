@@ -1,4 +1,9 @@
+
 # Uninstalling the CLI
+
+<p align="center">
+  <a href="../i18n/chinese/docs/Uninstall.md">🌐 简体中文</a> | English
+</p>
 
 Your uninstall method depends on how you ran the CLI. Follow the instructions for either npx or a global npm installation.
 

@@ -1,4 +1,9 @@
+
 # Gemini CLI Execution and Deployment
+
+<p align="center">
+  <a href="../i18n/chinese/docs/deployment.md">🌐 简体中文</a> | English
+</p>
 
 This document describes how to run Gemini CLI and explains the deployment architecture that Gemini CLI uses.
 

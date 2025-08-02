@@ -1,4 +1,9 @@
+
 # Gemini CLI Configuration
+
+<p align="center">
+  <a href="../../i18n/chinese/docs/cli/configuration.md">🌐 简体中文</a> | English
+</p>
 
 Gemini CLI offers several ways to configure its behavior, including environment variables, command-line arguments, and settings files. This document outlines the different configuration methods and available settings.
 

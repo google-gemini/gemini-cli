@@ -1,4 +1,9 @@
+
 # Package Overview
+
+<p align="center">
+  <a href="../i18n/chinese/docs/npm.md">🌐 简体中文</a> | English
+</p>
 
 This monorepo contains two main packages: `@google/gemini-cli` and `@google/gemini-cli-core`.
 
@@ -172,8 +177,8 @@ Stage 2: Building the Source Code
 
 - What happens: The TypeScript source code in packages/core/src and packages/cli/src is compiled into JavaScript.
 - File movement:
-  - packages/core/src/\*_/_.ts -> compiled to -> packages/core/dist/
-  - packages/cli/src/\*_/_.ts -> compiled to -> packages/cli/dist/
+  - packages/core/src/\*\*/\*.ts -> compiled to -> packages/core/dist/
+  - packages/cli/src/\*\*/\*.ts -> compiled to -> packages/cli/dist/
 - Why: The TypeScript code written during development needs to be converted into plain JavaScript that can be run by
   Node.js. The core package is built first as the cli package depends on it.
 
@@ -187,7 +192,7 @@ This is the most critical stage where files are moved and transformed into their
     - File movement: packages/cli/package.json -> (in-memory transformation) -> `bundle`/package.json
     - Why: The final package.json must be different from the one used in development. Key changes include:
       - Removing devDependencies.
-      - Removing workspace-specific "dependencies": { "@gemini-cli/core": "workspace:\*" } and ensuring the core code is
+      - Removing workspace-specific "dependencies": { "@gemini-cli/core": "workspace:*" } and ensuring the core code is
         bundled directly into the final JavaScript file.
       - Ensuring the bin, main, and files fields point to the correct locations within the final package structure.
 
@@ -205,7 +210,7 @@ This is the most critical stage where files are moved and transformed into their
     - File movement:
       - README.md -> `bundle`/README.md
       - LICENSE -> `bundle`/LICENSE
-      - packages/cli/src/utils/\*.sb (sandbox profiles) -> `bundle`/
+      - packages/cli/src/utils/*.sb (sandbox profiles) -> `bundle`/
     - Why:
       - The README.md and LICENSE are standard files that should be included in any NPM package.
       - The sandbox profiles (.sb files) are critical runtime assets required for the CLI's sandboxing feature to

@@ -1,4 +1,9 @@
+
 # CLI Commands
+
+<p align="center">
+  <a href="../../i18n/chinese/docs/cli/commands.md">🌐 简体中文</a> | English
+</p>
 
 Gemini CLI supports several built-in commands to help you manage your session, customize the interface, and control its behavior. These commands are prefixed with a forward slash (`/`), an at symbol (`@`), or an exclamation mark (`!`).
 

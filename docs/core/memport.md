@@ -1,5 +1,9 @@
 # Memory Import Processor
 
+<p align="center">
+  <a href="../../i18n/chinese/docs/core/memport.md">🌐 简体中文</a> | English
+</p>
+
 The Memory Import Processor is a feature that allows you to modularize your GEMINI.md files by importing content from other files using the `@file.md` syntax.
 
 ## Overview
