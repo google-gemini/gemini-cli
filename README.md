@@ -1,11 +1,12 @@
-# Gemini CLI
+# Gemini CLI with Databricks Support
 
 [![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
 
 ![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
 
-This repository contains the Gemini CLI, a command-line AI workflow tool that connects to your
-tools, understands your code and accelerates your workflows.
+This repository is a fork of the [Google Gemini CLI](https://github.com/google-gemini/gemini-cli) that adds support for Databricks as an AI provider. It maintains all the original functionality while extending it to work with Databricks models.
+
+This command-line AI workflow tool connects to your tools, understands your code and accelerates your workflows.
 
 With the Gemini CLI you can:
 
@@ -92,6 +93,19 @@ The Vertex AI API provides a [free tier](https://cloud.google.com/vertex-ai/gene
 3. (Optionally) Add a billing account on your project to get access to [higher usage limits](https://cloud.google.com/vertex-ai/generative-ai/docs/quotas)
 
 For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
+
+### Use Databricks:
+
+This fork adds support for Databricks models:
+
+1. Set your Databricks workspace URL and personal access token:
+
+   ```bash
+   export DATABRICKS_URL="https://your-workspace.databricks.com"
+   export DBX_PAT="your_personal_access_token"
+   ```
+
+2. The default model is `databricks-claude-sonnet-4`. You can configure different models in `~/.gemini/config.json`.
 
 ## Examples
 
