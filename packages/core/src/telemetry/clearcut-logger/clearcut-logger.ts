@@ -235,7 +235,11 @@ export class ClearcutLogger {
   }
 
   logStartSessionEvent(event: StartSessionEvent): void {
-    const surface = process.env.SURFACE || 'SURFACE_NOT_SET';
+    const surface =
+      process.env.CLOUD_SHELL === 'true'
+        ? 'CLOUD_SHELL'
+        : process.env.SURFACE || 'SURFACE_NOT_SET';
+
     const data = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
