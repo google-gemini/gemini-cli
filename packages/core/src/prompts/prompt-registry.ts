@@ -53,4 +53,11 @@ export class PromptRegistry {
     }
     return serverPrompts.sort((a, b) => a.name.localeCompare(b.name));
   }
+
+  /**
+   * Clears all the prompts from the registry.
+   */
+  clear(): void {
+    this.prompts.clear();
+  }
 }
