@@ -91,6 +91,9 @@ export interface Settings {
 
   hideWindowTitle?: boolean;
 
+  // Security setting to isolate from project .env files
+  ignoreLocalEnv?: boolean;
+
   hideTips?: boolean;
   hideBanner?: boolean;
 
@@ -289,13 +292,33 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   }
 }
 
-export function loadEnvironment(): void {
-  const envFilePath = findEnvFile(process.cwd());
+export function loadEnvironment(ignoreLocalEnv: boolean = false): void {
+  let envFilePath: string | null = null;
 
+  if (ignoreLocalEnv) {
+    // Only load from global Gemini CLI locations
+    const globalPaths = [
+      path.join(homedir(), GEMINI_DIR, '.env'),
+      path.join(homedir(), '.env'),
+    ];
+
+    for (const envPath of globalPaths) {
+      if (fs.existsSync(envPath)) {
+        envFilePath = envPath;
+        break;
+      }
+    }
+  } else {
+    // Current behavior - load from project directories, with fallback to global
+    envFilePath = findEnvFile(process.cwd());
+  }
+
+  // Handle Cloud Shell environment setup consistently
   if (process.env.CLOUD_SHELL === 'true') {
     setUpCloudShellEnvironment(envFilePath);
   }
 
+  // Load the determined .env file
   if (envFilePath) {
     dotenv.config({ path: envFilePath, quiet: true });
   }
@@ -306,7 +329,6 @@ export function loadEnvironment(): void {
  * Project settings override user settings.
  */
 export function loadSettings(workspaceDir: string): LoadedSettings {
-  loadEnvironment();
   let systemSettings: Settings = {};
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};

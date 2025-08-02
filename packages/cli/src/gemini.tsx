@@ -372,5 +372,6 @@ async function loadNonInteractiveConfig(
     settings.merged.selectedAuthType,
     settings.merged.useExternalAuth,
     finalConfig,
+    settings,
   );
 }

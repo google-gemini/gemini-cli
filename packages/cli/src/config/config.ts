@@ -24,7 +24,7 @@ import {
   FileFilteringOptions,
   IdeClient,
 } from '@google/gemini-cli-core';
-import { Settings } from './settings.js';
+import { Settings, loadEnvironment } from './settings.js';
 
 import { Extension, annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
@@ -57,6 +57,7 @@ export interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryLogPrompts: boolean | undefined;
+  'ignore-local-env': boolean | undefined;
   telemetryOutfile: string | undefined;
   allowedMcpServerNames: string[] | undefined;
   experimentalAcp: boolean | undefined;
@@ -174,6 +175,11 @@ export async function parseArguments(): Promise<CliArgs> {
       description: 'Enables checkpointing of file edits',
       default: false,
     })
+    .option('ignore-local-env', {
+      type: 'boolean',
+      description: 'Ignore project-specific .env files, only use global Gemini CLI environment',
+      default: false,
+    })
     .option('experimental-acp', {
       type: 'boolean',
       description: 'Starts the agent in ACP mode',
@@ -280,6 +286,10 @@ export async function loadCliConfig(
   sessionId: string,
   argv: CliArgs,
 ): Promise<Config> {
+  // Check both CLI flag and settings file for ignoreLocalEnv
+  const ignoreLocalEnv = argv['ignore-local-env'] || settings.ignoreLocalEnv || false;
+  loadEnvironment(ignoreLocalEnv);
+  
   const debugMode =
     argv.debug ||
     [process.env.DEBUG, process.env.DEBUG_MODE].some(

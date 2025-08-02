@@ -5,7 +5,7 @@
  */
 
 import { AuthType, Config } from '@google/gemini-cli-core';
-import { USER_SETTINGS_PATH } from './config/settings.js';
+import { USER_SETTINGS_PATH, LoadedSettings } from './config/settings.js';
 import { validateAuthMethod } from './config/auth.js';
 
 function getAuthTypeFromEnv(): AuthType | undefined {
@@ -25,6 +25,7 @@ export async function validateNonInteractiveAuth(
   configuredAuthType: AuthType | undefined,
   useExternalAuth: boolean | undefined,
   nonInteractiveConfig: Config,
+  settings: LoadedSettings,
 ) {
   const effectiveAuthType = configuredAuthType || getAuthTypeFromEnv();
 
