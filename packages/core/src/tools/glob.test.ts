@@ -9,9 +9,10 @@ import { partListUnionToString } from '../core/geminiRequest.js';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'; // Removed vi
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { Config } from '../config/config.js';
+import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 
 describe('GlobTool', () => {
   let tempRootDir: string; // This will be the rootDirectory for the GlobTool instance
@@ -22,12 +23,14 @@ describe('GlobTool', () => {
   const mockConfig = {
     getFileService: () => new FileDiscoveryService(tempRootDir),
     getFileFilteringRespectGitIgnore: () => true,
-  } as Partial<Config> as Config;
+    getTargetDir: () => tempRootDir,
+    getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+  } as unknown as Config;
 
   beforeEach(async () => {
     // Create a unique root directory for each test run
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'glob-tool-root-'));
-    globTool = new GlobTool(tempRootDir, mockConfig);
+    globTool = new GlobTool(mockConfig);
 
     // Create some test files and directories within this root
     // Top-level files
@@ -149,11 +152,19 @@ describe('GlobTool', () => {
       expect(typeof llmContent).toBe('string');
 
       const filesListed = llmContent
-        .substring(llmContent.indexOf(':') + 1)
         .trim()
-        .split('\n');
-      expect(filesListed[0]).toContain(path.join(tempRootDir, 'newer.sortme'));
-      expect(filesListed[1]).toContain(path.join(tempRootDir, 'older.sortme'));
+        .split(/\r?\n/)
+        .slice(1)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      expect(filesListed).toHaveLength(2);
+      expect(path.resolve(filesListed[0])).toBe(
+        path.resolve(tempRootDir, 'newer.sortme'),
+      );
+      expect(path.resolve(filesListed[1])).toBe(
+        path.resolve(tempRootDir, 'older.sortme'),
+      );
     });
   });
 
@@ -224,8 +235,8 @@ describe('GlobTool', () => {
 
     it("should return error if search path resolves outside the tool's root directory", () => {
       // Create a globTool instance specifically for this test, with a deeper root
-      const deeperRootDir = path.join(tempRootDir, 'sub');
-      const specificGlobTool = new GlobTool(deeperRootDir, mockConfig);
+      tempRootDir = path.join(tempRootDir, 'sub');
+      const specificGlobTool = new GlobTool(mockConfig);
       // const params: GlobToolParams = { pattern: '*.txt', path: '..' }; // This line is unused and will be removed.
       // This should be fine as tempRootDir is still within the original tempRootDir (the parent of deeperRootDir)
       // Let's try to go further up.
@@ -234,7 +245,7 @@ describe('GlobTool', () => {
         path: '../../../../../../../../../../tmp',
       }; // Definitely outside
       expect(specificGlobTool.validateToolParams(paramsOutside)).toContain(
-        "resolves outside the tool's root directory",
+        'resolves outside the allowed workspace directories',
       );
     });
 
@@ -253,6 +264,37 @@ describe('GlobTool', () => {
       expect(globTool.validateToolParams(params)).toContain(
         'Search path is not a directory',
       );
+    });
+  });
+
+  describe('workspace boundary validation', () => {
+    it('should validate search paths are within workspace boundaries', () => {
+      const validPath = { pattern: '*.ts', path: 'sub' };
+      const invalidPath = { pattern: '*.ts', path: '../..' };
+
+      expect(globTool.validateToolParams(validPath)).toBeNull();
+      expect(globTool.validateToolParams(invalidPath)).toContain(
+        'resolves outside the allowed workspace directories',
+      );
+    });
+
+    it('should provide clear error messages when path is outside workspace', () => {
+      const invalidPath = { pattern: '*.ts', path: '/etc' };
+      const error = globTool.validateToolParams(invalidPath);
+
+      expect(error).toContain(
+        'resolves outside the allowed workspace directories',
+      );
+      expect(error).toContain(tempRootDir);
+    });
+
+    it('should work with paths in workspace subdirectories', async () => {
+      const params: GlobToolParams = { pattern: '*.md', path: 'sub' };
+      const result = await globTool.execute(params, abortSignal);
+
+      expect(result.llmContent).toContain('Found 2 file(s)');
+      expect(result.llmContent).toContain('fileC.md');
+      expect(result.llmContent).toContain('FileD.MD');
     });
   });
 });

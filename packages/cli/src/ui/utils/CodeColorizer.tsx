@@ -50,7 +50,7 @@ function renderHastNode(
     }
 
     // Determine the color to pass down: Use this element's specific color
-    // if found, otherwise, continue passing down the already inherited color.
+    // if found; otherwise, continue passing down the already inherited color.
     const colorToPassDown = elementColor || inheritedColor;
 
     // Recursively render children, passing the determined color down
@@ -68,9 +68,9 @@ function renderHastNode(
     return <React.Fragment>{children}</React.Fragment>;
   }
 
-  // Handle Root Node: Start recursion with initial inherited color
+  // Handle Root Node: Start recursion with initially inherited color
   if (node.type === 'root') {
-    // Check if children array is empty - this happens when lowlight can't detect language – fallback to plain text
+    // Check if children array is empty - this happens when lowlight can't detect language – fall back to plain text
     if (!node.children || node.children.length === 0) {
       return null;
     }
@@ -88,6 +88,34 @@ function renderHastNode(
   return null;
 }
 
+function highlightAndRenderLine(
+  line: string,
+  language: string | null,
+  theme: Theme,
+): React.ReactNode {
+  try {
+    const getHighlightedLine = () =>
+      !language || !lowlight.registered(language)
+        ? lowlight.highlightAuto(line)
+        : lowlight.highlight(language, line);
+
+    const renderedNode = renderHastNode(getHighlightedLine(), theme, undefined);
+
+    return renderedNode !== null ? renderedNode : line;
+  } catch (_error) {
+    return line;
+  }
+}
+
+export function colorizeLine(
+  line: string,
+  language: string | null,
+  theme?: Theme,
+): React.ReactNode {
+  const activeTheme = theme || themeManager.getActiveTheme();
+  return highlightAndRenderLine(line, language, activeTheme);
+}
+
 /**
  * Renders syntax-highlighted code for Ink applications using a selected theme.
  *
@@ -100,9 +128,10 @@ export function colorizeCode(
   language: string | null,
   availableHeight?: number,
   maxWidth?: number,
+  theme?: Theme,
 ): React.ReactNode {
   const codeToHighlight = code.replace(/\n$/, '');
-  const activeTheme = themeManager.getActiveTheme();
+  const activeTheme = theme || themeManager.getActiveTheme();
 
   try {
     // Render the HAST tree using the adapted theme
@@ -122,11 +151,6 @@ export function colorizeCode(
       }
     }
 
-    const getHighlightedLines = (line: string) =>
-      !language || !lowlight.registered(language)
-        ? lowlight.highlightAuto(line)
-        : lowlight.highlight(language, line);
-
     return (
       <MaxSizedBox
         maxHeight={availableHeight}
@@ -135,17 +159,19 @@ export function colorizeCode(
         overflowDirection="top"
       >
         {lines.map((line, index) => {
-          const renderedNode = renderHastNode(
-            getHighlightedLines(line),
+          const contentToRender = highlightAndRenderLine(
+            line,
+            language,
             activeTheme,
-            undefined,
           );
 
-          const contentToRender = renderedNode !== null ? renderedNode : line;
           return (
             <Box key={index}>
               <Text color={activeTheme.colors.Gray}>
-                {`${String(index + 1 + hiddenLinesCount).padStart(padWidth, ' ')} `}
+                {`${String(index + 1 + hiddenLinesCount).padStart(
+                  padWidth,
+                  ' ',
+                )} `}
               </Text>
               <Text color={activeTheme.defaultColor} wrap="wrap">
                 {contentToRender}
@@ -160,7 +186,7 @@ export function colorizeCode(
       `[colorizeCode] Error highlighting code for language "${language}":`,
       error,
     );
-    // Fallback to plain text with default color on error
+    // Fall back to plain text with default color on error
     // Also display line numbers in fallback
     const lines = codeToHighlight.split('\n');
     const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
