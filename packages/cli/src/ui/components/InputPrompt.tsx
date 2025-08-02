@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
@@ -24,6 +24,7 @@ import {
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
 import * as path from 'path';
+import { StreamingState } from '../types.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -40,6 +41,8 @@ export interface InputPromptProps {
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
+  streamingState: StreamingState;
+  cancelCurrentRequest: () => void;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -57,8 +60,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   shellModeActive,
   setShellModeActive,
   vimHandleInput,
+  streamingState,
+  cancelCurrentRequest,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const preservedTextRef = useRef<string>('');
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -87,6 +93,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (shellModeActive) {
         shellHistory.addCommandToHistory(submittedValue);
       }
+
+      // LIFECYCLE-BASED PRESERVATION: Always preserve non-shell text on submission.
+      // Clear any existing preserved text since we're submitting new text.
+      // This handles rapid submissions and ensures only the latest text is preserved.
+
+      if (shellModeActive) {
+        // Shell commands never stream to Gemini, no need to preserve
+        preservedTextRef.current = '';
+      } else {
+        // Clear any old preserved text and preserve the new submission
+        preservedTextRef.current = submittedValue;
+      }
+
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
@@ -94,6 +113,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       resetCompletionState();
     },
     [onSubmit, buffer, resetCompletionState, shellModeActive, shellHistory],
+    // Note: preservedTextRef doesn't need to be in dependencies as it's a ref
   );
 
   const customSetTextAndResetCompletionSignal = useCallback(
@@ -126,6 +146,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     resetCompletionState,
     setJustNavigatedHistory,
   ]);
+
+  // Cleanup preserved text with timeout-based fallback to prevent memory leaks
+  // We use buffer.text as dependency to trigger cleanup setup on each submission
+  useEffect(() => {
+    if (!preservedTextRef.current) return;
+
+    // Clear very old preserved text (5 minutes) to prevent memory leaks
+    const timeoutId = setTimeout(
+      () => {
+        preservedTextRef.current = '';
+      },
+      5 * 60 * 1000,
+    ); // 5 minutes
+
+    return () => clearTimeout(timeoutId);
+  }, [buffer.text]); // Triggers on each submission when buffer.text changes
 
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
@@ -206,6 +242,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           completion.resetCompletionState();
           return;
         }
+
+        // Phase 1: Always handle stream cancellation if currently streaming
+        if (streamingState === StreamingState.Responding) {
+          cancelCurrentRequest();
+        }
+
+        // Phase 2: Handle text restoration only if buffer is empty to prevent data loss
+        if (preservedTextRef.current.trim() && buffer.text.length === 0) {
+          const textToRestore = preservedTextRef.current;
+          buffer.setText(textToRestore);
+        }
+
+        // Phase 3: Always clear preserved text to prevent state corruption
+        preservedTextRef.current = '';
       }
 
       if (key.ctrl && key.name === 'l') {
@@ -321,18 +371,62 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (buffer.text.length > 0) {
           buffer.setText('');
           resetCompletionState();
+          // Also clear preserved text since user explicitly cleared input
+          preservedTextRef.current = '';
           return;
         }
         return;
       }
 
-      // Kill line commands
+      // Kill line commands - also clear preserved text if entire buffer gets cleared
       if (key.ctrl && key.name === 'k') {
+        const { cursor, lines } = buffer;
+        const [cursorRow, cursorCol] = cursor;
+        const currentLine = lines[cursorRow] || '';
+        const currentLineLen = cpLen(currentLine);
+        
+        // Simulate the exact killLineRight logic from TextBuffer reducer
+        const simulatedLines = [...lines];
+        if (cursorCol < currentLineLen) {
+          // Case 1: Delete from cursor to end of current line
+          simulatedLines[cursorRow] = cpSlice(currentLine, 0, cursorCol);
+        } else if (cursorRow < lines.length - 1) {
+          // Case 2: Join current line with next line (act as delete)
+          const nextLineContent = lines[cursorRow + 1] || '';
+          simulatedLines[cursorRow] = currentLine + nextLineContent;
+          simulatedLines.splice(cursorRow + 1, 1);
+        }
+        // Case 3: No change if at end of last line
+        
         buffer.killLineRight();
+
+        // Only clear preserved text if the simulated result would be completely empty
+        const simulatedText = simulatedLines.join('\n');
+        if (simulatedText.trim() === '') {
+          preservedTextRef.current = '';
+        }
         return;
       }
       if (key.ctrl && key.name === 'u') {
+        const { cursor, lines } = buffer;
+        const [cursorRow, cursorCol] = cursor;
+        const currentLine = lines[cursorRow] || '';
+        
+        // Simulate the exact killLineLeft logic from TextBuffer reducer
+        const simulatedLines = [...lines];
+        if (cursorCol > 0) {
+          // Case 1: Delete from start of line to cursor position
+          simulatedLines[cursorRow] = cpSlice(currentLine, cursorCol);
+        }
+        // Case 2: No change if cursor is at column 0
+        
         buffer.killLineLeft();
+
+        // Only clear preserved text if the simulated result would be completely empty
+        const simulatedText = simulatedLines.join('\n');
+        if (simulatedText.trim() === '') {
+          preservedTextRef.current = '';
+        }
         return;
       }
 
@@ -365,6 +459,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleClipboardImage,
       resetCompletionState,
       vimHandleInput,
+      streamingState,
+      cancelCurrentRequest,
+      // Note: preservedTextRef doesn't need to be in dependencies as it's a ref
     ],
   );
 

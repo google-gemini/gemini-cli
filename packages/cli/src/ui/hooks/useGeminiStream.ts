@@ -5,7 +5,6 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { useInput } from 'ink';
 import {
   Config,
   GeminiClient,
@@ -181,11 +180,11 @@ export const useGeminiStream = (
     return StreamingState.Idle;
   }, [isResponding, toolCalls]);
 
-  useInput((_input, key) => {
-    if (streamingState === StreamingState.Responding && key.escape) {
-      if (turnCancelledRef.current) {
-        return;
-      }
+  const cancelCurrentRequest = useCallback(() => {
+    if (
+      streamingState === StreamingState.Responding &&
+      !turnCancelledRef.current
+    ) {
       turnCancelledRef.current = true;
       abortControllerRef.current?.abort();
       if (pendingHistoryItemRef.current) {
@@ -201,7 +200,16 @@ export const useGeminiStream = (
       setPendingHistoryItem(null);
       setIsResponding(false);
     }
-  });
+  }, [
+    streamingState,
+    addItem,
+    pendingHistoryItemRef,
+    setPendingHistoryItem,
+    setIsResponding,
+  ]);
+
+  // ESC handling is now completely handled by InputPrompt component
+  // No ESC handler here to avoid conflicts
 
   const prepareQueryForGemini = useCallback(
     async (
@@ -953,5 +961,6 @@ export const useGeminiStream = (
     initError,
     pendingHistoryItems,
     thought,
+    cancelCurrentRequest,
   };
 };
