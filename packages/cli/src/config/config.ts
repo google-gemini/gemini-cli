@@ -47,6 +47,7 @@ export interface CliArgs {
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
+  output: string | undefined;
   allFiles: boolean | undefined;
   all_files: boolean | undefined;
   showMemoryUsage: boolean | undefined;
@@ -91,6 +92,11 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'string',
       description:
         'Execute the provided prompt and continue in interactive mode',
+    })
+    .option('output', {
+      alias: 'o',
+      type: 'string',
+      description: 'Output file. In association with `prompt`',
     })
     .option('sandbox', {
       alias: 's',
@@ -399,6 +405,7 @@ export async function loadCliConfig(
     includeDirectories: argv.includeDirectories,
     debugMode,
     question: argv.promptInteractive || argv.prompt || '',
+    output: argv.output || '',
     fullContext: argv.allFiles || argv.all_files || false,
     coreTools: settings.coreTools || undefined,
     excludeTools,

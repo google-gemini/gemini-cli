@@ -17,6 +17,7 @@ import {
 import { Content, Part, FunctionCall } from '@google/genai';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
+import fs from 'fs';
 
 export async function runNonInteractive(
   config: Config,
@@ -38,7 +39,11 @@ export async function runNonInteractive(
   const abortController = new AbortController();
   let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
   let turnCount = 0;
+  let outputfs: fs.WriteStream | undefined;
   try {
+    const outputPath = config.getOutput();
+    outputfs = outputPath ? fs.createWriteStream(outputPath) : undefined;
+
     while (true) {
       turnCount++;
       if (
@@ -65,7 +70,11 @@ export async function runNonInteractive(
         }
 
         if (event.type === GeminiEventType.Content) {
-          process.stdout.write(event.value);
+          if (outputfs) {
+            outputfs.write(event.value);
+          } else {
+            process.stdout.write(event.value);
+          }
         } else if (event.type === GeminiEventType.ToolCallRequest) {
           const toolCallRequest = event.value;
           const fc: FunctionCall = {
@@ -133,6 +142,9 @@ export async function runNonInteractive(
     );
     process.exit(1);
   } finally {
+    if (outputfs) {
+      await new Promise((resolve) => outputfs?.end(resolve));
+    }
     if (isTelemetrySdkInitialized()) {
       await shutdownTelemetry();
     }

@@ -149,6 +149,7 @@ export interface ConfigParameters {
   targetDir: string;
   debugMode: boolean;
   question?: string;
+  output?: string;
   fullContext?: boolean;
   coreTools?: string[];
   excludeTools?: string[];
@@ -200,6 +201,7 @@ export class Config {
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
+  private readonly output: string | undefined;
   private readonly fullContext: boolean;
   private readonly coreTools: string[] | undefined;
   private readonly excludeTools: string[] | undefined;
@@ -259,6 +261,7 @@ export class Config {
     );
     this.debugMode = params.debugMode;
     this.question = params.question;
+    this.output = params.output;
     this.fullContext = params.fullContext ?? false;
     this.coreTools = params.coreTools;
     this.excludeTools = params.excludeTools;
@@ -430,6 +433,10 @@ export class Config {
   }
   getQuestion(): string | undefined {
     return this.question;
+  }
+
+  getOutput(): string | undefined {
+    return this.output;
   }
 
   getFullContext(): boolean {

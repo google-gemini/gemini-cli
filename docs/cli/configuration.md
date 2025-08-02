@@ -354,6 +354,8 @@ Arguments passed directly when running the CLI can override other configurations
   - The prompt is processed within the interactive session, not before it.
   - Cannot be used when piping input from stdin.
   - Example: `gemini -i "explain this code"`
+- **`--output <file_path>`** (**`-o <file_path>`**):
+  - Used in the non-interactive mode. The Gemini output will be written at the specified file, rather than stdout.
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
 - **`--sandbox-image`**:
