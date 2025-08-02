@@ -83,11 +83,12 @@ import {
   isGenericQuotaExceededError,
   UserTierId,
 } from '@google/gemini-cli-core';
-import { checkForUpdates } from './utils/updateCheck.js';
+import { UpdateObject } from './utils/updateCheck.js';
 import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
@@ -110,15 +111,16 @@ export const AppWrapper = (props: AppProps) => (
 const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const isFocused = useFocus();
   useBracketedPaste();
-  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
   const { stdout } = useStdout();
   const nightly = version.includes('nightly');
+  const { history, addItem, clearItems, loadHistory } = useHistory();
 
   useEffect(() => {
-    checkForUpdates().then(setUpdateMessage);
-  }, []);
+    const cleanup = setUpdateHandler(addItem, setUpdateInfo);
+    return cleanup;
+  }, [addItem]);
 
-  const { history, addItem, clearItems, loadHistory } = useHistory();
   const {
     consoleMessages,
     handleNewMessage,
@@ -232,14 +234,19 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   } = useAuthCommand(settings, setAuthError, config);
 
   useEffect(() => {
-    if (settings.merged.selectedAuthType) {
+    if (settings.merged.selectedAuthType && !settings.merged.useExternalAuth) {
       const error = validateAuthMethod(settings.merged.selectedAuthType);
       if (error) {
         setAuthError(error);
         openAuthDialog();
       }
     }
-  }, [settings.merged.selectedAuthType, openAuthDialog, setAuthError]);
+  }, [
+    settings.merged.selectedAuthType,
+    settings.merged.useExternalAuth,
+    openAuthDialog,
+    setAuthError,
+  ]);
 
   // Sync user tier from config when authentication changes
   useEffect(() => {
@@ -275,6 +282,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         config.getFileService(),
         settings.merged,
         config.getExtensionContextFilePaths(),
+        settings.merged.memoryImportFormat || 'tree', // Use setting or default to 'tree'
         config.getFileFilteringOptions(),
       );
 
@@ -398,6 +406,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
       // Switch model for future use but return false to stop current retry
       config.setModel(fallbackModel);
+      config.setFallbackMode(true);
       logFlashFallback(
         config,
         new FlashFallbackEvent(config.getContentGeneratorConfig().authType!),
@@ -570,7 +579,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       if (Object.keys(mcpServers || {}).length > 0) {
         handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
       }
-    } else if (key.ctrl && input === 'e' && ideContextState) {
+    } else if (
+      key.ctrl &&
+      input === 'e' &&
+      config.getIdeMode() &&
+      ideContextState
+    ) {
       setShowIDEContextDetail((prev) => !prev);
     } else if (key.ctrl && (input === 'c' || input === 'C')) {
       handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
@@ -756,9 +770,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   return (
     <StreamingContext.Provider value={streamingState}>
       <Box flexDirection="column" width="90%">
-        {/* Move UpdateNotification outside Static so it can re-render when updateMessage changes */}
-        {updateMessage && <UpdateNotification message={updateMessage} />}
-
         {/*
          * The Static component is an Ink intrinsic in which there can only be 1 per application.
          * Because of this restriction we're hacking it slightly by having a 'header' item here to
@@ -821,6 +832,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         {showHelp && <Help commands={slashCommands} />}
 
         <Box flexDirection="column" ref={mainControlsRef}>
+          {/* Move UpdateNotification to render update notification above input area */}
+          {updateInfo && <UpdateNotification message={updateInfo.message} />}
           {startupWarnings.length > 0 && (
             <Box
               borderStyle="round"
@@ -965,7 +978,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 </Box>
               </Box>
               {showIDEContextDetail && (
-                <IDEContextDetailDisplay ideContext={ideContextState} />
+                <IDEContextDetailDisplay
+                  ideContext={ideContextState}
+                  detectedIdeDisplay={config
+                    .getIdeClient()
+                    .getDetectedIdeDisplayName()}
+                />
               )}
               {showErrorDetails && (
                 <OverflowProvider>

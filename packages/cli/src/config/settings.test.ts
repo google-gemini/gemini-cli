@@ -59,7 +59,21 @@ const MOCK_WORKSPACE_SETTINGS_PATH = pathActual.join(
   'settings.json',
 );
 
-vi.mock('fs');
+vi.mock('fs', async (importOriginal) => {
+  // Get all the functions from the real 'fs' module
+  const actualFs = await importOriginal<typeof fs>();
+
+  return {
+    ...actualFs, // Keep all the real functions
+    // Now, just override the ones we need for the test
+    existsSync: vi.fn(),
+    readFileSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    mkdirSync: vi.fn(),
+    realpathSync: (p: string) => p,
+  };
+});
+
 vi.mock('strip-json-comments', () => ({
   default: vi.fn((content) => content),
 }));
@@ -775,6 +789,48 @@ describe('Settings Loading and Merging', () => {
       } else {
         delete process.env.SHARED_VAR; // Ensure it's deleted if it wasn't there before
       }
+    });
+
+    it('should correctly merge dnsResolutionOrder with workspace taking precedence', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        dnsResolutionOrder: 'ipv4first',
+      };
+      const workspaceSettingsContent = {
+        dnsResolutionOrder: 'verbatim',
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.dnsResolutionOrder).toBe('verbatim');
+    });
+
+    it('should use user dnsResolutionOrder if workspace is not defined', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const userSettingsContent = {
+        dnsResolutionOrder: 'verbatim',
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.dnsResolutionOrder).toBe('verbatim');
     });
 
     it('should leave unresolved environment variables as is', () => {

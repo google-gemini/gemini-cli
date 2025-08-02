@@ -172,6 +172,9 @@ describe('InputPrompt', () => {
         getProjectRoot: () => path.join('test', 'project'),
         getTargetDir: () => path.join('test', 'project', 'src'),
         getVimMode: () => false,
+        getWorkspaceContext: () => ({
+          getDirectories: () => ['/test/project/src'],
+        }),
       } as unknown as Config,
       slashCommands: mockSlashCommands,
       commandContext: mockCommandContext,
@@ -549,6 +552,28 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should autocomplete on Enter when suggestions are active, without submitting', async () => {
+    mockedUseCompletion.mockReturnValue({
+      ...mockCompletion,
+      showSuggestions: true,
+      suggestions: [{ label: 'memory', value: 'memory' }],
+      activeSuggestionIndex: 0,
+    });
+    props.buffer.setText('/mem');
+
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\r');
+    await wait();
+
+    // The app should autocomplete the text, NOT submit.
+    expect(mockCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('should complete a command based on its altNames', async () => {
     props.slashCommands = [
       {
@@ -626,6 +651,26 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should autocomplete an @-path on Enter without submitting', async () => {
+    mockedUseCompletion.mockReturnValue({
+      ...mockCompletion,
+      showSuggestions: true,
+      suggestions: [{ label: 'index.ts', value: 'index.ts' }],
+      activeSuggestionIndex: 0,
+    });
+    props.buffer.setText('@src/components/');
+
+    const { stdin, unmount } = render(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\r');
+    await wait();
+
+    expect(mockCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('should add a newline on enter when the line ends with a backslash', async () => {
     // This test simulates multi-line input, not submission
     mockBuffer.text = 'first line\\';
@@ -689,6 +734,7 @@ describe('InputPrompt', () => {
       // Verify useCompletion was called with correct signature
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -714,6 +760,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -739,6 +786,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -764,6 +812,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -789,6 +838,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -815,6 +865,7 @@ describe('InputPrompt', () => {
       // Verify useCompletion was called with the buffer
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -840,6 +891,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -866,6 +918,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -892,6 +945,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -918,6 +972,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -944,6 +999,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -972,6 +1028,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -998,6 +1055,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -1026,6 +1084,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,

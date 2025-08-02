@@ -27,7 +27,7 @@ import {
 } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
-import { getSpecificMimeType, isWithinRoot } from '../utils/fileUtils.js';
+import { getSpecificMimeType } from '../utils/fileUtils.js';
 import {
   recordFileOperationMetric,
   FileOperation,
@@ -105,8 +105,11 @@ export class WriteFileTool
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute: ${filePath}`;
     }
-    if (!isWithinRoot(filePath, this.config.getTargetDir())) {
-      return `File path must be within the root directory (${this.config.getTargetDir()}): ${filePath}`;
+
+    const workspaceContext = this.config.getWorkspaceContext();
+    if (!workspaceContext.isPathWithinWorkspace(filePath)) {
+      const directories = workspaceContext.getDirectories();
+      return `File path must be within one of the workspace directories: ${directories.join(', ')}`;
     }
 
     try {

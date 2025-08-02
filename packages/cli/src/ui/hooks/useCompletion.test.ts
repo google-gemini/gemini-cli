@@ -6,62 +6,74 @@
 
 /** @vitest-environment jsdom */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
 import { useCompletion } from './useCompletion.js';
-
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
 import { CommandContext, SlashCommand } from '../commands/types.js';
-import { useTextBuffer, TextBuffer } from '../components/shared/text-buffer.js';
-import { Config, FileSearch, AbortError } from '@google/gemini-cli-core';
-
-// Mock FileSearch
-const mockInitialize = vi.fn();
-const mockSearch = vi.fn();
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...original,
-    FileSearch: vi.fn().mockImplementation(() => ({
-      initialize: mockInitialize,
-      search: mockSearch,
-    })),
-    AbortError: class AbortError extends Error {
-      constructor(message?: string) {
-        super(message);
-        this.name = 'AbortError';
-      }
-    },
-  };
-});
+import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
+import { useTextBuffer } from '../components/shared/text-buffer.js';
 
 describe('useCompletion', () => {
+  let testRootDir: string;
+  let mockConfig: Config;
+
   // A minimal mock is sufficient for these tests.
   const mockCommandContext = {} as CommandContext;
-  const testRootDir = 'test/root/dir';
-  const mockConfig = {
-    getFileFilteringOptions: () => ({
-      respectGitIgnore: true,
-      respectGeminiIgnore: true,
-    }),
-  } as unknown as Config;
+  let testDirs: string[];
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockInitialize.mockResolvedValue(undefined);
-    mockSearch.mockResolvedValue([]);
-  });
+  async function createEmptyDir(...pathSegments: string[]) {
+    const fullPath = path.join(testRootDir, ...pathSegments);
+    await fs.mkdir(fullPath, { recursive: true });
+    return fullPath;
+  }
+
+  async function createTestFile(content: string, ...pathSegments: string[]) {
+    const fullPath = path.join(testRootDir, ...pathSegments);
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    await fs.writeFile(fullPath, content);
+    return fullPath;
+  }
 
   // Helper to create real TextBuffer objects within renderHook
-  function useTextBufferForTest(text: string) {
+  function useTextBufferForTest(text: string, cursorOffset?: number) {
     return useTextBuffer({
       initialText: text,
-      initialCursorOffset: text.length,
+      initialCursorOffset: cursorOffset ?? text.length,
       viewport: { width: 80, height: 20 },
       isValidPath: () => false,
       onChange: () => {},
     });
   }
+
+  beforeEach(async () => {
+    testRootDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'completion-unit-test-'),
+    );
+    testDirs = [testRootDir];
+    mockConfig = {
+      getTargetDir: () => testRootDir,
+      getWorkspaceContext: () => ({
+        getDirectories: () => testDirs,
+      }),
+      getProjectRoot: () => testRootDir,
+      getFileFilteringOptions: vi.fn(() => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      })),
+      getEnableRecursiveFileSearch: vi.fn(() => true),
+      getFileService: vi.fn(() => new FileDiscoveryService(testRootDir)),
+    } as unknown as Config;
+
+    vi.clearAllMocks();
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await fs.rm(testRootDir, { recursive: true, force: true });
+  });
 
   describe('Core Hook Behavior', () => {
     describe('State Management', () => {
@@ -72,6 +84,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest(''),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -101,6 +114,7 @@ describe('useCompletion', () => {
             const textBuffer = useTextBufferForTest(text);
             return useCompletion(
               textBuffer,
+              testDirs,
               testRootDir,
               slashCommands,
               mockCommandContext,
@@ -131,6 +145,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/help'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -163,6 +178,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest(''),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -184,6 +200,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest(''),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -208,6 +225,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/h'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -235,6 +253,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/h'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -263,6 +282,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -308,6 +328,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/command'),
+            testDirs,
             testRootDir,
             largeMockCommands,
             mockCommandContext,
@@ -365,6 +386,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -387,6 +409,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/mem'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -410,6 +433,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/usag'), // part of the word "usage"
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -436,6 +460,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/clear'), // No trailing space
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -467,6 +492,7 @@ describe('useCompletion', () => {
           const { result } = renderHook(() =>
             useCompletion(
               useTextBufferForTest(query),
+              testDirs,
               testRootDir,
               mockSlashCommands,
               mockCommandContext,
@@ -487,6 +513,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/clear '),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -507,6 +534,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/unknown-command'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -540,6 +568,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/memory'), // Note: no trailing space
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -577,6 +606,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/memory'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -612,6 +642,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/memory a'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -643,6 +674,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/memory dothisnow'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -685,6 +717,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/chat resume my-ch'),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -728,6 +761,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/chat resume '),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -762,6 +796,7 @@ describe('useCompletion', () => {
         const { result } = renderHook(() =>
           useCompletion(
             useTextBufferForTest('/chat resume '),
+            testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
@@ -779,199 +814,284 @@ describe('useCompletion', () => {
     });
   });
 
-  describe('File path completion (`@`)', () => {
-    it('should initialize FileSearch and show loading state', async () => {
-      mockInitialize.mockResolvedValue(undefined);
-      // Provide a mock implementation to prevent the unhandled error
-      mockSearch.mockResolvedValue([]);
-      const { result } = renderHook(() =>
-        useCompletion(
-          useTextBufferForTest('@'),
-          testRootDir,
-          [],
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
+  describe('File Path Completion (`@`)', () => {
+    describe('Basic Completion', () => {
+      it('should use glob for top-level @ completions when available', async () => {
+        await createTestFile('', 'src', 'index.ts');
+        await createTestFile('', 'derp', 'script.ts');
+        await createTestFile('', 'README.md');
 
-      expect(result.current.isLoadingSuggestions).toBe(true);
-      expect(FileSearch).toHaveBeenCalledWith({
-        projectRoot: testRootDir,
-        ignoreDirs: [],
-        useGitignore: true,
-        useGeminiignore: true,
-        cache: true,
-        cacheTtl: 30,
-      });
-
-      await waitFor(() => {
-        expect(result.current.isLoadingSuggestions).toBe(false);
-      });
-    });
-
-    it('should display suggestions after search completes', async () => {
-      mockInitialize.mockResolvedValue(undefined);
-      mockSearch.mockResolvedValue(['file1.txt', 'file2.js']);
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          useTextBufferForTest('@f'),
-          testRootDir,
-          [],
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
-
-      await waitFor(() => {
-        expect(result.current.isLoadingSuggestions).toBe(false);
-      });
-
-      expect(mockSearch).toHaveBeenCalledWith('f', {
-        signal: expect.any(AbortSignal),
-        maxResults: 24,
-      });
-
-      expect(result.current.suggestions).toEqual([
-        { label: 'file1.txt', value: 'file1.txt' },
-        { label: 'file2.js', value: 'file2.js' },
-      ]);
-      expect(result.current.showSuggestions).toBe(true);
-    });
-
-    it('should queue a search if the engine is still initializing', async () => {
-      mockInitialize.mockReturnValue(new Promise(() => {})); // Never resolves
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          useTextBufferForTest('@'),
-          testRootDir,
-          [],
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
-
-      expect(result.current.isLoadingSuggestions).toBe(true);
-      expect(mockSearch).not.toHaveBeenCalled();
-    });
-
-    it('should abort the previous search when the query changes', async () => {
-      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
-      mockInitialize.mockResolvedValue(undefined);
-      // Make the search promise never resolve so we can test the abort
-      mockSearch.mockReturnValue(new Promise(() => {}));
-
-      const { rerender, unmount } = renderHook(
-        ({ text }) =>
+        const { result } = renderHook(() =>
           useCompletion(
-            useTextBufferForTest(text),
+            useTextBufferForTest('@s'),
+            testDirs,
             testRootDir,
             [],
             mockCommandContext,
             mockConfig,
           ),
-        { initialProps: { text: '@a' } },
-      );
+        );
 
-      // Wait for initialization to complete and the first search to start
-      await waitFor(() => {
-        expect(mockSearch).toHaveBeenCalledTimes(1);
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        });
+
+        expect(result.current.suggestions).toHaveLength(2);
+        expect(result.current.suggestions).toEqual(
+          expect.arrayContaining([
+            {
+              label: 'derp/script.ts',
+              value: 'derp/script.ts',
+            },
+            { label: 'src', value: 'src' },
+          ]),
+        );
       });
 
-      // Trigger a new search, which should abort the previous one
-      rerender({ text: '@ab' });
+      it('should handle directory-specific completions with git filtering', async () => {
+        await createEmptyDir('.git');
+        await createTestFile('*.log', '.gitignore');
+        await createTestFile('', 'src', 'component.tsx');
+        await createTestFile('', 'src', 'temp.log');
+        await createTestFile('', 'src', 'index.ts');
 
-      await waitFor(() => {
-        expect(abortSpy).toHaveBeenCalled();
+        const { result } = renderHook(() =>
+          useCompletion(
+            useTextBufferForTest('@src/comp'),
+            testDirs,
+            testRootDir,
+            [],
+            mockCommandContext,
+            mockConfig,
+          ),
+        );
+
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        });
+
+        // Should filter out .log files but include matching .tsx files
+        expect(result.current.suggestions).toEqual([
+          { label: 'component.tsx', value: 'component.tsx' },
+        ]);
       });
 
-      unmount();
+      it('should include dotfiles in glob search when input starts with a dot', async () => {
+        await createTestFile('', '.env');
+        await createTestFile('', '.gitignore');
+        await createTestFile('', 'src', 'index.ts');
+
+        const { result } = renderHook(() =>
+          useCompletion(
+            useTextBufferForTest('@.'),
+            testDirs,
+            testRootDir,
+            [],
+            mockCommandContext,
+            mockConfig,
+          ),
+        );
+
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        });
+
+        expect(result.current.suggestions).toEqual([
+          { label: '.env', value: '.env' },
+          { label: '.gitignore', value: '.gitignore' },
+        ]);
+      });
     });
 
-    it('should handle AbortError gracefully', async () => {
-      mockInitialize.mockResolvedValue(undefined);
-      mockSearch.mockRejectedValue(new AbortError());
+    describe('Configuration-based Behavior', () => {
+      it('should not perform recursive search when disabled in config', async () => {
+        const mockConfigNoRecursive = {
+          ...mockConfig,
+          getEnableRecursiveFileSearch: vi.fn(() => false),
+        } as unknown as Config;
 
-      const { result } = renderHook(() =>
-        useCompletion(
-          useTextBufferForTest('@a'),
-          testRootDir,
-          [],
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
+        await createEmptyDir('data');
+        await createEmptyDir('dist');
 
-      await waitFor(() => {
-        // After an abort, loading should stop, but we keep the suggestion
-        // box open for the user.
-        expect(result.current.isLoadingSuggestions).toBe(false);
+        const { result } = renderHook(() =>
+          useCompletion(
+            useTextBufferForTest('@d'),
+            testDirs,
+            testRootDir,
+            [],
+            mockCommandContext,
+            mockConfigNoRecursive,
+          ),
+        );
+
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        });
+
+        expect(result.current.suggestions).toEqual([
+          { label: 'data/', value: 'data/' },
+          { label: 'dist/', value: 'dist/' },
+        ]);
+      });
+
+      it('should work without config (fallback behavior)', async () => {
+        await createEmptyDir('src');
+        await createEmptyDir('node_modules');
+        await createTestFile('', 'README.md');
+
+        const { result } = renderHook(() =>
+          useCompletion(
+            useTextBufferForTest('@'),
+            testDirs,
+            testRootDir,
+            [],
+            mockCommandContext,
+            undefined,
+          ),
+        );
+
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        });
+
+        // Without config, should include all files
+        expect(result.current.suggestions).toHaveLength(3);
+        expect(result.current.suggestions).toEqual(
+          expect.arrayContaining([
+            { label: 'src/', value: 'src/' },
+            { label: 'node_modules/', value: 'node_modules/' },
+            { label: 'README.md', value: 'README.md' },
+          ]),
+        );
+      });
+
+      it('should handle git discovery service initialization failure gracefully', async () => {
+        // Intentionally don't create a .git directory to cause an initialization failure.
+        await createEmptyDir('src');
+        await createTestFile('', 'README.md');
+
+        const consoleSpy = vi
+          .spyOn(console, 'warn')
+          .mockImplementation(() => {});
+
+        const { result } = renderHook(() =>
+          useCompletion(
+            useTextBufferForTest('@'),
+            testDirs,
+            testRootDir,
+            [],
+            mockCommandContext,
+            mockConfig,
+          ),
+        );
+
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        });
+
+        // Since we use centralized service, initialization errors are handled at config level
+        // This test should verify graceful fallback behavior
+        expect(result.current.suggestions.length).toBeGreaterThanOrEqual(0);
+        // Should still show completions even if git discovery fails
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+
+        consoleSpy.mockRestore();
+      });
+    });
+
+    describe('Git-Aware Filtering', () => {
+      it('should filter git-ignored entries from @ completions', async () => {
+        await createEmptyDir('.git');
+        await createTestFile('dist', '.gitignore');
+        await createEmptyDir('data');
+
+        const { result } = renderHook(() =>
+          useCompletion(
+            useTextBufferForTest('@d'),
+            testDirs,
+            testRootDir,
+            [],
+            mockCommandContext,
+            mockConfig,
+          ),
+        );
+
+        // Wait for async operations to complete
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 150)); // Account for debounce
+        });
+
+        expect(result.current.suggestions).toEqual(
+          expect.arrayContaining([{ label: 'data', value: 'data' }]),
+        );
         expect(result.current.showSuggestions).toBe(true);
       });
 
-      expect(result.current.suggestions).toEqual([]);
-    });
+      it('should filter git-ignored directories from @ completions', async () => {
+        await createEmptyDir('.git');
+        await createTestFile('node_modules\ndist\n.env', '.gitignore');
+        // gitignored entries
+        await createEmptyDir('node_modules');
+        await createEmptyDir('dist');
+        await createTestFile('', '.env');
 
-    it('should abort the search when the hook becomes inactive', async () => {
-      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
-      mockInitialize.mockResolvedValue(undefined);
-      mockSearch.mockReturnValue(new Promise(() => {}));
+        // visible
+        await createEmptyDir('src');
+        await createTestFile('', 'README.md');
 
-      const { rerender, unmount } = renderHook(
-        ({ text }) =>
+        const { result } = renderHook(() =>
           useCompletion(
-            useTextBufferForTest(text),
+            useTextBufferForTest('@'),
+            testDirs,
             testRootDir,
             [],
             mockCommandContext,
             mockConfig,
           ),
-        { initialProps: { text: '@a' } },
-      );
+        );
 
-      // Wait for initialization to complete and the first search to start
-      await waitFor(() => {
-        expect(mockSearch).toHaveBeenCalledTimes(1);
+        // Wait for async operations to complete
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 150)); // Account for debounce
+        });
+
+        expect(result.current.suggestions).toEqual([
+          { label: 'README.md', value: 'README.md' },
+          { label: 'src/', value: 'src/' },
+        ]);
+        expect(result.current.showSuggestions).toBe(true);
       });
 
-      rerender({ text: ' @a' }); // Becomes inactive
+      it('should handle recursive search with git-aware filtering', async () => {
+        await createEmptyDir('.git');
+        await createTestFile('node_modules/\ntemp/', '.gitignore');
+        await createTestFile('', 'data', 'test.txt');
+        await createEmptyDir('dist');
+        await createEmptyDir('node_modules');
+        await createTestFile('', 'src', 'index.ts');
+        await createEmptyDir('src', 'components');
+        await createTestFile('', 'temp', 'temp.log');
 
-      await waitFor(() => {
-        expect(abortSpy).toHaveBeenCalled();
+        const { result } = renderHook(() =>
+          useCompletion(
+            useTextBufferForTest('@t'),
+            testDirs,
+            testRootDir,
+            [],
+            mockCommandContext,
+            mockConfig,
+          ),
+        );
+
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        });
+
+        // Should not include anything from node_modules or dist
+        const suggestionLabels = result.current.suggestions.map((s) => s.label);
+        expect(suggestionLabels).not.toContain('temp/');
+        expect(suggestionLabels).not.toContain('node_modules/');
       });
-
-      unmount();
-    });
-
-    it('should handle @ at the end of query', async () => {
-      mockInitialize.mockResolvedValue(undefined);
-      mockSearch.mockResolvedValue(['file1.txt', 'file2.js']);
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          useTextBufferForTest('query @'),
-          testRootDir,
-          [],
-          mockCommandContext,
-          mockConfig,
-        ),
-      );
-
-      await waitFor(() => {
-        expect(result.current.isLoadingSuggestions).toBe(false);
-      });
-
-      expect(mockSearch).toHaveBeenCalledWith('', {
-        signal: expect.any(AbortSignal),
-        maxResults: 24,
-      });
-
-      expect(result.current.suggestions).toEqual([
-        { label: 'file1.txt', value: 'file1.txt' },
-        { label: 'file2.js', value: 'file2.js' },
-      ]);
-      expect(result.current.showSuggestions).toBe(true);
     });
   });
 
@@ -993,21 +1113,19 @@ describe('useCompletion', () => {
           ],
         },
       ] as unknown as SlashCommand[];
-      // Create a mock buffer that we can spy on directly
-      const mockBuffer = {
-        text: '/mem',
-        setText: vi.fn(),
-      } as unknown as TextBuffer;
 
-      const { result } = renderHook(() =>
-        useCompletion(
-          mockBuffer,
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('/mem');
+        const completion = useCompletion(
+          textBuffer,
+          testDirs,
           testRootDir,
           slashCommands,
           mockCommandContext,
           mockConfig,
-        ),
-      );
+        );
+        return { ...completion, textBuffer };
+      });
 
       expect(result.current.suggestions.map((s) => s.value)).toEqual([
         'memory',
@@ -1017,14 +1135,10 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(mockBuffer.setText).toHaveBeenCalledWith('/memory ');
+      expect(result.current.textBuffer.text).toBe('/memory ');
     });
 
     it('should append a sub-command when the parent is complete', () => {
-      const mockBuffer = {
-        text: '/memory',
-        setText: vi.fn(),
-      } as unknown as TextBuffer;
       const slashCommands = [
         {
           name: 'memory',
@@ -1042,15 +1156,18 @@ describe('useCompletion', () => {
         },
       ] as unknown as SlashCommand[];
 
-      const { result } = renderHook(() =>
-        useCompletion(
-          mockBuffer,
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('/memory');
+        const completion = useCompletion(
+          textBuffer,
+          testDirs,
           testRootDir,
           slashCommands,
           mockCommandContext,
           mockConfig,
-        ),
-      );
+        );
+        return { ...completion, textBuffer };
+      });
 
       // Suggestions are populated by useEffect
       expect(result.current.suggestions.map((s) => s.value)).toEqual([
@@ -1062,14 +1179,10 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(1); // index 1 is 'add'
       });
 
-      expect(mockBuffer.setText).toHaveBeenCalledWith('/memory add ');
+      expect(result.current.textBuffer.text).toBe('/memory add ');
     });
 
     it('should complete a command with an alternative name', () => {
-      const mockBuffer = {
-        text: '/?',
-        setText: vi.fn(),
-      } as unknown as TextBuffer;
       const slashCommands = [
         {
           name: 'memory',
@@ -1087,15 +1200,18 @@ describe('useCompletion', () => {
         },
       ] as unknown as SlashCommand[];
 
-      const { result } = renderHook(() =>
-        useCompletion(
-          mockBuffer,
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('/?');
+        const completion = useCompletion(
+          textBuffer,
+          testDirs,
           testRootDir,
           slashCommands,
           mockCommandContext,
           mockConfig,
-        ),
-      );
+        );
+        return { ...completion, textBuffer };
+      });
 
       result.current.suggestions.push({
         label: 'help',
@@ -1107,43 +1223,22 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(mockBuffer.setText).toHaveBeenCalledWith('/help ');
+      expect(result.current.textBuffer.text).toBe('/help ');
     });
 
-    it('should complete a file path', async () => {
-      const mockBuffer = {
-        text: '@src/fi',
-        lines: ['@src/fi'],
-        cursor: [0, 7],
-        setText: vi.fn(),
-        replaceRangeByOffset: vi.fn(),
-      } as unknown as TextBuffer;
-      const slashCommands = [
-        {
-          name: 'memory',
-          description: 'Manage memory',
-          subCommands: [
-            {
-              name: 'show',
-              description: 'Show memory',
-            },
-            {
-              name: 'add',
-              description: 'Add to memory',
-            },
-          ],
-        },
-      ] as unknown as SlashCommand[];
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          mockBuffer,
+    it('should complete a file path', () => {
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('@src/fi');
+        const completion = useCompletion(
+          textBuffer,
+          testDirs,
           testRootDir,
-          slashCommands,
+          [],
           mockCommandContext,
           mockConfig,
-        ),
-      );
+        );
+        return { ...completion, textBuffer };
+      });
 
       result.current.suggestions.push({
         label: 'file1.txt',
@@ -1154,11 +1249,64 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalledWith(
-        1, // after '@src/'
-        mockBuffer.text.length,
-        'file1.txt',
-      );
+      expect(result.current.textBuffer.text).toBe('@src/file1.txt');
+    });
+
+    it('should complete a file path when cursor is not at the end of the line', () => {
+      const text = '@src/fi le.txt';
+      const cursorOffset = 7; // after "i"
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest(text, cursorOffset);
+        const completion = useCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      result.current.suggestions.push({
+        label: 'file1.txt',
+        value: 'file1.txt',
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('@src/file1.txt le.txt');
+    });
+
+    it('should complete the correct file path with multiple @-commands', () => {
+      const text = '@file1.txt @src/fi';
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest(text);
+        const completion = useCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      result.current.suggestions.push({
+        label: 'file2.txt',
+        value: 'file2.txt',
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('@file1.txt @src/file2.txt');
     });
   });
 });

@@ -60,8 +60,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
 
+  const [dirs, setDirs] = useState<readonly string[]>(
+    config.getWorkspaceContext().getDirectories(),
+  );
+  const dirsChanged = config.getWorkspaceContext().getDirectories();
+  useEffect(() => {
+    if (dirs.length !== dirsChanged.length) {
+      setDirs(dirsChanged);
+    }
+  }, [dirs.length, dirsChanged]);
+
   const completion = useCompletion(
     buffer,
+    dirs,
     config.getTargetDir(),
     slashCommands,
     commandContext,
@@ -220,7 +231,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
         }
 
-        if (key.name === 'tab') {
+        if (key.name === 'tab' || (key.name === 'return' && !key.ctrl)) {
           if (completion.suggestions.length > 0) {
             const targetIndex =
               completion.activeSuggestionIndex === -1
