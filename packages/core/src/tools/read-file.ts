@@ -72,6 +72,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
         required: ['absolute_path'],
         type: Type.OBJECT,
       },
+      false,
     );
   }
 

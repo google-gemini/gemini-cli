@@ -112,6 +112,7 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
         required: ['pattern'],
         type: Type.OBJECT,
       },
+      false,
     );
   }
 

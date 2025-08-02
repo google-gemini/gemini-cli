@@ -84,6 +84,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         required: ['pattern'],
         type: Type.OBJECT,
       },
+      false,
     );
   }
 

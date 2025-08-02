@@ -50,6 +50,11 @@ export interface Tool<
   canUpdateOutput: boolean;
 
   /**
+   * Whether the tool has side effects
+   */
+  hasSideEffects: boolean;
+
+  /**
    * Validates the parameters for the tool
    * Should be called from both `shouldConfirmExecute` and `execute`
    * `shouldConfirmExecute` should return false immediately if invalid
@@ -108,9 +113,11 @@ export abstract class BaseTool<
    * @param name Internal name of the tool (used for API calls)
    * @param displayName User-friendly display name of the tool
    * @param description Description of what the tool does
+   * @param icon The icon to display when interacting via ACP
+   * @param parameterSchema Open API 3.0 Schema defining the parameters
+   * @param hasSideEffects Whether the tool has side effects. Defaults to true.
    * @param isOutputMarkdown Whether the tool's output should be rendered as markdown
    * @param canUpdateOutput Whether the tool supports live (streaming) output
-   * @param parameterSchema Open API 3.0 Schema defining the parameters
    */
   constructor(
     readonly name: string,
@@ -118,6 +125,7 @@ export abstract class BaseTool<
     readonly description: string,
     readonly icon: Icon,
     readonly parameterSchema: Schema,
+    readonly hasSideEffects: boolean = true,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
   ) {}

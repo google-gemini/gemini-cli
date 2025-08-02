@@ -50,6 +50,7 @@ describe('executeToolCall', () => {
       shouldConfirmExecute: vi.fn(() =>
         Promise.resolve(false as false | ToolCallConfirmationDetails),
       ),
+      hasSideEffects: false,
       isOutputMarkdown: false,
       canUpdateOutput: false,
       getDescription: vi.fn(),

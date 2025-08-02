@@ -10,6 +10,7 @@ import {
   main,
   setupUnhandledRejectionHandler,
   validateDnsResolutionOrder,
+  loadNonInteractiveConfig,
 } from './gemini.js';
 import {
   LoadedSettings,
@@ -17,6 +18,8 @@ import {
   loadSettings,
 } from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { Config, ApprovalMode } from '@google/gemini-cli-core';
+import { loadCliConfig } from './config/config.js';
 
 // Custom error to identify mock process.exit calls
 class MockProcessExitError extends Error {
@@ -26,7 +29,27 @@ class MockProcessExitError extends Error {
   }
 }
 
+const mockConfigInstance = vi.hoisted(() => ({
+  getSandbox: vi.fn(() => false),
+  getQuestion: vi.fn(() => ''),
+  getListExtensions: vi.fn(() => false),
+  initialize: vi.fn().mockResolvedValue(undefined),
+  getDebugMode: vi.fn(() => false),
+  refreshAuth: vi.fn().mockResolvedValue(undefined),
+  getExperimentalAcp: vi.fn(() => false),
+  getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
+  getToolRegistry: vi.fn().mockResolvedValue({
+    getAllTools: vi.fn(() => []),
+  }),
+  getSessionId: vi.fn(() => 'test-session'),
+}));
+
 // Mock dependencies
+vi.mock('./config/config.js', async () => ({
+  loadCliConfig: vi.fn().mockResolvedValue(mockConfigInstance),
+  parseArguments: vi.fn().mockResolvedValue({}),
+}));
+
 vi.mock('./config/settings.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./config/settings.js')>();
   return {
@@ -34,18 +57,6 @@ vi.mock('./config/settings.js', async (importOriginal) => {
     loadSettings: vi.fn(),
   };
 });
-
-vi.mock('./config/config.js', () => ({
-  loadCliConfig: vi.fn().mockResolvedValue({
-    config: {
-      getSandbox: vi.fn(() => false),
-      getQuestion: vi.fn(() => ''),
-    },
-    modelWasSwitched: false,
-    originalModelBeforeSwitch: null,
-    finalModel: 'test-model',
-  }),
-}));
 
 vi.mock('read-package-up', () => ({
   readPackageUp: vi.fn().mockResolvedValue({
@@ -73,6 +84,10 @@ vi.mock('./utils/events.js', async (importOriginal) => {
 vi.mock('./utils/sandbox.js', () => ({
   sandbox_command: vi.fn(() => ''), // Default to no sandbox command
   start_sandbox: vi.fn(() => Promise.resolve()), // Mock as an async function that resolves
+}));
+
+vi.mock('./validateNonInterActiveAuth.js', () => ({
+  validateNonInteractiveAuth: vi.fn((_a, _b, c) => Promise.resolve(c)),
 }));
 
 describe('gemini.tsx main function', () => {
@@ -248,5 +263,99 @@ describe('validateDnsResolutionOrder', () => {
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       'Invalid value for dnsResolutionOrder in settings: "invalid-value". Using default "ipv4first".',
     );
+  });
+});
+
+describe('loadNonInteractiveConfig', () => {
+  const mockToolRegistry = {
+    getAllTools: vi.fn(() => [
+      { name: 'toolWithSideEffects1', hasSideEffects: true },
+      { name: 'toolWithoutSideEffects', hasSideEffects: false },
+      { name: 'toolWithSideEffects2', hasSideEffects: true },
+    ]),
+  };
+  const loadCliConfigMock = vi.mocked(loadCliConfig);
+
+  beforeEach(() => {
+    loadCliConfigMock.mockClear();
+    // The first call to loadCliConfig happens in main(), this mock is for the one inside loadNonInteractiveConfig
+    loadCliConfigMock.mockResolvedValue({
+      ...mockConfigInstance,
+      initialize: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Config);
+  });
+
+  it('should exclude tools with side effects when not in YOLO mode', async () => {
+    const mockConfig = {
+      getApprovalMode: () => ApprovalMode.DEFAULT,
+      getToolRegistry: () => Promise.resolve(mockToolRegistry),
+      getSessionId: () => 'test-session',
+    } as unknown as Config;
+
+    await loadNonInteractiveConfig(
+      mockConfig,
+      [],
+      { merged: {} } as LoadedSettings,
+      {},
+    );
+
+    expect(loadCliConfigMock).toHaveBeenCalledTimes(1);
+    expect(loadCliConfigMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        excludeTools: ['toolWithSideEffects1', 'toolWithSideEffects2'],
+      }),
+      expect.any(Array),
+      expect.any(String),
+      expect.any(Object),
+    );
+  });
+
+  it('should add to existing excluded tools when not in YOLO mode', async () => {
+    const mockConfig = {
+      getApprovalMode: () => ApprovalMode.DEFAULT,
+      getToolRegistry: () => Promise.resolve(mockToolRegistry),
+      getSessionId: () => 'test-session',
+    } as unknown as Config;
+
+    await loadNonInteractiveConfig(
+      mockConfig,
+      [],
+      {
+        merged: { excludeTools: ['alreadyExcluded'] },
+      } as LoadedSettings,
+      {},
+    );
+
+    expect(loadCliConfigMock).toHaveBeenCalledTimes(1);
+    expect(loadCliConfigMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        excludeTools: [
+          'alreadyExcluded',
+          'toolWithSideEffects1',
+          'toolWithSideEffects2',
+        ],
+      }),
+      expect.any(Array),
+      expect.any(String),
+      expect.any(Object),
+    );
+  });
+
+  it('should not exclude any tools when in YOLO mode', async () => {
+    const mockConfig = {
+      getApprovalMode: () => ApprovalMode.YOLO,
+      getToolRegistry: () => Promise.resolve(mockToolRegistry),
+      getSessionId: () => 'test-session',
+    } as unknown as Config;
+
+    await loadNonInteractiveConfig(
+      mockConfig,
+      [],
+      { merged: {} } as LoadedSettings,
+      {},
+    );
+
+    // loadCliConfig should not be called again.
+    expect(loadCliConfigMock).not.toHaveBeenCalled();
   });
 });

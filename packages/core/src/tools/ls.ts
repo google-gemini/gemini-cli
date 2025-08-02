@@ -112,6 +112,7 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
         required: ['path'],
         type: Type.OBJECT,
       },
+      false,
     );
   }
 

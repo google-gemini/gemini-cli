@@ -83,6 +83,7 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
         required: ['prompt'],
         type: Type.OBJECT,
       },
+      true,
     );
     const proxy = config.getProxy();
     if (proxy) {
