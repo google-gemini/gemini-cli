@@ -121,7 +121,7 @@ function findImports(
     if (
       importPath.length > 0 &&
       (importPath[0] === '.' ||   // Relative paths like ./file.md
-       importPath[0] === '/')) {  // Absolute paths like /path/file.md
+       path.isAbsolute(importPath))) {  // Absolute paths on any platform
       // Exclude workspace syntax like @workspace/package (no leading ./ or /)
       imports.push({
         start: i,
@@ -140,13 +140,6 @@ function isWhitespace(char: string): boolean {
   return char === ' ' || char === '\t' || char === '\n' || char === '\r';
 }
 
-function isLetter(char: string): boolean {
-  const code = char.charCodeAt(0);
-  return (
-    (code >= 65 && code <= 90) || // A-Z
-    (code >= 97 && code <= 122)
-  ); // a-z
-}
 
 function findCodeRegions(content: string): Array<[number, number]> {
   const regions: Array<[number, number]> = [];
