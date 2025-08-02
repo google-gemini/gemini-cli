@@ -53,6 +53,8 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType | undefined;
   proxy?: string | undefined;
+  baseUrl?: string | undefined;
+  apiKeyHeader?: string | undefined;
 };
 
 export function createContentGeneratorConfig(
@@ -63,6 +65,8 @@ export function createContentGeneratorConfig(
   const googleApiKey = process.env.GOOGLE_API_KEY || undefined;
   const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT || undefined;
   const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION || undefined;
+  const customBaseUrl = process.env.BASE_URL || undefined;
+  const customApiKeyHeader = process.env.API_KEY_HEADER || undefined;
 
   // Use runtime model from config if available; otherwise, fall back to parameter or default
   const effectiveModel = config.getModel() || DEFAULT_GEMINI_MODEL;
@@ -103,7 +107,33 @@ export function createContentGeneratorConfig(
     return contentGeneratorConfig;
   }
 
+  if (
+    authType === AuthType.USE_GEMINI ||
+    authType === AuthType.USE_VERTEX_AI
+  ) {
+    contentGeneratorConfig.baseUrl = customBaseUrl;
+    contentGeneratorConfig.apiKeyHeader = customApiKeyHeader;
+  }
+
   return contentGeneratorConfig;
+}
+
+/**
+ * Configure HTTP options for custom API endpoints
+ */
+function configureHttpOptions(
+  config: ContentGeneratorConfig,
+  baseHttpOptions: { headers: Record<string, string>; baseUrl?: string },
+): void {
+  // Configure custom base URL if provided
+  if (config.baseUrl) {
+    baseHttpOptions.baseUrl = config.baseUrl;
+  }
+
+  // Configure custom API key header if provided
+  if (config.apiKeyHeader && config.apiKey !== undefined) {
+    baseHttpOptions.headers[config.apiKeyHeader] = config.apiKey;
+  }
 }
 
 export async function createContentGenerator(
@@ -112,11 +142,15 @@ export async function createContentGenerator(
   sessionId?: string,
 ): Promise<ContentGenerator> {
   const version = process.env.CLI_VERSION || process.version;
-  const httpOptions = {
+  const httpOptions: {
+    headers: Record<string, string>;
+    baseUrl?: string;
+  } = {
     headers: {
       'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
     },
   };
+
   if (
     config.authType === AuthType.LOGIN_WITH_GOOGLE ||
     config.authType === AuthType.CLOUD_SHELL
@@ -133,6 +167,8 @@ export async function createContentGenerator(
     config.authType === AuthType.USE_GEMINI ||
     config.authType === AuthType.USE_VERTEX_AI
   ) {
+    configureHttpOptions(config, httpOptions);
+
     const googleGenAI = new GoogleGenAI({
       apiKey: config.apiKey === '' ? undefined : config.apiKey,
       vertexai: config.vertexai,

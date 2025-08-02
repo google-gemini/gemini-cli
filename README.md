@@ -91,6 +91,20 @@ The Vertex AI API provides a [free tier](https://cloud.google.com/vertex-ai/gene
 
 3. (Optionally) Add a billing account on your project to get access to [higher usage limits](https://cloud.google.com/vertex-ai/generative-ai/docs/quotas)
 
+### Use a custom API endpoint:
+
+The Gemini CLI supports custom API endpoints, which is useful for enterprise deployments, proxy setups, or when using Gemini-compatible API services:
+
+1. Set the custom base URL and optionally a custom API key header:
+
+   ```bash
+   export BASE_URL="https://your-custom-endpoint.com/api"
+   export API_KEY_HEADER="X-Custom-Authorization"
+   export GEMINI_API_KEY="YOUR_API_KEY"
+   ```
+
+2. The CLI will automatically use these settings when making API requests. If no custom header is specified, the default header will be used.
+
 For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
 
 ## Examples
