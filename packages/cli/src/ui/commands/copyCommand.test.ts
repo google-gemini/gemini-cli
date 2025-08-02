@@ -224,10 +224,12 @@ describe('copyCommand', () => {
 
     const result = await copyCommand.action(mockContext, '');
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       type: 'message',
       messageType: 'error',
-      content: 'Failed to copy to the clipboard.',
+      content: expect.stringContaining(
+        'Failed to copy to the clipboard. This may be blocked in remote sessions.'
+      ),
     });
   });
 
@@ -246,10 +248,12 @@ describe('copyCommand', () => {
 
     const result = await copyCommand.action(mockContext, '');
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       type: 'message',
       messageType: 'error',
-      content: 'Failed to copy to the clipboard.',
+      content: expect.stringContaining(
+        'Failed to copy to the clipboard. This may be blocked in remote sessions.'
+      ),
     });
   });
 
