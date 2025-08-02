@@ -73,7 +73,7 @@ Gemini CLI 要求您向 Google 的 AI 服务进行身份验证。在首次启动
           export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
           export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION" # e.g., us-central1
           ```
-        - 对于重复使用，您可以将环境变量添加到您的 [.env 文件](#persisting-environment-variables-with-env-files)
+        - 对于重复使用，您可以将环境变量添加到您的 [.env 文件](#使用-env-文件持久化环境变量)
 
         - 或者，您可以从 shell 的配置文件（如 `~/.bashrc`、`~/.zshrc` 或 `~/.profile`）中导出环境变量。例如，以下命令将环境变量添加到 `~/.bashrc` 文件中：
 
@@ -89,8 +89,6 @@ Gemini CLI 要求您向 Google 的 AI 服务进行身份验证。在首次启动
     - 此选项仅在 Google Cloud Shell 环境中运行时可用。
     - 它会自动使用 Cloud Shell 环境中已登录用户的凭据。
     - 这是在 Cloud Shell 中运行且未配置其他方法时的默认身份验证方法。
-
-          :warning: 请注意，当您在 shell 配置文件中导出 API 密钥时，从该 shell 执行的任何其他进程都可以读取它。
 
 ### 使用 `.env` 文件持久化环境变量
 

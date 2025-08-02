@@ -10,7 +10,7 @@ Gemini CLI 是一个开源 AI 代理，可将 Gemini 的强大功能直接带入
 
 本文档概述了我们对 Gemini CLI 路线图的方法。在这里，您将找到我们的指导原则以及我们关注的重点开发领域的细分。我们的路线图不是一个静态列表，而是一组动态的优先级，这些优先级在我们的 GitHub Issues 中实时跟踪。
 
-作为一个 [Apache 2.0 开源项目](https://github.com/google-gemini/gemini-cli?tab=Apache-2.0-1-ov-file#readme)，我们赞赏并欢迎[公众贡献](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md)，并将优先考虑与我们路线图一致的贡献。如果您想为我们的路线图提出新功能或更改，请首先[提出问题进行讨论](https://github.com/google-gemini/gemini-cli/issues/new/choose)。
+作为一个 [Apache 2.0 开源项目](https://github.com/google-gemini/gemini-cli?tab=Apache-2.0-1-ov-file#readme)，我们赞赏并欢迎[公众贡献](./CONTRIBUTING.md)，并将优先考虑与我们路线图一致的贡献。如果您想为我们的路线图提出新功能或更改，请首先[提出问题进行讨论](https://github.com/google-gemini/gemini-cli/issues/new/choose)。
 
 ## 免责声明
 
@@ -55,11 +55,11 @@ Gemini CLI 是一个开源 AI 代理，可将 Gemini 的强大功能直接带入
 
 ## 如何贡献
 
-Gemini CLI 是一个开源项目，我们欢迎社区的贡献！无论您是开发人员、设计师，还是只是一个热情的用户，您都可以在此处找到我们的[社区指南](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md)以了解如何开始。有很多方法可以参与其中：
+Gemini CLI 是一个开源项目，我们欢迎社区的贡献！无论您是开发人员、设计师，还是只是一个热情的用户，您都可以在此处找到我们的[社区指南](./CONTRIBUTING.md)以了解如何开始。有很多方法可以参与其中：
 
 - **路线图：** 请查看并找到我们[路线图](https://github.com/google-gemini/gemini-cli/issues/4191)中您希望贡献的领域。基于此的贡献将最容易集成。
 - **报告 Bug：** 如果您发现问题，请创建一个[错误报告](https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml)，并尽可能详细地描述。如果您认为这是阻止直接使用 CLI 的严重问题，请标记为 `priorty/p0`。
 - **建议功能：** 有好主意吗？欢迎提出！请[提交功能请求](https://github.com/google-gemini/gemini-cli/issues/new?template=feature_request.yml)。
-- **贡献代码：** 请查阅我们的 [CONTRIBUTING.md](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md) 文件，了解如何提交拉取请求。我们为新贡献者准备了“good first issues”列表。
+- **贡献代码：** 请查阅我们的 [CONTRIBUTING.md](./CONTRIBUTING.md) 文件，了解如何提交拉取请求。我们为新贡献者准备了“good first issues”列表。
 - **编写文档：** 帮助我们完善文档、教程和示例。
 我们对 Gemini CLI 的未来充满期待，欢迎与您共同建设！

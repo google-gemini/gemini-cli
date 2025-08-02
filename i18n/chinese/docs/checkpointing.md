@@ -48,6 +48,8 @@ gemini --checkpointing
 }
 ```
 
+有关更多详细信息，请参阅[设置](./cli/configuration.md)。
+
 ## 使用 `/restore` 命令
 
 启用后，检查点会自动创建。要管理它们，请使用 `/restore` 命令。

@@ -177,8 +177,8 @@ Stage 2: Building the Source Code
 
 - What happens: The TypeScript source code in packages/core/src and packages/cli/src is compiled into JavaScript.
 - File movement:
-  - packages/core/src/*_/*.ts -> compiled to -> packages/core/dist/
-  - packages/cli/src/*_/*.ts -> compiled to -> packages/cli/dist/
+  - packages/core/src/\*\*/\*.ts -> compiled to -> packages/core/dist/
+  - packages/cli/src/\*\*/\*.ts -> compiled to -> packages/cli/dist/
 - Why: The TypeScript code written during development needs to be converted into plain JavaScript that can be run by
   Node.js. The core package is built first as the cli package depends on it.
 

@@ -262,7 +262,7 @@ DEBUG=1 gemini
     ```
 
     然后，您正在运行的 CLI 应用程序应连接到 React DevTools。
-    ![](/docs/assets/connected_devtools.png)
+            ![](../../docs/assets/connected_devtools.png)
 
 ## 沙盒
 
@@ -278,7 +278,7 @@ DEBUG=1 gemini
 
 #### 代理网络
 
-所有沙盒方法，包括使用 `*-proxied` 配置文件的 macOS Seatbelt，都支持通过自定义代理服务器限制出站网络流量，该代理服务器可以指定为 `GEMINI_SANDBOX_PROXY_COMMAND=<command>`，其中 `<command>` 必须启动一个侦听 `:::8877` 相关请求的代理服务器。有关仅允许与 `example.com:443` 建立 `HTTPS` 连接（例如 `curl https://example.com`）并拒绝所有其他请求的最小代理，请参阅 `../../docs/examples/proxy-script.md`。代理与沙盒一起自动启动和停止。
+所有沙盒方法，包括使用 `*-proxied` 配置文件的 macOS Seatbelt，都支持通过自定义代理服务器限制出站网络流量，该代理服务器可以指定为 `GEMINI_SANDBOX_PROXY_COMMAND=<command>`，其中 `<command>` 必须启动一个侦听 `:::8877` 相关请求的代理服务器。有关仅允许与 `example.com:443` 建立 `HTTPS` 连接（例如 `curl https://example.com`）并拒绝所有其他请求的最小代理，请参阅 `./docs/examples/proxy-script.md`。代理与沙盒一起自动启动和停止。
 
 ## 手动发布
 
