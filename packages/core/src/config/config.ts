@@ -168,6 +168,8 @@ export interface ConfigParameters {
     respectGitIgnore?: boolean;
     respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
+    maxSearchDepth?: number;
+    searchTimeoutMs?: number;
   };
   checkpointing?: boolean;
   proxy?: string;
@@ -219,6 +221,8 @@ export class Config {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
     enableRecursiveFileSearch: boolean;
+    maxSearchDepth: number;
+    searchTimeoutMs: number;
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
@@ -285,6 +289,8 @@ export class Config {
       respectGeminiIgnore: params.fileFiltering?.respectGeminiIgnore ?? true,
       enableRecursiveFileSearch:
         params.fileFiltering?.enableRecursiveFileSearch ?? true,
+      maxSearchDepth: params.fileFiltering?.maxSearchDepth ?? 5,
+      searchTimeoutMs: params.fileFiltering?.searchTimeoutMs ?? 30000,
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
@@ -533,6 +539,14 @@ export class Config {
   }
   getFileFilteringRespectGeminiIgnore(): boolean {
     return this.fileFiltering.respectGeminiIgnore;
+  }
+
+  getMaxSearchDepth(): number {
+    return this.fileFiltering.maxSearchDepth;
+  }
+
+  getSearchTimeoutMs(): number {
+    return this.fileFiltering.searchTimeoutMs;
   }
 
   getFileFilteringOptions(): FileFilteringOptions {

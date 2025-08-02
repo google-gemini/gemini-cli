@@ -56,15 +56,19 @@ In addition to a project settings file, a project's `.gemini` directory can cont
 
 - **`fileFiltering`** (object):
   - **Description:** Controls git-aware file filtering behavior for @ commands and file discovery tools.
-  - **Default:** `"respectGitIgnore": true, "enableRecursiveFileSearch": true`
+  - **Default:** `"respectGitIgnore": true, "enableRecursiveFileSearch": true, "maxSearchDepth": 10, "searchTimeoutMs": 30000`
   - **Properties:**
     - **`respectGitIgnore`** (boolean): Whether to respect .gitignore patterns when discovering files. When set to `true`, git-ignored files (like `node_modules/`, `dist/`, `.env`) are automatically excluded from @ commands and file listing operations.
-    - **`enableRecursiveFileSearch`** (boolean): Whether to enable searching recursively for filenames under the current tree when completing @ prefixes in the prompt.
+    - **`enableRecursiveFileSearch`** (boolean): Whether to enable searching recursively for filenames under the current tree when completing @ prefixes in the prompt. Set to `false` on remote filesystems to prevent performance issues.
+    - **`maxSearchDepth`** (number): Maximum depth for recursive file searches. Limits how deep the search will go into subdirectories. Useful for preventing performance issues on large directory trees.
+    - **`searchTimeoutMs`** (number): Timeout in milliseconds for file search operations. Prevents indefinite hangs on slow filesystems or remote directories.
   - **Example:**
     ```json
     "fileFiltering": {
       "respectGitIgnore": true,
-      "enableRecursiveFileSearch": false
+      "enableRecursiveFileSearch": false,
+      "maxSearchDepth": 5,
+      "searchTimeoutMs": 15000
     }
     ```
 

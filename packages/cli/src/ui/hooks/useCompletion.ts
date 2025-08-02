@@ -458,31 +458,33 @@ export function useCompletion(
       searchDir: string,
       maxResults = 50,
     ): Promise<Suggestion[]> => {
-      const globPattern = `**/${searchPrefix}*`;
-      const files = await glob(globPattern, {
-        cwd: searchDir,
-        dot: searchPrefix.startsWith('.'),
-        nocase: true,
-      });
 
-      const suggestions: Suggestion[] = files
-        .filter((file) => {
-          if (fileDiscoveryService) {
-            return !fileDiscoveryService.shouldIgnoreFile(file, filterOptions);
-          }
-          return true;
-        })
-        .map((file: string) => {
-          const absolutePath = path.resolve(searchDir, file);
-          const label = path.relative(cwd, absolutePath);
-          return {
-            label,
-            value: escapePath(label),
-          };
-        })
-        .slice(0, maxResults);
 
-      return suggestions;
+        const suggestions: Suggestion[] = files
+          .map((file: string) => ({
+            label: file,
+            value: escapePath(file),
+          }))
+          .filter((s) => {
+            if (fileDiscoveryService) {
+              return !fileDiscoveryService.shouldIgnoreFile(
+                s.label,
+                filterOptions,
+              );
+            }
+            return true;
+          })
+          .slice(0, maxResults);
+
+        return suggestions;
+      } catch (error) {
+        // If we hit an error, return empty results
+        console.debug(
+          `Glob search failed for pattern **/${searchPrefix}*`,
+          error,
+        );
+        return [];
+      }
     };
 
     const fetchSuggestions = async () => {

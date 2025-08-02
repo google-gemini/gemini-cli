@@ -26,6 +26,13 @@ This guide provides solutions to common issues and debugging tips.
 
 ## Common error messages and solutions
 
+- **Issue: `@` completion hangs or is very slow on remote filesystems**
+  - **Cause:** The `@` completion feature uses recursive file search that can be extremely slow on remote filesystems or large directory trees.
+  - **Solution:**
+    1. Disable recursive file search by setting `"enableRecursiveFileSearch": false` in your `fileFiltering` configuration.
+    2. Alternatively, limit search depth with `"maxSearchDepth": 5` and add timeout protection with `"searchTimeoutMs": 15000`.
+    3. See [CLI Configuration](./cli/configuration.md#filefiltering) for more details on file filtering options.
+
 - **Error: `EADDRINUSE` (Address already in use) when starting an MCP server.**
   - **Cause:** Another process is already using the port that the MCP server is trying to bind to.
   - **Solution:**
