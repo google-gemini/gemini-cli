@@ -94,6 +94,7 @@ describe('modifyWithEditor', () => {
         mockModifyContext,
         'vscode' as EditorType,
         abortSignal,
+        vi.fn(),
       );
 
       expect(mockModifyContext.getCurrentContent).toHaveBeenCalledWith(
@@ -148,6 +149,7 @@ describe('modifyWithEditor', () => {
         mockModifyContext,
         'vscode' as EditorType,
         abortSignal,
+        vi.fn(),
       );
 
       const stats = await fsp.stat(diffDir);
@@ -165,6 +167,7 @@ describe('modifyWithEditor', () => {
         mockModifyContext,
         'vscode' as EditorType,
         abortSignal,
+        vi.fn(),
       );
 
       expect(mkdirSpy).not.toHaveBeenCalled();
@@ -183,6 +186,7 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
+      vi.fn(),
     );
 
     expect(mockCreatePatch).toHaveBeenCalledWith(
@@ -211,6 +215,7 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
+      vi.fn(),
     );
 
     expect(mockCreatePatch).toHaveBeenCalledWith(
@@ -241,6 +246,7 @@ describe('modifyWithEditor', () => {
         mockModifyContext,
         'vscode' as EditorType,
         abortSignal,
+        vi.fn(),
       ),
     ).rejects.toThrow('Editor failed to open');
 
@@ -267,6 +273,7 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
+      vi.fn(),
     );
 
     expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
@@ -290,6 +297,7 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
+      vi.fn(),
     );
 
     expect(mockOpenDiff).toHaveBeenCalledOnce();
@@ -311,6 +319,7 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
+      vi.fn(),
     );
 
     expect(mockOpenDiff).toHaveBeenCalledOnce();
