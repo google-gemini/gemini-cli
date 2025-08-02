@@ -240,6 +240,14 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     }
     ```
 
+- **`excludedProjectEnvVars`** (array of strings):
+  - **Description:** Specifies environment variables that should be excluded from being loaded from project `.env` files. This prevents project-specific environment variables (like `DEBUG=true`) from interfering with gemini-cli behavior. Variables from `.gemini/.env` files are never excluded.
+  - **Default:** `["DEBUG", "DEBUG_MODE"]`
+  - **Example:**
+    ```json
+    "excludedProjectEnvVars": ["DEBUG", "DEBUG_MODE", "NODE_ENV"]
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -271,7 +279,8 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "run_shell_command": {
       "tokenBudget": 100
     }
-  }
+  },
+  "excludedProjectEnvVars": ["DEBUG", "DEBUG_MODE", "NODE_ENV"]
 }
 ```
 
@@ -292,6 +301,8 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 1.  `.env` file in the current working directory.
 2.  If not found, it searches upwards in parent directories until it finds an `.env` file or reaches the project root (identified by a `.git` folder) or the home directory.
 3.  If still not found, it looks for `~/.env` (in the user's home directory).
+
+**Environment Variable Exclusion:** Some environment variables (like `DEBUG` and `DEBUG_MODE`) are automatically excluded from being loaded from project `.env` files to prevent interference with gemini-cli behavior. Variables from `.gemini/.env` files are never excluded. You can customize this behavior using the `excludedProjectEnvVars` setting in your `settings.json` file.
 
 - **`GEMINI_API_KEY`** (Required):
   - Your API key for the Gemini API.
@@ -332,6 +343,7 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - `<profile_name>`: Uses a custom profile. To define a custom profile, create a file named `sandbox-macos-<profile_name>.sb` in your project's `.gemini/` directory (e.g., `my-project/.gemini/sandbox-macos-custom.sb`).
 - **`DEBUG` or `DEBUG_MODE`** (often used by underlying libraries or the CLI itself):
   - Set to `true` or `1` to enable verbose debug logging, which can be helpful for troubleshooting.
+  - **Note:** These variables are automatically excluded from project `.env` files by default to prevent interference with gemini-cli behavior. Use `.gemini/.env` files if you need to set these for gemini-cli specifically.
 - **`NO_COLOR`**:
   - Set to any value to disable all color output in the CLI.
 - **`CLI_TITLE`**:
