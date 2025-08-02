@@ -12,6 +12,7 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import { getScopeItems } from '../../utils/dialogScopeUtils.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
@@ -76,11 +77,7 @@ export function ThemeDialog({
   // If not found, fall back to the first theme
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
 
-  const scopeItems = [
-    { label: 'User Settings', value: SettingScope.User },
-    { label: 'Workspace Settings', value: SettingScope.Workspace },
-    { label: 'System Settings', value: SettingScope.System },
-  ];
+  const scopeItems = getScopeItems();
 
   const handleThemeSelect = useCallback(
     (themeName: string) => {
