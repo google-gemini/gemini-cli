@@ -65,12 +65,13 @@ export class WebSearchTool extends BaseTool<
   static readonly Name: string = 'google_web_search';
 
   constructor(private readonly config: Config) {
-    super(
-      WebSearchTool.Name,
-      'GoogleSearch',
-      'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
-      Icon.Globe,
-      {
+    super({
+      name: WebSearchTool.Name,
+      displayName: 'GoogleSearch',
+      description:
+        'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
+      icon: Icon.Globe,
+      parameterSchema: {
         type: Type.OBJECT,
         properties: {
           query: {
@@ -80,7 +81,7 @@ export class WebSearchTool extends BaseTool<
         },
         required: ['query'],
       },
-    );
+    });
   }
 
   /**

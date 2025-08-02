@@ -46,12 +46,13 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
   static readonly Name: string = 'read_file';
 
   constructor(private config: Config) {
-    super(
-      ReadFileTool.Name,
-      'ReadFile',
-      'Reads and returns the content of a specified file from the local filesystem. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.',
-      Icon.FileSearch,
-      {
+    super({
+      name: ReadFileTool.Name,
+      displayName: 'ReadFile',
+      description:
+        'Reads and returns the content of a specified file from the local filesystem. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.',
+      icon: Icon.FileSearch,
+      parameterSchema: {
         properties: {
           absolute_path: {
             description:
@@ -72,8 +73,8 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
         required: ['absolute_path'],
         type: Type.OBJECT,
       },
-      false,
-    );
+      hasSideEffects: false,
+    });
   }
 
   validateToolParams(params: ReadFileToolParams): string | null {

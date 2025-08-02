@@ -67,12 +67,13 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
   static readonly Name: string = 'web_fetch';
 
   constructor(private readonly config: Config) {
-    super(
-      WebFetchTool.Name,
-      'WebFetch',
-      "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
-      Icon.Globe,
-      {
+    super({
+      name: WebFetchTool.Name,
+      displayName: 'WebFetch',
+      description:
+        "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
+      icon: Icon.Globe,
+      parameterSchema: {
         properties: {
           prompt: {
             description:
@@ -83,8 +84,8 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
         required: ['prompt'],
         type: Type.OBJECT,
       },
-      true,
-    );
+      isOutputMarkdown: true,
+    });
     const proxy = config.getProxy();
     if (proxy) {
       setGlobalDispatcher(new ProxyAgent(proxy as string));

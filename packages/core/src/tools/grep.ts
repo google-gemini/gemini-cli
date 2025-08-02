@@ -58,12 +58,13 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
   static readonly Name = 'search_file_content'; // Keep static name
 
   constructor(private readonly config: Config) {
-    super(
-      GrepTool.Name,
-      'SearchText',
-      'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.',
-      Icon.Regex,
-      {
+    super({
+      name: GrepTool.Name,
+      displayName: 'SearchText',
+      description:
+        'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.',
+      icon: Icon.Regex,
+      parameterSchema: {
         properties: {
           pattern: {
             description:
@@ -84,8 +85,8 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         required: ['pattern'],
         type: Type.OBJECT,
       },
-      false,
-    );
+      hasSideEffects: false,
+    });
   }
 
   // --- Validation Methods ---

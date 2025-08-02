@@ -113,12 +113,18 @@ class MockTool extends BaseTool<{ param: string }, ToolResult> {
     displayName = 'A mock tool',
     description = 'A mock tool description',
   ) {
-    super(name, displayName, description, Icon.Hammer, {
-      type: Type.OBJECT,
-      properties: {
-        param: { type: Type.STRING },
+    super({
+      name,
+      displayName,
+      description,
+      icon: Icon.Hammer,
+      parameterSchema: {
+        type: Type.OBJECT,
+        properties: {
+          param: { type: Type.STRING },
+        },
+        required: ['param'],
       },
-      required: ['param'],
     });
   }
   async execute(params: { param: string }): Promise<ToolResult> {

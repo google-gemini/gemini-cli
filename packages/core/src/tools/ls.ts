@@ -72,12 +72,13 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
   static readonly Name = 'list_directory';
 
   constructor(private config: Config) {
-    super(
-      LSTool.Name,
-      'ReadFolder',
-      'Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.',
-      Icon.Folder,
-      {
+    super({
+      name: LSTool.Name,
+      displayName: 'ReadFolder',
+      description:
+        'Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.',
+      icon: Icon.Folder,
+      parameterSchema: {
         properties: {
           path: {
             description:
@@ -112,8 +113,8 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
         required: ['path'],
         type: Type.OBJECT,
       },
-      false,
-    );
+      hasSideEffects: false,
+    });
   }
 
   /**

@@ -100,6 +100,41 @@ export interface Tool<
   ): Promise<TResult>;
 }
 
+export interface ToolOptions {
+  /**
+   * Internal name of the tool (used for API calls)
+   */
+  name: string;
+  /**
+   * User-friendly display name of the tool
+   */
+  displayName: string;
+  /**
+   * Description of what the tool does
+   */
+  description: string;
+  /**
+   * The icon to display when interacting via ACP
+   */
+  icon: Icon;
+  /**
+   * Open API 3.0 Schema defining the parameters
+   */
+  parameterSchema: Schema;
+  /**
+   * Whether the tool has side effects. Defaults to true.
+   */
+  hasSideEffects?: boolean;
+  /**
+   * Whether the tool's output should be rendered as markdown
+   */
+  isOutputMarkdown?: boolean;
+  /**
+   * Whether the tool supports live (streaming) output
+   */
+  canUpdateOutput?: boolean;
+}
+
 /**
  * Base implementation for tools with common functionality
  */
@@ -108,27 +143,29 @@ export abstract class BaseTool<
   TResult extends ToolResult = ToolResult,
 > implements Tool<TParams, TResult>
 {
+  readonly name: string;
+  readonly displayName: string;
+  readonly description: string;
+  readonly icon: Icon;
+  readonly parameterSchema: Schema;
+  readonly hasSideEffects: boolean;
+  readonly isOutputMarkdown: boolean;
+  readonly canUpdateOutput: boolean;
+
   /**
    * Creates a new instance of BaseTool
-   * @param name Internal name of the tool (used for API calls)
-   * @param displayName User-friendly display name of the tool
-   * @param description Description of what the tool does
-   * @param icon The icon to display when interacting via ACP
-   * @param parameterSchema Open API 3.0 Schema defining the parameters
-   * @param hasSideEffects Whether the tool has side effects. Defaults to true.
-   * @param isOutputMarkdown Whether the tool's output should be rendered as markdown
-   * @param canUpdateOutput Whether the tool supports live (streaming) output
+   * @param options The options for creating the tool
    */
-  constructor(
-    readonly name: string,
-    readonly displayName: string,
-    readonly description: string,
-    readonly icon: Icon,
-    readonly parameterSchema: Schema,
-    readonly hasSideEffects: boolean = true,
-    readonly isOutputMarkdown: boolean = true,
-    readonly canUpdateOutput: boolean = false,
-  ) {}
+  constructor(options: ToolOptions) {
+    this.name = options.name;
+    this.displayName = options.displayName;
+    this.description = options.description;
+    this.icon = options.icon;
+    this.parameterSchema = options.parameterSchema;
+    this.hasSideEffects = options.hasSideEffects ?? true;
+    this.isOutputMarkdown = options.isOutputMarkdown ?? true;
+    this.canUpdateOutput = options.canUpdateOutput ?? false;
+  }
 
   /**
    * Function declaration schema computed from name, description, and parameterSchema

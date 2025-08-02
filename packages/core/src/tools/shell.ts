@@ -45,10 +45,10 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
   private allowlist: Set<string> = new Set();
 
   constructor(private readonly config: Config) {
-    super(
-      ShellTool.Name,
-      'Shell',
-      `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
+    super({
+      name: ShellTool.Name,
+      displayName: 'Shell',
+      description: `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
 
       The following information is returned:
 
@@ -60,9 +60,9 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       Exit Code: Exit code or \`(none)\` if terminated by signal.
       Signal: Signal number or \`(none)\` if no signal was received.
       Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\``,
-      Icon.Terminal,
-      {
+      Process Group PGID: Process group started or \`(none)\`:`,
+      icon: Icon.Terminal,
+      parameterSchema: {
         type: Type.OBJECT,
         properties: {
           command: {
@@ -82,10 +82,10 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
         },
         required: ['command'],
       },
-      false, // output is not markdown
-      true, // output can be updated
-      true, // has side effects
-    );
+      isOutputMarkdown: false,
+      canUpdateOutput: true,
+      hasSideEffects: true,
+    });
   }
 
   getDescription(params: ShellToolParams): string {

@@ -81,12 +81,13 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
   static readonly Name = 'glob';
 
   constructor(private config: Config) {
-    super(
-      GlobTool.Name,
-      'FindFiles',
-      'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
-      Icon.FileSearch,
-      {
+    super({
+      name: GlobTool.Name,
+      displayName: 'FindFiles',
+      description:
+        'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
+      icon: Icon.FileSearch,
+      parameterSchema: {
         properties: {
           pattern: {
             description:
@@ -112,8 +113,8 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
         required: ['pattern'],
         type: Type.OBJECT,
       },
-      false,
-    );
+      hasSideEffects: false,
+    });
   }
 
   /**

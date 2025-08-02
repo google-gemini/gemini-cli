@@ -40,15 +40,16 @@ Error: Error or \`(none)\` if no error was reported for the subprocess.
 Exit Code: Exit code or \`(none)\` if terminated by signal.
 Signal: Signal number or \`(none)\` if no signal was received.
 `;
-    super(
+    super({
       name,
-      name,
+      displayName: name,
       description,
-      Icon.Hammer,
-      parameterSchema,
-      false, // isOutputMarkdown
-      false, // canUpdateOutput
-    );
+      icon: Icon.Hammer,
+      parameterSchema: parameterSchema as Schema,
+      hasSideEffects: true,
+      isOutputMarkdown: false,
+      canUpdateOutput: false,
+    });
   }
 
   async execute(params: ToolParams): Promise<ToolResult> {

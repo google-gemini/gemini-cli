@@ -118,13 +118,16 @@ export class MemoryTool
 
   static readonly Name: string = memoryToolSchemaData.name!;
   constructor() {
-    super(
-      MemoryTool.Name,
-      'Save Memory',
-      memoryToolDescription,
-      Icon.LightBulb,
-      memoryToolSchemaData.parameters as Record<string, unknown>,
-    );
+    super({
+      name: MemoryTool.Name,
+      displayName: 'Save Memory',
+      description: memoryToolDescription,
+      icon: Icon.LightBulb,
+      parameterSchema: memoryToolSchemaData.parameters as Record<
+        string,
+        unknown
+      >,
+    });
   }
 
   getDescription(_params: SaveMemoryParams): string {
