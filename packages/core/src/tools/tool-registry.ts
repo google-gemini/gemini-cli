@@ -150,6 +150,14 @@ export class ToolRegistry {
     this.tools.set(tool.name, tool);
   }
 
+  private removeDiscoveredTools(): void {
+    for (const tool of this.tools.values()) {
+      if (tool instanceof DiscoveredTool || tool instanceof DiscoveredMCPTool) {
+        this.tools.delete(tool.name);
+      }
+    }
+  }
+
   /**
    * Discovers tools from project (if available and configured).
    * Can be called multiple times to update discovered tools.
@@ -157,11 +165,7 @@ export class ToolRegistry {
    */
   async discoverAllTools(): Promise<void> {
     // remove any previously discovered tools
-    for (const tool of this.tools.values()) {
-      if (tool instanceof DiscoveredTool || tool instanceof DiscoveredMCPTool) {
-        this.tools.delete(tool.name);
-      }
-    }
+    this.removeDiscoveredTools();
 
     this.config.getPromptRegistry().clear();
 
@@ -184,11 +188,7 @@ export class ToolRegistry {
    */
   async discoverMcpTools(): Promise<void> {
     // remove any previously discovered tools
-    for (const tool of this.tools.values()) {
-      if (tool instanceof DiscoveredMCPTool) {
-        this.tools.delete(tool.name);
-      }
-    }
+    this.removeDiscoveredTools();
 
     this.config.getPromptRegistry().clear();
 
