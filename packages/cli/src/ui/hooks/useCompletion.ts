@@ -15,7 +15,6 @@ import {
   getErrorMessage,
   Config,
   FileDiscoveryService,
-  DEFAULT_FILE_FILTERING_OPTIONS,
 } from '@google/gemini-cli-core';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
@@ -301,23 +300,12 @@ export function useCompletion(
       // Command/Sub-command Completion
       const commandsToSearch = currentLevel || [];
       if (commandsToSearch.length > 0) {
-        let potentialSuggestions = commandsToSearch.filter(
+        const potentialSuggestions = commandsToSearch.filter(
           (cmd) =>
             cmd.description &&
             (cmd.name.startsWith(partial) ||
               cmd.altNames?.some((alt) => alt.startsWith(partial))),
         );
-
-        // If a user's input is an exact match and it is a leaf command,
-        // enter should submit immediately.
-        if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
-          const perfectMatch = potentialSuggestions.find(
-            (s) => s.name === partial || s.altNames?.includes(partial),
-          );
-          if (perfectMatch && perfectMatch.action) {
-            potentialSuggestions = [];
-          }
-        }
 
         const finalSuggestions = potentialSuggestions.map((cmd) => ({
           label: cmd.name,
@@ -492,8 +480,11 @@ export function useCompletion(
       const fileDiscoveryService = config ? config.getFileService() : null;
       const enableRecursiveSearch =
         config?.getEnableRecursiveFileSearch() ?? true;
-      const filterOptions =
-        config?.getFileFilteringOptions() ?? DEFAULT_FILE_FILTERING_OPTIONS;
+      const filterOptions = {
+        respectGitIgnore: config?.getFileFilteringRespectGitIgnore() ?? true,
+        respectGeminiIgnore:
+          config?.getFileFilteringRespectGeminiIgnore() ?? true,
+      };
 
       try {
         // If there's no slash, or it's the root, do a recursive search from workspace directories

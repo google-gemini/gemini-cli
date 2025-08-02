@@ -97,6 +97,195 @@ describe('useCompletion', () => {
         expect(result.current.visibleStartIndex).toBe(0);
         expect(result.current.showSuggestions).toBe(false);
         expect(result.current.isLoadingSuggestions).toBe(false);
+      },
+    );
+
+    it('should suggest commands based on partial altName matches', () => {
+      const slashCommands = [
+        {
+          name: 'stats',
+          altNames: ['usage'],
+          description: 'check session stats. Usage: /stats [model|tools]',
+        },
+      ] as unknown as SlashCommand[];
+      const { result } = renderHook(() =>
+        useCompletion(
+          useTextBufferForTest('/usag'), // part of the word "usage"
+          testRootDir,
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions).toHaveLength(1);
+      expect(result.current.suggestions[0].label).toBe('stats');
+    });
+
+    it('should show suggestions for exact leaf command match', () => {
+      const slashCommands = [
+        {
+          name: 'clear',
+          description: 'Clear the screen',
+        },
+      ] as unknown as SlashCommand[];
+      const { result } = renderHook(() =>
+        useCompletion(
+          useTextBufferForTest('/clear'),
+          testRootDir,
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions).toHaveLength(1);
+      expect(result.current.suggestions[0].label).toBe('clear');
+      expect(result.current.suggestions[0].description).toBe('Clear the screen');
+      expect(result.current.showSuggestions).toBe(true);
+    });
+
+    it('should show sub-commands for parent commands', () => {
+      const slashCommands = [
+        {
+          name: 'memory',
+          description: 'Manage memory',
+          subCommands: [
+            {
+              name: 'show',
+              description: 'Show memory',
+            },
+            {
+              name: 'add',
+              description: 'Add to memory',
+            },
+          ],
+        },
+      ] as unknown as SlashCommand[];
+      const { result } = renderHook(() =>
+        useCompletion(
+          useTextBufferForTest('/memory'),
+          testRootDir,
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions).toHaveLength(2);
+      expect(result.current.suggestions.map((s) => s.label)).toEqual(
+        expect.arrayContaining(['show', 'add']),
+      );
+    });
+
+    it('should show all sub-commands after parent command with space', () => {
+      const slashCommands = [
+        {
+          name: 'memory',
+          description: 'Manage memory',
+          subCommands: [
+            {
+              name: 'show',
+              description: 'Show memory',
+            },
+            {
+              name: 'add',
+              description: 'Add to memory',
+            },
+          ],
+        },
+      ] as unknown as SlashCommand[];
+      const { result } = renderHook(() =>
+        useCompletion(
+          useTextBufferForTest('/memory '),
+          testRootDir,
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions).toHaveLength(2);
+      expect(result.current.suggestions.map((s) => s.label)).toEqual(
+        expect.arrayContaining(['show', 'add']),
+      );
+    });
+
+    it('should filter sub-commands by prefix', () => {
+      const slashCommands = [
+        {
+          name: 'memory',
+          description: 'Manage memory',
+          subCommands: [
+            {
+              name: 'show',
+              description: 'Show memory',
+            },
+            {
+              name: 'add',
+              description: 'Add to memory',
+            },
+          ],
+        },
+      ] as unknown as SlashCommand[];
+      const { result } = renderHook(() =>
+        useCompletion(
+          useTextBufferForTest('/memory a'),
+          testRootDir,
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions).toHaveLength(1);
+      expect(result.current.suggestions[0].label).toBe('add');
+    });
+
+    it('should handle unknown command gracefully', () => {
+      const slashCommands = [
+        {
+          name: 'help',
+          description: 'Show help',
+        },
+      ] as unknown as SlashCommand[];
+      const { result } = renderHook(() =>
+        useCompletion(
+          useTextBufferForTest('/unknown'),
+          testRootDir,
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions).toHaveLength(0);
+      expect(result.current.showSuggestions).toBe(false);
+    });
+  });
+
+  describe('Command argument completion', () => {
+    it('should call completion function for command arguments', async () => {
+      const completionFn = vi.fn().mockResolvedValue(['arg1', 'arg2']);
+      const slashCommands = [
+        {
+          name: 'chat',
+          description: 'Manage chat history',
+          subCommands: [
+            {
+              name: 'resume',
+              description: 'Resume a saved chat',
+              completion: completionFn,
+            },
+          ],
+        },
+      ] as unknown as SlashCommand[];
+
+      const { result } = renderHook(() =>
+        useCompletion(
+          useTextBufferForTest('/chat resume '),
+          testRootDir,
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
       });
 
       it('should reset state when isActive becomes false', () => {
