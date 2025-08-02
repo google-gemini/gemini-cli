@@ -17,6 +17,7 @@ import {
 } from '../ui/commands/types.js';
 import { ICommandLoader } from './types.js';
 import { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '@google/gemini-cli-core';
 
 /**
  * Discovers and loads executable slash commands from prompts exposed by
@@ -135,6 +136,7 @@ export class McpPromptLoader implements ICommandLoader {
               return {
                 type: 'submit_prompt',
                 content: JSON.stringify(result.messages[0].content.text),
+                model: DEFAULT_GEMINI_FLASH_MODEL,
               };
             } catch (error) {
               return {

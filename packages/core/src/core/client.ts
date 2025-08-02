@@ -344,6 +344,7 @@ export class GeminiClient {
     request: PartListUnion,
     signal: AbortSignal,
     prompt_id: string,
+    model: string | undefined = undefined,
     turns: number = this.MAX_TURNS,
     originalModel?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
@@ -428,7 +429,7 @@ export class GeminiClient {
       return turn;
     }
 
-    const resultStream = turn.run(request, signal);
+    const resultStream = turn.run(request, signal, model);
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
         yield { type: GeminiEventType.LoopDetected };
@@ -466,6 +467,7 @@ export class GeminiClient {
           nextRequest,
           signal,
           prompt_id,
+          undefined,
           boundedTurns - 1,
           initialModel,
         );

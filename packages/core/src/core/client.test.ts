@@ -733,6 +733,7 @@ Here are some other files the user has open, with the most recent at the top:
       expect(mockTurnRunFn).toHaveBeenCalledWith(
         expectedRequest,
         expect.any(Object),
+        undefined,
       );
     });
 
@@ -780,6 +781,7 @@ Here are some other files the user has open, with the most recent at the top:
       expect(mockTurnRunFn).toHaveBeenCalledWith(
         initialRequest,
         expect.any(Object),
+        undefined,
       );
     });
 
@@ -844,6 +846,7 @@ This is the selected text in the file:
       expect(mockTurnRunFn).toHaveBeenCalledWith(
         expectedRequest,
         expect.any(Object),
+        undefined,
       );
     });
 
@@ -906,6 +909,7 @@ Here are some files the user has open, with the most recent at the top:
       expect(mockTurnRunFn).toHaveBeenCalledWith(
         expectedRequest,
         expect.any(Object),
+        undefined,
       );
     });
 
@@ -1143,6 +1147,7 @@ Here are some files the user has open, with the most recent at the top:
         [{ text: 'Start conversation' }],
         signal,
         'prompt-id-3',
+        undefined,
         Number.MAX_SAFE_INTEGER, // Bypass the MAX_TURNS protection
       );
 
