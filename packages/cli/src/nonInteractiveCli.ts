@@ -15,6 +15,7 @@ import {
   ToolCallRecord,
   ResumedSessionData,
   GeminiEventType,
+  ToolErrorType,
 } from '@google/gemini-cli-core';
 import { Content, Part, FunctionCall } from '@google/genai';
 
@@ -156,15 +157,11 @@ export async function runNonInteractive(
 
           // Tool call error handling.
           if (toolResponse.error) {
-            const isToolNotFound = toolResponse.error.message.includes(
-              'not found in registry',
-            );
             console.error(
               `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
             );
-            if (!isToolNotFound) {
+            if (toolResponse.errorType === ToolErrorType.UNHANDLED_EXCEPTION)
               process.exit(1);
-            }
           }
 
           if (toolResponse.responseParts) {

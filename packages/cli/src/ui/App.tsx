@@ -312,14 +312,19 @@ const App = ({
   // ---------- Auth validation ----------
 
   useEffect(() => {
-    if (settings.merged.selectedAuthType) {
+    if (settings.merged.selectedAuthType && !settings.merged.useExternalAuth) {
       const error = validateAuthMethod(settings.merged.selectedAuthType);
       if (error) {
         setAuthError(error);
         openAuthDialog();
       }
     }
-  }, [settings.merged.selectedAuthType, openAuthDialog, setAuthError]);
+  }, [
+    settings.merged.selectedAuthType,
+    settings.merged.useExternalAuth,
+    openAuthDialog,
+    setAuthError,
+  ]);
 
   // Sync user tier from config when authentication changes
   useEffect(() => {
