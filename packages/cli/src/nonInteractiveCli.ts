@@ -19,7 +19,6 @@ import { Content, Part, FunctionCall } from '@google/genai';
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
 import fs from 'fs';
 
-
 export async function runNonInteractive(
   config: Config,
   input: string,

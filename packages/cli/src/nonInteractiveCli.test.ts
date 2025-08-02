@@ -87,27 +87,52 @@ describe('runNonInteractive', () => {
     }
   }
 
-  it('should process input and write text output', async () => {
-    const events: ServerGeminiStreamEvent[] = [
-      { type: GeminiEventType.Content, value: 'Hello' },
-      { type: GeminiEventType.Content, value: ' World' },
-    ];
-    mockGeminiClient.sendMessageStream.mockReturnValue(
-      createStreamFromEvents(events),
-    );
+  it.each([{ withOutputFile: false }, { withOutputFile: true }])(
+    'should process input and write text output',
+    async ({ withOutputFile }) => {
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.Content, value: 'Hello' },
+        { type: GeminiEventType.Content, value: ' World' },
+      ];
+      if (withOutputFile) {
+        vi.mock('fs', async () => {
+          const { fs } = await import('memfs');
+          return {
+            default: fs,
+            ...fs,
+          };
+        });
 
-    await runNonInteractive(mockConfig, 'Test input', 'prompt-id-1');
+        mockConfig.getOutput = vi.fn().mockReturnValue('/test/output.txt');
+        // Set up memfs with the directory structure
+        vol.fromJSON({
+          '/test': null, // Create directory
+        });
+      }
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
 
-    expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledWith(
-      [{ text: 'Test input' }],
-      expect.any(AbortSignal),
-      'prompt-id-1',
-    );
-    expect(processStdoutSpy).toHaveBeenCalledWith('Hello');
-    expect(processStdoutSpy).toHaveBeenCalledWith(' World');
-    expect(processStdoutSpy).toHaveBeenCalledWith('\n');
-    expect(mockShutdownTelemetry).toHaveBeenCalled();
-  });
+      await runNonInteractive(mockConfig, 'Test input', 'prompt-id-1');
+
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledWith(
+        [{ text: 'Test input' }],
+        expect.any(AbortSignal),
+        'prompt-id-1',
+      );
+      if (withOutputFile) {
+        // Verify file was created and contains expected content
+        expect(vol.existsSync('/test/output.txt')).toBe(true);
+        const fileContent = vol.readFileSync('/test/output.txt', 'utf8');
+        expect(fileContent).toBe('Hello World'); // No newline in file, only in stdout
+      } else {
+        expect(processStdoutSpy).toHaveBeenCalledWith('Hello');
+        expect(processStdoutSpy).toHaveBeenCalledWith(' World');
+        expect(processStdoutSpy).toHaveBeenCalledWith('\n');
+        expect(mockShutdownTelemetry).toHaveBeenCalled();
+      }
+    },
+  );
 
   it('should handle a single tool call and respond', async () => {
     const toolCallEvent: ServerGeminiStreamEvent = {
