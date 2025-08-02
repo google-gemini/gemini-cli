@@ -192,7 +192,7 @@ export interface ConfigParameters {
 export class Config {
   private toolRegistry!: ToolRegistry;
   private promptRegistry!: PromptRegistry;
-  private readonly sessionId: string;
+  private sessionId: string;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
@@ -346,6 +346,10 @@ export class Config {
 
   getSessionId(): string {
     return this.sessionId;
+  }
+
+  setSessionId(sessionId: string): void {
+    this.sessionId = sessionId;
   }
 
   getContentGeneratorConfig(): ContentGeneratorConfig {
