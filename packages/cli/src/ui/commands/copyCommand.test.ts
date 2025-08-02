@@ -227,7 +227,10 @@ describe('copyCommand', () => {
     expect(result).toEqual({
       type: 'message',
       messageType: 'error',
-      content: 'Failed to copy to the clipboard.',
+      content:
+        'Failed to copy to the clipboard.\n' +
+        'Remote sessions may block clipboard. ' +
+        'Try OSC52 or a local terminal.'
     });
   });
 
@@ -249,7 +252,10 @@ describe('copyCommand', () => {
     expect(result).toEqual({
       type: 'message',
       messageType: 'error',
-      content: 'Failed to copy to the clipboard.',
+      content:
+        'Failed to copy to the clipboard.\n' +
+        'Remote sessions may block clipboard. ' +
+        'Try OSC52 or a local terminal.'
     });
   });
 
