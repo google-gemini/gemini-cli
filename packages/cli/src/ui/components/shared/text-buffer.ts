@@ -13,6 +13,7 @@ import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
 import stringWidth from 'string-width';
 import { unescapePath } from '@google/gemini-cli-core';
 import { toCodePoints, cpLen, cpSlice } from '../../utils/textUtils.js';
+import { getTersePath } from '../../utils/clipboardUtils.js';
 import { handleVimAction, VimAction } from './vim-buffer-actions.js';
 
 export type Direction =
@@ -433,6 +434,91 @@ export function offsetToLogicalPos(
   return [row, col];
 }
 
+// --- Start of visual transformation logic ---
+
+interface Transformation {
+  logStart: number;
+  logEnd: number;
+  rawText: string;
+  terseText: string;
+}
+
+function getTransformationsForLine(line: string): Transformation[] {
+  const imagePathRegex =
+    /@((?:(?:\\ )|[^@[\]\s])+\.(?:png|jpg|jpeg|gif|webp|svg|bmp))/gi;
+  const transformations: Transformation[] = [];
+  let match;
+  while ((match = imagePathRegex.exec(line)) !== null) {
+    const rawText = match[0];
+    const terseText = getTersePath(rawText);
+    const logStart = cpLen(line.substring(0, match.index));
+    transformations.push({
+      logStart,
+      logEnd: logStart + cpLen(rawText),
+      rawText,
+      terseText,
+    });
+  }
+  return transformations.sort((a, b) => a.logStart - b.logStart);
+}
+
+function buildDisplayLineAndMap(
+  logLine: string,
+  logIndex: number,
+  logicalCursor: [number, number],
+  transformations: Transformation[],
+): { displayLine: string; displayToLogMap: number[] } {
+  let displayLine = '';
+  const displayToLogMap: number[] = [];
+  let lastLogPos = 0;
+
+  const cursorIsOnThisLine = logIndex === logicalCursor[0];
+  const cursorCol = logicalCursor[1];
+
+  for (const transform of transformations) {
+    // Append text before transform
+    const prefix = cpSlice(logLine, lastLogPos, transform.logStart);
+    displayLine += prefix;
+    for (let i = 0; i < cpLen(prefix); i++) {
+      displayToLogMap.push(lastLogPos + i);
+    }
+
+    const isExpanded =
+      cursorIsOnThisLine &&
+      cursorCol >= transform.logStart &&
+      cursorCol <= transform.logEnd;
+    const textToDisplay = isExpanded ? transform.rawText : transform.terseText;
+    displayLine += textToDisplay;
+
+    // Map display characters back to logical characters
+    for (let i = 0; i < cpLen(textToDisplay); i++) {
+      if (isExpanded) {
+        // 1-to-1 mapping
+        displayToLogMap.push(transform.logStart + i);
+      } else {
+        // When collapsed, moving inside the terse text should jump the logical cursor
+        // to the start of the raw path, which will expand it on the next render.
+        displayToLogMap.push(transform.logStart);
+      }
+    }
+    lastLogPos = transform.logEnd;
+  }
+
+  // Append text after last transform
+  const suffix = cpSlice(logLine, lastLogPos);
+  displayLine += suffix;
+  for (let i = 0; i < cpLen(suffix); i++) {
+    displayToLogMap.push(lastLogPos + i);
+  }
+
+  // For a cursor at the very end of the display line
+  displayToLogMap.push(cpLen(logLine));
+
+  return { displayLine, displayToLogMap };
+}
+
+// --- End of visual transformation logic ---
+
 /**
  * Converts logical row/col position to absolute text offset
  * Inverse operation of offsetToLogicalPos
@@ -470,15 +556,27 @@ function calculateVisualLayout(
   visualCursor: [number, number];
   logicalToVisualMap: Array<Array<[number, number]>>; // For each logical line, an array of [visualLineIndex, startColInLogical]
   visualToLogicalMap: Array<[number, number]>; // For each visual line, its [logicalLineIndex, startColInLogical]
+  displayToLogicalMaps: number[][]; // For each logical line, an array to represent the transformation on that line
 } {
   const visualLines: string[] = [];
   const logicalToVisualMap: Array<Array<[number, number]>> = [];
   const visualToLogicalMap: Array<[number, number]> = [];
+  const displayToLogicalMaps: number[][] = [];
   let currentVisualCursor: [number, number] = [0, 0];
 
   logicalLines.forEach((logLine, logIndex) => {
     logicalToVisualMap[logIndex] = [];
-    if (logLine.length === 0) {
+
+    const transformations = getTransformationsForLine(logLine);
+    const { displayLine, displayToLogMap } = buildDisplayLineAndMap(
+      logLine,
+      logIndex,
+      logicalCursor,
+      transformations,
+    );
+    displayToLogicalMaps[logIndex] = displayToLogMap;
+
+    if (displayLine.length === 0) {
       // Handle empty logical line
       logicalToVisualMap[logIndex].push([visualLines.length, 0]);
       visualToLogicalMap.push([logIndex, 0]);
@@ -489,7 +587,7 @@ function calculateVisualLayout(
     } else {
       // Non-empty logical line
       let currentPosInLogLine = 0; // Tracks position within the current logical line (code point index)
-      const codePointsInLogLine = toCodePoints(logLine);
+      const codePointsInLogLine = toCodePoints(displayLine);
 
       while (currentPosInLogLine < codePointsInLogLine.length) {
         let currentChunk = '';
@@ -588,20 +686,36 @@ function calculateVisualLayout(
         // Cursor mapping logic
         // Note: currentPosInLogLine here is the start of the currentChunk within the logical line.
         if (logIndex === logicalCursor[0]) {
-          const cursorLogCol = logicalCursor[1]; // This is a code point index
+          const cursorLogCol = logicalCursor[1];
+          let displayColForCursor;
+          // Find the first display position whose logical mapping is > our cursor's logical position.
+          const firstGreaterIndex = displayToLogMap.findIndex(
+            (logCol) => logCol > cursorLogCol,
+          );
+
+          if (firstGreaterIndex === -1) {
+            // This means the cursor is at or after the last logical position mapped.
+            // Place it at the end of the display line.
+            displayColForCursor = displayToLogMap.length - 1;
+          } else {
+            // The correct display position is the one right before the first greater one.
+            // We ensure it's not negative, which can happen if the cursor is at position 0.
+            displayColForCursor = Math.max(0, firstGreaterIndex - 1);
+          }
+
           if (
-            cursorLogCol >= currentPosInLogLine &&
-            cursorLogCol < currentPosInLogLine + numCodePointsInChunk // Cursor is within this chunk
+            displayColForCursor >= currentPosInLogLine &&
+            displayColForCursor < currentPosInLogLine + numCodePointsInChunk
           ) {
             currentVisualCursor = [
               visualLines.length - 1,
-              cursorLogCol - currentPosInLogLine, // Visual col is also code point index within visual line
+              displayColForCursor - currentPosInLogLine,
             ];
           } else if (
-            cursorLogCol === currentPosInLogLine + numCodePointsInChunk &&
+            displayColForCursor ===
+              currentPosInLogLine + numCodePointsInChunk &&
             numCodePointsInChunk > 0
           ) {
-            // Cursor is exactly at the end of this non-empty chunk
             currentVisualCursor = [
               visualLines.length - 1,
               numCodePointsInChunk,
@@ -628,7 +742,7 @@ function calculateVisualLayout(
       // if the cursor is at the very end of this logical line, update visual cursor.
       if (
         logIndex === logicalCursor[0] &&
-        logicalCursor[1] === codePointsInLogLine.length // Cursor at end of logical line
+        logicalCursor[1] === cpLen(logLine) // Cursor at end of logical line
       ) {
         const lastVisualLineIdx = visualLines.length - 1;
         if (
@@ -673,6 +787,7 @@ function calculateVisualLayout(
     visualCursor: currentVisualCursor,
     logicalToVisualMap,
     visualToLogicalMap,
+    displayToLogicalMaps,
   };
 }
 
@@ -893,7 +1008,12 @@ export function textBufferReducer(
         [cursorRow, cursorCol],
         viewportWidth,
       );
-      const { visualLines, visualCursor, visualToLogicalMap } = visualLayout;
+      const {
+        visualLines,
+        visualCursor,
+        visualToLogicalMap,
+        displayToLogicalMaps,
+      } = visualLayout;
 
       let newVisualRow = visualCursor[0];
       let newVisualCol = visualCursor[1];
@@ -1021,17 +1141,19 @@ export function textBufferReducer(
       }
 
       if (visualToLogicalMap[newVisualRow]) {
-        const [logRow, logStartCol] = visualToLogicalMap[newVisualRow];
-        return {
-          ...state,
-          cursorRow: logRow,
-          cursorCol: clamp(
-            logStartCol + newVisualCol,
-            0,
-            cpLen(state.lines[logRow] ?? ''),
-          ),
-          preferredCol: newPreferredCol,
-        };
+        const [logRow, displayStartCol] = visualToLogicalMap[newVisualRow];
+        const displayCol = displayStartCol + newVisualCol;
+        const displayToLogMap = displayToLogicalMaps[logRow];
+        if (displayToLogMap) {
+          const newLogicalCol =
+            displayToLogMap[displayCol] ?? cpLen(state.lines[logRow] ?? '');
+          return {
+            ...state,
+            cursorRow: logRow,
+            cursorCol: newLogicalCol,
+            preferredCol: newPreferredCol,
+          };
+        }
       }
       return state;
     }
@@ -1712,6 +1834,8 @@ export function useTextBuffer({
     viewportVisualLines: renderedVisualLines,
     visualCursor,
     visualScrollRow,
+    visualToLogicalMap: visualLayout.visualToLogicalMap,
+    displayToLogicalMaps: visualLayout.displayToLogicalMaps,
 
     setText,
     insert,
@@ -1786,6 +1910,8 @@ export interface TextBuffer {
   viewportVisualLines: string[]; // The subset of visual lines to be rendered based on visualScrollRow and viewport.height
   visualCursor: [number, number]; // Visual cursor [row, col] relative to the start of all visualLines
   visualScrollRow: number; // Scroll position for visual lines (index of the first visible visual line)
+  visualToLogicalMap: Array<[number, number]>;
+  displayToLogicalMaps: number[][];
 
   // Actions
 

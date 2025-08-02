@@ -10,7 +10,7 @@ import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { TextBuffer } from './shared/text-buffer.js';
-import { cpSlice, cpLen } from '../utils/textUtils.js';
+import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
@@ -400,38 +400,75 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           ) : (
             linesToRender.map((lineText, visualIdxInRenderedSet) => {
               const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
+
+              // 1. Pad the line to the full input width
               let display = cpSlice(lineText, 0, inputWidth);
               const currentVisualWidth = stringWidth(display);
               if (currentVisualWidth < inputWidth) {
                 display = display + ' '.repeat(inputWidth - currentVisualWidth);
               }
 
-              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
-                const relativeVisualColForHighlight = cursorVisualColAbsolute;
+              const codePoints = toCodePoints(display);
+              const outputChars = [];
 
-                if (relativeVisualColForHighlight >= 0) {
-                  if (relativeVisualColForHighlight < cpLen(display)) {
-                    const charToHighlight =
-                      cpSlice(
-                        display,
-                        relativeVisualColForHighlight,
-                        relativeVisualColForHighlight + 1,
-                      ) || ' ';
-                    const highlighted = chalk.inverse(charToHighlight);
-                    display =
-                      cpSlice(display, 0, relativeVisualColForHighlight) +
-                      highlighted +
-                      cpSlice(display, relativeVisualColForHighlight + 1);
-                  } else if (
-                    relativeVisualColForHighlight === cpLen(display) &&
-                    cpLen(display) === inputWidth
-                  ) {
-                    display = display + chalk.inverse(' ');
+              // 2. Apply transformation coloring character by character
+              for (let i = 0; i < codePoints.length; i++) {
+                const char = codePoints[i];
+                const absoluteVisualIdx =
+                  visualIdxInRenderedSet + scrollVisualRow;
+                const [logicalLineIndex, startColInDisplayLine] =
+                  buffer.visualToLogicalMap[absoluteVisualIdx] ?? [];
+
+                let isTransform = false;
+                if (logicalLineIndex !== undefined) {
+                  const displayToLogMap =
+                    buffer.displayToLogicalMaps[logicalLineIndex];
+                  if (displayToLogMap) {
+                    const displayMapIdx = startColInDisplayLine + i;
+                    const currentLogPos = displayToLogMap[displayMapIdx];
+                    const nextLogPos = displayToLogMap[displayMapIdx + 1];
+                    const prevLogPos = displayToLogMap[displayMapIdx - 1];
+                    // A character is part of a collapsed transformation if it's in a sequence
+                    // of display characters that all map to the same logical position.
+                    if (
+                      (currentLogPos !== undefined &&
+                        currentLogPos === nextLogPos) ||
+                      (currentLogPos !== undefined &&
+                        currentLogPos === prevLogPos)
+                    ) {
+                      isTransform = true;
+                    }
                   }
                 }
+
+                outputChars.push(isTransform ? chalk.cyan(char) : char);
               }
+
+              // 3. Apply cursor inversion on top of any existing styles
+              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
+                const relativeVisualColForHighlight = cursorVisualColAbsolute;
+                if (
+                  relativeVisualColForHighlight >= 0 &&
+                  relativeVisualColForHighlight < outputChars.length
+                ) {
+                  outputChars[relativeVisualColForHighlight] = chalk.inverse(
+                    outputChars[relativeVisualColForHighlight],
+                  );
+                } else if (
+                  relativeVisualColForHighlight === outputChars.length &&
+                  outputChars.length < inputWidth
+                ) {
+                  // Handle cursor at the end of the line
+                  outputChars.push(chalk.inverse(' '));
+                }
+              }
+
+              const finalDisplay = outputChars.join('');
+
               return (
-                <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
+                <Text key={`line-${visualIdxInRenderedSet}`}>
+                  {finalDisplay}
+                </Text>
               );
             })
           )}

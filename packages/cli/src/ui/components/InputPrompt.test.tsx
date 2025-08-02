@@ -113,6 +113,8 @@ describe('InputPrompt', () => {
       allVisualLines: [''],
       visualCursor: [0, 0],
       visualScrollRow: 0,
+      visualToLogicalMap: [[0, 0]],
+      displayToLogicalMaps: { 0: [0] },
       handleInput: vi.fn(),
       move: vi.fn(),
       moveToOffset: vi.fn(),
