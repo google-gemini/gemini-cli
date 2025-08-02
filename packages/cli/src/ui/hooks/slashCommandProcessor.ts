@@ -16,7 +16,7 @@ import {
   logSlashCommand,
   SlashCommandEvent,
   ToolConfirmationOutcome,
-} from '@google/gemini-cli-core';
+} from '@dbx-cli/core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
   Message,

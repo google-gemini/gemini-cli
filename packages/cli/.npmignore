@@ -1,0 +1,23 @@
+# Source files
+src/
+*.ts
+*.tsx
+!dist/**/*.d.ts
+
+# Config files
+tsconfig.json
+vitest.config.ts
+.eslintrc.*
+
+# Tests
+__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Development
+node_modules/
+coverage/
+.env
+.env.*

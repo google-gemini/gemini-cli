@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { isGitRepository } from '@google/gemini-cli-core';
+import { isGitRepository } from '@dbx-cli/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as childProcess from 'child_process';

@@ -13,7 +13,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { CommandContext, SlashCommand } from '../commands/types.js';
-import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
+import { Config, FileDiscoveryService } from '@dbx-cli/core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 
 describe('useCompletion', () => {

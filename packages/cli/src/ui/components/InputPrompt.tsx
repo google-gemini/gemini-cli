@@ -17,7 +17,7 @@ import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useCompletion } from '../hooks/useCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import { Config } from '@dbx-cli/core';
 import {
   clipboardHasImage,
   saveClipboardImage,

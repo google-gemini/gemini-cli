@@ -13,7 +13,7 @@ import {
   isTelemetrySdkInitialized,
   GeminiEventType,
   ToolErrorType,
-} from '@google/gemini-cli-core';
+} from '@dbx-cli/core';
 import { Content, Part, FunctionCall } from '@google/genai';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';

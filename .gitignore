@@ -40,3 +40,5 @@ packages/cli/src/generated/
 .integration-tests/
 packages/vscode-ide-companion/*.vsix
 .env.local
+scripts/prepare-npm-publish.js
+publish.sh

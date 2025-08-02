@@ -1,0 +1,51 @@
+# Source files
+packages/
+scripts/
+integration-tests/
+
+# Development files
+.eslintrc.*
+.prettierrc
+*.config.js
+*.config.ts
+tsconfig.json
+vitest.config.ts
+
+# CI/CD
+.github/
+.circleci/
+
+# Build artifacts (except bundle)
+dist/
+coverage/
+*.log
+
+# Development
+.env
+.env.*
+node_modules/
+
+# Docs (except main README)
+docs/
+*.md
+!README.md
+!LICENSE
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+test/
+tests/
+__tests__/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts

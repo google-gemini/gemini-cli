@@ -7,7 +7,7 @@
 import {
   getErrorMessage,
   loadServerHierarchicalMemory,
-} from '@google/gemini-cli-core';
+} from '@dbx-cli/core';
 import { MessageType } from '../types.js';
 import {
   CommandKind,

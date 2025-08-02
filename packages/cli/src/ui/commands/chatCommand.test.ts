@@ -21,7 +21,7 @@ import {
 } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { Content } from '@google/genai';
-import { GeminiClient } from '@google/gemini-cli-core';
+import { GeminiClient } from '@dbx-cli/core';
 
 import * as fsPromises from 'fs/promises';
 import { chatCommand } from './chatCommand.js';

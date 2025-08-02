@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ToolConfirmationOutcome } from '@google/gemini-cli-core';
+import { ToolConfirmationOutcome } from '@dbx-cli/core';
 import { Box, Text, useInput } from 'ink';
 import React from 'react';
 import { Colors } from '../colors.js';

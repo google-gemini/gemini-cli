@@ -38,7 +38,7 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
-} from '@google/gemini-cli-core';
+} from '@dbx-cli/core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';

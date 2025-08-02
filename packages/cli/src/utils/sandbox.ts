@@ -15,7 +15,7 @@ import {
   SETTINGS_DIRECTORY_NAME,
 } from '../config/settings.js';
 import { promisify } from 'util';
-import { Config, SandboxConfig } from '@google/gemini-cli-core';
+import { Config, SandboxConfig } from '@dbx-cli/core';
 
 const execAsync = promisify(exec);
 

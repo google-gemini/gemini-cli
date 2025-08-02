@@ -6,7 +6,7 @@
 
 import { ICommandLoader } from './types.js';
 import { SlashCommand } from '../ui/commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import { Config } from '@dbx-cli/core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';

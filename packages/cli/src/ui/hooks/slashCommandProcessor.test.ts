@@ -9,9 +9,9 @@ const { logSlashCommand, SlashCommandEvent } = vi.hoisted(() => ({
   SlashCommandEvent: vi.fn((command, subCommand) => ({ command, subCommand })),
 }));
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+vi.mock('@dbx-cli/core', async (importOriginal) => {
   const original =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+    await importOriginal<typeof import('@dbx-cli/core')>();
   return {
     ...original,
     logSlashCommand,
@@ -69,7 +69,7 @@ import {
   ConfirmShellCommandsActionReturn,
   SlashCommand,
 } from '../commands/types.js';
-import { Config, ToolConfirmationOutcome } from '@google/gemini-cli-core';
+import { Config, ToolConfirmationOutcome } from '@dbx-cli/core';
 import { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';

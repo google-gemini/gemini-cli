@@ -21,7 +21,7 @@ import {
   getErrorMessage,
   isWithinRoot,
   getErrorStatus,
-} from '@google/gemini-cli-core';
+} from '@dbx-cli/core';
 import * as acp from './acp.js';
 import { Agent } from './acp.js';
 import { Readable, Writable } from 'node:stream';

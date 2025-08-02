@@ -11,7 +11,7 @@ import {
   UserTierId,
   DEFAULT_GEMINI_FLASH_MODEL,
   isProQuotaExceededError,
-} from '@google/gemini-cli-core';
+} from '@dbx-cli/core';
 
 describe('parseAndFormatApiError', () => {
   const _enterpriseMessage =

@@ -6,7 +6,7 @@
 
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { getProjectTempDir } from '@google/gemini-cli-core';
+import { getProjectTempDir } from '@dbx-cli/core';
 
 const cleanupFunctions: Array<() => void> = [];
 

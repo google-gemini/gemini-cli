@@ -16,7 +16,7 @@ import {
   isBinary,
   ShellExecutionResult,
   ShellExecutionService,
-} from '@google/gemini-cli-core';
+} from '@dbx-cli/core';
 import { type PartListUnion } from '@google/genai';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';

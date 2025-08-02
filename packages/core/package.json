@@ -1,10 +1,10 @@
 {
-  "name": "@google/gemini-cli-core",
-  "version": "0.1.15",
-  "description": "Gemini CLI Core",
+  "name": "@dbx-cli/core",
+  "version": "1.0.0",
+  "description": "Databricks CLI Core",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+    "url": "git+https://github.com/MarkAngler/dbx-cli.git"
   },
   "type": "module",
   "main": "dist/index.js",

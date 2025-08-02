@@ -1,14 +1,13 @@
 {
-  "name": "gemini-cli-vscode-ide-companion",
-  "displayName": "Gemini CLI Companion",
-  "description": "Enable Gemini CLI with direct access to your VS Code workspace.",
-  "version": "0.0.1",
-  "publisher": "google",
+  "name": "dbx-cli-vscode-companion",
+  "displayName": "DBX CLI Companion",
+  "description": "VS Code companion for DBX CLI",
+  "version": "1.0.0",
+  "publisher": "dbx-cli",
   "icon": "assets/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/google-gemini/gemini-cli.git",
-    "directory": "packages/vscode-ide-companion"
+    "url": "git+https://github.com/MarkAngler/dbx-cli.git"
   },
   "engines": {
     "vscode": "^1.101.0"
@@ -19,10 +18,10 @@
     "AI"
   ],
   "keywords": [
-    "gemini-cli",
-    "gemini cli",
-    "gemini",
-    "gemini code",
+    "dbx-cli",
+    "dbx cli",
+    "databricks",
+    "databricks cli",
     "cli",
     "ide integration",
     "ide companion"
@@ -33,8 +32,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "gemini-cli.runGeminiCLI",
-        "title": "Gemini CLI: Run"
+        "command": "dbx-cli.runDBXCLI",
+        "title": "DBX CLI: Run"
       }
     ]
   },
