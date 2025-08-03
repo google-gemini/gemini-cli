@@ -167,7 +167,8 @@ export function useCompletion(
 
   useEffect(() => {
     if (commandIndex === -1) {
-      resetCompletionState();
+      // Reset suggestions in next tick to avoid conflicts with concurrent suggestions updates
+      setTimeout(resetCompletionState, 0);
       return;
     }
 
@@ -674,17 +675,18 @@ export function useCompletion(
         ) {
           suggestionText = ' ' + suggestionText;
         }
-        suggestionText += ' ';
       }
+
+      // Always add trailing space after completion
+      suggestionText += ' ';
 
       buffer.replaceRangeByOffset(
         logicalPosToOffset(buffer.lines, cursorRow, completionStart.current),
         logicalPosToOffset(buffer.lines, cursorRow, completionEnd.current),
         suggestionText,
       );
-      resetCompletionState();
     },
-    [cursorRow, resetCompletionState, buffer, suggestions, commandIndex],
+    [cursorRow, buffer, suggestions, commandIndex],
   );
 
   return {

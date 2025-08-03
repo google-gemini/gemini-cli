@@ -134,7 +134,7 @@ describe('useCompletion', () => {
         expect(result.current.isLoadingSuggestions).toBe(false);
       });
 
-      it('should reset all state to default values', () => {
+      it('should reset all state to default values', async () => {
         const slashCommands = [
           {
             name: 'help',
@@ -160,6 +160,11 @@ describe('useCompletion', () => {
 
         act(() => {
           result.current.resetCompletionState();
+        });
+
+        // Wait for async suggestions clearing
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
         });
 
         expect(result.current.suggestions).toEqual([]);
@@ -1249,7 +1254,7 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(result.current.textBuffer.text).toBe('@src/file1.txt');
+      expect(result.current.textBuffer.text).toBe('@src/file1.txt ');
     });
 
     it('should complete a file path when cursor is not at the end of the line', () => {
@@ -1278,7 +1283,7 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(result.current.textBuffer.text).toBe('@src/file1.txt le.txt');
+      expect(result.current.textBuffer.text).toBe('@src/file1.txt  le.txt');
     });
 
     it('should complete the correct file path with multiple @-commands', () => {
@@ -1306,7 +1311,7 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(result.current.textBuffer.text).toBe('@file1.txt @src/file2.txt');
+      expect(result.current.textBuffer.text).toBe('@file1.txt @src/file2.txt ');
     });
   });
 });
