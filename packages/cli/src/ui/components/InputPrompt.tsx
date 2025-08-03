@@ -66,6 +66,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const preservedTextRef = useRef<string>('');
+  const preservedTextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -116,9 +117,26 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (shellModeActive) {
         // Shell commands never stream to Gemini, no need to preserve
         preservedTextRef.current = '';
+        // Clear any existing timeout since we're not preserving
+        if (preservedTextTimeoutRef.current) {
+          clearTimeout(preservedTextTimeoutRef.current);
+          preservedTextTimeoutRef.current = null;
+        }
       } else {
+        // Clear any existing timeout before starting a new one
+        if (preservedTextTimeoutRef.current) {
+          clearTimeout(preservedTextTimeoutRef.current);
+          preservedTextTimeoutRef.current = null;
+        }
+
         // Clear any old preserved text and preserve the new submission
         preservedTextRef.current = submittedValue;
+
+        // Start a new 5-minute timeout to clear preserved text
+        preservedTextTimeoutRef.current = setTimeout(() => {
+          preservedTextRef.current = '';
+          preservedTextTimeoutRef.current = null;
+        }, 5 * 60 * 1000); // 5 minutes
       }
 
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
@@ -171,21 +189,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     resetReverseSearchCompletionState,
   ]);
 
-  // Cleanup preserved text with timeout-based fallback to prevent memory leaks
-  // Triggers only after successful submission when userMessages updates
-  useEffect(() => {
-    if (!preservedTextRef.current) return;
-
-    // Clear very old preserved text (5 minutes) to prevent memory leaks
-    const timeoutId = setTimeout(
-      () => {
-        preservedTextRef.current = '';
-      },
-      5 * 60 * 1000,
-    ); // 5 minutes
-
-    return () => clearTimeout(timeoutId);
-  }, [userMessages]); // Triggers only after submission when history updates
+  // Cleanup timeout on component unmount to prevent memory leaks
+  useEffect(() => () => {
+    if (preservedTextTimeoutRef.current) {
+      clearTimeout(preservedTextTimeoutRef.current);
+      preservedTextTimeoutRef.current = null;
+    }
+  }, []);
 
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
@@ -291,8 +301,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           buffer.setText(textToRestore);
         }
 
-        // Phase 3: Always clear preserved text to prevent state corruption
+        // Phase 3: Always clear preserved text and timeout to prevent state corruption
         preservedTextRef.current = '';
+        if (preservedTextTimeoutRef.current) {
+          clearTimeout(preservedTextTimeoutRef.current);
+          preservedTextTimeoutRef.current = null;
+        }
       }
 
       if (shellModeActive && key.ctrl && key.name === 'r') {
@@ -456,8 +470,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (buffer.text.length > 0) {
           buffer.setText('');
           resetCompletionState();
-          // Also clear preserved text since user explicitly cleared input
+          // Also clear preserved text and timeout since user explicitly cleared input
           preservedTextRef.current = '';
+          if (preservedTextTimeoutRef.current) {
+            clearTimeout(preservedTextTimeoutRef.current);
+            preservedTextTimeoutRef.current = null;
+          }
           return;
         }
         return;
