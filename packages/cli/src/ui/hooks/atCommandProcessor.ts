@@ -23,10 +23,6 @@ import {
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { simpleGit } from 'simple-git';
 
-// Extend globalThis interface for temporary git content storage
-declare global {
-  var _geminiGitContent: Map<string, string> | undefined;
-}
 
 interface HandleAtCommandParams {
   query: string;
@@ -40,6 +36,32 @@ interface HandleAtCommandParams {
 interface HandleAtCommandResult {
   processedQuery: PartListUnion | null;
   shouldProceed: boolean;
+}
+
+interface GitContentEntry {
+  atPath: string;
+  content: string;
+  description: string;
+}
+
+/**
+ * Adds git content to processed query parts
+ */
+function addGitContentToQuery(
+  processedQueryParts: PartUnion[],
+  gitContentEntries: GitContentEntry[],
+  atPathToResolvedSpecMap: Map<string, string>,
+): void {
+  if (gitContentEntries.length > 0) {
+    processedQueryParts.push({ text: '\n--- Git Context ---' });
+    for (const entry of gitContentEntries) {
+      const resolvedSpec = atPathToResolvedSpecMap.get(entry.atPath);
+      processedQueryParts.push({
+        text: `\n${resolvedSpec}:\n${entry.content}\n`,
+      });
+    }
+    processedQueryParts.push({ text: '\n--- End of git context ---' });
+  }
 }
 
 interface AtCommandPart {
@@ -301,6 +323,7 @@ export async function handleAtCommand({
   const pathSpecsToRead: string[] = [];
   const atPathToResolvedSpecMap = new Map<string, string>();
   const contentLabelsForDisplay: string[] = [];
+  const gitContentEntries: GitContentEntry[] = [];
   const ignoredByReason: Record<string, string[]> = {
     git: [],
     gemini: [],
@@ -351,9 +374,12 @@ export async function handleAtCommand({
       if (gitResult.success) {
         // Mark this as a special git command that should be processed later
         atPathToResolvedSpecMap.set(originalAtPath, `git:${gitResult.description}`);
-        // Store git content in a temporary map for later use
-        if (!globalThis._geminiGitContent) globalThis._geminiGitContent = new Map();
-        globalThis._geminiGitContent.set(originalAtPath, gitResult.content || '');
+        // Store git content locally for later use
+        gitContentEntries.push({
+          atPath: originalAtPath,
+          content: gitResult.content || '',
+          description: gitResult.description || '',
+        });
         contentLabelsForDisplay.push(`git:${gitResult.description}`);
         continue;
       } else {
@@ -551,18 +577,9 @@ export async function handleAtCommand({
     onDebugMessage('No valid file paths found in @ commands to read.');
     
     // Check if we have git content to add
-    if (globalThis._geminiGitContent && globalThis._geminiGitContent.size > 0) {
+    if (gitContentEntries.length > 0) {
       const processedQueryParts: PartUnion[] = [{ text: initialQueryText }];
-      processedQueryParts.push({ text: '\n--- Git Context ---' });
-      for (const [atPath, gitContent] of globalThis._geminiGitContent.entries()) {
-        const resolvedSpec = atPathToResolvedSpecMap.get(atPath);
-        processedQueryParts.push({
-          text: `\n${resolvedSpec}:\n${gitContent}\n`,
-        });
-      }
-      processedQueryParts.push({ text: '\n--- End of git context ---' });
-      // Clean up the temporary storage
-      globalThis._geminiGitContent.clear();
+      addGitContentToQuery(processedQueryParts, gitContentEntries, atPathToResolvedSpecMap);
       return { processedQuery: processedQueryParts, shouldProceed: true };
     }
     
@@ -636,18 +653,7 @@ export async function handleAtCommand({
     }
 
     // Add git content if any
-    if (globalThis._geminiGitContent && globalThis._geminiGitContent.size > 0) {
-      processedQueryParts.push({ text: '\n--- Git Context ---' });
-      for (const [atPath, gitContent] of globalThis._geminiGitContent.entries()) {
-        const resolvedSpec = atPathToResolvedSpecMap.get(atPath);
-        processedQueryParts.push({
-          text: `\n${resolvedSpec}:\n${gitContent}\n`,
-        });
-      }
-      processedQueryParts.push({ text: '\n--- End of git context ---' });
-      // Clean up the temporary storage
-      globalThis._geminiGitContent.clear();
-    }
+    addGitContentToQuery(processedQueryParts, gitContentEntries, atPathToResolvedSpecMap);
 
     addItem(
       { type: 'tool_group', tools: [toolCallDisplay] } as Omit<
