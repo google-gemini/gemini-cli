@@ -343,7 +343,7 @@ export async function start_sandbox(
   );
   const isCustomProjectSandbox = fs.existsSync(projectSandboxDockerfile);
 
-  const image = config.image;
+  let image = config.image;
   const workdir = path.resolve(process.cwd());
   const containerWorkdir = getContainerPath(workdir);
 
@@ -380,6 +380,10 @@ export async function start_sandbox(
           },
         },
       );
+      // After building, re-read the package.json to get the latest image URI
+      const cliPkgJsonPath = path.join(gcRoot, 'packages', 'cli', 'package.json');
+      const cliPkgJsonContent = await readFile(cliPkgJsonPath, 'utf-8');
+      image = JSON.parse(cliPkgJsonContent).config.sandboxImageUri;
     }
   }
 
