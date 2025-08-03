@@ -215,7 +215,9 @@ describe('Server Config (config.ts)', () => {
       };
 
       // Set the existing client
-      (config as unknown as { geminiClient: typeof mockExistingClient }).geminiClient = mockExistingClient;
+      (
+        config as unknown as { geminiClient: typeof mockExistingClient }
+      ).geminiClient = mockExistingClient;
       (GeminiClient as Mock).mockImplementation(() => mockNewClient);
 
       await config.refreshAuth(authType);
