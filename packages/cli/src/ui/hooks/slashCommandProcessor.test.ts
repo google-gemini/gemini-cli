@@ -128,6 +128,7 @@ describe('useSlashCommandProcessor', () => {
       useSlashCommandProcessor(
         mockConfig,
         mockSettings,
+        [], // history
         mockAddItem,
         mockClearItems,
         mockLoadHistory,
@@ -828,6 +829,7 @@ describe('useSlashCommandProcessor', () => {
           mockSetQuittingMessages,
           vi.fn(), // openPrivacyNotice
           vi.fn(), // toggleVimEnabled
+          vi.fn(), // setIsProcessing
         ),
       );
 
