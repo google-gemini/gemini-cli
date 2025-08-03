@@ -378,7 +378,12 @@ export async function connectAndDiscover(
         console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
         updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
       };
-      await discoverPrompts(mcpServerName, mcpClient, promptRegistry);
+      await discoverPrompts(
+        mcpServerName,
+        mcpClient,
+        promptRegistry,
+        mcpServerConfig,
+      );
 
       const tools = await discoverTools(
         mcpServerName,
@@ -469,6 +474,7 @@ export async function discoverPrompts(
   mcpServerName: string,
   mcpClient: Client,
   promptRegistry: PromptRegistry,
+  mcpServerConfig: MCPServerConfig,
 ): Promise<void> {
   try {
     const response = await mcpClient.request(
@@ -477,6 +483,12 @@ export async function discoverPrompts(
     );
 
     for (const prompt of response.prompts) {
+      if (
+        mcpServerConfig.excludeTools &&
+        mcpServerConfig.excludeTools.includes(prompt.name)
+      ) {
+        continue;
+      }
       promptRegistry.registerPrompt({
         ...prompt,
         serverName: mcpServerName,

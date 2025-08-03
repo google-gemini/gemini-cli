@@ -93,7 +93,7 @@ Each server configuration supports the following properties:
 - **`timeout`** (number): Request timeout in milliseconds (default: 600,000ms = 10 minutes)
 - **`trust`** (boolean): When `true`, bypasses all tool call confirmations for this server (default: `false`)
 - **`includeTools`** (string[]): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (whitelist behavior). If not specified, all tools from the server are enabled by default.
-- **`excludeTools`** (string[]): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
+- **`excludeTools`** (string[]): List of tool and prompt names to exclude from this MCP server. Tools or prompts listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
 
 ### OAuth Support for Remote MCP Servers
 
