@@ -25,8 +25,15 @@ rm -rf "$(npm config get cache)/_npx"
 _Command Prompt_
 
 ```cmd
-:: The path is typically %LocalAppData%\npm-cache\_npx
+# The path is usually %LocalAppData%\npm-cache\_npx
 rmdir /s /q "%LocalAppData%\npm-cache\_npx"
+
+_PowerShell_
+
+```powershell
+# The path is usually $env:LocalAppData\npm-cache\_npx
+Remove-Item -Path (Join-Path $env:LocalAppData "npm-cache\_npx") -Recurse -Force
+```
 ```
 
 _PowerShell_
