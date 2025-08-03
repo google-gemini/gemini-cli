@@ -1,4 +1,3 @@
-
 # Keyboard Shortcuts
 
 <p align="center">

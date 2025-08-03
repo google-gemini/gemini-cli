@@ -29,7 +29,7 @@ npm run preflight
 
 - **ES 模块**：使用 `vi.mock('module-name', async (importOriginal) => { ... })` 进行模拟。使用 `importOriginal` 进行选择性模拟。
   - _示例_：`vi.mock('os', async (importOriginal) => { const actual = await importOriginal(); return { ...actual, homedir: vi.fn() }; });`
-- **模拟顺序**：对于影响模块级常量的关键依赖项（例如 `os`、`fs`），请将 `vi.mock` 放置在测试文件的_最顶部_，在其他导入之前。
+- **模拟顺序**：对于影响模块级常量的关键依赖项（例如 `os`、`fs`），请将 `vi.mock` 放置在测试文件的*最顶部*，在其他导入之前。
 - **提升**：如果需要在 `vi.mock` 工厂中使用模拟函数之前定义它，请使用 `const myMock = vi.hoisted(() => vi.fn());`。
 - **模拟函数**：使用 `vi.fn()` 创建。使用 `mockImplementation()`、`mockResolvedValue()` 或 `mockRejectedValue()` 定义行为。
 - **监视**：使用 `vi.spyOn(object, 'methodName')`。在 `afterEach` 中使用 `mockRestore()` 恢复监视。

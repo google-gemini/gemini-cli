@@ -1,4 +1,3 @@
-
 # Gemini CLI Execution and Deployment
 
 <p align="center">

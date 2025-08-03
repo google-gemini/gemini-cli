@@ -8,15 +8,15 @@
 
 ## 功能
 
--   根据提供的查询执行网络搜索。
--   返回搜索结果列表，包括标题、链接和摘要。
+- 根据提供的查询执行网络搜索。
+- 返回搜索结果列表，包括标题、链接和摘要。
 
 ## 用法
 
 ```typescript
 import { google_web_search } from '@google/generative-ai/experimental/tools';
 
-const result = await google_web_search({ query: "最新的 AI 研究" });
+const result = await google_web_search({ query: '最新的 AI 研究' });
 console.log(result);
 ```
 
@@ -28,11 +28,13 @@ import { google_web_search } from '@google/generative-ai/experimental/tools';
 
 const genAI = new GoogleGenerativeAI(process.env.API_KEY);
 const model = genAI.getGenerativeModel({
-  model: "gemini-pro",
+  model: 'gemini-pro',
   tools: [google_web_search],
 });
 
-const result = await model.generateContent("关于 Gemini CLI 的最新消息是什么？");
+const result = await model.generateContent(
+  '关于 Gemini CLI 的最新消息是什么？',
+);
 console.log(result.response.text());
 ```
 

@@ -1,4 +1,3 @@
-
 # Integration Tests
 
 <p align="center">

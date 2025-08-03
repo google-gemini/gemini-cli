@@ -1,4 +1,3 @@
-
 # Ignoring Files
 
 <p align="center">

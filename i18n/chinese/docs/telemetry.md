@@ -1,14 +1,12 @@
 # Gemini CLI 可观测性指南
 
 <p align="center">
-  简体中文 | <a href="../../../docs/telemetry.md">🌐 English</a>
+  简体中文 | <a href="../../../../docs/telemetry.md">🌐 English</a>
 </p>
 
 遥测提供有关 Gemini CLI 性能、运行状况和使用情况的数据。通过启用它，您可以通过跟踪、指标和结构化日志来监控操作、调试问题和优化工具使用。
 
-Gemini CLI 的遥测系统建立在 **[OpenTelemetry] (OTEL)** 标准之上，允许您将数据发送到任何兼容的后端。
-
-[OpenTelemetry]: https://opentelemetry.io/
+Gemini CLI 的遥测系统建立在 **[OpenTelemetry](https://opentelemetry.io/) (OTEL)** 标准之上，允许您将数据发送到任何兼容的后端。
 
 ## 启用遥测
 
@@ -39,7 +37,7 @@ Gemini CLI 的遥测系统建立在 **[OpenTelemetry] (OTEL)** 标准之上，�
     - `telemetry.logPrompts`：`true`
 
 **对于 `npm run telemetry -- --target=<gcp|local>` 脚本：**
-此脚本的 `--target` 参数_仅_覆盖该脚本持续时间和目的的 `telemetry.target`（即选择要启动的收集器）。它不会永久更改您的 `settings.json`。该脚本将首先在 `settings.json` 中查找 `telemetry.target` 以用作其默认值。
+此脚本的 `--target` 参数*仅*覆盖该脚本持续时间和目的的 `telemetry.target`（即选择要启动的收集器）。它不会永久更改您的 `settings.json`。该脚本将首先在 `settings.json` 中查找 `telemetry.target` 以用作其默认值。
 
 ### 示例设置
 

@@ -8,16 +8,16 @@
 
 ## 功能
 
--   连接到正在运行的 MCP 服务器。
--   发送和接收 MCP 消息。
--   用于与外部服务（如 IDE）集成。
+- 连接到正在运行的 MCP 服务器。
+- 发送和接收 MCP 消息。
+- 用于与外部服务（如 IDE）集成。
 
 ## 用法
 
 ```typescript
 import { mcp_server } from '@google/generative-ai/experimental/tools';
 
-const result = await mcp_server({ command: "listOpenFiles" });
+const result = await mcp_server({ command: 'listOpenFiles' });
 console.log(result);
 ```
 
@@ -29,10 +29,10 @@ import { mcp_server } from '@google/generative-ai/experimental/tools';
 
 const genAI = new GoogleGenerativeAI(process.env.API_KEY);
 const model = genAI.getGenerativeModel({
-  model: "gemini-pro",
+  model: 'gemini-pro',
   tools: [mcp_server],
 });
 
-const result = await model.generateContent("列出 IDE 中所有打开的文件。");
+const result = await model.generateContent('列出 IDE 中所有打开的文件。');
 console.log(result.response.text());
 ```

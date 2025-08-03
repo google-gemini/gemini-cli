@@ -164,7 +164,7 @@ npm_package_version=9.9.9 SANDBOX_IMAGE_REGISTRY="registry" SANDBOX_IMAGE_NAME="
     - 文件移动：packages/cli/package.json -> (内存中转换) -> `bundle`/package.json
     - 为什么：最终的 package.json 必须与开发中使用的不同。关键更改包括：
       - 删除 devDependencies。
-      - 删除特定于工作区的“dependencies”：{ “@gemini-cli/core”：“workspace:*” } 并确保核心代码直接捆绑到最终的 JavaScript 文件中。
+      - 删除特定于工作区的"dependencies": { "@gemini-cli/core": "workspace:\*" } 并确保核心代码直接捆绑到最终的 JavaScript 文件中。
       - 确保 bin、main 和 files 字段指向最终软件包结构中的正确位置。
 
 2.  创建 JavaScript 捆绑包：
@@ -177,7 +177,7 @@ npm_package_version=9.9.9 SANDBOX_IMAGE_REGISTRY="registry" SANDBOX_IMAGE_NAME="
     - 文件移动：
       - README.md -> `bundle`/README.md
       - LICENSE -> `bundle`/LICENSE
-      - packages/cli/src/utils/*.sb (沙盒配置文件) -> `bundle`/
+      - packages/cli/src/utils/\*.sb (沙盒配置文件) -> `bundle`/
     - 为什么：
       - README.md 和 LICENSE 是应包含在任何 NPM 软件包中的标准文件。
       - 沙盒配置文件 (.sb 文件) 是 CLI 沙盒功能正常运行所需的关键运行时资产。它们必须位于最终可执行文件旁边。

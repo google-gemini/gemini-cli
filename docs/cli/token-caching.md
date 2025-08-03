@@ -1,4 +1,3 @@
-
 # Token Caching and Cost Optimization
 
 <p align="center">

@@ -1,4 +1,3 @@
-
 # Gemini CLI Extensions
 
 <p align="center">

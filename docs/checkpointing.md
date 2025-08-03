@@ -1,4 +1,3 @@
-
 # Checkpointing
 
 <p align="center">

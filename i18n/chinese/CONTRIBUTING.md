@@ -204,8 +204,9 @@ npm run lint
 ### 编码约定
 
 - 请遵守整个现有代码库中使用的编码风格、模式和约定。
- - 有关与 AI 辅助开发相关的特定说明，包括 React、注释和 Git 使用的约定，请参阅 [GEMINI.md](./GEMINI.md)（通常位于项目根目录中）。
+- 有关与 AI 辅助开发相关的特定说明，包括 React、注释和 Git 使用的约定，请参阅 [GEMINI.md](./GEMINI.md)（通常位于项目根目录中）。
 - **导入：** 请特别注意导入路径。该项目使用 ESLint 来强制执行包之间相对导入的限制。
+
 ### 项目结构
 
 - `packages/`：包含项目的各个子包。
@@ -262,7 +263,7 @@ DEBUG=1 gemini
     ```
 
     然后，您正在运行的 CLI 应用程序应连接到 React DevTools。
-            ![](../../docs/assets/connected_devtools.png)
+    ![](../../docs/assets/connected_devtools.png)
 
 ## 沙盒
 

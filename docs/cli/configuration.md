@@ -1,4 +1,3 @@
-
 # Gemini CLI Configuration
 
 <p align="center">

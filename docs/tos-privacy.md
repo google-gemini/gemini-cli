@@ -1,4 +1,3 @@
-
 # Terms of Service and Privacy Policy
 
 <p align="center">

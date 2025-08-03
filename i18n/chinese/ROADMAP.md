@@ -27,7 +27,7 @@ Gemini CLI 是一个开源 AI 代理，可将 Gemini 的强大功能直接带入
 
 ## 路线图如何运作
 
-我们的路线图直接通过 Github Issues 进行管理。请在此处查看我们的入口路线图问题 [此处](https://github.com/google-gemini/gemini-cli/issues/4191)。这种方法可以实现透明度，并为您提供直接的方式来了解更多信息或参与任何特定的计划。我们所有的路线图项目都将被标记为 Type:`Feature` 和 Label:`maintainer`，用于我们正在积极开发的功能，或 Type:`Task` 和 Label:`maintainer`，用于更详细的任务列表。
+我们的路线图直接通过 Github Issues 进行管理。请在此处查看我们的入口路线图问题 [此处](https://github.com/google-gemini/gemini-cli/issues/4191)。这种方法可以实现透明度，并为您提供直接的方式来了解更多信息或参与任何特定的计划。我们所有的路线图项目都将被标记为 `Type:Feature` 和 `Label:maintainer`，用于我们正在积极开发的功能，或 `Type:Task` 和 `Label:maintainer`，用于更详细的任务列表。
 
 问题的组织方式可以一目了然地提供关键信息：
 
@@ -58,8 +58,8 @@ Gemini CLI 是一个开源 AI 代理，可将 Gemini 的强大功能直接带入
 Gemini CLI 是一个开源项目，我们欢迎社区的贡献！无论您是开发人员、设计师，还是只是一个热情的用户，您都可以在此处找到我们的[社区指南](./CONTRIBUTING.md)以了解如何开始。有很多方法可以参与其中：
 
 - **路线图：** 请查看并找到我们[路线图](https://github.com/google-gemini/gemini-cli/issues/4191)中您希望贡献的领域。基于此的贡献将最容易集成。
-- **报告 Bug：** 如果您发现问题，请创建一个[错误报告](https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml)，并尽可能详细地描述。如果您认为这是阻止直接使用 CLI 的严重问题，请标记为 `priorty/p0`。
+- **报告 Bug：** 如果您发现问题，请创建一个[错误报告](https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml)，并尽可能详细地描述。如果您认为这是阻止直接使用 CLI 的严重问题，请标记为 `priority/p0`。
 - **建议功能：** 有好主意吗？欢迎提出！请[提交功能请求](https://github.com/google-gemini/gemini-cli/issues/new?template=feature_request.yml)。
 - **贡献代码：** 请查阅我们的 [CONTRIBUTING.md](./CONTRIBUTING.md) 文件，了解如何提交拉取请求。我们为新贡献者准备了“good first issues”列表。
 - **编写文档：** 帮助我们完善文档、教程和示例。
-我们对 Gemini CLI 的未来充满期待，欢迎与您共同建设！
+  我们对 Gemini CLI 的未来充满期待，欢迎与您共同建设！

@@ -1,4 +1,3 @@
-
 # Authentication Setup
 
 <p align="center">
