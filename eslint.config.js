@@ -34,6 +34,7 @@ export default tseslint.config(
       'packages/server/dist/**',
       'packages/vscode-ide-companion/dist/**',
       'bundle/**',
+      'package/bundle/**',
     ],
   },
   eslint.configs.recommended,
@@ -191,6 +192,21 @@ export default tseslint.config(
   },
   {
     files: ['packages/vscode-ide-companion/esbuild.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        process: 'readonly',
+        console: 'readonly',
+      },
+    },
+    rules: {
+      'no-restricted-syntax': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  // extra settings for scripts that we run directly with node
+  {
+    files: ['packages/vscode-ide-companion/scripts/**/*.js'],
     languageOptions: {
       globals: {
         ...globals.node,
