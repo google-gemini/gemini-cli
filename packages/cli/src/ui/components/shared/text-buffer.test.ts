@@ -144,7 +144,7 @@ describe('textBufferReducer', () => {
     });
   });
 
-  describe('create_undo_snapshot action', () => {
+  describe('vim_create_undo_snapshot action', () => {
     it('should create a snapshot without changing state', () => {
       const stateWithText: TextBufferState = {
         ...initialState,
@@ -152,7 +152,7 @@ describe('textBufferReducer', () => {
         cursorRow: 0,
         cursorCol: 5,
       };
-      const action: TextBufferAction = { type: 'create_undo_snapshot' };
+      const action: TextBufferAction = { type: 'vim_create_undo_snapshot' };
       const state = textBufferReducer(stateWithText, action);
       expect(state).toHaveOnlyValidCharacters();
 

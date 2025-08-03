@@ -733,7 +733,7 @@ export type TextBufferAction =
       };
     }
   | { type: 'move_to_offset'; payload: { offset: number } }
-  | { type: 'create_undo_snapshot' }
+  | { type: 'vim_create_undo_snapshot' }
   | { type: 'set_viewport_width'; payload: number }
   | { type: 'vim_delete_word_forward'; payload: { count: number } }
   | { type: 'vim_delete_word_backward'; payload: { count: number } }
@@ -1228,10 +1228,6 @@ export function textBufferReducer(
       };
     }
 
-    case 'create_undo_snapshot': {
-      return pushUndoLocal(state);
-    }
-
     // Vim-specific operations
     case 'vim_delete_word_forward':
     case 'vim_delete_word_backward':
@@ -1265,6 +1261,7 @@ export function textBufferReducer(
     case 'vim_move_to_last_line':
     case 'vim_move_to_line':
     case 'vim_escape_insert_mode':
+    case 'vim_create_undo_snapshot':
       return handleVimAction(state, action as VimAction);
 
     default: {
@@ -1578,7 +1575,7 @@ export function useTextBuffer({
       const filePath = pathMod.join(tmpDir, 'buffer.txt');
       fs.writeFileSync(filePath, text, 'utf8');
 
-      dispatch({ type: 'create_undo_snapshot' });
+      dispatch({ type: 'vim_create_undo_snapshot' });
 
       const wasRaw = stdin?.isRaw ?? false;
       try {
@@ -1611,6 +1608,10 @@ export function useTextBuffer({
     },
     [text, stdin, setRawMode],
   );
+
+  const vimCreateUndoSnapshot = useCallback((): void => {
+    dispatch({ type: 'vim_create_undo_snapshot' });
+  }, []);
 
   const handleInput = useCallback(
     (key: {
@@ -1730,6 +1731,7 @@ export function useTextBuffer({
     killLineLeft,
     handleInput,
     openInExternalEditor,
+    vimCreateUndoSnapshot,
     // Vim-specific operations
     vimDeleteWordForward,
     vimDeleteWordBackward,
@@ -1870,6 +1872,8 @@ export interface TextBuffer {
    * control‑flow (callers can simply `await` the Promise).
    */
   openInExternalEditor: (opts?: { editor?: string }) => Promise<void>;
+
+  vimCreateUndoSnapshot: () => void;
 
   replaceRangeByOffset: (
     startOffset: number,

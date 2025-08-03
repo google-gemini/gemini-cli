@@ -689,6 +689,13 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             return true;
           }
 
+          case 'u': {
+            // Undo last command
+            buffer.undo();
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
           default: {
             // Check for arrow keys (they have different sequences but known names)
             if (normalizedKey.name === 'left') {

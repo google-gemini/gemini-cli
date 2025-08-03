@@ -52,6 +52,7 @@ export type VimAction = Extract<
   | { type: 'vim_move_to_last_line' }
   | { type: 'vim_move_to_line' }
   | { type: 'vim_escape_insert_mode' }
+  | { type: 'vim_create_undo_snapshot' }
 >;
 
 export function handleVimAction(
@@ -876,6 +877,10 @@ export function handleVimAction(
         cursorCol: newCol,
         preferredCol: null,
       };
+    }
+
+    case 'vim_create_undo_snapshot': {
+      return pushUndo(state);
     }
 
     default: {

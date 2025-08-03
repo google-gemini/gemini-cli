@@ -85,6 +85,7 @@ describe('useVim hook', () => {
       replaceRangeByOffset: vi.fn(),
       handleInput: vi.fn(),
       setText: vi.fn(),
+      vimCreateUndoSnapshot: vi.fn(),
       // Vim-specific methods
       vimDeleteWordForward: vi.fn(),
       vimDeleteWordBackward: vi.fn(),
