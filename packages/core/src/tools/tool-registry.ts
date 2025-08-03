@@ -9,7 +9,8 @@ import { Tool, ToolResult, BaseTool, Icon } from './tools.js';
 import { Config } from '../config/config.js';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
-import { discoverMcpTools } from './mcp-client.js';
+import { connectAndDiscover } from './mcp-client.js';
+import { McpClientManager } from './mcp-client-manager.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 
@@ -127,9 +128,17 @@ Signal: Signal number or \`(none)\` if no signal was received.
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
   private config: Config;
+  private mcpClientManager: McpClientManager;
 
   constructor(config: Config) {
     this.config = config;
+    this.mcpClientManager = new McpClientManager(
+      this.config.getMcpServers() ?? {},
+      this.config.getMcpServerCommand(),
+      this,
+      this.config.getPromptRegistry(),
+      this.config.getDebugMode(),
+    );
   }
 
   /**
@@ -166,13 +175,7 @@ export class ToolRegistry {
     await this.discoverAndRegisterToolsFromCommand();
 
     // discover tools using MCP servers, if configured
-    await discoverMcpTools(
-      this.config.getMcpServers() ?? {},
-      this.config.getMcpServerCommand(),
-      this,
-      this.config.getPromptRegistry(),
-      this.config.getDebugMode(),
-    );
+    await this.mcpClientManager.discoverAllMcpTools();
   }
 
   /**
@@ -189,13 +192,15 @@ export class ToolRegistry {
     }
 
     // discover tools using MCP servers, if configured
-    await discoverMcpTools(
-      this.config.getMcpServers() ?? {},
-      this.config.getMcpServerCommand(),
-      this,
-      this.config.getPromptRegistry(),
-      this.config.getDebugMode(),
-    );
+    await this.mcpClientManager.discoverAllMcpTools();
+  }
+
+  /**
+   * Restarts all MCP servers and re-discovers tools.
+   */
+  async restartMcpServers(): Promise<void> {
+    await this.mcpClientManager.stop();
+    await this.discoverMcpTools();
   }
 
   /**
@@ -213,9 +218,9 @@ export class ToolRegistry {
     const mcpServers = this.config.getMcpServers() ?? {};
     const serverConfig = mcpServers[serverName];
     if (serverConfig) {
-      await discoverMcpTools(
-        { [serverName]: serverConfig },
-        undefined,
+      await connectAndDiscover(
+        serverName,
+        serverConfig,
         this,
         this.config.getPromptRegistry(),
         this.config.getDebugMode(),
