@@ -163,8 +163,8 @@ describe('useCompletion', () => {
         });
 
         // Wait for async suggestions clearing
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 10));
+        await waitFor(() => {
+          expect(result.current.suggestions).toEqual([]);
         });
 
         expect(result.current.suggestions).toEqual([]);
