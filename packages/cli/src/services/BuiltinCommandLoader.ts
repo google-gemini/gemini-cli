@@ -10,6 +10,7 @@ import { Config } from '@dbx-cli/core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
+import { databricksCommand } from '../ui/commands/databricksCommand.js';
 import { chatCommand } from '../ui/commands/chatCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
@@ -58,6 +59,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       compressCommand,
       copyCommand,
       corgiCommand,
+      databricksCommand,
       docsCommand,
       directoryCommand,
       editorCommand,

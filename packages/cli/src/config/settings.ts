@@ -108,6 +108,10 @@ export interface Settings {
   /// IDE mode setting configured via slash command toggle.
   ideMode?: boolean;
 
+  // Databricks configuration
+  databricksUrl?: string;
+  databricksPat?: string;
+
   // Setting for disabling auto-update.
   disableAutoUpdate?: boolean;
 
@@ -397,6 +401,15 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
         path: workspaceSettingsPath,
       });
     }
+  }
+
+  // Load Databricks settings into environment variables if not already set
+  const mergedSettings = { ...systemSettings, ...userSettings, ...workspaceSettings };
+  if (mergedSettings.databricksUrl && !process.env.DATABRICKS_URL) {
+    process.env.DATABRICKS_URL = mergedSettings.databricksUrl;
+  }
+  if (mergedSettings.databricksPat && !process.env.DBX_PAT) {
+    process.env.DBX_PAT = mergedSettings.databricksPat;
   }
 
   return new LoadedSettings(
