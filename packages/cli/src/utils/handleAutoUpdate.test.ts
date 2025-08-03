@@ -91,6 +91,14 @@ describe('handleAutoUpdate', () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
+  it('should do nothing if update nag is disabled', () => {
+    mockSettings.merged.disableUpdateNag = true;
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+    expect(mockGetInstallationInfo).not.toHaveBeenCalled();
+    expect(mockUpdateEventEmitter.emit).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
   it('should emit "update-received" but not update if auto-updates are disabled', () => {
     mockSettings.merged.disableAutoUpdate = true;
     mockGetInstallationInfo.mockReturnValue({
