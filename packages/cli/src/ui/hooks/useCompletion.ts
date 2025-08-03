@@ -11,6 +11,8 @@ import {
   Suggestion,
 } from '../components/SuggestionsDisplay.js';
 
+const normalizePath = (p: string) => p.replace(/\\/g, '/');
+
 export interface UseCompletionReturn {
   suggestions: Suggestion[];
   activeSuggestionIndex: number;
