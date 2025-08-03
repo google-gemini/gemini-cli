@@ -11,8 +11,6 @@ export function createLogger(
   logger: vscode.OutputChannel,
 ) {
   return (message: string) => {
-    if (context.extensionMode === vscode.ExtensionMode.Development) {
       logger.appendLine(message);
-    }
   };
 }
