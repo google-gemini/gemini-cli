@@ -116,6 +116,9 @@ export interface Settings {
   // Setting for disabling auto-update.
   disableAutoUpdate?: boolean;
 
+  // Setting for disabling the update nag message.
+  disableUpdateNag?: boolean;
+
   memoryDiscoveryMaxDirs?: number;
 
   // Environment variables to exclude from project .env files
