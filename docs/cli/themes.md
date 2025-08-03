@@ -62,13 +62,10 @@ Add a `customThemes` block to your user, project, or system `settings.json` file
       "DiffAdded": "#A6E3A1",
       "DiffRemoved": "#F38BA8",
       "DiffModified": "#89B4FA",
-      "GradientColors": [
-        "#4796E4",
-        "#847ACE",
-        "#C3677F"
-      ]
-    },
-},
+      "GradientColors": ["#4796E4", "#847ACE", "#C3677F"]
+    }
+  }
+}
 ```
 
 **Color keys:**
@@ -103,9 +100,6 @@ Add a `customThemes` block to your user, project, or system `settings.json` file
 - `AccentRed`
 - `Comment`
 - `Gray`
-- `DiffAdded`
-- `DiffRemoved`
-- `DiffModified`
 
 You can use either hex codes (e.g., `#FF0000`) **or** standard CSS color names (e.g., `coral`, `teal`, `blue`) for any color value. See [CSS color names](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value#color_keywords) for a full list of supported names.
 
