@@ -5,6 +5,7 @@
  */
 
 import { execSync, spawn } from 'child_process';
+import { existsSync } from 'fs';
 
 export type EditorType =
   | 'vscode'
@@ -34,7 +35,7 @@ interface DiffCommand {
   args: string[];
 }
 
-function commandExists(cmd: string): boolean {
+function commandExists(cmd: string, fallbackPath?: string): boolean {
   try {
     execSync(
       process.platform === 'win32' ? `where.exe ${cmd}` : `command -v ${cmd}`,
@@ -42,6 +43,10 @@ function commandExists(cmd: string): boolean {
     );
     return true;
   } catch {
+    // Check fallback path if provided
+    if (fallbackPath && existsSync(fallbackPath)) {
+      return true;
+    }
     return false;
   }
 }
@@ -52,9 +57,15 @@ function commandExists(cmd: string): boolean {
  */
 const editorCommands: Record<
   EditorType,
-  { win32: string[]; default: string[] }
+  { win32: string[]; default: string[]; fallbackPaths?: string[] }
 > = {
-  vscode: { win32: ['code.cmd'], default: ['code'] },
+  vscode: {
+    win32: ['code.cmd'],
+    default: ['code'],
+    fallbackPaths: [
+      '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
+    ],
+  },
   vscodium: { win32: ['codium.cmd'], default: ['codium'] },
   windsurf: { win32: ['windsurf'], default: ['windsurf'] },
   cursor: { win32: ['cursor'], default: ['cursor'] },
@@ -68,7 +79,20 @@ export function checkHasEditorType(editor: EditorType): boolean {
   const commandConfig = editorCommands[editor];
   const commands =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
-  return commands.some((cmd) => commandExists(cmd));
+  // First, try the standard commands
+  const hasStandardCommand = commands.some((cmd) => commandExists(cmd));
+  if (hasStandardCommand) {
+    return true;
+  }
+
+  // Try fallback paths
+  if (commandConfig.fallbackPaths) {
+    return commandConfig.fallbackPaths.some((fallbackPath) =>
+      existsSync(fallbackPath),
+    );
+  }
+
+  return false;
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
@@ -105,9 +129,21 @@ export function getDiffCommand(
   const commandConfig = editorCommands[editor];
   const commands =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
-  const command =
-    commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
-    commands[commands.length - 1];
+
+  // Try to find an available command
+  let command = commands.find((cmd) => commandExists(cmd));
+
+  // If no standard command found, try fallbacks
+  if (!command && commandConfig.fallbackPaths) {
+    command = commandConfig.fallbackPaths.find((fallbackPath) =>
+      existsSync(fallbackPath),
+    );
+  }
+
+  // Fallback to the last command in the list if nothing else works
+  if (!command) {
+    command = commands[commands.length - 1];
+  }
 
   switch (editor) {
     case 'vscode':
