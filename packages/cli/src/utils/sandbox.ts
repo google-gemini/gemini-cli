@@ -381,18 +381,9 @@ export async function start_sandbox(
         },
       );
       // After building, re-read the package.json to get the latest image URI
-      try {
-        const cliPkgJsonPath = path.join(gcRoot, 'packages', 'cli', 'package.json');
-        const cliPkgJsonContent = await readFile(cliPkgJsonPath, 'utf-8');
-        const newImage = JSON.parse(cliPkgJsonContent).config?.sandboxImageUri;
-        if (!newImage) {
-          throw new Error('sandboxImageUri not found in package.json after build.');
-        }
-        image = newImage;
-      } catch (err) {
-        console.error('package.json could not be read or parsed:', err);
-        throw err;
-      }
+      const cliPkgJsonPath = path.join(gcRoot, 'packages', 'cli', 'package.json');
+      const cliPkgJsonContent = await readFile(cliPkgJsonPath, 'utf-8');
+      image = JSON.parse(cliPkgJsonContent).config.sandboxImageUri;
     }
   }
 
