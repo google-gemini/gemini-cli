@@ -10,8 +10,7 @@ const { logSlashCommand, SlashCommandEvent } = vi.hoisted(() => ({
 }));
 
 vi.mock('@dbx-cli/core', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@dbx-cli/core')>();
+  const original = await importOriginal<typeof import('@dbx-cli/core')>();
   return {
     ...original,
     logSlashCommand,

@@ -19,8 +19,7 @@ import { vi } from 'vitest';
 
 // Mock core modules
 vi.mock('@dbx-cli/core', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@dbx-cli/core')>();
+  const original = await importOriginal<typeof import('@dbx-cli/core')>();
   return {
     ...original,
     executeToolCall: vi.fn(),

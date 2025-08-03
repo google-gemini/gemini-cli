@@ -73,25 +73,46 @@ describe('DatabricksContentGenerator', () => {
       expect(generator).toBeInstanceOf(DatabricksContentGenerator);
     });
 
-    it('should throw error when workspace_host is missing', () => {
+    it('should throw error when workspace_host is missing on API call', async () => {
       const invalidConfig = { ...config, workspace_host: '' };
-      expect(() => new DatabricksContentGenerator(invalidConfig)).toThrow(
-        'Databricks workspace host is required',
-      );
+      const generator = new DatabricksContentGenerator(invalidConfig);
+
+      await expect(
+        generator.generateContent(
+          {
+            model: 'databricks-claude-sonnet-4',
+            contents: [{ parts: [{ text: 'test' }], role: 'user' }],
+          },
+          'test-id',
+        ),
+      ).rejects.toThrow('Databricks is not configured');
     });
 
-    it('should throw error when auth_token is missing', () => {
+    it('should throw error when auth_token is missing on API call', async () => {
       const invalidConfig = { ...config, auth_token: '' };
-      expect(() => new DatabricksContentGenerator(invalidConfig)).toThrow(
-        'Databricks auth token is required',
-      );
+      const generator = new DatabricksContentGenerator(invalidConfig);
+
+      await expect(
+        generator.generateContent(
+          {
+            model: 'databricks-claude-sonnet-4',
+            contents: [{ parts: [{ text: 'test' }], role: 'user' }],
+          },
+          'test-id',
+        ),
+      ).rejects.toThrow('Databricks is not configured');
     });
 
-    it('should throw error when model is missing', () => {
+    it('should throw error when model is missing on API call', async () => {
       const invalidConfig = { ...config, model: '' };
-      expect(() => new DatabricksContentGenerator(invalidConfig)).toThrow(
-        'Databricks model is required',
-      );
+      const generator = new DatabricksContentGenerator(invalidConfig);
+
+      await expect(
+        generator.countTokens({
+          model: 'databricks-claude-sonnet-4',
+          contents: [{ parts: [{ text: 'test' }], role: 'user' }],
+        }),
+      ).rejects.toThrow('Databricks model is required');
     });
 
     it('should normalize workspace_host URL', () => {
@@ -111,9 +132,9 @@ describe('DatabricksContentGenerator', () => {
   describe('Model Mapping', () => {
     it('should map Claude model names to Databricks endpoints', () => {
       const modelMappings = {
-        'claude-3-5-sonnet-latest': 'databricks-dbrx-instruct',
+        'claude-3-5-sonnet-latest': 'databricks-claude-3.7-sonnet',
         'claude-3-5-haiku-latest': 'databricks-meta-llama-3-1-70b-instruct',
-        'claude-3-opus-latest': 'databricks-meta-llama-3-1-405b-instruct',
+        'claude-3-opus-latest': 'databricks-claude-opus-4',
       };
 
       Object.entries(modelMappings).forEach(
@@ -150,8 +171,8 @@ describe('DatabricksContentGenerator', () => {
 
       expect(models).toBeInstanceOf(Array);
       expect(models.length).toBeGreaterThan(0);
-      expect(models).toContain('databricks-dbrx-instruct');
-      expect(models).toContain('databricks-meta-llama-3-1-70b-instruct');
+      expect(models).toContain('databricks-claude-sonnet-4');
+      expect(models).toContain('databricks-meta-llama-3-1-8b-instruct');
       expect(models).toContain('databricks-meta-llama-3-1-405b-instruct');
     });
   });

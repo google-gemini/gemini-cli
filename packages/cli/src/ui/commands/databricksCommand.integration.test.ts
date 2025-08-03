@@ -14,7 +14,8 @@ import { LoadedSettings } from '../../config/settings.js';
 
 // Mock loadEnvironment to prevent loading from .env files during tests
 vi.mock('../../config/settings.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../config/settings.js')>();
+  const actual =
+    await importOriginal<typeof import('../../config/settings.js')>();
   return {
     ...actual,
     loadEnvironment: vi.fn(),
@@ -26,11 +27,11 @@ describe('databricksCommand integration with auth system', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    
+
     // Clear environment variables
     delete process.env.DATABRICKS_URL;
     delete process.env.DBX_PAT;
-    
+
     // Create a mock context
     context = {
       invocation: {
@@ -84,10 +85,10 @@ describe('databricksCommand integration with auth system', () => {
     // Given: Valid Databricks configuration
     process.env.DATABRICKS_URL = 'https://workspace.databricks.com';
     process.env.DBX_PAT = 'dapi123456789';
-    
+
     // When: Validating Databricks auth method
     const result = validateAuthMethod(AuthType.USE_DATABRICKS);
-    
+
     // Then: Should return null (no error)
     expect(result).toBeNull();
   });
@@ -96,10 +97,10 @@ describe('databricksCommand integration with auth system', () => {
     // Given: No Databricks configuration
     delete process.env.DATABRICKS_URL;
     delete process.env.DBX_PAT;
-    
+
     // When: Validating Databricks auth method
     const result = validateAuthMethod(AuthType.USE_DATABRICKS);
-    
+
     // Then: Should return error message
     expect(result).not.toBeNull();
     expect(result).toContain('When using Databricks, you must specify');
@@ -111,19 +112,23 @@ describe('databricksCommand integration with auth system', () => {
     // Given: No initial configuration
     delete process.env.DATABRICKS_URL;
     delete process.env.DBX_PAT;
-    
+
     // When: Setting configuration and enabling
-    context.invocation!.args = 'set --url="https://workspace.databricks.com" --pat="dapi123456789"';
+    context.invocation!.args =
+      'set --url="https://workspace.databricks.com" --pat="dapi123456789"';
     await databricksCommand.action!(context, context.invocation!.args);
-    
+
     context.invocation!.args = 'enable';
-    const result = await databricksCommand.action!(context, context.invocation!.args);
-    
+    const result = await databricksCommand.action!(
+      context,
+      context.invocation!.args,
+    );
+
     // Then: Should enable Databricks auth type
     expect(context.services.settings.setValue).toHaveBeenCalledWith(
       expect.any(String),
       'selectedAuthType',
-      AuthType.USE_DATABRICKS
+      AuthType.USE_DATABRICKS,
     );
     expect(result).toEqual({
       type: 'message',
@@ -136,16 +141,16 @@ describe('databricksCommand integration with auth system', () => {
     // Given: Databricks is configured
     process.env.DATABRICKS_URL = 'https://workspace.databricks.com';
     process.env.DBX_PAT = 'dapi123456789';
-    
+
     // When: User uses /auth command
     const authResult = await authCommand.action!(context, '');
-    
+
     // Then: Should open auth dialog
     expect(authResult).toEqual({
       type: 'dialog',
       dialog: 'auth',
     });
-    
+
     // And: Databricks should be a valid option with no validation errors
     const validationResult = validateAuthMethod(AuthType.USE_DATABRICKS);
     expect(validationResult).toBeNull();
@@ -155,19 +160,22 @@ describe('databricksCommand integration with auth system', () => {
     // Given: Databricks is configured
     process.env.DATABRICKS_URL = 'https://workspace.databricks.com';
     process.env.DBX_PAT = 'dapi123456789';
-    
+
     // When: Clearing configuration
     context.invocation!.args = 'clear';
     await databricksCommand.action!(context, context.invocation!.args);
-    
+
     // Then: Environment variables should be cleared
     expect(process.env.DATABRICKS_URL).toBeUndefined();
     expect(process.env.DBX_PAT).toBeUndefined();
-    
+
     // And: Trying to enable should fail
     context.invocation!.args = 'enable';
-    const result = await databricksCommand.action!(context, context.invocation!.args);
-    
+    const result = await databricksCommand.action!(
+      context,
+      context.invocation!.args,
+    );
+
     expect(result).toEqual({
       type: 'message',
       messageType: 'error',

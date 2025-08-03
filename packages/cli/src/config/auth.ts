@@ -39,14 +39,8 @@ export const validateAuthMethod = (authMethod: string): string | null => {
   }
 
   if (authMethod === AuthType.USE_DATABRICKS) {
-    if (!process.env.DATABRICKS_URL || !process.env.DBX_PAT) {
-      return (
-        'When using Databricks, you must specify:\n' +
-        '• DATABRICKS_URL environment variable (your Databricks workspace URL)\n' +
-        '• DBX_PAT environment variable (your Databricks personal access token)\n' +
-        'Update your environment and try again (no reload needed if using .env)!'
-      );
-    }
+    // Allow Databricks auth type to be selected even without credentials
+    // Users can configure them later using /databricks set command
     return null;
   }
 

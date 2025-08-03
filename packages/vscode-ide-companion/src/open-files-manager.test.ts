@@ -414,7 +414,7 @@ describe('OpenFilesManager', () => {
     await vi.advanceTimersByTimeAsync(100);
 
     file1 = manager.state.workspaceState!.openFiles!.find(
-      (f: any) => f.path === '/test/file1.txt',
+      (f) => f.path === '/test/file1.txt',
     )!;
     const file2 = manager.state.workspaceState!.openFiles![0];
 

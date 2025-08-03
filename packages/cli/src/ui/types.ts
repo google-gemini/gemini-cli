@@ -4,10 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  ToolCallConfirmationDetails,
-  ToolResultDisplay,
-} from '@dbx-cli/core';
+import { ToolCallConfirmationDetails, ToolResultDisplay } from '@dbx-cli/core';
 
 // Only defining the state enum needed by the UI
 export enum StreamingState {

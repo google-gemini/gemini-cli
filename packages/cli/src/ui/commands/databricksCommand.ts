@@ -5,7 +5,12 @@
  */
 
 import { AuthType } from '@dbx-cli/core';
-import { CommandContext, CommandKind, SlashCommand, SlashCommandActionReturn } from './types.js';
+import {
+  CommandContext,
+  CommandKind,
+  SlashCommand,
+  SlashCommandActionReturn,
+} from './types.js';
 import { SettingScope, loadEnvironment } from '../../config/settings.js';
 
 // Constants
@@ -51,10 +56,10 @@ function validatePat(pat: string): boolean {
 function parseArguments(args: string): Record<string, string> {
   const params: Record<string, string> = {};
   const parts = tokenizeArguments(args);
-  
+
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
-    
+
     if (part.startsWith('--')) {
       const { key, value, consumed } = extractKeyValue(parts, i);
       if (key) {
@@ -63,7 +68,7 @@ function parseArguments(args: string): Record<string, string> {
       }
     }
   }
-  
+
   return params;
 }
 
@@ -75,7 +80,7 @@ function tokenizeArguments(args: string): string[] {
   let current = '';
   let inQuotes = false;
   let quoteChar = '';
-  
+
   for (const char of args) {
     if ((char === '"' || char === "'") && !inQuotes) {
       inQuotes = true;
@@ -92,11 +97,11 @@ function tokenizeArguments(args: string): string[] {
       current += char;
     }
   }
-  
+
   if (current.trim()) {
     parts.push(current.trim());
   }
-  
+
   return parts;
 }
 
@@ -104,11 +109,14 @@ function tokenizeArguments(args: string): string[] {
  * Extracts a key-value pair from tokenized arguments.
  * Returns the key, value, and number of tokens consumed.
  */
-function extractKeyValue(parts: string[], index: number): { key: string; value: string; consumed: number } {
+function extractKeyValue(
+  parts: string[],
+  index: number,
+): { key: string; value: string; consumed: number } {
   const part = parts[index];
   const keyValue = part.substring(2); // Remove --
   const eqIndex = keyValue.indexOf('=');
-  
+
   if (eqIndex > 0) {
     // --key=value format
     const key = keyValue.substring(0, eqIndex);
@@ -129,15 +137,20 @@ function extractKeyValue(parts: string[], index: number): { key: string; value: 
  * Removes surrounding quotes from a string if present.
  */
 function removeQuotes(value: string): string {
-  if ((value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))) {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
     return value.substring(1, value.length - 1);
   }
   return value;
 }
 
 // Subcommand handlers
-const subcommandHandlers: Record<string, (context: CommandContext, args: string) => SlashCommandActionReturn> = {
+const subcommandHandlers: Record<
+  string,
+  (context: CommandContext, args: string) => SlashCommandActionReturn
+> = {
   show: handleShow,
   set: handleSet,
   clear: handleClear,
@@ -149,23 +162,23 @@ export const databricksCommand: SlashCommand = {
   altNames: ['dbx', 'db'],
   description: 'Configure Databricks connection settings',
   kind: CommandKind.BUILT_IN,
-  
+
   action: async (context, args): Promise<SlashCommandActionReturn> => {
     // Load environment to ensure we have latest values
     loadEnvironment();
-    
+
     const subcommand = args.split(/\s+/)[0] || '';
     const remainingArgs = args.substring(subcommand.length).trim();
-    
+
     const handler = subcommandHandlers[subcommand];
     if (handler) {
       return handler(context, remainingArgs);
     }
-    
+
     if (subcommand === '') {
       return showHelp();
     }
-    
+
     return {
       type: 'message',
       messageType: 'error',
@@ -174,21 +187,25 @@ export const databricksCommand: SlashCommand = {
   },
 };
 
-function handleShow(_context: CommandContext, _args: string): SlashCommandActionReturn {
+function handleShow(
+  _context: CommandContext,
+  _args: string,
+): SlashCommandActionReturn {
   const url = process.env.DATABRICKS_URL;
   const pat = process.env.DBX_PAT;
-  
+
   if (!url && !pat) {
     return {
       type: 'message',
       messageType: 'info',
-      content: 'Databricks is not configured.\nUse `/databricks set --url=<URL> --pat=<PAT>` to configure.',
+      content:
+        'Databricks is not configured.\nUse `/databricks set --url=<URL> --pat=<PAT>` to configure.',
     };
   }
-  
+
   const urlDisplay = url || 'not set';
   const patDisplay = pat ? maskPat(pat) : 'not set';
-  
+
   return {
     type: 'message',
     messageType: 'info',
@@ -196,9 +213,12 @@ function handleShow(_context: CommandContext, _args: string): SlashCommandAction
   };
 }
 
-function handleSet(context: CommandContext, args: string): SlashCommandActionReturn {
+function handleSet(
+  context: CommandContext,
+  args: string,
+): SlashCommandActionReturn {
   const params = parseArguments(args);
-  
+
   if (!params.url && !params.pat) {
     return {
       type: 'message',
@@ -206,7 +226,7 @@ function handleSet(context: CommandContext, args: string): SlashCommandActionRet
       content: 'At least one parameter (--url or --pat) is required.',
     };
   }
-  
+
   // Validate URL if provided
   if (params.url && !validateUrl(params.url)) {
     return {
@@ -215,7 +235,7 @@ function handleSet(context: CommandContext, args: string): SlashCommandActionRet
       content: 'Invalid URL format. Please provide a valid HTTP/HTTPS URL.',
     };
   }
-  
+
   // Validate PAT if provided
   if (params.pat && !validatePat(params.pat)) {
     return {
@@ -224,18 +244,26 @@ function handleSet(context: CommandContext, args: string): SlashCommandActionRet
       content: `Invalid PAT format. PAT must be at least ${MIN_PAT_LENGTH} characters long.`,
     };
   }
-  
+
   // Save to settings
   if (params.url) {
-    context.services.settings.setValue(SettingScope.User, 'databricksUrl', params.url);
+    context.services.settings.setValue(
+      SettingScope.User,
+      'databricksUrl',
+      params.url,
+    );
     process.env.DATABRICKS_URL = params.url;
   }
-  
+
   if (params.pat) {
-    context.services.settings.setValue(SettingScope.User, 'databricksPat', params.pat);
+    context.services.settings.setValue(
+      SettingScope.User,
+      'databricksPat',
+      params.pat,
+    );
     process.env.DBX_PAT = params.pat;
   }
-  
+
   return {
     type: 'message',
     messageType: 'info',
@@ -243,15 +271,26 @@ function handleSet(context: CommandContext, args: string): SlashCommandActionRet
   };
 }
 
-function handleClear(context: CommandContext, _args: string): SlashCommandActionReturn {
+function handleClear(
+  context: CommandContext,
+  _args: string,
+): SlashCommandActionReturn {
   // Clear from settings
-  context.services.settings.setValue(SettingScope.User, 'databricksUrl', undefined);
-  context.services.settings.setValue(SettingScope.User, 'databricksPat', undefined);
-  
+  context.services.settings.setValue(
+    SettingScope.User,
+    'databricksUrl',
+    undefined,
+  );
+  context.services.settings.setValue(
+    SettingScope.User,
+    'databricksPat',
+    undefined,
+  );
+
   // Clear from environment
   delete process.env.DATABRICKS_URL;
   delete process.env.DBX_PAT;
-  
+
   return {
     type: 'message',
     messageType: 'info',
@@ -259,22 +298,30 @@ function handleClear(context: CommandContext, _args: string): SlashCommandAction
   };
 }
 
-function handleEnable(context: CommandContext, _args: string): SlashCommandActionReturn {
+function handleEnable(
+  context: CommandContext,
+  _args: string,
+): SlashCommandActionReturn {
   // Reload environment to ensure we have latest values
   loadEnvironment();
-  
+
   // Check if configuration exists
   if (!process.env.DATABRICKS_URL || !process.env.DBX_PAT) {
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Cannot enable Databricks: configuration is incomplete.\nUse `/databricks set --url=<URL> --pat=<PAT>` first.',
+      content:
+        'Cannot enable Databricks: configuration is incomplete.\nUse `/databricks set --url=<URL> --pat=<PAT>` first.',
     };
   }
-  
+
   // Set auth type to Databricks
-  context.services.settings.setValue(SettingScope.User, 'selectedAuthType', AuthType.USE_DATABRICKS);
-  
+  context.services.settings.setValue(
+    SettingScope.User,
+    'selectedAuthType',
+    AuthType.USE_DATABRICKS,
+  );
+
   return {
     type: 'message',
     messageType: 'info',
@@ -286,6 +333,7 @@ function showHelp(): SlashCommandActionReturn {
   return {
     type: 'message',
     messageType: 'info',
-    content: 'Available subcommands:\n• show - Display current configuration\n• set - Set configuration values\n• clear - Clear configuration\n• enable - Enable Databricks authentication',
+    content:
+      'Available subcommands:\n• show - Display current configuration\n• set - Set configuration values\n• clear - Clear configuration\n• enable - Enable Databricks authentication',
   };
 }

@@ -26,9 +26,10 @@ import { useInput, type Key as InkKey } from 'ink';
 vi.mock('ink');
 
 vi.mock('@dbx-cli/core', async () => {
-  const actualServerModule = (await vi.importActual(
-    '@dbx-cli/core',
-  )) as Record<string, unknown>;
+  const actualServerModule = (await vi.importActual('@dbx-cli/core')) as Record<
+    string,
+    unknown
+  >;
   return {
     ...actualServerModule,
     Config: vi.fn(),

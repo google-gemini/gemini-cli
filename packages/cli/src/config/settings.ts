@@ -404,7 +404,11 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   }
 
   // Load Databricks settings into environment variables if not already set
-  const mergedSettings = { ...systemSettings, ...userSettings, ...workspaceSettings };
+  const mergedSettings = {
+    ...systemSettings,
+    ...userSettings,
+    ...workspaceSettings,
+  };
   if (mergedSettings.databricksUrl && !process.env.DATABRICKS_URL) {
     process.env.DATABRICKS_URL = mergedSettings.databricksUrl;
   }

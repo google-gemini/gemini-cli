@@ -24,8 +24,7 @@ vi.mock('open', () => ({
 }));
 
 vi.mock('@dbx-cli/core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@dbx-cli/core')>();
+  const actual = await importOriginal<typeof import('@dbx-cli/core')>();
   return {
     ...actual,
     getMCPServerStatus: vi.fn(),

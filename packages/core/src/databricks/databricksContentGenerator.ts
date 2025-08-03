@@ -32,7 +32,6 @@ export class DatabricksContentGenerator implements ContentGenerator {
   private headers: Record<string, string>;
 
   constructor(config: DatabricksConfig, proxy?: string) {
-    this.validateConfig(config);
     this.config = config;
 
     // Normalize workspace host (remove trailing slash)
@@ -55,14 +54,21 @@ export class DatabricksContentGenerator implements ContentGenerator {
     }
   }
 
-  private validateConfig(config: DatabricksConfig): void {
-    if (!config.workspace_host) {
-      throw new Error('Databricks workspace host is required');
+  private validateConfig(): void {
+    if (!this.config.workspace_host || !this.config.auth_token) {
+      throw new Error(
+        'Databricks is not configured. Please use the /databricks set command to configure:\n' +
+          '/databricks set --url=<your-workspace-url> --pat=<your-personal-access-token>\n' +
+          '\n' +
+          'Example:\n' +
+          '/databricks set --url=https://myworkspace.databricks.com --pat=dapi123...\n' +
+          '\n' +
+          'You can also set environment variables:\n' +
+          '• DATABRICKS_URL - Your Databricks workspace URL\n' +
+          '• DBX_PAT - Your Databricks personal access token',
+      );
     }
-    if (!config.auth_token) {
-      throw new Error('Databricks auth token is required');
-    }
-    if (!config.model) {
+    if (!this.config.model) {
       throw new Error('Databricks model is required');
     }
   }
@@ -83,6 +89,9 @@ export class DatabricksContentGenerator implements ContentGenerator {
     request: GenerateContentParameters,
     _userPromptId: string,
   ): Promise<GenerateContentResponse> {
+    // Validate configuration before making API call
+    this.validateConfig();
+
     // Convert to our internal format with prompt field
     const dbRequest = this.convertToInternalFormat(request);
     const databricksRequest = this.transformRequest(dbRequest, false);
@@ -119,6 +128,9 @@ export class DatabricksContentGenerator implements ContentGenerator {
     userPromptId: string,
     signal?: AbortSignal,
   ): AsyncGenerator<GenerateContentResponse> {
+    // Validate configuration before making API call
+    this.validateConfig();
+
     // Convert to our internal format with prompt field
     const dbRequest = this.convertToInternalFormat(request);
     const databricksRequest = this.transformRequest(dbRequest, true);
@@ -192,6 +204,9 @@ export class DatabricksContentGenerator implements ContentGenerator {
   async countTokens(
     request: CountTokensParameters,
   ): Promise<CountTokensResponse> {
+    // Validate configuration before making API call
+    this.validateConfig();
+
     // Simple estimation: ~4 characters per token
     let totalChars = 0;
 

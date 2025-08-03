@@ -18,8 +18,7 @@ import {
 const mockIsBinary = vi.hoisted(() => vi.fn());
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
 vi.mock('@dbx-cli/core', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@dbx-cli/core')>();
+  const original = await importOriginal<typeof import('@dbx-cli/core')>();
   return {
     ...original,
     ShellExecutionService: { execute: mockShellExecutionService },

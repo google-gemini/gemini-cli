@@ -4,10 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  checkCommandPermissions,
-  ShellExecutionService,
-} from '@dbx-cli/core';
+import { checkCommandPermissions, ShellExecutionService } from '@dbx-cli/core';
 
 import { CommandContext } from '../../ui/commands/types.js';
 import { IPromptProcessor } from './types.js';

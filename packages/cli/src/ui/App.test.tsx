@@ -88,8 +88,7 @@ interface MockServerConfig {
 
 // Mock @dbx-cli/core and its Config class
 vi.mock('@dbx-cli/core', async (importOriginal) => {
-  const actualCore =
-    await importOriginal<typeof import('@dbx-cli/core')>();
+  const actualCore = await importOriginal<typeof import('@dbx-cli/core')>();
   const ConfigClassMock = vi
     .fn()
     .mockImplementation((optionsPassedToConstructor) => {

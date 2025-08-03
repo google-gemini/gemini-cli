@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  Config,
-  getErrorMessage,
-  getMCPServerPrompts,
-} from '@dbx-cli/core';
+import { Config, getErrorMessage, getMCPServerPrompts } from '@dbx-cli/core';
 import {
   CommandContext,
   CommandKind,

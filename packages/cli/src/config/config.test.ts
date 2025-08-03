@@ -30,9 +30,8 @@ vi.mock('read-package-up', () => ({
 }));
 
 vi.mock('@dbx-cli/core', async () => {
-  const actualServer = await vi.importActual<typeof ServerConfig>(
-    '@dbx-cli/core',
-  );
+  const actualServer =
+    await vi.importActual<typeof ServerConfig>('@dbx-cli/core');
   return {
     ...actualServer,
     IdeClient: {

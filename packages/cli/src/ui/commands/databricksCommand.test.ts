@@ -12,7 +12,8 @@ import { AuthType } from '@dbx-cli/core';
 
 // Mock the settings module
 vi.mock('../../config/settings.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../config/settings.js')>();
+  const actual =
+    await importOriginal<typeof import('../../config/settings.js')>();
   return {
     ...actual,
     loadEnvironment: vi.fn(),
@@ -97,7 +98,9 @@ describe('databricksCommand', () => {
       expect((result as MessageActionReturn).content).toContain(
         'URL: https://workspace.databricks.com',
       );
-      expect((result as MessageActionReturn).content).toContain('PAT: dapi******789');
+      expect((result as MessageActionReturn).content).toContain(
+        'PAT: dapi******789',
+      );
     });
 
     it('should display "not configured" message when environment variables are not set', async () => {
@@ -130,7 +133,9 @@ describe('databricksCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: expect.stringContaining('URL: https://workspace.databricks.com'),
+        content: expect.stringContaining(
+          'URL: https://workspace.databricks.com',
+        ),
       });
       expect((result as MessageActionReturn).content).toContain('PAT: not set');
     });
@@ -144,7 +149,10 @@ describe('databricksCommand', () => {
 
       // When: User runs /databricks set with URL and PAT
       context.invocation!.args = `set --url="${url}" --pat="${pat}"`;
-      const result = await databricksCommand.action!(context, context.invocation!.args);
+      const result = await databricksCommand.action!(
+        context,
+        context.invocation!.args,
+      );
 
       // Then: Should save values and return success message
       expect(mockSetValue).toHaveBeenCalledWith(
@@ -160,7 +168,9 @@ describe('databricksCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: expect.stringContaining('Databricks configuration updated successfully'),
+        content: expect.stringContaining(
+          'Databricks configuration updated successfully',
+        ),
       });
     });
 
@@ -170,7 +180,10 @@ describe('databricksCommand', () => {
 
       // When: User runs /databricks set with only URL
       context.invocation!.args = `set --url="${url}"`;
-      const result = await databricksCommand.action!(context, context.invocation!.args);
+      const result = await databricksCommand.action!(
+        context,
+        context.invocation!.args,
+      );
 
       // Then: Should save only URL value
       expect(mockSetValue).toHaveBeenCalledWith(
@@ -186,7 +199,9 @@ describe('databricksCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: expect.stringContaining('Databricks configuration updated successfully'),
+        content: expect.stringContaining(
+          'Databricks configuration updated successfully',
+        ),
       });
     });
 
@@ -194,13 +209,18 @@ describe('databricksCommand', () => {
       // Given: User provides no parameters
       // When: User runs /databricks set without parameters
       context.invocation!.args = 'set';
-      const result = await databricksCommand.action!(context, context.invocation!.args);
+      const result = await databricksCommand.action!(
+        context,
+        context.invocation!.args,
+      );
 
       // Then: Should return error message
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: expect.stringContaining('At least one parameter (--url or --pat) is required'),
+        content: expect.stringContaining(
+          'At least one parameter (--url or --pat) is required',
+        ),
       });
       expect(mockSetValue).not.toHaveBeenCalled();
     });
@@ -211,7 +231,10 @@ describe('databricksCommand', () => {
 
       // When: User runs /databricks set with invalid URL
       context.invocation!.args = `set --url="${invalidUrl}"`;
-      const result = await databricksCommand.action!(context, context.invocation!.args);
+      const result = await databricksCommand.action!(
+        context,
+        context.invocation!.args,
+      );
 
       // Then: Should return error message
       expect(result).toEqual({
@@ -228,7 +251,10 @@ describe('databricksCommand', () => {
 
       // When: User runs /databricks set with invalid PAT
       context.invocation!.args = `set --pat="${invalidPat}"`;
-      const result = await databricksCommand.action!(context, context.invocation!.args);
+      const result = await databricksCommand.action!(
+        context,
+        context.invocation!.args,
+      );
 
       // Then: Should return error message
       expect(result).toEqual({
@@ -353,7 +379,10 @@ describe('databricksCommand', () => {
 
       // When: User runs set with quoted arguments
       context.invocation!.args = `set --url="${url}" --pat="${pat}"`;
-      const result = await databricksCommand.action!(context, context.invocation!.args);
+      const result = await databricksCommand.action!(
+        context,
+        context.invocation!.args,
+      );
 
       // Then: Should parse correctly and save values
       expect(mockSetValue).toHaveBeenCalledWith(
@@ -369,7 +398,9 @@ describe('databricksCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: expect.stringContaining('Databricks configuration updated successfully'),
+        content: expect.stringContaining(
+          'Databricks configuration updated successfully',
+        ),
       });
     });
 
@@ -380,7 +411,10 @@ describe('databricksCommand', () => {
 
       // When: User runs set with single-quoted arguments
       context.invocation!.args = `set --url='${url}' --pat='${pat}'`;
-      const _result = await databricksCommand.action!(context, context.invocation!.args);
+      const _result = await databricksCommand.action!(
+        context,
+        context.invocation!.args,
+      );
 
       // Then: Should parse correctly
       expect(mockSetValue).toHaveBeenCalledWith(
@@ -396,7 +430,10 @@ describe('databricksCommand', () => {
 
       // When: User runs set with equals syntax
       context.invocation!.args = `set --url=${url}`;
-      const _result = await databricksCommand.action!(context, context.invocation!.args);
+      const _result = await databricksCommand.action!(
+        context,
+        context.invocation!.args,
+      );
 
       // Then: Should parse correctly
       expect(mockSetValue).toHaveBeenCalledWith(
