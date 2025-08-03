@@ -689,7 +689,7 @@ describe('handleAtCommand', () => {
       `Ignored 1 files:\nGemini-ignored: ${geminiIgnoredFile}`,
     );
   });
-  
+
   describe('punctuation termination in @ commands', () => {
     it('should terminate @path at comma', async () => {
       const fileContent = 'File content here';

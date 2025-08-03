@@ -93,7 +93,8 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
       } else if (char === '.') {
         // For . we need to be more careful - only terminate if followed by whitespace or end of string
         // This allows file extensions like .txt, .js but terminates at sentence endings like "file.txt. Next sentence"
-        const nextChar = pathEndIndex + 1 < query.length ? query[pathEndIndex + 1] : '';
+        const nextChar =
+          pathEndIndex + 1 < query.length ? query[pathEndIndex + 1] : '';
         if (nextChar === '' || /\s/.test(nextChar)) {
           break;
         }
@@ -184,7 +185,7 @@ export async function handleAtCommand({
       addItem(
         {
           type: 'error',
-          text: `Error: Invalid @ command '${originalAtPath}'. No path specified.`, 
+          text: `Error: Invalid @ command '${originalAtPath}'. No path specified.`,
         },
         userMessageTimestamp,
       );
@@ -198,18 +199,18 @@ export async function handleAtCommand({
     const workspaceContext = config.getWorkspaceContext();
     if (!workspaceContext.isPathWithinWorkspace(pathName)) {
       onDebugMessage(
-        `Path ${pathName} is not in the workspace and will be skipped.`, 
+        `Path ${pathName} is not in the workspace and will be skipped.`,
       );
       continue;
     }
 
-    const gitIgnored = 
+    const gitIgnored =
       respectFileIgnore.respectGitIgnore &&
       fileDiscovery.shouldIgnoreFile(pathName, {
         respectGitIgnore: true,
         respectGeminiIgnore: false,
       });
-    const geminiIgnored = 
+    const geminiIgnored =
       respectFileIgnore.respectGeminiIgnore &&
       fileDiscovery.shouldIgnoreFile(pathName, {
         respectGitIgnore: false,
@@ -217,7 +218,7 @@ export async function handleAtCommand({
       });
 
     if (gitIgnored || geminiIgnored) {
-      const reason = 
+      const reason =
         gitIgnored && geminiIgnored ? 'both' : gitIgnored ? 'git' : 'gemini';
       ignoredByReason[reason].push(pathName);
       const reasonText =
@@ -250,7 +251,7 @@ export async function handleAtCommand({
         if (isNodeError(error) && error.code === 'ENOENT') {
           if (config.getEnableRecursiveFileSearch() && globTool) {
             onDebugMessage(
-              `Path ${pathName} not found directly, attempting glob search.`, 
+              `Path ${pathName} not found directly, attempting glob search.`,
             );
             try {
               const globResult = await globTool.execute(
@@ -276,12 +277,12 @@ export async function handleAtCommand({
                   resolvedSuccessfully = true;
                 } else {
                   onDebugMessage(
-                    `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`, 
+                    `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
                   );
                 }
               } else {
                 onDebugMessage(
-                  `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`, 
+                  `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
                 );
               }
             } catch (globError) {
@@ -289,12 +290,12 @@ export async function handleAtCommand({
                 `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
               );
               onDebugMessage(
-                `Error during glob search for ${pathName}. Path ${pathName} will be skipped.`, 
+                `Error during glob search for ${pathName}. Path ${pathName} will be skipped.`,
               );
             }
           } else {
             onDebugMessage(
-              `Glob tool not found. Path ${pathName} will be skipped.`, 
+              `Glob tool not found. Path ${pathName} will be skipped.`,
             );
           }
         } else {
@@ -302,7 +303,7 @@ export async function handleAtCommand({
             `Error stating path ${pathName}: ${getErrorMessage(error)}`,
           );
           onDebugMessage(
-            `Error stating path ${pathName}. Path ${pathName} will be skipped.`, 
+            `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
           );
         }
       }
@@ -359,7 +360,7 @@ export async function handleAtCommand({
   initialQueryText = initialQueryText.trim();
 
   // Inform user about ignored paths
-  const totalIgnored = 
+  const totalIgnored =
     ignoredByReason.git.length +
     ignoredByReason.gemini.length +
     ignoredByReason.both.length;
