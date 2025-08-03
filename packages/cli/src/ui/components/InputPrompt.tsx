@@ -172,7 +172,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   ]);
 
   // Cleanup preserved text with timeout-based fallback to prevent memory leaks
-  // We use buffer.text as dependency to trigger cleanup setup on each submission
+  // Triggers only after successful submission when userMessages updates
   useEffect(() => {
     if (!preservedTextRef.current) return;
 
@@ -185,7 +185,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ); // 5 minutes
 
     return () => clearTimeout(timeoutId);
-  }, [buffer.text]); // Triggers on each submission when buffer.text changes
+  }, [userMessages]); // Triggers only after submission when history updates
 
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
