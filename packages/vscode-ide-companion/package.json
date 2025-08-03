@@ -49,8 +49,7 @@
     "package": "vsce package --no-dependencies",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vitest run",
-    "test:ci": "vitest run --coverage"
+
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

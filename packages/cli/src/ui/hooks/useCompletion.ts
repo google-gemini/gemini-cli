@@ -301,23 +301,12 @@ export function useCompletion(
       // Command/Sub-command Completion
       const commandsToSearch = currentLevel || [];
       if (commandsToSearch.length > 0) {
-        let potentialSuggestions = commandsToSearch.filter(
+        const potentialSuggestions = commandsToSearch.filter(
           (cmd) =>
             cmd.description &&
             (cmd.name.startsWith(partial) ||
               cmd.altNames?.some((alt) => alt.startsWith(partial))),
         );
-
-        // If a user's input is an exact match and it is a leaf command,
-        // enter should submit immediately.
-        if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
-          const perfectMatch = potentialSuggestions.find(
-            (s) => s.name === partial || s.altNames?.includes(partial),
-          );
-          if (perfectMatch && perfectMatch.action) {
-            potentialSuggestions = [];
-          }
-        }
 
         const finalSuggestions = potentialSuggestions.map((cmd) => ({
           label: cmd.name,

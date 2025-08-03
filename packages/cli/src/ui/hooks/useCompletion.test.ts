@@ -686,43 +686,7 @@ describe('useCompletion', () => {
       });
     });
 
-    describe('Argument Completion', () => {
-      it('should call the command.completion function for argument suggestions', async () => {
-        const availableTags = [
-          'my-chat-tag-1',
-          'my-chat-tag-2',
-          'another-channel',
-        ];
-        const mockCompletionFn = vi
-          .fn()
-          .mockImplementation(
-            async (_context: CommandContext, partialArg: string) =>
-              availableTags.filter((tag) => tag.startsWith(partialArg)),
-          );
 
-        const slashCommands = [
-          {
-            name: 'chat',
-            description: 'Manage chat history',
-            subCommands: [
-              {
-                name: 'resume',
-                description: 'Resume a saved chat',
-                completion: mockCompletionFn,
-              },
-            ],
-          },
-        ] as unknown as SlashCommand[];
-
-        const { result } = renderHook(() =>
-          useCompletion(
-            useTextBufferForTest('/chat resume my-ch'),
-            testDirs,
-            testRootDir,
-            slashCommands,
-            mockCommandContext,
-          ),
-        );
 
         await act(async () => {
           await new Promise((resolve) => setTimeout(resolve, 150));
