@@ -359,6 +359,7 @@ describe('useGeminiStream', () => {
   const renderTestHook = (
     initialToolCalls: TrackedToolCall[] = [],
     geminiClient?: any,
+    interruptMode = false,
   ) => {
     let currentToolCalls = initialToolCalls;
     const setToolCalls = (newToolCalls: TrackedToolCall[]) => {
@@ -405,6 +406,7 @@ describe('useGeminiStream', () => {
           () => Promise.resolve(),
           false,
           () => {},
+          interruptMode,
         );
       },
       {
@@ -907,6 +909,38 @@ describe('useGeminiStream', () => {
       });
 
       // Verify state is reset
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    it('should interrupt stream and prompt for input when enabled', async () => {
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderTestHook([], undefined, true);
+
+      await act(async () => {
+        result.current.submitQuery('test query');
+      });
+
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      simulateEscapeKeyPress();
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Stream interrupted. Awaiting new input.',
+          },
+          expect.any(Number),
+        );
+      });
+
       expect(result.current.streamingState).toBe(StreamingState.Idle);
     });
 

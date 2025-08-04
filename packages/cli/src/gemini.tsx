@@ -269,6 +269,7 @@ export async function main() {
           settings={settings}
           startupWarnings={startupWarnings}
           version={version}
+          interruptMode={argv.interrupt ?? false}
         />
       </React.StrictMode>,
       { exitOnCtrlC: false },

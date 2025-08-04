@@ -66,6 +66,7 @@ export interface CliArgs {
   ideModeFeature: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
+  interrupt?: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -91,6 +92,11 @@ export async function parseArguments(): Promise<CliArgs> {
       type: 'string',
       description:
         'Execute the provided prompt and continue in interactive mode',
+    })
+    .option('interrupt', {
+      type: 'boolean',
+      description: 'Allow user to interrupt streaming responses',
+      default: false,
     })
     .option('sandbox', {
       alias: 's',

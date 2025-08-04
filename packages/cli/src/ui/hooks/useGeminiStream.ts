@@ -93,6 +93,7 @@ export const useGeminiStream = (
   performMemoryRefresh: () => Promise<void>,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
+  interruptMode = false,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -102,6 +103,7 @@ export const useGeminiStream = (
   const [pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
+  const interruptedResponseRef = useRef<string | null>(null);
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const logger = useLogger();
   const gitService = useMemo(() => {
@@ -186,6 +188,14 @@ export const useGeminiStream = (
         return;
       }
       turnCancelledRef.current = true;
+      if (interruptMode && pendingHistoryItemRef.current) {
+        if (
+          pendingHistoryItemRef.current.type === 'gemini' ||
+          pendingHistoryItemRef.current.type === 'gemini_content'
+        ) {
+          interruptedResponseRef.current = pendingHistoryItemRef.current.text;
+        }
+      }
       abortControllerRef.current?.abort();
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, Date.now());
@@ -193,7 +203,9 @@ export const useGeminiStream = (
       addItem(
         {
           type: MessageType.INFO,
-          text: 'Request cancelled.',
+          text: interruptMode
+            ? 'Stream interrupted. Awaiting new input.'
+            : 'Request cancelled.',
         },
         Date.now(),
       );
@@ -254,7 +266,14 @@ export const useGeminiStream = (
             }
             case 'submit_prompt': {
               localQueryToSendToGemini = slashCommandResult.content;
-
+              if (
+                interruptMode &&
+                interruptedResponseRef.current &&
+                typeof localQueryToSendToGemini === 'string'
+              ) {
+                localQueryToSendToGemini = `While you were reasoning, the user interjected: "${localQueryToSendToGemini}". Please integrate this and continue.`;
+                interruptedResponseRef.current = null;
+              }
               return {
                 queryToSend: localQueryToSendToGemini,
                 shouldProceed: true,
@@ -309,6 +328,14 @@ export const useGeminiStream = (
         );
         return { queryToSend: null, shouldProceed: false };
       }
+      if (
+        interruptMode &&
+        interruptedResponseRef.current &&
+        typeof localQueryToSendToGemini === 'string'
+      ) {
+        localQueryToSendToGemini = `While you were reasoning, the user interjected: "${localQueryToSendToGemini}". Please integrate this and continue.`;
+        interruptedResponseRef.current = null;
+      }
       return { queryToSend: localQueryToSendToGemini, shouldProceed: true };
     },
     [
@@ -320,6 +347,7 @@ export const useGeminiStream = (
       logger,
       shellModeActive,
       scheduleToolCalls,
+      interruptMode,
     ],
   );
 
