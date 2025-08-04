@@ -84,7 +84,7 @@ describe('parseArguments', () => {
 
     const mockConsoleError = vi
       .spyOn(console, 'error')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
 
     await expect(parseArguments()).rejects.toThrow('process.exit called');
 
@@ -114,7 +114,7 @@ describe('parseArguments', () => {
 
     const mockConsoleError = vi
       .spyOn(console, 'error')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
 
     await expect(parseArguments()).rejects.toThrow('process.exit called');
 
@@ -918,22 +918,32 @@ describe('loadCliConfig extensions', () => {
 });
 
 describe('loadCliConfig model selection', () => {
-    it('selects a model from settings.json if provided', async () => {
+  it('selects a model from settings.json if provided', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
-    const config = await loadCliConfig({
-      model: 'gemini-9001-ultra',
-    }, [], 'test-session', argv);
+    const config = await loadCliConfig(
+      {
+        model: 'gemini-9001-ultra',
+      },
+      [],
+      'test-session',
+      argv,
+    );
 
     expect(config.getModel()).toBe('gemini-9001-ultra');
   });
 
   it('uses the default gemini model if nothing is set', async () => {
-        process.argv = ['node', 'script.js']; // No model set.
+    process.argv = ['node', 'script.js']; // No model set.
     const argv = await parseArguments();
-    const config = await loadCliConfig({
-      // No model set.
-    }, [], 'test-session', argv);
+    const config = await loadCliConfig(
+      {
+        // No model set.
+      },
+      [],
+      'test-session',
+      argv,
+    );
 
     expect(config.getModel()).toBe('gemini-2.5-pro');
   });
@@ -941,9 +951,14 @@ describe('loadCliConfig model selection', () => {
   it('always prefers model from argvs', async () => {
     process.argv = ['node', 'script.js', '--model', 'gemini-8675309-ultra'];
     const argv = await parseArguments();
-    const config = await loadCliConfig({
-      model: 'gemini-9001-ultra',
-    }, [], 'test-session', argv);
+    const config = await loadCliConfig(
+      {
+        model: 'gemini-9001-ultra',
+      },
+      [],
+      'test-session',
+      argv,
+    );
 
     expect(config.getModel()).toBe('gemini-8675309-ultra');
   });
@@ -951,13 +966,18 @@ describe('loadCliConfig model selection', () => {
   it('selects the model from argvs if provided', async () => {
     process.argv = ['node', 'script.js', '--model', 'gemini-8675309-ultra'];
     const argv = await parseArguments();
-    const config = await loadCliConfig({
-      // No model provided via settings.
-    }, [], 'test-session', argv);
+    const config = await loadCliConfig(
+      {
+        // No model provided via settings.
+      },
+      [],
+      'test-session',
+      argv,
+    );
 
     expect(config.getModel()).toBe('gemini-8675309-ultra');
   });
-})
+});
 
 describe('loadCliConfig ideModeFeature', () => {
   const originalArgv = process.argv;
