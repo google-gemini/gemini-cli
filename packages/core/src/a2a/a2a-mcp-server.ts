@@ -11,7 +11,6 @@ import { A2AToolFunctions, LoadAgentInputSchema } from './tools.js';
 import { A2AToolRegistry } from './a2a-tool-registry.js';
 import { A2AServerConfig } from './types.js';
 
-
 /**
  * This script implements a standalone MCP server that communicates over stdio.
  * It exposes the A2A protocol tools to the Gemini CLI.

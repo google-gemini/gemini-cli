@@ -1,27 +1,28 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
   DataPart,
   FilePart,
-  FileWithBytes,
-  FileWithUri,
   Message,
   Message1,
   Message2,
-  Part,
   Task,
   TextPart,
 } from '@a2a-js/sdk';
 
-export const textResponse = (message: string): CallToolResult => {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: message,
-      },
-    ],
-  };
-};
+export const textResponse = (message: string): CallToolResult => ({
+  content: [
+    {
+      type: 'text',
+      text: message,
+    },
+  ],
+});
 
 export function extractMessageText(
   message: Message | Message1 | Message2 | undefined,
@@ -45,9 +46,7 @@ export function extractMessageText(
     .filter(Boolean);
 
   if (dataParts.length > 0) {
-    const responses = dataParts.map((data) => {
-      return `Data: ${JSON.stringify(data)}`;
-    });
+    const responses = dataParts.map((data) => `Data: ${JSON.stringify(data)}`);
     return responses.join('\n');
   }
 

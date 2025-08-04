@@ -28,7 +28,7 @@ export class A2AClientManager {
   /**
    * Gets the singleton instance of the A2AClientManager.
    */
-  public static getInstance(): A2AClientManager {
+  static getInstance(): A2AClientManager {
     if (!A2AClientManager.instance) {
       A2AClientManager.instance = new A2AClientManager();
     }
@@ -39,7 +39,7 @@ export class A2AClientManager {
   /**
    * Initializes the A2A client.
    */
-  public async initialize(): Promise<void> {
+  async initialize(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -48,10 +48,7 @@ export class A2AClientManager {
    * @param url The URL of the agent.
    * @returns The agent's card.
    */
-  public async loadAgent(
-    url: string,
-    agent_card_path?: string,
-  ): Promise<AgentCard> {
+  async loadAgent(url: string, agent_card_path?: string): Promise<AgentCard> {
     console.error(`Loading agent from URL: ${url}`);
 
     const a2aClient = new A2AClient(
@@ -68,7 +65,7 @@ export class A2AClientManager {
    * Lists all cached agent cards.
    * @returns An array of loaded agent cards.
    */
-  public async listAgents(): Promise<AgentCard[]> {
+  async listAgents(): Promise<AgentCard[]> {
     console.error('Listing all registered agents.');
     const agentCardsPromises = Array.from(this.registeredAgents.values()).map(
       (agentClient) => agentClient.getAgentCard(),
@@ -85,7 +82,7 @@ export class A2AClientManager {
    * @param message The message to send.
    * @returns The task representing the message exchange.
    */
-  public async sendMessage(
+  async sendMessage(
     agentName: string,
     message: string,
   ): Promise<SendMessageResponse> {
@@ -97,7 +94,10 @@ export class A2AClientManager {
     }
 
     const taskId = uuidv4(); // Generate a new taskId for the message
-    this.taskMap.set(agentName, (this.taskMap.get(agentName) || new Set()).add(taskId));
+    this.taskMap.set(
+      agentName,
+      (this.taskMap.get(agentName) || new Set()).add(taskId),
+    );
 
     // TODO: Support more than just text
     const messageParams: MessageSendParams = {
@@ -111,7 +111,7 @@ export class A2AClientManager {
             text: message,
           },
         ],
-        taskId: taskId,
+        taskId,
       },
     };
 
@@ -123,10 +123,7 @@ export class A2AClientManager {
    * @param taskId The ID of the task.
    * @returns The task object.
    */
-  public async getTask(
-    agentName: string,
-    taskId: string,
-  ): Promise<GetTaskResponse> {
+  async getTask(agentName: string, taskId: string): Promise<GetTaskResponse> {
     const a2aClient = this.registeredAgents.get(agentName);
     if (!a2aClient) {
       throw new Error(
@@ -147,7 +144,7 @@ export class A2AClientManager {
    * Cancels a task by its ID.
    * @param taskId The ID of the task.
    */
-  public async cancelTask(
+  async cancelTask(
     agentName: string,
     taskId: string,
   ): Promise<CancelTaskResponse> {
@@ -168,6 +165,6 @@ export class A2AClientManager {
 
     agentTaskSet.delete(taskId);
 
-    return a2aClient.cancelTask({ id: taskId });
+    return await a2aClient.cancelTask({ id: taskId });
   }
 }

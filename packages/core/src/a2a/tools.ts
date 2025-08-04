@@ -62,4 +62,3 @@ export class A2AToolFunctions {
     return textResponse(output);
   }
 }
-
