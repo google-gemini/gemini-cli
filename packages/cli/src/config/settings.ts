@@ -86,6 +86,8 @@ export interface Settings {
   bugCommand?: BugCommandSettings;
   checkpointing?: CheckpointingSettings;
   autoConfigureMaxOldSpaceSize?: boolean;
+  /** The model name to use (e.g 'gemini-9.0-pro') */
+  model?: string;
 
   // Git-aware file filtering settings
   fileFiltering?: {
