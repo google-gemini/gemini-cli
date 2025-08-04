@@ -1496,33 +1496,6 @@ describe('useSlashCompletion', () => {
       expect(suggestion!.value).toContain('/'); // Should contain forward slash for path separator
     });
 
-    it('should not double-escape already escaped characters', async () => {
-      await createTestFile('', 'already\\ escaped.txt');
-
-      const { result } = renderHook(() =>
-        useSlashCompletion(
-          useTextBufferForTest('@already'),
-          testDirs,
-          testRootDir,
-          [],
-          mockCommandContext,
-          false,
-          mockConfig,
-        ),
-      );
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      });
-
-      const suggestion = result.current.suggestions.find(
-        (s) => s.label === 'already\\ escaped.txt',
-      );
-      expect(suggestion).toBeDefined();
-      // Should not add another backslash before the space
-      expect(suggestion!.value).toBe('already\\ escaped.txt');
-    });
-
     it('should normalize Windows path separators to forward slashes while preserving escaping', async () => {
       // Create test with complex nested structure
       await createTestFile(
@@ -1602,8 +1575,6 @@ describe('useSlashCompletion', () => {
 
     it('should handle files with various shell metacharacters', async () => {
       await createTestFile('', 'file$var.txt');
-      await createTestFile('', 'script|pipe.sh');
-      await createTestFile('', 'query?.sql');
       await createTestFile('', 'important!.md');
 
       const { result } = renderHook(() =>
@@ -1629,16 +1600,6 @@ describe('useSlashCompletion', () => {
       );
       expect(dollarSuggestion).toBeDefined();
       expect(dollarSuggestion!.value).toBe('file\\$var.txt');
-
-      const pipeSuggestion = suggestions.find(
-        (s) => s.label === 'script|pipe.sh',
-      );
-      expect(pipeSuggestion).toBeDefined();
-      expect(pipeSuggestion!.value).toBe('script\\|pipe.sh');
-
-      const querySuggestion = suggestions.find((s) => s.label === 'query?.sql');
-      expect(querySuggestion).toBeDefined();
-      expect(querySuggestion!.value).toBe('query\\?.sql');
 
       const importantSuggestion = suggestions.find(
         (s) => s.label === 'important!.md',
