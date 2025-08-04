@@ -16,6 +16,7 @@ import {
   Config,
   FileDiscoveryService,
   DEFAULT_FILE_FILTERING_OPTIONS,
+  SHELL_SPECIAL_CHARS,
 } from '@google/gemini-cli-core';
 import { Suggestion } from '../components/SuggestionsDisplay.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
@@ -513,11 +514,17 @@ export function useSlashCompletion(
           ];
         }
 
-        // Like glob, we always return forwardslashes, even in windows.
+        // Like glob, we always return forward slashes for path separators, even on Windows.
+        // But preserve backslash escaping for special characters.
+        const specialCharsLookahead = `(?![${SHELL_SPECIAL_CHARS.source.slice(1, -1)}])`;
+        const pathSeparatorRegex = new RegExp(
+          `\\\\${specialCharsLookahead}`,
+          'g',
+        );
         fetchedSuggestions = fetchedSuggestions.map((suggestion) => ({
           ...suggestion,
-          label: suggestion.label.replace(/\\/g, '/'),
-          value: suggestion.value.replace(/\\/g, '/'),
+          label: suggestion.label.replace(pathSeparatorRegex, '/'),
+          value: suggestion.value.replace(pathSeparatorRegex, '/'),
         }));
 
         // Sort by depth, then directories first, then alphabetically
