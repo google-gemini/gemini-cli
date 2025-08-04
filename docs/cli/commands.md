@@ -17,6 +17,11 @@ Slash commands provide meta-level control over the CLI itself.
     - **`save`**
       - **Description:** Saves the current conversation history. You must add a `<tag>` for identifying the conversation state.
       - **Usage:** `/chat save <tag>`
+      - **Details on Checkpoint Location:** The default locations for saved chat checkpoints are:
+        - Linux/macOS: `~/.config/google-generative-ai/checkpoints/`
+        - Windows: `C:\Users\<YourUsername>\AppData\Roaming\google-generative-ai\checkpoints\`
+        - When you run `/chat list`, the CLI only scans these specific directories to find available checkpoints.
+        - **Note:** These checkpoints are for manually saving and resuming conversation states. For automatic checkpoints created before file modifications, see the [Checkpointing documentation](../checkpointing.md).
     - **`resume`**
       - **Description:** Resumes a conversation from a previous save.
       - **Usage:** `/chat resume <tag>`
@@ -32,6 +37,17 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **`/copy`**
   - **Description:** Copies the last output produced by Gemini CLI to your clipboard, for easy sharing or reuse.
+
+- **`/directory`** (or **`/dir`**)
+  - **Description:** Manage workspace directories for multi-directory support.
+  - **Sub-commands:**
+    - **`add`**:
+      - **Description:** Add a directory to the workspace. The path can be absolute or relative to the current working directory. Moreover, the reference from home directory is supported as well.
+      - **Usage:** `/directory add <path1>,<path2>`
+      - **Note:** Disabled in restrictive sandbox profiles. If you're using that, use `--include-directories` when starting the session instead.
+    - **`show`**:
+      - **Description:** Display all directories added by `/direcotry add` and `--include-directories`.
+      - **Usage:** `/directory show`
 
 - **`/editor`**
   - **Description:** Open a dialog for selecting supported editors.
@@ -105,6 +121,9 @@ Slash commands provide meta-level control over the CLI itself.
     - **Repeat last command:** Use `.` to repeat the last editing operation
     - **Persistent setting:** Vim mode preference is saved to `~/.gemini/settings.json` and restored between sessions
   - **Status indicator:** When enabled, shows `[NORMAL]` or `[INSERT]` in the footer
+
+- **`/init`**
+  - **Description:** To help users easily create a `GEMINI.md` file, this command analyzes the current directory and generates a tailored context file, making it simpler for them to provide project-specific instructions to the Gemini agent.
 
 ### Custom Commands
 
@@ -201,6 +220,47 @@ The command follows this format: `/changelog <version> <type> <message>`
 
 When you run `/changelog 1.2.0 added "New feature"`, the final text sent to the model will be the original prompt followed by two newlines and the command you typed.
 
+##### 3. Executing Shell Commands with `!{...}`
+
+You can make your commands dynamic by executing shell commands directly within your `prompt` and injecting their output. This is ideal for gathering context from your local environment, like reading file content or checking the status of Git.
+
+When a custom command attempts to execute a shell command, Gemini CLI will now prompt you for confirmation before proceeding. This is a security measure to ensure that only intended commands can be run.
+
+**How It Works:**
+
+1.  **Inject Commands:** Use the `!{...}` syntax in your `prompt` to specify where the command should be run and its output injected.
+2.  **Confirm Execution:** When you run the command, a dialog will appear listing the shell commands the prompt wants to execute.
+3.  **Grant Permission:** You can choose to:
+    - **Allow once:** The command(s) will run this one time.
+    - **Allow always for this session:** The command(s) will be added to a temporary allowlist for the current CLI session and will not require confirmation again.
+    - **No:** Cancel the execution of the shell command(s).
+
+The CLI still respects the global `excludeTools` and `coreTools` settings. A command will be blocked without a confirmation prompt if it is explicitly disallowed in your configuration.
+
+**Example (`git/commit.toml`):**
+
+This command gets the staged git diff and uses it to ask the model to write a commit message.
+
+````toml
+# In: <project>/.gemini/commands/git/commit.toml
+# Invoked via: /git:commit
+
+description = "Generates a Git commit message based on staged changes."
+
+# The prompt uses !{...} to execute the command and inject its output.
+prompt = """
+Please generate a Conventional Commit message based on the following git diff:
+
+```diff
+!{git diff --staged}
+````
+
+"""
+
+````
+
+When you run `/git:commit`, the CLI first executes `git diff --staged`, then replaces `!{git diff --staged}` with the output of that command before sending the final, complete prompt to the model.
+
 ---
 
 #### Example: A "Pure Function" Refactoring Command
@@ -214,7 +274,7 @@ First, ensure the user commands directory exists, then create a `refactor` subdi
 ```bash
 mkdir -p ~/.gemini/commands/refactor
 touch ~/.gemini/commands/refactor/pure.toml
-```
+````
 
 **2. Add the content to the file:**
 

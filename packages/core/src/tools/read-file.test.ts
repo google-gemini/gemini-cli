@@ -12,6 +12,7 @@ import fs from 'fs';
 import fsp from 'fs/promises';
 import { Config } from '../config/config.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 
 describe('ReadFileTool', () => {
   let tempRootDir: string;
@@ -27,6 +28,7 @@ describe('ReadFileTool', () => {
     const mockConfigInstance = {
       getFileService: () => new FileDiscoveryService(tempRootDir),
       getTargetDir: () => tempRootDir,
+      getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
     } as unknown as Config;
     tool = new ReadFileTool(mockConfigInstance);
   });
@@ -65,8 +67,9 @@ describe('ReadFileTool', () => {
     it('should return error for path outside root', () => {
       const outsidePath = path.resolve(os.tmpdir(), 'outside-root.txt');
       const params: ReadFileToolParams = { absolute_path: outsidePath };
-      expect(tool.validateToolParams(params)).toMatch(
-        /File path must be within the root directory/,
+      const error = tool.validateToolParams(params);
+      expect(error).toContain(
+        'File path must be within one of the workspace directories',
       );
     });
 
@@ -219,7 +222,7 @@ describe('ReadFileTool', () => {
           'Line 7',
           'Line 8',
         ].join('\n'),
-        returnDisplay: '(truncated)',
+        returnDisplay: 'Read lines 6-8 of 20 from paginated.txt',
       });
     });
 
@@ -259,6 +262,38 @@ describe('ReadFileTool', () => {
           returnDisplay: expectedError,
         });
       });
+    });
+  });
+
+  describe('workspace boundary validation', () => {
+    it('should validate paths are within workspace root', () => {
+      const params: ReadFileToolParams = {
+        absolute_path: path.join(tempRootDir, 'file.txt'),
+      };
+      expect(tool.validateToolParams(params)).toBeNull();
+    });
+
+    it('should reject paths outside workspace root', () => {
+      const params: ReadFileToolParams = {
+        absolute_path: '/etc/passwd',
+      };
+      const error = tool.validateToolParams(params);
+      expect(error).toContain(
+        'File path must be within one of the workspace directories',
+      );
+      expect(error).toContain(tempRootDir);
+    });
+
+    it('should provide clear error message with workspace directories', () => {
+      const outsidePath = path.join(os.tmpdir(), 'outside-workspace.txt');
+      const params: ReadFileToolParams = {
+        absolute_path: outsidePath,
+      };
+      const error = tool.validateToolParams(params);
+      expect(error).toContain(
+        'File path must be within one of the workspace directories',
+      );
+      expect(error).toContain(tempRootDir);
     });
   });
 });

@@ -209,6 +209,11 @@ Logs are timestamped records of specific events. The following events are logged
   - **Attributes**:
     - `auth_type`
 
+- `gemini_cli.slash_command`: This event occurs when a user executes a slash command.
+  - **Attributes**:
+    - `command` (string)
+    - `subcommand` (string, if applicable)
+
 ### Metrics
 
 Metrics are numerical measurements of behavior over time. The following metrics are collected for Gemini CLI:

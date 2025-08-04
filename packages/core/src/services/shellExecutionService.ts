@@ -89,13 +89,16 @@ export class ShellExecutionService {
     abortSignal: AbortSignal,
   ): ShellExecutionHandle {
     const isWindows = os.platform() === 'win32';
-    const shell = isWindows ? 'cmd.exe' : 'bash';
-    const shellArgs = [isWindows ? '/c' : '-c', commandToExecute];
 
-    const child = spawn(shell, shellArgs, {
+    const child = spawn(commandToExecute, [], {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
-      detached: !isWindows, // Use process groups on non-Windows for robust killing
+      // Use bash unless in Windows (since it doesn't support bash).
+      // For windows, just use the default.
+      shell: isWindows ? true : 'bash',
+      // Use process groups on non-Windows for robust killing.
+      // Windows process termination is handled by `taskkill /t`.
+      detached: !isWindows,
       env: {
         ...process.env,
         GEMINI_CLI: '1',

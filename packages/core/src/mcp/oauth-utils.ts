@@ -198,8 +198,8 @@ export class OAuthUtils {
    * @returns The resource metadata URI if found
    */
   static parseWWWAuthenticateHeader(header: string): string | null {
-    // Parse Bearer realm and resource_metadata_uri
-    const match = header.match(/resource_metadata_uri="([^"]+)"/);
+    // Parse Bearer realm and resource_metadata
+    const match = header.match(/resource_metadata="([^"]+)"/);
     if (match) {
       return match[1];
     }

@@ -137,7 +137,7 @@ export class ToolCallEvent {
       ? getDecisionFromOutcome(call.outcome)
       : undefined;
     this.error = call.response.error?.message;
-    this.error_type = call.response.error?.name;
+    this.error_type = call.response.errorType;
     this.prompt_id = call.request.prompt_id;
   }
 }
@@ -266,15 +266,45 @@ export class LoopDetectedEvent {
   }
 }
 
-export class FlashDecidedToContinueEvent {
-  'event.name': 'flash_decided_to_continue';
+export class NextSpeakerCheckEvent {
+  'event.name': 'next_speaker_check';
   'event.timestamp': string; // ISO 8601
   prompt_id: string;
+  finish_reason: string;
+  result: string;
 
-  constructor(prompt_id: string) {
-    this['event.name'] = 'flash_decided_to_continue';
+  constructor(prompt_id: string, finish_reason: string, result: string) {
+    this['event.name'] = 'next_speaker_check';
     this['event.timestamp'] = new Date().toISOString();
     this.prompt_id = prompt_id;
+    this.finish_reason = finish_reason;
+    this.result = result;
+  }
+}
+
+export class SlashCommandEvent {
+  'event.name': 'slash_command';
+  'event.timestamp': string; // ISO 8106
+  command: string;
+  subcommand?: string;
+
+  constructor(command: string, subcommand?: string) {
+    this['event.name'] = 'slash_command';
+    this['event.timestamp'] = new Date().toISOString();
+    this.command = command;
+    this.subcommand = subcommand;
+  }
+}
+
+export class MalformedJsonResponseEvent {
+  'event.name': 'malformed_json_response';
+  'event.timestamp': string; // ISO 8601
+  model: string;
+
+  constructor(model: string) {
+    this['event.name'] = 'malformed_json_response';
+    this['event.timestamp'] = new Date().toISOString();
+    this.model = model;
   }
 }
 
@@ -288,4 +318,6 @@ export type TelemetryEvent =
   | ApiResponseEvent
   | FlashFallbackEvent
   | LoopDetectedEvent
-  | FlashDecidedToContinueEvent;
+  | NextSpeakerCheckEvent
+  | SlashCommandEvent
+  | MalformedJsonResponseEvent;

@@ -14,49 +14,25 @@ import {
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Server as HTTPServer } from 'node:http';
-import { RecentFilesManager } from './recent-files-manager.js';
+import { OpenFilesManager } from './open-files-manager.js';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
-const MAX_SELECTED_TEXT_LENGTH = 16384; // 16 KiB limit
 
-function sendOpenFilesChangedNotification(
+function sendIdeContextUpdateNotification(
   transport: StreamableHTTPServerTransport,
   log: (message: string) => void,
-  recentFilesManager: RecentFilesManager,
+  openFilesManager: OpenFilesManager,
 ) {
-  const editor = vscode.window.activeTextEditor;
-  const filePath =
-    editor && editor.document.uri.scheme === 'file'
-      ? editor.document.uri.fsPath
-      : '';
-  const selection = editor?.selection;
-  const cursor = selection
-    ? {
-        // This value is a zero-based index, but the vscode IDE is one-based.
-        line: selection.active.line + 1,
-        character: selection.active.character,
-      }
-    : undefined;
-  let selectedText = editor?.document.getText(selection) ?? undefined;
-  if (selectedText && selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
-    selectedText =
-      selectedText.substring(0, MAX_SELECTED_TEXT_LENGTH) + '... [TRUNCATED]';
-  }
+  const ideContext = openFilesManager.state;
+
   const notification: JSONRPCNotification = {
     jsonrpc: '2.0',
-    method: 'ide/openFilesChanged',
-    params: {
-      activeFile: filePath,
-      recentOpenFiles: recentFilesManager.recentFiles.filter(
-        (file) => file.filePath !== filePath,
-      ),
-      cursor,
-      selectedText,
-    },
+    method: 'ide/contextUpdate',
+    params: ideContext,
   };
   log(
-    `Sending active file changed notification: ${JSON.stringify(
+    `Sending IDE context update notification: ${JSON.stringify(
       notification,
       null,
       2,
@@ -84,13 +60,13 @@ export class IDEServer {
     app.use(express.json());
     const mcpServer = createMcpServer();
 
-    const recentFilesManager = new RecentFilesManager(context);
-    const onDidChangeSubscription = recentFilesManager.onDidChange(() => {
+    const openFilesManager = new OpenFilesManager(context);
+    const onDidChangeSubscription = openFilesManager.onDidChange(() => {
       for (const transport of Object.values(transports)) {
-        sendOpenFilesChangedNotification(
+        sendIdeContextUpdateNotification(
           transport,
           this.log.bind(this),
-          recentFilesManager,
+          openFilesManager,
         );
       }
     });
@@ -191,10 +167,10 @@ export class IDEServer {
       }
 
       if (!sessionsWithInitialNotification.has(sessionId)) {
-        sendOpenFilesChangedNotification(
+        sendIdeContextUpdateNotification(
           transport,
           this.log.bind(this),
-          recentFilesManager,
+          openFilesManager,
         );
         sessionsWithInitialNotification.add(sessionId);
       }
