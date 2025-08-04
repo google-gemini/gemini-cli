@@ -67,6 +67,7 @@ async function main() {
         return toolImplementations.load_agent({
           url: agent.url,
           agent_card_path: agent.agent_card_path,
+          token: agent.accessToken,
         });
       });
 

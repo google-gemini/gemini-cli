@@ -20,7 +20,7 @@
     "dist"
   ],
   "dependencies": {
-    "@a2a-js/sdk": "^0.2.5",
+    "@a2a-js/sdk": "file:../../../auth-a2a-js/a2a-js",
     "@google/genai": "1.9.0",
     "@modelcontextprotocol/sdk": "^1.17.0",
     "@opentelemetry/api": "^1.9.0",

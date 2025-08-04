@@ -11,7 +11,12 @@ import {
   MessageSendParams,
   SendMessageResponse,
 } from '@a2a-js/sdk';
-import { A2AClient } from '@a2a-js/sdk/client';
+import {
+  A2AClient,
+  A2AClientOptions,
+  AuthenticationHandler,
+  HttpHeaders,
+} from '@a2a-js/sdk/client';
 import { v4 as uuidv4 } from 'uuid';
 
 const AGENT_CARD_WELL_KNOWN_PATH = '/.well-known/agent-card.json';
@@ -48,14 +53,25 @@ export class A2AClientManager {
    * @param url The URL of the agent.
    * @returns The agent's card.
    */
-  async loadAgent(url: string, agent_card_path?: string): Promise<AgentCard> {
+  async loadAgent(
+    url: string,
+    agent_card_path?: string,
+    token?: string,
+  ): Promise<AgentCard> {
     console.error(`Loading agent from URL: ${url}`);
 
-    const a2aClient = new A2AClient(
-      url,
-      agent_card_path || AGENT_CARD_WELL_KNOWN_PATH,
-    );
+    const options: A2AClientOptions = {
+      agentCardPath: agent_card_path || AGENT_CARD_WELL_KNOWN_PATH,
+      authHandler: token ? new StaticBearerTokenAuth(token) : undefined,
+    };
+
+    const a2aClient = new A2AClient(url, options);
     const agentCard = await a2aClient.getAgentCard();
+
+    if (this.registeredAgents.has(agentCard.name)) {
+      throw Error(`Agent with name ${agentCard.name} is already loaded.`)
+    }
+
     this.registeredAgents.set(agentCard.name, a2aClient!);
 
     return agentCard;
@@ -166,5 +182,31 @@ export class A2AClientManager {
     agentTaskSet.delete(taskId);
 
     return await a2aClient.cancelTask({ id: taskId });
+  }
+}
+
+// TODO: contribute this to a2a-js/sdk
+class StaticBearerTokenAuth implements AuthenticationHandler {
+  private token: string;
+
+  constructor(token: string) {
+    this.token = token;
+  }
+
+  headers(): HttpHeaders {
+    return {
+      Authorization: `Bearer ${this.token}`,
+    };
+  }
+
+  shouldRetryWithHeaders(
+    _req: RequestInit,
+    _res: Response,
+  ): Promise<HttpHeaders | undefined> {
+    return Promise.resolve(undefined);
+  }
+
+  onSuccess(_headers: HttpHeaders): Promise<void> {
+    return Promise.resolve();
   }
 }

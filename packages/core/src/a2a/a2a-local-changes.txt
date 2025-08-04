@@ -1,0 +1,1315 @@
+diff --git a/package-lock.json b/package-lock.json
+index 7067960d..e7822535 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -46,6 +46,377 @@
+         "node": ">=20.0.0"
+       }
+     },
++    "node_modules/@a2a-js/sdk": {
++      "version": "0.2.5",
++      "resolved": "https://registry.npmjs.org/@a2a-js/sdk/-/sdk-0.2.5.tgz",
++      "integrity": "sha512-VTDuRS5V0ATbJ/LkaQlisMnTAeYKXAK6scMguVBstf+KIBQ7HIuKhiXLv+G/hvejkV+THoXzoNifInAkU81P1g==",
++      "dependencies": {
++        "@types/cors": "^2.8.17",
++        "@types/express": "^4.17.23",
++        "body-parser": "^2.2.0",
++        "cors": "^2.8.5",
++        "express": "^4.21.2",
++        "uuid": "^11.1.0"
++      },
++      "engines": {
++        "node": ">=18"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/@types/express": {
++      "version": "4.17.23",
++      "resolved": "https://registry.npmjs.org/@types/express/-/express-4.17.23.tgz",
++      "integrity": "sha512-Crp6WY9aTYP3qPi2wGDo9iUe/rceX01UMhnF1jmwDcKCFM6cx7YhGP/Mpr3y9AASpfHixIG0E6azCcL5OcDHsQ==",
++      "license": "MIT",
++      "dependencies": {
++        "@types/body-parser": "*",
++        "@types/express-serve-static-core": "^4.17.33",
++        "@types/qs": "*",
++        "@types/serve-static": "*"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/@types/express-serve-static-core": {
++      "version": "4.19.6",
++      "resolved": "https://registry.npmjs.org/@types/express-serve-static-core/-/express-serve-static-core-4.19.6.tgz",
++      "integrity": "sha512-N4LZ2xG7DatVqhCZzOGb1Yi5lMbXSZcmdLDe9EzSndPV2HpWYWzRbaerl2n27irrm94EPpprqa8KpskPT085+A==",
++      "license": "MIT",
++      "dependencies": {
++        "@types/node": "*",
++        "@types/qs": "*",
++        "@types/range-parser": "*",
++        "@types/send": "*"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/accepts": {
++      "version": "1.3.8",
++      "resolved": "https://registry.npmjs.org/accepts/-/accepts-1.3.8.tgz",
++      "integrity": "sha512-PYAthTa2m2VKxuvSD3DPC/Gy+U+sOA1LAuT8mkmRuvw+NACSaeXEQ+NHcVF7rONl6qcaxV3Uuemwawk+7+SJLw==",
++      "license": "MIT",
++      "dependencies": {
++        "mime-types": "~2.1.34",
++        "negotiator": "0.6.3"
++      },
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/content-disposition": {
++      "version": "0.5.4",
++      "resolved": "https://registry.npmjs.org/content-disposition/-/content-disposition-0.5.4.tgz",
++      "integrity": "sha512-FveZTNuGw04cxlAiWbzi6zTAL/lhehaWbTtgluJh4/E95DqMwTmha3KZN1aAWA8cFIhHzMZUvLevkw5Rqk+tSQ==",
++      "license": "MIT",
++      "dependencies": {
++        "safe-buffer": "5.2.1"
++      },
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/cookie": {
++      "version": "0.7.1",
++      "resolved": "https://registry.npmjs.org/cookie/-/cookie-0.7.1.tgz",
++      "integrity": "sha512-6DnInpx7SJ2AK3+CTUE/ZM0vWTUboZCegxhC2xiIydHR9jNuTAASBrfEpHhiGOZw/nX51bHt6YQl8jsGo4y/0w==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/cookie-signature": {
++      "version": "1.0.6",
++      "resolved": "https://registry.npmjs.org/cookie-signature/-/cookie-signature-1.0.6.tgz",
++      "integrity": "sha512-QADzlaHc8icV8I7vbaJXJwod9HWYp8uCqf1xa4OfNu1T7JVxQIrUgOWtHdNDtPiywmFbiS12VjotIXLrKM3orQ==",
++      "license": "MIT"
++    },
++    "node_modules/@a2a-js/sdk/node_modules/debug": {
++      "version": "2.6.9",
++      "resolved": "https://registry.npmjs.org/debug/-/debug-2.6.9.tgz",
++      "integrity": "sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==",
++      "license": "MIT",
++      "dependencies": {
++        "ms": "2.0.0"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/debug/node_modules/ms": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz",
++      "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==",
++      "license": "MIT"
++    },
++    "node_modules/@a2a-js/sdk/node_modules/express": {
++      "version": "4.21.2",
++      "resolved": "https://registry.npmjs.org/express/-/express-4.21.2.tgz",
++      "integrity": "sha512-28HqgMZAmih1Czt9ny7qr6ek2qddF4FclbMzwhCREB6OFfH+rXAnuNCwo1/wFvrtbgsQDb4kSbX9de9lFbrXnA==",
++      "license": "MIT",
++      "dependencies": {
++        "accepts": "~1.3.8",
++        "array-flatten": "1.1.1",
++        "body-parser": "1.20.3",
++        "content-disposition": "0.5.4",
++        "content-type": "~1.0.4",
++        "cookie": "0.7.1",
++        "cookie-signature": "1.0.6",
++        "debug": "2.6.9",
++        "depd": "2.0.0",
++        "encodeurl": "~2.0.0",
++        "escape-html": "~1.0.3",
++        "etag": "~1.8.1",
++        "finalhandler": "1.3.1",
++        "fresh": "0.5.2",
++        "http-errors": "2.0.0",
++        "merge-descriptors": "1.0.3",
++        "methods": "~1.1.2",
++        "on-finished": "2.4.1",
++        "parseurl": "~1.3.3",
++        "path-to-regexp": "0.1.12",
++        "proxy-addr": "~2.0.7",
++        "qs": "6.13.0",
++        "range-parser": "~1.2.1",
++        "safe-buffer": "5.2.1",
++        "send": "0.19.0",
++        "serve-static": "1.16.2",
++        "setprototypeof": "1.2.0",
++        "statuses": "2.0.1",
++        "type-is": "~1.6.18",
++        "utils-merge": "1.0.1",
++        "vary": "~1.1.2"
++      },
++      "engines": {
++        "node": ">= 0.10.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/express"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/express/node_modules/body-parser": {
++      "version": "1.20.3",
++      "resolved": "https://registry.npmjs.org/body-parser/-/body-parser-1.20.3.tgz",
++      "integrity": "sha512-7rAxByjUMqQ3/bHJy7D6OGXvx/MMc4IqBn/X0fcM1QUcAItpZrBEYhWGem+tzXH90c+G01ypMcYJBO9Y30203g==",
++      "license": "MIT",
++      "dependencies": {
++        "bytes": "3.1.2",
++        "content-type": "~1.0.5",
++        "debug": "2.6.9",
++        "depd": "2.0.0",
++        "destroy": "1.2.0",
++        "http-errors": "2.0.0",
++        "iconv-lite": "0.4.24",
++        "on-finished": "2.4.1",
++        "qs": "6.13.0",
++        "raw-body": "2.5.2",
++        "type-is": "~1.6.18",
++        "unpipe": "1.0.0"
++      },
++      "engines": {
++        "node": ">= 0.8",
++        "npm": "1.2.8000 || >= 1.4.16"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/finalhandler": {
++      "version": "1.3.1",
++      "resolved": "https://registry.npmjs.org/finalhandler/-/finalhandler-1.3.1.tgz",
++      "integrity": "sha512-6BN9trH7bp3qvnrRyzsBz+g3lZxTNZTbVO2EV1CS0WIcDbawYVdYvGflME/9QP0h0pYlCDBCTjYa9nZzMDpyxQ==",
++      "license": "MIT",
++      "dependencies": {
++        "debug": "2.6.9",
++        "encodeurl": "~2.0.0",
++        "escape-html": "~1.0.3",
++        "on-finished": "2.4.1",
++        "parseurl": "~1.3.3",
++        "statuses": "2.0.1",
++        "unpipe": "~1.0.0"
++      },
++      "engines": {
++        "node": ">= 0.8"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/fresh": {
++      "version": "0.5.2",
++      "resolved": "https://registry.npmjs.org/fresh/-/fresh-0.5.2.tgz",
++      "integrity": "sha512-zJ2mQYM18rEFOudeV4GShTGIQ7RbzA7ozbU9I/XBpm7kqgMywgmylMwXHxZJmkVoYkna9d2pVXVXPdYTP9ej8Q==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/iconv-lite": {
++      "version": "0.4.24",
++      "resolved": "https://registry.npmjs.org/iconv-lite/-/iconv-lite-0.4.24.tgz",
++      "integrity": "sha512-v3MXnZAcvnywkTUEZomIActle7RXXeedOR31wwl7VlyoXO4Qi9arvSenNQWne1TcRwhCL1HwLI21bEqdpj8/rA==",
++      "license": "MIT",
++      "dependencies": {
++        "safer-buffer": ">= 2.1.2 < 3"
++      },
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/media-typer": {
++      "version": "0.3.0",
++      "resolved": "https://registry.npmjs.org/media-typer/-/media-typer-0.3.0.tgz",
++      "integrity": "sha512-dq+qelQ9akHpcOl/gUVRTxVIOkAJ1wR3QAvb4RsVjS8oVoFjDGTc679wJYmUmknUF5HwMLOgb5O+a3KxfWapPQ==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/merge-descriptors": {
++      "version": "1.0.3",
++      "resolved": "https://registry.npmjs.org/merge-descriptors/-/merge-descriptors-1.0.3.tgz",
++      "integrity": "sha512-gaNvAS7TZ897/rVaZ0nMtAyxNyi/pdbjbAwUpFQpN70GqnVfOiXpeUUMKRBmzXaSQ8DdTX4/0ms62r2K+hE6mQ==",
++      "license": "MIT",
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/mime-db": {
++      "version": "1.52.0",
++      "resolved": "https://registry.npmjs.org/mime-db/-/mime-db-1.52.0.tgz",
++      "integrity": "sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/mime-types": {
++      "version": "2.1.35",
++      "resolved": "https://registry.npmjs.org/mime-types/-/mime-types-2.1.35.tgz",
++      "integrity": "sha512-ZDY+bPm5zTTF+YpCrAU9nK0UgICYPT0QtT1NZWFv4s++TNkcgVaT0g6+4R2uI4MjQjzysHB1zxuWL50hzaeXiw==",
++      "license": "MIT",
++      "dependencies": {
++        "mime-db": "1.52.0"
++      },
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/negotiator": {
++      "version": "0.6.3",
++      "resolved": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.3.tgz",
++      "integrity": "sha512-+EUsqGPLsM+j/zdChZjsnX51g4XrHFOIXwfnCVPGlQk/k5giakcKsuxCObBRu6DSm9opw/O6slWbJdghQM4bBg==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/path-to-regexp": {
++      "version": "0.1.12",
++      "resolved": "https://registry.npmjs.org/path-to-regexp/-/path-to-regexp-0.1.12.tgz",
++      "integrity": "sha512-RA1GjUVMnvYFxuqovrEqZoxxW5NUZqbwKtYz/Tt7nXerk0LbLblQmrsgdeOxV5SFHf0UDggjS/bSeOZwt1pmEQ==",
++      "license": "MIT"
++    },
++    "node_modules/@a2a-js/sdk/node_modules/qs": {
++      "version": "6.13.0",
++      "resolved": "https://registry.npmjs.org/qs/-/qs-6.13.0.tgz",
++      "integrity": "sha512-+38qI9SOr8tfZ4QmJNplMUxqjbe7LKvvZgWdExBOmd+egZTtjLB67Gu0HRX3u/XOq7UU2Nx6nsjvS16Z9uwfpg==",
++      "license": "BSD-3-Clause",
++      "dependencies": {
++        "side-channel": "^1.0.6"
++      },
++      "engines": {
++        "node": ">=0.6"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/ljharb"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/raw-body": {
++      "version": "2.5.2",
++      "resolved": "https://registry.npmjs.org/raw-body/-/raw-body-2.5.2.tgz",
++      "integrity": "sha512-8zGqypfENjCIqGhgXToC8aB2r7YrBX+AQAfIPs/Mlk+BtPTztOvTS01NRW/3Eh60J+a48lt8qsCzirQ6loCVfA==",
++      "license": "MIT",
++      "dependencies": {
++        "bytes": "3.1.2",
++        "http-errors": "2.0.0",
++        "iconv-lite": "0.4.24",
++        "unpipe": "1.0.0"
++      },
++      "engines": {
++        "node": ">= 0.8"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/send": {
++      "version": "0.19.0",
++      "resolved": "https://registry.npmjs.org/send/-/send-0.19.0.tgz",
++      "integrity": "sha512-dW41u5VfLXu8SJh5bwRmyYUbAoSB3c9uQh6L8h/KtsFREPWpbX1lrljJo186Jc4nmci/sGUZ9a0a0J2zgfq2hw==",
++      "license": "MIT",
++      "dependencies": {
++        "debug": "2.6.9",
++        "depd": "2.0.0",
++        "destroy": "1.2.0",
++        "encodeurl": "~1.0.2",
++        "escape-html": "~1.0.3",
++        "etag": "~1.8.1",
++        "fresh": "0.5.2",
++        "http-errors": "2.0.0",
++        "mime": "1.6.0",
++        "ms": "2.1.3",
++        "on-finished": "2.4.1",
++        "range-parser": "~1.2.1",
++        "statuses": "2.0.1"
++      },
++      "engines": {
++        "node": ">= 0.8.0"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/send/node_modules/encodeurl": {
++      "version": "1.0.2",
++      "resolved": "https://registry.npmjs.org/encodeurl/-/encodeurl-1.0.2.tgz",
++      "integrity": "sha512-TPJXq8JqFaVYm2CWmPvnP2Iyo4ZSM7/QKcSmuMLDObfpH5fi7RUGmd/rTDf+rut/saiDiQEeVTNgAmJEdAOx0w==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 0.8"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/serve-static": {
++      "version": "1.16.2",
++      "resolved": "https://registry.npmjs.org/serve-static/-/serve-static-1.16.2.tgz",
++      "integrity": "sha512-VqpjJZKadQB/PEbEwvFdO43Ax5dFBZ2UECszz8bQ7pi7wt//PWe1P6MN7eCnjsatYtBT6EuiClbjSWP2WrIoTw==",
++      "license": "MIT",
++      "dependencies": {
++        "encodeurl": "~2.0.0",
++        "escape-html": "~1.0.3",
++        "parseurl": "~1.3.3",
++        "send": "0.19.0"
++      },
++      "engines": {
++        "node": ">= 0.8.0"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/statuses": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/statuses/-/statuses-2.0.1.tgz",
++      "integrity": "sha512-RwNA9Z/7PrK06rYLIzFMlaF+l73iwpzsqRIFgbMLbTcLD6cOao82TaWefPXQvB2fOC4AjuYSEndS7N/mTCbkdQ==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 0.8"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/type-is": {
++      "version": "1.6.18",
++      "resolved": "https://registry.npmjs.org/type-is/-/type-is-1.6.18.tgz",
++      "integrity": "sha512-TkRKr9sUTxEH8MdfuCSP7VizJyzRNMjj2J2do2Jr3Kym598JVdEksuzPQCnlFPW4ky9Q+iA+ma9BGm06XQBy8g==",
++      "license": "MIT",
++      "dependencies": {
++        "media-typer": "0.3.0",
++        "mime-types": "~2.1.24"
++      },
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/@a2a-js/sdk/node_modules/uuid": {
++      "version": "11.1.0",
++      "resolved": "https://registry.npmjs.org/uuid/-/uuid-11.1.0.tgz",
++      "integrity": "sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==",
++      "funding": [
++        "https://github.com/sponsors/broofa",
++        "https://github.com/sponsors/ctavan"
++      ],
++      "license": "MIT",
++      "bin": {
++        "uuid": "dist/esm/bin/uuid"
++      }
++    },
+     "node_modules/@alcalzone/ansi-tokenize": {
+       "version": "0.1.3",
+       "resolved": "https://registry.npmjs.org/@alcalzone/ansi-tokenize/-/ansi-tokenize-0.1.3.tgz",
+@@ -1211,9 +1582,9 @@
+       "license": "MIT"
+     },
+     "node_modules/@modelcontextprotocol/sdk": {
+-      "version": "1.15.1",
+-      "resolved": "https://registry.npmjs.org/@modelcontextprotocol/sdk/-/sdk-1.15.1.tgz",
+-      "integrity": "sha512-W/XlN9c528yYn+9MQkVjxiTPgPxoxt+oczfjHBDsJx0+59+O7B75Zhsp0B16Xbwbz8ANISDajh6+V7nIcPMc5w==",
++      "version": "1.17.0",
++      "resolved": "https://registry.npmjs.org/@modelcontextprotocol/sdk/-/sdk-1.17.0.tgz",
++      "integrity": "sha512-qFfbWFA7r1Sd8D697L7GkTd36yqDuTkvz0KfOGkgXR8EUhQn3/EDNIR/qUdQNMT8IjmasBvHWuXeisxtXTQT2g==",
+       "license": "MIT",
+       "dependencies": {
+         "ajv": "^6.12.6",
+@@ -2171,7 +2542,6 @@
+       "version": "1.19.6",
+       "resolved": "https://registry.npmjs.org/@types/body-parser/-/body-parser-1.19.6.tgz",
+       "integrity": "sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "@types/connect": "*",
+@@ -2212,7 +2582,6 @@
+       "version": "3.4.38",
+       "resolved": "https://registry.npmjs.org/@types/connect/-/connect-3.4.38.tgz",
+       "integrity": "sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "@types/node": "*"
+@@ -2222,7 +2591,6 @@
+       "version": "2.8.19",
+       "resolved": "https://registry.npmjs.org/@types/cors/-/cors-2.8.19.tgz",
+       "integrity": "sha512-mFNylyeyqN93lfe/9CSxOGREz8cpzAhH+E93xJ4xWQf62V8sQ/24reV2nyzUWM6H6Xji+GGHpkbLe7pVoUEskg==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "@types/node": "*"
+@@ -2322,7 +2690,6 @@
+       "version": "2.0.5",
+       "resolved": "https://registry.npmjs.org/@types/http-errors/-/http-errors-2.0.5.tgz",
+       "integrity": "sha512-r8Tayk8HJnX0FztbZN7oVqGccWgw98T/0neJphO91KkmOzug1KkofZURD4UaD5uH8AqcFLfdPErnBod0u71/qg==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/@types/json-schema": {
+@@ -2360,7 +2727,6 @@
+       "version": "1.3.5",
+       "resolved": "https://registry.npmjs.org/@types/mime/-/mime-1.3.5.tgz",
+       "integrity": "sha512-/pyBZWSLD2n0dcHE3hq8s8ZvcETHtEuF+3E7XVt0Ig2nvsVQXdghHVcEkIWjy9A0wKfTn97a/PSDYohKIlnP/w==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/@types/mime-types": {
+@@ -2405,14 +2771,12 @@
+       "version": "6.14.0",
+       "resolved": "https://registry.npmjs.org/@types/qs/-/qs-6.14.0.tgz",
+       "integrity": "sha512-eOunJqu0K1923aExK6y8p6fsihYEn/BYuQ4g0CxAAgFc4b/ZLN4CrsRZ55srTdqoiLzU2B2evC+apEIxprEzkQ==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/@types/range-parser": {
+       "version": "1.2.7",
+       "resolved": "https://registry.npmjs.org/@types/range-parser/-/range-parser-1.2.7.tgz",
+       "integrity": "sha512-hKormJbkJqzQGhziax5PItDUTMAM9uE2XXQmM37dyd4hVM+5aVl7oVxMVUiVQn2oCQFN/LKCZdvSM0pFRqbSmQ==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/@types/react": {
+@@ -2446,7 +2810,6 @@
+       "version": "0.17.5",
+       "resolved": "https://registry.npmjs.org/@types/send/-/send-0.17.5.tgz",
+       "integrity": "sha512-z6F2D3cOStZvuk2SaP6YrwkNO65iTZcwA2ZkSABegdkAh/lf+Aa/YQndZVfmEXT5vgAp6zv06VQ3ejSVjAny4w==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "@types/mime": "^1",
+@@ -2457,7 +2820,6 @@
+       "version": "1.15.8",
+       "resolved": "https://registry.npmjs.org/@types/serve-static/-/serve-static-1.15.8.tgz",
+       "integrity": "sha512-roei0UY3LhpOJvjbIP6ZZFngyLKl5dskOtDhxY5THRSpO+ZI+nzJ+m5yUMzGrp89YRa7lvknKkMYjqQFGwA7Sg==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "@types/http-errors": "*",
+@@ -2500,6 +2862,13 @@
+         "boxen": "^7.1.1"
+       }
+     },
++    "node_modules/@types/uuid": {
++      "version": "10.0.0",
++      "resolved": "https://registry.npmjs.org/@types/uuid/-/uuid-10.0.0.tgz",
++      "integrity": "sha512-7gqG38EyHgyP1S+7+xomFtL+ZNHcKv6DwNaCZmJmo1vgMugyF3TCnXVg4t1uk89mLNwnLtnY3TpOpCOyp1/xHQ==",
++      "dev": true,
++      "license": "MIT"
++    },
+     "node_modules/@types/vscode": {
+       "version": "1.102.0",
+       "resolved": "https://registry.npmjs.org/@types/vscode/-/vscode-1.102.0.tgz",
+@@ -3138,6 +3507,12 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/array-flatten": {
++      "version": "1.1.1",
++      "resolved": "https://registry.npmjs.org/array-flatten/-/array-flatten-1.1.1.tgz",
++      "integrity": "sha512-PCVAQswWemu6UdxsDFFX/+gVeYqKAod3D3UVm91jHwynguOwAvYPhx8nNlM++NqRcK6CxxpUafjmhIdKiHibqg==",
++      "license": "MIT"
++    },
+     "node_modules/array-includes": {
+       "version": "3.1.9",
+       "resolved": "https://registry.npmjs.org/array-includes/-/array-includes-3.1.9.tgz",
+@@ -4296,6 +4671,16 @@
+         "node": ">=6"
+       }
+     },
++    "node_modules/destroy": {
++      "version": "1.2.0",
++      "resolved": "https://registry.npmjs.org/destroy/-/destroy-1.2.0.tgz",
++      "integrity": "sha512-2sJGJTaXIIaR1w4iJSNoN0hnMY7Gpc/n8D4qSCJw8QqFWXf7cuAgnEHxBpweaVcPevC2l3KpjYCx3NypQQgaJg==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 0.8",
++        "npm": "1.2.8000 || >= 1.4.16"
++      }
++    },
+     "node_modules/devlop": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/devlop/-/devlop-1.1.0.tgz",
+@@ -7776,6 +8161,15 @@
+         "node": ">= 8"
+       }
+     },
++    "node_modules/methods": {
++      "version": "1.1.2",
++      "resolved": "https://registry.npmjs.org/methods/-/methods-1.1.2.tgz",
++      "integrity": "sha512-iclAHeNqNm68zFtnZ0e+1L2yUIdvzNoauKU4WBA3VvH/vPFieF7qfRlwUZU+DA9P9bPXIS90ulxoUoCH23sV2w==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
+     "node_modules/micromatch": {
+       "version": "4.0.8",
+       "resolved": "https://registry.npmjs.org/micromatch/-/micromatch-4.0.8.tgz",
+@@ -7789,6 +8183,18 @@
+         "node": ">=8.6"
+       }
+     },
++    "node_modules/mime": {
++      "version": "1.6.0",
++      "resolved": "https://registry.npmjs.org/mime/-/mime-1.6.0.tgz",
++      "integrity": "sha512-x0Vn8spI+wuJ1O6S7gnbaQg8Pxh4NNHb7KSINmEWKiPE4RKOplvijn+NkmYmmRgP68mc70j2EbeTFRsrswaQeg==",
++      "license": "MIT",
++      "bin": {
++        "mime": "cli.js"
++      },
++      "engines": {
++        "node": ">=4"
++      }
++    },
+     "node_modules/mime-db": {
+       "version": "1.54.0",
+       "resolved": "https://registry.npmjs.org/mime-db/-/mime-db-1.54.0.tgz",
+@@ -10915,6 +11321,15 @@
+         "punycode": "^2.1.0"
+       }
+     },
++    "node_modules/utils-merge": {
++      "version": "1.0.1",
++      "resolved": "https://registry.npmjs.org/utils-merge/-/utils-merge-1.0.1.tgz",
++      "integrity": "sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 0.4.0"
++      }
++    },
+     "node_modules/uuid": {
+       "version": "9.0.1",
+       "resolved": "https://registry.npmjs.org/uuid/-/uuid-9.0.1.tgz",
+@@ -11862,8 +12277,9 @@
+       "name": "@google/gemini-cli-core",
+       "version": "0.1.16",
+       "dependencies": {
++        "@a2a-js/sdk": "^0.2.5",
+         "@google/genai": "1.9.0",
+-        "@modelcontextprotocol/sdk": "^1.11.0",
++        "@modelcontextprotocol/sdk": "^1.17.0",
+         "@opentelemetry/api": "^1.9.0",
+         "@opentelemetry/exporter-logs-otlp-grpc": "^0.52.0",
+         "@opentelemetry/exporter-metrics-otlp-grpc": "^0.52.0",
+@@ -11888,13 +12304,16 @@
+         "simple-git": "^3.28.0",
+         "strip-ansi": "^7.1.0",
+         "undici": "^7.10.0",
+-        "ws": "^8.18.0"
++        "uuid": "^9.0.1",
++        "ws": "^8.18.0",
++        "zod": "^3.25.76"
+       },
+       "devDependencies": {
+         "@types/diff": "^7.0.2",
+         "@types/dotenv": "^6.1.1",
+         "@types/micromatch": "^4.0.8",
+         "@types/minimatch": "^5.1.2",
++        "@types/uuid": "^10.0.0",
+         "@types/ws": "^8.5.10",
+         "typescript": "^5.3.3",
+         "vitest": "^3.1.1"
+diff --git a/packages/cli/src/config/config.ts b/packages/cli/src/config/config.ts
+index 9274b65e..ef604659 100644
+--- a/packages/cli/src/config/config.ts
++++ b/packages/cli/src/config/config.ts
+@@ -340,6 +340,24 @@ export async function loadCliConfig(
+   );
+ 
+   let mcpServers = mergeMcpServers(settings, activeExtensions);
++  const a2aServers = settings.a2aServers;
++
++  if (a2aServers && a2aServers.length > 0) {
++    if (!mcpServers['a2a-server']) {
++      // Avoid overwriting if user defined manually
++      mcpServers['a2a-server'] = {
++        description: 'Handles communication with A2A-compatible agents.',
++        command: 'node',
++        args: [
++          './packages/core/dist/src/a2a/a2a-mcp-server.js',
++          '--agents',
++          JSON.stringify(a2aServers),
++        ],
++        cwd: './', // Relative to project root
++      };
++    }
++  }
++
+   const excludeTools = mergeExcludeTools(settings, activeExtensions);
+   const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
+ 
+diff --git a/packages/cli/src/config/settings.ts b/packages/cli/src/config/settings.ts
+index 05d4313f..8aca2248 100644
+--- a/packages/cli/src/config/settings.ts
++++ b/packages/cli/src/config/settings.ts
+@@ -55,6 +55,12 @@ export interface CheckpointingSettings {
+   enabled?: boolean;
+ }
+ 
++export interface A2AServerConfig {
++  url: string;
++  accessToken?: string;
++  agent_card_path?: string;
++}
++
+ export interface SummarizeToolOutputSettings {
+   tokenBudget?: number;
+ }
+@@ -75,6 +81,7 @@ export interface Settings {
+   toolCallCommand?: string;
+   mcpServerCommand?: string;
+   mcpServers?: Record<string, MCPServerConfig>;
++  a2aServers?: A2AServerConfig[];
+   allowMCPServers?: string[];
+   excludeMCPServers?: string[];
+   showMemoryUsage?: boolean;
+diff --git a/packages/core/package.json b/packages/core/package.json
+index de2b7201..b8f54775 100644
+--- a/packages/core/package.json
++++ b/packages/core/package.json
+@@ -20,8 +20,9 @@
+     "dist"
+   ],
+   "dependencies": {
++    "@a2a-js/sdk": "^0.2.5",
+     "@google/genai": "1.9.0",
+-    "@modelcontextprotocol/sdk": "^1.11.0",
++    "@modelcontextprotocol/sdk": "^1.17.0",
+     "@opentelemetry/api": "^1.9.0",
+     "@opentelemetry/exporter-logs-otlp-grpc": "^0.52.0",
+     "@opentelemetry/exporter-metrics-otlp-grpc": "^0.52.0",
+@@ -46,13 +47,16 @@
+     "simple-git": "^3.28.0",
+     "strip-ansi": "^7.1.0",
+     "undici": "^7.10.0",
+-    "ws": "^8.18.0"
++    "uuid": "^9.0.1",
++    "ws": "^8.18.0",
++    "zod": "^3.25.76"
+   },
+   "devDependencies": {
+     "@types/diff": "^7.0.2",
+     "@types/dotenv": "^6.1.1",
+     "@types/micromatch": "^4.0.8",
+     "@types/minimatch": "^5.1.2",
++    "@types/uuid": "^10.0.0",
+     "@types/ws": "^8.5.10",
+     "typescript": "^5.3.3",
+     "vitest": "^3.1.1"
+diff --git a/packages/core/src/a2a/a2a-client.ts b/packages/core/src/a2a/a2a-client.ts
+new file mode 100644
+index 00000000..a8badbf8
+--- /dev/null
++++ b/packages/core/src/a2a/a2a-client.ts
+@@ -0,0 +1,173 @@
++/**
++ * @license
++ * Copyright 2025 Google LLC
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++import {
++  AgentCard,
++  CancelTaskResponse,
++  GetTaskResponse,
++  MessageSendParams,
++  SendMessageResponse,
++} from '@a2a-js/sdk';
++import { A2AClient } from '@a2a-js/sdk/client';
++import { v4 as uuidv4 } from 'uuid';
++
++const AGENT_CARD_WELL_KNOWN_PATH = '/.well-known/agent-card.json';
++
++/**
++ * Manages the A2A client and caches loaded agent information.
++ * Follows a singleton pattern to ensure a single client instance.
++ */
++export class A2AClientManager {
++  private static instance: A2AClientManager;
++  private registeredAgents = new Map<string, A2AClient>(); // { agentName : A2AClient}
++  private taskMap = new Map<string, Set<string>>(); // { agentName : taskId}
++
++  /**
++   * Gets the singleton instance of the A2AClientManager.
++   */
++  public static getInstance(): A2AClientManager {
++    if (!A2AClientManager.instance) {
++      A2AClientManager.instance = new A2AClientManager();
++    }
++    console.error('created new A2AClientManager instance');
++    return A2AClientManager.instance;
++  }
++
++  /**
++   * Initializes the A2A client.
++   */
++  public async initialize(): Promise<void> {
++    return Promise.resolve();
++  }
++
++  /**
++   * InitializedFetches and caches an agent's card.
++   * @param url The URL of the agent.
++   * @returns The agent's card.
++   */
++  public async loadAgent(
++    url: string,
++    agent_card_path?: string,
++  ): Promise<AgentCard> {
++    console.error(`Loading agent from URL: ${url}`);
++
++    const a2aClient = new A2AClient(
++      url,
++      agent_card_path || AGENT_CARD_WELL_KNOWN_PATH,
++    );
++    const agentCard = await a2aClient.getAgentCard();
++    this.registeredAgents.set(agentCard.name, a2aClient!);
++
++    return agentCard;
++  }
++
++  /**
++   * Lists all cached agent cards.
++   * @returns An array of loaded agent cards.
++   */
++  public async listAgents(): Promise<AgentCard[]> {
++    console.error('Listing all registered agents.');
++    const agentCardsPromises = Array.from(this.registeredAgents.values()).map(
++      (agentClient) => agentClient.getAgentCard(),
++    );
++    // Wait for all the promises to resolve
++    const agentCards = await Promise.all(agentCardsPromises);
++    console.error('Returning agent cards:', agentCards);
++    return agentCards;
++  }
++
++  /**
++   * Connects to an agent and sends a message.
++   * @param agentName The name of the agent.
++   * @param message The message to send.
++   * @returns The task representing the message exchange.
++   */
++  public async sendMessage(
++    agentName: string,
++    message: string,
++  ): Promise<SendMessageResponse> {
++    const a2aClient = this.registeredAgents.get(agentName);
++    if (!a2aClient) {
++      throw new Error(
++        `Agent with name ${agentName} is not registered. Please run load_agent first.`,
++      );
++    }
++
++    const taskId = uuidv4(); // Generate a new taskId for the message
++    this.taskMap.set(agentName, (this.taskMap.get(agentName) || new Set()).add(taskId));
++
++    // TODO: Support more than just text
++    const messageParams: MessageSendParams = {
++      message: {
++        kind: 'message',
++        role: 'user',
++        messageId: uuidv4(),
++        parts: [
++          {
++            kind: 'text',
++            text: message,
++          },
++        ],
++        taskId: taskId,
++      },
++    };
++
++    return a2aClient.sendMessage(messageParams);
++  }
++
++  /**
++   * Retrieves a task by its ID.
++   * @param taskId The ID of the task.
++   * @returns The task object.
++   */
++  public async getTask(
++    agentName: string,
++    taskId: string,
++  ): Promise<GetTaskResponse> {
++    const a2aClient = this.registeredAgents.get(agentName);
++    if (!a2aClient) {
++      throw new Error(
++        `Agent with name ${agentName} is not registered. Please run load_agent first.`,
++      );
++    }
++
++    if (!this.taskMap.get(agentName)?.has(taskId)) {
++      throw new Error(
++        `Agent with name ${agentName} has no task ${taskId} associated with it.`,
++      );
++    }
++
++    return a2aClient.getTask({ id: taskId });
++  }
++
++  /**
++   * Cancels a task by its ID.
++   * @param taskId The ID of the task.
++   */
++  public async cancelTask(
++    agentName: string,
++    taskId: string,
++  ): Promise<CancelTaskResponse> {
++    const a2aClient = this.registeredAgents.get(agentName);
++    if (!a2aClient) {
++      throw new Error(
++        `Agent with name ${agentName} is not registered. Please run load_agent first.`,
++      );
++    }
++
++    const agentTaskSet = this.taskMap.get(agentName);
++
++    if (!agentTaskSet?.has(taskId)) {
++      throw new Error(
++        `Agent with name ${agentName} has no task ${taskId} associated with it.`,
++      );
++    }
++
++    agentTaskSet.delete(taskId);
++
++    return a2aClient.cancelTask({ id: taskId });
++  }
++}
+diff --git a/packages/core/src/a2a/a2a-mcp-server.ts b/packages/core/src/a2a/a2a-mcp-server.ts
+new file mode 100644
+index 00000000..b78aa64a
+--- /dev/null
++++ b/packages/core/src/a2a/a2a-mcp-server.ts
+@@ -0,0 +1,91 @@
++/**
++ * @license
++ * Copyright 2025 Google LLC
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
++import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
++import { A2AClientManager } from './a2a-client.js';
++import { A2AToolFunctions, LoadAgentInputSchema } from './tools.js';
++import { A2AToolRegistry } from './a2a-tool-registry.js';
++import { A2AServerConfig } from './types.js';
++
++
++/**
++ * This script implements a standalone MCP server that communicates over stdio.
++ * It exposes the A2A protocol tools to the Gemini CLI.
++ */
++async function main() {
++  // The server manages the tools and request handling.
++  const server = new McpServer({
++    name: 'a2a-mcp-server',
++    version: '0.0.1',
++  });
++
++  const clientManager = A2AClientManager.getInstance();
++  const registry = new A2AToolRegistry(server, clientManager);
++  const toolImplementations = new A2AToolFunctions(registry, clientManager);
++
++  // Register ONLY the static tools
++  server.registerTool(
++    'load_agent',
++    {
++      description:
++        "Retrieves and caches an agent's metadata (AgentCard) from a URL.",
++      inputSchema: LoadAgentInputSchema.shape,
++    },
++    toolImplementations.load_agent.bind(toolImplementations),
++  );
++
++  server.registerTool(
++    'list_agents',
++    {
++      description: 'Lists all A2A agents whose AgentCards have been loaded.',
++    },
++    toolImplementations.list_agents.bind(toolImplementations),
++  );
++
++  // Auto-load agents if provided via command-line argument
++  const args = process.argv.slice(2);
++  const agentFlagIndex = args.indexOf('--agents');
++
++  if (agentFlagIndex !== -1 && args[agentFlagIndex + 1]) {
++    try {
++      const agentConfigs: A2AServerConfig[] = JSON.parse(
++        args[agentFlagIndex + 1],
++      );
++
++      console.error('A2A Server: Parsed agent configs:', agentConfigs);
++
++      console.error(
++        `A2A Server: Found ${agentConfigs.length} agents to auto-load.`,
++      );
++
++      const loadingPromises = agentConfigs.map((agent) => {
++        console.error(`A2A Server: Auto-loading agent from ${agent.url}`);
++        // Note: accessToken is not used yet, but is available for future use.
++        return toolImplementations.load_agent({
++          url: agent.url,
++          agent_card_path: agent.agent_card_path,
++        });
++      });
++
++      await Promise.all(loadingPromises);
++
++      // This will print out to console.error() the agents
++      await toolImplementations.list_agents();
++    } catch (e) {
++      const error = e as Error;
++      console.error(`A2A Server: Error loading agents: ${error.message}`);
++    }
++  }
++
++  const transport = new StdioServerTransport();
++  await server.connect(transport);
++}
++
++main().catch((e) => {
++  console.error(e);
++  process.exit(1);
++});
+diff --git a/packages/core/src/a2a/a2a-tool-registry.ts b/packages/core/src/a2a/a2a-tool-registry.ts
+new file mode 100644
+index 00000000..400da40e
+--- /dev/null
++++ b/packages/core/src/a2a/a2a-tool-registry.ts
+@@ -0,0 +1,123 @@
++/**
++ * @license
++ * Copyright 2025 Google LLC
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++import { z } from 'zod';
++import { A2AClientManager } from './a2a-client.js';
++import { extractMessageText, extractTaskText, textResponse } from './utils.js';
++import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
++import { AgentCard } from '@a2a-js/sdk';
++
++// Zod Schemas for dynamically registered tools
++export const AgentSendMessageInputSchema = z.object({
++  message: z.string().describe('The text message to send to the agent.'),
++});
++
++export const AgentGetTaskInputSchema = z.object({
++  taskId: z.string().describe('The ID of the task to query.'),
++});
++
++export const AgentCancelTaskInputSchema = z.object({
++  taskId: z.string().describe('The ID of the task to cancel.'),
++});
++
++export class A2AToolRegistry {
++  constructor(
++    private server: McpServer,
++    private clientManager: A2AClientManager,
++  ) {}
++
++  registerToolsForAgent(agentCard: AgentCard): void {
++    const agentName = agentCard.name;
++    const sanitizedAgentName = agentName.replace(/\s/g, '');
++
++    // Register send_message for the agent
++    this.server.registerTool(
++      `${sanitizedAgentName}_sendMessage`,
++      {
++        description: `Sends a message to the ${agentName} agent.`,
++        inputSchema: AgentSendMessageInputSchema.shape,
++      },
++      async (args: z.infer<typeof AgentSendMessageInputSchema>) => {
++        try {
++          const response = await this.clientManager.sendMessage(
++            agentName,
++            args.message,
++          );
++          if ('error' in response) {
++            return textResponse(
++              `Error from agent ${agentName}: ${response.error.message}`,
++            );
++          }
++          if (response.result.kind === 'message') {
++            return textResponse(extractMessageText(response.result));
++          }
++          return textResponse(extractTaskText(response.result));
++        } catch (e) {
++          const error = e as Error;
++          return textResponse(
++            `Failed to send message to ${agentName}: ${error.message}`,
++          );
++        }
++      },
++    );
++
++    // Register get_task for the agent
++    this.server.registerTool(
++      `${sanitizedAgentName}_getTask`,
++      {
++        description: `Retrieves a task from the ${agentName} agent.`,
++        inputSchema: AgentGetTaskInputSchema.shape,
++      },
++      async (args: z.infer<typeof AgentGetTaskInputSchema>) => {
++        try {
++          const response = await this.clientManager.getTask(
++            agentName,
++            args.taskId,
++          );
++          if ('error' in response) {
++            return textResponse(
++              `Error from agent ${agentName} when getting task ${response.error.message}`,
++            );
++          }
++          return textResponse(extractTaskText(response.result));
++        } catch (e) {
++          const error = e as Error;
++          return textResponse(
++            `Failed to get task from agent ${agentName}: ${error.message}`,
++          );
++        }
++      },
++    );
++
++    // Register cancel_task for the agent
++    this.server.registerTool(
++      `${sanitizedAgentName}_cancelTask`,
++      {
++        description: `Cancels a task on the ${agentName} agent.`,
++        inputSchema: AgentCancelTaskInputSchema.shape,
++      },
++      async (args: z.infer<typeof AgentCancelTaskInputSchema>) => {
++        try {
++          const response = await this.clientManager.cancelTask(
++            agentName,
++            args.taskId,
++          );
++          if ('error' in response) {
++            return textResponse(
++              `Error from agent ${agentName} when canceling task: ${response.error.message}`,
++            );
++          }
++          return textResponse(extractTaskText(response.result));
++        } catch (e) {
++          const error = e as Error;
++          return textResponse(
++            `Failed to Cancel Task on Agent ${agentName}: ${error.message}`,
++          );
++        }
++      },
++    );
++  }
++}
+\ No newline at end of file
+diff --git a/packages/core/src/a2a/tools.ts b/packages/core/src/a2a/tools.ts
+new file mode 100644
+index 00000000..4850e055
+--- /dev/null
++++ b/packages/core/src/a2a/tools.ts
+@@ -0,0 +1,65 @@
++/**
++ * @license
++ * Copyright 2025 Google LLC
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++import { z } from 'zod';
++import { A2AClientManager } from './a2a-client.js';
++import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
++import { textResponse } from './utils.js';
++import { A2AToolRegistry } from './a2a-tool-registry.js';
++
++// Zod Schemas for Tool Inputs
++export const LoadAgentInputSchema = z.object({
++  url: z.string().describe('The URL of the A2A agent to load.'),
++  agent_card_path: z
++    .string()
++    .optional()
++    .describe(
++      'The path to the agent card endpoint, relative to the base URL. Defaults to `/.well-known/agent-card.json`',
++    ),
++});
++
++/**
++ * A class that provides the implementation for the A2A tools.
++ */
++export class A2AToolFunctions {
++  constructor(
++    private registry: A2AToolRegistry,
++    private clientManager: A2AClientManager,
++  ) {}
++
++  async load_agent(
++    args: z.infer<typeof LoadAgentInputSchema>,
++  ): Promise<CallToolResult> {
++    const { url, agent_card_path } = args;
++    try {
++      const agentCard = await this.clientManager.loadAgent(
++        url,
++        agent_card_path,
++      );
++
++      // Delegate registration
++      this.registry.registerToolsForAgent(agentCard);
++
++      const sanitizedAgentName = agentCard.name.replace(/\s/g, '');
++      const output = `Successfully loaded agent: ${agentCard.name}. New tools registered: ${sanitizedAgentName}_sendMessage, ${sanitizedAgentName}_getTask, ${sanitizedAgentName}_cancelTask.`;
++      return textResponse(output);
++    } catch (error) {
++      return textResponse(`Failed to load agent: ${error}`);
++    }
++  }
++
++  async list_agents(): Promise<CallToolResult> {
++    const agents = await this.clientManager.listAgents();
++    if (agents.length === 0) {
++      return textResponse('No agents are currently loaded.');
++    }
++    const output = agents
++      .map((agent) => `- ${agent.name} (${agent.url})`)
++      .join('\n');
++    return textResponse(output);
++  }
++}
++
+diff --git a/packages/core/src/a2a/types.ts b/packages/core/src/a2a/types.ts
+new file mode 100644
+index 00000000..062c6658
+--- /dev/null
++++ b/packages/core/src/a2a/types.ts
+@@ -0,0 +1,11 @@
++/**
++ * @license
++ * Copyright 2025 Google LLC
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++export interface A2AServerConfig {
++  url: string;
++  accessToken?: string;
++  agent_card_path?: string;
++}
+diff --git a/packages/core/src/a2a/utils.ts b/packages/core/src/a2a/utils.ts
+new file mode 100644
+index 00000000..6d9182aa
+--- /dev/null
++++ b/packages/core/src/a2a/utils.ts
+@@ -0,0 +1,91 @@
++import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
++import {
++  DataPart,
++  FilePart,
++  FileWithBytes,
++  FileWithUri,
++  Message,
++  Message1,
++  Message2,
++  Part,
++  Task,
++  TextPart,
++} from '@a2a-js/sdk';
++
++export const textResponse = (message: string): CallToolResult => {
++  return {
++    content: [
++      {
++        type: 'text',
++        text: message,
++      },
++    ],
++  };
++};
++
++export function extractMessageText(
++  message: Message | Message1 | Message2 | undefined,
++): string {
++  if (!message) {
++    return '';
++  }
++
++  const textParts = message.parts
++    .filter((p): p is TextPart => p.kind === 'text')
++    .map((p) => p.text)
++    .filter(Boolean);
++
++  if (textParts.length > 0) {
++    return textParts.join(' ');
++  }
++
++  const dataParts = message.parts
++    .filter((p): p is DataPart => p.kind === 'data')
++    .map((p) => p.data)
++    .filter(Boolean);
++
++  if (dataParts.length > 0) {
++    const responses = dataParts.map((data) => {
++      return `Data: ${JSON.stringify(data)}`;
++    });
++    return responses.join('\n');
++  }
++
++  const fileParts = message.parts
++    .filter((p): p is FilePart => p.kind === 'file')
++    .filter(Boolean);
++
++  if (fileParts.length > 0) {
++    const files = fileParts.map((fp) => {
++      const fileData = fp.file;
++      if (fileData.name) {
++        return `File: ${fileData.name}`;
++      }
++      if ('uri' in fileData) {
++        return `File: ${fileData.uri}`;
++      }
++      if ('bytes' in fileData) {
++        return `File: [unnamed file with bytes]`;
++      }
++      return '[unknown file part]';
++    });
++    return files.join('\n');
++  }
++
++  return '[unknown message part]';
++}
++
++export function extractTaskText(task: Task): string {
++  let output = `ID:      ${task.id}\n`;
++  output += `State:   ${task.status.state}\n`;
++  const messageText = extractMessageText(task.status.message);
++  if (messageText) {
++    output += `Message: ${messageText}\n`;
++  }
++
++  if (task.history && task.history.length > 0) {
++    output += '\nHistory:\n ${task.history.length} messages\n';
++  }
++
++  return output;
++}
+diff --git a/packages/core/src/config/config.ts b/packages/core/src/config/config.ts
+index e94e8421..b8b59096 100644
+--- a/packages/core/src/config/config.ts
++++ b/packages/core/src/config/config.ts
+@@ -47,6 +47,7 @@ import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js'
+ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
+ import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
+ import { IdeClient } from '../ide/ide-client.js';
++import { A2AServerConfig} from '../a2a/types.js'
+ import type { Content } from '@google/genai';
+ 
+ // Re-export OAuth config type
+@@ -157,6 +158,7 @@ export interface ConfigParameters {
+   toolCallCommand?: string;
+   mcpServerCommand?: string;
+   mcpServers?: Record<string, MCPServerConfig>;
++  a2aServers?: A2AServerConfig[];
+   userMemory?: string;
+   geminiMdFileCount?: number;
+   approvalMode?: ApprovalMode;
+@@ -208,6 +210,7 @@ export class Config {
+   private readonly toolCallCommand: string | undefined;
+   private readonly mcpServerCommand: string | undefined;
+   private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
++  private readonly a2aServers: A2AServerConfig[] | undefined;
+   private userMemory: string;
+   private geminiMdFileCount: number;
+   private approvalMode: ApprovalMode;
+@@ -267,6 +270,7 @@ export class Config {
+     this.toolCallCommand = params.toolCallCommand;
+     this.mcpServerCommand = params.mcpServerCommand;
+     this.mcpServers = params.mcpServers;
++    this.a2aServers = params.a2aServers;
+     this.userMemory = params.userMemory ?? '';
+     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
+     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
+@@ -478,6 +482,10 @@ export class Config {
+     return this.mcpServers;
+   }
+ 
++  getA2AServers(): A2AServerConfig[] | undefined {
++    return this.a2aServers;
++  }
++
+   getUserMemory(): string {
+     return this.userMemory;
+   }

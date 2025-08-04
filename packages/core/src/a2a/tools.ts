@@ -11,6 +11,7 @@ import { textResponse } from './utils.js';
 import { A2AToolRegistry } from './a2a-tool-registry.js';
 
 // Zod Schemas for Tool Inputs
+// Reconcile/Merge this with ./types.js
 export const LoadAgentInputSchema = z.object({
   url: z.string().describe('The URL of the A2A agent to load.'),
   agent_card_path: z
@@ -19,6 +20,7 @@ export const LoadAgentInputSchema = z.object({
     .describe(
       'The path to the agent card endpoint, relative to the base URL. Defaults to `/.well-known/agent-card.json`',
     ),
+  token: z.string().optional().describe("static Bearer token for authentication.")
 });
 
 /**
@@ -33,11 +35,12 @@ export class A2AToolFunctions {
   async load_agent(
     args: z.infer<typeof LoadAgentInputSchema>,
   ): Promise<CallToolResult> {
-    const { url, agent_card_path } = args;
+    const { url, agent_card_path, token } = args;
     try {
       const agentCard = await this.clientManager.loadAgent(
         url,
         agent_card_path,
+        token,
       );
 
       // Delegate registration
