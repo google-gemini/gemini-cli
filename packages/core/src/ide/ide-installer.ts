@@ -18,7 +18,6 @@ const VSCODE_COMPANION_EXTENSION_FOLDER = 'vscode-ide-companion';
 
 export interface IdeInstaller {
   install(): Promise<InstallResult>;
-  isInstalled(): Promise<boolean>;
 }
 
 export interface InstallResult {
@@ -95,16 +94,12 @@ class VsCodeInstaller implements IdeInstaller {
     this.vsCodeCommand = findVsCodeCommand();
   }
 
-  async isInstalled(): Promise<boolean> {
-    return (await this.vsCodeCommand) !== null;
-  }
-
   async install(): Promise<InstallResult> {
     const commandPath = await this.vsCodeCommand;
     if (!commandPath) {
       return {
         success: false,
-        message: `VS Code command-line tool not found in your PATH or common installation locations.`,
+        message: `VS Code CLI not found. Please ensure 'code' is in your system's PATH. For help, see https://code.visualstudio.com/docs/configure/command-line#_code-is-not-recognized-as-an-internal-or-external-command. You can also install the companion extension manually from the VS Code marketplace.`,
       };
     }
 
@@ -141,12 +136,12 @@ class VsCodeInstaller implements IdeInstaller {
       return {
         success: true,
         message:
-          'VS Code companion extension installed successfully. Restart gemini-cli in a fresh terminal window.',
+          'VS Code companion extension was installed successfully. Please restart your terminal to complete the setup.',
       };
     } catch (_error) {
       return {
         success: false,
-        message: 'Failed to install VS Code companion extension.',
+        message: `Failed to install VS Code companion extension. Please try installing it manually from the VS Code marketplace.`,
       };
     }
   }
@@ -154,7 +149,7 @@ class VsCodeInstaller implements IdeInstaller {
 
 export function getIdeInstaller(ide: DetectedIde): IdeInstaller | null {
   switch (ide) {
-    case 'vscode':
+    case DetectedIde.VSCode:
       return new VsCodeInstaller();
     default:
       return null;
