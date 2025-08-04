@@ -12,7 +12,10 @@ import {
   SettingScope,
   Settings,
 } from '../../config/settings.js';
-import { getScopeItems } from '../../utils/dialogScopeUtils.js';
+import {
+  getScopeItems,
+  getScopeMessageForSetting,
+} from '../../utils/dialogScopeUtils.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import {
   getDialogSettingKeys,
@@ -365,6 +368,13 @@ export function SettingsDialog({
           );
           const shouldBeGreyedOut = isDefaultValue(item.value, scopeSettings);
 
+          // Generate scope message for this setting
+          const scopeMessage = getScopeMessageForSetting(
+            item.value,
+            selectedScope,
+            settings,
+          );
+
           return (
             <React.Fragment key={item.value}>
               <Box flexDirection="row" alignItems="center">
@@ -378,6 +388,9 @@ export function SettingsDialog({
                     color={isActive ? Colors.AccentGreen : Colors.Foreground}
                   >
                     {item.label}
+                    {scopeMessage && (
+                      <Text color={Colors.Gray}> {scopeMessage}</Text>
+                    )}
                   </Text>
                 </Box>
                 <Box minWidth={3} />
