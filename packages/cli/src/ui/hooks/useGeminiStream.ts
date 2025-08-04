@@ -633,8 +633,33 @@ export const useGeminiStream = (
         (streamingState === StreamingState.Responding ||
           streamingState === StreamingState.WaitingForConfirmation) &&
         !options?.isContinuation
-      )
-        return;
+      ) {
+        if (interruptMode) {
+          turnCancelledRef.current = true;
+          abortControllerRef.current?.abort();
+          if (pendingHistoryItemRef.current) {
+            addItem(pendingHistoryItemRef.current, Date.now());
+            if (
+              pendingHistoryItemRef.current.type === 'gemini' ||
+              pendingHistoryItemRef.current.type === 'gemini_content'
+            ) {
+              interruptedResponseRef.current =
+                pendingHistoryItemRef.current.text;
+            }
+            setPendingHistoryItem(null);
+          }
+          addItem(
+            {
+              type: MessageType.INFO,
+              text: 'Stream interrupted. Awaiting new input.',
+            },
+            Date.now(),
+          );
+          setIsResponding(false);
+        } else {
+          return;
+        }
+      }
 
       const userMessageTimestamp = Date.now();
 
@@ -732,6 +757,7 @@ export const useGeminiStream = (
       startNewPrompt,
       getPromptCount,
       handleLoopDetectedEvent,
+      interruptMode,
     ],
   );
 
