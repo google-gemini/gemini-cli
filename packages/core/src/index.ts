@@ -6,6 +6,7 @@
 
 // Export config
 export * from './config/config.js';
+export * from './config/rateLimit.js';
 
 // Export Core Logic
 export * from './core/client.js';
@@ -26,6 +27,7 @@ export * from './code_assist/types.js';
 
 // Export utilities
 export * from './utils/paths.js';
+export * from './utils/rateLimiter.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
 export * from './utils/getFolderStructure.js';
