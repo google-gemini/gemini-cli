@@ -55,6 +55,12 @@ export interface CheckpointingSettings {
   enabled?: boolean;
 }
 
+export interface A2AServerConfig {
+  url: string;
+  accessToken?: string;
+  agent_card_path?: string;
+}
+
 export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
@@ -75,6 +81,7 @@ export interface Settings {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
+  a2aServers?: A2AServerConfig[];
   allowMCPServers?: string[];
   excludeMCPServers?: string[];
   showMemoryUsage?: boolean;

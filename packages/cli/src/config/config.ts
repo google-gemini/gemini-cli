@@ -361,6 +361,24 @@ export async function loadCliConfig(
   );
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
+  const a2aServers = settings.a2aServers;
+
+  if (a2aServers && a2aServers.length > 0) {
+    if (!mcpServers['a2a-server']) {
+      // Avoid overwriting if user defined manually
+      mcpServers['a2a-server'] = {
+        description: 'Handles communication with A2A-compatible agents.',
+        command: 'node',
+        args: [
+          './packages/core/dist/src/a2a/a2a-mcp-server.js',
+          '--agents',
+          JSON.stringify(a2aServers),
+        ],
+        cwd: './', // Relative to project root
+      };
+    }
+  }
+
   const excludeTools = mergeExcludeTools(settings, activeExtensions);
   const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
 

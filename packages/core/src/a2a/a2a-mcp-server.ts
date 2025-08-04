@@ -9,13 +9,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { A2AClientManager } from './a2a-client.js';
 import { A2AToolFunctions, LoadAgentInputSchema } from './tools.js';
 import { A2AToolRegistry } from './a2a-tool-registry.js';
+import { A2AServerConfig } from './types.js';
 
-// This interface should eventually match the one in settings.ts
-interface A2AServerConfig {
-  url: string;
-  accessToken?: string;
-  agent_card_path?: string;
-}
 
 /**
  * This script implements a standalone MCP server that communicates over stdio.
