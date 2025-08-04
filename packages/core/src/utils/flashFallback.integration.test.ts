@@ -34,7 +34,7 @@ describe('Flash Fallback Integration', () => {
       targetDir: '/test',
       debugMode: false,
       cwd: '/test',
-      model: 'gemini-2.5-pro-thinking',
+      model: 'gemini-2.5-pro',
       ideClient: IdeClient.getInstance(false),
     });
 
@@ -51,7 +51,7 @@ describe('Flash Fallback Integration', () => {
 
     // Call the handler directly to test
     const result = await config.flashFallbackHandler!(
-      'gemini-2.5-pro-thinking',
+      'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
 

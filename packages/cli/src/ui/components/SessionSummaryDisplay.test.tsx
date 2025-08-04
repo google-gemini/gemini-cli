@@ -40,7 +40,7 @@ describe('<SessionSummaryDisplay />', () => {
   it('renders the summary display with a title', () => {
     const metrics: SessionMetrics = {
       models: {
-        'gemini-2.5-pro-thinking': {
+        'gemini-2.5-pro': {
           api: { totalRequests: 10, totalErrors: 1, totalLatencyMs: 50234 },
           tokens: {
             prompt: 1000,

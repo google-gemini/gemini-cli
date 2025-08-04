@@ -34,7 +34,7 @@ describe('parseAndFormatApiError', () => {
       errorMessage,
       undefined,
       undefined,
-      'gemini-2.5-pro-thinking',
+      'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
     expect(result).toContain('[API Error: Rate limit exceeded');
@@ -50,7 +50,7 @@ describe('parseAndFormatApiError', () => {
       errorMessage,
       AuthType.LOGIN_WITH_GOOGLE,
       undefined,
-      'gemini-2.5-pro-thinking',
+      'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
     expect(result).toContain('[API Error: Rate limit exceeded');
@@ -143,7 +143,7 @@ describe('parseAndFormatApiError', () => {
       errorMessage,
       AuthType.LOGIN_WITH_GOOGLE,
       undefined,
-      'gemini-2.5-pro-thinking',
+      'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
     expect(result).toContain(
@@ -164,7 +164,7 @@ describe('parseAndFormatApiError', () => {
       errorMessage,
       AuthType.LOGIN_WITH_GOOGLE,
       undefined,
-      'gemini-2.5-pro-thinking',
+      'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
     expect(result).toContain('[API Error: Rate limit exceeded');
@@ -183,7 +183,7 @@ describe('parseAndFormatApiError', () => {
       errorMessage,
       AuthType.LOGIN_WITH_GOOGLE,
       undefined,
-      'gemini-2.5-pro-thinking',
+      'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
     expect(result).toContain(
@@ -202,7 +202,7 @@ describe('parseAndFormatApiError', () => {
       errorMessage,
       AuthType.LOGIN_WITH_GOOGLE,
       undefined,
-      'gemini-2.5-pro-thinking',
+      'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
     expect(result).toContain(
@@ -221,7 +221,7 @@ describe('parseAndFormatApiError', () => {
       errorMessage,
       AuthType.LOGIN_WITH_GOOGLE,
       UserTierId.STANDARD,
-      'gemini-2.5-pro-thinking',
+      'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
     expect(result).toContain(
@@ -245,7 +245,7 @@ describe('parseAndFormatApiError', () => {
       errorMessage,
       AuthType.LOGIN_WITH_GOOGLE,
       UserTierId.LEGACY,
-      'gemini-2.5-pro-thinking',
+      'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
     expect(result).toContain(
@@ -272,7 +272,7 @@ describe('parseAndFormatApiError', () => {
       errorMessage25,
       AuthType.LOGIN_WITH_GOOGLE,
       undefined,
-      'gemini-2.5-pro-thinking',
+      'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
     const resultPreview = parseAndFormatApiError(
@@ -342,7 +342,7 @@ describe('parseAndFormatApiError', () => {
       errorMessage,
       AuthType.LOGIN_WITH_GOOGLE,
       UserTierId.STANDARD,
-      'gemini-2.5-pro-thinking',
+      'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
     expect(result).toContain(
@@ -364,7 +364,7 @@ describe('parseAndFormatApiError', () => {
       errorMessage,
       AuthType.LOGIN_WITH_GOOGLE,
       UserTierId.STANDARD,
-      'gemini-2.5-pro-thinking',
+      'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
     expect(result).toContain('[API Error: Rate limit exceeded');
