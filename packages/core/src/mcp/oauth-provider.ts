@@ -308,8 +308,11 @@ export class MCPOAuthProvider {
       );
     }
 
-    const separator = config.authorizationUrl!.includes('?') ? '&' : '?';
-    return `${config.authorizationUrl}${separator}${params.toString()}`;
+    const url = new URL(config.authorizationUrl!);
+    params.forEach((value, key) => {
+      url.searchParams.append(key, value);
+    });
+    return url.toString();
   }
 
   /**
