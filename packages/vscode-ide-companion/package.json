@@ -2,7 +2,7 @@
   "name": "dbx-cli-vscode-companion",
   "displayName": "DBX CLI Companion",
   "description": "VS Code companion for DBX CLI",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "dbx-cli",
   "icon": "assets/icon.png",
   "repository": {
