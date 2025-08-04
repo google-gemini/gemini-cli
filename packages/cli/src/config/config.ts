@@ -403,7 +403,10 @@ export async function loadCliConfig(
     } else {
       // Use appropriate default based on auth type
       const authType = settings.selectedAuthType || AuthType.USE_GEMINI;
-      model = authType === AuthType.USE_DATABRICKS ? DEFAULT_DATABRICKS_MODEL : DEFAULT_GEMINI_MODEL;
+      model =
+        authType === AuthType.USE_DATABRICKS
+          ? DEFAULT_DATABRICKS_MODEL
+          : DEFAULT_GEMINI_MODEL;
     }
   }
 

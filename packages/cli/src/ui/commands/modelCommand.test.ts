@@ -22,28 +22,31 @@ vi.mock('@dbx-cli/core', async () => {
 describe('modelCommand - Detroit School TDD Tests', () => {
   let mockContext: CommandContext;
   let mockConfig: Config;
-  
+
   beforeEach(async () => {
     vi.resetAllMocks();
-    
+
     // Import after vi.mock is in place
     const { discoverDatabricksEndpoints } = await import('@dbx-cli/core');
-    
+
     // Default mock implementation - returns fallback models
-    (discoverDatabricksEndpoints as ReturnType<typeof vi.fn>).mockResolvedValue([
-      'databricks-claude-sonnet-4',
-      'databricks-claude-opus-4',
-      'databricks-llama-4-maverick',
-      'databricks-meta-llama-3-3-70b-instruct',
-      'databricks-meta-llama-3-1-8b-instruct',
-    ]);
-    
+    (discoverDatabricksEndpoints as ReturnType<typeof vi.fn>).mockResolvedValue(
+      [
+        'databricks-claude-sonnet-4',
+        'databricks-claude-opus-4',
+        'databricks-llama-4-maverick',
+        'databricks-meta-llama-3-3-70b-instruct',
+        'databricks-meta-llama-3-1-8b-instruct',
+      ],
+    );
+
     // Create mock config with real behavior
     mockConfig = {
       getModel: vi.fn().mockReturnValue('databricks-claude-sonnet-4'),
       setModel: vi.fn(),
+      refreshContentGenerator: vi.fn().mockResolvedValue(undefined),
     } as unknown as Config;
-    
+
     // Create mock context
     mockContext = {
       services: {
@@ -69,7 +72,7 @@ describe('modelCommand - Detroit School TDD Tests', () => {
       describe('When: Command is executed', () => {
         it('Then: Should return help message showing available subcommands', async () => {
           const result = await modelCommand.action(mockContext, '');
-          
+
           expect(result).toEqual({
             type: 'message',
             messageType: 'info',
@@ -86,11 +89,13 @@ describe('modelCommand - Detroit School TDD Tests', () => {
       describe('When: Command is executed with Databricks auth', () => {
         it('Then: Should return current model information', async () => {
           const result = await modelCommand.action(mockContext, 'show');
-          
+
           expect(result).toEqual({
             type: 'message',
             messageType: 'info',
-            content: expect.stringContaining('Current model: databricks-claude-sonnet-4'),
+            content: expect.stringContaining(
+              'Current model: databricks-claude-sonnet-4',
+            ),
           });
           expect(result.content).toContain('Provider: Databricks');
         });
@@ -98,11 +103,12 @@ describe('modelCommand - Detroit School TDD Tests', () => {
 
       describe('When: Command is executed with Gemini auth', () => {
         it('Then: Should show Gemini model information', async () => {
-          mockContext.services.settings.merged.selectedAuthType = AuthType.USE_GEMINI;
+          mockContext.services.settings.merged.selectedAuthType =
+            AuthType.USE_GEMINI;
           mockConfig.getModel = vi.fn().mockReturnValue('gemini-2.5-pro');
-          
+
           const result = await modelCommand.action(mockContext, 'show');
-          
+
           expect(result).toEqual({
             type: 'message',
             messageType: 'info',
@@ -122,20 +128,24 @@ describe('modelCommand - Detroit School TDD Tests', () => {
             'databricks-llama-3-1-70b',
             'databricks-mistral-7b',
           ];
-          
+
           const { discoverDatabricksEndpoints } = await import('@dbx-cli/core');
-          (discoverDatabricksEndpoints as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockEndpoints);
-          
+          (
+            discoverDatabricksEndpoints as ReturnType<typeof vi.fn>
+          ).mockResolvedValueOnce(mockEndpoints);
+
           const result = await modelCommand.action(mockContext, 'list');
-          
+
           expect(result).toEqual({
             type: 'message',
             messageType: 'info',
-            content: expect.stringMatching(/Available Databricks models \(fetched from workspace\):/),
+            content: expect.stringMatching(
+              /Available Databricks models \(fetched from workspace\):/,
+            ),
           });
-          
+
           // Should show the dynamically fetched models
-          mockEndpoints.forEach(model => {
+          mockEndpoints.forEach((model) => {
             expect(result.content).toContain(model);
           });
         });
@@ -143,10 +153,11 @@ describe('modelCommand - Detroit School TDD Tests', () => {
 
       describe('When: Command is executed with Gemini auth', () => {
         it('Then: Should return available Gemini models', async () => {
-          mockContext.services.settings.merged.selectedAuthType = AuthType.USE_GEMINI;
-          
+          mockContext.services.settings.merged.selectedAuthType =
+            AuthType.USE_GEMINI;
+
           const result = await modelCommand.action(mockContext, 'list');
-          
+
           expect(result).toEqual({
             type: 'message',
             messageType: 'info',
@@ -161,20 +172,26 @@ describe('modelCommand - Detroit School TDD Tests', () => {
         it('Then: Should show error and fall back to static list', async () => {
           // Clear module cache to ensure fresh import
           vi.resetModules();
-          
+
           // Re-import and set up the rejection mock
           const { discoverDatabricksEndpoints } = await import('@dbx-cli/core');
-          (discoverDatabricksEndpoints as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Network error'));
-          
+          (
+            discoverDatabricksEndpoints as ReturnType<typeof vi.fn>
+          ).mockRejectedValue(new Error('Network error'));
+
           // Re-import the command to use the updated mock
-          const { modelCommand: freshModelCommand } = await import('./modelCommand.js');
-          
+          const { modelCommand: freshModelCommand } = await import(
+            './modelCommand.js'
+          );
+
           const result = await freshModelCommand.action(mockContext, 'list');
-          
+
           expect(result).toEqual({
             type: 'message',
             messageType: 'error',
-            content: expect.stringContaining('Failed to fetch endpoints from workspace'),
+            content: expect.stringContaining(
+              'Failed to fetch endpoints from workspace',
+            ),
           });
           expect(result.content).toContain('Showing cached models:');
         });
@@ -185,15 +202,22 @@ describe('modelCommand - Detroit School TDD Tests', () => {
       describe('When: Setting a valid Databricks model', () => {
         it('Then: Should update the model configuration', async () => {
           const { discoverDatabricksEndpoints } = await import('@dbx-cli/core');
-          (discoverDatabricksEndpoints as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+          (
+            discoverDatabricksEndpoints as ReturnType<typeof vi.fn>
+          ).mockResolvedValueOnce([
             'databricks-claude-sonnet-4',
             'databricks-llama-3-1-70b',
             'databricks-mistral-7b',
           ]);
-          
-          const result = await modelCommand.action(mockContext, 'set databricks-llama-3-1-70b');
-          
-          expect(mockConfig.setModel).toHaveBeenCalledWith('databricks-llama-3-1-70b');
+
+          const result = await modelCommand.action(
+            mockContext,
+            'set databricks-llama-3-1-70b',
+          );
+
+          expect(mockConfig.setModel).toHaveBeenCalledWith(
+            'databricks-llama-3-1-70b',
+          );
           expect(result).toEqual({
             type: 'message',
             messageType: 'info',
@@ -204,13 +228,18 @@ describe('modelCommand - Detroit School TDD Tests', () => {
 
       describe('When: Setting an invalid model for current provider', () => {
         it('Then: Should return error message', async () => {
-          const result = await modelCommand.action(mockContext, 'set gemini-2.5-pro');
-          
+          const result = await modelCommand.action(
+            mockContext,
+            'set gemini-2.5-pro',
+          );
+
           expect(mockConfig.setModel).not.toHaveBeenCalled();
           expect(result).toEqual({
             type: 'message',
             messageType: 'error',
-            content: expect.stringContaining('Invalid model for Databricks provider'),
+            content: expect.stringContaining(
+              'Invalid model for Databricks provider',
+            ),
           });
           expect(result.content).toContain('Use /model list');
         });
@@ -219,7 +248,7 @@ describe('modelCommand - Detroit School TDD Tests', () => {
       describe('When: Setting model without providing name', () => {
         it('Then: Should return usage error', async () => {
           const result = await modelCommand.action(mockContext, 'set');
-          
+
           expect(mockConfig.setModel).not.toHaveBeenCalled();
           expect(result).toEqual({
             type: 'message',
@@ -233,12 +262,17 @@ describe('modelCommand - Detroit School TDD Tests', () => {
     describe('Given: User types invalid subcommand', () => {
       describe('When: Command is executed', () => {
         it('Then: Should return error with help text', async () => {
-          const result = await modelCommand.action(mockContext, 'invalid-subcommand');
-          
+          const result = await modelCommand.action(
+            mockContext,
+            'invalid-subcommand',
+          );
+
           expect(result).toEqual({
             type: 'message',
             messageType: 'error',
-            content: expect.stringContaining('Unknown subcommand: invalid-subcommand'),
+            content: expect.stringContaining(
+              'Unknown subcommand: invalid-subcommand',
+            ),
           });
           expect(result.content).toContain('Available subcommands:');
         });
@@ -253,10 +287,11 @@ describe('modelCommand - Detroit School TDD Tests', () => {
           // Start with Databricks
           let result = await modelCommand.action(mockContext, 'list');
           expect(result.content).toContain('Databricks models');
-          
+
           // Switch to Gemini
-          mockContext.services.settings.merged.selectedAuthType = AuthType.USE_GEMINI;
-          
+          mockContext.services.settings.merged.selectedAuthType =
+            AuthType.USE_GEMINI;
+
           // List models again
           result = await modelCommand.action(mockContext, 'list');
           expect(result.content).toContain('Gemini models');

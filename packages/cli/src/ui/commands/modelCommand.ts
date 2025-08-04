@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SlashCommand, CommandKind, CommandContext, MessageActionReturn } from './types.js';
+import {
+  SlashCommand,
+  CommandKind,
+  CommandContext,
+  MessageActionReturn,
+} from './types.js';
 import { AuthType, discoverDatabricksEndpoints } from '@dbx-cli/core';
 
 // Available models by provider
@@ -28,16 +33,21 @@ const DATABRICKS_MODELS_FALLBACK = [
 let cachedEndpoints: string[] | null = null;
 let cacheExpiry = 0;
 
-type Handler = (context: CommandContext, args: string) => Promise<MessageActionReturn>;
+type Handler = (
+  context: CommandContext,
+  args: string,
+) => Promise<MessageActionReturn>;
 
 // Helper to get Databricks endpoints with caching
-async function getDatabricksEndpoints(forceRefresh = false): Promise<{ endpoints: string[], isError: boolean, errorMessage?: string }> {
+async function getDatabricksEndpoints(
+  forceRefresh = false,
+): Promise<{ endpoints: string[]; isError: boolean; errorMessage?: string }> {
   const now = Date.now();
-  
+
   if (!forceRefresh && cachedEndpoints && now < cacheExpiry) {
     return { endpoints: cachedEndpoints, isError: false };
   }
-  
+
   try {
     const endpoints = await discoverDatabricksEndpoints({ forceRefresh });
     cachedEndpoints = endpoints;
@@ -48,12 +58,12 @@ async function getDatabricksEndpoints(forceRefresh = false): Promise<{ endpoints
     if (process.env.DBX_DEBUG) {
       console.error('[Model Command] Failed to fetch endpoints:', error);
     }
-    
+
     // Return cached data if available, otherwise fallback
-    return { 
+    return {
       endpoints: cachedEndpoints || DATABRICKS_MODELS_FALLBACK.slice(),
       isError: true,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
@@ -76,9 +86,10 @@ function getProviderName(authType: AuthType): string {
 
 const handleShow: Handler = async (context) => {
   const currentModel = context.services.config?.getModel() || 'Not set';
-  const authType = context.services.settings.merged.selectedAuthType || AuthType.USE_GEMINI;
+  const authType =
+    context.services.settings.merged.selectedAuthType || AuthType.USE_GEMINI;
   const provider = getProviderName(authType);
-  
+
   return {
     type: 'message',
     messageType: 'info',
@@ -87,11 +98,12 @@ const handleShow: Handler = async (context) => {
 };
 
 const handleList: Handler = async (context) => {
-  const authType = context.services.settings.merged.selectedAuthType || AuthType.USE_GEMINI;
-  
+  const authType =
+    context.services.settings.merged.selectedAuthType || AuthType.USE_GEMINI;
+
   if (authType === AuthType.USE_DATABRICKS) {
     const { endpoints, isError, errorMessage } = await getDatabricksEndpoints();
-    
+
     if (endpoints.length === 0) {
       return {
         type: 'message',
@@ -99,33 +111,46 @@ const handleList: Handler = async (context) => {
         content: 'No serving endpoints found in workspace',
       };
     }
-    
+
     const models = endpoints.join('\n  - ');
-    
+
     if (isError) {
       let content = `Failed to fetch endpoints from workspace. Showing cached models:\n  - ${models}`;
-      
+
       // Add specific error guidance
       if (errorMessage?.includes('credentials not configured')) {
-        content += '\n\nTip: Make sure DATABRICKS_URL and DBX_PAT environment variables are set.';
-      } else if (errorMessage?.includes('401') || errorMessage?.includes('Authentication failed')) {
-        content += '\n\nTip: Your PAT token may be invalid or expired. Check your DBX_PAT environment variable.';
-      } else if (errorMessage?.includes('403') || errorMessage?.includes('Permission denied')) {
-        content += '\n\nTip: Your user lacks permission to list serving endpoints in this workspace.';
-      } else if (errorMessage?.includes('429') || errorMessage?.includes('Rate limit')) {
-        content += '\n\nTip: Rate limit exceeded. Please try again in a few minutes.';
+        content +=
+          '\n\nTip: Make sure DATABRICKS_URL and DBX_PAT environment variables are set.';
+      } else if (
+        errorMessage?.includes('401') ||
+        errorMessage?.includes('Authentication failed')
+      ) {
+        content +=
+          '\n\nTip: Your PAT token may be invalid or expired. Check your DBX_PAT environment variable.';
+      } else if (
+        errorMessage?.includes('403') ||
+        errorMessage?.includes('Permission denied')
+      ) {
+        content +=
+          '\n\nTip: Your user lacks permission to list serving endpoints in this workspace.';
+      } else if (
+        errorMessage?.includes('429') ||
+        errorMessage?.includes('Rate limit')
+      ) {
+        content +=
+          '\n\nTip: Rate limit exceeded. Please try again in a few minutes.';
       }
-      
+
       // Add debug mode hint
       content += '\n\nRun with DBX_DEBUG=1 for more details.';
-      
+
       return {
         type: 'message',
         messageType: 'error',
         content,
       };
     }
-    
+
     return {
       type: 'message',
       messageType: 'info',
@@ -139,7 +164,7 @@ const handleList: Handler = async (context) => {
       content: `Available Gemini models:\n  - ${models}`,
     };
   }
-  
+
   return {
     type: 'message',
     messageType: 'info',
@@ -149,7 +174,7 @@ const handleList: Handler = async (context) => {
 
 const handleSet: Handler = async (context, args) => {
   const modelName = args.trim();
-  
+
   if (!modelName) {
     return {
       type: 'message',
@@ -157,15 +182,16 @@ const handleSet: Handler = async (context, args) => {
       content: 'Usage: /model set <model-name>',
     };
   }
-  
-  const authType = context.services.settings.merged.selectedAuthType || AuthType.USE_GEMINI;
-  
+
+  const authType =
+    context.services.settings.merged.selectedAuthType || AuthType.USE_GEMINI;
+
   // Validate model for provider
   if (authType === AuthType.USE_DATABRICKS) {
     const { endpoints, isError } = await getDatabricksEndpoints();
     const isValidFormat = modelName.startsWith('databricks-');
     const isInList = endpoints.includes(modelName);
-    
+
     if (!isValidFormat) {
       return {
         type: 'message',
@@ -173,7 +199,7 @@ const handleSet: Handler = async (context, args) => {
         content: `Invalid model for Databricks provider: ${modelName}\nUse /model list to see available models`,
       };
     }
-    
+
     if (!isInList && !isError) {
       // Only warn if we successfully fetched from workspace
       context.services.config?.setModel(modelName);
@@ -192,9 +218,20 @@ const handleSet: Handler = async (context, args) => {
       };
     }
   }
-  
+
   context.services.config?.setModel(modelName);
-  
+
+  // Refresh the content generator to use the new model
+  try {
+    await context.services.config?.refreshContentGenerator();
+  } catch (error) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Model updated but failed to refresh content generator: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
+  }
+
   return {
     type: 'message',
     messageType: 'info',
@@ -203,8 +240,9 @@ const handleSet: Handler = async (context, args) => {
 };
 
 const handleRefresh: Handler = async (context) => {
-  const authType = context.services.settings.merged.selectedAuthType || AuthType.USE_GEMINI;
-  
+  const authType =
+    context.services.settings.merged.selectedAuthType || AuthType.USE_GEMINI;
+
   if (authType !== AuthType.USE_DATABRICKS) {
     return {
       type: 'message',
@@ -212,9 +250,10 @@ const handleRefresh: Handler = async (context) => {
       content: 'Refresh is only available for Databricks provider',
     };
   }
-  
-  const { endpoints, isError, errorMessage } = await getDatabricksEndpoints(true);
-  
+
+  const { endpoints, isError, errorMessage } =
+    await getDatabricksEndpoints(true);
+
   if (isError) {
     return {
       type: 'message',
@@ -222,7 +261,7 @@ const handleRefresh: Handler = async (context) => {
       content: `Failed to refresh endpoints: ${errorMessage || 'Unknown error'}\n\nRun with DBX_DEBUG=1 for more details.`,
     };
   }
-  
+
   return {
     type: 'message',
     messageType: 'info',
@@ -231,14 +270,14 @@ const handleRefresh: Handler = async (context) => {
 };
 
 const showHelp = (): MessageActionReturn => ({
-    type: 'message',
-    messageType: 'info',
-    content: `Available subcommands:
+  type: 'message',
+  messageType: 'info',
+  content: `Available subcommands:
   - /model show - Display current model and provider
   - /model list - List available models for current provider
   - /model set <model-name> - Set the model to use
   - /model refresh - Refresh Databricks endpoint list from workspace`,
-  });
+});
 
 const subcommandHandlers: Record<string, Handler> = {
   show: handleShow,
@@ -255,13 +294,13 @@ export const modelCommand: SlashCommand = {
     const parts = args.split(/\s+/);
     const subcommand = parts[0] || '';
     const remainingArgs = parts.slice(1).join(' ');
-    
+
     const handler = subcommandHandlers[subcommand];
-    
+
     if (!subcommand) {
       return showHelp();
     }
-    
+
     if (!handler) {
       return {
         type: 'message',
@@ -269,7 +308,7 @@ export const modelCommand: SlashCommand = {
         content: `Unknown subcommand: ${subcommand}\n\n${showHelp().content}`,
       };
     }
-    
+
     return handler(context, remainingArgs);
   },
 };

@@ -13,10 +13,10 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.resetModules();
-    
+
     // Mock fetch globally
     global.fetch = vi.fn();
-    
+
     // Set up environment variables
     process.env.DATABRICKS_URL = 'https://test-workspace.databricks.com';
     process.env.DBX_PAT = 'test-pat-token';
@@ -36,7 +36,7 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
       const module = await import('./endpointDiscovery.js');
       return module.discoverDatabricksEndpoints;
     }
-    
+
     describe('Given: Valid Databricks workspace with serving endpoints', () => {
       describe('When: Fetching endpoints successfully', () => {
         it('Then: Should return array of endpoint names', async () => {
@@ -46,19 +46,19 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
               {
                 name: 'databricks-claude-sonnet-4',
                 id: 'endpoint-1',
-                state: { ready: 'READY' }
+                state: { ready: 'READY' },
               },
               {
                 name: 'databricks-llama-3-1-70b',
                 id: 'endpoint-2',
-                state: { ready: 'READY' }
+                state: { ready: 'READY' },
               },
               {
                 name: 'databricks-mistral-7b',
                 id: 'endpoint-3',
-                state: { ready: 'READY' }
-              }
-            ]
+                state: { ready: 'READY' },
+              },
+            ],
           };
 
           (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
@@ -67,7 +67,7 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
           });
 
           const endpoints = await discoverDatabricksEndpoints();
-          
+
           expect(endpoints).toEqual([
             'databricks-claude-sonnet-4',
             'databricks-llama-3-1-70b',
@@ -84,19 +84,19 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
               {
                 name: 'databricks-claude-sonnet-4',
                 id: 'endpoint-1',
-                state: { ready: 'READY' }
+                state: { ready: 'READY' },
               },
               {
                 name: 'databricks-llama-not-ready',
                 id: 'endpoint-2',
-                state: { ready: 'NOT_READY' }
+                state: { ready: 'NOT_READY' },
               },
               {
                 name: 'databricks-mistral-7b',
                 id: 'endpoint-3',
-                state: { ready: 'READY' }
-              }
-            ]
+                state: { ready: 'READY' },
+              },
+            ],
           };
 
           (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
@@ -105,7 +105,7 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
           });
 
           const endpoints = await discoverDatabricksEndpoints();
-          
+
           expect(endpoints).toEqual([
             'databricks-claude-sonnet-4',
             'databricks-mistral-7b',
@@ -145,7 +145,7 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
             });
 
           const endpoints = await discoverDatabricksEndpoints();
-          
+
           expect(endpoints).toEqual([
             'model-1',
             'model-2',
@@ -158,7 +158,7 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
           expect(global.fetch).toHaveBeenNthCalledWith(
             2,
             'https://test-workspace.databricks.com/api/2.0/serving-endpoints?page_token=page-2-token',
-            expect.any(Object)
+            expect.any(Object),
           );
         });
       });
@@ -174,15 +174,15 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
           });
 
           await discoverDatabricksEndpoints();
-          
+
           expect(global.fetch).toHaveBeenCalledWith(
             'https://test-workspace.databricks.com/api/2.0/serving-endpoints',
             {
               headers: {
-                'Authorization': 'Bearer test-pat-token',
+                Authorization: 'Bearer test-pat-token',
                 'Content-Type': 'application/json',
               },
-            }
+            },
           );
         });
       });
@@ -194,7 +194,7 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
           delete process.env.DBX_PAT;
 
           await expect(discoverDatabricksEndpoints()).rejects.toThrow(
-            'Databricks credentials not configured'
+            'Databricks credentials not configured',
           );
         });
       });
@@ -211,7 +211,7 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
           });
 
           await expect(discoverDatabricksEndpoints()).rejects.toThrow(
-            'Authentication failed: Invalid PAT token'
+            'Authentication failed: Invalid PAT token',
           );
         });
       });
@@ -226,7 +226,7 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
           });
 
           await expect(discoverDatabricksEndpoints()).rejects.toThrow(
-            'Permission denied: User lacks access to serving endpoints'
+            'Permission denied: User lacks access to serving endpoints',
           );
         });
       });
@@ -241,7 +241,7 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
           });
 
           await expect(discoverDatabricksEndpoints()).rejects.toThrow(
-            'Rate limit exceeded: Please try again later'
+            'Rate limit exceeded: Please try again later',
           );
         });
       });
@@ -249,10 +249,12 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
       describe('When: Network error occurs', () => {
         it('Then: Should throw network error', async () => {
           const discoverDatabricksEndpoints = await getFreshModule();
-          (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Network error'));
+          (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+            new Error('Network error'),
+          );
 
           await expect(discoverDatabricksEndpoints()).rejects.toThrow(
-            'Failed to fetch endpoints: Network error'
+            'Failed to fetch endpoints: Network error',
           );
         });
       });
@@ -268,7 +270,7 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
           });
 
           const endpoints = await discoverDatabricksEndpoints();
-          
+
           expect(endpoints).toEqual([]);
         });
       });
@@ -282,7 +284,7 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
           });
 
           await expect(discoverDatabricksEndpoints()).rejects.toThrow(
-            'Invalid response format from Databricks API'
+            'Invalid response format from Databricks API',
           );
         });
       });
@@ -305,10 +307,10 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
 
           // First call
           const result1 = await discoverDatabricksEndpoints();
-          
+
           // Second call (should use cache)
           const result2 = await discoverDatabricksEndpoints();
-          
+
           expect(result1).toEqual(['model-1']);
           expect(result2).toEqual(['model-1']);
           expect(global.fetch).toHaveBeenCalledTimes(1); // Only one API call
@@ -319,10 +321,14 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
         it('Then: Should fetch fresh data from API', async () => {
           const discoverDatabricksEndpoints = await getFreshModule();
           const mockResponse1 = {
-            endpoints: [{ name: 'model-1', id: '1', state: { ready: 'READY' } }],
+            endpoints: [
+              { name: 'model-1', id: '1', state: { ready: 'READY' } },
+            ],
           };
           const mockResponse2 = {
-            endpoints: [{ name: 'model-2', id: '2', state: { ready: 'READY' } }],
+            endpoints: [
+              { name: 'model-2', id: '2', state: { ready: 'READY' } },
+            ],
           };
 
           (global.fetch as ReturnType<typeof vi.fn>)
@@ -337,13 +343,13 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
 
           // First call
           const result1 = await discoverDatabricksEndpoints();
-          
+
           // Force cache expiration
           await discoverDatabricksEndpoints({ forceRefresh: true });
-          
+
           // Third call should get new data
           const result3 = await discoverDatabricksEndpoints();
-          
+
           expect(result1).toEqual(['model-1']);
           expect(result3).toEqual(['model-2']);
           expect(global.fetch).toHaveBeenCalledTimes(2);

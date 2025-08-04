@@ -248,6 +248,7 @@ export class Config {
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
   private readonly experimentalAcp: boolean = false;
+  private userSelectedModel: string | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -355,12 +356,31 @@ export class Config {
   }
 
   getModel(): string {
-    return this.contentGeneratorConfig?.model || this.model;
+    // Priority: user-selected model > contentGeneratorConfig model > default model
+    return (
+      this.userSelectedModel || this.contentGeneratorConfig?.model || this.model
+    );
   }
 
   setModel(newModel: string): void {
+    this.userSelectedModel = newModel;
     if (this.contentGeneratorConfig) {
       this.contentGeneratorConfig.model = newModel;
+    }
+  }
+
+  async refreshContentGenerator(): Promise<void> {
+    const authType = this.contentGeneratorConfig?.authType;
+    if (!authType) {
+      throw new Error('Cannot refresh content generator: auth type not set');
+    }
+
+    // Create new content generator config with updated model
+    this.contentGeneratorConfig = createContentGeneratorConfig(this, authType);
+
+    // Reinitialize the GeminiClient with the new content generator
+    if (this.geminiClient) {
+      await this.geminiClient.initialize(this.contentGeneratorConfig);
     }
   }
 
@@ -690,4 +710,8 @@ export class Config {
   }
 }
 // Export model constants for use in CLI
-export { DEFAULT_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_MODEL, DEFAULT_DATABRICKS_MODEL };
+export {
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_DATABRICKS_MODEL,
+};
