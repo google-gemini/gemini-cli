@@ -15,6 +15,7 @@ import {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
+  RateLimitSettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -124,6 +125,7 @@ export interface Settings {
   // Environment variables to exclude from project .env files
   excludedProjectEnvVars?: string[];
   dnsResolutionOrder?: DnsResolutionOrder;
+  rateLimit?: RateLimitSettings;
 }
 
 export interface SettingsError {

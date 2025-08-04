@@ -48,6 +48,7 @@ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
 import type { Content } from '@google/genai';
+import { RateLimitSettings } from './rateLimit.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
@@ -188,6 +189,7 @@ export interface ConfigParameters {
   ideModeFeature?: boolean;
   ideMode?: boolean;
   ideClient: IdeClient;
+  rateLimit?: RateLimitSettings;
 }
 
 export class Config {
@@ -233,6 +235,7 @@ export class Config {
   private readonly ideModeFeature: boolean;
   private ideMode: boolean;
   private ideClient: IdeClient;
+  private readonly rateLimit: RateLimitSettings | undefined;
   private inFallbackMode = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
@@ -304,6 +307,7 @@ export class Config {
     this.ideModeFeature = params.ideModeFeature ?? false;
     this.ideMode = params.ideMode ?? true;
     this.ideClient = params.ideClient;
+    this.rateLimit = params.rateLimit;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -631,6 +635,10 @@ export class Config {
 
   getIdeMode(): boolean {
     return this.ideMode;
+  }
+
+  getRateLimitSettings(): RateLimitSettings | undefined {
+    return this.rateLimit;
   }
 
   setIdeMode(value: boolean): void {

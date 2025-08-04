@@ -213,6 +213,59 @@ export async function parseArguments(): Promise<CliArgs> {
         // Handle comma-separated values
         dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
     })
+    .command(
+      'auth <subcommand>',
+      'Manage authentication',
+      (yargs) => {
+        return yargs.command(
+          'rate-limit',
+          'Configure rate limiting',
+          (yargs) => {
+            return yargs
+              .option('on', {
+                type: 'boolean',
+                description: 'Enable rate limiting.',
+              })
+              .option('off', {
+                type: 'boolean',
+                description: 'Disable rate limiting.',
+              })
+              .option('tier', {
+                type: 'string',
+                choices: ['free', 'tier1', 'tier2', 'tier3'],
+                description: 'Set the rate limit tier.',
+              });
+          },
+          (argv) => {
+            const settings = loadSettings(process.cwd());
+            const currentRateLimitSettings = settings.merged.rateLimit || {};
+
+            if (argv.on) {
+              currentRateLimitSettings.enabled = true;
+            } else if (argv.off) {
+              currentRateLimitSettings.enabled = false;
+            }
+
+            if (argv.tier) {
+              currentRateLimitSettings.tier = argv.tier as AuthTier;
+            }
+
+            settings.setValue(
+              SettingScope.User,
+              'rateLimit',
+              currentRateLimitSettings,
+            );
+
+            console.log('Rate limit settings updated.');
+          },
+        );
+      },
+      () => {
+        // This is the handler for the auth command
+        // It's required, but we don't need it to do anything
+        // as the subcommands have their own handlers.
+      },
+    )
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -456,6 +509,7 @@ export async function loadCliConfig(
     ideMode,
     ideModeFeature,
     ideClient,
+    rateLimit: settings.rateLimit,
   });
 }
 

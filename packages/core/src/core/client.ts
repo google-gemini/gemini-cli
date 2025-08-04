@@ -49,6 +49,7 @@ import {
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { AuthTier, RateLimiterManager } from '../utils/rateLimiter.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -508,10 +509,22 @@ export class GeminiClient {
           this.lastPromptId,
         );
 
+      const { totalTokens } = await this.getContentGenerator().countTokens({
+        model: modelToUse,
+        contents,
+      });
+
+      const rateLimiter = RateLimiterManager.getLimiter(
+        modelToUse,
+        AuthTier.FREE,
+      );
+
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: async (authType?: string, error?: unknown) =>
           await this.handleFlashFallback(authType, error),
         authType: this.config.getContentGeneratorConfig()?.authType,
+        rateLimiter,
+        tokens: totalTokens,
       });
 
       let text = getResponseText(result);
@@ -614,10 +627,20 @@ export class GeminiClient {
           this.lastPromptId,
         );
 
+      const { totalTokens } = await this.getContentGenerator().countTokens({
+        model: modelToUse,
+        contents,
+      });
+      const rateLimiter = RateLimiterManager.getLimiter(
+        modelToUse,
+        AuthTier.FREE,
+      );
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: async (authType?: string, error?: unknown) =>
           await this.handleFlashFallback(authType, error),
         authType: this.config.getContentGeneratorConfig()?.authType,
+        rateLimiter,
+        tokens: totalTokens,
       });
       return result;
     } catch (error: unknown) {
