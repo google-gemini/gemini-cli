@@ -87,9 +87,17 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
         inEscape = false;
       } else if (char === '\\') {
         inEscape = true;
-      } else if (/\s/.test(char)) {
-        // Path ends at first whitespace not escaped
+      } else if (/[,\s;!?()[\]{}]/.test(char)) {
+        // Path ends at first whitespace or punctuation not escaped
         break;
+      } else if (char === '.') {
+        // For . we need to be more careful - only terminate if followed by whitespace or end of string
+        // This allows file extensions like .txt, .js but terminates at sentence endings like "file.txt. Next sentence"
+        const nextChar =
+          pathEndIndex + 1 < query.length ? query[pathEndIndex + 1] : '';
+        if (nextChar === '' || /\s/.test(nextChar)) {
+          break;
+        }
       }
       pathEndIndex++;
     }
@@ -320,8 +328,7 @@ export async function handleAtCommand({
       if (
         i > 0 &&
         initialQueryText.length > 0 &&
-        !initialQueryText.endsWith(' ') &&
-        resolvedSpec
+        !initialQueryText.endsWith(' ')
       ) {
         // Add space if previous part was text and didn't end with space, or if previous was @path
         const prevPart = commandParts[i - 1];

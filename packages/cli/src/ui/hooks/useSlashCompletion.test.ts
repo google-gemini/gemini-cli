@@ -1350,4 +1350,262 @@ describe('useSlashCompletion', () => {
       expect(result.current.textBuffer.text).toBe('@file1.txt @src/file2.txt');
     });
   });
+
+  describe('File Path Escaping', () => {
+    it('should escape special characters in file names', async () => {
+      await createTestFile('', 'my file.txt');
+      await createTestFile('', 'file(1).txt');
+      await createTestFile('', 'backup[old].txt');
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@my'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestion = result.current.suggestions.find(
+        (s) => s.label === 'my file.txt',
+      );
+      expect(suggestion).toBeDefined();
+      expect(suggestion!.value).toBe('my\\ file.txt');
+    });
+
+    it('should escape parentheses in file names', async () => {
+      await createTestFile('', 'document(final).docx');
+      await createTestFile('', 'script(v2).sh');
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@doc'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestion = result.current.suggestions.find(
+        (s) => s.label === 'document(final).docx',
+      );
+      expect(suggestion).toBeDefined();
+      expect(suggestion!.value).toBe('document\\(final\\).docx');
+    });
+
+    it('should escape square brackets in file names', async () => {
+      await createTestFile('', 'backup[2024-01-01].zip');
+      await createTestFile('', 'config[dev].json');
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@backup'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestion = result.current.suggestions.find(
+        (s) => s.label === 'backup[2024-01-01].zip',
+      );
+      expect(suggestion).toBeDefined();
+      expect(suggestion!.value).toBe('backup\\[2024-01-01\\].zip');
+    });
+
+    it('should escape multiple special characters in file names', async () => {
+      await createTestFile('', 'my file (backup) [v1.2].txt');
+      await createTestFile('', 'data & config {prod}.json');
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@my'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestion = result.current.suggestions.find(
+        (s) => s.label === 'my file (backup) [v1.2].txt',
+      );
+      expect(suggestion).toBeDefined();
+      expect(suggestion!.value).toBe(
+        'my\\ file\\ \\(backup\\)\\ \\[v1.2\\].txt',
+      );
+    });
+
+    it('should preserve path separators while escaping special characters', async () => {
+      await createTestFile(
+        '',
+        'projects',
+        'my project (2024)',
+        'file with spaces.txt',
+      );
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@projects/my'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestion = result.current.suggestions.find((s) =>
+        s.label.includes('my project'),
+      );
+      expect(suggestion).toBeDefined();
+      // Should escape spaces and parentheses but preserve forward slashes
+      expect(suggestion!.value).toMatch(/my\\ project\\ \\\(2024\\\)/);
+      expect(suggestion!.value).toContain('/'); // Should contain forward slash for path separator
+    });
+
+    it('should normalize Windows path separators to forward slashes while preserving escaping', async () => {
+      // Create test with complex nested structure
+      await createTestFile(
+        '',
+        'deep',
+        'nested',
+        'special folder',
+        'file with (parentheses).txt',
+      );
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@deep/nested/special'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestion = result.current.suggestions.find((s) =>
+        s.label.includes('special folder'),
+      );
+      expect(suggestion).toBeDefined();
+      // Should use forward slashes for path separators and escape spaces
+      expect(suggestion!.value).toContain('special\\ folder/');
+      expect(suggestion!.value).not.toContain('\\\\'); // Should not contain double backslashes for path separators
+    });
+
+    it('should handle directory names with special characters', async () => {
+      await createEmptyDir('my documents (personal)');
+      await createEmptyDir('config [production]');
+      await createEmptyDir('data & logs');
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestions = result.current.suggestions;
+
+      const docSuggestion = suggestions.find(
+        (s) => s.label === 'my documents (personal)/',
+      );
+      expect(docSuggestion).toBeDefined();
+      expect(docSuggestion!.value).toBe('my\\ documents\\ \\(personal\\)/');
+
+      const configSuggestion = suggestions.find(
+        (s) => s.label === 'config [production]/',
+      );
+      expect(configSuggestion).toBeDefined();
+      expect(configSuggestion!.value).toBe('config\\ \\[production\\]/');
+
+      const dataSuggestion = suggestions.find(
+        (s) => s.label === 'data & logs/',
+      );
+      expect(dataSuggestion).toBeDefined();
+      expect(dataSuggestion!.value).toBe('data\\ \\&\\ logs/');
+    });
+
+    it('should handle files with various shell metacharacters', async () => {
+      await createTestFile('', 'file$var.txt');
+      await createTestFile('', 'important!.md');
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestions = result.current.suggestions;
+
+      const dollarSuggestion = suggestions.find(
+        (s) => s.label === 'file$var.txt',
+      );
+      expect(dollarSuggestion).toBeDefined();
+      expect(dollarSuggestion!.value).toBe('file\\$var.txt');
+
+      const importantSuggestion = suggestions.find(
+        (s) => s.label === 'important!.md',
+      );
+      expect(importantSuggestion).toBeDefined();
+      expect(importantSuggestion!.value).toBe('important\\!.md');
+    });
+  });
 });
