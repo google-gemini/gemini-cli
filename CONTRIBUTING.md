@@ -242,6 +242,8 @@ To hit a breakpoint inside the sandbox container run:
 DEBUG=1 gemini
 ```
 
+**Note:** If you have `DEBUG=true` in a project's `.env` file, it won't affect gemini-cli due to automatic exclusion. Use `.gemini/.env` files for gemini-cli specific debug settings.
+
 ### React DevTools
 
 To debug the CLI's React-based UI, you can use React DevTools. Ink, the library used for the CLI's interface, is compatible with React DevTools version 4.x.
