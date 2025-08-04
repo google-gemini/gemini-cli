@@ -180,6 +180,9 @@ const App = ({
     IdeContext | undefined
   >();
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [interruptModeEnabled, setInterruptModeEnabled] = useState(
+    interruptMode,
+  );
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
@@ -508,7 +511,7 @@ const App = ({
     performMemoryRefresh,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
-    interruptMode,
+    interruptModeEnabled,
   );
 
   // Input handling
@@ -598,6 +601,14 @@ const App = ({
         return;
       }
       handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
+    } else if (key.ctrl && (input === 'n' || input === 'N')) {
+      if (!interruptModeEnabled) {
+        setInterruptModeEnabled(true);
+        addItem(
+          { type: MessageType.INFO, text: 'Interrupt mode enabled.' },
+          Date.now(),
+        );
+      }
     } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
       setConstrainHeight(false);
     }
