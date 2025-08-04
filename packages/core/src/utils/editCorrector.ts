@@ -552,7 +552,7 @@ potentially_problematic_new_string (this is the text that should replace old_str
 ${potentiallyProblematicNewString}
 \`\`\`
 
-Task: Analyze the potentially_problematic_new_string. If it's syntactically invalid due to incorrect escaping (e.g., "\n", "\t", "\\", "\\'", "\\""), correct the invalid syntax. The goal is to ensure the new_string, when inserted into the code, will be a valid and correctly interpreted.
+Task: Analyze the potentially_problematic_new_string. If it's syntactically invalid due to incorrect escaping (e.g., "\\n", "\\t", "\\", "\\'", "\\""), correct the invalid syntax. The goal is to ensure the new_string, when inserted into the code, will be a valid and correctly interpreted.
 
 For example, if old_string is "foo" and potentially_problematic_new_string is "bar\\nbaz", the corrected_new_string_escaping should be "bar\nbaz".
 If potentially_problematic_new_string is console.log(\\"Hello World\\"), it should be console.log("Hello World").
@@ -618,7 +618,7 @@ potentially_problematic_string (this text MIGHT have bad escaping, or might be e
 ${potentiallyProblematicString}
 \`\`\`
 
-Task: Analyze the potentially_problematic_string. If it's syntactically invalid due to incorrect escaping (e.g., "\n", "\t", "\\", "\\'", "\\""), correct the invalid syntax. The goal is to ensure the text will be a valid and correctly interpreted.
+Task: Analyze the potentially_problematic_string. If it's syntactically invalid due to incorrect escaping (e.g., "\\n", "\\t", "\\", "\\'", "\\""), correct the invalid syntax. The goal is to ensure the text will be a valid and correctly interpreted.
 
 For example, if potentially_problematic_string is "bar\\nbaz", the corrected_new_string_escaping should be "bar\nbaz".
 If potentially_problematic_string is console.log(\\"Hello World\\"), it should be console.log("Hello World").
@@ -689,44 +689,39 @@ function trimPairIfPossible(
 
 /**
  * Unescapes a string that might have been overly escaped by an LLM.
+ * This function is designed to fix over-escaped strings while preserving legitimate
+ * backslashes in valid Python syntax like f-strings.
  */
 export function unescapeStringForGeminiBug(inputString: string): string {
-  // Regex explanation:
-  // \\ : Matches exactly one literal backslash character.
-  // (n|t|r|'|"|`|\\|\n) : This is a capturing group. It matches one of the following:
-  //   n, t, r, ', ", ` : These match the literal characters 'n', 't', 'r', single quote, double quote, or backtick.
-  //                       This handles cases like "\\n", "\\`", etc.
-  //   \\ : This matches a literal backslash. This handles cases like "\\\\" (escaped backslash).
-  //   \n : This matches an actual newline character. This handles cases where the input
-  //        string might have something like "\\\n" (a literal backslash followed by a newline).
-  // g : Global flag, to replace all occurrences.
+  // The main issue is that the original regex /\\+(n|t|r|'|"|`|\\|\n)/g is too aggressive
+  // and incorrectly removes legitimate backslashes at the end of f-strings like f"""\
+
+  // The simplest fix is to change the regex from /\\+(n|t|r|'|"|`|\\|\n)/g to /\\{2,}(n|t|r|'|"|`|\\|\n)/g
+  // This way, we only unescape sequences with 2 or more backslashes (clearly over-escaped),
+  // but leave single backslashes (like f"""\) alone.
 
   return inputString.replace(
-    /\\+(n|t|r|'|"|`|\\|\n)/g,
+    /\\{2,}(n|t|r|'|"|`|\\|\n)/g,
     (match, capturedChar) => {
-      // 'match' is the entire erroneous sequence, e.g., if the input (in memory) was "\\\\`", match is "\\\\`".
-      // 'capturedChar' is the character that determines the true meaning, e.g., '`'.
-
+      // Only handle cases with 2 or more backslashes (clearly over-escaped)
       switch (capturedChar) {
         case 'n':
-          return '\n'; // Correctly escaped: \n (newline character)
+          return '\n';
         case 't':
-          return '\t'; // Correctly escaped: \t (tab character)
+          return '\t';
         case 'r':
-          return '\r'; // Correctly escaped: \r (carriage return character)
+          return '\r';
         case "'":
-          return "'"; // Correctly escaped: ' (apostrophe character)
+          return "'";
         case '"':
-          return '"'; // Correctly escaped: " (quotation mark character)
+          return '"';
         case '`':
-          return '`'; // Correctly escaped: ` (backtick character)
-        case '\\': // This handles when 'capturedChar' is a literal backslash
-          return '\\'; // Replace escaped backslash (e.g., "\\\\") with single backslash
-        case '\n': // This handles when 'capturedChar' is an actual newline
-          return '\n'; // Replace the whole erroneous sequence (e.g., "\\\n" in memory) with a clean newline
+          return '`';
+        case '\\':
+          return '\\';
+        case '\n':
+          return '\n';
         default:
-          // This fallback should ideally not be reached if the regex captures correctly.
-          // It would return the original matched sequence if an unexpected character was captured.
           return match;
       }
     },
