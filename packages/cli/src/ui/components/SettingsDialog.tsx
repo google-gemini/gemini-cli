@@ -121,8 +121,7 @@ export function SettingsDialog({
     const settingKeys = getDialogSettingKeys();
 
     return settingKeys.map((key: string) => {
-      // Get the current value from pending settings, which reflects any pending changes
-      const currentValue = getSettingValue(key, pendingSettings, settings.merged);
+      const currentValue = getSettingValue(key, pendingSettings, {});
       const definition = getSettingDefinition(key);
 
       return {
@@ -132,13 +131,11 @@ export function SettingsDialog({
         toggle: () => {
           const newValue = !currentValue;
 
-          // Always update pending settings first
           setPendingSettings((prev) =>
             setPendingSettingValue(key, newValue, prev),
           );
 
           if (!requiresRestart(key)) {
-            // For non-restart settings, save immediately
             const immediateSettings = new Set([key]);
             const immediateSettingsObject = setPendingSettingValue(
               key,
@@ -146,6 +143,10 @@ export function SettingsDialog({
               {},
             );
 
+            console.log(
+              `[DEBUG SettingsDialog] Saving ${key} immediately with value:`,
+              newValue,
+            );
             saveModifiedSettings(
               immediateSettings,
               immediateSettingsObject,
@@ -188,7 +189,7 @@ export function SettingsDialog({
                   const modifiedValue = getSettingValue(
                     modifiedKey,
                     prevPending,
-                    settings.merged,
+                    {},
                   );
                   updatedPending = setPendingSettingValue(
                     modifiedKey,
@@ -201,7 +202,6 @@ export function SettingsDialog({
               return updatedPending;
             });
           } else {
-            // For restart-required settings, track the modification
             setModifiedSettings((prev) => {
               const updated = new Set(prev).add(key);
               const needsRestart = hasRestartRequiredSettings(updated);
@@ -216,13 +216,11 @@ export function SettingsDialog({
                   `[DEBUG SettingsDialog] Setting showRestartPrompt to true`,
                 );
                 setShowRestartPrompt(true);
+                // Track restart-required settings separately
+                setRestartRequiredSettings((prevRestart) =>
+                  new Set(prevRestart).add(key),
+                );
               }
-              return updated;
-            });
-
-            // Always track restart-required settings separately
-            setRestartRequiredSettings((prevRestart) => {
-              const updated = new Set(prevRestart).add(key);
               return updated;
             });
           }
