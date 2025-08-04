@@ -4,11 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MessageSendParams } from '@a2a-js/sdk';
-import { AgentCard, Message, Task, TaskState, Message1 } from '@a2a-js/sdk';
+import {
+  AgentCard,
+  CancelTaskResponse,
+  GetTaskResponse,
+  MessageSendParams,
+  SendMessageResponse,
+} from '@a2a-js/sdk';
 import { A2AClient } from '@a2a-js/sdk/client';
 import { v4 as uuidv4 } from 'uuid';
-import { extractMessageText, extractTaskText } from './utils.js';
 
 const AGENT_CARD_WELL_KNOWN_PATH = '/.well-known/agent-card.json';
 
@@ -18,7 +22,8 @@ const AGENT_CARD_WELL_KNOWN_PATH = '/.well-known/agent-card.json';
  */
 export class A2AClientManager {
   private static instance: A2AClientManager;
-  private registeredAgents = new Map<string, A2AClient>();
+  private registeredAgents = new Map<string, A2AClient>(); // { agentName : A2AClient}
+  private taskMap = new Map<string, Set<string>>(); // { agentName : taskId}
 
   /**
    * Gets the singleton instance of the A2AClientManager.
@@ -83,15 +88,16 @@ export class A2AClientManager {
   public async sendMessage(
     agentName: string,
     message: string,
-  ): Promise<string> {
-    // Support All SendMessageREsponse types
-
+  ): Promise<SendMessageResponse> {
     const a2aClient = this.registeredAgents.get(agentName);
     if (!a2aClient) {
       throw new Error(
         `Agent with name ${agentName} is not registered. Please run load_agent first.`,
       );
     }
+
+    const taskId = uuidv4(); // Generate a new taskId for the message
+    this.taskMap.set(agentName, (this.taskMap.get(agentName) || new Set()).add(taskId));
 
     // TODO: Support more than just text
     const messageParams: MessageSendParams = {
@@ -105,19 +111,11 @@ export class A2AClientManager {
             text: message,
           },
         ],
+        taskId: taskId,
       },
     };
 
-    const sendMessageResponse = await a2aClient.sendMessage(messageParams);
-    if ('error' in sendMessageResponse) {
-      return `There was an error getting a response from ${(await a2aClient.getAgentCard()).name}: ${sendMessageResponse.error.message};`;
-    } else if (sendMessageResponse.result.kind === 'message') {
-      return extractMessageText(sendMessageResponse.result);
-    } else if (sendMessageResponse.result.kind === 'task') {
-      return extractTaskText(sendMessageResponse.result);
-    } else {
-      return 'sendMessageResponse does not contain message or task, this should not happen.';
-    }
+    return a2aClient.sendMessage(messageParams);
   }
 
   /**
@@ -125,21 +123,51 @@ export class A2AClientManager {
    * @param taskId The ID of the task.
    * @returns The task object.
    */
-  public getTask(agentName: string, taskId: string): string {
+  public async getTask(
+    agentName: string,
+    taskId: string,
+  ): Promise<GetTaskResponse> {
     const a2aClient = this.registeredAgents.get(agentName);
+    if (!a2aClient) {
+      throw new Error(
+        `Agent with name ${agentName} is not registered. Please run load_agent first.`,
+      );
+    }
 
-    return 'Unimplemented';
+    if (!this.taskMap.get(agentName)?.has(taskId)) {
+      throw new Error(
+        `Agent with name ${agentName} has no task ${taskId} associated with it.`,
+      );
+    }
+
+    return a2aClient.getTask({ id: taskId });
   }
 
   /**
    * Cancels a task by its ID.
    * @param taskId The ID of the task.
    */
-  public async cancelTask(taskId: string): Promise<void> {
-    // This functionality is not directly supported by the SDK in a simple way.
-    // This is a placeholder for future, more complex implementation.
-    throw new Error(
-      `'cancel_task' is not yet implemented. Cannot cancel task with ID: ${taskId}`,
-    );
+  public async cancelTask(
+    agentName: string,
+    taskId: string,
+  ): Promise<CancelTaskResponse> {
+    const a2aClient = this.registeredAgents.get(agentName);
+    if (!a2aClient) {
+      throw new Error(
+        `Agent with name ${agentName} is not registered. Please run load_agent first.`,
+      );
+    }
+
+    const agentTaskSet = this.taskMap.get(agentName);
+
+    if (!agentTaskSet?.has(taskId)) {
+      throw new Error(
+        `Agent with name ${agentName} has no task ${taskId} associated with it.`,
+      );
+    }
+
+    agentTaskSet.delete(taskId);
+
+    return a2aClient.cancelTask({ id: taskId });
   }
 }

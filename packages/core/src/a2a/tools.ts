@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import { A2AClientManager } from './a2a-client.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { textResponse } from './utils.js';
+import { extractMessageText, extractTaskText, textResponse } from './utils.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { AgentCard } from '@a2a-js/sdk';
 
@@ -50,48 +50,92 @@ export class A2AToolRegistry {
 
   registerToolsForAgent(agentCard: AgentCard): void {
     const agentName = agentCard.name;
+    const sanitizedAgentName = agentName.replace(/\s/g, '');
 
     // Register send_message for the agent
     this.server.registerTool(
-      `${agentName}_sendMessage`,
+      `${sanitizedAgentName}_sendMessage`,
       {
         description: `Sends a message to the ${agentName} agent.`,
         inputSchema: AgentSendMessageInputSchema.shape,
       },
       async (args: z.infer<typeof AgentSendMessageInputSchema>) => {
-        return textResponse(
-          await this.clientManager.sendMessage(agentName, args.message),
-        );
+        try {
+          const response = await this.clientManager.sendMessage(
+            agentName,
+            args.message,
+          );
+          if ('error' in response) {
+            return textResponse(
+              `Error from agent ${agentName}: ${response.error.message}`,
+            );
+          }
+          if (response.result.kind === 'message') {
+            return textResponse(extractMessageText(response.result));
+          }
+          return textResponse(extractTaskText(response.result));
+        } catch (e) {
+          const error = e as Error;
+          return textResponse(
+            `Failed to send message to ${agentName}: ${error.message}`,
+          );
+        }
       },
     );
 
     // Register get_task for the agent
     this.server.registerTool(
-      `${agentName}_getTask`,
+      `${sanitizedAgentName}_getTask`,
       {
         description: `Retrieves a task from the ${agentName} agent.`,
         inputSchema: AgentGetTaskInputSchema.shape,
       },
       async (args: z.infer<typeof AgentGetTaskInputSchema>) => {
-        // Note: Implementation for get_task is currently a placeholder
-        return textResponse(
-          `'get_task' is not yet implemented for ${agentName}. Task ID: ${args.taskId}`,
-        );
+        try {
+          const response = await this.clientManager.getTask(
+            agentName,
+            args.taskId,
+          );
+          if ('error' in response) {
+            return textResponse(
+              `Error from agent ${agentName} when getting task ${response.error.message}`,
+            );
+          }
+          return textResponse(extractTaskText(response.result));
+        } catch (e) {
+          const error = e as Error;
+          return textResponse(
+            `Failed to get task from agent ${agentName}: ${error.message}`,
+          );
+        }
       },
     );
 
     // Register cancel_task for the agent
     this.server.registerTool(
-      `${agentName}_cancelTask`,
+      `${sanitizedAgentName}_cancelTask`,
       {
         description: `Cancels a task on the ${agentName} agent.`,
         inputSchema: AgentCancelTaskInputSchema.shape,
       },
       async (args: z.infer<typeof AgentCancelTaskInputSchema>) => {
-        // Note: Implementation for cancel_task is currently a placeholder
-        return textResponse(
-          `'cancel_task' is not yet implemented for ${agentName}. Task ID: ${args.taskId}`,
-        );
+        try {
+          const response = await this.clientManager.cancelTask(
+            agentName,
+            args.taskId,
+          );
+          if ('error' in response) {
+            return textResponse(
+              `Error from agent ${agentName} when canceling task: ${response.error.message}`,
+            );
+          }
+          return textResponse(extractTaskText(response.result));
+        } catch (e) {
+          const error = e as Error;
+          return textResponse(
+            `Failed to Cancel Task on Agent ${agentName}: ${error.message}`,
+          );
+        }
       },
     );
   }
@@ -119,7 +163,8 @@ export class A2AToolFunctions {
       // Delegate registration
       this.registry.registerToolsForAgent(agentCard);
 
-      const output = `Successfully loaded agent: ${agentCard.name}. New tools registered: ${agentCard.name}_sendMessage, ${agentCard.name}_getTask, ${agentCard.name}_cancelTask.`;
+      const sanitizedAgentName = agentCard.name.replace(/\s/g, '');
+      const output = `Successfully loaded agent: ${agentCard.name}. New tools registered: ${sanitizedAgentName}_sendMessage, ${sanitizedAgentName}_getTask, ${sanitizedAgentName}_cancelTask.`;
       return textResponse(output);
     } catch (error) {
       return textResponse(`Failed to load agent: ${error}`);
