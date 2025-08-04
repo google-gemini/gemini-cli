@@ -35,18 +35,24 @@
       {
         "command": "gemini-cli.runGeminiCLI",
         "title": "Gemini CLI: Run"
+      },
+      {
+        "command": "gemini-cli.showNotices",
+        "title": "Gemini CLI: View Third-Party Notices"
       }
     ]
   },
-  "main": "./dist/extension.js",
+  "main": "./dist/extension.cjs",
+  "type": "module",
   "scripts": {
-    "vscode:prepublish": "npm run check-types && npm run lint && node esbuild.js --production",
+    "vscode:prepublish": "npm run generate:notices && npm run check-types && npm run lint && node esbuild.js --production",
     "build": "npm run compile",
     "compile": "npm run check-types && npm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "vsce package --no-dependencies",
+    "generate:notices": "node ./scripts/generate-notices.js",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run",

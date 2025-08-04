@@ -7,16 +7,16 @@
 /** @vitest-environment jsdom */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import { useCompletion } from './useCompletion.js';
+import { renderHook, act, waitFor } from '@testing-library/react';
+import { useSlashCompletion } from './useSlashCompletion.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config, FileDiscoveryService } from '@google/gemini-cli-core';
-import { useTextBuffer, TextBuffer } from '../components/shared/text-buffer.js';
+import { useTextBuffer } from '../components/shared/text-buffer.js';
 
-describe('useCompletion', () => {
+describe('useSlashCompletion', () => {
   let testRootDir: string;
   let mockConfig: Config;
 
@@ -38,10 +38,10 @@ describe('useCompletion', () => {
   }
 
   // Helper to create real TextBuffer objects within renderHook
-  function useTextBufferForTest(text: string) {
+  function useTextBufferForTest(text: string, cursorOffset?: number) {
     return useTextBuffer({
       initialText: text,
-      initialCursorOffset: text.length,
+      initialCursorOffset: cursorOffset ?? text.length,
       viewport: { width: 80, height: 20 },
       isValidPath: () => false,
       onChange: () => {},
@@ -50,7 +50,7 @@ describe('useCompletion', () => {
 
   beforeEach(async () => {
     testRootDir = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'completion-unit-test-'),
+      path.join(os.tmpdir(), 'slash-completion-unit-test-'),
     );
     testDirs = [testRootDir];
     mockConfig = {
@@ -82,12 +82,13 @@ describe('useCompletion', () => {
           { name: 'dummy', description: 'dummy' },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest(''),
             testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
+            false,
             mockConfig,
           ),
         );
@@ -112,12 +113,13 @@ describe('useCompletion', () => {
         const { result, rerender } = renderHook(
           ({ text }) => {
             const textBuffer = useTextBufferForTest(text);
-            return useCompletion(
+            return useSlashCompletion(
               textBuffer,
               testDirs,
               testRootDir,
               slashCommands,
               mockCommandContext,
+              false,
               mockConfig,
             );
           },
@@ -134,7 +136,7 @@ describe('useCompletion', () => {
         expect(result.current.isLoadingSuggestions).toBe(false);
       });
 
-      it('should reset all state to default values', () => {
+      it('should reset all state to default values', async () => {
         const slashCommands = [
           {
             name: 'help',
@@ -143,12 +145,13 @@ describe('useCompletion', () => {
         ] as unknown as SlashCommand[];
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/help'),
             testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
+            false,
             mockConfig,
           ),
         );
@@ -160,6 +163,11 @@ describe('useCompletion', () => {
 
         act(() => {
           result.current.resetCompletionState();
+        });
+
+        // Wait for async suggestions clearing
+        await waitFor(() => {
+          expect(result.current.suggestions).toEqual([]);
         });
 
         expect(result.current.suggestions).toEqual([]);
@@ -176,12 +184,13 @@ describe('useCompletion', () => {
           { name: 'dummy', description: 'dummy' },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest(''),
             testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
+            false,
             mockConfig,
           ),
         );
@@ -198,12 +207,14 @@ describe('useCompletion', () => {
           { name: 'dummy', description: 'dummy' },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest(''),
             testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
+            false,
+
             mockConfig,
           ),
         );
@@ -223,12 +234,14 @@ describe('useCompletion', () => {
           },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/h'),
             testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
+            false,
+
             mockConfig,
           ),
         );
@@ -251,12 +264,14 @@ describe('useCompletion', () => {
           },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/h'),
             testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
+            false,
+
             mockConfig,
           ),
         );
@@ -280,12 +295,14 @@ describe('useCompletion', () => {
           { name: 'chat', description: 'Manage chat' },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/'),
             testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
+            false,
+
             mockConfig,
           ),
         );
@@ -326,12 +343,14 @@ describe('useCompletion', () => {
         })) as unknown as SlashCommand[];
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/command'),
             testDirs,
             testRootDir,
             largeMockCommands,
             mockCommandContext,
+            false,
+
             mockConfig,
           ),
         );
@@ -384,7 +403,7 @@ describe('useCompletion', () => {
           },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/'),
             testDirs,
             testRootDir,
@@ -407,7 +426,7 @@ describe('useCompletion', () => {
           },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/mem'),
             testDirs,
             testRootDir,
@@ -431,7 +450,7 @@ describe('useCompletion', () => {
           },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/usag'), // part of the word "usage"
             testDirs,
             testRootDir,
@@ -458,7 +477,7 @@ describe('useCompletion', () => {
           },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/clear'), // No trailing space
             testDirs,
             testRootDir,
@@ -490,7 +509,7 @@ describe('useCompletion', () => {
           ] as unknown as SlashCommand[];
 
           const { result } = renderHook(() =>
-            useCompletion(
+            useSlashCompletion(
               useTextBufferForTest(query),
               testDirs,
               testRootDir,
@@ -511,7 +530,7 @@ describe('useCompletion', () => {
           },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/clear '),
             testDirs,
             testRootDir,
@@ -532,7 +551,7 @@ describe('useCompletion', () => {
           },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/unknown-command'),
             testDirs,
             testRootDir,
@@ -566,7 +585,7 @@ describe('useCompletion', () => {
         ] as unknown as SlashCommand[];
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/memory'), // Note: no trailing space
             testDirs,
             testRootDir,
@@ -604,7 +623,7 @@ describe('useCompletion', () => {
           },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/memory'),
             testDirs,
             testRootDir,
@@ -640,7 +659,7 @@ describe('useCompletion', () => {
           },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/memory a'),
             testDirs,
             testRootDir,
@@ -672,7 +691,7 @@ describe('useCompletion', () => {
           },
         ] as unknown as SlashCommand[];
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/memory dothisnow'),
             testDirs,
             testRootDir,
@@ -715,7 +734,7 @@ describe('useCompletion', () => {
         ] as unknown as SlashCommand[];
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/chat resume my-ch'),
             testDirs,
             testRootDir,
@@ -759,7 +778,7 @@ describe('useCompletion', () => {
         ] as unknown as SlashCommand[];
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/chat resume '),
             testDirs,
             testRootDir,
@@ -794,12 +813,14 @@ describe('useCompletion', () => {
         ] as unknown as SlashCommand[];
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('/chat resume '),
             testDirs,
             testRootDir,
             slashCommands,
             mockCommandContext,
+            false,
+
             mockConfig,
           ),
         );
@@ -822,12 +843,14 @@ describe('useCompletion', () => {
         await createTestFile('', 'README.md');
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('@s'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
+
             mockConfig,
           ),
         );
@@ -856,12 +879,14 @@ describe('useCompletion', () => {
         await createTestFile('', 'src', 'index.ts');
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('@src/comp'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
+
             mockConfig,
           ),
         );
@@ -882,12 +907,14 @@ describe('useCompletion', () => {
         await createTestFile('', 'src', 'index.ts');
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('@.'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
+
             mockConfig,
           ),
         );
@@ -914,12 +941,14 @@ describe('useCompletion', () => {
         await createEmptyDir('dist');
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('@d'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
+
             mockConfigNoRecursive,
           ),
         );
@@ -940,7 +969,7 @@ describe('useCompletion', () => {
         await createTestFile('', 'README.md');
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('@'),
             testDirs,
             testRootDir,
@@ -975,12 +1004,14 @@ describe('useCompletion', () => {
           .mockImplementation(() => {});
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('@'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
+
             mockConfig,
           ),
         );
@@ -1006,12 +1037,14 @@ describe('useCompletion', () => {
         await createEmptyDir('data');
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('@d'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
+
             mockConfig,
           ),
         );
@@ -1040,12 +1073,14 @@ describe('useCompletion', () => {
         await createTestFile('', 'README.md');
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('@'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
+
             mockConfig,
           ),
         );
@@ -1073,12 +1108,14 @@ describe('useCompletion', () => {
         await createTestFile('', 'temp', 'temp.log');
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useSlashCompletion(
             useTextBufferForTest('@t'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
+
             mockConfig,
           ),
         );
@@ -1113,22 +1150,21 @@ describe('useCompletion', () => {
           ],
         },
       ] as unknown as SlashCommand[];
-      // Create a mock buffer that we can spy on directly
-      const mockBuffer = {
-        text: '/mem',
-        setText: vi.fn(),
-      } as unknown as TextBuffer;
 
-      const { result } = renderHook(() =>
-        useCompletion(
-          mockBuffer,
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('/mem');
+        const completion = useSlashCompletion(
+          textBuffer,
           testDirs,
           testRootDir,
           slashCommands,
           mockCommandContext,
+          false,
+
           mockConfig,
-        ),
-      );
+        );
+        return { ...completion, textBuffer };
+      });
 
       expect(result.current.suggestions.map((s) => s.value)).toEqual([
         'memory',
@@ -1138,14 +1174,10 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(mockBuffer.setText).toHaveBeenCalledWith('/memory ');
+      expect(result.current.textBuffer.text).toBe('/memory ');
     });
 
     it('should append a sub-command when the parent is complete', () => {
-      const mockBuffer = {
-        text: '/memory',
-        setText: vi.fn(),
-      } as unknown as TextBuffer;
       const slashCommands = [
         {
           name: 'memory',
@@ -1163,16 +1195,20 @@ describe('useCompletion', () => {
         },
       ] as unknown as SlashCommand[];
 
-      const { result } = renderHook(() =>
-        useCompletion(
-          mockBuffer,
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('/memory');
+        const completion = useSlashCompletion(
+          textBuffer,
           testDirs,
           testRootDir,
           slashCommands,
           mockCommandContext,
+          false,
+
           mockConfig,
-        ),
-      );
+        );
+        return { ...completion, textBuffer };
+      });
 
       // Suggestions are populated by useEffect
       expect(result.current.suggestions.map((s) => s.value)).toEqual([
@@ -1184,14 +1220,10 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(1); // index 1 is 'add'
       });
 
-      expect(mockBuffer.setText).toHaveBeenCalledWith('/memory add ');
+      expect(result.current.textBuffer.text).toBe('/memory add ');
     });
 
     it('should complete a command with an alternative name', () => {
-      const mockBuffer = {
-        text: '/?',
-        setText: vi.fn(),
-      } as unknown as TextBuffer;
       const slashCommands = [
         {
           name: 'memory',
@@ -1209,16 +1241,20 @@ describe('useCompletion', () => {
         },
       ] as unknown as SlashCommand[];
 
-      const { result } = renderHook(() =>
-        useCompletion(
-          mockBuffer,
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('/?');
+        const completion = useSlashCompletion(
+          textBuffer,
           testDirs,
           testRootDir,
           slashCommands,
           mockCommandContext,
+          false,
+
           mockConfig,
-        ),
-      );
+        );
+        return { ...completion, textBuffer };
+      });
 
       result.current.suggestions.push({
         label: 'help',
@@ -1230,44 +1266,23 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(mockBuffer.setText).toHaveBeenCalledWith('/help ');
+      expect(result.current.textBuffer.text).toBe('/help ');
     });
 
-    it('should complete a file path', async () => {
-      const mockBuffer = {
-        text: '@src/fi',
-        lines: ['@src/fi'],
-        cursor: [0, 7],
-        setText: vi.fn(),
-        replaceRangeByOffset: vi.fn(),
-      } as unknown as TextBuffer;
-      const slashCommands = [
-        {
-          name: 'memory',
-          description: 'Manage memory',
-          subCommands: [
-            {
-              name: 'show',
-              description: 'Show memory',
-            },
-            {
-              name: 'add',
-              description: 'Add to memory',
-            },
-          ],
-        },
-      ] as unknown as SlashCommand[];
-
-      const { result } = renderHook(() =>
-        useCompletion(
-          mockBuffer,
+    it('should complete a file path', () => {
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('@src/fi');
+        const completion = useSlashCompletion(
+          textBuffer,
           testDirs,
           testRootDir,
-          slashCommands,
+          [],
           mockCommandContext,
+          false,
           mockConfig,
-        ),
-      );
+        );
+        return { ...completion, textBuffer };
+      });
 
       result.current.suggestions.push({
         label: 'file1.txt',
@@ -1278,11 +1293,324 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalledWith(
-        5, // after '@src/'
-        mockBuffer.text.length,
-        'file1.txt',
+      expect(result.current.textBuffer.text).toBe('@src/file1.txt ');
+    });
+
+    it('should complete a file path when cursor is not at the end of the line', () => {
+      const text = '@src/fi le.txt';
+      const cursorOffset = 7; // after "i"
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest(text, cursorOffset);
+        const completion = useSlashCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      result.current.suggestions.push({
+        label: 'file1.txt',
+        value: 'file1.txt',
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('@src/file1.txt  le.txt');
+    });
+
+    it('should complete the correct file path with multiple @-commands', () => {
+      const text = '@file1.txt @src/fi';
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest(text);
+        const completion = useSlashCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      result.current.suggestions.push({
+        label: 'file2.txt',
+        value: 'file2.txt',
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('@file1.txt @src/file2.txt ');
+    });
+  });
+
+  describe('File Path Escaping', () => {
+    it('should escape special characters in file names', async () => {
+      await createTestFile('', 'my file.txt');
+      await createTestFile('', 'file(1).txt');
+      await createTestFile('', 'backup[old].txt');
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@my'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
       );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestion = result.current.suggestions.find(
+        (s) => s.label === 'my file.txt',
+      );
+      expect(suggestion).toBeDefined();
+      expect(suggestion!.value).toBe('my\\ file.txt');
+    });
+
+    it('should escape parentheses in file names', async () => {
+      await createTestFile('', 'document(final).docx');
+      await createTestFile('', 'script(v2).sh');
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@doc'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestion = result.current.suggestions.find(
+        (s) => s.label === 'document(final).docx',
+      );
+      expect(suggestion).toBeDefined();
+      expect(suggestion!.value).toBe('document\\(final\\).docx');
+    });
+
+    it('should escape square brackets in file names', async () => {
+      await createTestFile('', 'backup[2024-01-01].zip');
+      await createTestFile('', 'config[dev].json');
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@backup'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestion = result.current.suggestions.find(
+        (s) => s.label === 'backup[2024-01-01].zip',
+      );
+      expect(suggestion).toBeDefined();
+      expect(suggestion!.value).toBe('backup\\[2024-01-01\\].zip');
+    });
+
+    it('should escape multiple special characters in file names', async () => {
+      await createTestFile('', 'my file (backup) [v1.2].txt');
+      await createTestFile('', 'data & config {prod}.json');
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@my'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestion = result.current.suggestions.find(
+        (s) => s.label === 'my file (backup) [v1.2].txt',
+      );
+      expect(suggestion).toBeDefined();
+      expect(suggestion!.value).toBe(
+        'my\\ file\\ \\(backup\\)\\ \\[v1.2\\].txt',
+      );
+    });
+
+    it('should preserve path separators while escaping special characters', async () => {
+      await createTestFile(
+        '',
+        'projects',
+        'my project (2024)',
+        'file with spaces.txt',
+      );
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@projects/my'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestion = result.current.suggestions.find((s) =>
+        s.label.includes('my project'),
+      );
+      expect(suggestion).toBeDefined();
+      // Should escape spaces and parentheses but preserve forward slashes
+      expect(suggestion!.value).toMatch(/my\\ project\\ \\\(2024\\\)/);
+      expect(suggestion!.value).toContain('/'); // Should contain forward slash for path separator
+    });
+
+    it('should normalize Windows path separators to forward slashes while preserving escaping', async () => {
+      // Create test with complex nested structure
+      await createTestFile(
+        '',
+        'deep',
+        'nested',
+        'special folder',
+        'file with (parentheses).txt',
+      );
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@deep/nested/special'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestion = result.current.suggestions.find((s) =>
+        s.label.includes('special folder'),
+      );
+      expect(suggestion).toBeDefined();
+      // Should use forward slashes for path separators and escape spaces
+      expect(suggestion!.value).toContain('special\\ folder/');
+      expect(suggestion!.value).not.toContain('\\\\'); // Should not contain double backslashes for path separators
+    });
+
+    it('should handle directory names with special characters', async () => {
+      await createEmptyDir('my documents (personal)');
+      await createEmptyDir('config [production]');
+      await createEmptyDir('data & logs');
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestions = result.current.suggestions;
+
+      const docSuggestion = suggestions.find(
+        (s) => s.label === 'my documents (personal)/',
+      );
+      expect(docSuggestion).toBeDefined();
+      expect(docSuggestion!.value).toBe('my\\ documents\\ \\(personal\\)/');
+
+      const configSuggestion = suggestions.find(
+        (s) => s.label === 'config [production]/',
+      );
+      expect(configSuggestion).toBeDefined();
+      expect(configSuggestion!.value).toBe('config\\ \\[production\\]/');
+
+      const dataSuggestion = suggestions.find(
+        (s) => s.label === 'data & logs/',
+      );
+      expect(dataSuggestion).toBeDefined();
+      expect(dataSuggestion!.value).toBe('data\\ \\&\\ logs/');
+    });
+
+    it('should handle files with various shell metacharacters', async () => {
+      await createTestFile('', 'file$var.txt');
+      await createTestFile('', 'important!.md');
+
+      const { result } = renderHook(() =>
+        useSlashCompletion(
+          useTextBufferForTest('@'),
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+
+      const suggestions = result.current.suggestions;
+
+      const dollarSuggestion = suggestions.find(
+        (s) => s.label === 'file$var.txt',
+      );
+      expect(dollarSuggestion).toBeDefined();
+      expect(dollarSuggestion!.value).toBe('file\\$var.txt');
+
+      const importantSuggestion = suggestions.find(
+        (s) => s.label === 'important!.md',
+      );
+      expect(importantSuggestion).toBeDefined();
+      expect(importantSuggestion!.value).toBe('important\\!.md');
     });
   });
 });
