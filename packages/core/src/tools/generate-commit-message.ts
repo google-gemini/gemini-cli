@@ -13,6 +13,7 @@ import {
 } from './tools.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
+import { Type } from '@google/genai';
 import { spawn } from 'child_process';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 
@@ -226,7 +227,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       {
         properties: {},
         required: [],
-        type: 'object',
+        type: Type.OBJECT,
       },
     );
     this.client = config.getGeminiClient();
