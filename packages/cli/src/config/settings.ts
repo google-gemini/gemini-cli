@@ -45,8 +45,6 @@ export function getWorkspaceSettingsPath(workspaceDir: string): string {
   return path.join(workspaceDir, SETTINGS_DIRECTORY_NAME, 'settings.json');
 }
 
-export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
-
 export enum SettingScope {
   User = 'User',
   Workspace = 'Workspace',
