@@ -353,8 +353,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     'settings.json',
   );
 
-  debugger;
-
   // Load workspace settings
   try {
     if (fs.existsSync(workspaceSettingsPath)) {
