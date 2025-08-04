@@ -180,9 +180,8 @@ const App = ({
     IdeContext | undefined
   >();
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [interruptModeEnabled, setInterruptModeEnabled] = useState(
-    interruptMode,
-  );
+  const [interruptModeEnabled, setInterruptModeEnabled] =
+    useState(interruptMode);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
@@ -660,7 +659,10 @@ const App = ({
   }, [history, logger]);
 
   const isInputActive =
-    streamingState === StreamingState.Idle && !initError && !isProcessing;
+    (streamingState === StreamingState.Idle ||
+      (interruptModeEnabled && streamingState === StreamingState.Responding)) &&
+    !initError &&
+    !isProcessing;
 
   const handleClearScreen = useCallback(() => {
     clearItems();
