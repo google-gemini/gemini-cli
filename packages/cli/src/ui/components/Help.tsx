@@ -143,7 +143,7 @@ export const Help: React.FC<Help> = ({ commands }) => (
       <Text bold color={Colors.AccentPurple}>
         Ctrl+N
       </Text>{' '}
-      - Enable interrupt mode
+      - Toggle interrupt mode
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
