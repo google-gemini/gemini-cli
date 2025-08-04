@@ -696,77 +696,88 @@ describe('handleAtCommand', () => {
         name: 'comma',
         fileName: 'test.txt',
         fileContent: 'File content here',
-        queryTemplate: (filePath: string) => `Look at @${filePath}, then explain it.`,
+        queryTemplate: (filePath: string) =>
+          `Look at @${filePath}, then explain it.`,
         messageId: 400,
       },
       {
         name: 'period',
         fileName: 'readme.md',
         fileContent: 'File content here',
-        queryTemplate: (filePath: string) => `Check @${filePath}. What does it say?`,
+        queryTemplate: (filePath: string) =>
+          `Check @${filePath}. What does it say?`,
         messageId: 401,
       },
       {
         name: 'semicolon',
         fileName: 'example.js',
         fileContent: 'Code example',
-        queryTemplate: (filePath: string) => `Review @${filePath}; check for bugs.`,
+        queryTemplate: (filePath: string) =>
+          `Review @${filePath}; check for bugs.`,
         messageId: 402,
       },
       {
         name: 'exclamation mark',
         fileName: 'important.txt',
         fileContent: 'Important content',
-        queryTemplate: (filePath: string) => `Look at @${filePath}! This is critical.`,
+        queryTemplate: (filePath: string) =>
+          `Look at @${filePath}! This is critical.`,
         messageId: 403,
       },
       {
         name: 'question mark',
         fileName: 'config.json',
         fileContent: 'Config settings',
-        queryTemplate: (filePath: string) => `What is in @${filePath}? Please explain.`,
+        queryTemplate: (filePath: string) =>
+          `What is in @${filePath}? Please explain.`,
         messageId: 404,
       },
       {
         name: 'opening parenthesis',
         fileName: 'func.ts',
         fileContent: 'Function definition',
-        queryTemplate: (filePath: string) => `Analyze @${filePath}(the main function).`,
+        queryTemplate: (filePath: string) =>
+          `Analyze @${filePath}(the main function).`,
         messageId: 405,
       },
       {
         name: 'closing parenthesis',
         fileName: 'data.json',
         fileContent: 'Test data',
-        queryTemplate: (filePath: string) => `Use data from @${filePath}) for testing.`,
+        queryTemplate: (filePath: string) =>
+          `Use data from @${filePath}) for testing.`,
         messageId: 406,
       },
       {
         name: 'opening square bracket',
         fileName: 'array.js',
         fileContent: 'Array data',
-        queryTemplate: (filePath: string) => `Check @${filePath}[0] for the first element.`,
+        queryTemplate: (filePath: string) =>
+          `Check @${filePath}[0] for the first element.`,
         messageId: 407,
       },
       {
         name: 'closing square bracket',
         fileName: 'list.md',
         fileContent: 'List content',
-        queryTemplate: (filePath: string) => `Review item @${filePath}] from the list.`,
+        queryTemplate: (filePath: string) =>
+          `Review item @${filePath}] from the list.`,
         messageId: 408,
       },
       {
         name: 'opening curly brace',
         fileName: 'object.ts',
         fileContent: 'Object definition',
-        queryTemplate: (filePath: string) => `Parse @${filePath}{prop1: value1}.`,
+        queryTemplate: (filePath: string) =>
+          `Parse @${filePath}{prop1: value1}.`,
         messageId: 409,
       },
       {
         name: 'closing curly brace',
         fileName: 'config.yaml',
         fileContent: 'Configuration',
-        queryTemplate: (filePath: string) => `Use settings from @${filePath}} for deployment.`,
+        queryTemplate: (filePath: string) =>
+          `Use settings from @${filePath}} for deployment.`,
         messageId: 410,
       },
     ];
