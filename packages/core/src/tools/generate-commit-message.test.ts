@@ -11,10 +11,15 @@ import { spawn } from 'child_process';
 import { GeminiClient } from '../core/client.js';
 import { EventEmitter } from 'events';
 
-vi.mock('child_process', () => ({
-  spawn: vi.fn(),
-  exec: vi.fn(),
-}));
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    spawn: vi.fn(),
+    exec: vi.fn(),
+    execFile: vi.fn(),
+  };
+});
 
 vi.mock('../core/client.js', () => ({
   GeminiClient: vi.fn().mockImplementation(() => ({

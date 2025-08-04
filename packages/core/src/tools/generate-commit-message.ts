@@ -4,17 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Type } from '@google/genai';
+import { spawn } from 'child_process';
 import {
   BaseTool,
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
   ToolConfirmationOutcome,
+  Icon,
 } from './tools.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
-import { Type } from '@google/genai';
-import { spawn } from 'child_process';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 
 const COMMIT_ANALYSIS_PROMPT = `Generate a conventional commit message. Output ONLY the commit message text without any formatting, code blocks, or extra text.
@@ -61,7 +62,41 @@ Instructions:
 {{log}}
 \`\`\``;
 
-const COMMIT_CACHE_TIMEOUT_MS = 30000;
+const COMMIT_CACHE_TIMEOUT_MS = 30_000;
+const GIT_INDEX_LOCK_RETRY_DELAY_MS = 500;
+const MAX_COMMIT_RETRIES = 1;
+
+/** Git error patterns and their user-friendly messages */
+const GIT_ERROR_PATTERNS = [
+  {
+    pattern: /not a git repository/i,
+    message: 'This directory is not a Git repository. Please run this command from within a Git repository.',
+  },
+  {
+    pattern: /no changes added to commit/i,
+    message: 'No changes have been staged for commit. Use "git add" to stage changes first.',
+  },
+  {
+    pattern: /nothing to commit/i,
+    message: 'No changes detected. There is nothing to commit.',
+  },
+  {
+    pattern: /index\.lock/i,
+    message: 'Git index is locked. Another git process may be running. Please wait and try again.',
+  },
+  {
+    pattern: /refusing to merge unrelated histories/i,
+    message: 'Cannot merge unrelated Git histories. This may require manual intervention.',
+  },
+  {
+    pattern: /pathspec.*did not match any files/i,
+    message: 'No files match the specified path. Please check the file paths and try again.',
+  },
+  {
+    pattern: /fatal: (could not read|unable to read)/i,
+    message: 'Unable to read Git repository data. The repository may be corrupted.',
+  },
+] as const;
 
 /** Format git error messages with user-friendly descriptions */
 function formatGitError(
@@ -76,39 +111,27 @@ function formatGitError(
     return `${baseError}: No error details available`;
   }
 
-  if (stderr.includes('not a git repository')) {
-    return (
-      'This directory is not a Git repository. ' +
-      'Please run this command from within a Git repository.'
-    );
-  } else if (stderr.includes('no changes added to commit')) {
-    return 'No changes have been staged for commit. Use "git add" to stage changes first.';
-  } else if (stderr.includes('nothing to commit')) {
-    return 'No changes detected. There is nothing to commit.';
-  } else if (stderr.includes('index.lock')) {
-    return 'Git index is locked. Another git process may be running. Please wait and try again.';
-  } else if (stderr.includes('refusing to merge unrelated histories')) {
-    return (
-      'Cannot merge unrelated Git histories. ' +
-      'This may require manual intervention.'
-    );
-  } else if (
-    stderr.includes('pathspec') &&
-    stderr.includes('did not match any files')
-  ) {
-    return (
-      'No files match the specified path. ' +
-      'Please check the file paths and try again.'
-    );
-  } else if (
-    stderr.includes('fatal: could not read') ||
-    stderr.includes('fatal: unable to read')
-  ) {
-    return 'Unable to read Git repository data. The repository may be corrupted.';
-  } else {
-    return `${baseError}: ${stderr.trim()}`;
+  // Check for known error patterns
+  for (const { pattern, message } of GIT_ERROR_PATTERNS) {
+    if (pattern.test(stderr)) {
+      return message;
+    }
   }
+
+  return `${baseError}: ${stderr.trim()}`;
 }
+
+/** Common git spawn errors and their user-friendly messages */
+const SPAWN_ERROR_PATTERNS = [
+  {
+    pattern: /ENOENT/i,
+    message: 'Git is not installed or not found in PATH. Please install Git and try again.',
+  },
+  {
+    pattern: /EACCES/i,
+    message: 'Permission denied when executing git command. Please check file permissions.',
+  },
+] as const;
 
 /** Execute git command with proper error handling and stdin support */
 async function executeGitCommand(
@@ -116,19 +139,19 @@ async function executeGitCommand(
   signal: AbortSignal,
   stdin?: string,
 ): Promise<string | null> {
+  const commandString = `git ${args.join(' ')}`;
+  
   return new Promise((resolve, reject) => {
-    const commandString = `git ${args.join(' ')}`;
-
     try {
       const child = spawn('git', args, { signal, stdio: 'pipe' });
       let stdout = '';
       let stderr = '';
 
-      child.stdout?.on('data', (data) => {
+      child.stdout?.on('data', (data: Buffer) => {
         stdout += data.toString();
       });
 
-      child.stderr?.on('data', (data) => {
+      child.stderr?.on('data', (data: Buffer) => {
         stderr += data.toString();
       });
 
@@ -137,37 +160,28 @@ async function executeGitCommand(
         child.stdin.end();
       }
 
-      child.on('close', (exitCode) => {
+      child.on('close', (exitCode: number | null) => {
         if (exitCode !== 0) {
           const errorMessage = formatGitError(args, exitCode ?? -1, stderr);
-          console.error(
-            `Command failed: ${commandString}, Error: ${errorMessage}`,
-          );
+          console.error(`Command failed: ${commandString}, Error: ${errorMessage}`);
           reject(new Error(errorMessage));
         } else {
           resolve(stdout.trim() || null);
         }
       });
 
-      child.on('error', (err) => {
-        const errorMessage = `Failed to execute git command '${commandString}': ${err.message}`;
-        console.error(`Spawn error: ${errorMessage}`);
+      child.on('error', (err: Error) => {
+        console.error(`Spawn error: Failed to execute git command '${commandString}': ${err.message}`);
 
-        if (err.message.includes('ENOENT')) {
-          reject(
-            new Error(
-              `Git is not installed or not found in PATH. Please install Git and try again.`,
-            ),
-          );
-        } else if (err.message.includes('EACCES')) {
-          reject(
-            new Error(
-              `Permission denied when executing git command. Please check file permissions.`,
-            ),
-          );
-        } else {
-          reject(new Error(errorMessage));
+        // Check for known spawn error patterns
+        for (const { pattern, message } of SPAWN_ERROR_PATTERNS) {
+          if (pattern.test(err.message)) {
+            reject(new Error(message));
+            return;
+          }
         }
+
+        reject(new Error(`Failed to execute git command '${commandString}': ${err.message}`));
       });
     } catch (error) {
       const errorMessage = `Failed to spawn git process: ${
@@ -206,16 +220,16 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     diffOutput: string;
     logOutput: string;
   }> {
-    const [statusOutput, stagedDiff, logOutput] = await Promise.all([
+    const [statusOutput, stagedDiff, logOutput] = await Promise.allSettled([
       executeGitCommand(['status', '--porcelain'], signal),
       executeGitCommand(['diff', '--cached'], signal),
       executeGitCommand(['log', '--oneline', '-10'], signal),
     ]);
 
     return {
-      statusOutput: statusOutput || '',
-      diffOutput: stagedDiff || '',
-      logOutput: logOutput || '',
+      statusOutput: statusOutput.status === 'fulfilled' ? (statusOutput.value ?? '') : '',
+      diffOutput: stagedDiff.status === 'fulfilled' ? (stagedDiff.value ?? '') : '',
+      logOutput: logOutput.status === 'fulfilled' ? (logOutput.value ?? '') : '',
     };
   }
 
@@ -224,6 +238,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       GenerateCommitMessageTool.Name,
       'Generate Commit Message',
       'Executes a git commit workflow: analyzes changes, generates commit message, and creates commit.',
+      Icon.Terminal,
       {
         properties: {},
         required: [],
@@ -441,8 +456,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     // The git state has already been validated by `getOrGenerateCommitMessage`
     // before this function is called, so we can proceed directly to commit.
 
-    const maxRetries = 1;
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    for (let attempt = 0; attempt <= MAX_COMMIT_RETRIES; attempt++) {
       try {
         await executeGitCommand(['commit', '-F', '-'], signal, commitMessage);
 
@@ -457,22 +471,23 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
           throw commitError;
         }
 
+        // Pre-commit hook failures are not retried
         if (/\.git\/hooks\//.test(commitError.message)) {
-          const hookError = new Error(
+          throw new Error(
             `Commit failed due to a pre-commit hook. ` +
               `Please resolve the issues, stage any changes, and try again. ` +
               `Original error: ${commitError.message}`,
           );
-          throw hookError;
         }
 
         const isIndexLockError = commitError.message.includes('index.lock');
 
-        if (!isIndexLockError || attempt === maxRetries) {
+        if (!isIndexLockError || attempt === MAX_COMMIT_RETRIES) {
           throw commitError;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // Wait before retrying index lock errors
+        await new Promise((resolve) => setTimeout(resolve, GIT_INDEX_LOCK_RETRY_DELAY_MS));
       }
     }
     throw new Error('Commit failed after all retry attempts.');
@@ -480,26 +495,24 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
   /** Parse git status output to extract files that will be committed */
   private parseFilesToBeCommitted(statusOutput: string): string[] {
-    const lines = statusOutput.split('\n').filter((line) => line.trim());
-    const files: string[] = [];
-
-    for (const line of lines) {
-      if (line.length < 3) continue;
-
-      const status = line.substring(0, 2);
-      const filename = line.substring(3).trim();
-
-      // Skip unimportant directories
-      if (filename.includes('node_modules/') || filename.includes('.git/'))
-        continue;
-
-      // Include files with staged changes (first character not space or ?)
-      if (status[0] !== ' ' && status[0] !== '?') {
-        files.push(filename);
-      }
-    }
-
-    return files;
+    const IGNORED_PATHS = ['node_modules/', '.git/'] as const;
+    
+    return statusOutput
+      .split('\n')
+      .filter((line) => line.trim() && line.length >= 3)
+      .map((line) => ({
+        status: line.substring(0, 2),
+        filename: line.substring(3).trim(),
+      }))
+      .filter(({ status, filename }) => {
+        // Skip unimportant directories
+        if (IGNORED_PATHS.some((path) => filename.includes(path))) {
+          return false;
+        }
+        // Include files with staged changes (first character not space or ?)
+        return status[0] !== ' ' && status[0] !== '?';
+      })
+      .map(({ filename }) => filename);
   }
 
   /** Generate commit message using Gemini AI with conventional commits format */
