@@ -718,5 +718,57 @@ describe('MCPOAuthProvider', () => {
       expect(capturedUrl!).toContain('scope=read+write');
       expect(capturedUrl!).toContain('resource=https%3A%2F%2Fauth.example.com');
     });
+
+    it('should correctly append parameters to an authorization URL that already has query params', async () => {
+      // Mock to capture the URL that would be opened
+      let capturedUrl: string;
+      vi.mocked(open).mockImplementation((url) => {
+        capturedUrl = url;
+        // Return a minimal mock ChildProcess
+        return Promise.resolve({
+          pid: 1234,
+        } as unknown as import('child_process').ChildProcess);
+      });
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTokenResponse),
+      });
+
+      const configWithParamsInUrl = {
+        ...mockConfig,
+        authorizationUrl: 'https://auth.example.com/authorize?audience=1234',
+      };
+
+      await MCPOAuthProvider.authenticate('test-server', configWithParamsInUrl);
+
+      const url = new URL(capturedUrl!);
+      expect(url.searchParams.get('audience')).toBe('1234');
+      expect(url.searchParams.get('client_id')).toBe('test-client-id');
+      expect(url.search.startsWith('?audience=1234&')).toBe(true);
+    });
   });
 });
