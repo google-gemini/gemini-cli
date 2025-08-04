@@ -607,7 +607,7 @@ function layoutInkElementAsStyledText(
                 addWrappingPartToLines();
                 currentPartWidth = 0;
               }
-              if (part.trim()) {
+              if (part) {
                 // Skip empty parts
                 addToWrappingPart(part, segment.props);
                 currentPartWidth += partWidth;
@@ -709,22 +709,29 @@ function layoutInkElementAsStyledText(
 // This is crucial for maintaining the formatting of structured content
 // while still removing problematic terminal control sequences.
 function sanitize(str: string): string {
-  return (
-    str
-      // Remove ANSI Control Sequence Introducer (CSI) escape sequences used for text formatting in terminals.
-      .replace(
-        /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-ntqry=><~]/g,
-        '',
-      )
-      // Remove Operating System Command (OSC) sequences: ESC ] ... BEL
-      .replace(/\u001b\].*?\u0007/g, '')
-      // Remove C0 control characters (ASCII 0x00–0x1F, 0x7F)
-      // except tab (0x09), newline (0x0A), and carriage return (0x0D)
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-      // Remove characters that were followed by a backspace (\b), simulating backspace deletion
-      .replace(/.\u0008/g, '')
-      // Normalize carriage returns (\r or \r\n) to a single newline (\n)
-      .replace(/\r\n?/g, '\n')
-    // Note: multiple spaces are preserved to retain original spacing structure
-  );
+  // Step 1: Remove ANSI and OSC sequences, control chars, and normalize \r\n to \n
+  let sanitized = str
+    // Remove ANSI Control Sequence Introducer (CSI) escape sequences used for text formatting in terminals.
+    .replace(
+      /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-ntqry=><~]/g,
+      '',
+    )
+    // Remove Operating System Command (OSC) sequences: ESC ] ... BEL
+    .replace(/\u001b\].*?\u0007/g, '')
+    // Remove C0 control characters (ASCII 0x00–0x1F, 0x7F)
+    // except tab (0x09), newline (0x0A), and carriage return (0x0D)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    // Remove characters that were followed by a backspace (\b), simulating backspace deletion
+    .replace(/.\u0008/g, '')
+    // Normalize \r\n to \n (but not standalone \r)
+    .replace(/\r\n/g, '\n');
+
+  // Step 2: Handle standalone \r for line-overwriting (simulate terminal behavior)
+  // For each line, split by \r and keep only the last segment
+  sanitized = sanitized
+    .split('\n')
+    .map((line) => line.split('\r').pop() ?? '')
+    .join('\n');
+
+  return sanitized;
 }
