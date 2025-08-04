@@ -7,7 +7,7 @@
 /** @vitest-environment jsdom */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { renderHook, act, waitFor, waitFor, waitFor } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useCommandCompletion } from './useCommandCompletion.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
