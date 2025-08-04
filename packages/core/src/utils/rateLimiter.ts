@@ -39,8 +39,10 @@ export class RateLimiter {
   private readonly tpm: number;
   private readonly rpd: number;
 
-  private requestTimestamps: number[] = [];
-  private tokenUsage: Array<{ timestamp: number; tokens: number }> = [];
+  private requestsThisMinute = 0;
+  private tokensThisMinute = 0;
+  private minuteStart = Date.now();
+
   private requestsToday = 0;
   private lastDayReset = new Date().setHours(0, 0, 0, 0);
 
@@ -58,47 +60,40 @@ export class RateLimiter {
     this.rpd = limits.rpd;
   }
 
-  private cleanup() {
-    const now = Date.now();
-    const minuteAgo = now - 60 * 1000;
-    this.requestTimestamps = this.requestTimestamps.filter(
-      (ts) => ts > minuteAgo,
-    );
-    this.tokenUsage = this.tokenUsage.filter((tu) => tu.timestamp > minuteAgo);
+  private resetMinute() {
+    this.minuteStart = Date.now();
+    this.requestsThisMinute = 0;
+    this.tokensThisMinute = 0;
+  }
 
-    if (now - this.lastDayReset > 24 * 60 * 60 * 1000) {
-      this.lastDayReset = new Date(now).setHours(0, 0, 0, 0);
-      this.requestsToday = 0;
-    }
+  private resetDay() {
+    this.lastDayReset = new Date().setHours(0, 0, 0, 0);
+    this.requestsToday = 0;
   }
 
   getRetryDelay(tokens: number): number {
-    this.cleanup();
+    const now = Date.now();
 
-    // RPD check
-    if (this.requestsToday >= this.rpd) {
-      const nextDay = this.lastDayReset + 24 * 60 * 60 * 1000;
-      return nextDay - Date.now();
+    if (now - this.lastDayReset > 24 * 60 * 60 * 1000) {
+      this.resetDay();
     }
-
-    // RPM check
-    if (this.requestTimestamps.length >= this.rpm) {
-      const oldestRequest = this.requestTimestamps[0];
-      const timeToWait = oldestRequest + 60 * 1000 - Date.now();
+    if (this.requestsToday >= this.rpd) {
+      const timeToWait = this.lastDayReset + 24 * 60 * 60 * 1000 - now;
       return timeToWait > 0 ? timeToWait : 0;
     }
 
-    // TPM check
-    const currentTokens = this.tokenUsage.reduce(
-      (sum, tu) => sum + tu.tokens,
-      0,
-    );
-    if (currentTokens + tokens > this.tpm) {
-      const oldestTokenUsage = this.tokenUsage[0];
-      if (oldestTokenUsage) {
-        const timeToWait = oldestTokenUsage.timestamp + 60 * 1000 - Date.now();
-        return timeToWait > 0 ? timeToWait : 0;
-      }
+    if (now - this.minuteStart > 60 * 1000) {
+      this.resetMinute();
+    }
+
+    if (this.requestsThisMinute >= this.rpm) {
+      const timeToWait = this.minuteStart + 60 * 1000 - now;
+      return timeToWait > 0 ? timeToWait : 0;
+    }
+
+    if (this.tokensThisMinute + tokens > this.tpm) {
+      const timeToWait = this.minuteStart + 60 * 1000 - now;
+      return timeToWait > 0 ? timeToWait : 0;
     }
 
     return 0;
@@ -106,10 +101,16 @@ export class RateLimiter {
 
   addRequest(tokens: number) {
     const now = Date.now();
-    this.requestTimestamps.push(now);
-    this.tokenUsage.push({ timestamp: now, tokens });
+    if (now - this.minuteStart > 60 * 1000) {
+      this.resetMinute();
+    }
+    if (now - this.lastDayReset > 24 * 60 * 60 * 1000) {
+      this.resetDay();
+    }
+
+    this.requestsThisMinute++;
+    this.tokensThisMinute += tokens;
     this.requestsToday++;
-    this.cleanup();
   }
 }
 
