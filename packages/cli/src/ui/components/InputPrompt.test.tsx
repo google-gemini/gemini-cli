@@ -20,9 +20,9 @@ import {
   UseShellHistoryReturn,
 } from '../hooks/useShellHistory.js';
 import {
-  useSlashCompletion,
-  UseSlashCompletionReturn,
-} from '../hooks/useSlashCompletion.js';
+  useCommandCompletion,
+  UseCommandCompletionReturn,
+} from '../hooks/useCommandCompletion.js';
 import {
   useInputHistory,
   UseInputHistoryReturn,
@@ -31,7 +31,7 @@ import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 
 vi.mock('../hooks/useShellHistory.js');
-vi.mock('../hooks/useSlashCompletion.js');
+vi.mock('../hooks/useCommandCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
 vi.mock('../utils/clipboardUtils.js');
 
@@ -86,13 +86,13 @@ const mockSlashCommands: SlashCommand[] = [
 describe('InputPrompt', () => {
   let props: InputPromptProps;
   let mockShellHistory: UseShellHistoryReturn;
-  let mockSlashCompletion: UseSlashCompletionReturn;
+  let mockSlashCompletion: UseCommandCompletionReturn;
   let mockInputHistory: UseInputHistoryReturn;
   let mockBuffer: TextBuffer;
   let mockCommandContext: CommandContext;
 
   const mockedUseShellHistory = vi.mocked(useShellHistory);
-  const mockedUseSlashCompletion = vi.mocked(useSlashCompletion);
+  const mockedUseSlashCompletion = vi.mocked(useCommandCompletion);
   const mockedUseInputHistory = vi.mocked(useInputHistory);
 
   beforeEach(() => {
