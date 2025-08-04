@@ -14,6 +14,8 @@ import {
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Server as HTTPServer } from 'node:http';
+import { z } from 'zod';
+import { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
@@ -45,20 +47,22 @@ export class IDEServer {
   private server: HTTPServer | undefined;
   private context: vscode.ExtensionContext | undefined;
   private log: (message: string) => void;
+  diffManager: DiffManager;
 
-  constructor(log: (message: string) => void) {
+  constructor(log: (message: string) => void, diffManager: DiffManager) {
     this.log = log;
+    this.diffManager = diffManager;
   }
 
   async start(context: vscode.ExtensionContext) {
     this.context = context;
+    const sessionsWithInitialNotification = new Set<string>();
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } =
       {};
-    const sessionsWithInitialNotification = new Set<string>();
 
     const app = express();
     app.use(express.json());
-    const mcpServer = createMcpServer();
+    const mcpServer = createMcpServer(this.diffManager);
 
     const openFilesManager = new OpenFilesManager(context);
     const onDidChangeSubscription = openFilesManager.onDidChange(() => {
@@ -71,6 +75,14 @@ export class IDEServer {
       }
     });
     context.subscriptions.push(onDidChangeSubscription);
+    const onDidChangeDiffSubscription = this.diffManager.onDidChange(
+      (notification: JSONRPCNotification) => {
+        for (const transport of Object.values(transports)) {
+          transport.send(notification);
+        }
+      },
+    );
+    context.subscriptions.push(onDidChangeDiffSubscription);
 
     app.post('/mcp', async (req: Request, res: Response) => {
       const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
@@ -88,7 +100,6 @@ export class IDEServer {
             transports[newSessionId] = transport;
           },
         });
-
         const keepAlive = setInterval(() => {
           try {
             transport.send({ jsonrpc: '2.0', method: 'ping' });
@@ -212,13 +223,62 @@ export class IDEServer {
   }
 }
 
-const createMcpServer = () => {
+const createMcpServer = (diffManager: DiffManager) => {
   const server = new McpServer(
     {
       name: 'gemini-cli-companion-mcp-server',
       version: '1.0.0',
     },
     { capabilities: { logging: {} } },
+  );
+  server.registerTool(
+    'openDiff',
+    {
+      description:
+        '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejcted.',
+      inputSchema: z.object({
+        filePath: z.string(),
+        // TODO(chrstn): determine if this should be required or not.
+        newContent: z.string().optional(),
+      }).shape,
+    },
+    async ({
+      filePath,
+      newContent,
+    }: {
+      filePath: string;
+      newContent?: string;
+    }) => {
+      await diffManager.showDiff(filePath, newContent ?? '');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Showing diff for ${filePath}`,
+          },
+        ],
+      };
+    },
+  );
+  server.registerTool(
+    'closeDiff',
+    {
+      description: '(IDE Tool) Close an open diff view for a specific file.',
+      inputSchema: z.object({
+        filePath: z.string(),
+      }).shape,
+    },
+    async ({ filePath }: { filePath: string }) => {
+      await diffManager.closeDiff(filePath);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Closed diff for ${filePath}`,
+          },
+        ],
+      };
+    },
   );
   return server;
 };
