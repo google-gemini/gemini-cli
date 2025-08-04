@@ -412,6 +412,24 @@ export const SETTINGS_SCHEMA = {
     description: 'The DNS resolution order.',
     showInDialog: false,
   },
+  excludedProjectEnvVars: {
+    type: 'array',
+    label: 'Excluded Project Environment Variables',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: ['DEBUG', 'DEBUG_MODE'] as string[],
+    description: 'Environment variables to exclude from project context.',
+    showInDialog: false,
+  },
+  disableUpdateNag: {
+    type: 'boolean',
+    label: 'Disable Update Nag',
+    category: 'Updates',
+    requiresRestart: false,
+    default: false,
+    description: 'Disable update notification prompts.',
+    showInDialog: false,
+  },
 } as const;
 
 type InferSettings<T extends SettingsSchema> = {
