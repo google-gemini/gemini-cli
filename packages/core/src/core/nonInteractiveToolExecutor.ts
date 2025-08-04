@@ -64,7 +64,7 @@ export async function executeToolCall(
   try {
     // Directly execute without confirmation or live output handling
     const effectiveAbortSignal = abortSignal ?? new AbortController().signal;
-    const toolResult: ToolResult = await tool.execute(
+    const toolResult: ToolResult = await tool.buildAndExecute(
       toolCallRequest.args,
       effectiveAbortSignal,
       // No live output callback for non-interactive mode
