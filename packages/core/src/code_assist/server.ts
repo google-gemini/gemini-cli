@@ -53,10 +53,16 @@ export class CodeAssistServer implements ContentGenerator {
 
   async generateContentStream(
     req: GenerateContentParameters,
+    userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const resps = await this.requestStreamingPost<CaGenerateContentResponse>(
       'streamGenerateContent',
-      toGenerateContentRequest(req, this.projectId, this.sessionId),
+      toGenerateContentRequest(
+        req,
+        userPromptId,
+        this.projectId,
+        this.sessionId,
+      ),
       req.config?.abortSignal,
     );
     return (async function* (): AsyncGenerator<GenerateContentResponse> {
@@ -68,10 +74,16 @@ export class CodeAssistServer implements ContentGenerator {
 
   async generateContent(
     req: GenerateContentParameters,
+    userPromptId: string,
   ): Promise<GenerateContentResponse> {
     const resp = await this.requestPost<CaGenerateContentResponse>(
       'generateContent',
-      toGenerateContentRequest(req, this.projectId, this.sessionId),
+      toGenerateContentRequest(
+        req,
+        userPromptId,
+        this.projectId,
+        this.sessionId,
+      ),
       req.config?.abortSignal,
     );
     return fromGenerateContentResponse(resp);

@@ -24,6 +24,7 @@ import { CustomTheme } from '../ui/themes/theme.js';
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
+export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
 export function getSystemSettingsPath(): string {
   if (process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH) {
@@ -37,6 +38,12 @@ export function getSystemSettingsPath(): string {
     return '/etc/gemini-cli/settings.json';
   }
 }
+
+export function getWorkspaceSettingsPath(workspaceDir: string): string {
+  return path.join(workspaceDir, SETTINGS_DIRECTORY_NAME, 'settings.json');
+}
+
+export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
 
 export enum SettingScope {
   User = 'User',
@@ -60,6 +67,7 @@ export interface Settings {
   theme?: string;
   customThemes?: Record<string, CustomTheme>;
   selectedAuthType?: AuthType;
+  useExternalAuth?: boolean;
   sandbox?: boolean | string;
   coreTools?: string[];
   excludeTools?: string[];
@@ -108,7 +116,14 @@ export interface Settings {
   // Setting for disabling auto-update.
   disableAutoUpdate?: boolean;
 
+  // Setting for disabling the update nag message.
+  disableUpdateNag?: boolean;
+
   memoryDiscoveryMaxDirs?: number;
+
+  // Environment variables to exclude from project .env files
+  excludedProjectEnvVars?: string[];
+  dnsResolutionOrder?: DnsResolutionOrder;
 }
 
 export interface SettingsError {
@@ -285,15 +300,61 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   }
 }
 
-export function loadEnvironment(): void {
+export function loadEnvironment(settings?: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
+  // Cloud Shell environment variable handling
   if (process.env.CLOUD_SHELL === 'true') {
     setUpCloudShellEnvironment(envFilePath);
   }
 
+  // If no settings provided, try to load workspace settings for exclusions
+  let resolvedSettings = settings;
+  if (!resolvedSettings) {
+    const workspaceSettingsPath = getWorkspaceSettingsPath(process.cwd());
+    try {
+      if (fs.existsSync(workspaceSettingsPath)) {
+        const workspaceContent = fs.readFileSync(
+          workspaceSettingsPath,
+          'utf-8',
+        );
+        const parsedWorkspaceSettings = JSON.parse(
+          stripJsonComments(workspaceContent),
+        ) as Settings;
+        resolvedSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
+      }
+    } catch (_e) {
+      // Ignore errors loading workspace settings
+    }
+  }
+
   if (envFilePath) {
-    dotenv.config({ path: envFilePath, quiet: true });
+    // Manually parse and load environment variables to handle exclusions correctly.
+    // This avoids modifying environment variables that were already set from the shell.
+    try {
+      const envFileContent = fs.readFileSync(envFilePath, 'utf-8');
+      const parsedEnv = dotenv.parse(envFileContent);
+
+      const excludedVars =
+        resolvedSettings?.excludedProjectEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
+      const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
+
+      for (const key in parsedEnv) {
+        if (Object.hasOwn(parsedEnv, key)) {
+          // If it's a project .env file, skip loading excluded variables.
+          if (isProjectEnvFile && excludedVars.includes(key)) {
+            continue;
+          }
+
+          // Load variable only if it's not already set in the environment.
+          if (!Object.hasOwn(process.env, key)) {
+            process.env[key] = parsedEnv[key];
+          }
+        }
+      }
+    } catch (_e) {
+      // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
+    }
   }
 }
 
@@ -302,12 +363,29 @@ export function loadEnvironment(): void {
  * Project settings override user settings.
  */
 export function loadSettings(workspaceDir: string): LoadedSettings {
-  loadEnvironment();
   let systemSettings: Settings = {};
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};
   const settingsErrors: SettingsError[] = [];
   const systemSettingsPath = getSystemSettingsPath();
+
+  // FIX: Resolve paths to their canonical representation to handle symlinks
+  const resolvedWorkspaceDir = path.resolve(workspaceDir);
+  const resolvedHomeDir = path.resolve(homedir());
+
+  let realWorkspaceDir = resolvedWorkspaceDir;
+  try {
+    // fs.realpathSync gets the "true" path, resolving any symlinks
+    realWorkspaceDir = fs.realpathSync(resolvedWorkspaceDir);
+  } catch (_e) {
+    // This is okay. The path might not exist yet, and that's a valid state.
+  }
+
+  // We expect homedir to always exist and be resolvable.
+  const realHomeDir = fs.realpathSync(resolvedHomeDir);
+
+  const workspaceSettingsPath = getWorkspaceSettingsPath(workspaceDir);
+
   // Load system settings
   try {
     if (fs.existsSync(systemSettingsPath)) {
@@ -346,37 +424,35 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     });
   }
 
-  const workspaceSettingsPath = path.join(
-    workspaceDir,
-    SETTINGS_DIRECTORY_NAME,
-    'settings.json',
-  );
-
-  // Load workspace settings
-  try {
-    if (fs.existsSync(workspaceSettingsPath)) {
-      const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
-      const parsedWorkspaceSettings = JSON.parse(
-        stripJsonComments(projectContent),
-      ) as Settings;
-      workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
-      if (workspaceSettings.theme && workspaceSettings.theme === 'VS') {
-        workspaceSettings.theme = DefaultLight.name;
-      } else if (
-        workspaceSettings.theme &&
-        workspaceSettings.theme === 'VS2015'
-      ) {
-        workspaceSettings.theme = DefaultDark.name;
+  // This comparison is now much more reliable.
+  if (realWorkspaceDir !== realHomeDir) {
+    // Load workspace settings
+    try {
+      if (fs.existsSync(workspaceSettingsPath)) {
+        const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
+        const parsedWorkspaceSettings = JSON.parse(
+          stripJsonComments(projectContent),
+        ) as Settings;
+        workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
+        if (workspaceSettings.theme && workspaceSettings.theme === 'VS') {
+          workspaceSettings.theme = DefaultLight.name;
+        } else if (
+          workspaceSettings.theme &&
+          workspaceSettings.theme === 'VS2015'
+        ) {
+          workspaceSettings.theme = DefaultDark.name;
+        }
       }
+    } catch (error: unknown) {
+      settingsErrors.push({
+        message: getErrorMessage(error),
+        path: workspaceSettingsPath,
+      });
     }
-  } catch (error: unknown) {
-    settingsErrors.push({
-      message: getErrorMessage(error),
-      path: workspaceSettingsPath,
-    });
   }
 
-  return new LoadedSettings(
+  // Create LoadedSettings first
+  const loadedSettings = new LoadedSettings(
     {
       path: systemSettingsPath,
       settings: systemSettings,
@@ -391,6 +467,11 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     },
     settingsErrors,
   );
+
+  // Load environment with merged settings
+  loadEnvironment(loadedSettings.merged);
+
+  return loadedSettings;
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {
