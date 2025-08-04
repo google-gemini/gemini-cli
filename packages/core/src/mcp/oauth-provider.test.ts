@@ -722,13 +722,13 @@ describe('MCPOAuthProvider', () => {
     it('should correctly append parameters to an authorization URL that already has query params', async () => {
       // Mock to capture the URL that would be opened
       let capturedUrl: string;
-      vi.mocked(open).mockImplementation((url) => {
-        capturedUrl = url;
+      vi.mocked(open).mockImplementation(((url: string | URL) => {
+        capturedUrl = url.toString();
         // Return a minimal mock ChildProcess
         return Promise.resolve({
           pid: 1234,
-        } as unknown as import('child_process').ChildProcess);
-      });
+        });
+      }) as typeof open);
 
       let callbackHandler: unknown;
       vi.mocked(http.createServer).mockImplementation((handler) => {
@@ -774,13 +774,13 @@ describe('MCPOAuthProvider', () => {
     it('should correctly append parameters to a URL with a fragment', async () => {
       // Mock to capture the URL that would be opened
       let capturedUrl: string;
-      vi.mocked(open).mockImplementation((url) => {
-        capturedUrl = url;
+      vi.mocked(open).mockImplementation(((url: string | URL) => {
+        capturedUrl = url.toString();
         // Return a minimal mock ChildProcess
         return Promise.resolve({
           pid: 1234,
-        } as unknown as import('child_process').ChildProcess);
-      });
+        });
+      }) as typeof open);
 
       let callbackHandler: unknown;
       vi.mocked(http.createServer).mockImplementation((handler) => {
