@@ -31,7 +31,22 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "languages": [
+      {
+        "id": "gemini-diff-editable"
+      }
+    ],
     "commands": [
+      {
+        "command": "gemini.diff.accept",
+        "title": "Gemini CLI: Accept Current Diff",
+        "icon": "$(check)"
+      },
+      {
+        "command": "gemini.diff.cancel",
+        "title": "Cancel",
+        "icon": "$(close)"
+      },
       {
         "command": "gemini-cli.runGeminiCLI",
         "title": "Gemini CLI: Run"
@@ -39,6 +54,42 @@
       {
         "command": "gemini-cli.showNotices",
         "title": "Gemini CLI: View Third-Party Notices"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "gemini.diff.accept",
+          "when": "gemini.diff.isVisible"
+        },
+        {
+          "command": "gemini.diff.cancel",
+          "when": "gemini.diff.isVisible"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "gemini.diff.accept",
+          "when": "gemini.diff.isVisible",
+          "group": "navigation"
+        },
+        {
+          "command": "gemini.diff.cancel",
+          "when": "gemini.diff.isVisible",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "gemini.diff.accept",
+        "key": "ctrl+s",
+        "when": "gemini.diff.isVisible"
+      },
+      {
+        "command": "gemini.diff.accept",
+        "key": "cmd+s",
+        "when": "gemini.diff.isVisible"
       }
     ]
   },
