@@ -234,7 +234,8 @@ export async function parseArguments(): Promise<CliArgs> {
                 type: 'string',
                 choices: ['free', 'tier1', 'tier2', 'tier3'],
                 description: 'Set the rate limit tier.',
-              });
+              })
+              .conflicts('on', 'off');
           },
           (argv) => {
             const settings = loadSettings(process.cwd());
@@ -248,6 +249,7 @@ export async function parseArguments(): Promise<CliArgs> {
 
             if (argv.tier) {
               currentRateLimitSettings.tier = argv.tier as AuthTier;
+              currentRateLimitSettings.enabled = true; // Also enable rate limiting when a tier is set
             }
 
             settings.setValue(
