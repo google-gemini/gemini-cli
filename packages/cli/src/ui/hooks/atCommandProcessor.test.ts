@@ -689,5 +689,397 @@ describe('handleAtCommand', () => {
       `Ignored 1 files:\nGemini-ignored: ${geminiIgnoredFile}`,
     );
   });
-  // });
+
+  describe('punctuation termination in @ commands', () => {
+    const punctuationTestCases = [
+      {
+        name: 'comma',
+        fileName: 'test.txt',
+        fileContent: 'File content here',
+        queryTemplate: (filePath: string) =>
+          `Look at @${filePath}, then explain it.`,
+        messageId: 400,
+      },
+      {
+        name: 'period',
+        fileName: 'readme.md',
+        fileContent: 'File content here',
+        queryTemplate: (filePath: string) =>
+          `Check @${filePath}. What does it say?`,
+        messageId: 401,
+      },
+      {
+        name: 'semicolon',
+        fileName: 'example.js',
+        fileContent: 'Code example',
+        queryTemplate: (filePath: string) =>
+          `Review @${filePath}; check for bugs.`,
+        messageId: 402,
+      },
+      {
+        name: 'exclamation mark',
+        fileName: 'important.txt',
+        fileContent: 'Important content',
+        queryTemplate: (filePath: string) =>
+          `Look at @${filePath}! This is critical.`,
+        messageId: 403,
+      },
+      {
+        name: 'question mark',
+        fileName: 'config.json',
+        fileContent: 'Config settings',
+        queryTemplate: (filePath: string) =>
+          `What is in @${filePath}? Please explain.`,
+        messageId: 404,
+      },
+      {
+        name: 'opening parenthesis',
+        fileName: 'func.ts',
+        fileContent: 'Function definition',
+        queryTemplate: (filePath: string) =>
+          `Analyze @${filePath}(the main function).`,
+        messageId: 405,
+      },
+      {
+        name: 'closing parenthesis',
+        fileName: 'data.json',
+        fileContent: 'Test data',
+        queryTemplate: (filePath: string) =>
+          `Use data from @${filePath}) for testing.`,
+        messageId: 406,
+      },
+      {
+        name: 'opening square bracket',
+        fileName: 'array.js',
+        fileContent: 'Array data',
+        queryTemplate: (filePath: string) =>
+          `Check @${filePath}[0] for the first element.`,
+        messageId: 407,
+      },
+      {
+        name: 'closing square bracket',
+        fileName: 'list.md',
+        fileContent: 'List content',
+        queryTemplate: (filePath: string) =>
+          `Review item @${filePath}] from the list.`,
+        messageId: 408,
+      },
+      {
+        name: 'opening curly brace',
+        fileName: 'object.ts',
+        fileContent: 'Object definition',
+        queryTemplate: (filePath: string) =>
+          `Parse @${filePath}{prop1: value1}.`,
+        messageId: 409,
+      },
+      {
+        name: 'closing curly brace',
+        fileName: 'config.yaml',
+        fileContent: 'Configuration',
+        queryTemplate: (filePath: string) =>
+          `Use settings from @${filePath}} for deployment.`,
+        messageId: 410,
+      },
+    ];
+
+    it.each(punctuationTestCases)(
+      'should terminate @path at $name',
+      async ({ fileName, fileContent, queryTemplate, messageId }) => {
+        const filePath = await createTestFile(
+          path.join(testRootDir, fileName),
+          fileContent,
+        );
+        const query = queryTemplate(filePath);
+
+        const result = await handleAtCommand({
+          query,
+          config: mockConfig,
+          addItem: mockAddItem,
+          onDebugMessage: mockOnDebugMessage,
+          messageId,
+          signal: abortController.signal,
+        });
+
+        expect(result).toEqual({
+          processedQuery: [
+            { text: query },
+            { text: '\n--- Content from referenced files ---' },
+            { text: `\nContent from @${filePath}:\n` },
+            { text: fileContent },
+            { text: '\n--- End of content ---' },
+          ],
+          shouldProceed: true,
+        });
+      },
+    );
+
+    it('should handle multiple @paths terminated by different punctuation', async () => {
+      const content1 = 'First file';
+      const file1Path = await createTestFile(
+        path.join(testRootDir, 'first.txt'),
+        content1,
+      );
+      const content2 = 'Second file';
+      const file2Path = await createTestFile(
+        path.join(testRootDir, 'second.txt'),
+        content2,
+      );
+      const query = `Compare @${file1Path}, @${file2Path}; what's different?`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 411,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [
+          { text: `Compare @${file1Path}, @${file2Path}; what's different?` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${file1Path}:\n` },
+          { text: content1 },
+          { text: `\nContent from @${file2Path}:\n` },
+          { text: content2 },
+          { text: '\n--- End of content ---' },
+        ],
+        shouldProceed: true,
+      });
+    });
+
+    it('should still handle escaped spaces in paths before punctuation', async () => {
+      const fileContent = 'Spaced file content';
+      const filePath = await createTestFile(
+        path.join(testRootDir, 'spaced file.txt'),
+        fileContent,
+      );
+      const escapedPath = path.join(testRootDir, 'spaced\\ file.txt');
+      const query = `Check @${escapedPath}, it has spaces.`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 412,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [
+          { text: `Check @${filePath}, it has spaces.` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${filePath}:\n` },
+          { text: fileContent },
+          { text: '\n--- End of content ---' },
+        ],
+        shouldProceed: true,
+      });
+    });
+
+    it('should not break file paths with periods in extensions', async () => {
+      const fileContent = 'TypeScript content';
+      const filePath = await createTestFile(
+        path.join(testRootDir, 'example.d.ts'),
+        fileContent,
+      );
+      const query = `Analyze @${filePath} for type definitions.`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 413,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [
+          { text: `Analyze @${filePath} for type definitions.` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${filePath}:\n` },
+          { text: fileContent },
+          { text: '\n--- End of content ---' },
+        ],
+        shouldProceed: true,
+      });
+    });
+
+    it('should handle file paths ending with period followed by space', async () => {
+      const fileContent = 'Config content';
+      const filePath = await createTestFile(
+        path.join(testRootDir, 'config.json'),
+        fileContent,
+      );
+      const query = `Check @${filePath}. This file contains settings.`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 414,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [
+          { text: `Check @${filePath}. This file contains settings.` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${filePath}:\n` },
+          { text: fileContent },
+          { text: '\n--- End of content ---' },
+        ],
+        shouldProceed: true,
+      });
+    });
+
+    it('should handle comma termination with complex file paths', async () => {
+      const fileContent = 'Package info';
+      const filePath = await createTestFile(
+        path.join(testRootDir, 'package.json'),
+        fileContent,
+      );
+      const query = `Review @${filePath}, then check dependencies.`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 415,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [
+          { text: `Review @${filePath}, then check dependencies.` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${filePath}:\n` },
+          { text: fileContent },
+          { text: '\n--- End of content ---' },
+        ],
+        shouldProceed: true,
+      });
+    });
+
+    it('should not terminate at period within file name', async () => {
+      const fileContent = 'Version info';
+      const filePath = await createTestFile(
+        path.join(testRootDir, 'version.1.2.3.txt'),
+        fileContent,
+      );
+      const query = `Check @${filePath} contains version information.`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 416,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [
+          { text: `Check @${filePath} contains version information.` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${filePath}:\n` },
+          { text: fileContent },
+          { text: '\n--- End of content ---' },
+        ],
+        shouldProceed: true,
+      });
+    });
+
+    it('should handle end of string termination for period and comma', async () => {
+      const fileContent = 'End file content';
+      const filePath = await createTestFile(
+        path.join(testRootDir, 'end.txt'),
+        fileContent,
+      );
+      const query = `Show me @${filePath}.`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 417,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [
+          { text: `Show me @${filePath}.` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${filePath}:\n` },
+          { text: fileContent },
+          { text: '\n--- End of content ---' },
+        ],
+        shouldProceed: true,
+      });
+    });
+
+    it('should handle files with special characters in names', async () => {
+      const fileContent = 'File with special chars content';
+      const filePath = await createTestFile(
+        path.join(testRootDir, 'file$with&special#chars.txt'),
+        fileContent,
+      );
+      const query = `Check @${filePath} for content.`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 418,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [
+          { text: `Check @${filePath} for content.` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${filePath}:\n` },
+          { text: fileContent },
+          { text: '\n--- End of content ---' },
+        ],
+        shouldProceed: true,
+      });
+    });
+
+    it('should handle basic file names without special characters', async () => {
+      const fileContent = 'Basic file content';
+      const filePath = await createTestFile(
+        path.join(testRootDir, 'basicfile.txt'),
+        fileContent,
+      );
+      const query = `Check @${filePath} please.`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 421,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [
+          { text: `Check @${filePath} please.` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${filePath}:\n` },
+          { text: fileContent },
+          { text: '\n--- End of content ---' },
+        ],
+        shouldProceed: true,
+      });
+    });
+  });
 });
