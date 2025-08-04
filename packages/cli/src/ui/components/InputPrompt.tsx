@@ -15,7 +15,7 @@ import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
-import { useSlashCompletion } from '../hooks/useSlashCompletion.js';
+import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
@@ -78,7 +78,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const shellHistory = useShellHistory(config.getProjectRoot());
   const historyData = shellHistory.history;
 
-  const completion = useSlashCompletion(
+  const completion = useCommandCompletion(
     buffer,
     dirs,
     config.getTargetDir(),
