@@ -33,11 +33,8 @@ import {
 } from './settingsUtils.js';
 
 describe('SettingsUtils', () => {
-  // ============================================================================
-  // SCHEMA UTILITIES TESTS
-  // ============================================================================
-
-  describe('getSettingsByCategory', () => {
+  describe('Schema Utilities', () => {
+    describe('getSettingsByCategory', () => {
     it('should group settings by category', () => {
       const categories = getSettingsByCategory();
 
@@ -255,11 +252,10 @@ describe('SettingsUtils', () => {
     });
   });
 
-  // ============================================================================
-  // BUSINESS LOGIC UTILITIES TESTS
-  // ============================================================================
+  });
 
-  describe('getSettingValue', () => {
+  describe('Business Logic Utilities', () => {
+    describe('getSettingValue', () => {
     it('should return value from settings when set', () => {
       const settings = { showMemoryUsage: true };
       const mergedSettings = { showMemoryUsage: false };
@@ -632,5 +628,6 @@ describe('SettingsUtils', () => {
       );
       expect(result).toBe(false); // Default value
     });
+  });
   });
 });
