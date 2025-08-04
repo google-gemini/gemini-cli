@@ -395,8 +395,14 @@ function layoutInkElementAsStyledText(
 
   // First, lay out the non-wrapping segments
   row.noWrapSegments.forEach((segment) => {
-    nonWrappingContent.push(segment);
-    noWrappingWidth += stringWidth(segment.text);
+    // Apply text sanitization to non-wrapping segments to ensure consistent
+    // handling of control characters and whitespace across all text types.
+    segment.text = sanitize(segment.text);
+
+    if (segment.text) {
+      nonWrappingContent.push(segment);
+      noWrappingWidth += stringWidth(segment.text);
+    }
   });
 
   if (row.segments.length === 0) {
@@ -546,7 +552,77 @@ function layoutInkElementAsStyledText(
     }
   }
 
+  // Detect content that appears to be tabular data based on structural patterns.
+  // This heuristic identifies tables by looking for:
+  // - Multiple consecutive spaces (common in column-aligned data)
+  // - Consistent column structure across multiple lines
+  // - Minimum of 2 lines to establish a pattern
+  //
+  // This is specifically designed to handle cases like curl progress output where
+  // preserving column alignment is critical for readability.
+  function looksLikeTable(text: string): boolean {
+    const lines = text.split('\n').filter((line) => line.trim());
+    if (lines.length < 2) return false;
+
+    // Check if lines have similar structure (multiple spaces between words)
+    const hasMultipleSpaces = lines.every((line) => /\s{2,}/.test(line));
+    const hasConsistentStructure =
+      lines.length >= 2 &&
+      lines[0].split(/\s{2,}/).length === lines[1].split(/\s{2,}/).length;
+
+    return hasMultipleSpaces && hasConsistentStructure;
+  }
+
   row.segments.forEach((segment) => {
+    segment.text = sanitize(segment.text);
+
+    // Special handling for detected tabular content to preserve structure.
+    // This ensures that structured data like curl progress tables maintain their
+    // visual formatting instead of being treated as flowing text.
+    if (looksLikeTable(segment.text)) {
+      const tableLines = segment.text.split('\n');
+      tableLines.forEach((tableLine, lineIndex) => {
+        if (lineIndex > 0 || wrappingPart.length > 0) {
+          addWrappingPartToLines();
+        }
+
+        // For table lines, avoid aggressive word wrapping
+        if (tableLine.trim()) {
+          const lineWidth = stringWidth(tableLine);
+          if (lineWidth <= availableWidth) {
+            // Line fits, add it as-is
+            addToWrappingPart(tableLine, segment.props);
+            wrappingPartWidth += lineWidth;
+          } else {
+            // Line too long, but try to preserve structure by breaking at major gaps
+            const parts = tableLine.split(/(\s{3,})/); // Split on 3+ spaces
+            let currentPartWidth = 0;
+
+            parts.forEach((part) => {
+              const partWidth = stringWidth(part);
+              if (
+                currentPartWidth + partWidth > availableWidth &&
+                currentPartWidth > 0
+              ) {
+                addWrappingPartToLines();
+                currentPartWidth = 0;
+              }
+              if (part.trim()) {
+                // Skip empty parts
+                addToWrappingPart(part, segment.props);
+                currentPartWidth += partWidth;
+              }
+            });
+          }
+        }
+      });
+
+      if (segment.text.endsWith('\n')) {
+        addWrappingPartToLines();
+      }
+      return;
+    }
+
     const linesFromSegment = segment.text.split('\n');
 
     linesFromSegment.forEach((lineText, lineIndex) => {
@@ -621,4 +697,34 @@ function layoutInkElementAsStyledText(
   for (const line of lines) {
     output.push(line);
   }
+}
+
+// Improved text sanitization that preserves structural whitespace.
+// Key improvements:
+// 1. More careful about preserving tabs, newlines, and carriage returns
+// 2. Converts \r\n and \r to consistent \n for cross-platform compatibility
+// 3. Preserves multiple spaces that might be structural (like table columns)
+// 4. More targeted removal of only harmful control characters
+//
+// This is crucial for maintaining the formatting of structured content
+// while still removing problematic terminal control sequences.
+function sanitize(str: string): string {
+  return (
+    str
+      // Remove ANSI Control Sequence Introducer (CSI) escape sequences used for text formatting in terminals.
+      .replace(
+        /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-ntqry=><~]/g,
+        '',
+      )
+      // Remove Operating System Command (OSC) sequences: ESC ] ... BEL
+      .replace(/\u001b\].*?\u0007/g, '')
+      // Remove C0 control characters (ASCII 0x00–0x1F, 0x7F)
+      // except tab (0x09), newline (0x0A), and carriage return (0x0D)
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+      // Remove characters that were followed by a backspace (\b), simulating backspace deletion
+      .replace(/.\u0008/g, '')
+      // Normalize carriage returns (\r or \r\n) to a single newline (\n)
+      .replace(/\r\n?/g, '\n')
+    // Note: multiple spaces are preserved to retain original spacing structure
+  );
 }
