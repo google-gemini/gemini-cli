@@ -14,6 +14,13 @@ const TMP_DIR_NAME = 'tmp';
 const COMMANDS_DIR_NAME = 'commands';
 
 /**
+ * Special characters that need to be escaped in file paths for shell compatibility.
+ * Includes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
+ * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
+ */
+export const SHELL_SPECIAL_CHARS = /[ ()[\]{};|*?$`'"#&<>!~]/;
+
+/**
  * Replaces the home directory with a tilde.
  * @param path - The path to tildeify.
  * @returns The tildeified path.
@@ -119,26 +126,35 @@ export function makeRelative(
 }
 
 /**
- * Escapes spaces in a file path.
+ * Escapes special characters in a file path like macOS terminal does.
+ * Escapes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
+ * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
  */
 export function escapePath(filePath: string): string {
   let result = '';
   for (let i = 0; i < filePath.length; i++) {
-    // Only escape spaces that are not already escaped.
-    if (filePath[i] === ' ' && (i === 0 || filePath[i - 1] !== '\\')) {
-      result += '\\ ';
+    const char = filePath[i];
+    const isAlreadyEscaped = i > 0 && filePath[i - 1] === '\\';
+
+    // Only escape if not already escaped
+    if (!isAlreadyEscaped && SHELL_SPECIAL_CHARS.test(char)) {
+      result += '\\' + char;
     } else {
-      result += filePath[i];
+      result += char;
     }
   }
   return result;
 }
 
 /**
- * Unescapes spaces in a file path.
+ * Unescapes special characters in a file path.
+ * Removes backslash escaping from shell metacharacters.
  */
 export function unescapePath(filePath: string): string {
-  return filePath.replace(/\\ /g, ' ');
+  return filePath.replace(
+    new RegExp(`\\\\([${SHELL_SPECIAL_CHARS.source.slice(1, -1)}])`, 'g'),
+    '$1',
+  );
 }
 
 /**
