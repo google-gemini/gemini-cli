@@ -30,6 +30,7 @@ import { Header } from './components/Header.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
 import { AutoAcceptIndicator } from './components/AutoAcceptIndicator.js';
 import { ShellModeIndicator } from './components/ShellModeIndicator.js';
+import { InterruptModeIndicator } from './components/InterruptModeIndicator.js';
 import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
@@ -601,13 +602,17 @@ const App = ({
       }
       handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
     } else if (key.ctrl && (input === 'n' || input === 'N')) {
-      if (!interruptModeEnabled) {
-        setInterruptModeEnabled(true);
-        addItem(
-          { type: MessageType.INFO, text: 'Interrupt mode enabled.' },
-          Date.now(),
-        );
-      }
+      const newValue = !interruptModeEnabled;
+      setInterruptModeEnabled(newValue);
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: newValue
+            ? 'Interrupt mode enabled.'
+            : 'Interrupt mode disabled.',
+        },
+        Date.now(),
+      );
     } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
       setConstrainHeight(false);
     }
@@ -990,6 +995,9 @@ const App = ({
                         approvalMode={showAutoAcceptIndicator}
                       />
                     )}
+                  {interruptModeEnabled && !shellModeActive && (
+                    <InterruptModeIndicator />
+                  )}
                   {shellModeActive && <ShellModeIndicator />}
                 </Box>
               </Box>
