@@ -10,6 +10,13 @@ import { A2AClientManager } from './a2a-client.js';
 import { A2AToolFunctions, LoadAgentInputSchema } from './tools.js';
 import { A2AToolRegistry } from './a2a-tool-registry.js';
 
+// This interface should eventually match the one in settings.ts
+interface A2AServerConfig {
+  url: string;
+  accessToken?: string;
+  agent_card_path?: string;
+}
+
 /**
  * This script implements a standalone MCP server that communicates over stdio.
  * It exposes the A2A protocol tools to the Gemini CLI.
@@ -43,6 +50,41 @@ async function main() {
     },
     toolImplementations.list_agents.bind(toolImplementations),
   );
+
+  // Auto-load agents if provided via command-line argument
+  const args = process.argv.slice(2);
+  const agentFlagIndex = args.indexOf('--agents');
+
+  if (agentFlagIndex !== -1 && args[agentFlagIndex + 1]) {
+    try {
+      const agentConfigs: A2AServerConfig[] = JSON.parse(
+        args[agentFlagIndex + 1],
+      );
+
+      console.error('A2A Server: Parsed agent configs:', agentConfigs);
+
+      console.error(
+        `A2A Server: Found ${agentConfigs.length} agents to auto-load.`,
+      );
+
+      const loadingPromises = agentConfigs.map((agent) => {
+        console.error(`A2A Server: Auto-loading agent from ${agent.url}`);
+        // Note: accessToken is not used yet, but is available for future use.
+        return toolImplementations.load_agent({
+          url: agent.url,
+          agent_card_path: agent.agent_card_path,
+        });
+      });
+
+      await Promise.all(loadingPromises);
+
+      // This will print out to console.error() the agents
+      await toolImplementations.list_agents();
+    } catch (e) {
+      const error = e as Error;
+      console.error(`A2A Server: Error loading agents: ${error.message}`);
+    }
+  }
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
