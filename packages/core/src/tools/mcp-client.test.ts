@@ -23,6 +23,11 @@ import { PromptRegistry } from '../prompts/prompt-registry.js';
 
 import { DiscoveredMCPTool } from './mcp-tool.js';
 
+// Mock GoogleCredentialProvider to avoid needing real scopes
+vi.mock('../mcp/google-auth-provider', () => ({
+  GoogleCredentialProvider: vi.fn().mockImplementation(() => ({})),
+}));
+
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 vi.mock('@google/genai');
@@ -195,6 +200,24 @@ describe('mcp-client', () => {
   });
 
   describe('createTransport', () => {
+    it('should forward custom headers with Google Credentials provider', async () => {
+      const transport = await createTransport(
+        'gc-server',
+        {
+          httpUrl: 'http://gc-server',
+          headers: { 'X-Test': 'abc' },
+          authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+        },
+        false,
+      );
+
+      expect(transport).toEqual(
+        new StreamableHTTPClientTransport(new URL('http://gc-server'), {
+          requestInit: { headers: { 'X-Test': 'abc' } },
+          authProvider: expect.anything(),
+        }),
+      );
+    });
     const originalEnv = process.env;
 
     beforeEach(() => {

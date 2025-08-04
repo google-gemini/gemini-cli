@@ -936,7 +936,16 @@ export async function createTransport(
       | StreamableHTTPClientTransportOptions
       | SSEClientTransportOptions = {
       authProvider: provider,
-    };
+    } as StreamableHTTPClientTransportOptions | SSEClientTransportOptions;
+
+    // Forward custom headers, if any, even when OAuth is not used
+    if (mcpServerConfig.headers) {
+      (transportOptions as StreamableHTTPClientTransportOptions).requestInit = {
+        headers: {
+          ...mcpServerConfig.headers,
+        },
+      };
+    }
     if (mcpServerConfig.httpUrl) {
       return new StreamableHTTPClientTransport(
         new URL(mcpServerConfig.httpUrl),
