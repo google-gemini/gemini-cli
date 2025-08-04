@@ -106,7 +106,12 @@ describe('useSlashCompletion', () => {
         ] as unknown as SlashCommand[];
 
         const { result } = renderHook(() =>
-          useSlashCompletion(true, query, mockSlashCommands, mockCommandContext),
+          useSlashCompletion(
+            true,
+            query,
+            mockSlashCommands,
+            mockCommandContext,
+          ),
         );
 
         expect(result.current.suggestions).toHaveLength(0);
@@ -129,7 +134,12 @@ describe('useSlashCompletion', () => {
         { name: 'help', description: 'Show help' },
       ] as unknown as SlashCommand[];
       const { result } = renderHook(() =>
-        useSlashCompletion(true, '/unknown-command', slashCommands, mockCommandContext),
+        useSlashCompletion(
+          true,
+          '/unknown-command',
+          slashCommands,
+          mockCommandContext,
+        ),
       );
 
       expect(result.current.suggestions).toHaveLength(0);
@@ -198,7 +208,12 @@ describe('useSlashCompletion', () => {
         },
       ] as unknown as SlashCommand[];
       const { result } = renderHook(() =>
-        useSlashCompletion(true, '/memory a', slashCommands, mockCommandContext),
+        useSlashCompletion(
+          true,
+          '/memory a',
+          slashCommands,
+          mockCommandContext,
+        ),
       );
 
       expect(result.current.suggestions).toEqual([
@@ -218,7 +233,12 @@ describe('useSlashCompletion', () => {
         },
       ] as unknown as SlashCommand[];
       const { result } = renderHook(() =>
-        useSlashCompletion(true, '/memory dothisnow', slashCommands, mockCommandContext),
+        useSlashCompletion(
+          true,
+          '/memory dothisnow',
+          slashCommands,
+          mockCommandContext,
+        ),
       );
 
       expect(result.current.suggestions).toHaveLength(0);
@@ -266,7 +286,10 @@ describe('useSlashCompletion', () => {
         await new Promise((resolve) => setTimeout(resolve, 150));
       });
 
-      expect(mockCompletionFn).toHaveBeenCalledWith(mockCommandContext, 'my-ch');
+      expect(mockCompletionFn).toHaveBeenCalledWith(
+        mockCommandContext,
+        'my-ch',
+      );
       expect(result.current.suggestions).toEqual([
         { label: 'my-chat-tag-1', value: 'my-chat-tag-1' },
         { label: 'my-chat-tag-2', value: 'my-chat-tag-2' },
@@ -293,7 +316,12 @@ describe('useSlashCompletion', () => {
       ] as unknown as SlashCommand[];
 
       const { result } = renderHook(() =>
-        useSlashCompletion(true, '/chat resume ', slashCommands, mockCommandContext),
+        useSlashCompletion(
+          true,
+          '/chat resume ',
+          slashCommands,
+          mockCommandContext,
+        ),
       );
 
       await act(async () => {
@@ -321,7 +349,12 @@ describe('useSlashCompletion', () => {
       ] as unknown as SlashCommand[];
 
       const { result } = renderHook(() =>
-        useSlashCompletion(true, '/chat resume ', slashCommands, mockCommandContext),
+        useSlashCompletion(
+          true,
+          '/chat resume ',
+          slashCommands,
+          mockCommandContext,
+        ),
       );
 
       await act(async () => {

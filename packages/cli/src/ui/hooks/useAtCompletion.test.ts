@@ -43,10 +43,7 @@ describe('useAtCompletion', () => {
         'file.txt': '',
         src: {
           'index.js': '',
-          components: [
-            'Button.tsx',
-            'Button with spaces.tsx',
-          ],
+          components: ['Button.tsx', 'Button with spaces.tsx'],
         },
       };
       testRootDir = await createTmpDir(structure);
@@ -140,7 +137,8 @@ describe('useAtCompletion', () => {
       testRootDir = await createTmpDir(structure);
 
       const { result, rerender } = renderHook(
-        ({ pattern }) => useAtCompletion(true, pattern, mockConfig, testRootDir),
+        ({ pattern }) =>
+          useAtCompletion(true, pattern, mockConfig, testRootDir),
         { initialProps: { pattern: 'a' } },
       );
 
@@ -169,15 +167,16 @@ describe('useAtCompletion', () => {
 
       // Spy on the search method to introduce an artificial delay
       const originalSearch = FileSearch.prototype.search;
-      vi.spyOn(FileSearch.prototype, 'search').mockImplementation(async function (
-        ...args
-      ) {
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        return originalSearch.apply(this, args);
-      });
+      vi.spyOn(FileSearch.prototype, 'search').mockImplementation(
+        async function (...args) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          return originalSearch.apply(this, args);
+        },
+      );
 
       const { result, rerender } = renderHook(
-        ({ pattern }) => useAtCompletion(true, pattern, mockConfig, testRootDir),
+        ({ pattern }) =>
+          useAtCompletion(true, pattern, mockConfig, testRootDir),
         { initialProps: { pattern: 'a' } },
       );
 
@@ -227,7 +226,8 @@ describe('useAtCompletion', () => {
         });
 
       const { result, rerender } = renderHook(
-        ({ pattern }) => useAtCompletion(true, pattern, mockConfig, testRootDir),
+        ({ pattern }) =>
+          useAtCompletion(true, pattern, mockConfig, testRootDir),
         { initialProps: { pattern: 'a' } },
       );
 

@@ -5,8 +5,11 @@
  */
 
 import { useEffect, useReducer, useRef } from 'react';
-import { Config, FileSearch , escapePath } from '@google/gemini-cli-core';
-import { Suggestion , MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
+import { Config, FileSearch, escapePath } from '@google/gemini-cli-core';
+import {
+  Suggestion,
+  MAX_SUGGESTIONS_TO_SHOW,
+} from '../components/SuggestionsDisplay.js';
 
 export enum AtCompletionStatus {
   IDLE = 'idle',
@@ -45,7 +48,11 @@ function atCompletionReducer(
 ): AtCompletionState {
   switch (action.type) {
     case 'INITIALIZE':
-      return { ...state, status: AtCompletionStatus.INITIALIZING, isLoading: true };
+      return {
+        ...state,
+        status: AtCompletionStatus.INITIALIZING,
+        isLoading: true,
+      };
     case 'INITIALIZE_SUCCESS':
       return { ...state, status: AtCompletionStatus.READY, isLoading: false };
     case 'SEARCH':
@@ -69,7 +76,12 @@ function atCompletionReducer(
       }
       return state;
     case 'ERROR':
-      return { ...state, status: AtCompletionStatus.ERROR, isLoading: false, suggestions: [] };
+      return {
+        ...state,
+        status: AtCompletionStatus.ERROR,
+        isLoading: false,
+        suggestions: [],
+      };
     case 'RESET':
       return { ...state, suggestions: [], isLoading: false, pattern: null };
     default:
@@ -121,8 +133,10 @@ export function useAtCompletion(
         const searcher = new FileSearch({
           projectRoot: cwd,
           ignoreDirs: [],
-          useGitignore: config?.getFileFilteringOptions()?.respectGitIgnore ?? true,
-          useGeminiignore: config?.getFileFilteringOptions()?.respectGeminiIgnore ?? true,
+          useGitignore:
+            config?.getFileFilteringOptions()?.respectGitIgnore ?? true,
+          useGeminiignore:
+            config?.getFileFilteringOptions()?.respectGeminiIgnore ?? true,
           cache: true,
           cacheTtl: 3600,
         });
@@ -145,7 +159,7 @@ export function useAtCompletion(
       if (slowSearchTimer.current) {
         clearTimeout(slowSearchTimer.current);
       }
-      
+
       const controller = new AbortController();
       searchAbortController.current = controller;
 
@@ -158,7 +172,7 @@ export function useAtCompletion(
           signal: controller.signal,
           maxResults: MAX_SUGGESTIONS_TO_SHOW * 3,
         });
-        
+
         if (slowSearchTimer.current) {
           clearTimeout(slowSearchTimer.current);
         }
@@ -167,7 +181,10 @@ export function useAtCompletion(
           return;
         }
 
-        const suggestions = results.map((p) => ({ label: p, value: escapePath(p) }));
+        const suggestions = results.map((p) => ({
+          label: p,
+          value: escapePath(p),
+        }));
         dispatch({ type: 'SEARCH_SUCCESS', payload: suggestions });
       } catch (error) {
         if (!(error instanceof Error && error.name === 'AbortError')) {

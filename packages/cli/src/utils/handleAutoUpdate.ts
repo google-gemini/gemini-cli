@@ -22,6 +22,10 @@ export function handleAutoUpdate(
     return;
   }
 
+  if (settings.merged.disableUpdateNag) {
+    return;
+  }
+
   const installationInfo = getInstallationInfo(
     projectRoot,
     settings.merged.disableAutoUpdate ?? false,

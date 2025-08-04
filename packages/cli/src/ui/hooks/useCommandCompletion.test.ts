@@ -8,10 +8,11 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useCompletion } from './useCompletion.js';
+import { useCommandCompletion } from './useCommandCompletion.js';
 import { CommandContext } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
+import { useCommandCompletion } from './useCommandCompletion.js';
 
 vi.mock('./useAtCompletion', () => ({
   useAtCompletion: vi.fn(() => ({
@@ -33,7 +34,7 @@ vi.mock('./useSlashCompletion', () => ({
 import { useAtCompletion } from './useAtCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
 
-describe('useCompletion', () => {
+describe('useCommandCompletion', () => {
   const mockCommandContext = {} as CommandContext;
   const mockConfig = {} as Config;
   const testDirs: string[] = [];
@@ -62,12 +63,13 @@ describe('useCompletion', () => {
     describe('State Management', () => {
       it('should initialize with default state', () => {
         const { result } = renderHook(() =>
-          useCompletion(
+          useCommandCompletion(
             useTextBufferForTest(''),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
             mockConfig,
           ),
         );
@@ -87,12 +89,13 @@ describe('useCompletion', () => {
 
         const { result } = renderHook(() => {
           const textBuffer = useTextBufferForTest('@file');
-          const completion = useCompletion(
+          const completion = useCommandCompletion(
             textBuffer,
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
             mockConfig,
           );
           return { completion, textBuffer };
@@ -105,7 +108,11 @@ describe('useCompletion', () => {
 
         // Rerender with text that is not a completion trigger
         act(() => {
-          result.current.textBuffer.replaceRangeByOffset(0, 5, 'just some text');
+          result.current.textBuffer.replaceRangeByOffset(
+            0,
+            5,
+            'just some text',
+          );
         });
 
         expect(result.current.completion.showSuggestions).toBe(false);
@@ -113,12 +120,13 @@ describe('useCompletion', () => {
 
       it('should reset all state to default values', () => {
         const { result } = renderHook(() =>
-          useCompletion(
+          useCommandCompletion(
             useTextBufferForTest('@files'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
             mockConfig,
           ),
         );
@@ -140,12 +148,13 @@ describe('useCompletion', () => {
       it('should call useAtCompletion with the correct query for an escaped space', () => {
         const text = '@src/a\\ file.txt';
         renderHook(() =>
-          useCompletion(
+          useCommandCompletion(
             useTextBufferForTest(text),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
             mockConfig,
           ),
         );
@@ -163,12 +172,13 @@ describe('useCompletion', () => {
         const cursorOffset = 3; // @fi|le1 @file2
 
         renderHook(() =>
-          useCompletion(
+          useCommandCompletion(
             useTextBufferForTest(text, cursorOffset),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
             mockConfig,
           ),
         );
@@ -180,8 +190,6 @@ describe('useCompletion', () => {
           testRootDir,
         );
       });
-
-      
     });
 
     describe('Navigation', () => {
@@ -208,12 +216,13 @@ describe('useCompletion', () => {
         });
 
         const { result } = renderHook(() =>
-          useCompletion(
+          useCommandCompletion(
             useTextBufferForTest('/'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
             mockConfig,
           ),
         );
@@ -231,12 +240,13 @@ describe('useCompletion', () => {
           isLoadingSuggestions: false,
         });
         const { result } = renderHook(() =>
-          useCompletion(
+          useCommandCompletion(
             useTextBufferForTest('/'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
             mockConfig,
           ),
         );
@@ -250,12 +260,13 @@ describe('useCompletion', () => {
 
       it('should navigate up through suggestions with wrap-around', () => {
         const { result } = renderHook(() =>
-          useCompletion(
+          useCommandCompletion(
             useTextBufferForTest('/'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
             mockConfig,
           ),
         );
@@ -273,12 +284,13 @@ describe('useCompletion', () => {
 
       it('should navigate down through suggestions with wrap-around', () => {
         const { result } = renderHook(() =>
-          useCompletion(
+          useCommandCompletion(
             useTextBufferForTest('/'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
             mockConfig,
           ),
         );
@@ -298,12 +310,13 @@ describe('useCompletion', () => {
 
       it('should handle navigation with multiple suggestions', () => {
         const { result } = renderHook(() =>
-          useCompletion(
+          useCommandCompletion(
             useTextBufferForTest('/'),
             testDirs,
             testRootDir,
             [],
             mockCommandContext,
+            false,
             mockConfig,
           ),
         );
@@ -334,12 +347,13 @@ describe('useCompletion', () => {
               suggestions,
               isLoadingSuggestions: false,
             });
-            return useCompletion(
+            return useCommandCompletion(
               useTextBufferForTest('/'),
               testDirs,
               testRootDir,
               [],
               mockCommandContext,
+              false,
               mockConfig,
             );
           },
@@ -367,12 +381,13 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() => {
         const textBuffer = useTextBufferForTest('/mem');
-        const completion = useCompletion(
+        const completion = useCommandCompletion(
           textBuffer,
           testDirs,
           testRootDir,
           [],
           mockCommandContext,
+          false,
           mockConfig,
         );
         return { ...completion, textBuffer };
@@ -393,12 +408,13 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() => {
         const textBuffer = useTextBufferForTest('@src/fi');
-        const completion = useCompletion(
+        const completion = useCommandCompletion(
           textBuffer,
           testDirs,
           testRootDir,
           [],
           mockCommandContext,
+          false,
           mockConfig,
         );
         return { ...completion, textBuffer };
@@ -408,7 +424,7 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(result.current.textBuffer.text).toBe('@src/file1.txt');
+      expect(result.current.textBuffer.text).toBe('@src/file1.txt ');
     });
 
     it('should complete a file path when cursor is not at the end of the line', () => {
@@ -422,12 +438,13 @@ describe('useCompletion', () => {
 
       const { result } = renderHook(() => {
         const textBuffer = useTextBufferForTest(text, cursorOffset);
-        const completion = useCompletion(
+        const completion = useCommandCompletion(
           textBuffer,
           testDirs,
           testRootDir,
           [],
           mockCommandContext,
+          false,
           mockConfig,
         );
         return { ...completion, textBuffer };
@@ -437,7 +454,9 @@ describe('useCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(result.current.textBuffer.text).toBe('@src/file1.txt is a good file');
+      expect(result.current.textBuffer.text).toBe(
+        '@src/file1.txt  is a good file',
+      );
     });
   });
 });
