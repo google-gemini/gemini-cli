@@ -1,5 +1,3 @@
-# .github/workflows/ci.yml
-
 name: Gemini CLI CI
 
 on:
