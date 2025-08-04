@@ -157,7 +157,7 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
           expect(global.fetch).toHaveBeenCalledTimes(2);
           expect(global.fetch).toHaveBeenNthCalledWith(
             2,
-            'https://test-workspace.databricks.com/api/2.0/serving-endpoints/list?page_token=page-2-token',
+            'https://test-workspace.databricks.com/api/2.0/serving-endpoints?page_token=page-2-token',
             expect.any(Object)
           );
         });
@@ -176,7 +176,7 @@ describe('Databricks Endpoint Discovery - Detroit School TDD Tests', () => {
           await discoverDatabricksEndpoints();
           
           expect(global.fetch).toHaveBeenCalledWith(
-            'https://test-workspace.databricks.com/api/2.0/serving-endpoints/list',
+            'https://test-workspace.databricks.com/api/2.0/serving-endpoints',
             {
               headers: {
                 'Authorization': 'Bearer test-pat-token',

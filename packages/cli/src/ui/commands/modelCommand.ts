@@ -31,7 +31,7 @@ let cacheExpiry = 0;
 type Handler = (context: CommandContext, args: string) => Promise<MessageActionReturn>;
 
 // Helper to get Databricks endpoints with caching
-async function getDatabricksEndpoints(forceRefresh = false): Promise<{ endpoints: string[], isError: boolean }> {
+async function getDatabricksEndpoints(forceRefresh = false): Promise<{ endpoints: string[], isError: boolean, errorMessage?: string }> {
   const now = Date.now();
   
   if (!forceRefresh && cachedEndpoints && now < cacheExpiry) {
@@ -43,11 +43,17 @@ async function getDatabricksEndpoints(forceRefresh = false): Promise<{ endpoints
     cachedEndpoints = endpoints;
     cacheExpiry = now + 5 * 60 * 1000; // Cache for 5 minutes
     return { endpoints, isError: false };
-  } catch {
+  } catch (error) {
+    // Log error details for debugging
+    if (process.env.DBX_DEBUG) {
+      console.error('[Model Command] Failed to fetch endpoints:', error);
+    }
+    
     // Return cached data if available, otherwise fallback
     return { 
       endpoints: cachedEndpoints || DATABRICKS_MODELS_FALLBACK.slice(),
-      isError: true 
+      isError: true,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 }
@@ -84,7 +90,7 @@ const handleList: Handler = async (context) => {
   const authType = context.services.settings.merged.selectedAuthType || AuthType.USE_GEMINI;
   
   if (authType === AuthType.USE_DATABRICKS) {
-    const { endpoints, isError } = await getDatabricksEndpoints();
+    const { endpoints, isError, errorMessage } = await getDatabricksEndpoints();
     
     if (endpoints.length === 0) {
       return {
@@ -97,10 +103,26 @@ const handleList: Handler = async (context) => {
     const models = endpoints.join('\n  - ');
     
     if (isError) {
+      let content = `Failed to fetch endpoints from workspace. Showing cached models:\n  - ${models}`;
+      
+      // Add specific error guidance
+      if (errorMessage?.includes('credentials not configured')) {
+        content += '\n\nTip: Make sure DATABRICKS_URL and DBX_PAT environment variables are set.';
+      } else if (errorMessage?.includes('401') || errorMessage?.includes('Authentication failed')) {
+        content += '\n\nTip: Your PAT token may be invalid or expired. Check your DBX_PAT environment variable.';
+      } else if (errorMessage?.includes('403') || errorMessage?.includes('Permission denied')) {
+        content += '\n\nTip: Your user lacks permission to list serving endpoints in this workspace.';
+      } else if (errorMessage?.includes('429') || errorMessage?.includes('Rate limit')) {
+        content += '\n\nTip: Rate limit exceeded. Please try again in a few minutes.';
+      }
+      
+      // Add debug mode hint
+      content += '\n\nRun with DBX_DEBUG=1 for more details.';
+      
       return {
         type: 'message',
         messageType: 'error',
-        content: `Failed to fetch endpoints from workspace. Showing cached models:\n  - ${models}`,
+        content,
       };
     }
     
@@ -180,19 +202,49 @@ const handleSet: Handler = async (context, args) => {
   };
 };
 
+const handleRefresh: Handler = async (context) => {
+  const authType = context.services.settings.merged.selectedAuthType || AuthType.USE_GEMINI;
+  
+  if (authType !== AuthType.USE_DATABRICKS) {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: 'Refresh is only available for Databricks provider',
+    };
+  }
+  
+  const { endpoints, isError, errorMessage } = await getDatabricksEndpoints(true);
+  
+  if (isError) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Failed to refresh endpoints: ${errorMessage || 'Unknown error'}\n\nRun with DBX_DEBUG=1 for more details.`,
+    };
+  }
+  
+  return {
+    type: 'message',
+    messageType: 'info',
+    content: `Successfully refreshed Databricks endpoints. Found ${endpoints.length} models.`,
+  };
+};
+
 const showHelp = (): MessageActionReturn => ({
     type: 'message',
     messageType: 'info',
     content: `Available subcommands:
   - /model show - Display current model and provider
   - /model list - List available models for current provider
-  - /model set <model-name> - Set the model to use`,
+  - /model set <model-name> - Set the model to use
+  - /model refresh - Refresh Databricks endpoint list from workspace`,
   });
 
 const subcommandHandlers: Record<string, Handler> = {
   show: handleShow,
   list: handleList,
   set: handleSet,
+  refresh: handleRefresh,
 };
 
 export const modelCommand: SlashCommand = {

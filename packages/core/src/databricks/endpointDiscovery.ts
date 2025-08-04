@@ -50,8 +50,8 @@ export async function discoverDatabricksEndpoints(options: DiscoveryOptions = {}
     // Fetch all pages
     do {
       const url = pageToken 
-        ? `${databricksUrl}/api/2.0/serving-endpoints/list?page_token=${pageToken}`
-        : `${databricksUrl}/api/2.0/serving-endpoints/list`;
+        ? `${databricksUrl}/api/2.0/serving-endpoints?page_token=${pageToken}`
+        : `${databricksUrl}/api/2.0/serving-endpoints`;
         
       const response = await fetch(url, {
         headers: {
@@ -94,6 +94,9 @@ export async function discoverDatabricksEndpoints(options: DiscoveryOptions = {}
     return readyEndpoints;
     
   } catch (error) {
+    // Log the actual error for debugging
+    console.error('[Databricks] Endpoint discovery error:', error);
+    
     if (error instanceof Error && error.message.includes('Network')) {
       throw new Error(`Failed to fetch endpoints: ${error.message}`);
     }

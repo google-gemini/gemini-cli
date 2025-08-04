@@ -17,12 +17,14 @@ import {
   getCurrentGeminiMdFilename,
   ApprovalMode,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_DATABRICKS_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
   TelemetryTarget,
   FileFilteringOptions,
   IdeClient,
+  AuthType,
 } from '@dbx-cli/core';
 import { Settings } from './settings.js';
 
@@ -79,7 +81,8 @@ export async function parseArguments(): Promise<CliArgs> {
       alias: 'm',
       type: 'string',
       description: `Model`,
-      default: process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
+      // Note: The actual default is determined in loadCliConfig based on auth type
+      default: undefined,
     })
     .option('prompt', {
       alias: 'p',
@@ -391,6 +394,19 @@ export async function loadCliConfig(
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
 
+  // Determine the model to use
+  let model = argv.model;
+  if (!model) {
+    // If no model specified via command line, check if it's from env or use appropriate default
+    if (process.env.GEMINI_MODEL) {
+      model = process.env.GEMINI_MODEL;
+    } else {
+      // Use appropriate default based on auth type
+      const authType = settings.selectedAuthType || AuthType.USE_GEMINI;
+      model = authType === AuthType.USE_DATABRICKS ? DEFAULT_DATABRICKS_MODEL : DEFAULT_GEMINI_MODEL;
+    }
+  }
+
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -444,7 +460,7 @@ export async function loadCliConfig(
     cwd: process.cwd(),
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
-    model: argv.model!,
+    model,
     extensionContextFilePaths,
     maxSessionTurns: settings.maxSessionTurns ?? -1,
     experimentalAcp: argv.experimentalAcp || false,
