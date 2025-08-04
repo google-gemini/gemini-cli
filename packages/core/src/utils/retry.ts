@@ -103,6 +103,9 @@ export async function retryWithBackoff<T>(
     if (rateLimiter) {
       const rateLimitDelay = rateLimiter.getRetryDelay(requestTokens);
       if (rateLimitDelay > 0) {
+        console.warn(
+          `Rate limit reached. Retrying in ${rateLimitDelay}ms...`,
+        );
         await delay(rateLimitDelay);
       }
     }
