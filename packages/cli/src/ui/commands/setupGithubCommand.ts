@@ -29,13 +29,13 @@ export const setupGithubCommand: SlashCommand = {
 
     // TODO(#5198): pin workflow versions for release controls
     const version = 'main';
-    const workflowBaseUrl = `https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/heads/${version}/workflows/`;
+    const workflowBaseUrl = `https://raw.githubusercontent.com/google-gemini/gemini-cli-action/refs/heads/${version}/examples/`;
 
     const workflows = [
-      'gemini-cli/gemini-cli.yml',
-      'issue-triage/gemini-issue-automated-triage.yml',
-      'issue-triage/gemini-issue-scheduled-triage.yml',
-      'pr-review/gemini-pr-review.yml',
+      'gemini-cli.yml',
+      'gemini-issue-automated-triage.yml',
+      'gemini-issue-scheduled-triage.yml',
+      'gemini-pr-review.yml',
     ];
 
     const command = [
