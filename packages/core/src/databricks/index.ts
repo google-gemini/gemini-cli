@@ -7,3 +7,4 @@
 export { DatabricksContentGenerator } from './databricksContentGenerator.js';
 export type { DatabricksConfig } from './types.js';
 export { DATABRICKS_MODELS, DATABRICKS_MODEL_MAPPING } from './types.js';
+export { discoverDatabricksEndpoints } from './endpointDiscovery.js';
