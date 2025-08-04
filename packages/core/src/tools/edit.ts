@@ -44,6 +44,9 @@ export enum ReplaceStrategy {
 
   /** Tries a sequence of strategies, stopping at the first success. */
   COMPOSITE = 'composite',
+
+  /** Mode just for testing. will use console.log() to log all outputs of the strategies */
+  TEST_ALL = 'test_all',
 }
 
 /**
@@ -474,12 +477,99 @@ class CompositeStrategy implements ReplaceStrategyImpl {
   }
 }
 
+class TestAllStrategy implements ReplaceStrategyImpl {
+  readonly mode = ReplaceStrategy.TEST_ALL;
+  private strategies: ReplaceStrategyImpl[];
+
+  constructor(
+    strategies: ReplaceStrategyImpl[] = [
+      new ExactStrategy(),
+      new FuzzyStrategy(),
+      new FuzzyStrategyV2(),
+      new CorrectorStrategy(),
+    ],
+  ) {
+    this.strategies = strategies;
+  }
+
+  async performEdit(
+    context: ReplaceStrategyContext,
+  ): Promise<ReplaceStrategyResult> {
+    const { params } = context;
+    const expectedReplacements = params.expected_replacements ?? 1;
+    let correctorResultToReturn: ReplaceStrategyResult | null = null;
+    const allResults: Record<string, unknown> = {
+      old_string: params.old_string,
+      new_string: params.new_string,
+    };
+
+    for (const strategy of this.strategies) {
+      try {
+        const result = await strategy.performEdit(context);
+        const validationError = validateEditResult({
+          ...result,
+          expectedReplacements,
+          filePath: params.file_path,
+        });
+        const errorType = validationError?.type ?? 'success';
+
+        allResults[strategy.mode] = {
+          final_old_string: result.finalOldString,
+          final_new_string: result.finalNewString,
+          error_type: errorType,
+        };
+
+        if (strategy.mode === ReplaceStrategy.CORRECTOR) {
+          correctorResultToReturn = result;
+        }
+      } catch (e) {
+        const errorType = e instanceof Error ? e.message : String(e);
+        allResults[strategy.mode] = {
+          old_string: params.old_string,
+          new_string: params.new_string,
+          error_type: `exception: ${errorType}`,
+        };
+        if (strategy.mode === ReplaceStrategy.CORRECTOR) {
+          // If corrector throws, we still need to return a "result" for it
+          // so the calling function can see it failed.
+          correctorResultToReturn = {
+            newContent: context.currentContent,
+            occurrences: 0,
+            finalOldString: params.old_string,
+            finalNewString: params.new_string,
+            mode: ReplaceStrategy.CORRECTOR,
+          };
+        }
+      }
+    }
+
+    console.log(
+      '\n' + JSON.stringify({ test_all_results: allResults }, null, 0) + '\n',
+    );
+
+    if (correctorResultToReturn) {
+      return correctorResultToReturn;
+    }
+
+    // This case would be hit if CorrectorStrategy is not in the list.
+    // We should return a failure state.
+    return {
+      newContent: context.currentContent,
+      occurrences: 0,
+      finalOldString: params.old_string,
+      finalNewString: params.new_string,
+      mode: this.mode,
+    };
+  }
+}
+
 const editStrategies: Record<ReplaceStrategy, ReplaceStrategyImpl> = {
   [ReplaceStrategy.EXACT]: new ExactStrategy(),
   [ReplaceStrategy.CORRECTOR]: new CorrectorStrategy(),
   [ReplaceStrategy.FUZZY]: new FuzzyStrategy(),
   [ReplaceStrategy.FUZZY_V2]: new FuzzyStrategyV2(),
   [ReplaceStrategy.COMPOSITE]: new CompositeStrategy(),
+  [ReplaceStrategy.TEST_ALL]: new TestAllStrategy(),
 };
 
 /**
