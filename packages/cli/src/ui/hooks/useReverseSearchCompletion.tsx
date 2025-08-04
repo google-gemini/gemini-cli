@@ -4,10 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useCompletion } from './useCompletion.js';
 import { TextBuffer } from '../components/shared/text-buffer.js';
-import { Suggestion } from '../components/SuggestionsDisplay.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
+
+function useDebouncedValue<T>(value: T, delay = 200): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const handle = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(handle);
+  }, [value, delay]);
+  return debounced;
+}
 
 export interface UseReverseSearchCompletionReturn {
   suggestions: Suggestion[];
@@ -23,7 +32,7 @@ export interface UseReverseSearchCompletionReturn {
 
 export function useReverseSearchCompletion(
   buffer: TextBuffer,
-  shellHistory: readonly string[],
+  history: readonly string[],
   reverseSearchActive: boolean,
 ): UseReverseSearchCompletionReturn {
   const {
@@ -32,7 +41,6 @@ export function useReverseSearchCompletion(
     visibleStartIndex,
     showSuggestions,
     isLoadingSuggestions,
-
     setSuggestions,
     setShowSuggestions,
     setActiveSuggestionIndex,
@@ -40,6 +48,50 @@ export function useReverseSearchCompletion(
     navigateUp,
     navigateDown,
   } = useCompletion();
+
+  const debouncedQuery = useDebouncedValue(buffer.text, 100);
+
+  // incremental search
+  const prevQueryRef = useRef<string>('');
+  const prevMatchesRef = useRef<Suggestion[]>([]);
+
+  const searchHistory = useCallback(
+    (query: string, items: readonly string[]) => {
+      const lower = query.toLowerCase();
+      const out: Suggestion[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const cmd = items[i];
+        const idx = cmd.toLowerCase().indexOf(lower);
+        if (idx !== -1) {
+          out.push({ label: cmd, value: cmd, matchedIndex: idx });
+        }
+      }
+      return out;
+    },
+    [],
+  );
+
+  const matches = useMemo<Suggestion[]>(() => {
+    if (!reverseSearchActive) return [];
+    if (debouncedQuery.length === 0)
+      return history.map((cmd) => ({
+        label: cmd,
+        value: cmd,
+        matchedIndex: -1,
+      }));
+
+    const query = debouncedQuery.toLowerCase();
+    const canUseCache =
+      prevQueryRef.current &&
+      query.startsWith(prevQueryRef.current) &&
+      prevMatchesRef.current.length > 0;
+
+    const source = canUseCache
+      ? prevMatchesRef.current.map((m) => m.value)
+      : history;
+
+    return searchHistory(query, source);
+  }, [debouncedQuery, history, reverseSearchActive, searchHistory]);
 
   useEffect(() => {
     if (!reverseSearchActive) {
@@ -52,25 +104,22 @@ export function useReverseSearchCompletion(
       return;
     }
 
-    const q = buffer.text.toLowerCase();
-    const matches = shellHistory.reduce<Suggestion[]>((acc, cmd) => {
-      const idx = cmd.toLowerCase().indexOf(q);
-      if (idx !== -1) {
-        acc.push({ label: cmd, value: cmd, matchedIndex: idx });
-      }
-      return acc;
-    }, []);
-
     setSuggestions(matches);
-    setShowSuggestions(matches.length > 0);
-    setActiveSuggestionIndex(matches.length > 0 ? 0 : -1);
+    const hasAny = matches.length > 0;
+    setShowSuggestions(hasAny);
+    setActiveSuggestionIndex(hasAny ? 0 : -1);
+
+    prevQueryRef.current = debouncedQuery;
+    prevMatchesRef.current = matches;
   }, [
-    buffer.text,
-    shellHistory,
+    debouncedQuery,
+    matches,
     reverseSearchActive,
-    setActiveSuggestionIndex,
-    setShowSuggestions,
+    resetCompletionState,
     setSuggestions,
+    setShowSuggestions,
+    setActiveSuggestionIndex,
+    buffer.text,
   ]);
 
   const handleAutocomplete = useCallback(

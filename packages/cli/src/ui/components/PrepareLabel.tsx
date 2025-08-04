@@ -8,7 +8,9 @@ import React from 'react';
 import { Text } from 'ink';
 import { Colors } from '../colors.js';
 
-interface PrepareLabelProps {
+const MAX_WIDTH = 150; // Maximum width for the text that is shown
+
+export interface PrepareLabelProps {
   label: string;
   matchedIndex?: number;
   userInput: string;
@@ -16,7 +18,7 @@ interface PrepareLabelProps {
   highlightColor?: string;
 }
 
-export const PrepareLabel: React.FC<PrepareLabelProps> = ({
+const _PrepareLabel: React.FC<PrepareLabelProps> = ({
   label,
   matchedIndex,
   userInput,
@@ -29,12 +31,21 @@ export const PrepareLabel: React.FC<PrepareLabelProps> = ({
     matchedIndex >= label.length ||
     userInput.length === 0
   ) {
-    return <Text color={textColor}>{label}</Text>;
+    const truncatedLabel =
+      label.length > MAX_WIDTH ? label.slice(0, MAX_WIDTH) + '...' : label;
+    return <Text color={textColor}>{truncatedLabel}</Text>;
   }
 
-  const start = label.slice(0, matchedIndex);
-  const match = label.slice(matchedIndex, matchedIndex + userInput.length);
-  const end = label.slice(matchedIndex + userInput.length);
+  const matchLength = userInput.length;
+  const start = label.slice(
+    Math.max(0, matchedIndex - 60 - matchLength),
+    matchedIndex,
+  );
+  const match = label.slice(matchedIndex, matchedIndex + matchLength);
+  const end = label.slice(
+    matchedIndex + matchLength,
+    Math.min(label.length, matchedIndex + matchLength + 60),
+  );
 
   return (
     <Text>
@@ -46,3 +57,5 @@ export const PrepareLabel: React.FC<PrepareLabelProps> = ({
     </Text>
   );
 };
+
+export const PrepareLabel = React.memo(_PrepareLabel);
