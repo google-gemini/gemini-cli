@@ -42,3 +42,4 @@ packages/vscode-ide-companion/*.vsix
 .env.local
 scripts/prepare-npm-publish.js
 publish.sh
+.env.settings
