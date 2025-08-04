@@ -6,6 +6,7 @@
 
 import {
   Config,
+  DetectedIde,
   IDEConnectionStatus,
   getIdeDisplayName,
   getIdeInstaller,
@@ -19,12 +20,27 @@ import {
 import { SettingScope } from '../../config/settings.js';
 
 export const ideCommand = (config: Config | null): SlashCommand | null => {
-  if (!config?.getIdeModeFeature()) {
+  if (!config || !config.getIdeModeFeature()) {
     return null;
   }
-  const currentIDE = config.getIdeClient().getCurrentIde();
-  if (!currentIDE) {
-    return null;
+  const ideClient = config.getIdeClient();
+  const currentIDE = ideClient.getCurrentIde();
+  if (!currentIDE || !ideClient.getDetectedIdeDisplayName()) {
+    return {
+      name: 'ide',
+      description: 'manage IDE integration',
+      kind: CommandKind.BUILT_IN,
+      action: (): SlashCommandActionReturn =>
+        ({
+          type: 'message',
+          messageType: 'error',
+          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: ${Object.values(
+            DetectedIde,
+          )
+            .map((ide) => getIdeDisplayName(ide))
+            .join(', ')}`,
+        }) as const,
+    };
   }
 
   const ideSlashCommand: SlashCommand = {
@@ -39,13 +55,13 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
     description: 'check status of IDE integration',
     kind: CommandKind.BUILT_IN,
     action: (_context: CommandContext): SlashCommandActionReturn => {
-      const connection = config.getIdeClient().getConnectionStatus();
-      switch (connection?.status) {
+      const connection = ideClient.getConnectionStatus();
+      switch (connection.status) {
         case IDEConnectionStatus.Connected:
           return {
             type: 'message',
             messageType: 'info',
-            content: `🟢 Connected`,
+            content: `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}`,
           } as const;
         case IDEConnectionStatus.Connecting:
           return {
@@ -70,7 +86,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
 
   const installCommand: SlashCommand = {
     name: 'install',
-    description: `install required IDE companion ${getIdeDisplayName(currentIDE)} extension `,
+    description: `install required IDE companion for ${ideClient.getDetectedIdeDisplayName()}`,
     kind: CommandKind.BUILT_IN,
     action: async (context) => {
       const installer = getIdeInstaller(currentIDE);
@@ -78,7 +94,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         context.ui.addItem(
           {
             type: 'error',
-            text: 'No installer available for your configured IDE.',
+            text: `No installer is available for ${ideClient.getDetectedIdeDisplayName()}. Please install the IDE companion manually from its marketplace.`,
           },
           Date.now(),
         );
@@ -88,7 +104,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
       context.ui.addItem(
         {
           type: 'info',
-          text: `Installing IDE companion extension...`,
+          text: `Installing IDE companion...`,
         },
         Date.now(),
       );
