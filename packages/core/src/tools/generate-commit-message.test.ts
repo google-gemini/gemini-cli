@@ -7,7 +7,6 @@
 import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { GenerateCommitMessageTool } from './generate-commit-message.js';
 import { Config, ApprovalMode } from '../config/config.js';
-import { ToolConfirmationOutcome } from './tools.js';
 import { spawn } from 'child_process';
 import { GeminiClient } from '../core/client.js';
 import { EventEmitter } from 'events';
@@ -29,27 +28,32 @@ function createGitCommandMock(outputs: { [key: string]: string }) {
     const child = new EventEmitter() as EventEmitter & {
       stdout: { on: ReturnType<typeof vi.fn> };
       stderr: { on: ReturnType<typeof vi.fn> };
-      stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> };
+      stdin?: {
+        write: ReturnType<typeof vi.fn>;
+        end: ReturnType<typeof vi.fn>;
+      };
     };
 
     if (args.includes('commit')) {
       child.stdin = { write: vi.fn(), end: vi.fn() };
     }
-    
-    child.stdout = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
-      if (event === 'data') {
-        const argString = args.join(' ');
-        for (const [pattern, output] of Object.entries(outputs)) {
-          if (argString.includes(pattern)) {
-            listener(Buffer.from(output));
-            return;
+
+    child.stdout = {
+      on: vi.fn((event: string, listener: (data: Buffer) => void) => {
+        if (event === 'data') {
+          const argString = args.join(' ');
+          for (const [pattern, output] of Object.entries(outputs)) {
+            if (argString.includes(pattern)) {
+              listener(Buffer.from(output));
+              return;
+            }
           }
+          // Default empty response if no pattern matches
+          listener(Buffer.from(''));
         }
-        // Default empty response if no pattern matches
-        listener(Buffer.from(''));
-      }
-    }) };
-    
+      }),
+    };
+
     child.stderr = { on: vi.fn() };
     process.nextTick(() => child.emit('close', 0));
     return child;
@@ -75,10 +79,12 @@ describe('GenerateCommitMessageTool', () => {
   });
 
   it('should return a message when there are no changes', async () => {
-    mockSpawn.mockImplementation(createGitCommandMock({
-      'status --porcelain': '',
-      'diff --cached': '',
-    }));
+    mockSpawn.mockImplementation(
+      createGitCommandMock({
+        'status --porcelain': '',
+        'diff --cached': '',
+      }),
+    );
 
     const result = await tool.execute(undefined, new AbortController().signal);
 
@@ -95,9 +101,11 @@ describe('GenerateCommitMessageTool', () => {
         stderr: { on: ReturnType<typeof vi.fn> };
       };
       child.stdout = { on: vi.fn() };
-      child.stderr = { on: vi.fn((event: string, listener: (data: Buffer) => void) => {
-        if (event === 'data') listener(Buffer.from('git error'));
-      }) };
+      child.stderr = {
+        on: vi.fn((event: string, listener: (data: Buffer) => void) => {
+          if (event === 'data') listener(Buffer.from('git error'));
+        }),
+      };
       process.nextTick(() => child.emit('close', 1));
       return child;
     });
@@ -124,7 +132,10 @@ describe('GenerateCommitMessageTool', () => {
       const child = new EventEmitter() as EventEmitter & {
         stdout: { on: ReturnType<typeof vi.fn> };
         stderr: { on: ReturnType<typeof vi.fn> };
-        stdin?: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> };
+        stdin?: {
+          write: ReturnType<typeof vi.fn>;
+          end: ReturnType<typeof vi.fn>;
+        };
       };
       const argString = args.join(' ');
 
@@ -178,17 +189,21 @@ describe('GenerateCommitMessageTool', () => {
     );
     expect(mockStdin.end).toHaveBeenCalled();
   });
-  
+
   it('should return "no changes" when there are only unstaged changes', async () => {
-    mockSpawn.mockImplementation(createGitCommandMock({
-      'status --porcelain': ' M file.txt',
-      'diff --cached': '', // No staged changes
-    }));
+    mockSpawn.mockImplementation(
+      createGitCommandMock({
+        'status --porcelain': ' M file.txt',
+        'diff --cached': '', // No staged changes
+      }),
+    );
 
     const controller = new AbortController();
     const result = await tool.execute(undefined, controller.signal);
 
-    expect(result.llmContent).toBe('No changes detected in the current workspace.');
+    expect(result.llmContent).toBe(
+      'No changes detected in the current workspace.',
+    );
     expect(mockClient.generateContent).not.toHaveBeenCalled();
   });
 
@@ -283,13 +298,16 @@ describe('GenerateCommitMessageTool', () => {
   it('should only use staged changes for commit message when mixed changes exist', async () => {
     const statusOutput = 'MM file.txt\n?? newfile.txt';
     const logOutput = 'abc1234 Previous commit message';
-    const stagedDiff = 'diff --git a/file.txt b/file.txt\n@@ -1 +1 @@\n-staged\n+staged modified';
+    const stagedDiff =
+      'diff --git a/file.txt b/file.txt\n@@ -1 +1 @@\n-staged\n+staged modified';
 
-    mockSpawn.mockImplementation(createGitCommandMock({
-      'status --porcelain': statusOutput,
-      'diff --cached': stagedDiff,
-      'log --oneline': logOutput,
-    }));
+    mockSpawn.mockImplementation(
+      createGitCommandMock({
+        'status --porcelain': statusOutput,
+        'diff --cached': stagedDiff,
+        'log --oneline': logOutput,
+      }),
+    );
 
     (mockClient.generateContent as Mock).mockResolvedValue({
       candidates: [{ content: { parts: [{ text: 'feat: handle staged' }] } }],
@@ -298,13 +316,14 @@ describe('GenerateCommitMessageTool', () => {
     const controller = new AbortController();
     await tool.execute(undefined, controller.signal);
 
-    const generateContentCalls = (mockClient.generateContent as Mock).mock.calls;
+    const generateContentCalls = (mockClient.generateContent as Mock).mock
+      .calls;
     expect(generateContentCalls.length).toBe(1);
     const promptText = generateContentCalls[0][0][0].parts[0].text;
     expect(promptText).toContain('-staged\n+staged modified');
-    
-    const addCalls = mockSpawn.mock.calls.filter(call => 
-      call[0] === 'git' && call[1]?.includes('add')
+
+    const addCalls = mockSpawn.mock.calls.filter(
+      (call) => call[0] === 'git' && call[1]?.includes('add'),
     );
     expect(addCalls).toHaveLength(0);
   });

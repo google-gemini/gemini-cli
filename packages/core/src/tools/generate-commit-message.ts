@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { 
-  BaseTool, 
-  ToolResult, 
+import {
+  BaseTool,
+  ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
-  ToolConfirmationOutcome 
+  ToolConfirmationOutcome,
 } from './tools.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
@@ -187,7 +187,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
   static readonly Name = 'generate_commit_message';
   private readonly client: GeminiClient;
   private readonly config: Config;
-  
+
   /** Cache to avoid regenerating commit messages between confirmation and execution */
   private cachedCommitData: {
     statusOutput: string;
@@ -196,7 +196,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     commitMessage: string;
     timestamp: number;
   } | null = null;
-  
+
   /** Lock to prevent concurrent cache operations */
   private commitLock = false;
 
@@ -209,7 +209,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     const [statusOutput, stagedDiff, logOutput] = await Promise.all([
       executeGitCommand(['status', '--porcelain'], signal),
       executeGitCommand(['diff', '--cached'], signal),
-      executeGitCommand(['log', '--oneline', '-10'], signal)
+      executeGitCommand(['log', '--oneline', '-10'], signal),
     ]);
 
     return {
@@ -262,7 +262,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         gitState.statusOutput,
         gitState.diffOutput,
         gitState.logOutput,
-        signal
+        signal,
       );
 
       if (!commitMessage?.trim()) {
@@ -270,20 +270,10 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       }
 
       const finalCommitMessage = commitMessage;
-      
+
       this.updateCacheData(gitState, commitMessage);
 
-      const filesToCommit = this.parseFilesToBeCommitted(
-        gitState.statusOutput
-      );
-      
-      let filesDisplay = '';
-      if (filesToCommit.length > 0) {
-        filesDisplay = `\n\nFiles to be committed:\n` +
-          `${filesToCommit.map(f => `  ${f}`).join('\n')}`;
-      }
-
-      const commitModeText = 'staged changes only';
+      const _filesToCommit = this.parseFilesToBeCommitted(gitState.statusOutput);
 
       const confirmationDetails: ToolExecuteConfirmationDetails = {
         type: 'exec',
@@ -308,13 +298,14 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     if (this.commitLock) {
       throw new Error('Another commit operation is in progress');
     }
-    
+
     this.commitLock = true;
     try {
       return await this.executeCommitWorkflow(signal);
     } catch (error) {
       console.error('Error during execution:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       return {
         llmContent: `Error during commit workflow: ${errorMessage}`,
         returnDisplay: `Error during commit workflow: ${errorMessage}`,
@@ -323,9 +314,11 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       this.commitLock = false;
     }
   }
-  
+
   /** Internal commit workflow implementation */
-  private async executeCommitWorkflow(signal: AbortSignal): Promise<ToolResult> {
+  private async executeCommitWorkflow(
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     const gitState = await this.analyzeGitState(signal);
 
     if (!gitState.diffOutput.trim()) {
@@ -335,8 +328,11 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       };
     }
 
-    const finalCommitMessage = await this.getOrGenerateCommitMessage(gitState, signal);
-    
+    const finalCommitMessage = await this.getOrGenerateCommitMessage(
+      gitState,
+      signal,
+    );
+
     try {
       return await this.commitWithRetry(finalCommitMessage, signal);
     } catch (error) {
@@ -344,11 +340,11 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       throw error;
     }
   }
-  
+
   /** Get cached commit message or abort if git state changed */
   private async getOrGenerateCommitMessage(
     gitState: { statusOutput: string; diffOutput: string; logOutput: string },
-    signal: AbortSignal
+    signal: AbortSignal,
   ): Promise<string> {
     if (this.cachedCommitData) {
       // If cache is present, validate it.
@@ -365,7 +361,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         // SECURITY: Git state changed since confirmation. Abort with detailed error.
         const cachedData = this.cachedCommitData;
         this.cachedCommitData = null; // Clear cache
-        
+
         const changes = [];
         if (gitState.diffOutput !== cachedData.diffOutput) {
           changes.push('staged changes');
@@ -376,11 +372,11 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         if (gitState.logOutput !== cachedData.logOutput) {
           changes.push('commit history');
         }
-        
+
         throw new Error(
           `Security: Git state changed since confirmation (${changes.join(', ')} modified). ` +
-          `Operation aborted to prevent committing unintended changes. ` +
-          `Please run the command again to review and confirm the current state.`
+            `Operation aborted to prevent committing unintended changes. ` +
+            `Please run the command again to review and confirm the current state.`,
         );
       } else {
         // Cache is valid and state is unchanged.
@@ -404,11 +400,11 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
     return commitMessage;
   }
-  
+
   /** Update cache data with git state and commit message */
   private updateCacheData(
     gitState: { statusOutput: string; diffOutput: string; logOutput: string },
-    commitMessage: string
+    commitMessage: string,
   ): void {
     this.cachedCommitData = {
       statusOutput: gitState.statusOutput,
@@ -423,10 +419,12 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
   private clearCacheOnCommitError(error: unknown): void {
     if (error instanceof Error) {
       // Only clear cache for state-related errors, not transient ones
-      if (error.message.includes('Git state changed') || 
-          error.message.includes('Operation aborted for security') ||
-          error.message.includes('not a git repository') ||
-          error.message.includes('nothing to commit')) {
+      if (
+        error.message.includes('Git state changed') ||
+        error.message.includes('Operation aborted for security') ||
+        error.message.includes('not a git repository') ||
+        error.message.includes('nothing to commit')
+      ) {
         this.cachedCommitData = null;
       }
     }
@@ -438,7 +436,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
    */
   private async commitWithRetry(
     commitMessage: string,
-    signal: AbortSignal
+    signal: AbortSignal,
   ): Promise<ToolResult> {
     // The git state has already been validated by `getOrGenerateCommitMessage`
     // before this function is called, so we can proceed directly to commit.
@@ -446,11 +444,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     const maxRetries = 1;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        await executeGitCommand(
-          ['commit', '-F', '-'],
-          signal,
-          commitMessage
-        );
+        await executeGitCommand(['commit', '-F', '-'], signal, commitMessage);
 
         this.cachedCommitData = null;
 
@@ -467,7 +461,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
           const hookError = new Error(
             `Commit failed due to a pre-commit hook. ` +
               `Please resolve the issues, stage any changes, and try again. ` +
-              `Original error: ${commitError.message}`
+              `Original error: ${commitError.message}`,
           );
           throw hookError;
         }
@@ -478,7 +472,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
           throw commitError;
         }
 
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
     throw new Error('Commit failed after all retry attempts.');
@@ -486,18 +480,19 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
   /** Parse git status output to extract files that will be committed */
   private parseFilesToBeCommitted(statusOutput: string): string[] {
-    const lines = statusOutput.split('\n').filter(line => line.trim());
+    const lines = statusOutput.split('\n').filter((line) => line.trim());
     const files: string[] = [];
 
     for (const line of lines) {
       if (line.length < 3) continue;
-      
+
       const status = line.substring(0, 2);
       const filename = line.substring(3).trim();
-      
+
       // Skip unimportant directories
-      if (filename.includes('node_modules/') || filename.includes('.git/')) continue;
-      
+      if (filename.includes('node_modules/') || filename.includes('.git/'))
+        continue;
+
       // Include files with staged changes (first character not space or ?)
       if (status[0] !== ' ' && status[0] !== '?') {
         files.push(filename);
@@ -514,11 +509,9 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     log: string,
     signal: AbortSignal,
   ): Promise<string> {
-    const prompt = COMMIT_ANALYSIS_PROMPT
-      .replace('{{status}}', status)
+    const prompt = COMMIT_ANALYSIS_PROMPT.replace('{{status}}', status)
       .replace('{{diff}}', diff)
       .replace('{{log}}', log);
-
 
     try {
       const response = await this.client.generateContent(
@@ -528,7 +521,7 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
       );
 
       const generatedText = getResponseText(response) ?? '';
-      
+
       // Extract commit message from analysis response
       const analysisEndIndex = generatedText.indexOf('</commit_analysis>');
       if (analysisEndIndex !== -1) {
@@ -538,15 +531,17 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
           .replace(/^```[a-z]*\n?/, '') // Remove code block markers
           .replace(/```$/, '')
           .trim();
-        
+
         return commitMessage;
       }
 
       return generatedText;
     } catch (error) {
       console.error('Error during Gemini API call:', error);
-      throw new Error(`Failed to generate commit message: ` +
-        `${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to generate commit message: ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }
