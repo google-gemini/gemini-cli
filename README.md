@@ -13,7 +13,7 @@ With the Gemini CLI you can:
 - Generate new apps from PDFs or sketches, using Gemini's multimodal capabilities.
 - Automate operational tasks, like querying pull requests or handling complex rebases.
 - Use tools and MCP servers to connect new capabilities, including [media generation with Imagen,
-  Veo or Lyria](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia)
+  Veo or Lyric](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia)
 - Ground your queries with the [Google Search](https://ai.google.dev/gemini-api/docs/grounding)
   tool, built into Gemini.
 
@@ -59,8 +59,8 @@ You have two options to install Gemini CLI.
 
 ### Common Configuration steps
 
-3. **Pick a color theme**
-4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
+1. **Pick a color theme**
+2. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
 
 You are now ready to use the Gemini CLI!
 
