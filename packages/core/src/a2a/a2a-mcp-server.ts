@@ -6,13 +6,11 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { A2AClientManager } from './a2a-client.js';
 import {
   A2AToolFunctions,
-  CancelTaskInputSchema,
-  GetTaskInputSchema,
+  A2AToolRegistry,
   LoadAgentInputSchema,
-  SendMessageInputSchema,
-  StringOutputSchema,
 } from './tools.js';
 
 /**
@@ -26,18 +24,17 @@ async function main() {
     version: '0.0.1',
   });
 
-  // The A2AToolFunctions class contains the actual logic for each tool.
-  const toolImplementations = new A2AToolFunctions();
+  const clientManager = A2AClientManager.getInstance();
+  const registry = new A2AToolRegistry(server, clientManager);
+  const toolImplementations = new A2AToolFunctions(registry, clientManager);
 
-  // Register each tool with the server using the new Zod-based schema.
-  // The shape of the Zod object is passed to the schema properties.
+  // Register ONLY the static tools
   server.registerTool(
     'load_agent',
     {
       description:
         "Retrieves and caches an agent's metadata (AgentCard) from a URL.",
       inputSchema: LoadAgentInputSchema.shape,
-      // outputSchema: StringOutputSchema.shape,
     },
     toolImplementations.load_agent.bind(toolImplementations),
   );
@@ -46,41 +43,8 @@ async function main() {
     'list_agents',
     {
       description: 'Lists all A2A agents whose AgentCards have been loaded.',
-      // outputSchema: StringOutputSchema.shape,
     },
     toolImplementations.list_agents.bind(toolImplementations),
-  );
-
-  // TODO: this will eventually have to take in Part[]. Then Message type from a2a-js will have to be constructed in sendMessage().
-  server.registerTool(
-    'send_message',
-    {
-      description:
-        'Connects to a known A2A agent, sends a message, and returns a task ID.',
-      inputSchema: SendMessageInputSchema.shape,
-      // outputSchema: StringOutputSchema.shape,
-    },
-    toolImplementations.send_message.bind(toolImplementations),
-  );
-
-  server.registerTool(
-    'get_task',
-    {
-      description: 'Retrieves the status and result of a task.',
-      inputSchema: GetTaskInputSchema.shape,
-      outputSchema: StringOutputSchema.shape,
-    },
-    toolImplementations.get_task.bind(toolImplementations),
-  );
-
-  server.registerTool(
-    'cancel_task',
-    {
-      description: 'Cancels a running task.',
-      inputSchema: CancelTaskInputSchema.shape,
-      // outputSchema: StringOutputSchema.shape,
-    },
-    toolImplementations.cancel_task.bind(toolImplementations),
   );
 
   const transport = new StdioServerTransport();

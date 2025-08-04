@@ -6,9 +6,10 @@
 
 import { z } from 'zod';
 import { A2AClientManager } from './a2a-client.js';
-import { Message } from '@a2a-js/sdk';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { textResponse } from './utils.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { AgentCard } from '@a2a-js/sdk';
 
 // Zod Schemas for Tool Inputs
 export const LoadAgentInputSchema = z.object({
@@ -21,19 +22,18 @@ export const LoadAgentInputSchema = z.object({
     ),
 });
 
-export const SendMessageInputSchema = z.object({
-  agent_name: z.string().describe('The name of the target agent.'),
+// New schema for agent-specific send_message
+export const AgentSendMessageInputSchema = z.object({
   message: z.string().describe('The text message to send to the agent.'),
 });
 
-// TODO create a map of taskId to agent_name so this doesn't neeed to be passed
-export const GetTaskInputSchema = z.object({
-  agent_name: z.string().describe('The name of the target agent.'),
+// New schema for agent-specific get_task
+export const AgentGetTaskInputSchema = z.object({
   taskId: z.string().describe('The ID of the task to query.'),
 });
 
-export const CancelTaskInputSchema = z.object({
-  agent_name: z.string().describe('The name of the target agent.'),
+// New schema for agent-specific cancel_task
+export const AgentCancelTaskInputSchema = z.object({
   taskId: z.string().describe('The ID of the task to cancel.'),
 });
 
@@ -42,11 +42,69 @@ export const StringOutputSchema = z.object({
   output: z.string(),
 });
 
+export class A2AToolRegistry {
+  constructor(
+    private server: McpServer,
+    private clientManager: A2AClientManager,
+  ) {}
+
+  registerToolsForAgent(agentCard: AgentCard): void {
+    const agentName = agentCard.name;
+
+    // Register send_message for the agent
+    this.server.registerTool(
+      `${agentName}_sendMessage`,
+      {
+        description: `Sends a message to the ${agentName} agent.`,
+        inputSchema: AgentSendMessageInputSchema.shape,
+      },
+      async (args: z.infer<typeof AgentSendMessageInputSchema>) => {
+        return textResponse(
+          await this.clientManager.sendMessage(agentName, args.message),
+        );
+      },
+    );
+
+    // Register get_task for the agent
+    this.server.registerTool(
+      `${agentName}_getTask`,
+      {
+        description: `Retrieves a task from the ${agentName} agent.`,
+        inputSchema: AgentGetTaskInputSchema.shape,
+      },
+      async (args: z.infer<typeof AgentGetTaskInputSchema>) => {
+        // Note: Implementation for get_task is currently a placeholder
+        return textResponse(
+          `'get_task' is not yet implemented for ${agentName}. Task ID: ${args.taskId}`,
+        );
+      },
+    );
+
+    // Register cancel_task for the agent
+    this.server.registerTool(
+      `${agentName}_cancelTask`,
+      {
+        description: `Cancels a task on the ${agentName} agent.`,
+        inputSchema: AgentCancelTaskInputSchema.shape,
+      },
+      async (args: z.infer<typeof AgentCancelTaskInputSchema>) => {
+        // Note: Implementation for cancel_task is currently a placeholder
+        return textResponse(
+          `'cancel_task' is not yet implemented for ${agentName}. Task ID: ${args.taskId}`,
+        );
+      },
+    );
+  }
+}
+
 /**
  * A class that provides the implementation for the A2A tools.
  */
 export class A2AToolFunctions {
-  private clientManager = A2AClientManager.getInstance();
+  constructor(
+    private registry: A2AToolRegistry,
+    private clientManager: A2AClientManager,
+  ) {}
 
   async load_agent(
     args: z.infer<typeof LoadAgentInputSchema>,
@@ -57,7 +115,11 @@ export class A2AToolFunctions {
         url,
         agent_card_path,
       );
-      const output = `Successfully loaded agent: ${agentCard.name}. Skills: ${JSON.stringify(agentCard.skills)}`;
+
+      // Delegate registration
+      this.registry.registerToolsForAgent(agentCard);
+
+      const output = `Successfully loaded agent: ${agentCard.name}. New tools registered: ${agentCard.name}_sendMessage, ${agentCard.name}_getTask, ${agentCard.name}_cancelTask.`;
       return textResponse(output);
     } catch (error) {
       return textResponse(`Failed to load agent: ${error}`);
@@ -73,35 +135,5 @@ export class A2AToolFunctions {
       .map((agent) => `- ${agent.name} (${agent.url})`)
       .join('\n');
     return textResponse(output);
-  }
-
-  async send_message(
-    args: z.infer<typeof SendMessageInputSchema>,
-  ): Promise<CallToolResult> {
-    const { agent_name, message } = args;
-    // TODO: Construct a full A2A Message
-    return textResponse(
-      await this.clientManager.sendMessage(agent_name, message),
-    );
-  }
-
-  async get_task(
-    args: z.infer<typeof GetTaskInputSchema>,
-  ): Promise<CallToolResult> {
-    const unimplementedString = await this.clientManager.getTask(
-      args.agent_name,
-      args.taskId,
-    );
-    return textResponse(
-      `'get_task' is not yet implemented. Task ID: ${args.taskId}`,
-    );
-  }
-
-  async cancel_task(
-    args: z.infer<typeof CancelTaskInputSchema>,
-  ): Promise<CallToolResult> {
-    return textResponse(
-      `'cancel_task' is not yet implemented. Task ID: ${args.taskId}`,
-    );
   }
 }

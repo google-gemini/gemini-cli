@@ -49,7 +49,6 @@ export class A2AClientManager {
   ): Promise<AgentCard> {
     console.error(`Loading agent from URL: ${url}`);
 
-    // Typescript SDK throws unrecoverable error if not located at well-known/agent.json
     const a2aClient = new A2AClient(
       url,
       agent_card_path || AGENT_CARD_WELL_KNOWN_PATH,
