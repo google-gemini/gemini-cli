@@ -13,7 +13,7 @@ import {
   vi,
   type Mocked,
 } from 'vitest';
-import { WriteFileTool } from './write-file.js';
+import { WriteFileTool, WriteFileToolParams } from './write-file.js';
 import {
   FileDiff,
   ToolConfirmationOutcome,
@@ -200,6 +200,32 @@ describe('WriteFileTool', () => {
       };
       expect(tool.validateToolParams(params)).toMatch(
         `Path is a directory, not a file: ${dirAsFilePath}`,
+      );
+    });
+
+    it('should return error if the content is null', () => {
+      const dirAsFilePath = path.join(rootDir, 'a_directory');
+      fs.mkdirSync(dirAsFilePath);
+      const params = {
+        file_path: dirAsFilePath,
+        content: null,
+      } as unknown as WriteFileToolParams; // Intentionally non-conforming
+      expect(tool.validateToolParams(params)).toMatch(
+        `params/content must be string`,
+      );
+    });
+  });
+
+  describe('getDescription', () => {
+    it('should return error if the file_path is empty', () => {
+      const dirAsFilePath = path.join(rootDir, 'a_directory');
+      fs.mkdirSync(dirAsFilePath);
+      const params = {
+        file_path: '',
+        content: '',
+      };
+      expect(tool.getDescription(params)).toMatch(
+        `Model did not provide valid parameters for write file tool, missing or empty "file_path"`,
       );
     });
   });

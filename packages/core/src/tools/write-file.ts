@@ -131,8 +131,8 @@ export class WriteFileTool
   }
 
   getDescription(params: WriteFileToolParams): string {
-    if (!params.file_path || !params.content) {
-      return `Model did not provide valid parameters for write file tool`;
+    if (!params.file_path) {
+      return `Model did not provide valid parameters for write file tool, missing or empty "file_path"`;
     }
     const relativePath = makeRelative(
       params.file_path,
