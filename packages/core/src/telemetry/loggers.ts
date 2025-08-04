@@ -15,6 +15,7 @@ import {
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
+  EVENT_KITTY_SEQUENCE_OVERFLOW,
   SERVICE_NAME,
 } from './constants.js';
 import {
@@ -26,6 +27,7 @@ import {
   UserPromptEvent,
   FlashFallbackEvent,
   LoopDetectedEvent,
+  KittySequenceOverflowEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -177,6 +179,28 @@ export function logFlashFallback(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Switching to flash as Fallback.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logKittySequenceOverflow(
+  config: Config,
+  event: KittySequenceOverflowEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logKittySequenceOverflowEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_KITTY_SEQUENCE_OVERFLOW,
+    'event.timestamp': new Date().toISOString(),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Kitty sequence buffer overflow: length=${event.sequence_length}`,
     attributes,
   };
   logger.emit(logRecord);

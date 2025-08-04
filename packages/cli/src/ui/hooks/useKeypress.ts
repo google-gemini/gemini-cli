@@ -9,6 +9,7 @@ import { useStdin } from 'ink';
 import readline from 'readline';
 import { PassThrough } from 'stream';
 import { KITTY_CTRL_C, BACKSLASH_ENTER_DETECTION_WINDOW_MS, MAX_KITTY_SEQUENCE_LENGTH } from '../utils/platformConstants.js';
+import { KittySequenceOverflowEvent, logKittySequenceOverflow, Config } from '@google/gemini-cli-core';
 
 export interface Key {
   name: string;
@@ -33,13 +34,15 @@ export interface Key {
  * @param options - Options to control the hook's behavior.
  * @param options.isActive - Whether the hook should be actively listening for input.
  * @param options.kittyProtocolEnabled - Whether Kitty keyboard protocol is enabled.
+ * @param options.config - Optional config for telemetry logging.
  */
 export function useKeypress(
   onKeypress: (key: Key) => void,
   {
     isActive,
     kittyProtocolEnabled = false,
-  }: { isActive: boolean; kittyProtocolEnabled?: boolean },
+    config,
+  }: { isActive: boolean; kittyProtocolEnabled?: boolean; config?: Config },
 ) {
   const { stdin, setRawMode } = useStdin();
   const onKeypressRef = useRef(onKeypress);
@@ -105,10 +108,12 @@ export function useKeypress(
         };
       }
 
-      // Handle Ctrl+C (code 99 for 'c')
-      if (keyCode === 99 && ctrl) {
+      // Handle Ctrl+letter combinations (a-z)
+      // ASCII codes: a=97, b=98, c=99, ..., z=122
+      if (keyCode >= 97 && keyCode <= 122 && ctrl) {
+        const letter = String.fromCharCode(keyCode);
         return {
-          name: 'c',
+          name: letter,
           ctrl: true,
           meta: alt,
           shift,
@@ -219,6 +224,14 @@ export function useKeypress(
 
           // If buffer doesn't match expected pattern and is getting long, flush it
           if (kittySequenceBuffer.length > MAX_KITTY_SEQUENCE_LENGTH) {
+            // Log telemetry for buffer overflow
+            if (config) {
+              const event = new KittySequenceOverflowEvent(
+                kittySequenceBuffer.length,
+                kittySequenceBuffer
+              );
+              logKittySequenceOverflow(config, event);
+            }
             // Not a Kitty sequence, treat as regular key
             kittySequenceBuffer = '';
           } else {
@@ -349,5 +362,5 @@ export function useKeypress(
         pasteBuffer = Buffer.alloc(0);
       }
     };
-  }, [isActive, stdin, setRawMode, kittyProtocolEnabled]);
+  }, [isActive, stdin, setRawMode, kittyProtocolEnabled, config]);
 }

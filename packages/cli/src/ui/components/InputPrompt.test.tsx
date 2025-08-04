@@ -630,6 +630,106 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should pass Ctrl+C to onCtrlKey when buffer is empty', async () => {
+    const onCtrlKey = vi.fn();
+    props.buffer.text = '';
+    const { stdin, unmount } = render(<InputPrompt {...props} onCtrlKey={onCtrlKey} />);
+    await wait();
+
+    stdin.write('\x03'); // Ctrl+C character
+    await wait();
+
+    expect(onCtrlKey).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'c',
+        ctrl: true,
+      })
+    );
+    unmount();
+  });
+
+  it('should pass Ctrl+D to onCtrlKey when buffer is empty', async () => {
+    const onCtrlKey = vi.fn();
+    props.buffer.text = '';
+    const { stdin, unmount } = render(<InputPrompt {...props} onCtrlKey={onCtrlKey} />);
+    await wait();
+
+    stdin.write('\x04'); // Ctrl+D character
+    await wait();
+
+    expect(onCtrlKey).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'd',
+        ctrl: true,
+      })
+    );
+    unmount();
+  });
+
+  it('should NOT pass Ctrl+D to onCtrlKey when buffer has text', async () => {
+    const onCtrlKey = vi.fn();
+    props.buffer.text = 'some text';
+    const { stdin, unmount } = render(<InputPrompt {...props} onCtrlKey={onCtrlKey} />);
+    await wait();
+
+    stdin.write('\x04'); // Ctrl+D character
+    await wait();
+
+    expect(onCtrlKey).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should pass Ctrl+O to onCtrlKey for debug view toggle', async () => {
+    const onCtrlKey = vi.fn();
+    const { stdin, unmount } = render(<InputPrompt {...props} onCtrlKey={onCtrlKey} />);
+    await wait();
+
+    stdin.write('\x0F'); // Ctrl+O character
+    await wait();
+
+    expect(onCtrlKey).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'o',
+        ctrl: true,
+      })
+    );
+    unmount();
+  });
+
+  it('should pass Ctrl+T to onCtrlKey for tool descriptions toggle', async () => {
+    const onCtrlKey = vi.fn();
+    const { stdin, unmount } = render(<InputPrompt {...props} onCtrlKey={onCtrlKey} />);
+    await wait();
+
+    stdin.write('\x14'); // Ctrl+T character
+    await wait();
+
+    expect(onCtrlKey).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 't',
+        ctrl: true,
+      })
+    );
+    unmount();
+  });
+
+  it('should pass Ctrl+S to onCtrlKey for constrain height toggle', async () => {
+    const onCtrlKey = vi.fn();
+    const { stdin, unmount } = render(<InputPrompt {...props} onCtrlKey={onCtrlKey} />);
+    await wait();
+
+    stdin.write('\x13'); // Ctrl+S character
+    await wait();
+
+    expect(onCtrlKey).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 's',
+        ctrl: true,
+      })
+    );
+    unmount();
+  });
+
   describe('cursor-based completion trigger', () => {
     it('should trigger completion when cursor is after @ without spaces', async () => {
       // Set up buffer state

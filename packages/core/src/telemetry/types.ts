@@ -264,6 +264,21 @@ export class LoopDetectedEvent {
   }
 }
 
+export class KittySequenceOverflowEvent {
+  'event.name': 'kitty_sequence_overflow';
+  'event.timestamp': string; // ISO 8601
+  sequence_length: number;
+  truncated_sequence: string;
+
+  constructor(sequence_length: number, truncated_sequence: string) {
+    this['event.name'] = 'kitty_sequence_overflow';
+    this['event.timestamp'] = new Date().toISOString();
+    this.sequence_length = sequence_length;
+    // Truncate to first 20 chars for logging (avoid logging sensitive data)
+    this.truncated_sequence = truncated_sequence.substring(0, 20);
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -273,4 +288,5 @@ export type TelemetryEvent =
   | ApiErrorEvent
   | ApiResponseEvent
   | FlashFallbackEvent
-  | LoopDetectedEvent;
+  | LoopDetectedEvent
+  | KittySequenceOverflowEvent;

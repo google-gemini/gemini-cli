@@ -9,7 +9,30 @@ import { useKeypress, Key } from './useKeypress.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
-import { BACKSLASH_ENTER_DETECTION_WINDOW_MS } from '../utils/platformConstants.js';
+import { BACKSLASH_ENTER_DETECTION_WINDOW_MS, MAX_KITTY_SEQUENCE_LENGTH } from '../utils/platformConstants.js';
+import { logKittySequenceOverflow, Config } from '@google/gemini-cli-core';
+
+// Mock telemetry logging
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...original,
+    logKittySequenceOverflow: vi.fn(),
+    KittySequenceOverflowEvent: class MockKittySequenceOverflowEvent {
+      'event.name': string;
+      'event.timestamp': string;
+      sequence_length: number;
+      truncated_sequence: string;
+      
+      constructor(sequence_length: number, truncated_sequence: string) {
+        this['event.name'] = 'kitty_sequence_overflow';
+        this['event.timestamp'] = new Date().toISOString();
+        this.sequence_length = sequence_length;
+        this.truncated_sequence = truncated_sequence.substring(0, 20);
+      }
+    },
+  };
+});
 
 // Mock the 'ink' module to control stdin
 vi.mock('ink', async (importOriginal) => {
@@ -271,6 +294,101 @@ describe('useKeypress', () => {
   });
 
   describe('Kitty Keyboard Protocol', () => {
+    it('should parse Ctrl+O and other Ctrl+letter combinations', () => {
+      const onKeypress = vi.fn();
+      renderHook(() =>
+        useKeypress(onKeypress, { isActive: true, kittyProtocolEnabled: true }),
+      );
+
+      // Test Ctrl+O (ASCII 111)
+      act(() => {
+        stdin.pressKey({ sequence: '\x1b[111;5u' });
+      });
+
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'o',
+        ctrl: true,
+        meta: false,
+        shift: false,
+        paste: false,
+        sequence: '\x1b[111;5u',
+        kittyProtocol: true,
+      });
+
+      onKeypress.mockClear();
+
+      // Test Ctrl+T (ASCII 116)
+      act(() => {
+        stdin.pressKey({ sequence: '\x1b[116;5u' });
+      });
+
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 't',
+        ctrl: true,
+        meta: false,
+        shift: false,
+        paste: false,
+        sequence: '\x1b[116;5u',
+        kittyProtocol: true,
+      });
+
+      onKeypress.mockClear();
+
+      // Test Ctrl+A (ASCII 97)
+      act(() => {
+        stdin.pressKey({ sequence: '\x1b[97;5u' });
+      });
+
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'a',
+        ctrl: true,
+        meta: false,
+        shift: false,
+        paste: false,
+        sequence: '\x1b[97;5u',
+        kittyProtocol: true,
+      });
+
+      onKeypress.mockClear();
+
+      // Test Ctrl+Z (ASCII 122)
+      act(() => {
+        stdin.pressKey({ sequence: '\x1b[122;5u' });
+      });
+
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'z',
+        ctrl: true,
+        meta: false,
+        shift: false,
+        paste: false,
+        sequence: '\x1b[122;5u',
+        kittyProtocol: true,
+      });
+    });
+
+    it('should parse Ctrl+Shift+letter combinations', () => {
+      const onKeypress = vi.fn();
+      renderHook(() =>
+        useKeypress(onKeypress, { isActive: true, kittyProtocolEnabled: true }),
+      );
+
+      // Test Ctrl+Shift+O (modifiers = 6: shift+ctrl)
+      act(() => {
+        stdin.pressKey({ sequence: '\x1b[111;6u' });
+      });
+
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'o',
+        ctrl: true,
+        meta: false,
+        shift: true,
+        paste: false,
+        sequence: '\x1b[111;6u',
+        kittyProtocol: true,
+      });
+    });
+
     it('should parse Kitty protocol Shift+Enter sequence', () => {
       const onKeypress = vi.fn();
       renderHook(() =>
@@ -413,6 +531,108 @@ describe('useKeypress', () => {
           kittyProtocol: true,
         }),
       );
+    });
+
+    it('should log telemetry when Kitty sequence buffer overflows', () => {
+      const onKeypress = vi.fn();
+      const mockConfig = { getSessionId: () => 'test-session' } as Config;
+      
+      renderHook(() =>
+        useKeypress(onKeypress, { 
+          isActive: true, 
+          kittyProtocolEnabled: true,
+          config: mockConfig 
+        }),
+      );
+
+      // Build a long invalid sequence that will exceed MAX_KITTY_SEQUENCE_LENGTH
+      const longSequence = '\x1b[' + 'x'.repeat(MAX_KITTY_SEQUENCE_LENGTH);
+      
+      // Send the long sequence in parts to trigger the overflow
+      act(() => {
+        stdin.pressKey({ sequence: longSequence });
+      });
+
+      // The overflow should be logged
+      expect(logKittySequenceOverflow).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          sequence_length: longSequence.length,
+          truncated_sequence: longSequence.substring(0, 20),
+        }),
+      );
+
+      // The buffer should be cleared after overflow
+      onKeypress.mockClear();
+      vi.mocked(logKittySequenceOverflow).mockClear();
+
+      // A subsequent valid sequence should work normally
+      act(() => {
+        stdin.pressKey({ sequence: '\x1b[111;5u' });
+      });
+
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: 'o',
+        ctrl: true,
+        meta: false,
+        shift: false,
+        paste: false,
+        sequence: '\x1b[111;5u',
+        kittyProtocol: true,
+      });
+    });
+
+    it('should not log telemetry when buffer overflows without config', () => {
+      const onKeypress = vi.fn();
+      
+      renderHook(() =>
+        useKeypress(onKeypress, { 
+          isActive: true, 
+          kittyProtocolEnabled: true,
+          // No config provided
+        }),
+      );
+
+      // Build a long invalid sequence
+      const longSequence = '\x1b[' + 'x'.repeat(MAX_KITTY_SEQUENCE_LENGTH);
+      
+      act(() => {
+        stdin.pressKey({ sequence: longSequence });
+      });
+
+      // No telemetry should be logged without config
+      expect(logKittySequenceOverflow).not.toHaveBeenCalled();
+    });
+
+    it('should not trigger overflow for valid partial sequences within limit', () => {
+      const onKeypress = vi.fn();
+      const mockConfig = { getSessionId: () => 'test-session' } as Config;
+      
+      renderHook(() =>
+        useKeypress(onKeypress, { 
+          isActive: true, 
+          kittyProtocolEnabled: true,
+          config: mockConfig 
+        }),
+      );
+
+      // Send a partial sequence that is under the limit
+      const partialSequence = '\x1b[123456';
+      
+      act(() => {
+        stdin.pressKey({ sequence: partialSequence });
+      });
+
+      // Should not log overflow (sequence is under the limit)
+      expect(logKittySequenceOverflow).not.toHaveBeenCalled();
+      
+      // Complete the sequence
+      act(() => {
+        stdin.pressKey({ sequence: ';5u' });
+      });
+
+      // Should not log overflow (sequence was completed)
+      expect(logKittySequenceOverflow).not.toHaveBeenCalled();
     });
 
     it('should handle Ctrl+C immediately in both standard and Kitty format', () => {
@@ -670,8 +890,18 @@ describe('useKeypress', () => {
     it('should handle multiple consecutive backslashes correctly', () => {
       const onKeypress = vi.fn();
       vi.useFakeTimers();
+      
+      // Skip this test if we're testing with Kitty protocol enabled
+      // (backslash+Enter detection is for VS Code terminals without Kitty support)
+      const isKittyEnabled = false; // This test is for non-Kitty mode
+      if (process.env.KITTY_WINDOW_ID) {
+        // Skip test in actual Kitty terminal
+        vi.useRealTimers();
+        return;
+      }
+      
       renderHook(() =>
-        useKeypress(onKeypress, { isActive: true }),
+        useKeypress(onKeypress, { isActive: true, kittyProtocolEnabled: isKittyEnabled }),
       );
 
       // Send first backslash
@@ -685,16 +915,8 @@ describe('useKeypress', () => {
         });
       });
 
-      // First backslash should be passed through immediately
-      expect(onKeypress).toHaveBeenCalledTimes(1);
-      expect(onKeypress).toHaveBeenCalledWith({
-        name: undefined,
-        sequence: '\\',
-        ctrl: false,
-        meta: false,
-        shift: false,
-        paste: false,
-      });
+      // First backslash should NOT be passed through immediately (held for detection)
+      expect(onKeypress).not.toHaveBeenCalled();
 
       // Send second backslash
       act(() => {
@@ -707,10 +929,11 @@ describe('useKeypress', () => {
         });
       });
 
-      // Second backslash should also be passed through immediately
-      expect(onKeypress).toHaveBeenCalledTimes(2);
-      expect(onKeypress).toHaveBeenNthCalledWith(2, {
-        name: undefined,
+      // When second backslash arrives, first one should be passed through
+      // and second one is held
+      expect(onKeypress).toHaveBeenCalledTimes(1);
+      expect(onKeypress).toHaveBeenCalledWith({
+        name: '',
         sequence: '\\',
         ctrl: false,
         meta: false,
@@ -729,8 +952,16 @@ describe('useKeypress', () => {
         });
       });
 
-      // 'a' should be passed through normally
+      // Second backslash should be passed through first, then 'a'
       expect(onKeypress).toHaveBeenCalledTimes(3);
+      expect(onKeypress).toHaveBeenNthCalledWith(2, {
+        name: '',
+        sequence: '\\',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
       expect(onKeypress).toHaveBeenNthCalledWith(3, {
         name: 'a',
         sequence: 'a',

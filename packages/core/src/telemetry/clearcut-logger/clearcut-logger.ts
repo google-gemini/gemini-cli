@@ -18,6 +18,7 @@ import {
   ApiErrorEvent,
   FlashFallbackEvent,
   LoopDetectedEvent,
+  KittySequenceOverflowEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
@@ -476,6 +477,24 @@ export class ClearcutLogger {
     });
   }
 
+  logKittySequenceOverflowEvent(event: KittySequenceOverflowEvent): void {
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_KITTY_SEQUENCE_LENGTH,
+        value: event.sequence_length.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE,
+        value: event.truncated_sequence,
+      },
+    ];
+    this.enqueueLogEvent(this.createLogEvent('kitty_sequence_overflow', data));
+    this.flushIfNeeded();
+  }
   logLoopDetectedEvent(event: LoopDetectedEvent): void {
     const data = [
       {

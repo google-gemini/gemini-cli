@@ -42,6 +42,7 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  onCtrlKey?: (key: Key) => void;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -58,6 +59,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  onCtrlKey,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const kittyProtocolStatus = useKittyKeyboardProtocol();
@@ -421,12 +423,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
-      // Ctrl+C (Clear input)
+      // Ctrl+C (Clear input or exit if empty)
       if (key.ctrl && key.name === 'c') {
         if (buffer.text.length > 0) {
           buffer.setText('');
           resetCompletionState();
           return;
+        }
+        // If buffer is empty, pass through to App for exit handling
+        if (onCtrlKey) {
+          onCtrlKey(key);
         }
         return;
       }
@@ -454,6 +460,25 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Ctrl+D (exit if buffer is empty)
+      if (key.ctrl && key.name === 'd') {
+        if (buffer.text.length === 0 && onCtrlKey) {
+          onCtrlKey(key);
+        }
+        return;
+      }
+
+      // Pass through certain Ctrl+letter combinations to App component
+      // Skip ones that are handled locally in InputPrompt
+      const passThruCtrlKeys = ['o', 't', 's']; // o=debug, t=tools, s=constrain
+      // Note: c (clear/exit) and d (exit) are handled above, y (auto-accept) is handled in useAutoAcceptIndicator
+      if (key.ctrl && key.name && passThruCtrlKeys.includes(key.name.toLowerCase())) {
+        if (onCtrlKey) {
+          onCtrlKey(key);
+        }
+        return;
+      }
+
       // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
     },
@@ -470,6 +495,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellHistory,
       handleClipboardImage,
       resetCompletionState,
+      onCtrlKey,
     ],
   );
 
@@ -477,6 +503,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   useKeypress(handleInput, {
     isActive: focus,
     kittyProtocolEnabled: kittyProtocolStatus.enabled,
+    config,
   });
 
   const linesToRender = buffer.viewportVisualLines;

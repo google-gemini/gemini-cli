@@ -163,6 +163,16 @@ export enum EventMetadataKey {
 
   // Logs the type of loop detected.
   GEMINI_CLI_LOOP_DETECTED_TYPE = 38,
+
+  // ==========================================================================
+  // Kitty Sequence Overflow Event Keys
+  // ===========================================================================
+
+  // Logs the length of the Kitty sequence that overflowed.
+  GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 41,
+
+  // Logs the truncated Kitty sequence.
+  GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 42,
 }
 
 export function getEventMetadataKey(

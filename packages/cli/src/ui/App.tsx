@@ -86,7 +86,6 @@ import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import {
   CTRL_EXIT_PROMPT_DURATION_MS,
-  KITTY_CTRL_C,
 } from './utils/platformConstants.js';
 
 interface AppProps {
@@ -445,41 +444,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     [handleSlashCommand],
   );
 
-  useInput((input: string, key: InkKeyType) => {
-    let enteringConstrainHeightMode = false;
+  useInput((_input: string, _key: InkKeyType) => {
+    // Auto-enter constrain height mode when user starts typing
     if (!constrainHeight) {
-      // Automatically re-enter constrain height mode if the user types
-      // anything. When constrainHeight==false, the user will experience
-      // significant flickering so it is best to disable it immediately when
-      // the user starts interacting with the app.
-      enteringConstrainHeightMode = true;
       setConstrainHeight(true);
     }
 
-    if (key.ctrl && input === 'o') {
-      setShowErrorDetails((prev) => !prev);
-    } else if (key.ctrl && input === 't') {
-      const newValue = !showToolDescriptions;
-      setShowToolDescriptions(newValue);
-
-      const mcpServers = config.getMcpServers();
-      if (Object.keys(mcpServers || {}).length > 0) {
-        handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
-      }
-    } else if (
-      (key.ctrl && (input === 'c' || input === 'C')) ||
-      input === KITTY_CTRL_C
-    ) {
-      handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
-    } else if (key.ctrl && (input === 'd' || input === 'D')) {
-      if (buffer.text.length > 0) {
-        // Do nothing if there is text in the input.
-        return;
-      }
-      handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
-    } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
-      setConstrainHeight(false);
-    }
+    // Note: Most Ctrl+key combinations are now handled via onCtrlKey callback from InputPrompt
+    // This useInput is kept for backward compatibility with non-Kitty terminals
   });
 
   useEffect(() => {
@@ -934,6 +906,34 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
                   focus={isFocused}
+                  onCtrlKey={(key) => {
+                    // Handle Ctrl+O for debug view toggle
+                    if (key.name === 'o') {
+                      setShowErrorDetails((prev) => !prev);
+                    }
+                    // Handle Ctrl+T for tool descriptions toggle
+                    else if (key.name === 't') {
+                      const newValue = !showToolDescriptions;
+                      setShowToolDescriptions(newValue);
+                      const mcpServers = config.getMcpServers();
+                      if (Object.keys(mcpServers || {}).length > 0) {
+                        handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
+                      }
+                    }
+                    // Handle Ctrl+S for constrain height toggle
+                    else if (key.name === 's') {
+                      setConstrainHeight(false);
+                    }
+                    // Handle Ctrl+C for exit (when buffer is empty)
+                    else if (key.name === 'c') {
+                      handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+                    }
+                    // Handle Ctrl+D for exit (when buffer is empty)
+                    else if (key.name === 'd') {
+                      handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
+                    }
+                    // Add more Ctrl+key handlers here as needed
+                  }}
                 />
               )}
             </>
