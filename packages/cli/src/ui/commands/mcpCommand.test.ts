@@ -212,9 +212,9 @@ describe('mcpCommand', () => {
         );
         expect(message).toContain('server2_tool1');
 
-        // Server 3 - Disconnected
+        // Server 3 - Disconnected but with cached tools, so shows as Ready
         expect(message).toContain(
-          '🔴 \u001b[1mserver3\u001b[0m - Disconnected (1 tools cached)',
+          '🟢 \u001b[1mserver3\u001b[0m - Ready (1 tool)',
         );
         expect(message).toContain('server3_tool1');
 
