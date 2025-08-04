@@ -7,7 +7,7 @@
 /** @vitest-environment jsdom */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useSlashCompletion } from './useSlashCompletion.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -136,7 +136,7 @@ describe('useSlashCompletion', () => {
         expect(result.current.isLoadingSuggestions).toBe(false);
       });
 
-      it('should reset all state to default values', () => {
+      it('should reset all state to default values', async () => {
         const slashCommands = [
           {
             name: 'help',
@@ -163,6 +163,11 @@ describe('useSlashCompletion', () => {
 
         act(() => {
           result.current.resetCompletionState();
+        });
+
+        // Wait for async suggestions clearing
+        await waitFor(() => {
+          expect(result.current.suggestions).toEqual([]);
         });
 
         expect(result.current.suggestions).toEqual([]);
@@ -1288,7 +1293,7 @@ describe('useSlashCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(result.current.textBuffer.text).toBe('@src/file1.txt');
+      expect(result.current.textBuffer.text).toBe('@src/file1.txt ');
     });
 
     it('should complete a file path when cursor is not at the end of the line', () => {
@@ -1318,7 +1323,7 @@ describe('useSlashCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(result.current.textBuffer.text).toBe('@src/file1.txt le.txt');
+      expect(result.current.textBuffer.text).toBe('@src/file1.txt  le.txt');
     });
 
     it('should complete the correct file path with multiple @-commands', () => {
@@ -1347,7 +1352,7 @@ describe('useSlashCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(result.current.textBuffer.text).toBe('@file1.txt @src/file2.txt');
+      expect(result.current.textBuffer.text).toBe('@file1.txt @src/file2.txt ');
     });
   });
 

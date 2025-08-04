@@ -111,7 +111,7 @@ export function useSlashCompletion(
 
   useEffect(() => {
     if (commandIndex === -1 || reverseSearchActive) {
-      resetCompletionState();
+      setTimeout(resetCompletionState, 0);
       return;
     }
 
@@ -631,17 +631,17 @@ export function useSlashCompletion(
         ) {
           suggestionText = ' ' + suggestionText;
         }
-        suggestionText += ' ';
       }
+
+      suggestionText += ' ';
 
       buffer.replaceRangeByOffset(
         logicalPosToOffset(buffer.lines, cursorRow, completionStart.current),
         logicalPosToOffset(buffer.lines, cursorRow, completionEnd.current),
         suggestionText,
       );
-      resetCompletionState();
     },
-    [cursorRow, resetCompletionState, buffer, suggestions, commandIndex],
+    [cursorRow, buffer, suggestions, commandIndex],
   );
 
   return {
