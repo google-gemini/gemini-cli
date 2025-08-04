@@ -201,6 +201,11 @@ describe('fileUtils', () => {
       expect(await detectFileType('file.test.ts')).toBe('text');
     });
 
+    it('should detect typescript module type by extension (mts)', async () => {
+      expect(await detectFileType('file.mts')).toBe('text');
+      expect(await detectFileType('vite.config.mts')).toBe('text');
+    });
+
     it('should detect image type by extension (png)', async () => {
       mockMimeLookup.mockReturnValueOnce('image/png');
       expect(await detectFileType('file.png')).toBe('image');

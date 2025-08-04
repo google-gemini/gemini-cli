@@ -122,9 +122,9 @@ export async function detectFileType(
 ): Promise<'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg'> {
   const ext = path.extname(filePath).toLowerCase();
 
-  // The mimetype for "ts" is MPEG transport stream (a video format) but we want
+  // The mimetype for "ts" and "mts" is MPEG transport stream (a video format) but we want
   // to assume these are typescript files instead.
-  if (ext === '.ts') {
+  if (ext === '.ts' || ext === '.mts') {
     return 'text';
   }
 
