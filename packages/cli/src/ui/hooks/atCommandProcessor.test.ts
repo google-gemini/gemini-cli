@@ -691,324 +691,116 @@ describe('handleAtCommand', () => {
   });
 
   describe('punctuation termination in @ commands', () => {
-    it('should terminate @path at comma', async () => {
-      const fileContent = 'File content here';
-      const filePath = await createTestFile(
-        path.join(testRootDir, 'test.txt'),
-        fileContent,
-      );
-      const query = `Look at @${filePath}, then explain it.`;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
+    const punctuationTestCases = [
+      {
+        name: 'comma',
+        fileName: 'test.txt',
+        fileContent: 'File content here',
+        queryTemplate: (filePath: string) => `Look at @${filePath}, then explain it.`,
         messageId: 400,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [
-          { text: `Look at @${filePath}, then explain it.` },
-          { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
-          { text: fileContent },
-          { text: '\n--- End of content ---' },
-        ],
-        shouldProceed: true,
-      });
-    });
-
-    it('should terminate @path at period', async () => {
-      const fileContent = 'File content here';
-      const filePath = await createTestFile(
-        path.join(testRootDir, 'readme.md'),
-        fileContent,
-      );
-      const query = `Check @${filePath}. What does it say?`;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
+      },
+      {
+        name: 'period',
+        fileName: 'readme.md',
+        fileContent: 'File content here',
+        queryTemplate: (filePath: string) => `Check @${filePath}. What does it say?`,
         messageId: 401,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [
-          { text: `Check @${filePath}. What does it say?` },
-          { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
-          { text: fileContent },
-          { text: '\n--- End of content ---' },
-        ],
-        shouldProceed: true,
-      });
-    });
-
-    it('should terminate @path at semicolon', async () => {
-      const fileContent = 'Code example';
-      const filePath = await createTestFile(
-        path.join(testRootDir, 'example.js'),
-        fileContent,
-      );
-      const query = `Review @${filePath}; check for bugs.`;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
+      },
+      {
+        name: 'semicolon',
+        fileName: 'example.js',
+        fileContent: 'Code example',
+        queryTemplate: (filePath: string) => `Review @${filePath}; check for bugs.`,
         messageId: 402,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [
-          { text: `Review @${filePath}; check for bugs.` },
-          { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
-          { text: fileContent },
-          { text: '\n--- End of content ---' },
-        ],
-        shouldProceed: true,
-      });
-    });
-
-    it('should terminate @path at exclamation mark', async () => {
-      const fileContent = 'Important content';
-      const filePath = await createTestFile(
-        path.join(testRootDir, 'important.txt'),
-        fileContent,
-      );
-      const query = `Look at @${filePath}! This is critical.`;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
+      },
+      {
+        name: 'exclamation mark',
+        fileName: 'important.txt',
+        fileContent: 'Important content',
+        queryTemplate: (filePath: string) => `Look at @${filePath}! This is critical.`,
         messageId: 403,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [
-          { text: `Look at @${filePath}! This is critical.` },
-          { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
-          { text: fileContent },
-          { text: '\n--- End of content ---' },
-        ],
-        shouldProceed: true,
-      });
-    });
-
-    it('should terminate @path at question mark', async () => {
-      const fileContent = 'Config settings';
-      const filePath = await createTestFile(
-        path.join(testRootDir, 'config.json'),
-        fileContent,
-      );
-      const query = `What is in @${filePath}? Please explain.`;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
+      },
+      {
+        name: 'question mark',
+        fileName: 'config.json',
+        fileContent: 'Config settings',
+        queryTemplate: (filePath: string) => `What is in @${filePath}? Please explain.`,
         messageId: 404,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [
-          { text: `What is in @${filePath}? Please explain.` },
-          { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
-          { text: fileContent },
-          { text: '\n--- End of content ---' },
-        ],
-        shouldProceed: true,
-      });
-    });
-
-    it('should terminate @path at opening parenthesis', async () => {
-      const fileContent = 'Function definition';
-      const filePath = await createTestFile(
-        path.join(testRootDir, 'func.ts'),
-        fileContent,
-      );
-      const query = `Analyze @${filePath}(the main function).`;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
+      },
+      {
+        name: 'opening parenthesis',
+        fileName: 'func.ts',
+        fileContent: 'Function definition',
+        queryTemplate: (filePath: string) => `Analyze @${filePath}(the main function).`,
         messageId: 405,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [
-          { text: `Analyze @${filePath}(the main function).` },
-          { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
-          { text: fileContent },
-          { text: '\n--- End of content ---' },
-        ],
-        shouldProceed: true,
-      });
-    });
-
-    it('should terminate @path at closing parenthesis', async () => {
-      const fileContent = 'Test data';
-      const filePath = await createTestFile(
-        path.join(testRootDir, 'data.json'),
-        fileContent,
-      );
-      const query = `Use data from @${filePath}) for testing.`;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
+      },
+      {
+        name: 'closing parenthesis',
+        fileName: 'data.json',
+        fileContent: 'Test data',
+        queryTemplate: (filePath: string) => `Use data from @${filePath}) for testing.`,
         messageId: 406,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [
-          { text: `Use data from @${filePath}) for testing.` },
-          { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
-          { text: fileContent },
-          { text: '\n--- End of content ---' },
-        ],
-        shouldProceed: true,
-      });
-    });
-
-    it('should terminate @path at opening square bracket', async () => {
-      const fileContent = 'Array data';
-      const filePath = await createTestFile(
-        path.join(testRootDir, 'array.js'),
-        fileContent,
-      );
-      const query = `Check @${filePath}[0] for the first element.`;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
+      },
+      {
+        name: 'opening square bracket',
+        fileName: 'array.js',
+        fileContent: 'Array data',
+        queryTemplate: (filePath: string) => `Check @${filePath}[0] for the first element.`,
         messageId: 407,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [
-          { text: `Check @${filePath}[0] for the first element.` },
-          { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
-          { text: fileContent },
-          { text: '\n--- End of content ---' },
-        ],
-        shouldProceed: true,
-      });
-    });
-
-    it('should terminate @path at closing square bracket', async () => {
-      const fileContent = 'List content';
-      const filePath = await createTestFile(
-        path.join(testRootDir, 'list.md'),
-        fileContent,
-      );
-      const query = `Review item @${filePath}] from the list.`;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
+      },
+      {
+        name: 'closing square bracket',
+        fileName: 'list.md',
+        fileContent: 'List content',
+        queryTemplate: (filePath: string) => `Review item @${filePath}] from the list.`,
         messageId: 408,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [
-          { text: `Review item @${filePath}] from the list.` },
-          { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
-          { text: fileContent },
-          { text: '\n--- End of content ---' },
-        ],
-        shouldProceed: true,
-      });
-    });
-
-    it('should terminate @path at opening curly brace', async () => {
-      const fileContent = 'Object definition';
-      const filePath = await createTestFile(
-        path.join(testRootDir, 'object.ts'),
-        fileContent,
-      );
-      const query = `Parse @${filePath}{prop1: value1}.`;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
+      },
+      {
+        name: 'opening curly brace',
+        fileName: 'object.ts',
+        fileContent: 'Object definition',
+        queryTemplate: (filePath: string) => `Parse @${filePath}{prop1: value1}.`,
         messageId: 409,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [
-          { text: `Parse @${filePath}{prop1: value1}.` },
-          { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
-          { text: fileContent },
-          { text: '\n--- End of content ---' },
-        ],
-        shouldProceed: true,
-      });
-    });
-
-    it('should terminate @path at closing curly brace', async () => {
-      const fileContent = 'Configuration';
-      const filePath = await createTestFile(
-        path.join(testRootDir, 'config.yaml'),
-        fileContent,
-      );
-      const query = `Use settings from @${filePath}} for deployment.`;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
+      },
+      {
+        name: 'closing curly brace',
+        fileName: 'config.yaml',
+        fileContent: 'Configuration',
+        queryTemplate: (filePath: string) => `Use settings from @${filePath}} for deployment.`,
         messageId: 410,
-        signal: abortController.signal,
-      });
+      },
+    ];
 
-      expect(result).toEqual({
-        processedQuery: [
-          { text: `Use settings from @${filePath}} for deployment.` },
-          { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
-          { text: fileContent },
-          { text: '\n--- End of content ---' },
-        ],
-        shouldProceed: true,
-      });
-    });
+    it.each(punctuationTestCases)(
+      'should terminate @path at $name',
+      async ({ fileName, fileContent, queryTemplate, messageId }) => {
+        const filePath = await createTestFile(
+          path.join(testRootDir, fileName),
+          fileContent,
+        );
+        const query = queryTemplate(filePath);
+
+        const result = await handleAtCommand({
+          query,
+          config: mockConfig,
+          addItem: mockAddItem,
+          onDebugMessage: mockOnDebugMessage,
+          messageId,
+          signal: abortController.signal,
+        });
+
+        expect(result).toEqual({
+          processedQuery: [
+            { text: query },
+            { text: '\n--- Content from referenced files ---' },
+            { text: `\nContent from @${filePath}:\n` },
+            { text: fileContent },
+            { text: '\n--- End of content ---' },
+          ],
+          shouldProceed: true,
+        });
+      },
+    );
 
     it('should handle multiple @paths terminated by different punctuation', async () => {
       const content1 = 'First file';
