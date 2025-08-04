@@ -286,7 +286,7 @@ export async function loadCliConfig(
     ) ||
     false;
   const memoryImportFormat = settings.memoryImportFormat || 'tree';
-  const ideMode = settings.ideMode ?? false
+  const ideMode = settings.ideMode ?? false;
 
   const ideModeFeature =
     (argv.ideModeFeature ?? settings.ideModeFeature ?? false) &&
