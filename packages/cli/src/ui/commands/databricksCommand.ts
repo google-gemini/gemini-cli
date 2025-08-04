@@ -264,6 +264,26 @@ function handleSet(
     process.env.DBX_PAT = params.pat;
   }
 
+  // If both URL and PAT are now configured, automatically enable Databricks
+  const hasUrl = process.env.DATABRICKS_URL || params.url;
+  const hasPat = process.env.DBX_PAT || params.pat;
+
+  if (hasUrl && hasPat) {
+    // Automatically enable Databricks authentication
+    context.services.settings.setValue(
+      SettingScope.User,
+      'selectedAuthType',
+      AuthType.USE_DATABRICKS,
+    );
+
+    return {
+      type: 'message',
+      messageType: 'info',
+      content:
+        'Databricks configuration updated and authentication enabled successfully.',
+    };
+  }
+
   return {
     type: 'message',
     messageType: 'info',
@@ -305,7 +325,20 @@ function handleEnable(
   // Reload environment to ensure we have latest values
   loadEnvironment();
 
-  // Check if configuration exists
+  // Also check settings directly in case they haven't been loaded to env yet
+  const settings = context.services.settings.merged;
+  const urlFromSettings = settings.databricksUrl;
+  const patFromSettings = settings.databricksPat;
+
+  // Ensure environment variables are set from settings if needed
+  if (urlFromSettings && !process.env.DATABRICKS_URL) {
+    process.env.DATABRICKS_URL = urlFromSettings;
+  }
+  if (patFromSettings && !process.env.DBX_PAT) {
+    process.env.DBX_PAT = patFromSettings;
+  }
+
+  // Check if configuration exists (either in env or settings)
   if (!process.env.DATABRICKS_URL || !process.env.DBX_PAT) {
     return {
       type: 'message',

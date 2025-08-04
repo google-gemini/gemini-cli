@@ -169,7 +169,7 @@ describe('databricksCommand', () => {
         type: 'message',
         messageType: 'info',
         content: expect.stringContaining(
-          'Databricks configuration updated successfully',
+          'Databricks configuration updated and authentication enabled successfully',
         ),
       });
     });
@@ -200,7 +200,7 @@ describe('databricksCommand', () => {
         type: 'message',
         messageType: 'info',
         content: expect.stringContaining(
-          'Databricks configuration updated successfully',
+          'Databricks configuration updated and authentication enabled successfully',
         ),
       });
     });
@@ -399,7 +399,7 @@ describe('databricksCommand', () => {
         type: 'message',
         messageType: 'info',
         content: expect.stringContaining(
-          'Databricks configuration updated successfully',
+          'Databricks configuration updated and authentication enabled successfully',
         ),
       });
     });

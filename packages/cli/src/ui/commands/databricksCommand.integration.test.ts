@@ -93,7 +93,7 @@ describe('databricksCommand integration with auth system', () => {
     expect(result).toBeNull();
   });
 
-  it('should return error when trying to use Databricks without configuration', () => {
+  it('should allow selecting Databricks auth even without configuration', () => {
     // Given: No Databricks configuration
     delete process.env.DATABRICKS_URL;
     delete process.env.DBX_PAT;
@@ -101,11 +101,8 @@ describe('databricksCommand integration with auth system', () => {
     // When: Validating Databricks auth method
     const result = validateAuthMethod(AuthType.USE_DATABRICKS);
 
-    // Then: Should return error message
-    expect(result).not.toBeNull();
-    expect(result).toContain('When using Databricks, you must specify');
-    expect(result).toContain('DATABRICKS_URL');
-    expect(result).toContain('DBX_PAT');
+    // Then: Should allow selection (users can configure later with /databricks set)
+    expect(result).toBeNull();
   });
 
   it('should enable Databricks auth after configuration', async () => {
