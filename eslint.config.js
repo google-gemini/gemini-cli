@@ -12,7 +12,6 @@ import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 import licenseHeader from 'eslint-plugin-license-header';
-import noRelativeCrossPackageImports from './eslint-rules/no-relative-cross-package-imports.js';
 import path from 'node:path'; // Use node: prefix for built-ins
 import url from 'node:url';
 
@@ -33,8 +32,9 @@ export default tseslint.config(
       'packages/cli/dist/**',
       'packages/core/dist/**',
       'packages/server/dist/**',
-      'eslint-rules/*',
+      'packages/vscode-ide-companion/dist/**',
       'bundle/**',
+      'package/bundle/**',
     ],
   },
   eslint.configs.recommended,
@@ -71,6 +71,14 @@ export default tseslint.config(
   {
     // General overrides and rules for the project (TS/TSX files)
     files: ['packages/*/src/**/*.{ts,tsx}'], // Target only TS/TSX in the cli package
+    plugins: {
+      import: importPlugin,
+    },
+    settings: {
+      'import/resolver': {
+        node: true,
+      },
+    },
     languageOptions: {
       globals: {
         ...globals.node,
@@ -105,6 +113,13 @@ export default tseslint.config(
           caughtErrorsIgnorePattern: '^_',
         },
       ],
+      'import/no-internal-modules': [
+        'error',
+        {
+          allow: ['react-dom/test-utils', 'memfs/lib/volume.js', 'yargs/**'],
+        },
+      ],
+      'import/no-relative-packages': 'error',
       'no-cond-assign': 'error',
       'no-debugger': 'error',
       'no-duplicate-case': 'error',
@@ -175,6 +190,35 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['packages/vscode-ide-companion/esbuild.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        process: 'readonly',
+        console: 'readonly',
+      },
+    },
+    rules: {
+      'no-restricted-syntax': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  // extra settings for scripts that we run directly with node
+  {
+    files: ['packages/vscode-ide-companion/scripts/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        process: 'readonly',
+        console: 'readonly',
+      },
+    },
+    rules: {
+      'no-restricted-syntax': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
   // Prettier config must be last
   prettierConfig,
   // extra settings for scripts that we run directly with node
@@ -194,26 +238,6 @@ export default tseslint.config(
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
           caughtErrorsIgnorePattern: '^_',
-        },
-      ],
-    },
-  },
-  // Custom eslint rules for this repo
-  {
-    files: ['packages/**/*.{js,jsx,ts,tsx}'],
-    plugins: {
-      custom: {
-        rules: {
-          'no-relative-cross-package-imports': noRelativeCrossPackageImports,
-        },
-      },
-    },
-    rules: {
-      // Enable and configure your custom rule
-      'custom/no-relative-cross-package-imports': [
-        'error',
-        {
-          root: path.join(projectRoot, 'packages'),
         },
       ],
     },

@@ -136,12 +136,17 @@ export async function handleAtCommand({
 
   // Get centralized file discovery service
   const fileDiscovery = config.getFileService();
-  const respectGitIgnore = config.getFileFilteringRespectGitIgnore();
+
+  const respectFileIgnore = config.getFileFilteringOptions();
 
   const pathSpecsToRead: string[] = [];
   const atPathToResolvedSpecMap = new Map<string, string>();
   const contentLabelsForDisplay: string[] = [];
-  const ignoredPaths: string[] = [];
+  const ignoredByReason: Record<string, string[]> = {
+    git: [],
+    gemini: [],
+    both: [],
+  };
 
   const toolRegistry = await config.getToolRegistry();
   const readManyFilesTool = toolRegistry.getTool('read_many_files');
@@ -181,98 +186,125 @@ export async function handleAtCommand({
       return { processedQuery: null, shouldProceed: false };
     }
 
-    // Check if path should be ignored by git
-    if (fileDiscovery.shouldGitIgnoreFile(pathName)) {
-      const reason = respectGitIgnore
-        ? 'git-ignored and will be skipped'
-        : 'ignored by custom patterns';
-      onDebugMessage(`Path ${pathName} is ${reason}.`);
-      ignoredPaths.push(pathName);
+    // Check if path should be ignored based on filtering options
+
+    const workspaceContext = config.getWorkspaceContext();
+    if (!workspaceContext.isPathWithinWorkspace(pathName)) {
+      onDebugMessage(
+        `Path ${pathName} is not in the workspace and will be skipped.`,
+      );
       continue;
     }
 
-    let currentPathSpec = pathName;
-    let resolvedSuccessfully = false;
+    const gitIgnored =
+      respectFileIgnore.respectGitIgnore &&
+      fileDiscovery.shouldIgnoreFile(pathName, {
+        respectGitIgnore: true,
+        respectGeminiIgnore: false,
+      });
+    const geminiIgnored =
+      respectFileIgnore.respectGeminiIgnore &&
+      fileDiscovery.shouldIgnoreFile(pathName, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: true,
+      });
 
-    try {
-      const absolutePath = path.resolve(config.getTargetDir(), pathName);
-      const stats = await fs.stat(absolutePath);
-      if (stats.isDirectory()) {
-        currentPathSpec = pathName.endsWith('/')
-          ? `${pathName}**`
-          : `${pathName}/**`;
-        onDebugMessage(
-          `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
-        );
-      } else {
-        onDebugMessage(`Path ${pathName} resolved to file: ${currentPathSpec}`);
-      }
-      resolvedSuccessfully = true;
-    } catch (error) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        if (config.getEnableRecursiveFileSearch() && globTool) {
+    if (gitIgnored || geminiIgnored) {
+      const reason =
+        gitIgnored && geminiIgnored ? 'both' : gitIgnored ? 'git' : 'gemini';
+      ignoredByReason[reason].push(pathName);
+      const reasonText =
+        reason === 'both'
+          ? 'ignored by both git and gemini'
+          : reason === 'git'
+            ? 'git-ignored'
+            : 'gemini-ignored';
+      onDebugMessage(`Path ${pathName} is ${reasonText} and will be skipped.`);
+      continue;
+    }
+
+    for (const dir of config.getWorkspaceContext().getDirectories()) {
+      let currentPathSpec = pathName;
+      let resolvedSuccessfully = false;
+      try {
+        const absolutePath = path.resolve(dir, pathName);
+        const stats = await fs.stat(absolutePath);
+        if (stats.isDirectory()) {
+          currentPathSpec =
+            pathName + (pathName.endsWith(path.sep) ? `**` : `/**`);
           onDebugMessage(
-            `Path ${pathName} not found directly, attempting glob search.`,
+            `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
           );
-          try {
-            const globResult = await globTool.execute(
-              { pattern: `**/*${pathName}*`, path: config.getTargetDir() },
-              signal,
+        } else {
+          onDebugMessage(`Path ${pathName} resolved to file: ${absolutePath}`);
+        }
+        resolvedSuccessfully = true;
+      } catch (error) {
+        if (isNodeError(error) && error.code === 'ENOENT') {
+          if (config.getEnableRecursiveFileSearch() && globTool) {
+            onDebugMessage(
+              `Path ${pathName} not found directly, attempting glob search.`,
             );
-            if (
-              globResult.llmContent &&
-              typeof globResult.llmContent === 'string' &&
-              !globResult.llmContent.startsWith('No files found') &&
-              !globResult.llmContent.startsWith('Error:')
-            ) {
-              const lines = globResult.llmContent.split('\n');
-              if (lines.length > 1 && lines[1]) {
-                const firstMatchAbsolute = lines[1].trim();
-                currentPathSpec = path.relative(
-                  config.getTargetDir(),
-                  firstMatchAbsolute,
-                );
-                onDebugMessage(
-                  `Glob search for ${pathName} found ${firstMatchAbsolute}, using relative path: ${currentPathSpec}`,
-                );
-                resolvedSuccessfully = true;
+            try {
+              const globResult = await globTool.execute(
+                {
+                  pattern: `**/*${pathName}*`,
+                  path: dir,
+                },
+                signal,
+              );
+              if (
+                globResult.llmContent &&
+                typeof globResult.llmContent === 'string' &&
+                !globResult.llmContent.startsWith('No files found') &&
+                !globResult.llmContent.startsWith('Error:')
+              ) {
+                const lines = globResult.llmContent.split('\n');
+                if (lines.length > 1 && lines[1]) {
+                  const firstMatchAbsolute = lines[1].trim();
+                  currentPathSpec = path.relative(dir, firstMatchAbsolute);
+                  onDebugMessage(
+                    `Glob search for ${pathName} found ${firstMatchAbsolute}, using relative path: ${currentPathSpec}`,
+                  );
+                  resolvedSuccessfully = true;
+                } else {
+                  onDebugMessage(
+                    `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
+                  );
+                }
               } else {
                 onDebugMessage(
-                  `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
+                  `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
                 );
               }
-            } else {
+            } catch (globError) {
+              console.error(
+                `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
+              );
               onDebugMessage(
-                `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
+                `Error during glob search for ${pathName}. Path ${pathName} will be skipped.`,
               );
             }
-          } catch (globError) {
-            console.error(
-              `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
-            );
+          } else {
             onDebugMessage(
-              `Error during glob search for ${pathName}. Path ${pathName} will be skipped.`,
+              `Glob tool not found. Path ${pathName} will be skipped.`,
             );
           }
         } else {
+          console.error(
+            `Error stating path ${pathName}: ${getErrorMessage(error)}`,
+          );
           onDebugMessage(
-            `Glob tool not found. Path ${pathName} will be skipped.`,
+            `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
           );
         }
-      } else {
-        console.error(
-          `Error stating path ${pathName}: ${getErrorMessage(error)}`,
-        );
-        onDebugMessage(
-          `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
-        );
       }
-    }
-
-    if (resolvedSuccessfully) {
-      pathSpecsToRead.push(currentPathSpec);
-      atPathToResolvedSpecMap.set(originalAtPath, currentPathSpec);
-      contentLabelsForDisplay.push(pathName);
+      if (resolvedSuccessfully) {
+        pathSpecsToRead.push(currentPathSpec);
+        atPathToResolvedSpecMap.set(originalAtPath, currentPathSpec);
+        contentLabelsForDisplay.push(pathName);
+        break;
+      }
     }
   }
 
@@ -321,11 +353,26 @@ export async function handleAtCommand({
   initialQueryText = initialQueryText.trim();
 
   // Inform user about ignored paths
-  if (ignoredPaths.length > 0) {
-    const ignoreType = respectGitIgnore ? 'git-ignored' : 'custom-ignored';
-    onDebugMessage(
-      `Ignored ${ignoredPaths.length} ${ignoreType} files: ${ignoredPaths.join(', ')}`,
-    );
+  const totalIgnored =
+    ignoredByReason.git.length +
+    ignoredByReason.gemini.length +
+    ignoredByReason.both.length;
+
+  if (totalIgnored > 0) {
+    const messages = [];
+    if (ignoredByReason.git.length) {
+      messages.push(`Git-ignored: ${ignoredByReason.git.join(', ')}`);
+    }
+    if (ignoredByReason.gemini.length) {
+      messages.push(`Gemini-ignored: ${ignoredByReason.gemini.join(', ')}`);
+    }
+    if (ignoredByReason.both.length) {
+      messages.push(`Ignored by both: ${ignoredByReason.both.join(', ')}`);
+    }
+
+    const message = `Ignored ${totalIgnored} files:\n${messages.join('\n')}`;
+    console.log(message);
+    onDebugMessage(message);
   }
 
   // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
@@ -349,7 +396,11 @@ export async function handleAtCommand({
 
   const toolArgs = {
     paths: pathSpecsToRead,
-    respectGitIgnore, // Use configuration setting
+    file_filtering_options: {
+      respect_git_ignore: respectFileIgnore.respectGitIgnore,
+      respect_gemini_ignore: respectFileIgnore.respectGeminiIgnore,
+    },
+    // Use configuration setting
   };
   let toolCallDisplay: IndividualToolCallDisplay;
 

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MCPServerConfig } from '@google/gemini-cli-core';
+import { MCPServerConfig, GeminiCLIExtension } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -13,6 +13,7 @@ export const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 
 export interface Extension {
+  path: string;
   config: ExtensionConfig;
   contextFiles: string[];
 }
@@ -22,6 +23,7 @@ export interface ExtensionConfig {
   version: string;
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
+  excludeTools?: string[];
 }
 
 export function loadExtensions(workspaceDir: string): Extension[] {
@@ -30,19 +32,14 @@ export function loadExtensions(workspaceDir: string): Extension[] {
     ...loadExtensionsFromDir(os.homedir()),
   ];
 
-  const uniqueExtensions: Extension[] = [];
-  const seenNames = new Set<string>();
+  const uniqueExtensions = new Map<string, Extension>();
   for (const extension of allExtensions) {
-    if (!seenNames.has(extension.config.name)) {
-      console.log(
-        `Loading extension: ${extension.config.name} (version: ${extension.config.version})`,
-      );
-      uniqueExtensions.push(extension);
-      seenNames.add(extension.config.name);
+    if (!uniqueExtensions.has(extension.config.name)) {
+      uniqueExtensions.set(extension.config.name, extension);
     }
   }
 
-  return uniqueExtensions;
+  return Array.from(uniqueExtensions.values());
 }
 
 function loadExtensionsFromDir(dir: string): Extension[] {
@@ -94,6 +91,7 @@ function loadExtension(extensionDir: string): Extension | null {
       .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
     return {
+      path: extensionDir,
       config,
       contextFiles,
     };
@@ -112,4 +110,60 @@ function getContextFileNames(config: ExtensionConfig): string[] {
     return [config.contextFileName];
   }
   return config.contextFileName;
+}
+
+export function annotateActiveExtensions(
+  extensions: Extension[],
+  enabledExtensionNames: string[],
+): GeminiCLIExtension[] {
+  const annotatedExtensions: GeminiCLIExtension[] = [];
+
+  if (enabledExtensionNames.length === 0) {
+    return extensions.map((extension) => ({
+      name: extension.config.name,
+      version: extension.config.version,
+      isActive: true,
+      path: extension.path,
+    }));
+  }
+
+  const lowerCaseEnabledExtensions = new Set(
+    enabledExtensionNames.map((e) => e.trim().toLowerCase()),
+  );
+
+  if (
+    lowerCaseEnabledExtensions.size === 1 &&
+    lowerCaseEnabledExtensions.has('none')
+  ) {
+    return extensions.map((extension) => ({
+      name: extension.config.name,
+      version: extension.config.version,
+      isActive: false,
+      path: extension.path,
+    }));
+  }
+
+  const notFoundNames = new Set(lowerCaseEnabledExtensions);
+
+  for (const extension of extensions) {
+    const lowerCaseName = extension.config.name.toLowerCase();
+    const isActive = lowerCaseEnabledExtensions.has(lowerCaseName);
+
+    if (isActive) {
+      notFoundNames.delete(lowerCaseName);
+    }
+
+    annotatedExtensions.push({
+      name: extension.config.name,
+      version: extension.config.version,
+      isActive,
+      path: extension.path,
+    });
+  }
+
+  for (const requestedName of notFoundNames) {
+    console.error(`Extension not found: ${requestedName}`);
+  }
+
+  return annotatedExtensions;
 }
