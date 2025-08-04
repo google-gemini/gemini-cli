@@ -186,7 +186,7 @@ describe('useSlashCommandProcessor', () => {
       }).toThrow(TypeError);
     });
 
-    it('should override built-in commands with file-based commands of the same name', async () => {
+    it('should prioritize built-in commands over file-based commands of the same name', async () => {
       const builtinAction = vi.fn();
       const fileAction = vi.fn();
 
@@ -203,17 +203,16 @@ describe('useSlashCommandProcessor', () => {
       const result = setupProcessorHook([builtinCommand], [fileCommand]);
 
       await waitFor(() => {
-        // The service should only return one command with the name 'override'
-        expect(result.current.slashCommands).toHaveLength(1);
+        expect(result.current.slashCommands).toHaveLength(2);
       });
 
       await act(async () => {
         await result.current.handleSlashCommand('/override');
       });
 
-      // Only the file-based command's action should be called.
-      expect(fileAction).toHaveBeenCalledTimes(1);
-      expect(builtinAction).not.toHaveBeenCalled();
+      // The built-in command comes first in the concatenated array and is found first.
+      expect(builtinAction).toHaveBeenCalledTimes(1);
+      expect(fileAction).not.toHaveBeenCalled();
     });
   });
 
@@ -713,7 +712,7 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Command Precedence', () => {
-    it('should override mcp-based commands with file-based commands of the same name', async () => {
+    it('should rename mcp-based commands when conflicting with file-based commands', async () => {
       const mcpAction = vi.fn();
       const fileAction = vi.fn();
 
@@ -722,6 +721,7 @@ describe('useSlashCommandProcessor', () => {
           name: 'override',
           description: 'mcp',
           action: mcpAction,
+          serverName: 'test_server',
         },
         CommandKind.MCP_PROMPT,
       );
@@ -733,15 +733,25 @@ describe('useSlashCommandProcessor', () => {
       const result = setupProcessorHook([], [fileCommand], [mcpCommand]);
 
       await waitFor(() => {
-        // The service should only return one command with the name 'override'
-        expect(result.current.slashCommands).toHaveLength(1);
+        expect(result.current.slashCommands).toHaveLength(2);
       });
+
+      const originalCmd = result.current.slashCommands.find(
+        (cmd) => cmd.name === 'override',
+      );
+      const renamedCmd = result.current.slashCommands.find(
+        (cmd) => cmd.name === 'test_server_override',
+      );
+
+      expect(originalCmd).toBeDefined();
+      expect(originalCmd?.description).toBe('file');
+      expect(renamedCmd).toBeDefined();
+      expect(renamedCmd?.description).toBe('mcp');
 
       await act(async () => {
         await result.current.handleSlashCommand('/override');
       });
 
-      // Only the file-based command's action should be called.
       expect(fileAction).toHaveBeenCalledTimes(1);
       expect(mcpAction).not.toHaveBeenCalled();
     });
@@ -828,6 +838,7 @@ describe('useSlashCommandProcessor', () => {
           mockSetQuittingMessages,
           vi.fn(), // openPrivacyNotice
           vi.fn(), // toggleVimEnabled
+          vi.fn(), // setIsProcessing
         ),
       );
 
