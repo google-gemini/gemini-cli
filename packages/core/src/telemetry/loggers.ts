@@ -356,3 +356,5 @@ export function logSlashCommand(
   };
   logger.emit(logRecord);
 }
+
+export * from './metrics.js';
