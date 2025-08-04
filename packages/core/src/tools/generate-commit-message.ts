@@ -27,6 +27,7 @@ Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
 Rules:
 - Lowercase type and description
 - Present tense, no period
+- Commit title must be 70 characters or less
 - Breaking changes: use ! after type/scope OR "BREAKING CHANGE:" in footer
 - Body: explain motivation (optional)
 - Footer: "BREAKING CHANGE:", "Closes #123", "Refs #456" (optional)
@@ -44,7 +45,7 @@ feat(api)!: remove deprecated endpoints
 BREAKING CHANGE: The /v1/users endpoint has been removed. Use /v2/users instead.
 
 Instructions:
-1. Analyze changes in <commit_analysis> tags
+1. Analyze the Git Diff to generate a conventional commit message
 2. Output ONLY the raw commit message text
 
 ## Git Status
@@ -535,20 +536,9 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
 
       const generatedText = getResponseText(response) ?? '';
 
-      // Extract commit message from analysis response
-      const analysisEndIndex = generatedText.indexOf('</commit_analysis>');
-      if (analysisEndIndex !== -1) {
-        const commitMessage = generatedText
-          .substring(analysisEndIndex + '</commit_analysis>'.length)
-          .trim()
-          .replace(/^```[a-z]*\n?/, '') // Remove code block markers
-          .replace(/```$/, '')
-          .trim();
-
-        return commitMessage;
-      }
-
-      return generatedText;
+      // The prompt instructs the model to return only the raw commit message,
+      // so no extra parsing is needed here.
+      return generatedText.trim();
     } catch (error) {
       console.error('Error during Gemini API call:', error);
       throw new Error(

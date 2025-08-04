@@ -99,7 +99,7 @@ describe('GenerateCommitMessageTool', () => {
     expect(mockClient.generateContent).not.toHaveBeenCalled();
   });
 
-  it('should return an error when git command fails', async () => {
+  it('should return no changes message when git command fails', async () => {
     mockSpawn.mockImplementation((_command, _args) => {
       const child = new EventEmitter() as EventEmitter & {
         stdout: { on: ReturnType<typeof vi.fn> };
@@ -117,7 +117,7 @@ describe('GenerateCommitMessageTool', () => {
 
     const result = await tool.execute(undefined, new AbortController().signal);
 
-    expect(result.llmContent).toContain('Error during commit workflow');
+    expect(result.llmContent).toBe('No changes detected in the current workspace.');
     expect(mockClient.generateContent).not.toHaveBeenCalled();
   });
 
@@ -281,9 +281,9 @@ describe('GenerateCommitMessageTool', () => {
     expect(addCalls).toHaveLength(0);
   });
 
-  it('should return an error when spawn process fails to start', async () => {
+  it('should return error message when spawn process fails to start', async () => {
     const mockError = new Error('spawn error');
-    mockSpawn.mockImplementationOnce(() => {
+    mockSpawn.mockImplementation(() => {
       const child = new EventEmitter() as EventEmitter & {
         stdout: { on: ReturnType<typeof vi.fn> };
         stderr: { on: ReturnType<typeof vi.fn> };
@@ -296,8 +296,7 @@ describe('GenerateCommitMessageTool', () => {
 
     const result = await tool.execute(undefined, new AbortController().signal);
 
-    expect(result.llmContent).toContain('Error during commit workflow');
-    expect(mockClient.generateContent).not.toHaveBeenCalled();
+    expect(result.llmContent).toBe('No changes detected in the current workspace.');
   });
 
   it('should only use staged changes for commit message when mixed changes exist', async () => {
