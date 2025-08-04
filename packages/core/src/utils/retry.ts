@@ -9,6 +9,7 @@ import {
   isProQuotaExceededError,
   isGenericQuotaExceededError,
 } from './quotaErrorDetection.js';
+import { RateLimiter } from './rateLimiter.js';
 
 export interface HttpError extends Error {
   status?: number;
@@ -24,6 +25,8 @@ export interface RetryOptions {
     error?: unknown,
   ) => Promise<string | boolean | null>;
   authType?: string;
+  rateLimiter?: RateLimiter;
+  tokens?: number;
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
@@ -81,10 +84,14 @@ export async function retryWithBackoff<T>(
     onPersistent429,
     authType,
     shouldRetry,
+    rateLimiter,
+    tokens,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
     ...options,
   };
+
+  const requestTokens = tokens ?? 0;
 
   let attempt = 0;
   let currentDelay = initialDelayMs;
@@ -92,8 +99,20 @@ export async function retryWithBackoff<T>(
 
   while (attempt < maxAttempts) {
     attempt++;
+
+    if (rateLimiter) {
+      const rateLimitDelay = rateLimiter.getRetryDelay(requestTokens);
+      if (rateLimitDelay > 0) {
+        await delay(rateLimitDelay);
+      }
+    }
+
     try {
-      return await fn();
+      const result = await fn();
+      if (rateLimiter) {
+        rateLimiter.addRequest(requestTokens);
+      }
+      return result;
     } catch (error) {
       const errorStatus = getErrorStatus(error);
 
