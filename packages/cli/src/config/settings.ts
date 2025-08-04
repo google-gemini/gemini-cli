@@ -9,17 +9,19 @@ import * as path from 'path';
 import { homedir, platform } from 'os';
 import * as dotenv from 'dotenv';
 import {
-  MCPServerConfig,
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
-  BugCommandSettings,
-  TelemetrySettings,
-  AuthType,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
-import { CustomTheme } from '../ui/themes/theme.js';
+import {
+  Settings,
+  DnsResolutionOrder,
+  MemoryImportFormat,
+} from './settingsSchema.js';
+
+export type { Settings, DnsResolutionOrder, MemoryImportFormat };
 
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
@@ -38,81 +40,10 @@ export function getSystemSettingsPath(): string {
   }
 }
 
-export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
-
 export enum SettingScope {
   User = 'User',
   Workspace = 'Workspace',
   System = 'System',
-}
-
-export interface CheckpointingSettings {
-  enabled?: boolean;
-}
-
-export interface SummarizeToolOutputSettings {
-  tokenBudget?: number;
-}
-
-export interface AccessibilitySettings {
-  disableLoadingPhrases?: boolean;
-}
-
-export interface Settings {
-  theme?: string;
-  customThemes?: Record<string, CustomTheme>;
-  selectedAuthType?: AuthType;
-  useExternalAuth?: boolean;
-  sandbox?: boolean | string;
-  coreTools?: string[];
-  excludeTools?: string[];
-  toolDiscoveryCommand?: string;
-  toolCallCommand?: string;
-  mcpServerCommand?: string;
-  mcpServers?: Record<string, MCPServerConfig>;
-  allowMCPServers?: string[];
-  excludeMCPServers?: string[];
-  showMemoryUsage?: boolean;
-  contextFileName?: string | string[];
-  accessibility?: AccessibilitySettings;
-  telemetry?: TelemetrySettings;
-  usageStatisticsEnabled?: boolean;
-  preferredEditor?: string;
-  bugCommand?: BugCommandSettings;
-  checkpointing?: CheckpointingSettings;
-  autoConfigureMaxOldSpaceSize?: boolean;
-
-  // Git-aware file filtering settings
-  fileFiltering?: {
-    respectGitIgnore?: boolean;
-    respectGeminiIgnore?: boolean;
-    enableRecursiveFileSearch?: boolean;
-  };
-
-  hideWindowTitle?: boolean;
-
-  hideTips?: boolean;
-  hideBanner?: boolean;
-
-  // Setting for setting maximum number of user/model/tool turns in a session.
-  maxSessionTurns?: number;
-
-  // A map of tool names to their summarization settings.
-  summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
-
-  vimMode?: boolean;
-  memoryImportFormat?: 'tree' | 'flat';
-
-  // Flag to be removed post-launch.
-  ideModeFeature?: boolean;
-  /// IDE mode setting configured via slash command toggle.
-  ideMode?: boolean;
-
-  // Setting for disabling auto-update.
-  disableAutoUpdate?: boolean;
-
-  memoryDiscoveryMaxDirs?: number;
-  dnsResolutionOrder?: DnsResolutionOrder;
 }
 
 export interface SettingsError {

@@ -15,7 +15,7 @@ import {
 import { getScopeItems } from '../../utils/dialogScopeUtils.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import {
-  getAllSettingKeys,
+  getDialogSettingKeys,
   getSettingValue,
   setPendingSettingValue,
   getDisplayValue,
@@ -79,19 +79,46 @@ export function SettingsDialog({
     setPendingSettings(
       structuredClone(settings.forScope(selectedScope).settings),
     );
-    setModifiedSettings(new Set());
-    // Only reset restart prompt if there are no restart-required settings
+    // Don't reset modifiedSettings when scope changes - preserve user's pending changes
     if (restartRequiredSettings.size === 0) {
       setShowRestartPrompt(false);
     }
   }, [selectedScope, settings, restartRequiredSettings]);
 
+  // Preserve pending changes when scope changes
+  useEffect(() => {
+    if (modifiedSettings.size > 0) {
+      setPendingSettings((prevPending) => {
+        let updatedPending = { ...prevPending };
+
+        // Reapply all modified settings to the new pending settings
+        modifiedSettings.forEach((key) => {
+          const definition = getSettingDefinition(key);
+          if (definition) {
+            const originalValue = getSettingValue(
+              key,
+              settings.forScope(selectedScope).settings,
+              {},
+            );
+            const intendedValue = !originalValue;
+            updatedPending = setPendingSettingValue(
+              key,
+              intendedValue,
+              updatedPending,
+            );
+          }
+        });
+
+        return updatedPending;
+      });
+    }
+  }, [selectedScope, modifiedSettings, settings]);
+
   const generateSettingsItems = () => {
-    const settingKeys = getAllSettingKeys();
+    const settingKeys = getDialogSettingKeys();
 
-    return settingKeys.map((key) => {
+    return settingKeys.map((key: string) => {
       const currentValue = getSettingValue(key, pendingSettings, {});
-
       const definition = getSettingDefinition(key);
 
       return {
@@ -149,15 +176,11 @@ export function SettingsDialog({
               return updated;
             });
 
-            // Update pending settings to reflect the newly saved state
-            // while preserving other pending changes by reapplying them
             setPendingSettings((prevPending) => {
-              // Start with the current saved state (which now includes our just-saved change)
               let updatedPending = structuredClone(
                 settings.forScope(selectedScope).settings,
               );
 
-              // Reapply any other pending changes that weren't just saved
               currentModifiedSettings.forEach((modifiedKey) => {
                 if (modifiedKey !== key) {
                   const modifiedValue = getSettingValue(
@@ -208,14 +231,13 @@ export function SettingsDialog({
   // Scope selector items
   const scopeItems = getScopeItems();
 
-  // Scope handling functions (similar to ThemeDialog)
   const handleScopeHighlight = (scope: SettingScope) => {
     setSelectedScope(scope);
   };
 
   const handleScopeSelect = (scope: SettingScope) => {
     handleScopeHighlight(scope);
-    setFocusSection('settings'); // Reset focus to settings section
+    setFocusSection('settings');
   };
 
   // Scroll logic for settings

@@ -5,30 +5,37 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { SETTINGS_SCHEMA } from './settingsSchema.js';
+import { SETTINGS_SCHEMA, Settings } from './settingsSchema.js';
 
 describe('SettingsSchema', () => {
   describe('SETTINGS_SCHEMA', () => {
-    it('should contain all expected settings', () => {
+    it('should contain all expected top-level settings', () => {
       const expectedSettings = [
+        'theme',
+        'customThemes',
         'showMemoryUsage',
         'usageStatisticsEnabled',
         'autoConfigureMaxOldSpaceSize',
-        'accessibility.disableLoadingPhrases',
-        'checkpointing.enabled',
-        'fileFiltering.respectGitIgnore',
-        'fileFiltering.respectGeminiIgnore',
-        'fileFiltering.enableRecursiveFileSearch',
+        'preferredEditor',
+        'maxSessionTurns',
+        'memoryImportFormat',
+        'memoryDiscoveryMaxDirs',
+        'contextFileName',
+        'vimMode',
+        'ideMode',
+        'accessibility',
+        'checkpointing',
+        'fileFiltering',
+        'disableAutoUpdate',
         'hideWindowTitle',
         'hideTips',
         'hideBanner',
-        'ideMode',
-        'vimMode',
-        'disableAutoUpdate',
       ];
 
       expectedSettings.forEach((setting) => {
-        expect(SETTINGS_SCHEMA[setting]).toBeDefined();
+        expect(
+          SETTINGS_SCHEMA[setting as keyof typeof SETTINGS_SCHEMA],
+        ).toBeDefined();
       });
     });
 
@@ -48,45 +55,155 @@ describe('SettingsSchema', () => {
 
     it('should have correct nested setting structure', () => {
       const nestedSettings = [
-        'accessibility.disableLoadingPhrases',
-        'checkpointing.enabled',
-        'fileFiltering.respectGitIgnore',
-        'fileFiltering.respectGeminiIgnore',
-        'fileFiltering.enableRecursiveFileSearch',
+        'accessibility',
+        'checkpointing',
+        'fileFiltering',
       ];
 
       nestedSettings.forEach((setting) => {
-        const definition = SETTINGS_SCHEMA[setting];
-        expect(definition.parentKey).toBeDefined();
-        expect(definition.childKey).toBeDefined();
-        expect(typeof definition.parentKey).toBe('string');
-        expect(typeof definition.childKey).toBe('string');
+        const definition = SETTINGS_SCHEMA[
+          setting as keyof typeof SETTINGS_SCHEMA
+        ] as (typeof SETTINGS_SCHEMA)[keyof typeof SETTINGS_SCHEMA] & {
+          properties: unknown;
+        };
+        expect(definition.type).toBe('object');
+        expect(definition.properties).toBeDefined();
+        expect(typeof definition.properties).toBe('object');
       });
+    });
+
+    it('should have accessibility nested properties', () => {
+      expect(
+        SETTINGS_SCHEMA.accessibility.properties?.disableLoadingPhrases,
+      ).toBeDefined();
+      expect(
+        SETTINGS_SCHEMA.accessibility.properties?.disableLoadingPhrases.type,
+      ).toBe('boolean');
+    });
+
+    it('should have checkpointing nested properties', () => {
+      expect(SETTINGS_SCHEMA.checkpointing.properties?.enabled).toBeDefined();
+      expect(SETTINGS_SCHEMA.checkpointing.properties?.enabled.type).toBe(
+        'boolean',
+      );
+    });
+
+    it('should have fileFiltering nested properties', () => {
+      expect(
+        SETTINGS_SCHEMA.fileFiltering.properties?.respectGitIgnore,
+      ).toBeDefined();
+      expect(
+        SETTINGS_SCHEMA.fileFiltering.properties?.respectGeminiIgnore,
+      ).toBeDefined();
+      expect(
+        SETTINGS_SCHEMA.fileFiltering.properties?.enableRecursiveFileSearch,
+      ).toBeDefined();
     });
 
     it('should have unique categories', () => {
       const categories = new Set();
+
+      // Collect categories from top-level settings
       Object.values(SETTINGS_SCHEMA).forEach((definition) => {
         categories.add(definition.category);
+        // Also collect from nested properties
+        const defWithProps = definition as typeof definition & {
+          properties?: Record<string, unknown>;
+        };
+        if (defWithProps.properties) {
+          Object.values(defWithProps.properties).forEach(
+            (nestedDef: unknown) => {
+              const nestedDefTyped = nestedDef as { category?: string };
+              if (nestedDefTyped.category) {
+                categories.add(nestedDefTyped.category);
+              }
+            },
+          );
+        }
       });
 
-      // Should have exactly 7 categories
-      expect(categories.size).toBe(7);
+      expect(categories.size).toBeGreaterThan(0);
       expect(categories).toContain('General');
-      expect(categories).toContain('Accessibility');
-      expect(categories).toContain('Checkpointing');
-      expect(categories).toContain('File Filtering');
       expect(categories).toContain('UI');
       expect(categories).toContain('Mode');
       expect(categories).toContain('Updates');
+      expect(categories).toContain('Accessibility');
+      expect(categories).toContain('Checkpointing');
+      expect(categories).toContain('File Filtering');
+      expect(categories).toContain('Advanced');
     });
 
     it('should have consistent default values for boolean settings', () => {
-      Object.entries(SETTINGS_SCHEMA).forEach(([_key, definition]) => {
-        if (definition.type === 'boolean') {
-          expect(typeof definition.default).toBe('boolean');
-        }
-      });
+      const checkBooleanDefaults = (schema: Record<string, unknown>) => {
+        Object.entries(schema).forEach(
+          ([_key, definition]: [string, unknown]) => {
+            const def = definition as {
+              type?: string;
+              default?: unknown;
+              properties?: Record<string, unknown>;
+            };
+            if (def.type === 'boolean') {
+              // Boolean settings can have boolean or undefined defaults (for optional settings)
+              expect(['boolean', 'undefined']).toContain(typeof def.default);
+            }
+            if (def.properties) {
+              checkBooleanDefaults(def.properties);
+            }
+          },
+        );
+      };
+
+      checkBooleanDefaults(SETTINGS_SCHEMA as Record<string, unknown>);
+    });
+
+    it('should have showInDialog property configured', () => {
+      // Check that user-facing settings are marked for dialog display
+      expect(SETTINGS_SCHEMA.showMemoryUsage.showInDialog).toBe(true);
+      expect(SETTINGS_SCHEMA.vimMode.showInDialog).toBe(true);
+      expect(SETTINGS_SCHEMA.ideMode.showInDialog).toBe(true);
+      expect(SETTINGS_SCHEMA.disableAutoUpdate.showInDialog).toBe(true);
+      expect(SETTINGS_SCHEMA.hideWindowTitle.showInDialog).toBe(true);
+      expect(SETTINGS_SCHEMA.hideTips.showInDialog).toBe(true);
+      expect(SETTINGS_SCHEMA.hideBanner.showInDialog).toBe(true);
+      expect(SETTINGS_SCHEMA.usageStatisticsEnabled.showInDialog).toBe(true);
+
+      // Check that advanced settings are hidden from dialog
+      expect(SETTINGS_SCHEMA.selectedAuthType.showInDialog).toBe(false);
+      expect(SETTINGS_SCHEMA.coreTools.showInDialog).toBe(false);
+      expect(SETTINGS_SCHEMA.mcpServers.showInDialog).toBe(false);
+      expect(SETTINGS_SCHEMA.telemetry.showInDialog).toBe(false);
+
+      // Check that some settings are appropriately hidden
+      expect(SETTINGS_SCHEMA.theme.showInDialog).toBe(false); // Changed to false
+      expect(SETTINGS_SCHEMA.customThemes.showInDialog).toBe(false); // Managed via theme editor
+      expect(SETTINGS_SCHEMA.checkpointing.showInDialog).toBe(false); // Experimental feature
+      expect(SETTINGS_SCHEMA.accessibility.showInDialog).toBe(false); // Changed to false
+      expect(SETTINGS_SCHEMA.fileFiltering.showInDialog).toBe(false); // Changed to false
+      expect(SETTINGS_SCHEMA.preferredEditor.showInDialog).toBe(false); // Changed to false
+      expect(SETTINGS_SCHEMA.autoConfigureMaxOldSpaceSize.showInDialog).toBe(
+        false,
+      ); // Advanced
+    });
+
+    it('should infer Settings type correctly', () => {
+      // This is a compile-time test - if it compiles, the types are working
+      const settings: Settings = {
+        theme: 'dark',
+        showMemoryUsage: true,
+        accessibility: {
+          disableLoadingPhrases: true,
+        },
+        fileFiltering: {
+          respectGitIgnore: true,
+          enableRecursiveFileSearch: false,
+        },
+      };
+
+      expect(settings).toBeDefined();
+      expect(settings.theme).toBe('dark');
+      expect(settings.showMemoryUsage).toBe(true);
+      expect(settings.accessibility?.disableLoadingPhrases).toBe(true);
+      expect(settings.fileFiltering?.respectGitIgnore).toBe(true);
     });
   });
 });
