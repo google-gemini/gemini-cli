@@ -7,9 +7,8 @@
 import { z } from 'zod';
 import { A2AClientManager } from './a2a-client.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { extractMessageText, extractTaskText, textResponse } from './utils.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { AgentCard } from '@a2a-js/sdk';
+import { textResponse } from './utils.js';
+import { A2AToolRegistry } from './a2a-tool-registry.js';
 
 // Zod Schemas for Tool Inputs
 export const LoadAgentInputSchema = z.object({
@@ -21,125 +20,6 @@ export const LoadAgentInputSchema = z.object({
       'The path to the agent card endpoint, relative to the base URL. Defaults to `/.well-known/agent-card.json`',
     ),
 });
-
-// New schema for agent-specific send_message
-export const AgentSendMessageInputSchema = z.object({
-  message: z.string().describe('The text message to send to the agent.'),
-});
-
-// New schema for agent-specific get_task
-export const AgentGetTaskInputSchema = z.object({
-  taskId: z.string().describe('The ID of the task to query.'),
-});
-
-// New schema for agent-specific cancel_task
-export const AgentCancelTaskInputSchema = z.object({
-  taskId: z.string().describe('The ID of the task to cancel.'),
-});
-
-// Zod Schemas for Tool Outputs
-export const StringOutputSchema = z.object({
-  output: z.string(),
-});
-
-export class A2AToolRegistry {
-  constructor(
-    private server: McpServer,
-    private clientManager: A2AClientManager,
-  ) {}
-
-  registerToolsForAgent(agentCard: AgentCard): void {
-    const agentName = agentCard.name;
-    const sanitizedAgentName = agentName.replace(/\s/g, '');
-
-    // Register send_message for the agent
-    this.server.registerTool(
-      `${sanitizedAgentName}_sendMessage`,
-      {
-        description: `Sends a message to the ${agentName} agent.`,
-        inputSchema: AgentSendMessageInputSchema.shape,
-      },
-      async (args: z.infer<typeof AgentSendMessageInputSchema>) => {
-        try {
-          const response = await this.clientManager.sendMessage(
-            agentName,
-            args.message,
-          );
-          if ('error' in response) {
-            return textResponse(
-              `Error from agent ${agentName}: ${response.error.message}`,
-            );
-          }
-          if (response.result.kind === 'message') {
-            return textResponse(extractMessageText(response.result));
-          }
-          return textResponse(extractTaskText(response.result));
-        } catch (e) {
-          const error = e as Error;
-          return textResponse(
-            `Failed to send message to ${agentName}: ${error.message}`,
-          );
-        }
-      },
-    );
-
-    // Register get_task for the agent
-    this.server.registerTool(
-      `${sanitizedAgentName}_getTask`,
-      {
-        description: `Retrieves a task from the ${agentName} agent.`,
-        inputSchema: AgentGetTaskInputSchema.shape,
-      },
-      async (args: z.infer<typeof AgentGetTaskInputSchema>) => {
-        try {
-          const response = await this.clientManager.getTask(
-            agentName,
-            args.taskId,
-          );
-          if ('error' in response) {
-            return textResponse(
-              `Error from agent ${agentName} when getting task ${response.error.message}`,
-            );
-          }
-          return textResponse(extractTaskText(response.result));
-        } catch (e) {
-          const error = e as Error;
-          return textResponse(
-            `Failed to get task from agent ${agentName}: ${error.message}`,
-          );
-        }
-      },
-    );
-
-    // Register cancel_task for the agent
-    this.server.registerTool(
-      `${sanitizedAgentName}_cancelTask`,
-      {
-        description: `Cancels a task on the ${agentName} agent.`,
-        inputSchema: AgentCancelTaskInputSchema.shape,
-      },
-      async (args: z.infer<typeof AgentCancelTaskInputSchema>) => {
-        try {
-          const response = await this.clientManager.cancelTask(
-            agentName,
-            args.taskId,
-          );
-          if ('error' in response) {
-            return textResponse(
-              `Error from agent ${agentName} when canceling task: ${response.error.message}`,
-            );
-          }
-          return textResponse(extractTaskText(response.result));
-        } catch (e) {
-          const error = e as Error;
-          return textResponse(
-            `Failed to Cancel Task on Agent ${agentName}: ${error.message}`,
-          );
-        }
-      },
-    );
-  }
-}
 
 /**
  * A class that provides the implementation for the A2A tools.
@@ -182,3 +62,4 @@ export class A2AToolFunctions {
     return textResponse(output);
   }
 }
+

@@ -7,11 +7,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { A2AClientManager } from './a2a-client.js';
-import {
-  A2AToolFunctions,
-  A2AToolRegistry,
-  LoadAgentInputSchema,
-} from './tools.js';
+import { A2AToolFunctions, LoadAgentInputSchema } from './tools.js';
+import { A2AToolRegistry } from './a2a-tool-registry.js';
 
 /**
  * This script implements a standalone MCP server that communicates over stdio.
