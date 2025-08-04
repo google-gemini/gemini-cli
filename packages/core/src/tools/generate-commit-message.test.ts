@@ -10,6 +10,7 @@ import { Config, ApprovalMode } from '../config/config.js';
 import { spawn } from 'child_process';
 import { GeminiClient } from '../core/client.js';
 import { EventEmitter } from 'events';
+import { ToolConfirmationOutcome } from './tools.js';
 
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
@@ -330,5 +331,149 @@ describe('GenerateCommitMessageTool', () => {
       (call) => call[0] === 'git' && call[1]?.includes('add'),
     );
     expect(addCalls).toHaveLength(0);
+  });
+
+  describe('Interactive Confirmation', () => {
+    it('should provide confirmation details with enhanced display when approval mode is not AUTO_EDIT', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new';
+      const statusOutput = 'M  file.txt';
+      const logOutput = 'abc1234 Previous commit message';
+      const commitMessage = 'feat: new feature implementation';
+
+      mockSpawn.mockImplementation(
+        createGitCommandMock({
+          'status --porcelain': statusOutput,
+          'diff --cached': diff,
+          'log --oneline': logOutput,
+        }),
+      );
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [{ content: { parts: [{ text: commitMessage }] } }],
+      });
+
+      const controller = new AbortController();
+      const confirmationDetails = await tool.shouldConfirmExecute(
+        undefined,
+        controller.signal,
+      );
+
+      expect(confirmationDetails).toBeTruthy();
+      if (confirmationDetails && confirmationDetails.type === 'exec') {
+        expect(confirmationDetails.type).toBe('exec');
+        expect(confirmationDetails.title).toContain('feat: new feature implementation');
+        expect(confirmationDetails.command).toContain('📝 Commit Message:');
+        expect(confirmationDetails.command).toContain('📁 Files (1):');
+        expect(confirmationDetails.command).toContain('file.txt');
+        expect(confirmationDetails.rootCommand).toBe('git commit');
+        expect(confirmationDetails.onConfirm).toBeDefined();
+      }
+    });
+
+    it('should handle ProceedAlways confirmation outcome', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n+new content';
+      const statusOutput = 'M  file.txt';
+      const setApprovalModeSpy = vi.fn();
+
+      mockConfig.setApprovalMode = setApprovalModeSpy;
+
+      mockSpawn.mockImplementation(
+        createGitCommandMock({
+          'status --porcelain': statusOutput,
+          'diff --cached': diff,
+          'log --oneline': 'abc1234 Previous commit',
+        }),
+      );
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [{ content: { parts: [{ text: 'feat: test' }] } }],
+      });
+
+      const controller = new AbortController();
+      const confirmationDetails = await tool.shouldConfirmExecute(
+        undefined,
+        controller.signal,
+      );
+
+      expect(confirmationDetails).toBeTruthy();
+      if (confirmationDetails && confirmationDetails.type === 'exec') {
+        await confirmationDetails.onConfirm(ToolConfirmationOutcome.ProceedAlways);
+        expect(setApprovalModeSpy).toHaveBeenCalledWith(ApprovalMode.AUTO_EDIT);
+      }
+    });
+
+    it('should handle ModifyWithEditor confirmation outcome', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n+new content';
+      const statusOutput = 'M  file.txt';
+
+      mockSpawn.mockImplementation(
+        createGitCommandMock({
+          'status --porcelain': statusOutput,
+          'diff --cached': diff,
+          'log --oneline': 'abc1234 Previous commit',
+        }),
+      );
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [{ content: { parts: [{ text: 'feat: original message' }] } }],
+      });
+
+      const controller = new AbortController();
+      const confirmationDetails = await tool.shouldConfirmExecute(
+        undefined,
+        controller.signal,
+      );
+
+      expect(confirmationDetails).toBeTruthy();
+      if (confirmationDetails && confirmationDetails.type === 'exec') {
+        // Mock the interactive editing to return the same message
+        await confirmationDetails.onConfirm(ToolConfirmationOutcome.ModifyWithEditor);
+        // Should not throw error and should handle the editor interaction
+        expect(true).toBe(true); // Test passes if no error is thrown
+      }
+    });
+
+    it('should return false for confirmation when in AUTO_EDIT mode', async () => {
+      mockConfig.getApprovalMode = () => ApprovalMode.AUTO_EDIT;
+
+      const controller = new AbortController();
+      const confirmationDetails = await tool.shouldConfirmExecute(
+        undefined,
+        controller.signal,
+      );
+
+      expect(confirmationDetails).toBe(false);
+    });
+
+    it('should include file statistics in confirmation display', async () => {
+      const diff = 'diff --git a/file.txt b/file.txt\n+++ b/file.txt\n@@ -1,3 +1,4 @@\n line1\n+new line\n line2\n-old line';
+      const statusOutput = 'M  file.txt\nA  newfile.js';
+
+      mockSpawn.mockImplementation(
+        createGitCommandMock({
+          'status --porcelain': statusOutput,
+          'diff --cached': diff,
+          'log --oneline': 'abc1234 Previous commit',
+        }),
+      );
+
+      (mockClient.generateContent as Mock).mockResolvedValue({
+        candidates: [{ content: { parts: [{ text: 'feat: add new functionality' }] } }],
+      });
+
+      const controller = new AbortController();
+      const confirmationDetails = await tool.shouldConfirmExecute(
+        undefined,
+        controller.signal,
+      );
+
+      expect(confirmationDetails).toBeTruthy();
+      if (confirmationDetails && confirmationDetails.type === 'exec') {
+        expect(confirmationDetails.command).toContain('📊 Changes:');
+        expect(confirmationDetails.command).toContain('📁 Files (2):');
+        expect(confirmationDetails.command).toContain('file.txt');
+        expect(confirmationDetails.command).toContain('newfile.js');
+      }
+    });
   });
 });

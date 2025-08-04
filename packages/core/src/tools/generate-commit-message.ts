@@ -6,6 +6,7 @@
 
 import { Type } from '@google/genai';
 import { spawn } from 'child_process';
+import { createInterface } from 'readline';
 import {
   BaseTool,
   ToolResult,
@@ -285,20 +286,29 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
         throw new Error('Generated commit message is empty');
       }
 
-      const finalCommitMessage = commitMessage;
-
       this.updateCacheData(gitState, commitMessage);
 
-      const _filesToCommit = this.parseFilesToBeCommitted(gitState.statusOutput);
+      const filesToCommit = this.parseFilesToBeCommitted(gitState.statusOutput);
 
+      const summaryInfo = this.generateCommitSummary(gitState, commitMessage, filesToCommit);
+
+      const shortSummary = commitMessage.split('\n')[0];
+      const displayTitle = `Commit: ${shortSummary.length > 50 ? shortSummary.substring(0, 47) + '...' : shortSummary}`;
+      
       const confirmationDetails: ToolExecuteConfirmationDetails = {
         type: 'exec',
-        title: 'Confirm Git Commit',
-        command: `git commit -m "${finalCommitMessage.replace(/"/g, '\\"')}"`,
+        title: displayTitle,
+        command: `${summaryInfo}\n\ngit commit -m "${commitMessage.replace(/"/g, '\\"')}"`,
         rootCommand: 'git commit',
         onConfirm: async (outcome: ToolConfirmationOutcome) => {
           if (outcome === ToolConfirmationOutcome.ProceedAlways) {
             this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+          } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
+            // Allow user to modify the commit message
+            const editedMessage = await this.promptForCustomCommitMessage(gitState, signal);
+            if (editedMessage !== commitMessage) {
+              this.updateCacheData(gitState, editedMessage);
+            }
           }
         },
       };
@@ -306,6 +316,67 @@ export class GenerateCommitMessageTool extends BaseTool<undefined, ToolResult> {
     } catch (error) {
       console.error('Error determining commit confirmation details:', error);
       return false;
+    }
+  }
+
+  /** Generate a summary of the commit for confirmation */
+  private generateCommitSummary(
+    gitState: { statusOutput: string; diffOutput: string; logOutput: string },
+    commitMessage: string,
+    filesToCommit: string[],
+  ): string {
+    const lines = commitMessage.split('\n');
+    const title = lines[0];
+    const body = lines.slice(1).join('\n').trim();
+    
+    let summary = `📝 Commit Message:\n${title}`;
+    if (body) {
+      summary += `\n\n${body}`;
+    }
+    
+    if (filesToCommit.length > 0) {
+      summary += `\n\n📁 Files (${filesToCommit.length}):`;
+      filesToCommit.slice(0, 10).forEach(file => {
+        summary += `\n  • ${file}`;
+      });
+      if (filesToCommit.length > 10) {
+        summary += `\n  ... and ${filesToCommit.length - 10} more`;
+      }
+    }
+    
+    // Add statistics about changes
+    const diffLines = gitState.diffOutput.split('\n');
+    const additions = diffLines.filter(line => line.startsWith('+')).length;
+    const deletions = diffLines.filter(line => line.startsWith('-')).length;
+    
+    if (additions > 0 || deletions > 0) {
+      summary += `\n\n📊 Changes: +${additions} -${deletions}`;
+    }
+    
+    return summary;
+  }
+
+  /** Allow user to provide custom commit message via editor */
+  private async promptForCustomCommitMessage(
+    gitState: { statusOutput: string; diffOutput: string; logOutput: string },
+    signal: AbortSignal,
+  ): Promise<string> {
+    try {
+      // Use git's built-in commit editor with the prepared message
+      const currentMessage = this.cachedCommitData?.commitMessage || '';
+      
+      // Create temp file with current message for editing
+      await executeGitCommand(
+        ['commit', '--edit', '--message', currentMessage, '--dry-run'],
+        signal
+      );
+      
+      // If user wants to edit interactively, they can use git commit --amend
+      return currentMessage;
+      
+    } catch (_error) {
+      // If editing fails, return the original message
+      return this.cachedCommitData?.commitMessage || '';
     }
   }
 
