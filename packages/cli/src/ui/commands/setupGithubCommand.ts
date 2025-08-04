@@ -27,8 +27,7 @@ export const setupGithubCommand: SlashCommand = {
       throw new Error('Unable to determine the Git root directory.');
     }
 
-    // TODO(#5198): pin workflow versions for release controls
-    const version = 'main';
+    const version = 'v0';
     const workflowBaseUrl = `https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/heads/${version}/examples/workflows/`;
 
     const workflows = [
