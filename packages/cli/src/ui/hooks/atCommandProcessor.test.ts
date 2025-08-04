@@ -1023,5 +1023,63 @@ describe('handleAtCommand', () => {
         shouldProceed: true,
       });
     });
+
+    it('should handle files with special characters in names', async () => {
+      const fileContent = 'File with special chars content';
+      const filePath = await createTestFile(
+        path.join(testRootDir, 'file$with&special#chars.txt'),
+        fileContent,
+      );
+      const query = `Check @${filePath} for content.`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 418,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [
+          { text: `Check @${filePath} for content.` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${filePath}:\n` },
+          { text: fileContent },
+          { text: '\n--- End of content ---' },
+        ],
+        shouldProceed: true,
+      });
+    });
+
+    it('should handle basic file names without special characters', async () => {
+      const fileContent = 'Basic file content';
+      const filePath = await createTestFile(
+        path.join(testRootDir, 'basicfile.txt'),
+        fileContent,
+      );
+      const query = `Check @${filePath} please.`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 421,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [
+          { text: `Check @${filePath} please.` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${filePath}:\n` },
+          { text: fileContent },
+          { text: '\n--- End of content ---' },
+        ],
+        shouldProceed: true,
+      });
+    });
   });
 });

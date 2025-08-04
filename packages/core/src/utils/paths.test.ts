@@ -12,6 +12,10 @@ describe('escapePath', () => {
     expect(escapePath('my file.txt')).toBe('my\\ file.txt');
   });
 
+  it('should escape tabs', () => {
+    expect(escapePath('file\twith\ttabs.txt')).toBe('file\\\twith\\\ttabs.txt');
+  });
+
   it('should escape parentheses', () => {
     expect(escapePath('file(1).txt')).toBe('file\\(1\\).txt');
   });
@@ -87,6 +91,24 @@ describe('escapePath', () => {
     expect(escapePath('file\\(name\\).txt')).toBe('file\\(name\\).txt');
   });
 
+  it('should handle escaped backslashes correctly', () => {
+    // Double backslash (escaped backslash) followed by space should escape the space
+    expect(escapePath('path\\\\ file.txt')).toBe('path\\\\\\ file.txt');
+    // Triple backslash (escaped backslash + escaping backslash) followed by space should not double-escape
+    expect(escapePath('path\\\\\\ file.txt')).toBe('path\\\\\\ file.txt');
+    // Quadruple backslash (two escaped backslashes) followed by space should escape the space
+    expect(escapePath('path\\\\\\\\ file.txt')).toBe('path\\\\\\\\\\ file.txt');
+  });
+
+  it('should handle complex escaped backslash scenarios', () => {
+    // Escaped backslash before special character that needs escaping
+    expect(escapePath('file\\\\(test).txt')).toBe('file\\\\\\(test\\).txt');
+    // Multiple escaped backslashes
+    expect(escapePath('path\\\\\\\\with space.txt')).toBe(
+      'path\\\\\\\\with\\ space.txt',
+    );
+  });
+
   it('should handle paths without special characters', () => {
     expect(escapePath('normalfile.txt')).toBe('normalfile.txt');
     expect(escapePath('path/to/normalfile.txt')).toBe('path/to/normalfile.txt');
@@ -115,6 +137,12 @@ describe('escapePath', () => {
 describe('unescapePath', () => {
   it('should unescape spaces', () => {
     expect(unescapePath('my\\ file.txt')).toBe('my file.txt');
+  });
+
+  it('should unescape tabs', () => {
+    expect(unescapePath('file\\\twith\\\ttabs.txt')).toBe(
+      'file\twith\ttabs.txt',
+    );
   });
 
   it('should unescape parentheses', () => {
@@ -158,6 +186,7 @@ describe('unescapePath', () => {
       'My Documents/Project (2024)/file [backup].txt',
       'file with $special &chars!.txt',
       ' ()[]{};&|*?$`\'"#!~<>',
+      'file\twith\ttabs.txt',
     ];
 
     testCases.forEach((testCase) => {
@@ -172,5 +201,14 @@ describe('unescapePath', () => {
   it('should not affect backslashes not followed by special characters', () => {
     expect(unescapePath('file\\name.txt')).toBe('file\\name.txt');
     expect(unescapePath('path\\to\\file.txt')).toBe('path\\to\\file.txt');
+  });
+
+  it('should handle escaped backslashes in unescaping', () => {
+    // Should correctly unescape when there are escaped backslashes
+    expect(unescapePath('path\\\\\\ file.txt')).toBe('path\\\\ file.txt');
+    expect(unescapePath('path\\\\\\\\\\ file.txt')).toBe(
+      'path\\\\\\\\ file.txt',
+    );
+    expect(unescapePath('file\\\\\\(test\\).txt')).toBe('file\\\\(test).txt');
   });
 });

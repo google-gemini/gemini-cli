@@ -18,7 +18,7 @@ const COMMANDS_DIR_NAME = 'commands';
  * Includes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
  * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
  */
-export const SHELL_SPECIAL_CHARS = /[ ()[\]{};|*?$`'"#&<>!~]/;
+export const SHELL_SPECIAL_CHARS = /[ \t()[\]{};|*?$`'"#&<>!~]/;
 
 /**
  * Replaces the home directory with a tilde.
@@ -134,7 +134,15 @@ export function escapePath(filePath: string): string {
   let result = '';
   for (let i = 0; i < filePath.length; i++) {
     const char = filePath[i];
-    const isAlreadyEscaped = i > 0 && filePath[i - 1] === '\\';
+
+    // Count consecutive backslashes before this character
+    let backslashCount = 0;
+    for (let j = i - 1; j >= 0 && filePath[j] === '\\'; j--) {
+      backslashCount++;
+    }
+
+    // Character is already escaped if there's an odd number of backslashes before it
+    const isAlreadyEscaped = backslashCount % 2 === 1;
 
     // Only escape if not already escaped
     if (!isAlreadyEscaped && SHELL_SPECIAL_CHARS.test(char)) {
