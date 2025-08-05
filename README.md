@@ -1,16 +1,14 @@
 # Gemini CLI
 
-[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
+[![Gemini CLI CI](https://github.com/damdam775/gemini-cli-interrupt/actions/workflows/ci.yml/badge.svg)](https://github.com/damdam775/gemini-cli-interrupt/actions/workflows/ci.yml)
 
 ![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
 
 This repository contains the Gemini CLI, a command-line AI workflow tool that connects to your
 tools, understands your code and accelerates your workflows.
 
-This fork introduces an experimental **interrupt mode**. When enabled, you can type a new prompt
-while Gemini is still responding; the current stream is cancelled and replaced with a quick
-summary of your new request. Toggle it at any time with `Ctrl+N` or start the CLI with the
-`--interrupt` flag.
+> **Interrupt mode (Int.)** — type a new prompt while Gemini is still responding and the current
+> stream is cancelled with a quick summary. Toggle with `Ctrl+N` or start with `--interrupt`.
 
 With the Gemini CLI you can:
 
@@ -22,6 +20,13 @@ With the Gemini CLI you can:
 - Ground your queries with the [Google Search](https://ai.google.dev/gemini-api/docs/grounding)
   tool, built into Gemini.
 
+## Interrupt mode (Int.)
+
+Interrupt mode lets you pivot quickly during a streaming response. When it is on, typing a new
+prompt immediately cancels the in-flight reply and processes your latest request instead. Toggle
+the mode at any time with `Ctrl+N`, or start the CLI with `--interrupt` to have it enabled from the
+beginning.
+
 ## Quickstart
 
 You have two options to install Gemini CLI.
@@ -29,17 +34,16 @@ You have two options to install Gemini CLI.
 ### With Node
 
 1. **Prerequisites:** Ensure you have [Node.js version 20](https://nodejs.org/en/download) or higher installed.
-2. **Run the CLI:** Execute the following command in your terminal:
+2. **Run the CLI:** Execute one of the following commands in your terminal:
 
-   ```bash
-   npx https://github.com/google-gemini/gemini-cli-interrupt
-   ```
-
-   Add `--interrupt` to launch with interrupt mode already enabled:
-
-   ```bash
-   npx https://github.com/google-gemini/gemini-cli-interrupt -- --interrupt
-   ```
+   - Standard mode:
+     ```bash
+     npx https://github.com/damdam775/gemini-cli-interrupt
+     ```
+   - **Start in interrupt mode (`Int.`):**
+     ```bash
+     npx https://github.com/damdam775/gemini-cli-interrupt -- --interrupt
+     ```
 
    Or install it with:
 
@@ -75,12 +79,7 @@ You have two options to install Gemini CLI.
 
 You are now ready to use the Gemini CLI!
 
-## Interrupt mode
-
-Interrupt mode lets you pivot quickly during a streaming response. When it is on, typing a new
-prompt immediately cancels the in-flight reply and processes your latest request instead. Toggle
-the mode at any time with `Ctrl+N`, or start the CLI with `--interrupt` to have it enabled from the
-beginning.
+## Authentication
 
 ### Use a Gemini API key:
 
@@ -126,8 +125,8 @@ gemini
 Or work with an existing project:
 
 ```sh
-git clone https://github.com/google-gemini/gemini-cli
-cd gemini-cli
+git clone https://github.com/damdam775/gemini-cli-interrupt
+cd gemini-cli-interrupt
 gemini
 > Give me a summary of all of the changes that went in yesterday
 ```
@@ -230,4 +229,4 @@ For details on the terms of service and privacy notice applicable to your use of
 
 ## Security Disclosures
 
-Please see our [security disclosure process](SECURITY.md). All [security advisories](https://github.com/google-gemini/gemini-cli/security/advisories) are managed on Github.
+Please see our [security disclosure process](SECURITY.md). All [security advisories](https://github.com/damdam775/gemini-cli-interrupt/security/advisories) are managed on Github.
