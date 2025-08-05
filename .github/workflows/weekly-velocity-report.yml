@@ -1,0 +1,39 @@
+# .github/workflows/weekly-velocity-report.yml
+
+name: Weekly Velocity Report
+
+on:
+  schedule:
+    #- cron: "0 13 * * 1" # Runs every Monday at 9:00 AM UTC
+    - cron: "*/5 * * * *" # Test by running every 5 minutes
+  workflow_dispatch:
+
+jobs:
+  generate_report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate Weekly Report as CSV
+        id: report
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_REPO: ${{ github.repository }}
+        run: |
+          chmod +x ./.github/workflows/scripts/generate-report.sh
+          REPORT_CSV=$(./.github/workflows/scripts/generate-report.sh)
+          echo "csv_data<<EOF" >> $GITHUB_OUTPUT
+          echo "$REPORT_CSV" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Append data to Google Sheet
+        if: success()
+        uses: jroehl/gcp-google-sheets-action@v2.0.0
+        with:
+          gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
+          spreadsheet_id: ${{ secrets.SPREADSHEET_ID }}
+          sheet_name: "Weekly Reports" # The name of the tab in your sheet
+          data: ${{ steps.report.outputs.csv_data }}
+          major_dimension: "ROWS"
+          value_input_option: "USER_ENTERED"
