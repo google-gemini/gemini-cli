@@ -17,6 +17,7 @@ import {
 import { Content, Part, FunctionCall } from '@google/genai';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
+import logUpdate from 'log-update';
 
 export async function runNonInteractive(
   config: Config,
@@ -52,6 +53,7 @@ export async function runNonInteractive(
       }
       const functionCalls: FunctionCall[] = [];
 
+      let responseBuffer = '';
       const responseStream = geminiClient.sendMessageStream(
         currentMessages[0]?.parts || [],
         abortController.signal,
@@ -65,7 +67,8 @@ export async function runNonInteractive(
         }
 
         if (event.type === GeminiEventType.Content) {
-          process.stdout.write(event.value);
+          responseBuffer += event.value;
+          logUpdate(responseBuffer);
         } else if (event.type === GeminiEventType.ToolCallRequest) {
           const toolCallRequest = event.value;
           const fc: FunctionCall = {
@@ -76,6 +79,7 @@ export async function runNonInteractive(
           functionCalls.push(fc);
         }
       }
+      logUpdate.done();
 
       if (functionCalls.length > 0) {
         const toolResponseParts: Part[] = [];
@@ -120,7 +124,6 @@ export async function runNonInteractive(
         }
         currentMessages = [{ role: 'user', parts: toolResponseParts }];
       } else {
-        process.stdout.write('\n'); // Ensure a final newline
         return;
       }
     }
