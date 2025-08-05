@@ -17,7 +17,7 @@ import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
 import { GlobTool } from '../tools/glob.js';
-import { EditTool } from '../tools/edit.js';
+import { EditTool, ReplaceStrategy } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
@@ -188,6 +188,7 @@ export interface ConfigParameters {
   ideModeFeature?: boolean;
   ideMode?: boolean;
   ideClient: IdeClient;
+  replaceStrategy?: ReplaceStrategy;
 }
 
 export class Config {
@@ -247,6 +248,7 @@ export class Config {
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
   private readonly experimentalAcp: boolean = false;
+  private readonly replaceStrategy: ReplaceStrategy;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -280,6 +282,7 @@ export class Config {
       outfile: params.telemetry?.outfile,
     };
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
+    this.replaceStrategy = params.replaceStrategy ?? ReplaceStrategy.CORRECTOR;
 
     this.fileFiltering = {
       respectGitIgnore: params.fileFiltering?.respectGitIgnore ?? true,
@@ -631,6 +634,10 @@ export class Config {
 
   getIdeMode(): boolean {
     return this.ideMode;
+  }
+
+  getReplaceStrategy(): ReplaceStrategy {
+    return this.replaceStrategy;
   }
 
   setIdeMode(value: boolean): void {

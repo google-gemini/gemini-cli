@@ -25,7 +25,7 @@ vi.mock('../utils/editor.js', () => ({
 }));
 
 import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
-import { EditTool, EditToolParams } from './edit.js';
+import { EditTool, EditToolParams, ReplaceStrategy } from './edit.js';
 import { FileDiff } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'path';
@@ -58,6 +58,7 @@ describe('EditTool', () => {
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
+      getReplaceStrategy: () => ReplaceStrategy.CORRECTOR,
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
       // Add other properties/methods of Config if EditTool uses them
       // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
@@ -491,7 +492,7 @@ describe('EditTool', () => {
       // The default mockEnsureCorrectEdit will return 2 occurrences for 'old'
       const result = await tool.execute(params, new AbortController().signal);
       expect(result.llmContent).toMatch(
-        /Expected 1 occurrence but found 2 for old_string in file/,
+        /Expected 1 occurrence but found 2 for old_string in .*/,
       );
       expect(result.returnDisplay).toMatch(
         /Failed to edit, expected 1 occurrence but found 2/,
@@ -534,7 +535,7 @@ describe('EditTool', () => {
       };
       const result = await tool.execute(params, new AbortController().signal);
       expect(result.llmContent).toMatch(
-        /Expected 3 occurrences but found 2 for old_string in file/,
+        /Expected 3 occurrences but found 2 for old_string in .*/,
       );
       expect(result.returnDisplay).toMatch(
         /Failed to edit, expected 3 occurrences but found 2/,
