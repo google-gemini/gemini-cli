@@ -142,6 +142,34 @@ Start by `cd`ing into an existing or newly-cloned repository and running `gemini
 > What security mechanisms are in place?
 ```
 
+```text
+> Provide a step-by-step dev onboarding doc for developers new to the codebase.
+```
+
+```text
+> Summarize this codebase and highlight the most interesting patterns or techniques I could learn from.
+```
+
+```text
+> Identify potential areas for improvement or refactoring in this codebase, highlighting parts that appear fragile, complex, or hard to maintain.
+```
+
+```text
+> Which parts of this codebase might be challenging to scale or debug?
+```
+
+```text
+> Generate a README section for the [module name] module explaining what it does and how to use it.
+```
+
+```text
+> What kind of error handling and logging strategies does the project use?
+```
+
+```text
+> Which tools, libraries, and dependencies are used in this project?
+```
+
 ### Work with your existing code
 
 ```text
@@ -181,3 +209,7 @@ Head over to the [Uninstall](docs/Uninstall.md) guide for uninstallation instruc
 ## Terms of Service and Privacy Notice
 
 For details on the terms of service and privacy notice applicable to your use of Gemini CLI, see the [Terms of Service and Privacy Notice](./docs/tos-privacy.md).
+
+## Security Disclosures
+
+Please see our [security disclosure process](SECURITY.md). All [security advisories](https://github.com/google-gemini/gemini-cli/security/advisories) are managed on Github.

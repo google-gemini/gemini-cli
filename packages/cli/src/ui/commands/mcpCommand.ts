@@ -12,6 +12,7 @@ import {
   MessageActionReturn,
 } from './types.js';
 import {
+  DiscoveredMCPPrompt,
   DiscoveredMCPTool,
   getMCPDiscoveryState,
   getMCPServerStatus,
@@ -20,7 +21,6 @@ import {
   mcpServerRequiresOAuth,
   getErrorMessage,
 } from '@google/gemini-cli-core';
-import open from 'open';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
@@ -59,21 +59,11 @@ const getMcpStatus = async (
 
   if (serverNames.length === 0 && blockedMcpServers.length === 0) {
     const docsUrl = 'https://goo.gle/gemini-cli-docs-mcp';
-    if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: `No MCP servers configured. Please open the following URL in your browser to view documentation:\n${docsUrl}`,
-      };
-    } else {
-      // Open the URL in the browser
-      await open(docsUrl);
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: `No MCP servers configured. Opening documentation in your browser: ${docsUrl}`,
-      };
-    }
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `No MCP servers configured. Please view MCP documentation in your browser: ${docsUrl} or use the cli /docs command`,
+    };
   }
 
   // Check if any servers are still connecting
@@ -101,8 +91,18 @@ const getMcpStatus = async (
       (tool) =>
         tool instanceof DiscoveredMCPTool && tool.serverName === serverName,
     ) as DiscoveredMCPTool[];
+    const promptRegistry = await config.getPromptRegistry();
+    const serverPrompts = promptRegistry.getPromptsByServer(serverName) || [];
 
-    const status = getMCPServerStatus(serverName);
+    const originalStatus = getMCPServerStatus(serverName);
+    const hasCachedItems = serverTools.length > 0 || serverPrompts.length > 0;
+
+    // If the server is "disconnected" but has prompts or cached tools, display it as Ready
+    // by using CONNECTED as the display status.
+    const status =
+      originalStatus === MCPServerStatus.DISCONNECTED && hasCachedItems
+        ? MCPServerStatus.CONNECTED
+        : originalStatus;
 
     // Add status indicator with descriptive text
     let statusIndicator = '';
@@ -160,9 +160,26 @@ const getMcpStatus = async (
 
     // Add tool count with conditional messaging
     if (status === MCPServerStatus.CONNECTED) {
-      message += ` (${serverTools.length} tools)`;
+      const parts = [];
+      if (serverTools.length > 0) {
+        parts.push(
+          `${serverTools.length} ${serverTools.length === 1 ? 'tool' : 'tools'}`,
+        );
+      }
+      if (serverPrompts.length > 0) {
+        parts.push(
+          `${serverPrompts.length} ${
+            serverPrompts.length === 1 ? 'prompt' : 'prompts'
+          }`,
+        );
+      }
+      if (parts.length > 0) {
+        message += ` (${parts.join(', ')})`;
+      } else {
+        message += ` (0 tools)`;
+      }
     } else if (status === MCPServerStatus.CONNECTING) {
-      message += ` (tools will appear when ready)`;
+      message += ` (tools and prompts will appear when ready)`;
     } else {
       message += ` (${serverTools.length} tools cached)`;
     }
@@ -186,6 +203,7 @@ const getMcpStatus = async (
     message += RESET_COLOR;
 
     if (serverTools.length > 0) {
+      message += `  ${COLOR_CYAN}Tools:${RESET_COLOR}\n`;
       serverTools.forEach((tool) => {
         if (showDescriptions && tool.description) {
           // Format tool name in cyan using simple ANSI cyan color
@@ -222,12 +240,44 @@ const getMcpStatus = async (
           }
         }
       });
-    } else {
+    }
+    if (serverPrompts.length > 0) {
+      if (serverTools.length > 0) {
+        message += '\n';
+      }
+      message += `  ${COLOR_CYAN}Prompts:${RESET_COLOR}\n`;
+      serverPrompts.forEach((prompt: DiscoveredMCPPrompt) => {
+        if (showDescriptions && prompt.description) {
+          message += `  - ${COLOR_CYAN}${prompt.name}${RESET_COLOR}`;
+          const descLines = prompt.description.trim().split('\n');
+          if (descLines) {
+            message += ':\n';
+            for (const descLine of descLines) {
+              message += `      ${COLOR_GREEN}${descLine}${RESET_COLOR}\n`;
+            }
+          } else {
+            message += '\n';
+          }
+        } else {
+          message += `  - ${COLOR_CYAN}${prompt.name}${RESET_COLOR}\n`;
+        }
+      });
+    }
+
+    if (serverTools.length === 0 && serverPrompts.length === 0) {
+      message += '  No tools or prompts available\n';
+    } else if (serverTools.length === 0) {
       message += '  No tools available';
-      if (status === MCPServerStatus.DISCONNECTED && needsAuthHint) {
+      if (originalStatus === MCPServerStatus.DISCONNECTED && needsAuthHint) {
         message += ` ${COLOR_GREY}(type: "/mcp auth ${serverName}" to authenticate this server)${RESET_COLOR}`;
       }
       message += '\n';
+    } else if (
+      originalStatus === MCPServerStatus.DISCONNECTED &&
+      needsAuthHint
+    ) {
+      // This case is for when serverTools.length > 0
+      message += `  ${COLOR_GREY}(type: "/mcp auth ${serverName}" to authenticate this server)${RESET_COLOR}\n`;
     }
     message += '\n';
   }
@@ -328,11 +378,10 @@ const authCommand: SlashCommand = {
       // Import dynamically to avoid circular dependencies
       const { MCPOAuthProvider } = await import('@google/gemini-cli-core');
 
-      // Create OAuth config for authentication (will be discovered automatically)
-      const oauthConfig = server.oauth || {
-        authorizationUrl: '', // Will be discovered automatically
-        tokenUrl: '', // Will be discovered automatically
-      };
+      let oauthConfig = server.oauth;
+      if (!oauthConfig) {
+        oauthConfig = { enabled: false };
+      }
 
       // Pass the MCP server URL for OAuth discovery
       const mcpServerUrl = server.httpUrl || server.url;
@@ -417,12 +466,57 @@ const listCommand: SlashCommand = {
   },
 };
 
+const refreshCommand: SlashCommand = {
+  name: 'refresh',
+  description: 'Refresh the list of MCP servers and tools',
+  kind: CommandKind.BUILT_IN,
+  action: async (
+    context: CommandContext,
+  ): Promise<SlashCommandActionReturn> => {
+    const { config } = context.services;
+    if (!config) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Config not loaded.',
+      };
+    }
+
+    const toolRegistry = await config.getToolRegistry();
+    if (!toolRegistry) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Could not retrieve tool registry.',
+      };
+    }
+
+    context.ui.addItem(
+      {
+        type: 'info',
+        text: 'Refreshing MCP servers and tools...',
+      },
+      Date.now(),
+    );
+
+    await toolRegistry.discoverMcpTools();
+
+    // Update the client with the new tools
+    const geminiClient = config.getGeminiClient();
+    if (geminiClient) {
+      await geminiClient.setTools();
+    }
+
+    return getMcpStatus(context, false, false, false);
+  },
+};
+
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
   description:
     'list configured MCP servers and tools, or authenticate with OAuth-enabled servers',
   kind: CommandKind.BUILT_IN,
-  subCommands: [listCommand, authCommand],
+  subCommands: [listCommand, authCommand, refreshCommand],
   // Default action when no subcommand is provided
   action: async (context: CommandContext, args: string) =>
     // If no subcommand, run the list command

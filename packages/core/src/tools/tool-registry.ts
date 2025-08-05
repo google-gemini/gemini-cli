@@ -150,17 +150,24 @@ export class ToolRegistry {
     this.tools.set(tool.name, tool);
   }
 
-  /**
-   * Discovers tools from project (if available and configured).
-   * Can be called multiple times to update discovered tools.
-   */
-  async discoverTools(): Promise<void> {
-    // remove any previously discovered tools
+  private removeDiscoveredTools(): void {
     for (const tool of this.tools.values()) {
       if (tool instanceof DiscoveredTool || tool instanceof DiscoveredMCPTool) {
         this.tools.delete(tool.name);
       }
     }
+  }
+
+  /**
+   * Discovers tools from project (if available and configured).
+   * Can be called multiple times to update discovered tools.
+   * This will discover tools from the command line and from MCP servers.
+   */
+  async discoverAllTools(): Promise<void> {
+    // remove any previously discovered tools
+    this.removeDiscoveredTools();
+
+    this.config.getPromptRegistry().clear();
 
     await this.discoverAndRegisterToolsFromCommand();
 
@@ -169,6 +176,28 @@ export class ToolRegistry {
       this.config.getMcpServers() ?? {},
       this.config.getMcpServerCommand(),
       this,
+      this.config.getPromptRegistry(),
+      this.config.getDebugMode(),
+    );
+  }
+
+  /**
+   * Discovers tools from project (if available and configured).
+   * Can be called multiple times to update discovered tools.
+   * This will NOT discover tools from the command line, only from MCP servers.
+   */
+  async discoverMcpTools(): Promise<void> {
+    // remove any previously discovered tools
+    this.removeDiscoveredTools();
+
+    this.config.getPromptRegistry().clear();
+
+    // discover tools using MCP servers, if configured
+    await discoverMcpTools(
+      this.config.getMcpServers() ?? {},
+      this.config.getMcpServerCommand(),
+      this,
+      this.config.getPromptRegistry(),
       this.config.getDebugMode(),
     );
   }
@@ -185,6 +214,8 @@ export class ToolRegistry {
       }
     }
 
+    this.config.getPromptRegistry().removePromptsByServer(serverName);
+
     const mcpServers = this.config.getMcpServers() ?? {};
     const serverConfig = mcpServers[serverName];
     if (serverConfig) {
@@ -192,6 +223,7 @@ export class ToolRegistry {
         { [serverName]: serverConfig },
         undefined,
         this,
+        this.config.getPromptRegistry(),
         this.config.getDebugMode(),
       );
     }

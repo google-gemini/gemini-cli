@@ -58,10 +58,14 @@ export interface CommandContext {
     loadHistory: UseHistoryManagerReturn['loadHistory'];
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
+    toggleVimEnabled: () => Promise<boolean>;
+    setGeminiMdFileCount: (count: number) => void;
   };
   // Session-specific data
   session: {
     stats: SessionStatsState;
+    /** A transient list of shell commands the user has approved for this session. */
+    sessionShellAllowlist: Set<string>;
   };
 }
 
@@ -95,7 +99,7 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy';
+  dialog: 'auth' | 'theme' | 'editor' | 'privacy';
 }
 
 /**
@@ -117,17 +121,33 @@ export interface SubmitPromptActionReturn {
   content: string;
 }
 
+/**
+ * The return type for a command action that needs to pause and request
+ * confirmation for a set of shell commands before proceeding.
+ */
+export interface ConfirmShellCommandsActionReturn {
+  type: 'confirm_shell_commands';
+  /** The list of shell commands that require user confirmation. */
+  commandsToConfirm: string[];
+  /** The original invocation context to be re-run after confirmation. */
+  originalInvocation: {
+    raw: string;
+  };
+}
+
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
   | QuitActionReturn
   | OpenDialogActionReturn
   | LoadHistoryActionReturn
-  | SubmitPromptActionReturn;
+  | SubmitPromptActionReturn
+  | ConfirmShellCommandsActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
   FILE = 'file',
+  MCP_PROMPT = 'mcp-prompt',
 }
 
 // The standardized contract for any command in the system.
@@ -137,6 +157,9 @@ export interface SlashCommand {
   description: string;
 
   kind: CommandKind;
+
+  // Optional metadata for extension commands
+  extensionName?: string;
 
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (

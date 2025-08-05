@@ -15,8 +15,10 @@ The Gemini CLI core (`packages/core`) features a robust system for defining, reg
   - `execute()`: The core method that performs the tool's action and returns a `ToolResult`.
 
 - **`ToolResult` (`tools.ts`):** An interface defining the structure of a tool's execution outcome:
-  - `llmContent`: The factual string content to be included in the history sent back to the LLM for context.
+  - `llmContent`: The factual content to be included in the history sent back to the LLM for context. This can be a simple string or a `PartListUnion` (an array of `Part` objects and strings) for rich content.
   - `returnDisplay`: A user-friendly string (often Markdown) or a special object (like `FileDiff`) for display in the CLI.
+
+- **Returning Rich Content:** Tools are not limited to returning simple text. The `llmContent` can be a `PartListUnion`, which is an array that can contain a mix of `Part` objects (for images, audio, etc.) and `string`s. This allows a single tool execution to return multiple pieces of rich content.
 
 - **Tool Registry (`tool-registry.ts`):** A class (`ToolRegistry`) responsible for:
   - **Registering Tools:** Holding a collection of all available built-in tools (e.g., `ReadFileTool`, `ShellTool`).
