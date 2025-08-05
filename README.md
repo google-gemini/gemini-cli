@@ -76,7 +76,7 @@ Choose the authentication method that best fits your needs:
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
 
-# Start Geminii CLI, then choose OAuth and follow the browser authentication flow when prompted
+#### Start Gemini CLI, then choose OAuth and follow the browser authentication flow when prompted
 ```bash
 gemini
 ```
