@@ -7,6 +7,11 @@
 This repository contains the Gemini CLI, a command-line AI workflow tool that connects to your
 tools, understands your code and accelerates your workflows.
 
+This fork introduces an experimental **interrupt mode**. When enabled, you can type a new prompt
+while Gemini is still responding; the current stream is cancelled and replaced with a quick
+summary of your new request. Toggle it at any time with `Ctrl+N` or start the CLI with the
+`--interrupt` flag.
+
 With the Gemini CLI you can:
 
 - Query and edit large codebases in and beyond Gemini's 1M token context window.
@@ -27,7 +32,13 @@ You have two options to install Gemini CLI.
 2. **Run the CLI:** Execute the following command in your terminal:
 
    ```bash
-   npx https://github.com/google-gemini/gemini-cli
+   npx https://github.com/google-gemini/gemini-cli-interrupt
+   ```
+
+   Add `--interrupt` to launch with interrupt mode already enabled:
+
+   ```bash
+   npx https://github.com/google-gemini/gemini-cli-interrupt -- --interrupt
    ```
 
    Or install it with:
@@ -63,6 +74,13 @@ You have two options to install Gemini CLI.
 4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
 
 You are now ready to use the Gemini CLI!
+
+## Interrupt mode
+
+Interrupt mode lets you pivot quickly during a streaming response. When it is on, typing a new
+prompt immediately cancels the in-flight reply and processes your latest request instead. Toggle
+the mode at any time with `Ctrl+N`, or start the CLI with `--interrupt` to have it enabled from the
+beginning.
 
 ### Use a Gemini API key:
 
