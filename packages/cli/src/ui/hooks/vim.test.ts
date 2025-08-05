@@ -1246,6 +1246,26 @@ describe('useVim hook', () => {
     });
   });
 
+  describe('Shell command pass-through', () => {
+    it('should pass through ctrl+r in NORMAL mode', () => {
+      mockVimContext.vimMode = 'NORMAL';
+      const { result } = renderVimHook();
+
+      const handled = result.current.handleInput({ name: 'r', ctrl: true });
+
+      expect(handled).toBe(false);
+    });
+
+    it('should pass through ctrl+r in INSERT mode', () => {
+      mockVimContext.vimMode = 'INSERT';
+      const { result } = renderVimHook();
+
+      const handled = result.current.handleInput({ name: 'r', ctrl: true });
+
+      expect(handled).toBe(false);
+    });
+  });
+
   // Line operations (dd, cc) are tested in text-buffer.test.ts
 
   describe('Reducer-based integration tests', () => {

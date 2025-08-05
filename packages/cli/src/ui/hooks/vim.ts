@@ -260,7 +260,8 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         normalizedKey.name === 'tab' ||
         (normalizedKey.name === 'return' && !normalizedKey.ctrl) ||
         normalizedKey.name === 'up' ||
-        normalizedKey.name === 'down'
+        normalizedKey.name === 'down' ||
+        (normalizedKey.ctrl && normalizedKey.name === 'r')
       ) {
         return false; // Let InputPrompt handle completion
       }
@@ -412,6 +413,11 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             return true; // Handled by vim
           }
           return false; // Pass through to other handlers
+        }
+
+        // Let shell mode handle reverse search
+        if (normalizedKey.ctrl && normalizedKey.name === 'r') {
+          return false;
         }
 
         // Handle count input (numbers 1-9, and 0 if count > 0)
