@@ -4,7 +4,7 @@
 [![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli)
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
 
-> **Free and open source, Gemini CLI brings Gemini directly into developers' terminals — with unmatched access for individuals.**
+> **Free and open source, Gemini CLI brings Gemini directly into developers' terminals**
 
 ![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
 
