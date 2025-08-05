@@ -20,7 +20,10 @@ export const LoadAgentInputSchema = z.object({
     .describe(
       'The path to the agent card endpoint, relative to the base URL. Defaults to `/.well-known/agent-card.json`',
     ),
-  token: z.string().optional().describe("static Bearer token for authentication.")
+  token: z
+    .string()
+    .optional()
+    .describe('static Bearer token for authentication.'),
 });
 
 /**

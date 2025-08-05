@@ -33,11 +33,30 @@ export class A2AToolRegistry {
     const agentName = agentCard.name;
     const sanitizedAgentName = agentName.replace(/\s/g, '');
 
+    let description = `Sends a message to the ${agentName} agent.`;
+    if (agentCard.skills && agentCard.skills.length > 0) {
+      const skillsDescription = agentCard.skills
+        .map((skill) => {
+          let skillInfo = `- ${skill.name}`;
+          if (skill.description) {
+            skillInfo += `: ${skill.description}`;
+          }
+          if (skill.examples && skill.examples.length > 0) {
+            skillInfo += `\n  Examples:\n${skill.examples
+              .map((e) => `  - "${e}"`)
+              .join('\n')}`;
+          }
+          return skillInfo;
+        })
+        .join('\n');
+      description += `\nAvailable skills:\n${skillsDescription}`;
+    }
+
     // Register send_message for the agent
     this.server.registerTool(
       `${sanitizedAgentName}_sendMessage`,
       {
-        description: `Sends a message to the ${agentName} agent.`,
+        description,
         inputSchema: AgentSendMessageInputSchema.shape,
       },
       async (args: z.infer<typeof AgentSendMessageInputSchema>) => {

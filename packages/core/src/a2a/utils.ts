@@ -13,9 +13,8 @@ import {
   Message2,
   Task,
   TextPart,
-  SendMessageResponse
+  SendMessageResponse,
 } from '@a2a-js/sdk';
-import {getErrorMessage} from '../utils/errors.js';
 
 export const textResponse = (message: string): CallToolResult => ({
   content: [
@@ -91,7 +90,9 @@ export function extractTaskText(task: Task): string {
   return output;
 }
 
-export function extractContextId(sendMessageResponse: SendMessageResponse) : string|undefined {
+export function extractContextId(
+  sendMessageResponse: SendMessageResponse,
+): string | undefined {
   if ('error' in sendMessageResponse) return undefined;
   return sendMessageResponse.result.contextId;
 }

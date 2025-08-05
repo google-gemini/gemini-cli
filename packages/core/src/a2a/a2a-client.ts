@@ -72,7 +72,7 @@ export class A2AClientManager {
     const agentCard = await a2aClient.getAgentCard();
 
     if (this.registeredAgents.has(agentCard.name)) {
-      throw Error(`Agent with name ${agentCard.name} is already loaded.`)
+      throw Error(`Agent with name ${agentCard.name} is already loaded.`);
     }
 
     this.registeredAgents.set(agentCard.name, a2aClient!);
@@ -134,12 +134,12 @@ export class A2AClientManager {
       },
     };
 
-    const contextId = this.contextMap.get(agentName)
+    const contextId = this.contextMap.get(agentName);
     if (contextId) messageParams.message.contextId = contextId;
 
-    const response = await a2aClient.sendMessage(messageParams)
-    const newContextId = extractContextId(response)
-    if (newContextId) this.contextMap.set(agentName, newContextId)
+    const response = await a2aClient.sendMessage(messageParams);
+    const newContextId = extractContextId(response);
+    if (newContextId) this.contextMap.set(agentName, newContextId);
 
     return response;
   }
