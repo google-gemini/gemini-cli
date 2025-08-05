@@ -52,7 +52,7 @@ Read the main README, all Markdown files in the `docs` directory, and a specific
 read_many_files(paths=["README.md", "docs/**/*.md", "assets/logo.png"], exclude=["docs/OLD_README.md"])
 ```
 
-Read all JavaScript files but explicitly including test files and all JPEGs in an `images` folder:
+Read all JavaScript files but explicitly include test files and all JPEGs in an `images` folder:
 
 ```
 read_many_files(paths=["**/*.js"], include=["**/*.test.js", "images/**/*.jpg"], useDefaultExcludes=False)
