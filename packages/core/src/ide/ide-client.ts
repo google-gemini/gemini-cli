@@ -78,11 +78,11 @@ export class IdeClient {
   }
 
   disconnect() {
-    this.client?.close();
     this.setState(
       IDEConnectionStatus.Disconnected,
       'IDE integration disabled. To enable it again, run /ide enable.',
     );
+    this.client?.close();
   }
 
   getCurrentIde(): DetectedIde | undefined {
@@ -133,7 +133,7 @@ export class IdeClient {
     if (ideWorkspacePath !== process.cwd()) {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `Directory mismatch: Gemini CLI is running in a different location than the open workspace in ${this.currentIdeDisplayName}. Please run the CLI from the same directory as your project's root folder.`,
+        `Directory mismatch. Gemini CLI is running in a different location than the open workspace in ${this.currentIdeDisplayName}. Please run the CLI from the same directory as your project's root folder.`,
       );
       return false;
     }
@@ -166,13 +166,13 @@ export class IdeClient {
     this.client.onerror = (_error) => {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `IDE connection error: The connection was lost unexpectedly. Please try reconnecting by running /ide enable`,
+        `IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable`,
       );
     };
     this.client.onclose = () => {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `IDE connection error: The connection was lost unexpectedly. Please try reconnecting by running /ide enable`,
+        `IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable`,
       );
     };
   }
