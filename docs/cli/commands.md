@@ -27,6 +27,9 @@ Slash commands provide meta-level control over the CLI itself.
       - **Usage:** `/chat resume <tag>`
     - **`list`**
       - **Description:** Lists available tags for chat state resumption.
+    - **`delete`**
+      - **Description:** Deletes a saved conversation checkpoint.
+      - **Usage:** `/chat delete <tag>`
 
 - **`/clear`**
   - **Description:** Clear the terminal screen, including the visible session history and scrollback within the CLI. The underlying session data (for history recall) might be preserved depending on the exact implementation, but the visual display is cleared.
