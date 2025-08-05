@@ -415,11 +415,6 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           return false; // Pass through to other handlers
         }
 
-        // Let shell mode handle reverse search
-        if (normalizedKey.ctrl && normalizedKey.name === 'r') {
-          return false;
-        }
-
         // Handle count input (numbers 1-9, and 0 if count > 0)
         if (
           DIGIT_1_TO_9.test(normalizedKey.sequence) ||
