@@ -39,7 +39,7 @@ export const PlanSidebar = ({ width = 30 }: { width?: number }) => {
         <Box key={step.id} flexDirection="column">
           <Text color={idx === currentStep ? Colors.AccentGreen : undefined}>
             {idx === currentStep ? '→ ' : '  '}
-            {JSON.stringify({ id: step.id, desc: step.description, status: step.status })}
+            {`${step.id}. ${step.description} [${step.status}]`}
           </Text>
           <ProgressBar progress={step.progress} />
         </Box>
