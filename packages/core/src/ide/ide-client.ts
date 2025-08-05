@@ -33,32 +33,66 @@ export enum IDEConnectionStatus {
  * Manages the connection to and interaction with the IDE server.
  */
 export class IdeClient {
-  client: Client | undefined = undefined;
+  private static instance: IdeClient;
+  private client: Client | undefined = undefined;
   private state: IDEConnectionState = {
     status: IDEConnectionStatus.Disconnected,
   };
-  private static instance: IdeClient;
   private readonly currentIde: DetectedIde | undefined;
   private readonly currentIdeDisplayName: string | undefined;
 
-  constructor(ideMode: boolean) {
+  private constructor() {
     this.currentIde = detectIde();
     if (this.currentIde) {
       this.currentIdeDisplayName = getIdeDisplayName(this.currentIde);
     }
-    if (!ideMode) {
-      return;
-    }
-    this.init().catch((err) => {
-      logger.debug('Failed to initialize IdeClient:', err);
-    });
   }
 
-  static getInstance(ideMode: boolean): IdeClient {
+  static getInstance(): IdeClient {
     if (!IdeClient.instance) {
-      IdeClient.instance = new IdeClient(ideMode);
+      IdeClient.instance = new IdeClient();
     }
     return IdeClient.instance;
+  }
+
+  async connect(): Promise<void> {
+    if (this.state.status === IDEConnectionStatus.Connected) {
+      return;
+    }
+
+    if (!this.currentIde) {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        'Not running in a supported IDE, skipping connection.',
+      );
+      return;
+    }
+
+    this.setState(IDEConnectionStatus.Connecting);
+
+    if (!this.validateWorkspacePath()) {
+      return;
+    }
+
+    const port = this.getPortFromEnv();
+    if (!port) {
+      return;
+    }
+
+    await this.establishConnection(port);
+  }
+
+  async reconnect() {
+    await this.connect();
+  }
+
+  disconnect() {
+    this.client?.close();
+    this.setState(IDEConnectionStatus.Disconnected, 'User disconnected.');
+  }
+
+  dispose() {
+    this.disconnect();
   }
 
   getCurrentIde(): DetectedIde | undefined {
@@ -67,6 +101,10 @@ export class IdeClient {
 
   getConnectionStatus(): IDEConnectionState {
     return this.state;
+  }
+
+  getDetectedIdeDisplayName(): string | undefined {
+    return this.currentIdeDisplayName;
   }
 
   private setState(status: IDEConnectionStatus, details?: string) {
@@ -130,10 +168,6 @@ export class IdeClient {
     };
   }
 
-  async reconnect(ideMode: boolean) {
-    IdeClient.instance = new IdeClient(ideMode);
-  }
-
   private async establishConnection(port: string) {
     let transport: StreamableHTTPClientTransport | undefined;
     try {
@@ -165,43 +199,5 @@ export class IdeClient {
         }
       }
     }
-  }
-
-  async init(): Promise<void> {
-    if (this.state.status === IDEConnectionStatus.Connected) {
-      return;
-    }
-    if (!this.currentIde) {
-      this.setState(
-        IDEConnectionStatus.Disconnected,
-        'Not running in a supported IDE, skipping connection.',
-      );
-      return;
-    }
-
-    this.setState(IDEConnectionStatus.Connecting);
-
-    if (!this.validateWorkspacePath()) {
-      return;
-    }
-
-    const port = this.getPortFromEnv();
-    if (!port) {
-      return;
-    }
-
-    await this.establishConnection(port);
-  }
-
-  dispose() {
-    this.client?.close();
-  }
-
-  getDetectedIdeDisplayName(): string | undefined {
-    return this.currentIdeDisplayName;
-  }
-
-  setDisconnected() {
-    this.setState(IDEConnectionStatus.Disconnected);
   }
 }
