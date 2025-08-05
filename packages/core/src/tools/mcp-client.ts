@@ -36,6 +36,33 @@ import { getErrorMessage } from '../utils/errors.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
+/**
+ * Helper function to merge headers with existing requestInit options
+ * @param existingRequestInit - Existing requestInit options
+ * @param customHeaders - Custom headers to merge
+ * @param accessToken - Optional access token to add as Authorization header
+ * @returns Merged RequestInit object
+ */
+function mergeHeaders(
+  existingRequestInit: RequestInit | undefined,
+  customHeaders: Record<string, string> | undefined,
+  accessToken?: string | null,
+): RequestInit {
+  const newHeaders: Record<string, string> = {
+    ...((existingRequestInit?.headers as Record<string, string>) ?? {}),
+    ...(customHeaders ?? {}),
+  };
+
+  if (accessToken) {
+    newHeaders['Authorization'] = `Bearer ${accessToken}`;
+  }
+
+  return {
+    ...existingRequestInit,
+    headers: newHeaders,
+  };
+}
+
 export type DiscoveredMCPPrompt = Prompt & {
   serverName: string;
   invoke: (params: Record<string, unknown>) => Promise<GetPromptResult>;
@@ -970,16 +997,10 @@ export async function createTransport(
 
     // Add custom headers if they exist
     if (mcpServerConfig.headers) {
-      transportOptions.requestInit = {
-        ...transportOptions.requestInit,
-        headers: {
-          ...((transportOptions.requestInit?.headers as Record<
-            string,
-            string
-          >) ?? {}),
-          ...mcpServerConfig.headers,
-        },
-      };
+      transportOptions.requestInit = mergeHeaders(
+        transportOptions.requestInit,
+        mcpServerConfig.headers,
+      );
     }
 
     if (mcpServerConfig.httpUrl) {
@@ -1036,29 +1057,12 @@ export async function createTransport(
     const transportOptions: StreamableHTTPClientTransportOptions = {};
 
     // Set up headers with OAuth token if available
-    if (hasOAuthConfig && accessToken) {
-      transportOptions.requestInit = {
-        ...transportOptions.requestInit,
-        headers: {
-          ...((transportOptions.requestInit?.headers as Record<
-            string,
-            string
-          >) ?? {}),
-          ...mcpServerConfig.headers,
-          Authorization: `Bearer ${accessToken}`,
-        },
-      };
-    } else if (mcpServerConfig.headers) {
-      transportOptions.requestInit = {
-        ...transportOptions.requestInit,
-        headers: {
-          ...((transportOptions.requestInit?.headers as Record<
-            string,
-            string
-          >) ?? {}),
-          ...mcpServerConfig.headers,
-        },
-      };
+    if ((hasOAuthConfig && accessToken) || mcpServerConfig.headers) {
+      transportOptions.requestInit = mergeHeaders(
+        transportOptions.requestInit,
+        mcpServerConfig.headers,
+        hasOAuthConfig && accessToken ? accessToken : undefined,
+      );
     }
 
     return new StreamableHTTPClientTransport(
@@ -1071,29 +1075,12 @@ export async function createTransport(
     const transportOptions: SSEClientTransportOptions = {};
 
     // Set up headers with OAuth token if available
-    if (hasOAuthConfig && accessToken) {
-      transportOptions.requestInit = {
-        ...transportOptions.requestInit,
-        headers: {
-          ...((transportOptions.requestInit?.headers as Record<
-            string,
-            string
-          >) ?? {}),
-          ...mcpServerConfig.headers,
-          Authorization: `Bearer ${accessToken}`,
-        },
-      };
-    } else if (mcpServerConfig.headers) {
-      transportOptions.requestInit = {
-        ...transportOptions.requestInit,
-        headers: {
-          ...((transportOptions.requestInit?.headers as Record<
-            string,
-            string
-          >) ?? {}),
-          ...mcpServerConfig.headers,
-        },
-      };
+    if ((hasOAuthConfig && accessToken) || mcpServerConfig.headers) {
+      transportOptions.requestInit = mergeHeaders(
+        transportOptions.requestInit,
+        mcpServerConfig.headers,
+        hasOAuthConfig && accessToken ? accessToken : undefined,
+      );
     }
 
     return new SSEClientTransport(
