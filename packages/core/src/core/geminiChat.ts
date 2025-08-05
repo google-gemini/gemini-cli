@@ -32,6 +32,8 @@ import {
   ApiResponseEvent,
 } from '../telemetry/types.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { hasCycleInSchema } from '../tools/tools.js';
+import { isStructuredError } from '../utils/quotaErrorDetection.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -413,6 +415,8 @@ export class GeminiChat {
       // If errors occur mid-stream, this setup won't resume the stream; it will restart it.
       const streamResponse = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
+          // Check for likely recursive schema errors, don't retry those.
+          if (error.message.includes('maximum schema depth exceeded')) return false;
           // Check error messages for status codes, or specific error names if known
           if (error && error.message) {
             if (error.message.includes('429')) return true;
@@ -443,6 +447,28 @@ export class GeminiChat {
       const durationMs = Date.now() - startTime;
       this._logApiError(durationMs, error, prompt_id);
       this.sendPromise = Promise.resolve();
+      // Check for potentially problematic cyclic tools with cyclic schemas
+      // and include a recommendation to remove potentially problematic tools.
+      if (`${error}`.includes('maximum schema depth exceeded')) {
+        const tools = (await this.config.getToolRegistry()).getAllTools();
+        const cyclicSchemaTools: String[] = [];
+        for (const tool of tools) {
+          if ((tool.schema.parametersJsonSchema && hasCycleInSchema(tool.schema.parametersJsonSchema)) ||
+            (tool.schema.parameters && hasCycleInSchema(tool.schema.parameters))) {
+            cyclicSchemaTools.push(tool.displayName);
+          }
+        }
+        if (cyclicSchemaTools.length > 0) {
+          const extraDetails = `\n\nThis error was probably caused by cyclic schema references in one of the following tools, try disabling them:\n\n - `
+            + cyclicSchemaTools.join(`\n - `) + `\n`;
+          if (isStructuredError(error)) {
+            error.message += extraDetails;
+          } else {
+            error = `${error}${extraDetails}`;
+          }
+        }
+      }
+
       throw error;
     }
   }

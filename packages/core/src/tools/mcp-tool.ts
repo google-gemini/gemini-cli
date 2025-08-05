@@ -24,7 +24,6 @@ type ToolParams = Record<string, unknown>;
 
 export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
   private static readonly allowlist: Set<string> = new Set();
-  readonly isCyclic: boolean;
 
   constructor(
     private readonly mcpTool: CallableTool,
@@ -36,27 +35,15 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     readonly trust?: boolean,
     nameOverride?: string,
   ) {
-    const isCyclic = hasCycleInSchema(parameterSchemaJson as object);
-    const finalDescription = isCyclic
-      ? `[DISABLED - CYCLIC SCHEMA] ${description}`
-      : description;
-
     super(
       nameOverride ?? generateValidName(serverToolName),
       `${serverToolName} (${serverName} MCP Server)`,
-      finalDescription,
+      description,
       Icon.Hammer,
       { type: Type.OBJECT }, // this is a dummy Schema for MCP, will be not be used to construct the FunctionDeclaration
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
-
-    this.isCyclic = isCyclic;
-    if (this.isCyclic) {
-      console.warn(
-        `Tool "${this.serverToolName}" from server "${this.serverName}" has a cyclic schema and will be disabled.`,
-      );
-    }
   }
 
   asFullyQualifiedTool(): DiscoveredMCPTool {
@@ -205,70 +192,4 @@ export function generateValidName(name: string) {
       validToolname.slice(0, 28) + '___' + validToolname.slice(-32);
   }
   return validToolname;
-}
-
-/**
- * Detects cycles in a JSON schemas due to `$ref`s.
- * Visible for testing.
- * @param schema The root of the JSON schema.
- * @returns `true` if a cycle is detected, `false` otherwise.
- */
-export function hasCycleInSchema(schema: object): boolean {
-  function resolveRef(ref: string): object | null {
-    if (!ref.startsWith('#/')) {
-      return null;
-    }
-    const path = ref.substring(2).split('/');
-    let current: unknown = schema;
-    for (const segment of path) {
-      if (
-        typeof current !== 'object' ||
-        current === null ||
-        !Object.prototype.hasOwnProperty.call(current, segment)
-      ) {
-        return null;
-      }
-      current = (current as Record<string, unknown>)[segment];
-    }
-    return current as object;
-  }
-
-  function traverse(node: unknown, visitedRefs: Set<string>, pathRefs: Set<string>): boolean {
-    if (typeof node !== 'object' || node === null || Array.isArray(node)) {
-      return false;
-    }
-
-    if ('$ref' in node && typeof node.$ref === 'string') {
-      const ref = node.$ref;
-      if (ref === '#/' || pathRefs.has(ref)) {  // A ref to just '#/' is always a cycle.
-        return true; // Cycle detected!
-      }
-      if (visitedRefs.has(ref)) {
-        return false; // Bail early, we have checked this ref before.
-      }
-
-      const resolvedNode = resolveRef(ref);
-      if (resolvedNode) {
-        // Add it to both visited and the current path
-        visitedRefs.add(ref);
-        pathRefs.add(ref);
-        const hasCycle = traverse(resolvedNode, visitedRefs, pathRefs);
-        pathRefs.delete(ref); // Backtrack, leaving it in visited
-        return hasCycle;
-      }
-    }
-
-    // Crawl all the properties of node
-    for (const key in node) {
-      if (Object.prototype.hasOwnProperty.call(node, key)) {
-        if (traverse((node as Record<string, unknown>)[key], visitedRefs, pathRefs)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  return traverse(schema, new Set<string>(), new Set<string>());
 }
