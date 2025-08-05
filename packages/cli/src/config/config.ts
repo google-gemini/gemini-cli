@@ -22,7 +22,6 @@ import {
   FileDiscoveryService,
   TelemetryTarget,
   FileFilteringOptions,
-  IdeClient,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -296,13 +295,10 @@ export async function loadCliConfig(
     ) ||
     false;
   const memoryImportFormat = settings.memoryImportFormat || 'tree';
+
   const ideMode = settings.ideMode ?? false;
-
   const ideModeFeature =
-    (argv.ideModeFeature ?? settings.ideModeFeature ?? false) &&
-    !process.env.SANDBOX;
-
-  const ideClient = IdeClient.getInstance(ideMode && ideModeFeature);
+    argv.ideModeFeature ?? settings.ideModeFeature ?? false;
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -471,7 +467,6 @@ export async function loadCliConfig(
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
     ideModeFeature,
-    ideClient,
   });
 }
 
