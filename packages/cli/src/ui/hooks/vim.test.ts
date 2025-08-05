@@ -1203,7 +1203,9 @@ describe('useVim hook', () => {
         });
 
         // Press escape to clear pending state
-        exitInsertMode(result);
+        act(() => {
+          result.current.handleInput({ name: 'escape' });
+        });
 
         // Now 'w' should just move cursor, not delete
         act(() => {
@@ -1213,6 +1215,33 @@ describe('useVim hook', () => {
         expect(testBuffer.vimDeleteWordForward).not.toHaveBeenCalled();
         // w should move to next word after clearing pending state
         expect(testBuffer.vimMoveWordForward).toHaveBeenCalledWith(1);
+      });
+    });
+
+    describe('NORMAL mode escape behavior', () => {
+      it('should pass escape through when no pending operator is active', () => {
+        mockVimContext.vimMode = 'NORMAL';
+        const { result } = renderVimHook();
+
+        const handled = result.current.handleInput({ name: 'escape' });
+
+        expect(handled).toBe(false);
+      });
+
+      it('should handle escape and clear pending operator', () => {
+        mockVimContext.vimMode = 'NORMAL';
+        const { result } = renderVimHook();
+
+        act(() => {
+          result.current.handleInput({ sequence: 'd' });
+        });
+
+        let handled: boolean | undefined;
+        act(() => {
+          handled = result.current.handleInput({ name: 'escape' });
+        });
+
+        expect(handled).toBe(true);
       });
     });
   });

@@ -270,6 +270,11 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         return false; // Let InputPrompt handle clipboard functionality
       }
 
+      // Let InputPrompt handle shell commands
+      if (normalizedKey.sequence === '!' && buffer.text.length === 0) {
+        return false;
+      }
+
       // Special handling for Enter key to allow command submission (lower priority than completion)
       if (
         normalizedKey.name === 'return' &&
@@ -399,10 +404,14 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
       // Handle NORMAL mode
       if (state.mode === 'NORMAL') {
-        // Handle Escape key in NORMAL mode - clear all pending states
+        // If in NORMAL mode, allow escape to pass through to other handlers
+        // if there's no pending operation.
         if (normalizedKey.name === 'escape') {
-          dispatch({ type: 'CLEAR_PENDING_STATES' });
-          return true; // Handled by vim
+          if (state.pendingOperator) {
+            dispatch({ type: 'CLEAR_PENDING_STATES' });
+            return true; // Handled by vim
+          }
+          return false; // Pass through to other handlers
         }
 
         // Handle count input (numbers 1-9, and 0 if count > 0)
