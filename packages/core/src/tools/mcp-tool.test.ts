@@ -14,7 +14,11 @@ import {
   afterEach,
   Mocked,
 } from 'vitest';
-import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
+import {
+  DiscoveredMCPTool,
+  generateValidName,
+  hasCycleInSchema,
+} from './mcp-tool.js'; // Added getStringifiedResultForDisplay
 import { ToolResult, ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
 import { CallableTool, Part } from '@google/genai';
 
@@ -397,5 +401,157 @@ describe('DiscoveredMCPTool', () => {
         );
       }
     });
+  });
+
+  describe('with cyclic schema', () => {
+    const cyclicSchema = {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          properties: {
+            child: { $ref: '#/properties/data' },
+          },
+        },
+      },
+    };
+
+    beforeEach(() => {
+      vi.spyOn(console, 'warn').mockImplementation(() => { });
+    });
+
+    it('should be marked as cyclic and have a modified description', () => {
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        cyclicSchema,
+      );
+      expect(tool.isCyclic).toBe(true);
+      expect(tool.description).toBe(
+        `[DISABLED - CYCLIC SCHEMA] ${baseDescription}`,
+      );
+      expect(console.warn).toHaveBeenCalledWith(
+        `Tool "${serverToolName}" from server "${serverName}" has a cyclic schema and will be disabled.`,
+      );
+    });
+  });
+});
+
+describe('hasCycleInSchema', () => {
+  it('should detect a simple direct cycle', () => {
+    const schema = {
+      properties: {
+        data: {
+          $ref: '#/properties/data',
+        },
+      },
+    };
+    expect(hasCycleInSchema(schema)).toBe(true);
+  });
+
+  it('should detect a cycle from object properties referencing parent properties', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          properties: {
+            child: { $ref: '#/properties/data' },
+          },
+        },
+      },
+    };
+    expect(hasCycleInSchema(schema)).toBe(true);
+  });
+
+  it('should detect a cycle from array items referencing parent properties', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              child: { $ref: '#/properties/data/items' },
+            },
+          },
+        },
+      },
+    };
+    expect(hasCycleInSchema(schema)).toBe(true);
+  });
+
+  it('should detect a cycle between sibling properties', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        a: {
+          type: 'object',
+          properties: {
+            child: { $ref: '#/properties/b' },
+          },
+        },
+        b: {
+          type: 'object',
+          properties: {
+            child: { $ref: '#/properties/a' },
+          },
+        },
+      },
+    };;
+    expect(hasCycleInSchema(schema)).toBe(true);
+  });
+
+  it('should not detect a cycle in a valid schema', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        address: { $ref: '#/definitions/address' },
+      },
+      definitions: {
+        address: {
+          type: 'object',
+          properties: {
+            street: { type: 'string' },
+            city: { type: 'string' },
+          },
+        },
+      },
+    };
+    expect(hasCycleInSchema(schema)).toBe(false);
+  });
+
+  it('should handle non-cyclic sibling refs', () => {
+    const schema = {
+      properties: {
+        a: { $ref: '#/definitions/stringDef' },
+        b: { $ref: '#/definitions/stringDef' },
+      },
+      definitions: {
+        stringDef: { type: 'string' },
+      },
+    };
+    expect(hasCycleInSchema(schema)).toBe(false);
+  });
+
+  it('should handle nested but not cyclic refs', () => {
+    const schema = {
+      properties: {
+        a: { $ref: '#/definitions/defA' },
+      },
+      definitions: {
+        defA: { properties: { b: { $ref: '#/definitions/defB' } } },
+        defB: { type: 'string' },
+      },
+    };
+    expect(hasCycleInSchema(schema)).toBe(false);
+  });
+
+  it('should return false for an empty schema', () => {
+    expect(hasCycleInSchema({})).toBe(false);
   });
 });
