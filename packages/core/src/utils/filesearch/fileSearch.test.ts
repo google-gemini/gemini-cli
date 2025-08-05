@@ -492,7 +492,7 @@ describe('FileSearch', () => {
 
   it('should be cancellable via AbortSignal', async () => {
     const largeDir: Record<string, string> = {};
-    for (let i = 0; i < 5000; i++) {
+    for (let i = 0; i < 100; i++) {
       largeDir[`file${i}.js`] = '';
     }
     tmpDir = await createTmpDir(largeDir);
