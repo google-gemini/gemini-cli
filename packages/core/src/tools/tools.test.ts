@@ -4,27 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach, Mocked } from 'vitest';
-import { BaseTool, ToolResult, hasCycleInSchema } from './tools.js'; // Added getStringifiedResultForDisplay
-
-describe('BaseTool checks for cyclic schemas', () => {
-    const cyclicSchema = {
-        type: 'object',
-        properties: {
-            data: {
-                type: 'object',
-                properties: {
-                    child: { $ref: '#/properties/data' },
-                },
-            },
-        },
-    };
-
-    beforeEach(() => {
-        vi.spyOn(console, 'warn').mockImplementation(() => { });
-    });
-});
+import { describe, it, expect } from 'vitest';
+import { hasCycleInSchema } from './tools.js'; // Added getStringifiedResultForDisplay
 
 describe('hasCycleInSchema', () => {
     it('should detect a simple direct cycle', () => {
@@ -142,13 +123,3 @@ describe('hasCycleInSchema', () => {
         expect(hasCycleInSchema({})).toBe(false);
     });
 });
-
-class TestTool extends BaseTool {
-    execute(
-        params: unknown,
-        signal: AbortSignal,
-        updateOutput?: (output: string) => void,
-    ): Promise<ToolResult> {
-        throw 'Unimplemented';
-    }
-}

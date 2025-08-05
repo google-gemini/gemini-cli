@@ -101,8 +101,7 @@ export interface Tool<
 export abstract class BaseTool<
   TParams = unknown,
   TResult extends ToolResult = ToolResult,
-> implements Tool<TParams, TResult>
-{
+> implements Tool<TParams, TResult> {
   /**
    * Creates a new instance of BaseTool
    * @param name Internal name of the tool (used for API calls)
@@ -120,7 +119,7 @@ export abstract class BaseTool<
     readonly parameterSchema: Schema,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
-  ) {}
+  ) { }
 
   /**
    * Function declaration schema computed from name, description, and parameterSchema
@@ -230,7 +229,6 @@ export interface ToolResult {
 
 /**
  * Detects cycles in a JSON schemas due to `$ref`s.
- * Visible for testing.
  * @param schema The root of the JSON schema.
  * @returns `true` if a cycle is detected, `false` otherwise.
  */
