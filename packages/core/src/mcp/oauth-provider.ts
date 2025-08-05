@@ -39,6 +39,7 @@ export interface OAuthAuthorizationResponse {
  */
 export interface OAuthTokenResponse {
   access_token: string;
+  id_token?: string;
   token_type: string;
   expires_in?: number;
   refresh_token?: string;
@@ -615,10 +616,13 @@ export class MCPOAuthProvider {
       pkceParams.codeVerifier,
       mcpServerUrl,
     );
+    
+    // Prioritize the ID Token for authentication if it exists (OIDC flow),
+    const bearerToken = tokenResponse.id_token || tokenResponse.access_token;
 
     // Convert to our token format
     const token: MCPOAuthToken = {
-      accessToken: tokenResponse.access_token,
+      accessToken: bearerToken,
       tokenType: tokenResponse.token_type,
       refreshToken: tokenResponse.refresh_token,
       scope: tokenResponse.scope,
@@ -698,9 +702,12 @@ export class MCPOAuthProvider {
           credentials.mcpServerUrl,
         );
 
+        // Prioritize the ID Token from the refresh response if it exists.
+        const newBearerToken = newTokenResponse.id_token || newTokenResponse.access_token;
+
         // Update stored token
         const newToken: MCPOAuthToken = {
-          accessToken: newTokenResponse.access_token,
+          accessToken: newBearerToken,
           tokenType: newTokenResponse.token_type,
           refreshToken: newTokenResponse.refresh_token || token.refreshToken,
           scope: newTokenResponse.scope || token.scope,
