@@ -171,6 +171,10 @@ describe('ToolRegistry', () => {
     );
     vi.spyOn(config, 'getMcpServers');
     vi.spyOn(config, 'getMcpServerCommand');
+    vi.spyOn(config, 'getPromptRegistry').mockReturnValue({
+      clear: vi.fn(),
+      removePromptsByServer: vi.fn(),
+    } as any);
     mockDiscoverMcpTools.mockReset().mockResolvedValue(undefined);
   });
 
@@ -352,7 +356,7 @@ describe('ToolRegistry', () => {
         mcpServerConfigVal,
         undefined,
         toolRegistry,
-        undefined,
+        config.getPromptRegistry(),
         false,
       );
     });
@@ -375,7 +379,7 @@ describe('ToolRegistry', () => {
         mcpServerConfigVal,
         undefined,
         toolRegistry,
-        undefined,
+        config.getPromptRegistry(),
         false,
       );
     });
