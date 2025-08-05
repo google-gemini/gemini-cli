@@ -22,6 +22,7 @@ export interface MCPOAuthConfig {
   authorizationUrl?: string;
   tokenUrl?: string;
   scopes?: string[];
+  audiences?: string[];
   redirectUri?: string;
   tokenParamName?: string; // For SSE connections, specifies the query parameter name for the token
 }
@@ -297,6 +298,10 @@ export class MCPOAuthProvider {
       params.append('scope', config.scopes.join(' '));
     }
 
+    if (config.audiences && config.audiences.length > 0) {
+      params.append('audience', config.audiences.join(' '));
+    }
+
     // Add resource parameter for MCP OAuth spec compliance
     // Use the MCP server URL if provided, otherwise fall back to authorization URL
     const resourceUrl = mcpServerUrl || config.authorizationUrl!;
@@ -344,6 +349,10 @@ export class MCPOAuthProvider {
 
     if (config.clientSecret) {
       params.append('client_secret', config.clientSecret);
+    }
+
+    if (config.audiences && config.audiences.length > 0) {
+      params.append('audience', config.audiences.join(' '));
     }
 
     // Add resource parameter for MCP OAuth spec compliance
@@ -402,6 +411,10 @@ export class MCPOAuthProvider {
 
     if (config.scopes && config.scopes.length > 0) {
       params.append('scope', config.scopes.join(' '));
+    }
+
+    if (config.audiences && config.audiences.length > 0) {
+      params.append('audience', config.audiences.join(' '));
     }
 
     // Add resource parameter for MCP OAuth spec compliance
