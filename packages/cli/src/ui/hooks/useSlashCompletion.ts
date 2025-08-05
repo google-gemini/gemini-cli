@@ -8,31 +8,34 @@ import { useState, useEffect } from 'react';
 import { Suggestion } from '../components/SuggestionsDisplay.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 
-export interface UseSlashCompletionReturn {
-  suggestions: Suggestion[];
-  isLoadingSuggestions: boolean;
-  isPerfectMatch: boolean;
-  completionStart: number;
-  completionEnd: number;
+export interface UseSlashCompletionProps {
+  enabled: boolean;
+  query: string | null;
+  slashCommands: readonly SlashCommand[];
+  commandContext: CommandContext;
+  setSuggestions: (suggestions: Suggestion[]) => void;
+  setIsLoadingSuggestions: (isLoading: boolean) => void;
+  setIsPerfectMatch: (isMatch: boolean) => void;
 }
 
-export function useSlashCompletion(
-  enabled: boolean,
-  query: string | null,
-  slashCommands: readonly SlashCommand[],
-  commandContext: CommandContext,
-): UseSlashCompletionReturn {
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
-  const [isPerfectMatch, setIsPerfectMatch] = useState(false);
+export function useSlashCompletion(props: UseSlashCompletionProps): {
+  completionStart: number;
+  completionEnd: number;
+} {
+  const {
+    enabled,
+    query,
+    slashCommands,
+    commandContext,
+    setSuggestions,
+    setIsLoadingSuggestions,
+    setIsPerfectMatch,
+  } = props;
   const [completionStart, setCompletionStart] = useState(-1);
   const [completionEnd, setCompletionEnd] = useState(-1);
 
   useEffect(() => {
     if (!enabled || query === null) {
-      setSuggestions([]);
-      setIsLoadingSuggestions(false);
-      setIsPerfectMatch(false);
       return;
     }
 
@@ -167,12 +170,17 @@ export function useSlashCompletion(
     }
 
     setSuggestions([]);
-  }, [enabled, query, slashCommands, commandContext]);
+  }, [
+    enabled,
+    query,
+    slashCommands,
+    commandContext,
+    setSuggestions,
+    setIsLoadingSuggestions,
+    setIsPerfectMatch,
+  ]);
 
   return {
-    suggestions,
-    isLoadingSuggestions,
-    isPerfectMatch,
     completionStart,
     completionEnd,
   };

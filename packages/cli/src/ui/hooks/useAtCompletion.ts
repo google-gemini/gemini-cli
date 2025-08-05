@@ -89,26 +89,40 @@ function atCompletionReducer(
   }
 }
 
-export interface UseAtCompletionReturn {
-  suggestions: Suggestion[];
-  isLoadingSuggestions: boolean;
+export interface UseAtCompletionProps {
+  enabled: boolean;
+  pattern: string;
+  config: Config | undefined;
+  cwd: string;
+  setSuggestions: (suggestions: Suggestion[]) => void;
+  setIsLoadingSuggestions: (isLoading: boolean) => void;
 }
 
-export function useAtCompletion(
-  enabled: boolean,
-  pattern: string,
-  config: Config | undefined,
-  cwd: string,
-): UseAtCompletionReturn {
+export function useAtCompletion(props: UseAtCompletionProps): void {
+  const {
+    enabled,
+    pattern,
+    config,
+    cwd,
+    setSuggestions,
+    setIsLoadingSuggestions,
+  } = props;
   const [state, dispatch] = useReducer(atCompletionReducer, initialState);
   const fileSearch = useRef<FileSearch | null>(null);
   const searchAbortController = useRef<AbortController | null>(null);
   const slowSearchTimer = useRef<NodeJS.Timeout | null>(null);
 
+  useEffect(() => {
+    setSuggestions(state.suggestions);
+  }, [state.suggestions, setSuggestions]);
+
+  useEffect(() => {
+    setIsLoadingSuggestions(state.isLoading);
+  }, [state.isLoading, setIsLoadingSuggestions]);
+
   // Effect 1: Reacts to user input (`pattern`) ONLY.
   useEffect(() => {
     if (!enabled) {
-      dispatch({ type: 'RESET' });
       return;
     }
     if (pattern === null) {
@@ -207,9 +221,4 @@ export function useAtCompletion(
       }
     };
   }, [state.status, state.pattern, config, cwd]);
-
-  return {
-    suggestions: state.suggestions,
-    isLoadingSuggestions: state.isLoading,
-  };
 }

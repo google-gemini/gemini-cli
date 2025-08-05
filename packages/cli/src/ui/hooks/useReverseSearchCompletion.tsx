@@ -41,12 +41,19 @@ export function useReverseSearchCompletion(
     navigateDown,
   } = useCompletion();
 
-  // whenever reverseSearchActive is on, filter history
+  // Effect 1: Reset state when reverse search is deactivated.
   useEffect(() => {
     if (!reverseSearchActive) {
       resetCompletionState();
+    }
+  }, [reverseSearchActive, resetCompletionState]);
+
+  // Effect 2: Perform search when active and text changes.
+  useEffect(() => {
+    if (!reverseSearchActive) {
       return;
     }
+
     const q = buffer.text.toLowerCase();
     const matches = shellHistory.reduce<Suggestion[]>((acc, cmd) => {
       const idx = cmd.toLowerCase().indexOf(q);
@@ -55,6 +62,7 @@ export function useReverseSearchCompletion(
       }
       return acc;
     }, []);
+
     setSuggestions(matches);
     setShowSuggestions(matches.length > 0);
     setActiveSuggestionIndex(matches.length > 0 ? 0 : -1);
@@ -62,7 +70,6 @@ export function useReverseSearchCompletion(
     buffer.text,
     shellHistory,
     reverseSearchActive,
-    resetCompletionState,
     setActiveSuggestionIndex,
     setShowSuggestions,
     setSuggestions,

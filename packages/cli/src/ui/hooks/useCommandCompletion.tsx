@@ -5,9 +5,7 @@
  */
 
 import { useCallback, useMemo, useEffect } from 'react';
-import {
-  Suggestion,
-} from '../components/SuggestionsDisplay.js';
+import { Suggestion } from '../components/SuggestionsDisplay.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import {
   logicalPosToOffset,
@@ -135,54 +133,30 @@ export function useCommandCompletion(
       };
     }, [cursorRow, cursorCol, buffer.lines]);
 
-  const atCompletion = useAtCompletion(
-    completionMode === CompletionMode.AT,
-    query || '',
+  useAtCompletion({
+    enabled: completionMode === CompletionMode.AT,
+    pattern: query || '',
     config,
     cwd,
-  );
-  const slashCompletion = useSlashCompletion(
-    completionMode === CompletionMode.SLASH,
+    setSuggestions,
+    setIsLoadingSuggestions,
+  });
+
+  const slashCompletionRange = useSlashCompletion({
+    enabled: completionMode === CompletionMode.SLASH,
     query,
     slashCommands,
     commandContext,
-  );
-
-  const activeCompletion = useMemo(() => {
-    if (completionMode === CompletionMode.AT) {
-      return { ...atCompletion, isPerfectMatch: false };
-    }
-    if (completionMode === CompletionMode.SLASH) {
-      return slashCompletion;
-    }
-    return {
-      suggestions: [],
-      isLoadingSuggestions: false,
-      isPerfectMatch: false,
-    };
-  }, [completionMode, atCompletion, slashCompletion]);
-
-   
-  const stableSuggestions = useMemo(
-    () => activeCompletion.suggestions,
-    // eslint-disable-next-line
-    // TODO: This was necessary to prevent render loops in tests. We should
-    // find a better way.
-    [JSON.stringify(activeCompletion.suggestions)],
-  );
-
-  useEffect(() => {
-    setSuggestions(stableSuggestions);
-    setIsLoadingSuggestions(activeCompletion.isLoadingSuggestions);
-    setIsPerfectMatch(activeCompletion.isPerfectMatch);
-  }, [
-    stableSuggestions,
-    activeCompletion.isLoadingSuggestions,
-    activeCompletion.isPerfectMatch,
     setSuggestions,
     setIsLoadingSuggestions,
     setIsPerfectMatch,
-  ]);
+  });
+
+  useEffect(() => {
+    if (completionMode === CompletionMode.AT) {
+      setIsPerfectMatch(false);
+    }
+  }, [completionMode, setIsPerfectMatch]);
 
   useEffect(() => {
     setActiveSuggestionIndex(suggestions.length > 0 ? 0 : -1);
@@ -215,8 +189,8 @@ export function useCommandCompletion(
       let start = completionStart;
       let end = completionEnd;
       if (completionMode === CompletionMode.SLASH) {
-        start = slashCompletion.completionStart;
-        end = slashCompletion.completionEnd;
+        start = slashCompletionRange.completionStart;
+        end = slashCompletionRange.completionEnd;
       }
 
       if (start === -1 || end === -1) {
@@ -249,8 +223,7 @@ export function useCommandCompletion(
       completionMode,
       completionStart,
       completionEnd,
-      slashCompletion.completionStart,
-      slashCompletion.completionEnd,
+      slashCompletionRange,
     ],
   );
 

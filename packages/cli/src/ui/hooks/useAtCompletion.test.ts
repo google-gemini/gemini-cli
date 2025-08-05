@@ -15,6 +15,30 @@ import {
   cleanupTmpDir,
   FileSystemStructure,
 } from '@google/gemini-cli-test-utils';
+import { useState } from 'react';
+import { Suggestion } from '../components/SuggestionsDisplay.js';
+
+// Test harness to capture the state from the hook's callbacks.
+function useTestHarnessForAtCompletion(
+  enabled: boolean,
+  pattern: string,
+  config: Config | undefined,
+  cwd: string,
+) {
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+
+  useAtCompletion({
+    enabled,
+    pattern,
+    config,
+    cwd,
+    setSuggestions,
+    setIsLoadingSuggestions,
+  });
+
+  return { suggestions, isLoadingSuggestions };
+}
 
 describe('useAtCompletion', () => {
   let testRootDir: string;
@@ -49,7 +73,7 @@ describe('useAtCompletion', () => {
       testRootDir = await createTmpDir(structure);
 
       const { result } = renderHook(() =>
-        useAtCompletion(true, '', mockConfig, testRootDir),
+        useTestHarnessForAtCompletion(true, '', mockConfig, testRootDir),
       );
 
       await waitFor(() => {
@@ -79,7 +103,7 @@ describe('useAtCompletion', () => {
       testRootDir = await createTmpDir(structure);
 
       const { result } = renderHook(() =>
-        useAtCompletion(true, 'src/', mockConfig, testRootDir),
+        useTestHarnessForAtCompletion(true, 'src/', mockConfig, testRootDir),
       );
 
       await waitFor(() => {
@@ -102,7 +126,7 @@ describe('useAtCompletion', () => {
       testRootDir = await createTmpDir(structure);
 
       const { result } = renderHook(() =>
-        useAtCompletion(true, '', mockConfig, testRootDir),
+        useTestHarnessForAtCompletion(true, '', mockConfig, testRootDir),
       );
 
       await waitFor(() => {
@@ -120,10 +144,10 @@ describe('useAtCompletion', () => {
     it('should be in a loading state during initial file system crawl', async () => {
       testRootDir = await createTmpDir({});
       const { result } = renderHook(() =>
-        useAtCompletion(true, '', mockConfig, testRootDir),
+        useTestHarnessForAtCompletion(true, '', mockConfig, testRootDir),
       );
 
-      // Initially, it should be loading.
+      // It's initially true because the effect runs synchronously.
       expect(result.current.isLoadingSuggestions).toBe(true);
 
       // Wait for the loading to complete.
@@ -138,7 +162,7 @@ describe('useAtCompletion', () => {
 
       const { result, rerender } = renderHook(
         ({ pattern }) =>
-          useAtCompletion(true, pattern, mockConfig, testRootDir),
+          useTestHarnessForAtCompletion(true, pattern, mockConfig, testRootDir),
         { initialProps: { pattern: 'a' } },
       );
 
@@ -176,7 +200,7 @@ describe('useAtCompletion', () => {
 
       const { result, rerender } = renderHook(
         ({ pattern }) =>
-          useAtCompletion(true, pattern, mockConfig, testRootDir),
+          useTestHarnessForAtCompletion(true, pattern, mockConfig, testRootDir),
         { initialProps: { pattern: 'a' } },
       );
 
@@ -227,7 +251,7 @@ describe('useAtCompletion', () => {
 
       const { result, rerender } = renderHook(
         ({ pattern }) =>
-          useAtCompletion(true, pattern, mockConfig, testRootDir),
+          useTestHarnessForAtCompletion(true, pattern, mockConfig, testRootDir),
         { initialProps: { pattern: 'a' } },
       );
 
@@ -272,7 +296,7 @@ describe('useAtCompletion', () => {
       testRootDir = await createTmpDir(structure);
 
       const { result } = renderHook(() =>
-        useAtCompletion(true, '', mockConfig, testRootDir),
+        useTestHarnessForAtCompletion(true, '', mockConfig, testRootDir),
       );
 
       await waitFor(() => {
@@ -293,7 +317,7 @@ describe('useAtCompletion', () => {
       testRootDir = await createTmpDir(structure);
 
       const { result } = renderHook(() =>
-        useAtCompletion(true, '', undefined, testRootDir),
+        useTestHarnessForAtCompletion(true, '', undefined, testRootDir),
       );
 
       await waitFor(() => {
