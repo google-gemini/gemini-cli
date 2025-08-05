@@ -161,6 +161,10 @@ describe('memoryCommand', () => {
         getDebugMode: () => false,
         getFileService: () => ({}) as FileDiscoveryService,
         getExtensionContextFilePaths: () => [],
+        shouldLoadMemoryFromIncludeDirectories: () => false,
+        getWorkspaceContext: () => ({
+          getDirectories: () => [],
+        }),
         getFileFilteringOptions: () => ({
           ignore: [],
           include: [],
