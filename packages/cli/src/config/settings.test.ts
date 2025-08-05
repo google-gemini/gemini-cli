@@ -112,6 +112,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged).toEqual({
         customThemes: {},
         mcpServers: {},
+        includeDirectories: [],
       });
       expect(settings.errors.length).toBe(0);
     });
@@ -145,6 +146,7 @@ describe('Settings Loading and Merging', () => {
         ...systemSettingsContent,
         customThemes: {},
         mcpServers: {},
+        includeDirectories: [],
       });
     });
 
@@ -178,6 +180,7 @@ describe('Settings Loading and Merging', () => {
         ...userSettingsContent,
         customThemes: {},
         mcpServers: {},
+        includeDirectories: [],
       });
     });
 
@@ -209,6 +212,7 @@ describe('Settings Loading and Merging', () => {
         ...workspaceSettingsContent,
         customThemes: {},
         mcpServers: {},
+        includeDirectories: [],
       });
     });
 
@@ -246,6 +250,7 @@ describe('Settings Loading and Merging', () => {
         contextFileName: 'WORKSPACE_CONTEXT.md',
         customThemes: {},
         mcpServers: {},
+        includeDirectories: [],
       });
     });
 
@@ -295,6 +300,7 @@ describe('Settings Loading and Merging', () => {
         allowMCPServers: ['server1', 'server2'],
         customThemes: {},
         mcpServers: {},
+        includeDirectories: [],
       });
     });
 
@@ -616,6 +622,40 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.mcpServers).toEqual({});
     });
 
+    it('should merge includeDirectories from all scopes', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const systemSettingsContent = {
+        includeDirectories: ['/system/dir'],
+      };
+      const userSettingsContent = {
+        includeDirectories: ['/user/dir1', '/user/dir2'],
+      };
+      const workspaceSettingsContent = {
+        includeDirectories: ['/workspace/dir'],
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.includeDirectories).toEqual([
+        '/system/dir',
+        '/user/dir1',
+        '/user/dir2',
+        '/workspace/dir',
+      ]);
+    });
+
     it('should handle JSON parsing errors gracefully', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true); // Both files "exist"
       const invalidJsonContent = 'invalid json';
@@ -654,6 +694,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged).toEqual({
         customThemes: {},
         mcpServers: {},
+        includeDirectories: [],
       });
 
       // Check that error objects are populated in settings.errors
@@ -1090,6 +1131,7 @@ describe('Settings Loading and Merging', () => {
           ...systemSettingsContent,
           customThemes: {},
           mcpServers: {},
+          includeDirectories: [],
         });
       });
     });

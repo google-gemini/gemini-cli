@@ -40,11 +40,24 @@ describe('directoryCommand', () => {
       getGeminiClient: vi.fn().mockReturnValue({
         addDirectoryContext: vi.fn(),
       }),
+      getWorkingDir: () => '/test/dir',
+      shouldLoadMemoryFromIncludeDirectories: () => false,
+      getDebugMode: () => false,
+      getFileService: () => ({}),
+      getExtensionContextFilePaths: () => [],
+      getFileFilteringOptions: () => ({ ignore: [], include: [] }),
+      setUserMemory: vi.fn(),
+      setGeminiMdFileCount: vi.fn(),
     } as unknown as Config;
 
     mockContext = {
       services: {
         config: mockConfig,
+        settings: {
+          merged: {
+            memoryDiscoveryMaxDirs: 1000,
+          },
+        },
       },
       ui: {
         addItem: vi.fn(),
