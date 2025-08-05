@@ -32,8 +32,8 @@ export const copyPromptCommand: SlashCommand = {
       };
     }
     // Extract text from the parts
-    const lastUserOutput = lastUserMessage.parts
-      ?.filter((part) => part.text)
+    const lastUserOutput = (lastUserMessage.parts ?? [])
+      .filter((part) => part.text)
       .map((part) => part.text)
       .join('');
 
