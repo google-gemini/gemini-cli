@@ -728,7 +728,7 @@ describe('MCPOAuthProvider', () => {
         return Promise.resolve({
           pid: 1234,
         });
-      }) as typeof open);
+      }) as unknown as typeof open);
 
       let callbackHandler: unknown;
       vi.mocked(http.createServer).mockImplementation((handler) => {
@@ -780,7 +780,7 @@ describe('MCPOAuthProvider', () => {
         return Promise.resolve({
           pid: 1234,
         });
-      }) as typeof open);
+      }) as unknown as typeof open);
 
       let callbackHandler: unknown;
       vi.mocked(http.createServer).mockImplementation((handler) => {
