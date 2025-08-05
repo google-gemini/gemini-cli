@@ -257,7 +257,16 @@ export function hasCycleInSchema(schema: object): boolean {
     visitedRefs: Set<string>,
     pathRefs: Set<string>,
   ): boolean {
-    if (typeof node !== 'object' || node === null || Array.isArray(node)) {
+    if (typeof node !== 'object' || node === null) {
+      return false;
+    }
+
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        if (traverse(item, visitedRefs, pathRefs)) {
+          return true;
+        }
+      }
       return false;
     }
 
