@@ -34,7 +34,6 @@ import {
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
-import { StructuredError } from './turn.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -303,7 +302,8 @@ export class GeminiChat {
       response = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
           // Check for likely cyclic schema errors, don't retry those.
-          if (error.message.includes('maximum schema depth exceeded')) return false;
+          if (error.message.includes('maximum schema depth exceeded'))
+            return false;
           // Check error messages for status codes, or specific error names if known
           if (error && error.message) {
             if (error.message.includes('429')) return true;
@@ -421,7 +421,8 @@ export class GeminiChat {
       const streamResponse = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
           // Check for likely cyclic schema errors, don't retry those.
-          if (error.message.includes('maximum schema depth exceeded')) return false;
+          if (error.message.includes('maximum schema depth exceeded'))
+            return false;
           // Check error messages for status codes, or specific error names if known
           if (error && error.message) {
             if (error.message.includes('429')) return true;

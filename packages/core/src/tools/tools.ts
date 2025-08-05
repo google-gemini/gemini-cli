@@ -101,7 +101,8 @@ export interface Tool<
 export abstract class BaseTool<
   TParams = unknown,
   TResult extends ToolResult = ToolResult,
-> implements Tool<TParams, TResult> {
+> implements Tool<TParams, TResult>
+{
   /**
    * Creates a new instance of BaseTool
    * @param name Internal name of the tool (used for API calls)
@@ -119,7 +120,7 @@ export abstract class BaseTool<
     readonly parameterSchema: Schema,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
-  ) { }
+  ) {}
 
   /**
    * Function declaration schema computed from name, description, and parameterSchema
