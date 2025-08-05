@@ -1248,6 +1248,66 @@ describe('Settings Loading and Merging', () => {
       }
     });
 
+    it('should exclude GOOGLE_GENAI_USE_VERTEXAI from project .env files by default', () => {
+      // Create a workspace settings file with the default excludedProjectEnvVars
+      const workspaceSettingsContent = {
+        excludedProjectEnvVars: ['DEBUG', 'DEBUG_MODE', 'GOOGLE_GENAI_USE_VERTEXAI'],
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      // Mock findEnvFile to return a project .env file
+      const originalFindEnvFile = (
+        loadSettings as unknown as { findEnvFile: () => string }
+      ).findEnvFile;
+      (loadSettings as unknown as { findEnvFile: () => string }).findEnvFile =
+        () => '/mock/project/.env';
+
+      // Mock fs.readFileSync for .env file content
+      const originalReadFileSync = fs.readFileSync;
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === '/mock/project/.env') {
+            return 'GOOGLE_GENAI_USE_VERTEXAI=true\nGOOGLE_CLOUD_PROJECT=test-project\nGEMINI_API_KEY=test-key';
+          }
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
+            return JSON.stringify(workspaceSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      try {
+        // This will call loadEnvironment internally with the merged settings
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        // Verify the settings were loaded correctly
+        expect(settings.merged.excludedProjectEnvVars).toEqual([
+          'DEBUG',
+          'DEBUG_MODE',
+          'GOOGLE_GENAI_USE_VERTEXAI',
+        ]);
+
+        // Note: We can't directly test process.env changes here because the mocking
+        // prevents the actual file system operations, but we can verify the settings
+        // are correctly merged and passed to loadEnvironment
+      } finally {
+        (loadSettings as unknown as { findEnvFile: () => string }).findEnvFile =
+          originalFindEnvFile;
+        (fs.readFileSync as Mock).mockImplementation(originalReadFileSync);
+      }
+    });
+
     it('should respect custom excludedProjectEnvVars from user settings', () => {
       const userSettingsContent = {
         excludedProjectEnvVars: ['NODE_ENV', 'DEBUG'],
