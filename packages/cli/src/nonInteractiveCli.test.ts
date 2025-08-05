@@ -4,6 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { vi } from 'vitest';
+
+vi.mock('log-update', () => {
+  const logUpdate = vi.fn() as vi.Mock & { done: vi.Mock };
+  logUpdate.done = vi.fn();
+  return { default: logUpdate };
+});
+
+import logUpdate from 'log-update';
 import {
   Config,
   executeToolCall,
@@ -15,7 +24,6 @@ import {
 } from '@google/gemini-cli-core';
 import { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { vi } from 'vitest';
 
 // Mock core modules
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -37,6 +45,7 @@ describe('runNonInteractive', () => {
   let consoleErrorSpy: vi.SpyInstance;
   let processExitSpy: vi.SpyInstance;
   let processStdoutSpy: vi.SpyInstance;
+  let logUpdateSpy: vi.Mock & { done: vi.Mock };
   let mockGeminiClient: {
     sendMessageStream: vi.Mock;
   };
@@ -52,6 +61,11 @@ describe('runNonInteractive', () => {
     processStdoutSpy = vi
       .spyOn(process.stdout, 'write')
       .mockImplementation(() => true);
+    logUpdateSpy = vi.mocked(logUpdate) as unknown as vi.Mock & {
+      done: vi.Mock;
+    };
+    logUpdateSpy.mockClear();
+    logUpdateSpy.done.mockClear();
 
     mockToolRegistry = {
       getTool: vi.fn(),
@@ -101,8 +115,9 @@ describe('runNonInteractive', () => {
       expect.any(AbortSignal),
       'prompt-id-1',
     );
-    expect(processStdoutSpy).toHaveBeenCalledWith('Hello');
-    expect(processStdoutSpy).toHaveBeenCalledWith(' World');
+    expect(logUpdateSpy).toHaveBeenNthCalledWith(1, 'Hello');
+    expect(logUpdateSpy).toHaveBeenNthCalledWith(2, 'Hello World');
+    expect(logUpdateSpy.done).toHaveBeenCalled();
     expect(processStdoutSpy).toHaveBeenCalledWith('\n');
     expect(mockShutdownTelemetry).toHaveBeenCalled();
   });
@@ -145,7 +160,8 @@ describe('runNonInteractive', () => {
       expect.any(AbortSignal),
       'prompt-id-2',
     );
-    expect(processStdoutSpy).toHaveBeenCalledWith('Final answer');
+    expect(logUpdateSpy).toHaveBeenCalledWith('Final answer');
+    expect(logUpdateSpy.done).toHaveBeenCalled();
     expect(processStdoutSpy).toHaveBeenCalledWith('\n');
   });
 
@@ -229,9 +245,7 @@ describe('runNonInteractive', () => {
     );
     expect(processExitSpy).not.toHaveBeenCalled();
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(2);
-    expect(processStdoutSpy).toHaveBeenCalledWith(
-      "Sorry, I can't find that tool.",
-    );
+    expect(logUpdateSpy).toHaveBeenCalledWith("Sorry, I can't find that tool.");
   });
 
   it('should exit when max session turns are exceeded', async () => {
