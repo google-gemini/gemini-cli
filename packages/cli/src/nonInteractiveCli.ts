@@ -24,27 +24,30 @@ export async function runNonInteractive(
   input: string,
   prompt_id: string,
 ): Promise<void> {
-  await config.initialize();
   const consolePatcher = new ConsolePatcher({
     stderrOnly: true,
     debugMode: config.getDebugMode(),
   });
-  consolePatcher.patch();
-  // Handle EPIPE errors when the output is piped to a command that closes early.
-  process.stdout.on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EPIPE') {
-      // Exit gracefully if the pipe is closed.
-      process.exit(0);
-    }
-  });
 
-  const geminiClient = config.getGeminiClient();
-  const toolRegistry: ToolRegistry = await config.getToolRegistry();
-
-  const abortController = new AbortController();
-  let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
-  let turnCount = 0;
   try {
+    await config.initialize();
+    consolePatcher.patch();
+    // Handle EPIPE errors when the output is piped to a command that closes early.
+    process.stdout.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EPIPE') {
+        // Exit gracefully if the pipe is closed.
+        process.exit(0);
+      }
+    });
+
+    const geminiClient = config.getGeminiClient();
+    const toolRegistry: ToolRegistry = await config.getToolRegistry();
+
+    const abortController = new AbortController();
+    let currentMessages: Content[] = [
+      { role: 'user', parts: [{ text: input }] },
+    ];
+    let turnCount = 0;
     while (true) {
       turnCount++;
       if (
