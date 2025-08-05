@@ -22,7 +22,6 @@ import { AuthProviderType } from '../config/config.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { ServerCapabilities } from '@modelcontextprotocol/sdk/types.js';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -115,7 +114,7 @@ describe('mcp-client', () => {
         ],
       });
       const mockGetServerCapabilities = vi.fn().mockReturnValue({
-        prompts: {}
+        prompts: {},
       });
       const mockedClient = {
         getServerCapabilities: mockGetServerCapabilities,
@@ -136,7 +135,7 @@ describe('mcp-client', () => {
         prompts: [],
       });
       const mockGetServerCapabilities = vi.fn().mockReturnValue({
-        'prompts': {}
+        prompts: {},
       });
 
       const mockedClient = {
@@ -190,7 +189,7 @@ describe('mcp-client', () => {
       testError.message = 'test error';
       const mockRequest = vi.fn().mockRejectedValue(testError);
       const mockGetServerCapabilities = vi.fn().mockReturnValue({
-        prompts: {}
+        prompts: {},
       });
       const mockedClient = {
         getServerCapabilities: mockGetServerCapabilities,
