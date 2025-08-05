@@ -1264,6 +1264,31 @@ describe('useVim hook', () => {
 
       expect(handled).toBe(false);
     });
+
+    it('should pass through ! in INSERT mode when buffer is empty', () => {
+      mockVimContext.vimMode = 'INSERT';
+      const emptyBuffer = createMockBuffer('');
+      const { result } = renderVimHook(emptyBuffer);
+
+      const handled = result.current.handleInput({ sequence: '!' });
+
+      expect(handled).toBe(false);
+    });
+
+    it('should handle ! as input in INSERT mode when buffer is not empty', () => {
+      mockVimContext.vimMode = 'INSERT';
+      const nonEmptyBuffer = createMockBuffer('not empty');
+      const { result } = renderVimHook(nonEmptyBuffer);
+      const key = { sequence: '!', name: '!' };
+
+      act(() => {
+        result.current.handleInput(key);
+      });
+
+      expect(nonEmptyBuffer.handleInput).toHaveBeenCalledWith(
+        expect.objectContaining(key),
+      );
+    });
   });
 
   // Line operations (dd, cc) are tested in text-buffer.test.ts
