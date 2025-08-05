@@ -146,20 +146,6 @@ export function getMCPDiscoveryState(): MCPDiscoveryState {
 }
 
 /**
- * Parse www-authenticate header to extract OAuth metadata URI.
- *
- * @param wwwAuthenticate The www-authenticate header value
- * @returns The resource metadata URI if found, null otherwise
- */
-function _parseWWWAuthenticate(wwwAuthenticate: string): string | null {
-  // Parse header like: Bearer realm="MCP Server", resource_metadata_uri="https://..."
-  const resourceMetadataMatch = wwwAuthenticate.match(
-    /resource_metadata_uri="([^"]+)"/,
-  );
-  return resourceMetadataMatch ? resourceMetadataMatch[1] : null;
-}
-
-/**
  * Extract WWW-Authenticate header from error message string.
  * This is a more robust approach than regex matching.
  *
@@ -380,33 +366,47 @@ export async function connectAndDiscover(
 ): Promise<void> {
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
+  let mcpClient: Client | undefined;
   try {
-    const mcpClient = await connectToMcpServer(
+    mcpClient = await connectToMcpServer(
       mcpServerName,
       mcpServerConfig,
       debugMode,
     );
-    try {
-      updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
-      mcpClient.onerror = (error) => {
-        console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
-        updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
-      };
-      await discoverPrompts(mcpServerName, mcpClient, promptRegistry);
 
-      const tools = await discoverTools(
-        mcpServerName,
-        mcpServerConfig,
-        mcpClient,
-      );
-      for (const tool of tools) {
-        toolRegistry.registerTool(tool);
-      }
-    } catch (error) {
-      mcpClient.close();
-      throw error;
+    mcpClient.onerror = (error) => {
+      console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
+      updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+    };
+
+    // Attempt to discover both prompts and tools
+    const prompts = await discoverPrompts(
+      mcpServerName,
+      mcpClient,
+      promptRegistry,
+    );
+    const tools = await discoverTools(
+      mcpServerName,
+      mcpServerConfig,
+      mcpClient,
+    );
+
+    // If we have neither prompts nor tools, it's a failed discovery
+    if (prompts.length === 0 && tools.length === 0) {
+      throw new Error('No prompts or tools found on the server.');
+    }
+
+    // If we found anything, the server is connected
+    updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
+
+    // Register any discovered tools
+    for (const tool of tools) {
+      toolRegistry.registerTool(tool);
     }
   } catch (error) {
+    if (mcpClient) {
+      mcpClient.close();
+    }
     console.error(
       `Error connecting to MCP server '${mcpServerName}': ${getErrorMessage(
         error,
@@ -437,30 +437,49 @@ export async function discoverTools(
     const tool = await mcpCallableTool.tool();
 
     if (!Array.isArray(tool.functionDeclarations)) {
-      throw new Error(`Server did not return valid function declarations.`);
+      // This is a valid case for a prompt-only server
+      return [];
     }
 
     const discoveredTools: DiscoveredMCPTool[] = [];
     for (const funcDecl of tool.functionDeclarations) {
-      if (!isEnabled(funcDecl, mcpServerName, mcpServerConfig)) {
-        continue;
-      }
+      try {
+        if (!isEnabled(funcDecl, mcpServerName, mcpServerConfig)) {
+          continue;
+        }
 
-      discoveredTools.push(
-        new DiscoveredMCPTool(
-          mcpCallableTool,
-          mcpServerName,
-          funcDecl.name!,
-          funcDecl.description ?? '',
-          funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
-          mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-          mcpServerConfig.trust,
-        ),
-      );
+        discoveredTools.push(
+          new DiscoveredMCPTool(
+            mcpCallableTool,
+            mcpServerName,
+            funcDecl.name!,
+            funcDecl.description ?? '',
+            funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
+            mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+            mcpServerConfig.trust,
+          ),
+        );
+      } catch (error) {
+        console.error(
+          `Error discovering tool: '${
+            funcDecl.name
+          }' from MCP server '${mcpServerName}': ${(error as Error).message}`,
+        );
+      }
     }
     return discoveredTools;
   } catch (error) {
-    throw new Error(`Error discovering tools: ${error}`);
+    if (
+      error instanceof Error &&
+      !error.message?.includes('Method not found')
+    ) {
+      console.error(
+        `Error discovering tools from ${mcpServerName}: ${getErrorMessage(
+          error,
+        )}`,
+      );
+    }
+    return [];
   }
 }
 
@@ -475,8 +494,11 @@ export async function discoverPrompts(
   mcpServerName: string,
   mcpClient: Client,
   promptRegistry: PromptRegistry,
-): Promise<void> {
+): Promise<Prompt[]> {
   try {
+    // Only request prompts if the server supports them.
+    if (mcpClient.getServerCapabilities()?.prompts == null) return [];
+
     const response = await mcpClient.request(
       { method: 'prompts/list', params: {} },
       ListPromptsResultSchema,
@@ -490,6 +512,7 @@ export async function discoverPrompts(
           invokeMcpPrompt(mcpServerName, mcpClient, prompt.name, params),
       });
     }
+    return response.prompts;
   } catch (error) {
     // It's okay if this fails, not all servers will have prompts.
     // Don't log an error if the method is not found, which is a common case.
@@ -503,6 +526,7 @@ export async function discoverPrompts(
         )}`,
       );
     }
+    return [];
   }
 }
 

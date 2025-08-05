@@ -21,11 +21,14 @@ import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { AuthProviderType } from '../config/config.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 
+import { DiscoveredMCPTool } from './mcp-tool.js';
+
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 vi.mock('@google/genai');
 vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
+vi.mock('./mcp-tool.js');
 
 describe('mcp-client', () => {
   afterEach(() => {
@@ -50,6 +53,50 @@ describe('mcp-client', () => {
       expect(tools.length).toBe(1);
       expect(mockedMcpToTool).toHaveBeenCalledOnce();
     });
+
+    it('should log an error if there is an error discovering a tool', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      const testError = new Error('Invalid tool name');
+      vi.mocked(DiscoveredMCPTool).mockImplementation(
+        (
+          _mcpCallableTool: GenAiLib.CallableTool,
+          _serverName: string,
+          name: string,
+        ) => {
+          if (name === 'invalid tool name') {
+            throw testError;
+          }
+          return { name: 'validTool' } as DiscoveredMCPTool;
+        },
+      );
+
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'validTool',
+              },
+              {
+                name: 'invalid tool name', // this will fail validation
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(tools[0].name).toBe('validTool');
+      expect(consoleErrorSpy).toHaveBeenCalledOnce();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        `Error discovering tool: 'invalid tool name' from MCP server 'test-server': ${testError.message}`,
+      );
+    });
   });
 
   describe('discoverPrompts', () => {
@@ -64,12 +111,17 @@ describe('mcp-client', () => {
           { name: 'prompt2' },
         ],
       });
+      const mockGetServerCapabilities = vi.fn().mockReturnValue({
+        prompts: {},
+      });
       const mockedClient = {
+        getServerCapabilities: mockGetServerCapabilities,
         request: mockRequest,
       } as unknown as ClientLib.Client;
 
       await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
 
+      expect(mockGetServerCapabilities).toHaveBeenCalledOnce();
       expect(mockRequest).toHaveBeenCalledWith(
         { method: 'prompts/list', params: {} },
         expect.anything(),
@@ -80,19 +132,47 @@ describe('mcp-client', () => {
       const mockRequest = vi.fn().mockResolvedValue({
         prompts: [],
       });
+      const mockGetServerCapabilities = vi.fn().mockReturnValue({
+        prompts: {},
+      });
+
       const mockedClient = {
+        getServerCapabilities: mockGetServerCapabilities,
         request: mockRequest,
       } as unknown as ClientLib.Client;
 
       const consoleLogSpy = vi
         .spyOn(console, 'debug')
-        .mockImplementation(() => {
-          // no-op
-        });
+        .mockImplementation(() => {});
 
       await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
 
+      expect(mockGetServerCapabilities).toHaveBeenCalledOnce();
       expect(mockRequest).toHaveBeenCalledOnce();
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should do nothing if the server has no prompt support', async () => {
+      const mockRequest = vi.fn().mockResolvedValue({
+        prompts: [],
+      });
+      const mockGetServerCapabilities = vi.fn().mockReturnValue({});
+
+      const mockedClient = {
+        getServerCapabilities: mockGetServerCapabilities,
+        request: mockRequest,
+      } as unknown as ClientLib.Client;
+
+      const consoleLogSpy = vi
+        .spyOn(console, 'debug')
+        .mockImplementation(() => {});
+
+      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
+
+      expect(mockGetServerCapabilities).toHaveBeenCalledOnce();
+      expect(mockRequest).not.toHaveBeenCalled();
       expect(consoleLogSpy).not.toHaveBeenCalled();
 
       consoleLogSpy.mockRestore();
@@ -102,15 +182,17 @@ describe('mcp-client', () => {
       const testError = new Error('test error');
       testError.message = 'test error';
       const mockRequest = vi.fn().mockRejectedValue(testError);
+      const mockGetServerCapabilities = vi.fn().mockReturnValue({
+        prompts: {},
+      });
       const mockedClient = {
+        getServerCapabilities: mockGetServerCapabilities,
         request: mockRequest,
       } as unknown as ClientLib.Client;
 
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
-        .mockImplementation(() => {
-          // no-op
-        });
+        .mockImplementation(() => {});
 
       await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
 
