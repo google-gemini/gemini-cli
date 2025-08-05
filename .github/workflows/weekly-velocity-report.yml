@@ -5,7 +5,7 @@ name: Weekly Velocity Report
 on:
   schedule:
     #- cron: "0 13 * * 1" # Runs every Monday at 9:00 AM UTC
-    - cron: "*/5 * * * *" # Test by running every 5 minutes
+    - cron: '*/5 * * * *' # Test by running every 5 minutes
   workflow_dispatch:
 
 jobs:
@@ -29,11 +29,11 @@ jobs:
 
       - name: Append data to Google Sheet
         if: success()
-        uses: jroehl/gcp-google-sheets-action@v2.0.0
+        uses: jroehl/gsheet.action@v2.0.0
         with:
           gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
           spreadsheet_id: ${{ secrets.SPREADSHEET_ID }}
-          sheet_name: "Weekly Reports" # The name of the tab in your sheet
+          sheet_name: 'Weekly Reports' # The name of the tab in your sheet
           data: ${{ steps.report.outputs.csv_data }}
-          major_dimension: "ROWS"
-          value_input_option: "USER_ENTERED"
+          major_dimension: 'ROWS'
+          value_input_option: 'USER_ENTERED'
