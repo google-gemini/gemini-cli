@@ -58,9 +58,7 @@ describe('mcp-client', () => {
       const mockedClient = {} as unknown as ClientLib.Client;
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
-        .mockImplementation(() => {
-          // no-op
-        });
+        .mockImplementation(() => {});
 
       const testError = new Error('Invalid tool name');
       vi.mocked(DiscoveredMCPTool).mockImplementation(
@@ -145,9 +143,7 @@ describe('mcp-client', () => {
 
       const consoleLogSpy = vi
         .spyOn(console, 'debug')
-        .mockImplementation(() => {
-          // no-op
-        });
+        .mockImplementation(() => {});
 
       await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
 
@@ -171,9 +167,7 @@ describe('mcp-client', () => {
 
       const consoleLogSpy = vi
         .spyOn(console, 'debug')
-        .mockImplementation(() => {
-          // no-op
-        });
+        .mockImplementation(() => {});
 
       await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
 
@@ -198,9 +192,7 @@ describe('mcp-client', () => {
 
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
-        .mockImplementation(() => {
-          // no-op
-        });
+        .mockImplementation(() => {});
 
       await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
 
