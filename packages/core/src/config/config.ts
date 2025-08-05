@@ -189,7 +189,6 @@ export interface ConfigParameters {
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideModeFeature?: boolean;
   ideMode?: boolean;
-  ideClient: IdeClient;
   loadMemoryFromIncludeDirectories?: boolean;
 }
 
