@@ -28,7 +28,7 @@ jobs:
 
       - name: Append data to Google Sheet
         if: success()
-        uses: jroehl/gsheet-action@v2.0.0
+        uses: jroehl/gsheet-action@v2.1.1
         with:
           spreadsheetId: ${{ secrets.SPREADSHEET_ID }}
           commands: |
