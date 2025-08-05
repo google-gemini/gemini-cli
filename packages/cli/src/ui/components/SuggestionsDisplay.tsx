@@ -91,8 +91,9 @@ export function SuggestionsDisplay({
                   {isLong && !isExpanded && (
                     <Text>
                       {' '}
-                      (+ {suggestion.value.split(' ').length -
-                        userInput.length}{' '}
+                      (+{' '}
+                      {suggestion.value.split(' ').length -
+                        userInput.split(' ').length}{' '}
                       words)
                     </Text>
                   )}
