@@ -50,12 +50,12 @@ npx https://github.com/google-gemini/gemini-cli
 ```
 
 #### Install globally with npm
-```
+```bash
 npm install -g @google/gemini-cli
 ```
 
 #### Install globally with Homebrew (macOS/Linux)
-```
+```bash
 brew install gemini-cli
 ```
 
@@ -76,9 +76,9 @@ Choose the authentication method that best fits your needs:
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
 
+# Start Geminii CLI, then choose OAuth and follow the browser authentication flow when prompted
 ```bash
 gemini
-# Follow the browser authentication flow when prompted
 ```
 
 ### Option 2: Gemini API Key
@@ -116,29 +116,37 @@ For Google Workspace accounts and other authentication methods, see the [authent
 
 ### Basic Usage
 
+#### Start in current directory
 ```bash
-# Start in current directory
 gemini
+```
 
-# Include multiple directories
+#### Include multiple directories
+```bash
 gemini --include-directories ../lib,../docs
+```
 
-# Use specific model
+#### Use specific model
+```bash
 gemini --model gemini-2.0-flash-exp
+```
 
-# Non-interactive mode for scripts
+#### Non-interactive mode for scripts
+```bash
 gemini "Explain the architecture of this codebase" --no-interactive
 ```
 
 ### Quick Examples
 
+#### Start a new project
 ```bash
-# Start a new project
 cd new-project/
 gemini
 > Write me a Discord bot that answers questions using a FAQ.md file I will provide
+``
 
-# Analyze existing code
+#### Analyze existing code
+``bash
 git clone https://github.com/google-gemini/gemini-cli
 cd gemini-cli
 gemini
