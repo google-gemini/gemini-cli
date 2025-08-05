@@ -39,12 +39,6 @@ try {
   }).trim();
   if (gitHash) {
     gitCommitInfo = gitHash;
-    const gitStatus = execSync('git status --porcelain', {
-      encoding: 'utf-8',
-    }).trim();
-    if (gitStatus) {
-      gitCommitInfo = `${gitHash} (local modifications)`;
-    }
   }
 } catch {
   // ignore
