@@ -48,6 +48,8 @@ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
 import type { Content } from '@google/genai';
+import { logIdeConnection } from '../telemetry/loggers.js';
+import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
@@ -305,6 +307,7 @@ export class Config {
     this.ideClient = IdeClient.getInstance();
     if (this.ideMode && this.ideModeFeature) {
       this.ideClient.connect();
+      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
     }
 
     if (params.contextFileName) {
@@ -639,6 +642,7 @@ export class Config {
     this.ideMode = value;
     if (value) {
       await this.ideClient.connect();
+      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.SESSION));
     } else {
       this.ideClient.disconnect();
     }
