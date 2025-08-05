@@ -25,7 +25,7 @@ export async function runNonInteractive(
   prompt_id: string,
 ): Promise<void> {
   const consolePatcher = new ConsolePatcher({
-    stderrOnly: true,
+    stderr: true,
     debugMode: config.getDebugMode(),
   });
 
