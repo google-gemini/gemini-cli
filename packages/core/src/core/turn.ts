@@ -192,6 +192,7 @@ export class Turn {
       );
 
       for await (const resp of responseStream) {
+        
         if (signal?.aborted) {
           yield { type: GeminiEventType.UserCancelled };
           // Do not add resp to debugResponses if aborted before processing
@@ -199,7 +200,10 @@ export class Turn {
         }
         this.debugResponses.push(resp);
 
-        const thoughtPart = resp.candidates?.[0]?.content?.parts?.[0];
+        const content = resp.candidates?.[0]?.content;
+        const thoughtPart = content?.parts?.[0];
+        
+        
         if (thoughtPart?.thought) {
           // Thought always has a bold "subject" part enclosed in double asterisks
           // (e.g., **Subject**). The rest of the string is considered the description.
@@ -213,6 +217,7 @@ export class Turn {
             subject,
             description,
           };
+
 
           yield {
             type: GeminiEventType.Thought,

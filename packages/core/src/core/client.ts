@@ -50,7 +50,7 @@ import {
 } from '../telemetry/types.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
-function isThinkingSupported(model: string) {
+export function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
   return false;
 }
@@ -314,11 +314,15 @@ export class GeminiClient {
       )
         ? {
             ...this.generateContentConfig,
+            temperature: 0,  // Disable temperature for thinking models
             thinkingConfig: {
-              includeThoughts: true,
+              thinkingBudget: 32768,  // Use maximum budget for gemini-2.5-pro
+              includeThoughts: true,  // Include thinking traces in response
             },
           }
         : this.generateContentConfig;
+      
+      
       return new GeminiChat(
         this.config,
         this.getContentGenerator(),

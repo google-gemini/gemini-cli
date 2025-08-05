@@ -317,6 +317,7 @@ export class GeminiChat {
         JSON.stringify(response),
       );
 
+
       this.sendPromise = (async () => {
         const outputContent = response.candidates?.[0]?.content;
         // Because the AFC input contains the entire curated chat history in
@@ -525,11 +526,17 @@ export class GeminiChat {
 
     try {
       for await (const chunk of streamResponse) {
+        
         if (isValidResponse(chunk)) {
           chunks.push(chunk);
           const content = chunk.candidates?.[0]?.content;
+          
+          
           if (content !== undefined) {
-            if (this.isThoughtContent(content)) {
+            const isThought = this.isThoughtContent(content);
+            
+            
+            if (isThought) {
               yield chunk;
               continue;
             }
@@ -559,6 +566,7 @@ export class GeminiChat {
         this.getFinalUsageMetadata(chunks),
         JSON.stringify(chunks),
       );
+      
     }
     this.recordHistory(inputContent, outputContent);
   }
@@ -665,7 +673,8 @@ export class GeminiChat {
   private isThoughtContent(
     content: Content | undefined,
   ): content is Content & { parts: [{ thought: boolean }, ...Part[]] } {
-    return !!(
+    
+    const result = !!(
       content &&
       content.role === 'model' &&
       content.parts &&
@@ -673,5 +682,6 @@ export class GeminiChat {
       typeof content.parts[0].thought === 'boolean' &&
       content.parts[0].thought === true
     );
+    return result;
   }
 }

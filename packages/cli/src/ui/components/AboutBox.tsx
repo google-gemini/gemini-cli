@@ -8,6 +8,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
+import { isThinkingSupported } from '@google/gemini-cli-core';
 
 interface AboutBoxProps {
   cliVersion: string;
@@ -71,6 +72,18 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
         <Text>{modelVersion}</Text>
       </Box>
     </Box>
+    {isThinkingSupported(modelVersion) && (
+      <Box flexDirection="row">
+        <Box width="35%">
+          <Text bold color={Colors.LightBlue}>
+            Thinking Budget
+          </Text>
+        </Box>
+        <Box>
+          <Text color={Colors.AccentGreen}>32,768 tokens</Text>
+        </Box>
+      </Box>
+    )}
     <Box flexDirection="row">
       <Box width="35%">
         <Text bold color={Colors.LightBlue}>

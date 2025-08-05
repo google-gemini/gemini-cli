@@ -534,6 +534,15 @@ export const useGeminiStream = (
         switch (event.type) {
           case ServerGeminiEventType.Thought:
             setThought(event.value);
+            // Add thinking trace to history for display
+            addItem(
+              {
+                type: 'thinking',
+                subject: event.value.subject,
+                description: event.value.description,
+              } as HistoryItemWithoutId,
+              userMessageTimestamp,
+            );
             break;
           case ServerGeminiEventType.Content:
             geminiMessageBuffer = handleContentEvent(
