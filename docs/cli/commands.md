@@ -256,7 +256,7 @@ Please generate a Conventional Commit message based on the following git diff:
 
 ```diff
 !{git diff --staged}
-````
+```
 
 """
 
@@ -277,7 +277,7 @@ First, ensure the user commands directory exists, then create a `refactor` subdi
 ```bash
 mkdir -p ~/.gemini/commands/refactor
 touch ~/.gemini/commands/refactor/pure.toml
-````
+```
 
 **2. Add the content to the file:**
 
