@@ -12,7 +12,6 @@ import {
   Static,
   Text,
   useStdin,
-  useStdout,
   useInput,
   type Key as InkKeyType,
 } from 'ink';
@@ -84,7 +83,6 @@ import {
   UserTierId,
 } from '@google/gemini-cli-core';
 import { UpdateObject } from './utils/updateCheck.js';
-import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
@@ -123,7 +121,6 @@ const App = ({
   const isFocused = useFocus();
   useBracketedPaste();
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
-  const { stdout } = useStdout();
   const nightly = version.includes('nightly');
   const { history, addItem, clearItems, loadHistory } = useHistory();
 
@@ -151,9 +148,8 @@ const App = ({
   const [staticNeedsRefresh, setStaticNeedsRefresh] = useState(false);
   const [staticKey, setStaticKey] = useState(0);
   const refreshStatic = useCallback(() => {
-    stdout.write(ansiEscapes.clearTerminal);
     setStaticKey((prev) => prev + 1);
-  }, [setStaticKey, stdout]);
+  }, [setStaticKey]);
 
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
