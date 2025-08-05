@@ -8,8 +8,9 @@ import util from 'util';
 import { ConsoleMessageItem } from '../types.js';
 
 interface ConsolePatcherParams {
-  onNewMessage: (message: Omit<ConsoleMessageItem, 'id'>) => void;
+  onNewMessage?: (message: Omit<ConsoleMessageItem, 'id'>) => void;
   debugMode: boolean;
+  stderrOnly?: boolean;
 }
 
 export class ConsolePatcher {
@@ -46,16 +47,23 @@ export class ConsolePatcher {
       originalMethod: (...args: unknown[]) => void,
     ) =>
     (...args: unknown[]) => {
+      if (this.params.stderrOnly) {
+        this.originalConsoleError(this.formatArgs(args));
+        return;
+      }
+
       if (this.params.debugMode) {
         originalMethod.apply(console, args);
       }
 
       if (type !== 'debug' || this.params.debugMode) {
-        this.params.onNewMessage({
-          type,
-          content: this.formatArgs(args),
-          count: 1,
-        });
+        if (this.params.onNewMessage) {
+          this.params.onNewMessage({
+            type,
+            content: this.formatArgs(args),
+            count: 1,
+          });
+        }
       }
     };
 }
