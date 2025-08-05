@@ -153,12 +153,6 @@ export function useCommandCompletion(
   });
 
   useEffect(() => {
-    if (completionMode === CompletionMode.AT) {
-      setIsPerfectMatch(false);
-    }
-  }, [completionMode, setIsPerfectMatch]);
-
-  useEffect(() => {
     setActiveSuggestionIndex(suggestions.length > 0 ? 0 : -1);
     setVisibleStartIndex(0);
   }, [suggestions, setActiveSuggestionIndex, setVisibleStartIndex]);

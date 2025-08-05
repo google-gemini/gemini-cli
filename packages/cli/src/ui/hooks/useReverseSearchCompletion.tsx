@@ -41,14 +41,12 @@ export function useReverseSearchCompletion(
     navigateDown,
   } = useCompletion();
 
-  // Effect 1: Reset state when reverse search is deactivated.
   useEffect(() => {
     if (!reverseSearchActive) {
       resetCompletionState();
     }
   }, [reverseSearchActive, resetCompletionState]);
 
-  // Effect 2: Perform search when active and text changes.
   useEffect(() => {
     if (!reverseSearchActive) {
       return;
