@@ -10,6 +10,41 @@ import { getFolderStructure } from './getFolderStructure.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 
 /**
+ * Generates a string describing the current workspace directories and their structures.
+ * @param {Config} config - The runtime configuration and services.
+ * @returns {Promise<string>} A promise that resolves to the directory context string.
+ */
+export async function getDirectoryContextString(
+  config: Config,
+): Promise<string> {
+  const workspaceContext = config.getWorkspaceContext();
+  const workspaceDirectories = workspaceContext.getDirectories();
+
+  const folderStructures = await Promise.all(
+    workspaceDirectories.map((dir) =>
+      getFolderStructure(dir, {
+        fileService: config.getFileService(),
+      }),
+    ),
+  );
+
+  const folderStructure = folderStructures.join('\n');
+
+  let workingDirPreamble: string;
+  if (workspaceDirectories.length === 1) {
+    workingDirPreamble = `I'm currently working in the directory: ${workspaceDirectories[0]}`;
+  } else {
+    const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
+    workingDirPreamble = `I'm currently working in the following directories:\n${dirList}`;
+  }
+
+  return `${workingDirPreamble}
+Here is the folder structure of the current working directories:
+
+${folderStructure}`;
+}
+
+/**
  * Retrieves environment-related information to be included in the chat context.
  * This includes the current working directory, date, operating system, and folder structure.
  * Optionally, it can also include the full file context if enabled.
@@ -17,7 +52,6 @@ import { ReadManyFilesTool } from '../tools/read-many-files.js';
  * @returns A promise that resolves to an array of `Part` objects containing environment information.
  */
 export async function getEnvironmentContext(config: Config): Promise<Part[]> {
-  const cwd = config.getWorkingDir();
   const today = new Date().toLocaleDateString(undefined, {
     weekday: 'long',
     year: 'numeric',
@@ -25,15 +59,13 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
     day: 'numeric',
   });
   const platform = process.platform;
-  const folderStructure = await getFolderStructure(cwd, {
-    fileService: config.getFileService(),
-  });
+  const directoryContext = await getDirectoryContextString(config);
+
   const context = `
 This is the Gemini CLI. We are setting up the context for our chat.
 Today's date is ${today}.
 My operating system is: ${platform}
-I'm currently working in the directory: ${cwd}
-${folderStructure}
+${directoryContext}
         `.trim();
 
   const initialParts: Part[] = [{ text: context }];
@@ -43,7 +75,7 @@ ${folderStructure}
   if (config.getFullContext()) {
     try {
       const readManyFilesTool = toolRegistry.getTool('read_many_files');
-      if (readManyFilesTool) {
+        if (readManyFilesTool) {
           const invocation = readManyFilesTool.build({
             paths: ['**/*'], // Read everything recursively
             useDefaultExcludes: true, // Use default excludes
@@ -51,31 +83,20 @@ ${folderStructure}
 
           // Read all files in the target directory
           const result = await invocation.execute(AbortSignal.timeout(30000));
-        const content = result.llmContent;
-        let hasContent = false;
-        if (typeof content === 'string') {
-          hasContent = content.length > 0;
-        } else if (Array.isArray(content)) {
-          hasContent = content.length > 0;
-        } else if (content) {
-          // It's a single Part object, which we consider as content if it exists.
-          hasContent = true;
-        }
-
-        if (hasContent) {
-          initialParts.push({
-            text: `\n--- Full File Context ---\n${content}`,
-          });
+          if (result.llmContent) {
+            initialParts.push({
+              text: `\n--- Full File Context ---\n${result.llmContent}`,
+            });
+          } else {
+            console.warn(
+              'Full context requested, but read_many_files returned no content.',
+            );
+          }
         } else {
           console.warn(
-            'Full context requested, but read_many_files returned no content.',
+            'Full context requested, but read_many_files tool not found.',
           );
         }
-      } else {
-        console.warn(
-          'Full context requested, but read_many_files tool not found.',
-        );
-      }
     } catch (error) {
       // Not using reportError here as it's a startup/config phase, not a chat/generation phase error.
       console.error('Error reading full file context:', error);

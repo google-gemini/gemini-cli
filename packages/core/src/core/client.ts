@@ -13,7 +13,10 @@ import {
   Tool,
   GenerateContentResponse,
 } from '@google/genai';
-import { getEnvironmentContext } from '../utils/environmentContext.js';
+import {
+  getDirectoryContextString,
+  getEnvironmentContext,
+} from '../utils/environmentContext.js';
 import {
   Turn,
   ServerGeminiStreamEvent,
@@ -181,29 +184,11 @@ export class GeminiClient {
 
     this.getChat().addHistory({
       role: 'user',
-      parts: [{ text: await this.getDirectoryContext() }],
+      parts: [{ text: await getDirectoryContextString(this.config) }],
     });
   }
 
-  private async getDirectoryContext(): Promise<string> {
-    const workspaceContext = this.config.getWorkspaceContext();
-    const workspaceDirectories = workspaceContext.getDirectories();
-
-    const folderStructures = await Promise.all(
-      workspaceDirectories.map((dir) =>
-        getFolderStructure(dir, {
-          fileService: this.config.getFileService(),
-        }),
-      ),
-    );
-
-    const folderStructure = folderStructures.join('\n');
-    const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
-    const workingDirPreamble = `I'm currently working in the following directories:\n${dirList}\n Folder structures are as follows:\n${folderStructure}`;
-    return workingDirPreamble;
-  }
-
-  private async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
+  async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     const envParts = await getEnvironmentContext(this.config);
     const toolRegistry = await this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();

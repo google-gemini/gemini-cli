@@ -14,12 +14,15 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createContentGenerator } from '../core/contentGenerator.js';
 import { GeminiChat } from './geminiChat.js';
 import { Config, ConfigParameters } from '../config/config.js';
+import { IdeClient } from '../ide/ide-client.js';
 import {
   ContextState,
   SubAgentScope,
   SubagentTerminateMode,
 } from './subagent.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
+
+vi.mock('../ide/ide-client.js');
 
 describe('SubAgentScope', () => {
   let mockSendMessageStream: Mock;
@@ -65,6 +68,7 @@ describe('SubAgentScope', () => {
       targetDir: '.',
       debugMode: false,
       cwd: process.cwd(),
+      ideClient: new IdeClient(false),
     };
 
     const config = new Config(configParams);
@@ -118,6 +122,7 @@ describe('SubAgentScope', () => {
       targetDir: '.',
       debugMode: false,
       cwd: process.cwd(),
+      ideClient: new IdeClient(false),
     };
 
     const config = new Config(configParams);
