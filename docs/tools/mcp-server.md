@@ -169,6 +169,7 @@ Use the `/mcp auth` command to manage OAuth authentication:
 - **`scopes`** (string[]): Required OAuth scopes
 - **`redirectUri`** (string): Custom redirect URI (defaults to `http://localhost:7777/oauth/callback`)
 - **`tokenParamName`** (string): Query parameter name for tokens in SSE URLs
+- **`audiences`** (string[]): Audiences the token is valid for
 
 #### Token Management
 
