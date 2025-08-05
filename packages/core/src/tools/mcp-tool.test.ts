@@ -131,8 +131,11 @@ describe('DiscoveredMCPTool', () => {
         success: true,
         details: 'executed',
       };
-      const mockFunctionResponseContent: Part[] = [
-        { text: JSON.stringify(mockToolSuccessResultObject) },
+      const mockFunctionResponseContent = [
+        {
+          type: 'text',
+          text: JSON.stringify(mockToolSuccessResultObject),
+        },
       ];
       const mockMcpToolResponseParts: Part[] = [
         {
@@ -149,11 +152,13 @@ describe('DiscoveredMCPTool', () => {
       expect(mockCallTool).toHaveBeenCalledWith([
         { name: serverToolName, args: params },
       ]);
-      expect(toolResult.llmContent).toEqual(mockMcpToolResponseParts);
 
       const stringifiedResponseContent = JSON.stringify(
         mockToolSuccessResultObject,
       );
+      expect(toolResult.llmContent).toEqual([
+        { text: stringifiedResponseContent },
+      ]);
       expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
     });
 
@@ -170,6 +175,9 @@ describe('DiscoveredMCPTool', () => {
       mockCallTool.mockResolvedValue(mockMcpToolResponsePartsEmpty);
       const toolResult: ToolResult = await tool.execute(params);
       expect(toolResult.returnDisplay).toBe('```json\n[]\n```');
+      expect(toolResult.llmContent).toEqual([
+        { text: '[Error: Could not parse tool response]' },
+      ]);
     });
 
     it('should propagate rejection if mcpTool.callTool rejects', async () => {
@@ -185,6 +193,361 @@ describe('DiscoveredMCPTool', () => {
       mockCallTool.mockRejectedValue(expectedError);
 
       await expect(tool.execute(params)).rejects.toThrow(expectedError);
+    });
+
+    it('should handle a simple text response correctly', async () => {
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+      );
+      const params = { query: 'test' };
+      const successMessage = 'This is a success message.';
+
+      // Simulate the response from the GenAI SDK, which wraps the MCP
+      // response in a functionResponse Part.
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              // The `content` array contains MCP ContentBlocks.
+              content: [{ type: 'text', text: successMessage }],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const toolResult = await tool.execute(params);
+
+      // 1. Assert that the llmContent sent to the scheduler is a clean Part array.
+      expect(toolResult.llmContent).toEqual([{ text: successMessage }]);
+
+      // 2. Assert that the display output is the simple text message.
+      expect(toolResult.returnDisplay).toBe(successMessage);
+
+      // 3. Verify that the underlying callTool was made correctly.
+      expect(mockCallTool).toHaveBeenCalledWith([
+        { name: serverToolName, args: params },
+      ]);
+    });
+
+    it('should handle an AudioBlock response', async () => {
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+      );
+      const params = { action: 'play' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                {
+                  type: 'audio',
+                  data: 'BASE64_AUDIO_DATA',
+                  mimeType: 'audio/mp3',
+                },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const toolResult = await tool.execute(params);
+
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: `[Tool '${serverToolName}' provided the following audio data with mime-type: audio/mp3]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'audio/mp3',
+            data: 'BASE64_AUDIO_DATA',
+          },
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe('[Audio: audio/mp3]');
+    });
+
+    it('should handle a ResourceLinkBlock response', async () => {
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+      );
+      const params = { resource: 'get' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                {
+                  type: 'resource_link',
+                  uri: 'file:///path/to/thing',
+                  name: 'resource-name',
+                  title: 'My Resource',
+                },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const toolResult = await tool.execute(params);
+
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: 'Resource Link: My Resource at file:///path/to/thing',
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe(
+        '[Link to My Resource: file:///path/to/thing]',
+      );
+    });
+
+    it('should handle an embedded text ResourceBlock response', async () => {
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+      );
+      const params = { resource: 'get' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                {
+                  type: 'resource',
+                  resource: {
+                    uri: 'file:///path/to/text.txt',
+                    text: 'This is the text content.',
+                    mimeType: 'text/plain',
+                  },
+                },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const toolResult = await tool.execute(params);
+
+      expect(toolResult.llmContent).toEqual([
+        { text: 'This is the text content.' },
+      ]);
+      expect(toolResult.returnDisplay).toBe('This is the text content.');
+    });
+
+    it('should handle an embedded binary ResourceBlock response', async () => {
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+      );
+      const params = { resource: 'get' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                {
+                  type: 'resource',
+                  resource: {
+                    uri: 'file:///path/to/data.bin',
+                    blob: 'BASE64_BINARY_DATA',
+                    mimeType: 'application/octet-stream',
+                  },
+                },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const toolResult = await tool.execute(params);
+
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: `[Tool '${serverToolName}' provided the following embedded resource with mime-type: application/octet-stream]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'application/octet-stream',
+            data: 'BASE64_BINARY_DATA',
+          },
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe(
+        '[Embedded Resource: application/octet-stream]',
+      );
+    });
+
+    it('should handle a mix of content block types', async () => {
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+      );
+      const params = { action: 'complex' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                { type: 'text', text: 'First part.' },
+                {
+                  type: 'image',
+                  data: 'BASE64_IMAGE_DATA',
+                  mimeType: 'image/jpeg',
+                },
+                { type: 'text', text: 'Second part.' },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const toolResult = await tool.execute(params);
+
+      expect(toolResult.llmContent).toEqual([
+        { text: 'First part.' },
+        {
+          text: `[Tool '${serverToolName}' provided the following image data with mime-type: image/jpeg]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: 'BASE64_IMAGE_DATA',
+          },
+        },
+        { text: 'Second part.' },
+      ]);
+      expect(toolResult.returnDisplay).toBe(
+        'First part.\n[Image: image/jpeg]\nSecond part.',
+      );
+    });
+
+    it('should ignore unknown content block types', async () => {
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+      );
+      const params = { action: 'test' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                { type: 'text', text: 'Valid part.' },
+                { type: 'future_block', data: 'some-data' },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const toolResult = await tool.execute(params);
+
+      expect(toolResult.llmContent).toEqual([{ text: 'Valid part.' }]);
+      expect(toolResult.returnDisplay).toBe(
+        'Valid part.\n[Unknown content type: future_block]',
+      );
+    });
+
+    it('should handle a complex mix of content block types', async () => {
+      const tool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+      );
+      const params = { action: 'super-complex' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                { type: 'text', text: 'Here is a resource.' },
+                {
+                  type: 'resource_link',
+                  uri: 'file:///path/to/resource',
+                  name: 'resource-name',
+                  title: 'My Resource',
+                },
+                {
+                  type: 'resource',
+                  resource: {
+                    uri: 'file:///path/to/text.txt',
+                    text: 'Embedded text content.',
+                    mimeType: 'text/plain',
+                  },
+                },
+                {
+                  type: 'image',
+                  data: 'BASE64_IMAGE_DATA',
+                  mimeType: 'image/jpeg',
+                },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const toolResult = await tool.execute(params);
+
+      expect(toolResult.llmContent).toEqual([
+        { text: 'Here is a resource.' },
+        {
+          text: 'Resource Link: My Resource at file:///path/to/resource',
+        },
+        { text: 'Embedded text content.' },
+        {
+          text: `[Tool '${serverToolName}' provided the following image data with mime-type: image/jpeg]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: 'BASE64_IMAGE_DATA',
+          },
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe(
+        'Here is a resource.\n[Link to My Resource: file:///path/to/resource]\nEmbedded text content.\n[Image: image/jpeg]',
+      );
     });
   });
 
