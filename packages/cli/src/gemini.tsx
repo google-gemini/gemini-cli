@@ -4,9 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { render } from 'ink';
-import { AppWrapper } from './ui/App.js';
+import { runBlessedApp } from './ui/blessedApp.js';
 import { loadCliConfig, parseArguments, CliArgs } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
@@ -26,7 +24,7 @@ import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions, Extension } from './config/extension.js';
-import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
+import { cleanupCheckpoints } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
 import {
   ApprovalMode,
@@ -262,19 +260,6 @@ export async function main() {
   if (shouldBeInteractive) {
     const version = await getCliVersion();
     setWindowTitle(basename(workspaceRoot), settings);
-    const instance = render(
-      <React.StrictMode>
-        <AppWrapper
-          config={config}
-          settings={settings}
-          startupWarnings={startupWarnings}
-          version={version}
-          interruptMode={argv.interrupt ?? false}
-        />
-      </React.StrictMode>,
-      { exitOnCtrlC: false },
-    );
-
     checkForUpdates()
       .then((info) => {
         handleAutoUpdate(info, settings, config.getProjectRoot());
@@ -286,7 +271,14 @@ export async function main() {
         }
       });
 
-    registerCleanup(() => instance.unmount());
+    await runBlessedApp({
+      config,
+      settings,
+      startupWarnings,
+      version,
+      interruptMode: argv.interrupt ?? false,
+    });
+
     return;
   }
   // If not a TTY, read from stdin

@@ -21,7 +21,7 @@ esbuild
     outfile: 'bundle/gemini.js',
     platform: 'node',
     format: 'esm',
-    external: [],
+    external: ['pty.js', 'term.js'],
     alias: {
       'is-in-ci': path.resolve(
         __dirname,
