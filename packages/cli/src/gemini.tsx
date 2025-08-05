@@ -260,6 +260,7 @@ export async function main() {
   if (shouldBeInteractive) {
     const version = await getCliVersion();
     setWindowTitle(basename(workspaceRoot), settings);
+
     checkForUpdates()
       .then((info) => {
         handleAutoUpdate(info, settings, config.getProjectRoot());
@@ -271,13 +272,6 @@ export async function main() {
         }
       });
 
-    await runBlessedApp({
-      config,
-      settings,
-      startupWarnings,
-      version,
-      interruptMode: argv.interrupt ?? false,
-    });
 
     return;
   }
