@@ -59,6 +59,7 @@ export class IdeClient {
 
   async connect(): Promise<void> {
     this.setState(IDEConnectionStatus.Connecting);
+
     if (!this.currentIde || !this.currentIdeDisplayName) {
       this.setState(IDEConnectionStatus.Disconnected);
       return;
@@ -113,31 +114,19 @@ export class IdeClient {
     }
   }
 
-  private getPortFromEnv(): string | undefined {
-    const port = process.env['GEMINI_CLI_IDE_SERVER_PORT'];
-    if (!port) {
-      this.setState(
-        IDEConnectionStatus.Disconnected,
-        'Failed to connect to IDE companion extension for ${this.getDetectedIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.',
-      );
-      return undefined;
-    }
-    return port;
-  }
-
   private validateWorkspacePath(): boolean {
     const ideWorkspacePath = process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
     if (ideWorkspacePath === undefined) {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `Failed to connect to IDE companion extension for ${this.getDetectedIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
+        `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
       );
       return false;
     }
     if (ideWorkspacePath === '') {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        'To use this feature, please open a single workspace folder in ${this.currentIdeDisplayName} and try again.',
+        `To use this feature, please open a single workspace folder in ${this.currentIdeDisplayName} and try again.`,
       );
       return false;
     }
@@ -151,6 +140,18 @@ export class IdeClient {
     return true;
   }
 
+  private getPortFromEnv(): string | undefined {
+    const port = process.env['GEMINI_CLI_IDE_SERVER_PORT'];
+    if (!port) {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
+      );
+      return undefined;
+    }
+    return port;
+  }
+
   private registerClientHandlers() {
     if (!this.client) {
       return;
@@ -162,13 +163,17 @@ export class IdeClient {
         ideContext.setIdeContext(notification.params);
       },
     );
-
     this.client.onerror = (_error) => {
-      this.setState(IDEConnectionStatus.Disconnected, `IDE connection error: The connection was lost unexpectedly. Please try reconnecting with '/ide enable'`);
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `IDE connection error: The connection was lost unexpectedly. Please try reconnecting by running /ide enable`,
+      );
     };
-
     this.client.onclose = () => {
-      this.setState(IDEConnectionStatus.Disconnected, `IDE connection error: The connection was lost unexpectedly. Please try reconnecting with '/ide enable'`,);
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `IDE connection error: The connection was lost unexpectedly. Please try reconnecting by running /ide enable`,
+      );
     };
   }
 
@@ -180,20 +185,16 @@ export class IdeClient {
         // TODO(#3487): use the CLI version here.
         version: '1.0.0',
       });
-
       transport = new StreamableHTTPClientTransport(
         new URL(`http://localhost:${port}/mcp`),
       );
-
-
       await this.client.connect(transport);
-
       this.registerClientHandlers();
       this.setState(IDEConnectionStatus.Connected);
     } catch (_error) {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `Failed to connect to IDE companion extension for ${this.getDetectedIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
+        `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
       );
       if (transport) {
         try {
