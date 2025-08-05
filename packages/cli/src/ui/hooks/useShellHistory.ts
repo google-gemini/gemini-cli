@@ -13,6 +13,7 @@ const HISTORY_FILE = 'shell_history';
 const MAX_HISTORY_LENGTH = 100;
 
 export interface UseShellHistoryReturn {
+  history: string[];
   addCommandToHistory: (command: string) => void;
   getPreviousCommand: () => string | null;
   getNextCommand: () => string | null;
@@ -24,15 +25,32 @@ async function getHistoryFilePath(projectRoot: string): Promise<string> {
   return path.join(historyDir, HISTORY_FILE);
 }
 
+// Handle multiline commands
 async function readHistoryFile(filePath: string): Promise<string[]> {
   try {
-    const content = await fs.readFile(filePath, 'utf-8');
-    return content.split('\n').filter(Boolean);
-  } catch (error) {
-    if (isNodeError(error) && error.code === 'ENOENT') {
-      return [];
+    const text = await fs.readFile(filePath, 'utf-8');
+    const result: string[] = [];
+    let cur = '';
+
+    for (const raw of text.split(/\r?\n/)) {
+      if (!raw.trim()) continue;
+      const line = raw;
+
+      const m = cur.match(/(\\+)$/);
+      if (m && m[1].length % 2) {
+        // odd number of trailing '\'
+        cur = cur.slice(0, -1) + ' ' + line;
+      } else {
+        if (cur) result.push(cur);
+        cur = line;
+      }
     }
-    console.error('Error reading shell history:', error);
+
+    if (cur) result.push(cur);
+    return result;
+  } catch (err) {
+    if (isNodeError(err) && err.code === 'ENOENT') return [];
+    console.error('Error reading history:', err);
     return [];
   }
 }
@@ -101,10 +119,15 @@ export function useShellHistory(projectRoot: string): UseShellHistoryReturn {
     return history[newIndex] ?? null;
   }, [history, historyIndex]);
 
+  const resetHistoryPosition = useCallback(() => {
+    setHistoryIndex(-1);
+  }, []);
+
   return {
+    history,
     addCommandToHistory,
     getPreviousCommand,
     getNextCommand,
-    resetHistoryPosition: () => setHistoryIndex(-1),
+    resetHistoryPosition,
   };
 }
