@@ -1247,7 +1247,6 @@ describe('useVim hook', () => {
   });
 
   describe('Shell command pass-through', () => {
-
     it('should pass through ctrl+r in INSERT mode', () => {
       mockVimContext.vimMode = 'INSERT';
       const { result } = renderVimHook();
