@@ -60,6 +60,7 @@ import {
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
+import { usePlan } from '../contexts/PlanContext.js';
 
 export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
   const resultParts: PartListUnion = [];
@@ -147,6 +148,7 @@ export const useGeminiStream = (
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const interruptedResponseRef = useRef<string | null>(null);
   const { startNewPrompt, getPromptCount } = useSessionStats();
+  const { createPlanFromQuery } = usePlan();
   const logger = useLogger();
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
@@ -721,8 +723,9 @@ export const useGeminiStream = (
 
       const userMessageTimestamp = Date.now();
 
-      // Reset quota error flag when starting a new query (not a continuation)
       if (!options?.isContinuation) {
+        createPlanFromQuery(partListToString(query));
+        // Reset quota error flag when starting a new query (not a continuation)
         setModelSwitchedFromQuotaError(false);
         config.setQuotaErrorOccurred(false);
       }
