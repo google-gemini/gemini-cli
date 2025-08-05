@@ -55,7 +55,7 @@ if (process.env.DEBUG && !sandboxCommand) {
   }
 }
 
-nodeArgs.push('./packages/cli');
+nodeArgs.push(join(root, 'packages', 'cli'));
 nodeArgs.push(...process.argv.slice(2));
 
 const env = {
