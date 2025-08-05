@@ -37,6 +37,7 @@ export class IdeClient {
   private client: Client | undefined = undefined;
   private state: IDEConnectionState = {
     status: IDEConnectionStatus.Disconnected,
+    details: "IDE integration is currently disabled. To enable it, run /ide enable."
   };
   private readonly currentIde: DetectedIde | undefined;
   private readonly currentIdeDisplayName: string | undefined;
@@ -56,10 +57,7 @@ export class IdeClient {
   }
 
   async connect(): Promise<void> {
-    if (this.state.status === IDEConnectionStatus.Connected) {
-      return;
-    }
-
+    this.setState(IDEConnectionStatus.Connecting);
     if (!this.currentIde) {
       this.setState(
         IDEConnectionStatus.Disconnected,
@@ -67,8 +65,6 @@ export class IdeClient {
       );
       return;
     }
-
-    this.setState(IDEConnectionStatus.Connecting);
 
     if (!this.validateWorkspacePath()) {
       return;
@@ -82,17 +78,9 @@ export class IdeClient {
     await this.establishConnection(port);
   }
 
-  async reconnect() {
-    await this.connect();
-  }
-
   disconnect() {
     this.client?.close();
-    this.setState(IDEConnectionStatus.Disconnected, 'User disconnected.');
-  }
-
-  dispose() {
-    this.disconnect();
+    this.setState(IDEConnectionStatus.Disconnected, 'IDE integration disabled. To enable it again, run /ide enable.');
   }
 
   getCurrentIde(): DetectedIde | undefined {
