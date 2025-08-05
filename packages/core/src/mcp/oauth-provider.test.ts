@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { vi } from 'vitest';
+
+// Mock dependencies AT THE TOP
+vi.mock('open');
+vi.mock('node:crypto');
+vi.mock('./oauth-token-storage.js');
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import open from 'open';
@@ -15,11 +22,6 @@ import {
   OAuthClientRegistrationResponse,
 } from './oauth-provider.js';
 import { MCPOAuthTokenStorage, MCPOAuthToken } from './oauth-token-storage.js';
-
-// Mock dependencies
-vi.mock('open');
-vi.mock('node:crypto');
-vi.mock('./oauth-token-storage.js');
 
 // Mock fetch globally
 const mockFetch = vi.fn();
