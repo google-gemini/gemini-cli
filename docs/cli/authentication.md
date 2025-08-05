@@ -3,7 +3,7 @@
 The Gemini CLI requires you to authenticate with Google's AI services. On initial startup you'll need to configure **one** of the following authentication methods:
 
 1.  **Login with Google (Gemini Code Assist):**
-    - Use this option to log in with your google account.
+    - Use this option to log in with your Google account.
     - During initial startup, Gemini CLI will direct you to a webpage for authentication. Once authenticated, your credentials will be cached locally so the web login can be skipped on subsequent runs.
     - Note that the web login must be done in a browser that can communicate with the machine Gemini CLI is being run from. (Specifically, the browser will be redirected to a localhost url that Gemini CLI will be listening on).
     - <a id="workspace-gca">Users may have to specify a GOOGLE_CLOUD_PROJECT if:</a>

@@ -137,6 +137,5 @@ To block all shell commands, add the `run_shell_command` wildcard to `excludeToo
 
 ## Security Note for `excludeTools`
 
-Command-specific restrictions in
-`excludeTools` for `run_shell_command` are based on simple string matching and can be easily bypassed. This feature is **not a security mechanism** and should not be relied upon to safely execute untrusted code. It is recommended to use `coreTools` to explicitly select commands
+Command-specific restrictions in `excludeTools` for `run_shell_command` are based on simple string matching and can be easily bypassed. This feature is **not a security mechanism** and should not be relied upon to safely execute untrusted code. It is recommended to use `coreTools` to explicitly select commands
 that can be executed.
