@@ -48,6 +48,8 @@ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
 import type { Content } from '@google/genai';
+import { logIdeConnection } from '../telemetry/loggers.js';
+import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
@@ -187,7 +189,6 @@ export interface ConfigParameters {
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideModeFeature?: boolean;
   ideMode?: boolean;
-  ideClient: IdeClient;
   loadMemoryFromIncludeDirectories?: boolean;
 }
 
@@ -305,7 +306,11 @@ export class Config {
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.ideModeFeature = params.ideModeFeature ?? false;
     this.ideMode = params.ideMode ?? false;
-    this.ideClient = params.ideClient;
+    this.ideClient = IdeClient.getInstance();
+    if (this.ideMode && this.ideModeFeature) {
+      this.ideClient.connect();
+      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
+    }
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
 
@@ -633,10 +638,6 @@ export class Config {
     return this.ideModeFeature;
   }
 
-  getIdeClient(): IdeClient {
-    return this.ideClient;
-  }
-
   getIdeMode(): boolean {
     return this.ideMode;
   }
@@ -645,12 +646,18 @@ export class Config {
     this.ideMode = value;
   }
 
-  setIdeClientDisconnected(): void {
-    this.ideClient.setDisconnected();
+  async setIdeModeAndSyncConnection(value: boolean): Promise<void> {
+    this.ideMode = value;
+    if (value) {
+      await this.ideClient.connect();
+      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.SESSION));
+    } else {
+      this.ideClient.disconnect();
+    }
   }
 
-  setIdeClientConnected(): void {
-    this.ideClient.reconnect(this.ideMode && this.ideModeFeature);
+  getIdeClient(): IdeClient {
+    return this.ideClient;
   }
 
   async getGitService(): Promise<GitService> {

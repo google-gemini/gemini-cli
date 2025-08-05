@@ -42,9 +42,15 @@ describe('ideCommand', () => {
     mockConfig = {
       getIdeModeFeature: vi.fn(),
       getIdeMode: vi.fn(),
-      getIdeClient: vi.fn(),
+      getIdeClient: vi.fn(() => ({
+        reconnect: vi.fn(),
+        disconnect: vi.fn(),
+        getCurrentIde: vi.fn(),
+        getDetectedIdeDisplayName: vi.fn(),
+        getConnectionStatus: vi.fn(),
+      })),
+      setIdeModeAndSyncConnection: vi.fn(),
       setIdeMode: vi.fn(),
-      setIdeClientDisconnected: vi.fn(),
     } as unknown as Config;
 
     platformSpy = vi.spyOn(process, 'platform', 'get');
