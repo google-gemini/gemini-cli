@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { memo } from 'react';
 import { Box, Text } from 'ink';
 import { usePlan } from '../contexts/PlanContext.js';
 import { Colors } from '../colors.js';
 
-const ProgressBar = ({ progress }: { progress: number }) => {
+function ProgressBarComponent({ progress }: { progress: number }) {
   const width = 20;
   const completed = Math.round(width * progress);
   const remaining = width - completed;
@@ -18,9 +19,11 @@ const ProgressBar = ({ progress }: { progress: number }) => {
       {'.'.repeat(remaining)}] {Math.round(progress * 100)}%
     </Text>
   );
-};
+}
 
-export const PlanSidebar = ({ width = 30 }: { width?: number }) => {
+const ProgressBar = memo(ProgressBarComponent);
+
+function PlanSidebarComponent({ width = 30 }: { width?: number }) {
   const { steps, currentStep } = usePlan();
   if (!steps.length) {
     return null;
@@ -46,4 +49,6 @@ export const PlanSidebar = ({ width = 30 }: { width?: number }) => {
       ))}
     </Box>
   );
-};
+}
+
+export const PlanSidebar = memo(PlanSidebarComponent);
