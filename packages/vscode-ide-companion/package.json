@@ -31,22 +31,79 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "languages": [
+      {
+        "id": "gemini-diff-editable"
+      }
+    ],
     "commands": [
+      {
+        "command": "gemini.diff.accept",
+        "title": "Gemini CLI: Accept Current Diff",
+        "icon": "$(check)"
+      },
+      {
+        "command": "gemini.diff.cancel",
+        "title": "Cancel",
+        "icon": "$(close)"
+      },
       {
         "command": "gemini-cli.runGeminiCLI",
         "title": "Gemini CLI: Run"
+      },
+      {
+        "command": "gemini-cli.showNotices",
+        "title": "Gemini CLI: View Third-Party Notices"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "gemini.diff.accept",
+          "when": "gemini.diff.isVisible"
+        },
+        {
+          "command": "gemini.diff.cancel",
+          "when": "gemini.diff.isVisible"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "gemini.diff.accept",
+          "when": "gemini.diff.isVisible",
+          "group": "navigation"
+        },
+        {
+          "command": "gemini.diff.cancel",
+          "when": "gemini.diff.isVisible",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "gemini.diff.accept",
+        "key": "ctrl+s",
+        "when": "gemini.diff.isVisible"
+      },
+      {
+        "command": "gemini.diff.accept",
+        "key": "cmd+s",
+        "when": "gemini.diff.isVisible"
       }
     ]
   },
-  "main": "./dist/extension.js",
+  "main": "./dist/extension.cjs",
+  "type": "module",
   "scripts": {
-    "vscode:prepublish": "npm run check-types && npm run lint && node esbuild.js --production",
+    "vscode:prepublish": "npm run generate:notices && npm run check-types && npm run lint && node esbuild.js --production",
     "build": "npm run compile",
     "compile": "npm run check-types && npm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "vsce package --no-dependencies",
+    "generate:notices": "node ./scripts/generate-notices.js",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run",

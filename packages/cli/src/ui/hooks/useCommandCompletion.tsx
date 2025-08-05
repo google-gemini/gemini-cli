@@ -16,6 +16,7 @@ import {
   Config,
   FileDiscoveryService,
   DEFAULT_FILE_FILTERING_OPTIONS,
+  SHELL_SPECIAL_CHARS,
 } from '@google/gemini-cli-core';
 import { Suggestion } from '../components/SuggestionsDisplay.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
@@ -27,7 +28,7 @@ import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
 import { useCompletion } from './useCompletion.js';
 
-export interface UseSlashCompletionReturn {
+export interface UseCommandCompletionReturn {
   suggestions: Suggestion[];
   activeSuggestionIndex: number;
   visibleStartIndex: number;
@@ -42,7 +43,7 @@ export interface UseSlashCompletionReturn {
   handleAutocomplete: (indexToUse: number) => void;
 }
 
-export function useSlashCompletion(
+export function useCommandCompletion(
   buffer: TextBuffer,
   dirs: readonly string[],
   cwd: string,
@@ -50,7 +51,7 @@ export function useSlashCompletion(
   commandContext: CommandContext,
   reverseSearchActive: boolean = false,
   config?: Config,
-): UseSlashCompletionReturn {
+): UseCommandCompletionReturn {
   const {
     suggestions,
     activeSuggestionIndex,
@@ -110,7 +111,7 @@ export function useSlashCompletion(
 
   useEffect(() => {
     if (commandIndex === -1 || reverseSearchActive) {
-      resetCompletionState();
+      setTimeout(resetCompletionState, 0);
       return;
     }
 
@@ -513,11 +514,17 @@ export function useSlashCompletion(
           ];
         }
 
-        // Like glob, we always return forwardslashes, even in windows.
+        // Like glob, we always return forward slashes for path separators, even on Windows.
+        // But preserve backslash escaping for special characters.
+        const specialCharsLookahead = `(?![${SHELL_SPECIAL_CHARS.source.slice(1, -1)}])`;
+        const pathSeparatorRegex = new RegExp(
+          `\\\\${specialCharsLookahead}`,
+          'g',
+        );
         fetchedSuggestions = fetchedSuggestions.map((suggestion) => ({
           ...suggestion,
-          label: suggestion.label.replace(/\\/g, '/'),
-          value: suggestion.value.replace(/\\/g, '/'),
+          label: suggestion.label.replace(pathSeparatorRegex, '/'),
+          value: suggestion.value.replace(pathSeparatorRegex, '/'),
         }));
 
         // Sort by depth, then directories first, then alphabetically
@@ -624,17 +631,17 @@ export function useSlashCompletion(
         ) {
           suggestionText = ' ' + suggestionText;
         }
-        suggestionText += ' ';
       }
+
+      suggestionText += ' ';
 
       buffer.replaceRangeByOffset(
         logicalPosToOffset(buffer.lines, cursorRow, completionStart.current),
         logicalPosToOffset(buffer.lines, cursorRow, completionEnd.current),
         suggestionText,
       );
-      resetCompletionState();
     },
-    [cursorRow, resetCompletionState, buffer, suggestions, commandIndex],
+    [cursorRow, buffer, suggestions, commandIndex],
   );
 
   return {

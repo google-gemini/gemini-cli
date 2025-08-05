@@ -184,6 +184,87 @@ describe('Server Config (config.ts)', () => {
       // Verify that fallback mode is reset
       expect(config.isInFallbackMode()).toBe(false);
     });
+
+    it('should preserve conversation history when refreshing auth', async () => {
+      const config = new Config(baseParams);
+      const authType = AuthType.USE_GEMINI;
+      const mockContentConfig = {
+        model: 'gemini-pro',
+        apiKey: 'test-key',
+      };
+
+      (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
+
+      // Mock the existing client with some history
+      const mockExistingHistory = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there!' }] },
+        { role: 'user', parts: [{ text: 'How are you?' }] },
+      ];
+
+      const mockExistingClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue(mockExistingHistory),
+      };
+
+      const mockNewClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        initialize: vi.fn().mockResolvedValue(undefined),
+      };
+
+      // Set the existing client
+      (
+        config as unknown as { geminiClient: typeof mockExistingClient }
+      ).geminiClient = mockExistingClient;
+      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
+
+      await config.refreshAuth(authType);
+
+      // Verify that existing history was retrieved
+      expect(mockExistingClient.getHistory).toHaveBeenCalled();
+
+      // Verify that new client was created and initialized
+      expect(GeminiClient).toHaveBeenCalledWith(config);
+      expect(mockNewClient.initialize).toHaveBeenCalledWith(mockContentConfig);
+
+      // Verify that history was restored to the new client
+      expect(mockNewClient.setHistory).toHaveBeenCalledWith(
+        mockExistingHistory,
+      );
+    });
+
+    it('should handle case when no existing client is initialized', async () => {
+      const config = new Config(baseParams);
+      const authType = AuthType.USE_GEMINI;
+      const mockContentConfig = {
+        model: 'gemini-pro',
+        apiKey: 'test-key',
+      };
+
+      (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
+
+      const mockNewClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        initialize: vi.fn().mockResolvedValue(undefined),
+      };
+
+      // No existing client
+      (config as unknown as { geminiClient: null }).geminiClient = null;
+      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
+
+      await config.refreshAuth(authType);
+
+      // Verify that new client was created and initialized
+      expect(GeminiClient).toHaveBeenCalledWith(config);
+      expect(mockNewClient.initialize).toHaveBeenCalledWith(mockContentConfig);
+
+      // Verify that setHistory was not called since there was no existing history
+      expect(mockNewClient.setHistory).not.toHaveBeenCalled();
+    });
   });
 
   it('Config constructor should store userMemory correctly', () => {
