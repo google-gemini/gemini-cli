@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+import { homedir } from 'node:os';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
@@ -26,6 +29,7 @@ import { Settings } from './settings.js';
 import { Extension, annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
+import { resolvePath } from '../utils/resolvePath.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -59,10 +63,10 @@ export interface CliArgs {
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
-  ideMode?: boolean | undefined;
   ideModeFeature: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
+  loadMemoryFromIncludeDirectories: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -76,7 +80,7 @@ export async function parseArguments(): Promise<CliArgs> {
       alias: 'm',
       type: 'string',
       description: `Model`,
-      default: process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
+      default: process.env.GEMINI_MODEL,
     })
     .option('prompt', {
       alias: 'p',
@@ -210,6 +214,12 @@ export async function parseArguments(): Promise<CliArgs> {
         // Handle comma-separated values
         dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
     })
+    .option('load-memory-from-include-directories', {
+      type: 'boolean',
+      description:
+        'If true, when refreshing memory, GEMINI.md files should be loaded from all directories that are added. If false, GEMINI.md files should only be loaded from the primary working directory.',
+      default: false,
+    })
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -237,6 +247,7 @@ export async function parseArguments(): Promise<CliArgs> {
 // TODO: Consider if App.tsx should get memory via a server call or if Config should refresh itself.
 export async function loadHierarchicalGeminiMemory(
   currentWorkingDirectory: string,
+  includeDirectoriesToReadGemini: readonly string[] = [],
   debugMode: boolean,
   fileService: FileDiscoveryService,
   settings: Settings,
@@ -244,16 +255,25 @@ export async function loadHierarchicalGeminiMemory(
   memoryImportFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
 ): Promise<{ memoryContent: string; fileCount: number }> {
+  // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
+  const realCwd = fs.realpathSync(path.resolve(currentWorkingDirectory));
+  const realHome = fs.realpathSync(path.resolve(homedir()));
+  const isHomeDirectory = realCwd === realHome;
+
+  // If it is the home directory, pass an empty string to the core memory
+  // function to signal that it should skip the workspace search.
+  const effectiveCwd = isHomeDirectory ? '' : currentWorkingDirectory;
+
   if (debugMode) {
     logger.debug(
       `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory} (memoryImportFormat: ${memoryImportFormat})`,
     );
   }
 
-  // Directly call the server function.
-  // The server function will use its own homedir() for the global path.
+  // Directly call the server function with the corrected path.
   return loadServerHierarchicalMemory(
-    currentWorkingDirectory,
+    effectiveCwd,
+    includeDirectoriesToReadGemini,
     debugMode,
     fileService,
     extensionContextFilePaths,
@@ -276,9 +296,7 @@ export async function loadCliConfig(
     ) ||
     false;
   const memoryImportFormat = settings.memoryImportFormat || 'tree';
-  const ideMode =
-    (argv.ideMode ?? settings.ideMode ?? false) &&
-    process.env.TERM_PROGRAM === 'vscode';
+  const ideMode = settings.ideMode ?? false;
 
   const ideModeFeature =
     (argv.ideModeFeature ?? settings.ideModeFeature ?? false) &&
@@ -317,9 +335,14 @@ export async function loadCliConfig(
     ...settings.fileFiltering,
   };
 
+  const includeDirectories = (settings.includeDirectories || [])
+    .map(resolvePath)
+    .concat((argv.includeDirectories || []).map(resolvePath));
+
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
     process.cwd(),
+    settings.loadMemoryFromIncludeDirectories ? includeDirectories : [],
     debugMode,
     fileService,
     settings,
@@ -385,7 +408,11 @@ export async function loadCliConfig(
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: process.cwd(),
-    includeDirectories: argv.includeDirectories,
+    includeDirectories,
+    loadMemoryFromIncludeDirectories:
+      argv.loadMemoryFromIncludeDirectories ||
+      settings.loadMemoryFromIncludeDirectories ||
+      false,
     debugMode,
     question: argv.promptInteractive || argv.prompt || '',
     fullContext: argv.allFiles || argv.all_files || false,
@@ -433,7 +460,7 @@ export async function loadCliConfig(
     cwd: process.cwd(),
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
-    model: argv.model!,
+    model: argv.model || settings.model || DEFAULT_GEMINI_MODEL,
     extensionContextFilePaths,
     maxSessionTurns: settings.maxSessionTurns ?? -1,
     experimentalAcp: argv.experimentalAcp || false,
