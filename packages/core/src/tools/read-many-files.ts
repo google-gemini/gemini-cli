@@ -71,6 +71,27 @@ export interface ReadManyFilesParams {
 }
 
 /**
+ * Result type for file processing operations
+ */
+type FileProcessingResult =
+  | {
+      success: true;
+      filePath: string;
+      relativePathForDisplay: string;
+      fileReadResult: NonNullable<
+        Awaited<ReturnType<typeof processSingleFileContent>>
+      >;
+      reason?: undefined;
+    }
+  | {
+      success: false;
+      filePath: string;
+      relativePathForDisplay: string;
+      fileReadResult?: undefined;
+      reason: string;
+    };
+
+/**
  * Default exclusion patterns for commonly ignored directories and binary file types.
  * These are compatible with glob ignore patterns.
  * TODO(adh): Consider making this configurable or extendable through a command line argument.
@@ -413,66 +434,124 @@ Use this tool when the user's query implies needing the content of several files
 
     const sortedFiles = Array.from(filesToConsider).sort();
 
-    for (const filePath of sortedFiles) {
-      const relativePathForDisplay = path
-        .relative(this.config.getTargetDir(), filePath)
-        .replace(/\\/g, '/');
+    const fileProcessingPromises = sortedFiles.map(
+      async (filePath): Promise<FileProcessingResult> => {
+        try {
+          const relativePathForDisplay = path
+            .relative(this.config.getTargetDir(), filePath)
+            .replace(/\\/g, '/');
 
-      const fileType = await detectFileType(filePath);
+          const fileType = await detectFileType(filePath);
 
-      if (fileType === 'image' || fileType === 'pdf') {
-        const fileExtension = path.extname(filePath).toLowerCase();
-        const fileNameWithoutExtension = path.basename(filePath, fileExtension);
-        const requestedExplicitly = inputPatterns.some(
-          (pattern: string) =>
-            pattern.toLowerCase().includes(fileExtension) ||
-            pattern.includes(fileNameWithoutExtension),
-        );
+          if (fileType === 'image' || fileType === 'pdf') {
+            const fileExtension = path.extname(filePath).toLowerCase();
+            const fileNameWithoutExtension = path.basename(
+              filePath,
+              fileExtension,
+            );
+            const requestedExplicitly = inputPatterns.some(
+              (pattern: string) =>
+                pattern.toLowerCase().includes(fileExtension) ||
+                pattern.includes(fileNameWithoutExtension),
+            );
 
-        if (!requestedExplicitly) {
-          skippedFiles.push({
-            path: relativePathForDisplay,
-            reason:
-              'asset file (image/pdf) was not explicitly requested by name or extension',
-          });
-          continue;
-        }
-      }
+            if (!requestedExplicitly) {
+              return {
+                success: false,
+                filePath,
+                relativePathForDisplay,
+                reason:
+                  'asset file (image/pdf) was not explicitly requested by name or extension',
+              };
+            }
+          }
 
-      // Use processSingleFileContent for all file types now
-      const fileReadResult = await processSingleFileContent(
-        filePath,
-        this.config.getTargetDir(),
-      );
-
-      if (fileReadResult.error) {
-        skippedFiles.push({
-          path: relativePathForDisplay,
-          reason: `Read error: ${fileReadResult.error}`,
-        });
-      } else {
-        if (typeof fileReadResult.llmContent === 'string') {
-          const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
-            '{filePath}',
+          // Use processSingleFileContent for all file types now
+          const fileReadResult = await processSingleFileContent(
             filePath,
+            this.config.getTargetDir(),
           );
-          contentParts.push(`${separator}\n\n${fileReadResult.llmContent}\n\n`);
-        } else {
-          contentParts.push(fileReadResult.llmContent); // This is a Part for image/pdf
+
+          if (fileReadResult.error) {
+            return {
+              success: false,
+              filePath,
+              relativePathForDisplay,
+              reason: `Read error: ${fileReadResult.error}`,
+            };
+          }
+
+          return {
+            success: true,
+            filePath,
+            relativePathForDisplay,
+            fileReadResult,
+          };
+        } catch (error) {
+          const relativePathForDisplay = path
+            .relative(this.config.getTargetDir(), filePath)
+            .replace(/\\/g, '/');
+
+          return {
+            success: false,
+            filePath,
+            relativePathForDisplay,
+            reason: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+          };
         }
-        processedFilesRelativePaths.push(relativePathForDisplay);
-        const lines =
-          typeof fileReadResult.llmContent === 'string'
-            ? fileReadResult.llmContent.split('\n').length
-            : undefined;
-        const mimetype = getSpecificMimeType(filePath);
-        recordFileOperationMetric(
-          this.config,
-          FileOperation.READ,
-          lines,
-          mimetype,
-          path.extname(filePath),
-        );
+      },
+    );
+
+    const results = await Promise.allSettled(fileProcessingPromises);
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const fileResult = result.value;
+
+        if (!fileResult.success) {
+          // Handle skipped files (images/PDFs not requested or read errors)
+          skippedFiles.push({
+            path: fileResult.relativePathForDisplay,
+            reason: fileResult.reason,
+          });
+        } else {
+          // Handle successfully processed files
+          const { filePath, relativePathForDisplay, fileReadResult } =
+            fileResult;
+
+          if (typeof fileReadResult.llmContent === 'string') {
+            const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
+              '{filePath}',
+              filePath,
+            );
+            contentParts.push(
+              `${separator}\n\n${fileReadResult.llmContent}\n\n`,
+            );
+          } else {
+            contentParts.push(fileReadResult.llmContent); // This is a Part for image/pdf
+          }
+
+          processedFilesRelativePaths.push(relativePathForDisplay);
+
+          const lines =
+            typeof fileReadResult.llmContent === 'string'
+              ? fileReadResult.llmContent.split('\n').length
+              : undefined;
+          const mimetype = getSpecificMimeType(filePath);
+          recordFileOperationMetric(
+            this.config,
+            FileOperation.READ,
+            lines,
+            mimetype,
+            path.extname(filePath),
+          );
+        }
+      } else {
+        // Handle Promise rejection (unexpected errors)
+        skippedFiles.push({
+          path: 'unknown',
+          reason: `Unexpected error: ${result.reason}`,
+        });
       }
     }
 
