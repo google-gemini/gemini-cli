@@ -48,6 +48,7 @@ describe('MCPOAuthProvider', () => {
     tokenUrl: 'https://auth.example.com/token',
     scopes: ['read', 'write'],
     redirectUri: 'http://localhost:7777/oauth/callback',
+    audiences: ['https://api.example.com'],
   };
 
   const mockToken: MCPOAuthToken = {
@@ -722,6 +723,7 @@ describe('MCPOAuthProvider', () => {
       expect(capturedUrl!).toContain('code_challenge_method=S256');
       expect(capturedUrl!).toContain('scope=read+write');
       expect(capturedUrl!).toContain('resource=https%3A%2F%2Fauth.example.com');
+      expect(capturedUrl!).toContain('audience=https%3A%2F%2Fapi.example.com');
     });
 
     it('should correctly append parameters to an authorization URL that already has query params', async () => {
