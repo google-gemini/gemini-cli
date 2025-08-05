@@ -964,6 +964,21 @@ export async function createTransport(
       | SSEClientTransportOptions = {
       authProvider: provider,
     };
+
+    // Add custom headers if they exist
+    if (mcpServerConfig.headers) {
+      transportOptions.requestInit = {
+        ...transportOptions.requestInit,
+        headers: {
+          ...((transportOptions.requestInit?.headers as Record<
+            string,
+            string
+          >) ?? {}),
+          ...mcpServerConfig.headers,
+        },
+      };
+    }
+
     if (mcpServerConfig.httpUrl) {
       return new StreamableHTTPClientTransport(
         new URL(mcpServerConfig.httpUrl),
@@ -1020,14 +1035,26 @@ export async function createTransport(
     // Set up headers with OAuth token if available
     if (hasOAuthConfig && accessToken) {
       transportOptions.requestInit = {
+        ...transportOptions.requestInit,
         headers: {
+          ...((transportOptions.requestInit?.headers as Record<
+            string,
+            string
+          >) ?? {}),
           ...mcpServerConfig.headers,
           Authorization: `Bearer ${accessToken}`,
         },
       };
     } else if (mcpServerConfig.headers) {
       transportOptions.requestInit = {
-        headers: mcpServerConfig.headers,
+        ...transportOptions.requestInit,
+        headers: {
+          ...((transportOptions.requestInit?.headers as Record<
+            string,
+            string
+          >) ?? {}),
+          ...mcpServerConfig.headers,
+        },
       };
     }
 
@@ -1043,14 +1070,26 @@ export async function createTransport(
     // Set up headers with OAuth token if available
     if (hasOAuthConfig && accessToken) {
       transportOptions.requestInit = {
+        ...transportOptions.requestInit,
         headers: {
+          ...((transportOptions.requestInit?.headers as Record<
+            string,
+            string
+          >) ?? {}),
           ...mcpServerConfig.headers,
           Authorization: `Bearer ${accessToken}`,
         },
       };
     } else if (mcpServerConfig.headers) {
       transportOptions.requestInit = {
-        headers: mcpServerConfig.headers,
+        ...transportOptions.requestInit,
+        headers: {
+          ...((transportOptions.requestInit?.headers as Record<
+            string,
+            string
+          >) ?? {}),
+          ...mcpServerConfig.headers,
+        },
       };
     }
 
