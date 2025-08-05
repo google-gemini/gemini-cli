@@ -182,7 +182,7 @@ export class WriteFileTool
       'Current',
       'Proposed',
       DEFAULT_DIFF_OPTIONS,
-    );
+    ) ?? '';
 
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
@@ -263,7 +263,7 @@ export class WriteFileTool
         'Original',
         'Written',
         DEFAULT_DIFF_OPTIONS,
-      );
+      ) ?? '';
 
       const llmSuccessMessageParts = [
         isNewFile
