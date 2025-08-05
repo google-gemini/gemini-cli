@@ -27,7 +27,12 @@ import {
   UserPromptEvent,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
-import { type Part, type PartListUnion, FinishReason } from '@google/genai';
+import {
+  type Part,
+  type PartListUnion,
+  type GenerateContentResponse,
+  FinishReason,
+} from '@google/genai';
 import {
   StreamingState,
   HistoryItem,
@@ -66,6 +71,43 @@ export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
     }
   }
   return resultParts;
+}
+
+function partListToString(value: PartListUnion): string {
+  if (!value) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => partListToString(v)).join('');
+  }
+  return (value as Part).text ?? '';
+}
+
+function extractTextFromResponse(response: GenerateContentResponse): string {
+  return (
+    response.candidates?.[0]?.content?.parts
+      ?.map((p: Part) => p.text ?? '')
+      .join('') ?? ''
+  );
+}
+
+function historyToContext(history: HistoryItem[], limit = 500): string {
+  const segments: string[] = [];
+  for (let i = history.length - 1; i >= 0; i--) {
+    const item = history[i];
+    if (!item.text) continue;
+    const role =
+      item.type === 'user' || item.type === 'user_shell' ? 'User' : 'Model';
+    segments.unshift(`${role}: ${item.text}`);
+    if (segments.join('\n').length > limit) {
+      break;
+    }
+  }
+  const context = segments.join('\n');
+  return context.slice(Math.max(0, context.length - limit));
 }
 
 enum StreamProcessingStatus {
@@ -181,6 +223,27 @@ export const useGeminiStream = (
     }
     return StreamingState.Idle;
   }, [isResponding, toolCalls]);
+
+  const summarizeInterruption = useCallback(
+    async (query: PartListUnion) => {
+      const queryText = partListToString(query);
+      const context = historyToContext(history);
+      const prompt = `In context of the conversation:\n${context}\n\nUser request: ${queryText}\n\nBriefly explain what the user wants.`;
+      try {
+        const response = await geminiClient.generateContent(
+          [{ role: 'user', parts: [{ text: prompt }] }],
+          {},
+          new AbortController().signal,
+          DEFAULT_GEMINI_FLASH_MODEL,
+        );
+        const explanation = extractTextFromResponse(response).trim();
+        return `First let's deal with this user demand: ${queryText}. ${explanation}`;
+      } catch {
+        return `First let's deal with this user demand: ${queryText}.`;
+      }
+    },
+    [geminiClient, history],
+  );
 
   useInput((_input, key) => {
     if (streamingState === StreamingState.Responding && key.escape) {
@@ -629,12 +692,14 @@ export const useGeminiStream = (
       options?: { isContinuation: boolean },
       prompt_id?: string,
     ) => {
+      let wasInterrupted = false;
       if (
         (streamingState === StreamingState.Responding ||
           streamingState === StreamingState.WaitingForConfirmation) &&
         !options?.isContinuation
       ) {
         if (interruptMode) {
+          wasInterrupted = true;
           turnCancelledRef.current = true;
           abortControllerRef.current?.abort();
           if (pendingHistoryItemRef.current) {
@@ -648,13 +713,6 @@ export const useGeminiStream = (
             }
             setPendingHistoryItem(null);
           }
-          addItem(
-            {
-              type: MessageType.INFO,
-              text: 'Stream interrupted. Awaiting new input.',
-            },
-            Date.now(),
-          );
           setIsResponding(false);
         } else {
           return;
@@ -686,6 +744,11 @@ export const useGeminiStream = (
 
       if (!shouldProceed || queryToSend === null) {
         return;
+      }
+
+      if (wasInterrupted) {
+        const summary = await summarizeInterruption(query);
+        addItem({ type: MessageType.GEMINI, text: summary }, Date.now());
       }
 
       if (!options?.isContinuation) {
@@ -757,6 +820,7 @@ export const useGeminiStream = (
       startNewPrompt,
       getPromptCount,
       handleLoopDetectedEvent,
+      summarizeInterruption,
       interruptMode,
     ],
   );
