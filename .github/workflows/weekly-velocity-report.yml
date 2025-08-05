@@ -28,16 +28,9 @@ jobs:
 
       - name: Append data to Google Sheet
         if: success()
-        uses: jroehl/gsheet-action@v2.0.0
+        uses: gautamkrishnar/append-csv-to-google-sheet-action@v2
         with:
-          spreadsheetId: ${{ secrets.SPREADSHEET_ID }}
-          commands: |
-            [
-              {
-                "command": "appendData",
-                "params": {
-                  "sheetName": "Weekly Reports",
-                  "data": "${{ steps.report.outputs.csv_data }}"
-                }
-              }
-            ]
+          sheet-name: "Weekly Reports" # The name of the tab in your sheet
+          csv-text: ${{ steps.report.outputs.csv_data }}
+          spreadsheet-id: ${{ secrets.SPREADSHEET_ID }}
+          google-api-key-base64: ${{ secrets.GCP_SA_KEY }}
