@@ -57,6 +57,16 @@ export function AuthDialog({
     ) {
       return 'Existing API key detected (GEMINI_API_KEY). Select "Gemini API Key" option to use it.';
     }
+
+    if (process.env.GOOGLE_GENAI_USE_VERTEXAI === 'true') {
+      return (
+        'Warning: GOOGLE_GENAI_USE_VERTEXAI=true detected in environment. ' +
+        'This variable is intended for your project code, not the Gemini CLI. ' +
+        'Consider moving it to a .gemini/.env file if you want to use Vertex AI for the CLI, ' +
+        'or ignore this warning if using a different auth method for the CLI.'
+      );
+    }
+
     return null;
   });
   const items = [

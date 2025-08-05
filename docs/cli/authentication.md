@@ -91,7 +91,7 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
 
 You can create a **`.gemini/.env`** file in your project directory or in your home directory. Creating a plain **`.env`** file also works, but `.gemini/.env` is recommended to keep Gemini variables isolated from other tools.
 
-**Important:** Some environment variables (like `DEBUG` and `DEBUG_MODE`) are automatically excluded from project `.env` files to prevent interference with gemini-cli behavior. Use `.gemini/.env` files for gemini-cli specific variables.
+**Important:** Some environment variables (like `DEBUG`, `DEBUG_MODE`, and `GOOGLE_GENAI_USE_VERTEXAI`) are automatically excluded from project `.env` files to prevent interference with gemini-cli behavior. This prevents project-specific authentication variables intended for your application code from inadvertently affecting the CLI's authentication method. Use `.gemini/.env` files for gemini-cli specific variables.
 
 Gemini CLI automatically loads environment variables from the **first** `.env` file it finds, using the following search order:
 
@@ -122,6 +122,39 @@ GOOGLE_CLOUD_PROJECT="your-project-id"
 GEMINI_API_KEY="your-gemini-api-key"
 EOF
 ```
+
+## Troubleshooting Authentication Issues
+
+### Issue: GOOGLE_GENAI_USE_VERTEXAI Environment Variable Conflicts
+
+**Problem:** You have `GOOGLE_GENAI_USE_VERTEXAI=true` in your project's `.env` file for your application code, but you want to use a different authentication method (like Gemini API Key) for the CLI itself.
+
+**What happens:** The CLI detects this environment variable and automatically attempts to use Vertex AI authentication, even when you select "Gemini API Key" in the `/auth` dialog.
+
+**Solutions:**
+
+1. **Recommended:** Move CLI-specific environment variables to a `.gemini/.env` file:
+   ```bash
+   mkdir -p .gemini
+   echo 'GEMINI_API_KEY="your-api-key"' > .gemini/.env
+   ```
+
+2. **Alternative:** Customize which environment variables are excluded from project `.env` files by adding this to your `~/.gemini/settings.json`:
+   ```json
+   {
+     "excludedProjectEnvVars": ["DEBUG", "DEBUG_MODE", "GOOGLE_GENAI_USE_VERTEXAI", "YOUR_OTHER_VARS"]
+   }
+   ```
+
+3. **If you want to use Vertex AI for the CLI:** Move the Vertex AI configuration to `.gemini/.env`:
+   ```bash
+   mkdir -p .gemini
+   cat >> .gemini/.env <<'EOF'
+   GOOGLE_GENAI_USE_VERTEXAI=true
+   GOOGLE_CLOUD_PROJECT="your-project-id"
+   GOOGLE_CLOUD_LOCATION="us-central1"
+   EOF
+   ```
 
 ## Non-Interactive Mode / Headless Environments
 
