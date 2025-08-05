@@ -329,5 +329,52 @@ describe('useAtCompletion', () => {
         'src/',
       ]);
     });
+
+    it('should reset and re-initialize when the cwd changes', async () => {
+      const structure1: FileSystemStructure = { 'file1.txt': '' };
+      const rootDir1 = await createTmpDir(structure1);
+      const structure2: FileSystemStructure = { 'file2.txt': '' };
+      const rootDir2 = await createTmpDir(structure2);
+
+      const { result, rerender } = renderHook(
+        ({ cwd, pattern }) =>
+          useTestHarnessForAtCompletion(true, pattern, mockConfig, cwd),
+        {
+          initialProps: {
+            cwd: rootDir1,
+            pattern: 'file',
+          },
+        },
+      );
+
+      // Wait for initial suggestions from the first directory
+      await waitFor(() => {
+        expect(result.current.suggestions.map((s) => s.value)).toEqual([
+          'file1.txt',
+        ]);
+      });
+
+      // Change the CWD
+      act(() => {
+        rerender({ cwd: rootDir2, pattern: 'file' });
+      });
+
+      // After CWD changes, suggestions should be cleared and it should load again.
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(true);
+        expect(result.current.suggestions).toEqual([]);
+      });
+
+      // Wait for the new suggestions from the second directory
+      await waitFor(() => {
+        expect(result.current.suggestions.map((s) => s.value)).toEqual([
+          'file2.txt',
+        ]);
+      });
+      expect(result.current.isLoadingSuggestions).toBe(false);
+
+      await cleanupTmpDir(rootDir1);
+      await cleanupTmpDir(rootDir2);
+    });
   });
 });

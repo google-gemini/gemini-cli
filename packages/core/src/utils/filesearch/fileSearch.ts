@@ -50,9 +50,7 @@ export async function filter(
   for (const [i, p] of allPaths.entries()) {
     // Yield control to the event loop periodically to prevent blocking.
     if (i % 1000 === 0) {
-      await new Promise((resolve) => {
-        setImmediate(resolve);
-      });
+      await new Promise((resolve) => setImmediate(resolve));
       if (signal?.aborted) {
         throw new AbortError();
       }
@@ -155,7 +153,15 @@ export class FileSearch {
     //    than applying it to every file during the initial crawl.
     const fileFilter = this.ignore.getFileFilter();
     const results: string[] = [];
-    for (const candidate of filteredCandidates) {
+    for (const [i, candidate] of filteredCandidates.entries()) {
+      // Yield to the event loop to avoid blocking on large result sets.
+      if (i % 1000 === 0) {
+        await new Promise((resolve) => setImmediate(resolve));
+        if (options.signal?.aborted) {
+          throw new AbortError();
+        }
+      }
+
       if (results.length >= (options.maxResults ?? Infinity)) {
         break;
       }

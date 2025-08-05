@@ -83,7 +83,7 @@ function atCompletionReducer(
         suggestions: [],
       };
     case 'RESET':
-      return { ...state, suggestions: [], isLoading: false, pattern: null };
+      return initialState;
     default:
       return state;
   }
@@ -120,7 +120,11 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     setIsLoadingSuggestions(state.isLoading);
   }, [state.isLoading, setIsLoadingSuggestions]);
 
-  // Effect 1: Reacts to user input (`pattern`) ONLY.
+  useEffect(() => {
+    dispatch({ type: 'RESET' });
+  }, [cwd, config]);
+
+  // Reacts to user input (`pattern`) ONLY.
   useEffect(() => {
     if (!enabled) {
       return;
@@ -141,7 +145,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     }
   }, [enabled, pattern, state.status, state.pattern]);
 
-  // Effect 2: The "Worker" that performs async operations based on status.
+  // The "Worker" that performs async operations based on status.
   useEffect(() => {
     const initialize = async () => {
       try {
