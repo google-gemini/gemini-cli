@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
 import { Box, Text } from 'ink';
 import { usePlan } from '../contexts/PlanContext.js';
 import { Colors } from '../colors.js';
@@ -15,7 +14,8 @@ const ProgressBar = ({ progress }: { progress: number }) => {
   const remaining = width - completed;
   return (
     <Text>
-      [{'#'.repeat(completed)}{'.'.repeat(remaining)}] {Math.round(progress * 100)}%
+      [{'#'.repeat(completed)}
+      {'.'.repeat(remaining)}] {Math.round(progress * 100)}%
     </Text>
   );
 };
@@ -47,4 +47,3 @@ export const PlanSidebar = ({ width = 30 }: { width?: number }) => {
     </Box>
   );
 };
-

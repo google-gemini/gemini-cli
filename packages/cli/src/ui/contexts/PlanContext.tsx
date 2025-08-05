@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
 
 export interface PlanStep {
   id: number;
@@ -16,48 +22,27 @@ export interface PlanStep {
 interface PlanContextValue {
   steps: PlanStep[];
   currentStep: number;
-  createPlanFromQuery: (query: string) => void;
-  interruptPlan: (query: string) => void;
+  setPlan: (steps: PlanStep[]) => void;
 }
 
 const PlanContext = createContext<PlanContextValue>({
   steps: [],
   currentStep: 0,
-  createPlanFromQuery: () => {},
-  interruptPlan: () => {},
+  setPlan: () => {},
 });
-
-const generateDefaultPlan = (query: string): PlanStep[] => {
-  return [
-    {
-      id: 1,
-      description: `Analyze request: ${query}`,
-      status: 'pending',
-      progress: 0,
-    },
-    {
-      id: 2,
-      description: 'Execute planned steps',
-      status: 'pending',
-      progress: 0,
-    },
-  ];
-};
-
 export const PlanProvider = ({ children }: { children: ReactNode }) => {
   const [steps, setSteps] = useState<PlanStep[]>([]);
   const [currentStep, setCurrentStep] = useState<number>(0);
 
-  const createPlanFromQuery = (query: string) => {
-    const newSteps = generateDefaultPlan(query).map((step, idx) =>
-      idx === 0 ? { ...step, status: 'in-progress' } : step,
-    );
+  const setPlan = (planSteps: PlanStep[]) => {
+    const newSteps: PlanStep[] = planSteps.map((step, idx) => ({
+      ...step,
+      id: idx + 1,
+      status: idx === 0 ? 'in-progress' : 'pending',
+      progress: 0,
+    }));
     setSteps(newSteps);
     setCurrentStep(0);
-  };
-
-  const interruptPlan = (query: string) => {
-    createPlanFromQuery(query);
   };
 
   useEffect(() => {
@@ -97,13 +82,10 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
   }, [steps, currentStep]);
 
   return (
-    <PlanContext.Provider
-      value={{ steps, currentStep, createPlanFromQuery, interruptPlan }}
-    >
+    <PlanContext.Provider value={{ steps, currentStep, setPlan }}>
       {children}
     </PlanContext.Provider>
   );
 };
 
 export const usePlan = () => useContext(PlanContext);
-
