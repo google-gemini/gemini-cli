@@ -277,19 +277,17 @@ You can specify the authentication provider type using the `authProviderType` pr
 ```
 #### HTTP-based MCP Server [NO-Auth]
 
-json
 {
   "mcpServers": {
     "httpServer": {
       "httpUrl": "http://localhost:3000/mcp",
-       "headers": {
+      "headers": {
         "X-Custom-Header": "custom-value"
       },
       "timeout": 5000
-    }
-  }
+    }
+  }
 }
-```
 
 #### HTTP-based MCP Server with Custom Headers
 
