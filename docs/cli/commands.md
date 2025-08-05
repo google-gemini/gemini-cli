@@ -38,6 +38,9 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/copy`**
   - **Description:** Copies the last output produced by Gemini CLI to your clipboard, for easy sharing or reuse.
 
+- **`/copyprompt`**
+  - **Description:** Copies the last prompt you sent to your clipboard, for easy sharing or reuse.
+
 - **`/directory`** (or **`/dir`**)
   - **Description:** Manage workspace directories for multi-directory support.
   - **Sub-commands:**
