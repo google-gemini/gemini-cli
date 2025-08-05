@@ -75,8 +75,18 @@ class ThemeManager {
     )) {
       const validation = validateCustomTheme(customThemeConfig);
       if (validation.isValid) {
+        if (validation.warning) {
+          console.warn(`Theme "${name}": ${validation.warning}`);
+        }
+        const themeWithDefaults: CustomTheme = {
+          ...DEFAULT_THEME.colors,
+          ...customThemeConfig,
+          name: customThemeConfig.name || name,
+          type: 'custom',
+        };
+
         try {
-          const theme = createCustomTheme(customThemeConfig);
+          const theme = createCustomTheme(themeWithDefaults);
           this.customThemes.set(name, theme);
         } catch (error) {
           console.warn(`Failed to load custom theme "${name}":`, error);
@@ -117,7 +127,7 @@ class ThemeManager {
     if (process.env.NO_COLOR) {
       return NoColorTheme;
     }
-    // Ensure the active theme is always valid (fallback to default if not)
+    // Ensure the active theme is always valid (fall back to default if not)
     if (!this.activeTheme || !this.findThemeByName(this.activeTheme.name)) {
       this.activeTheme = DEFAULT_THEME;
     }

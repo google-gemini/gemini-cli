@@ -13,6 +13,8 @@ import process from 'node:process';
 import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 
+import { DebugProfiler } from './DebugProfiler.js';
+
 interface FooterProps {
   model: string;
   targetDir: string;
@@ -25,6 +27,7 @@ interface FooterProps {
   showMemoryUsage?: boolean;
   promptTokenCount: number;
   nightly: boolean;
+  vimMode?: string;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -39,13 +42,16 @@ export const Footer: React.FC<FooterProps> = ({
   showMemoryUsage,
   promptTokenCount,
   nightly,
+  vimMode,
 }) => {
   const limit = tokenLimit(model);
   const percentage = promptTokenCount / limit;
 
   return (
-    <Box marginTop={1} justifyContent="space-between" width="100%">
+    <Box justifyContent="space-between" width="100%">
       <Box>
+        {debugMode && <DebugProfiler />}
+        {vimMode && <Text color={Colors.Gray}>[{vimMode}] </Text>}
         {nightly ? (
           <Gradient colors={Colors.GradientColors}>
             <Text>
@@ -79,7 +85,7 @@ export const Footer: React.FC<FooterProps> = ({
           </Text>
         ) : process.env.SANDBOX === 'sandbox-exec' ? (
           <Text color={Colors.AccentYellow}>
-            MacOS Seatbelt{' '}
+            macOS Seatbelt{' '}
             <Text color={Colors.Gray}>({process.env.SEATBELT_PROFILE})</Text>
           </Text>
         ) : (

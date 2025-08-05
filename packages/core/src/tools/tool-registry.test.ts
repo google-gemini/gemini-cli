@@ -30,6 +30,10 @@ import {
   Schema,
 } from '@google/genai';
 import { spawn } from 'node:child_process';
+import { IdeClient } from '../ide/ide-client.js';
+import fs from 'node:fs';
+
+vi.mock('node:fs');
 
 // Use vi.hoisted to define the mock function so it can be used in the vi.mock factory
 const mockDiscoverMcpTools = vi.hoisted(() => vi.fn());
@@ -136,6 +140,7 @@ const baseConfigParams: ConfigParameters = {
   geminiMdFileCount: 0,
   approvalMode: ApprovalMode.DEFAULT,
   sessionId: 'test-session-id',
+  ideClient: IdeClient.getInstance(false),
 };
 
 describe('ToolRegistry', () => {
@@ -144,6 +149,10 @@ describe('ToolRegistry', () => {
   let mockConfigGetToolDiscoveryCommand: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.statSync).mockReturnValue({
+      isDirectory: () => true,
+    } as fs.Stats);
     config = new Config(baseConfigParams);
     toolRegistry = new ToolRegistry(config);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -312,7 +321,7 @@ describe('ToolRegistry', () => {
         return mockChildProcess as any;
       });
 
-      await toolRegistry.discoverTools();
+      await toolRegistry.discoverAllTools();
 
       const discoveredTool = toolRegistry.getTool('tool-with-bad-format');
       expect(discoveredTool).toBeDefined();
@@ -338,12 +347,13 @@ describe('ToolRegistry', () => {
       };
       vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
 
-      await toolRegistry.discoverTools();
+      await toolRegistry.discoverAllTools();
 
       expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
         mcpServerConfigVal,
         undefined,
         toolRegistry,
+        undefined,
         false,
       );
     });
@@ -360,12 +370,13 @@ describe('ToolRegistry', () => {
       };
       vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
 
-      await toolRegistry.discoverTools();
+      await toolRegistry.discoverAllTools();
 
       expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
         mcpServerConfigVal,
         undefined,
         toolRegistry,
+        undefined,
         false,
       );
     });

@@ -128,8 +128,6 @@ export class ReadManyFilesTool extends BaseTool<
 > {
   static readonly Name: string = 'read_many_files';
 
-  private readonly geminiIgnorePatterns: string[] = [];
-
   constructor(private config: Config) {
     const parameterSchema: Schema = {
       type: Type.OBJECT,
@@ -213,9 +211,6 @@ Use this tool when the user's query implies needing the content of several files
       Icon.FileSearch,
       parameterSchema,
     );
-    this.geminiIgnorePatterns = config
-      .getFileService()
-      .getGeminiIgnorePatterns();
   }
 
   validateParams(params: ReadManyFilesParams): string | null {
@@ -233,17 +228,19 @@ Use this tool when the user's query implies needing the content of several files
     // Determine the final list of exclusion patterns exactly as in execute method
     const paramExcludes = params.exclude || [];
     const paramUseDefaultExcludes = params.useDefaultExcludes !== false;
-
+    const geminiIgnorePatterns = this.config
+      .getFileService()
+      .getGeminiIgnorePatterns();
     const finalExclusionPatternsForDescription: string[] =
       paramUseDefaultExcludes
-        ? [...DEFAULT_EXCLUDES, ...paramExcludes, ...this.geminiIgnorePatterns]
-        : [...paramExcludes, ...this.geminiIgnorePatterns];
+        ? [...DEFAULT_EXCLUDES, ...paramExcludes, ...geminiIgnorePatterns]
+        : [...paramExcludes, ...geminiIgnorePatterns];
 
     let excludeDesc = `Excluding: ${finalExclusionPatternsForDescription.length > 0 ? `patterns like \`${finalExclusionPatternsForDescription.slice(0, 2).join('`, `')}${finalExclusionPatternsForDescription.length > 2 ? '...`' : '`'}` : 'none specified'}`;
 
     // Add a note if .geminiignore patterns contributed to the final list of exclusions
-    if (this.geminiIgnorePatterns.length > 0) {
-      const geminiPatternsInEffect = this.geminiIgnorePatterns.filter((p) =>
+    if (geminiIgnorePatterns.length > 0) {
+      const geminiPatternsInEffect = geminiIgnorePatterns.filter((p) =>
         finalExclusionPatternsForDescription.includes(p),
       ).length;
       if (geminiPatternsInEffect > 0) {
@@ -305,15 +302,27 @@ Use this tool when the user's query implies needing the content of several files
     }
 
     try {
-      const entries = await glob(searchPatterns, {
-        cwd: this.config.getTargetDir(),
-        ignore: effectiveExcludes,
-        nodir: true,
-        dot: true,
-        absolute: true,
-        nocase: true,
-        signal,
-      });
+      const allEntries = new Set<string>();
+      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
+
+      for (const dir of workspaceDirs) {
+        const entriesInDir = await glob(
+          searchPatterns.map((p) => p.replace(/\\/g, '/')),
+          {
+            cwd: dir,
+            ignore: effectiveExcludes,
+            nodir: true,
+            dot: true,
+            absolute: true,
+            nocase: true,
+            signal,
+          },
+        );
+        for (const entry of entriesInDir) {
+          allEntries.add(entry);
+        }
+      }
+      const entries = Array.from(allEntries);
 
       const gitFilteredEntries = fileFilteringOptions.respectGitIgnore
         ? fileDiscovery
@@ -346,11 +355,15 @@ Use this tool when the user's query implies needing the content of several files
       let geminiIgnoredCount = 0;
 
       for (const absoluteFilePath of entries) {
-        // Security check: ensure the glob library didn't return something outside targetDir.
-        if (!absoluteFilePath.startsWith(this.config.getTargetDir())) {
+        // Security check: ensure the glob library didn't return something outside the workspace.
+        if (
+          !this.config
+            .getWorkspaceContext()
+            .isPathWithinWorkspace(absoluteFilePath)
+        ) {
           skippedFiles.push({
             path: absoluteFilePath,
-            reason: `Security: Glob library returned path outside target directory. Base: ${this.config.getTargetDir()}, Path: ${absoluteFilePath}`,
+            reason: `Security: Glob library returned path outside workspace. Path: ${absoluteFilePath}`,
           });
           continue;
         }

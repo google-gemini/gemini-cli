@@ -185,7 +185,7 @@ export async function detectFileType(
     return 'binary';
   }
 
-  // Fallback to content-based check if mime type wasn't conclusive for image/pdf
+  // Fall back to content-based check if mime type wasn't conclusive for image/pdf
   // and it's not a known binary extension.
   if (await isBinaryFile(filePath)) {
     return 'binary';
@@ -299,7 +299,8 @@ export async function processSingleFileContent(
           return line;
         });
 
-        const contentRangeTruncated = endLine < originalLineCount;
+        const contentRangeTruncated =
+          startLine > 0 || endLine < originalLineCount;
         const isTruncated = contentRangeTruncated || linesWereTruncatedInLength;
 
         let llmTextContent = '';
@@ -310,9 +311,22 @@ export async function processSingleFileContent(
         }
         llmTextContent += formattedLines.join('\n');
 
+        // By default, return nothing to streamline the common case of a successful read_file.
+        let returnDisplay = '';
+        if (contentRangeTruncated) {
+          returnDisplay = `Read lines ${
+            actualStartLine + 1
+          }-${endLine} of ${originalLineCount} from ${relativePathForDisplay}`;
+          if (linesWereTruncatedInLength) {
+            returnDisplay += ' (some lines were shortened)';
+          }
+        } else if (linesWereTruncatedInLength) {
+          returnDisplay = `Read all ${originalLineCount} lines from ${relativePathForDisplay} (some lines were shortened)`;
+        }
+
         return {
           llmContent: llmTextContent,
-          returnDisplay: isTruncated ? '(truncated)' : '',
+          returnDisplay,
           isTruncated,
           originalLineCount,
           linesShown: [actualStartLine + 1, endLine],

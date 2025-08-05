@@ -103,6 +103,11 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Default:** `"Default"`
   - **Example:** `"theme": "GitHub"`
 
+- **`vimMode`** (boolean):
+  - **Description:** Enables or disables vim mode for input editing. When enabled, the input area supports vim-style navigation and editing commands with NORMAL and INSERT modes. The vim mode status is displayed in the footer and persists between sessions.
+  - **Default:** `false`
+  - **Example:** `"vimMode": true`
+
 - **`sandbox`** (boolean or string):
   - **Description:** Controls whether and how to use sandboxing for tool execution. If set to `true`, Gemini CLI uses a pre-built `gemini-cli-sandbox` Docker image. For more information, see [Sandboxing](#sandboxing).
   - **Default:** `false`
@@ -235,6 +240,34 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     }
     ```
 
+- **`excludedProjectEnvVars`** (array of strings):
+  - **Description:** Specifies environment variables that should be excluded from being loaded from project `.env` files. This prevents project-specific environment variables (like `DEBUG=true`) from interfering with gemini-cli behavior. Variables from `.gemini/.env` files are never excluded.
+  - **Default:** `["DEBUG", "DEBUG_MODE"]`
+  - **Example:**
+    ```json
+    "excludedProjectEnvVars": ["DEBUG", "DEBUG_MODE", "NODE_ENV"]
+    ```
+
+- **`includeDirectories`** (array of strings):
+  - **Description:** Specifies an array of additional absolute or relative paths to include in the workspace context. This allows you to work with files across multiple directories as if they were one. Paths can use `~` to refer to the user's home directory. This setting can be combined with the `--include-directories` command-line flag.
+  - **Default:** `[]`
+  - **Example:**
+    ```json
+    "includeDirectories": [
+      "/path/to/another/project",
+      "../shared-library",
+      "~/common-utils"
+    ]
+    ```
+
+- **`loadMemoryFromIncludeDirectories`** (boolean):
+  - **Description:** Controls the behavior of the `/memory refresh` command. If set to `true`, `GEMINI.md` files should be loaded from all directories that are added. If set to `false`, `GEMINI.md` should only be loaded from the current directory.
+  - **Default:** `false`
+  - **Example:**
+    ```json
+    "loadMemoryFromIncludeDirectories": true
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -266,7 +299,10 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "run_shell_command": {
       "tokenBudget": 100
     }
-  }
+  },
+  "excludedProjectEnvVars": ["DEBUG", "DEBUG_MODE", "NODE_ENV"],
+  "includeDirectories": ["path/to/dir1", "~/path/to/dir2", "../path/to/dir3"],
+  "loadMemoryFromIncludeDirectories": true
 }
 ```
 
@@ -287,6 +323,8 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 1.  `.env` file in the current working directory.
 2.  If not found, it searches upwards in parent directories until it finds an `.env` file or reaches the project root (identified by a `.git` folder) or the home directory.
 3.  If still not found, it looks for `~/.env` (in the user's home directory).
+
+**Environment Variable Exclusion:** Some environment variables (like `DEBUG` and `DEBUG_MODE`) are automatically excluded from being loaded from project `.env` files to prevent interference with gemini-cli behavior. Variables from `.gemini/.env` files are never excluded. You can customize this behavior using the `excludedProjectEnvVars` setting in your `settings.json` file.
 
 - **`GEMINI_API_KEY`** (Required):
   - Your API key for the Gemini API.
@@ -327,6 +365,7 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - `<profile_name>`: Uses a custom profile. To define a custom profile, create a file named `sandbox-macos-<profile_name>.sb` in your project's `.gemini/` directory (e.g., `my-project/.gemini/sandbox-macos-custom.sb`).
 - **`DEBUG` or `DEBUG_MODE`** (often used by underlying libraries or the CLI itself):
   - Set to `true` or `1` to enable verbose debug logging, which can be helpful for troubleshooting.
+  - **Note:** These variables are automatically excluded from project `.env` files by default to prevent interference with gemini-cli behavior. Use `.gemini/.env` files if you need to set these for gemini-cli specifically.
 - **`NO_COLOR`**:
   - Set to any value to disable all color output in the CLI.
 - **`CLI_TITLE`**:
@@ -344,6 +383,11 @@ Arguments passed directly when running the CLI can override other configurations
   - Example: `npm start -- --model gemini-1.5-pro-latest`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a non-interactive mode.
+- **`--prompt-interactive <your_prompt>`** (**`-i <your_prompt>`**):
+  - Starts an interactive session with the provided prompt as the initial input.
+  - The prompt is processed within the interactive session, not before it.
+  - Cannot be used when piping input from stdin.
+  - Example: `gemini -i "explain this code"`
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
 - **`--sandbox-image`**:
@@ -377,6 +421,11 @@ Arguments passed directly when running the CLI can override other configurations
 - **`--proxy`**:
   - Sets the proxy for the CLI.
   - Example: `--proxy http://localhost:7890`.
+- **`--include-directories <dir1,dir2,...>`**:
+  - Includes additional directories in the workspace for multi-directory support.
+  - Can be specified multiple times or as comma-separated values.
+  - 5 directories can be added at maximum.
+  - Example: `--include-directories /path/to/project1,/path/to/project2` or `--include-directories /path/to/project1 --include-directories /path/to/project2`
 - **`--version`**:
   - Displays the version of the CLI.
 
@@ -429,9 +478,10 @@ This example demonstrates how you can provide general project context, specific 
       - Location: The CLI searches for the configured context file in the current working directory and then in each parent directory up to either the project root (identified by a `.git` folder) or your home directory.
       - Scope: Provides context relevant to the entire project or a significant portion of it.
   3.  **Sub-directory Context Files (Contextual/Local):**
-      - Location: The CLI also scans for the configured context file in subdirectories _below_ the current working directory (respecting common ignore patterns like `node_modules`, `.git`, etc.).
+      - Location: The CLI also scans for the configured context file in subdirectories _below_ the current working directory (respecting common ignore patterns like `node_modules`, `.git`, etc.). The breadth of this search is limited to 200 directories by default, but can be configured with a `memoryDiscoveryMaxDirs` field in your `settings.json` file.
       - Scope: Allows for highly specific instructions relevant to a particular component, module, or subsection of your project.
 - **Concatenation & UI Indication:** The contents of all found context files are concatenated (with separators indicating their origin and path) and provided as part of the system prompt to the Gemini model. The CLI footer displays the count of loaded context files, giving you a quick visual cue about the active instructional context.
+- **Importing Content:** You can modularize your context files by importing other Markdown files using the `@path/to/file.md` syntax. For more details, see the [Memory Import Processor documentation](../core/memport.md).
 - **Commands for Memory Management:**
   - Use `/memory refresh` to force a re-scan and reload of all context files from all configured locations. This updates the AI's instructional context.
   - Use `/memory show` to display the combined instructional context currently loaded, allowing you to verify the hierarchy and content being used by the AI.

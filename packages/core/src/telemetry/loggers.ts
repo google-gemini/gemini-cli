@@ -15,7 +15,9 @@ import {
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
+  EVENT_NEXT_SPEAKER_CHECK,
   SERVICE_NAME,
+  EVENT_SLASH_COMMAND,
 } from './constants.js';
 import {
   ApiErrorEvent,
@@ -25,7 +27,9 @@ import {
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  NextSpeakerCheckEvent,
   LoopDetectedEvent,
+  SlashCommandEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -305,6 +309,48 @@ export function logLoopDetected(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Loop detected. Type: ${event.loop_type}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logNextSpeakerCheck(
+  config: Config,
+  event: NextSpeakerCheckEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logNextSpeakerCheck(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_NEXT_SPEAKER_CHECK,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Next speaker check.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logSlashCommand(
+  config: Config,
+  event: SlashCommandEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logSlashCommandEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_SLASH_COMMAND,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Slash command: ${event.command}.`,
     attributes,
   };
   logger.emit(logRecord);

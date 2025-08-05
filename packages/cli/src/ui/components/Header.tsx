@@ -38,7 +38,6 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <Box
-      marginBottom={1}
       alignItems="flex-start"
       width={artWidth}
       flexShrink={0}
