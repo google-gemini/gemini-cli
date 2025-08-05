@@ -13,12 +13,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
+
       - name: This is the Google Sheets action we want to use
         uses: gautamkrishnar/append-csv-to-google-sheet-action@v2
         with:
           # We don't need real inputs, we just want to see if it can be found
-          sheet-name: 'Test' 
+          sheet-name: 'Test'
           csv-text: 'test'
           spreadsheet-id: 'test'
           google-api-key-base64: 'test'
