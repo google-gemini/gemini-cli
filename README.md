@@ -42,18 +42,24 @@ With Gemini CLI you can:
 
 ### Quick Install
 
+#### Run instantly with npx
+
 ```bash
 # Using npx (no installation required)
 npx https://github.com/google-gemini/gemini-cli
+```
 
-# Or install globally with npm
+#### Install globally with npm
+```
 npm install -g @google/gemini-cli
+```
 
-# Or with Homebrew (macOS/Linux)
+#### Install globally with Homebrew (macOS/Linux)
+```
 brew install gemini-cli
 ```
 
-### System Requirements
+#### System Requirements
 - Node.js version 20 or higher
 - macOS, Linux, or Windows
 
@@ -61,11 +67,11 @@ brew install gemini-cli
 
 Choose the authentication method that best fits your needs:
 
-### Option 1: Personal Google Account (Recommended for Individuals)
-**✨ Best for:** Individual developers who want the highest free usage limits
+### Option 1: OAuth login (Personal Google Account)
+**✨ Best for:** Individual developers (see [quota limits and terms of service](https://cloud.google.com/gemini/docs/quotas) for details)
 
 **Benefits:**
-- **Industry-leading free tier**: 60 requests/min and 1,000 requests/day
+- **Free tier**: 60 requests/min and 1,000 requests/day
 - **Gemini 2.5 Pro** with 1M token context window
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
