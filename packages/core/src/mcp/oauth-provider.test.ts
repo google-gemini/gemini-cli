@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { vi } from 'vitest';
+
+// Mock dependencies AT THE TOP
+vi.mock('open');
+vi.mock('node:crypto');
+vi.mock('./oauth-token-storage.js');
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import open from 'open';
@@ -15,11 +22,6 @@ import {
   OAuthClientRegistrationResponse,
 } from './oauth-provider.js';
 import { MCPOAuthTokenStorage, MCPOAuthToken } from './oauth-token-storage.js';
-
-// Mock dependencies
-vi.mock('open');
-vi.mock('node:crypto');
-vi.mock('./oauth-token-storage.js');
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -717,6 +719,110 @@ describe('MCPOAuthProvider', () => {
       expect(capturedUrl!).toContain('code_challenge_method=S256');
       expect(capturedUrl!).toContain('scope=read+write');
       expect(capturedUrl!).toContain('resource=https%3A%2F%2Fauth.example.com');
+    });
+
+    it('should correctly append parameters to an authorization URL that already has query params', async () => {
+      // Mock to capture the URL that would be opened
+      let capturedUrl: string;
+      vi.mocked(open).mockImplementation(((url: string | URL) => {
+        capturedUrl = url.toString();
+        // Return a minimal mock ChildProcess
+        return Promise.resolve({
+          pid: 1234,
+        });
+      }) as unknown as typeof open);
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTokenResponse),
+      });
+
+      const configWithParamsInUrl = {
+        ...mockConfig,
+        authorizationUrl: 'https://auth.example.com/authorize?audience=1234',
+      };
+
+      await MCPOAuthProvider.authenticate('test-server', configWithParamsInUrl);
+
+      const url = new URL(capturedUrl!);
+      expect(url.searchParams.get('audience')).toBe('1234');
+      expect(url.searchParams.get('client_id')).toBe('test-client-id');
+      expect(url.search.startsWith('?audience=1234&')).toBe(true);
+    });
+
+    it('should correctly append parameters to a URL with a fragment', async () => {
+      // Mock to capture the URL that would be opened
+      let capturedUrl: string;
+      vi.mocked(open).mockImplementation(((url: string | URL) => {
+        capturedUrl = url.toString();
+        // Return a minimal mock ChildProcess
+        return Promise.resolve({
+          pid: 1234,
+        });
+      }) as unknown as typeof open);
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTokenResponse),
+      });
+
+      const configWithFragment = {
+        ...mockConfig,
+        authorizationUrl: 'https://auth.example.com/authorize#login',
+      };
+
+      await MCPOAuthProvider.authenticate('test-server', configWithFragment);
+
+      const url = new URL(capturedUrl!);
+      expect(url.searchParams.get('client_id')).toBe('test-client-id');
+      expect(url.hash).toBe('#login');
+      expect(url.pathname).toBe('/authorize');
     });
   });
 });
