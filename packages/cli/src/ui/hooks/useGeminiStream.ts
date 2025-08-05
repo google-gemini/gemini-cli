@@ -60,7 +60,8 @@ import {
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
-import { usePlan } from '../contexts/PlanContext.js';
+import { usePlan, PlanStep } from '../contexts/PlanContext.js';
+import { loadRules, addRule } from '../utils/rules.js';
 
 export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
   const resultParts: PartListUnion = [];
@@ -111,6 +112,125 @@ function historyToContext(history: HistoryItem[], limit = 500): string {
   return context.slice(Math.max(0, context.length - limit));
 }
 
+type InterruptionType = 'continue' | 'question' | 'rule' | 'change-plan';
+
+const classifyInterruption = async (
+  client: GeminiClient,
+  message: string,
+): Promise<InterruptionType> => {
+  const prompt =
+    'Classify the following user message as one of: continue, question, rule, change-plan.\nMessage: ' +
+    JSON.stringify(message) +
+    '\nRespond with only the category name.';
+  try {
+    const resp = await client.generateContent(
+      [{ role: 'user', parts: [{ text: prompt }] }],
+      {},
+      new AbortController().signal,
+      DEFAULT_GEMINI_FLASH_MODEL,
+    );
+    const result = extractTextFromResponse(resp).trim().toLowerCase();
+    if (result.includes('continue')) return 'continue';
+    if (result.includes('question')) return 'question';
+    if (result.includes('rule')) return 'rule';
+    return 'change-plan';
+  } catch {
+    return 'change-plan';
+  }
+};
+
+const answerQuickQuestion = async (
+  client: GeminiClient,
+  question: string,
+  history: HistoryItem[],
+  addItem: UseHistoryManagerReturn['addItem'],
+) => {
+  const context = historyToContext(history);
+  const prompt = `Context:\n${context}\n\nUser question: ${question}\nRespond briefly.`;
+  try {
+    const resp = await client.generateContent(
+      [{ role: 'user', parts: [{ text: prompt }] }],
+      {},
+      new AbortController().signal,
+      DEFAULT_GEMINI_FLASH_MODEL,
+    );
+    const answer = extractTextFromResponse(resp).trim();
+    addItem({ type: MessageType.GEMINI, text: answer }, Date.now());
+  } catch (err) {
+    addItem(
+      { type: MessageType.ERROR, text: getErrorMessage(err) },
+      Date.now(),
+    );
+  }
+};
+
+const generatePlanSteps = async (
+  client: GeminiClient,
+  query: string,
+  config: Config,
+): Promise<PlanStep[]> => {
+  const prompt = `User request: ${query}\nProvide an ordered list of steps to accomplish this request.`;
+  try {
+    const resp = await client.generateContent(
+      [{ role: 'user', parts: [{ text: prompt }] }],
+      {},
+      new AbortController().signal,
+      DEFAULT_GEMINI_FLASH_MODEL,
+    );
+    const text = extractTextFromResponse(resp);
+    const lines = text
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l);
+    let descriptions = lines.map((l) =>
+      l.replace(/^\d+\.\s*/, '').replace(/^[-*]\s*/, ''),
+    );
+    if (descriptions.length === 0) {
+      descriptions = [`Analyze request: ${query}`, 'Execute planned steps'];
+    }
+    const rules = await loadRules(config.getProjectRoot());
+    const finalDescriptions = await Promise.all(
+      descriptions.map(async (d) => {
+        if (!rules.length) return d;
+        const rulePrompt = `Step: ${d}\nRules: ${rules.join('; ')}\nReturn the step modified to satisfy the rules.`;
+        try {
+          const rResp = await client.generateContent(
+            [{ role: 'user', parts: [{ text: rulePrompt }] }],
+            {},
+            new AbortController().signal,
+            DEFAULT_GEMINI_FLASH_MODEL,
+          );
+          const updated = extractTextFromResponse(rResp).trim();
+          return updated || d;
+        } catch {
+          return d;
+        }
+      }),
+    );
+    return finalDescriptions.map((desc, i) => ({
+      id: i + 1,
+      description: desc,
+      status: 'pending',
+      progress: 0,
+    }));
+  } catch {
+    return [
+      {
+        id: 1,
+        description: `Analyze request: ${query}`,
+        status: 'pending',
+        progress: 0,
+      },
+      {
+        id: 2,
+        description: 'Execute planned steps',
+        status: 'pending',
+        progress: 0,
+      },
+    ];
+  }
+};
+
 enum StreamProcessingStatus {
   Completed,
   UserCancelled,
@@ -148,7 +268,7 @@ export const useGeminiStream = (
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const interruptedResponseRef = useRef<string | null>(null);
   const { startNewPrompt, getPromptCount } = useSessionStats();
-  const { createPlanFromQuery } = usePlan();
+  const { setPlan } = usePlan();
   const logger = useLogger();
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
@@ -701,6 +821,27 @@ export const useGeminiStream = (
         !options?.isContinuation
       ) {
         if (interruptMode) {
+          const interruptionText = partListToString(query);
+          const classification = await classifyInterruption(
+            geminiClient,
+            interruptionText,
+          );
+          if (classification === 'continue') {
+            return;
+          }
+          if (classification === 'question') {
+            await answerQuickQuestion(
+              geminiClient,
+              interruptionText,
+              history,
+              addItem,
+            );
+            return;
+          }
+          if (classification === 'rule') {
+            await addRule(interruptionText, config.getProjectRoot());
+            return;
+          }
           wasInterrupted = true;
           turnCancelledRef.current = true;
           abortControllerRef.current?.abort();
@@ -724,7 +865,12 @@ export const useGeminiStream = (
       const userMessageTimestamp = Date.now();
 
       if (!options?.isContinuation) {
-        createPlanFromQuery(partListToString(query));
+        const planSteps = await generatePlanSteps(
+          geminiClient,
+          partListToString(query),
+          config,
+        );
+        setPlan(planSteps);
         // Reset quota error flag when starting a new query (not a continuation)
         setModelSwitchedFromQuotaError(false);
         config.setQuotaErrorOccurred(false);
@@ -825,6 +971,8 @@ export const useGeminiStream = (
       handleLoopDetectedEvent,
       summarizeInterruption,
       interruptMode,
+      history,
+      setPlan,
     ],
   );
 
