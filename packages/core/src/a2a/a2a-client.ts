@@ -17,6 +17,7 @@ import {
   AuthenticationHandler,
   HttpHeaders,
 } from '@a2a-js/sdk/client';
+import { extractContextId } from './utils.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const AGENT_CARD_WELL_KNOWN_PATH = '/.well-known/agent-card.json';
@@ -27,8 +28,10 @@ const AGENT_CARD_WELL_KNOWN_PATH = '/.well-known/agent-card.json';
  */
 export class A2AClientManager {
   private static instance: A2AClientManager;
+  // TODO: unif these maps
   private registeredAgents = new Map<string, A2AClient>(); // { agentName : A2AClient}
-  private taskMap = new Map<string, Set<string>>(); // { agentName : taskId}
+  private taskMap = new Map<string, Set<string>>(); // { agentName : Set<>taskId} // TODO handle taskId completion
+  private contextMap = new Map<string, string>(); // { agentName : contextId}
 
   /**
    * Gets the singleton instance of the A2AClientManager.
@@ -131,7 +134,14 @@ export class A2AClientManager {
       },
     };
 
-    return a2aClient.sendMessage(messageParams);
+    const contextId = this.contextMap.get(agentName)
+    if (contextId) messageParams.message.contextId = contextId;
+
+    const response = await a2aClient.sendMessage(messageParams)
+    const newContextId = extractContextId(response)
+    if (newContextId) this.contextMap.set(agentName, newContextId)
+
+    return response;
   }
 
   /**
