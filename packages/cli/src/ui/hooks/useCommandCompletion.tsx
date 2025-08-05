@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect } from 'react';
 import {
-  MAX_SUGGESTIONS_TO_SHOW,
   Suggestion,
 } from '../components/SuggestionsDisplay.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
@@ -163,8 +162,12 @@ export function useCommandCompletion(
     };
   }, [completionMode, atCompletion, slashCompletion]);
 
+   
   const stableSuggestions = useMemo(
     () => activeCompletion.suggestions,
+    // eslint-disable-next-line
+    // TODO: This was necessary to prevent render loops in tests. We should
+    // find a better way.
     [JSON.stringify(activeCompletion.suggestions)],
   );
 
@@ -197,6 +200,7 @@ export function useCommandCompletion(
     completionMode,
     suggestions.length,
     isLoadingSuggestions,
+    reverseSearchActive,
     resetCompletionState,
     setShowSuggestions,
   ]);

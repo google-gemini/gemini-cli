@@ -119,12 +119,13 @@ export function useAtCompletion(
     if (state.status === AtCompletionStatus.IDLE) {
       dispatch({ type: 'INITIALIZE' });
     } else if (
-      state.status === AtCompletionStatus.READY ||
-      state.status === AtCompletionStatus.SEARCHING
+      (state.status === AtCompletionStatus.READY ||
+        state.status === AtCompletionStatus.SEARCHING) &&
+      pattern !== state.pattern // Only search if the pattern has changed
     ) {
       dispatch({ type: 'SEARCH', payload: pattern });
     }
-  }, [enabled, pattern, state.status]);
+  }, [enabled, pattern, state.status, state.pattern]);
 
   // Effect 2: The "Worker" that performs async operations based on status.
   useEffect(() => {
@@ -138,7 +139,7 @@ export function useAtCompletion(
           useGeminiignore:
             config?.getFileFilteringOptions()?.respectGeminiIgnore ?? true,
           cache: true,
-          cacheTtl: 3600,
+          cacheTtl: 30, // 30 seconds
         });
         await searcher.initialize();
         fileSearch.current = searcher;

@@ -245,6 +245,7 @@ export class FileSearch {
     const api = new fdir()
       .withRelativePaths()
       .withDirs()
+      .withPathSeparator('/') // Always use unix style paths
       .exclude((_, dirPath) => {
         const relativePath = path.relative(this.absoluteDir, dirPath);
         return dirFilter(`${relativePath}/`);
