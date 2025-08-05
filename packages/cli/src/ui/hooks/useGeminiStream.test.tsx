@@ -38,12 +38,14 @@ const mockSendMessageStream = vi
   .mockReturnValue((async function* () {})());
 const mockStartChat = vi.fn();
 
+const mockGenerateContent = vi.fn();
 const MockedGeminiClientClass = vi.hoisted(() =>
   vi.fn().mockImplementation(function (this: any, _config: any) {
     // _config
     this.startChat = mockStartChat;
     this.sendMessageStream = mockSendMessageStream;
     this.addHistory = vi.fn();
+    this.generateContent = mockGenerateContent;
   }),
 );
 
@@ -954,6 +956,9 @@ describe('useGeminiStream', () => {
       })();
       mockSendMessageStream.mockReturnValueOnce(mockStream1);
       mockSendMessageStream.mockReturnValueOnce(mockStream2);
+      mockGenerateContent.mockResolvedValueOnce({
+        candidates: [{ content: { parts: [{ text: 'summary text' }] } }],
+      });
 
       const { result } = renderTestHook([], undefined, true);
 
@@ -976,8 +981,8 @@ describe('useGeminiStream', () => {
       await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           {
-            type: MessageType.INFO,
-            text: 'Stream interrupted. Awaiting new input.',
+            type: MessageType.GEMINI,
+            text: expect.stringContaining('First let\'s deal with this user demand: second query.'),
           },
           expect.any(Number),
         );
