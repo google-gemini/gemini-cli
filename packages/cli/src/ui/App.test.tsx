@@ -1056,4 +1056,41 @@ describe('App UI', () => {
       expect(validateAuthMethodSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('interrupt mode', () => {
+    it('should toggle interrupt mode with Ctrl+N', async () => {
+      const { stdin, lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Initially, interrupt mode should be disabled.
+      expect(vi.mocked(useGeminiStream).mock.calls.at(-1)?.[12]).toBe(false);
+
+      // Send Ctrl+N to enable interrupt mode.
+      stdin.write('\u000e');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Verify that useGeminiStream is called with interrupt mode enabled
+      expect(vi.mocked(useGeminiStream).mock.calls.at(-1)?.[12]).toBe(true);
+      expect(lastFrame()).toContain(
+        'interrupt mode enabled (ctrl+n to disable)',
+      );
+
+      // Send Ctrl+N again to disable interrupt mode.
+      stdin.write('\u000e');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Verify that useGeminiStream is called with interrupt mode disabled
+      expect(vi.mocked(useGeminiStream).mock.calls.at(-1)?.[12]).toBe(false);
+      expect(lastFrame()).toContain('Interrupt mode disabled.');
+      expect(lastFrame()).not.toContain(
+        'interrupt mode enabled (ctrl+n to disable)',
+      );
+    });
+  });
 });

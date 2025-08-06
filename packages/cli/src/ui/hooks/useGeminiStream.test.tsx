@@ -38,12 +38,14 @@ const mockSendMessageStream = vi
   .mockReturnValue((async function* () {})());
 const mockStartChat = vi.fn();
 
+const mockGenerateContent = vi.fn();
 const MockedGeminiClientClass = vi.hoisted(() =>
   vi.fn().mockImplementation(function (this: any, _config: any) {
     // _config
     this.startChat = mockStartChat;
     this.sendMessageStream = mockSendMessageStream;
     this.addHistory = vi.fn();
+    this.generateContent = mockGenerateContent;
   }),
 );
 
@@ -359,6 +361,7 @@ describe('useGeminiStream', () => {
   const renderTestHook = (
     initialToolCalls: TrackedToolCall[] = [],
     geminiClient?: any,
+    interruptMode = false,
   ) => {
     let currentToolCalls = initialToolCalls;
     const setToolCalls = (newToolCalls: TrackedToolCall[]) => {
@@ -405,6 +408,7 @@ describe('useGeminiStream', () => {
           () => Promise.resolve(),
           false,
           () => {},
+          interruptMode,
         );
       },
       {
@@ -908,6 +912,84 @@ describe('useGeminiStream', () => {
 
       // Verify state is reset
       expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    it('should interrupt stream and prompt for input when enabled', async () => {
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderTestHook([], undefined, true);
+
+      await act(async () => {
+        result.current.submitQuery('test query');
+      });
+
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      simulateEscapeKeyPress();
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Stream interrupted. Awaiting new input.',
+          },
+          expect.any(Number),
+        );
+      });
+
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    it('allows submitting new query while responding in interrupt mode', async () => {
+      const mockStream1 = (async function* () {
+        yield { type: 'content', value: 'Partial' };
+        await new Promise(() => {});
+      })();
+      const mockStream2 = (async function* () {
+        yield { type: ServerGeminiEventType.Finished, value: 'STOP' };
+      })();
+      mockSendMessageStream.mockReturnValueOnce(mockStream1);
+      mockSendMessageStream.mockReturnValueOnce(mockStream2);
+      mockGenerateContent.mockResolvedValueOnce({
+        candidates: [{ content: { parts: [{ text: 'summary text' }] } }],
+      });
+
+      const { result } = renderTestHook([], undefined, true);
+
+      await act(async () => {
+        result.current.submitQuery('first query');
+      });
+
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      await act(async () => {
+        result.current.submitQuery('second query');
+      });
+
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.GEMINI,
+            text: expect.stringContaining('First let\'s deal with this user demand: second query.'),
+          },
+          expect.any(Number),
+        );
+      });
+
+      const secondCallArg = mockSendMessageStream.mock.calls[1][0] as string;
+      expect(secondCallArg).toBe('second query');
     });
 
     it('should not do anything if escape is pressed when not responding', () => {

@@ -141,6 +141,12 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
+        Ctrl+N
+      </Text>{' '}
+      - Toggle interrupt mode
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
         Enter
       </Text>{' '}
       - Send message

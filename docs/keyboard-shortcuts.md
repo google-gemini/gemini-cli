@@ -14,6 +14,8 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 | `Ctrl+S` | Allows long responses to print fully, disabling truncation. Use your terminal's scrollback to view the entire output. |
 | `Ctrl+T` | Toggle the display of tool descriptions.                                                                              |
 | `Ctrl+Y` | Toggle auto-approval (YOLO mode) for all tool calls.                                                                  |
+| `Ctrl+N` | Toggle interrupt mode. When enabled, a new prompt during a response cancels the stream and shows a brief fast-model summary of the new request.
+|  |
 
 ## Input Prompt
 
