@@ -324,7 +324,7 @@ export class WriteFileTool
 
       if (isNodeError(error)) {
         // Handle specific Node.js errors with their error codes
-        errorMsg = `Error writing to file: ${error.message} (${error.code})`;
+        errorMsg = `Error writing to file '${params.file_path}': ${error.message} (${error.code})`;
 
         // Log specific error types for better debugging
         if (error.code === 'EACCES') {
