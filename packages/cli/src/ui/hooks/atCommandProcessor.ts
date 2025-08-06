@@ -87,9 +87,17 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
         inEscape = false;
       } else if (char === '\\') {
         inEscape = true;
-      } else if (/\s/.test(char)) {
-        // Path ends at first whitespace not escaped
+      } else if (/[,\s;!?()[\]{}]/.test(char)) {
+        // Path ends at first whitespace or punctuation not escaped
         break;
+      } else if (char === '.') {
+        // For . we need to be more careful - only terminate if followed by whitespace or end of string
+        // This allows file extensions like .txt, .js but terminates at sentence endings like "file.txt. Next sentence"
+        const nextChar =
+          pathEndIndex + 1 < query.length ? query[pathEndIndex + 1] : '';
+        if (nextChar === '' || /\s/.test(nextChar)) {
+          break;
+        }
       }
       pathEndIndex++;
     }
@@ -188,6 +196,14 @@ export async function handleAtCommand({
 
     // Check if path should be ignored based on filtering options
 
+    const workspaceContext = config.getWorkspaceContext();
+    if (!workspaceContext.isPathWithinWorkspace(pathName)) {
+      onDebugMessage(
+        `Path ${pathName} is not in the workspace and will be skipped.`,
+      );
+      continue;
+    }
+
     const gitIgnored =
       respectFileIgnore.respectGitIgnore &&
       fileDiscovery.shouldIgnoreFile(pathName, {
@@ -215,90 +231,88 @@ export async function handleAtCommand({
       continue;
     }
 
-    let currentPathSpec = pathName;
-    let resolvedSuccessfully = false;
-
-    try {
-      const absolutePath = path.resolve(config.getTargetDir(), pathName);
-      const stats = await fs.stat(absolutePath);
-      if (stats.isDirectory()) {
-        currentPathSpec =
-          pathName + (pathName.endsWith(path.sep) ? `**` : `/**`);
-        onDebugMessage(
-          `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
-        );
-      } else {
-        onDebugMessage(`Path ${pathName} resolved to file: ${absolutePath}`);
-      }
-      resolvedSuccessfully = true;
-    } catch (error) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        if (config.getEnableRecursiveFileSearch() && globTool) {
+    for (const dir of config.getWorkspaceContext().getDirectories()) {
+      let currentPathSpec = pathName;
+      let resolvedSuccessfully = false;
+      try {
+        const absolutePath = path.resolve(dir, pathName);
+        const stats = await fs.stat(absolutePath);
+        if (stats.isDirectory()) {
+          currentPathSpec =
+            pathName + (pathName.endsWith(path.sep) ? `**` : `/**`);
           onDebugMessage(
-            `Path ${pathName} not found directly, attempting glob search.`,
+            `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
           );
-          try {
-            const globResult = await globTool.execute(
-              {
-                pattern: `**/*${pathName}*`,
-                path: config.getTargetDir(),
-              },
-              signal,
+        } else {
+          onDebugMessage(`Path ${pathName} resolved to file: ${absolutePath}`);
+        }
+        resolvedSuccessfully = true;
+      } catch (error) {
+        if (isNodeError(error) && error.code === 'ENOENT') {
+          if (config.getEnableRecursiveFileSearch() && globTool) {
+            onDebugMessage(
+              `Path ${pathName} not found directly, attempting glob search.`,
             );
-            if (
-              globResult.llmContent &&
-              typeof globResult.llmContent === 'string' &&
-              !globResult.llmContent.startsWith('No files found') &&
-              !globResult.llmContent.startsWith('Error:')
-            ) {
-              const lines = globResult.llmContent.split('\n');
-              if (lines.length > 1 && lines[1]) {
-                const firstMatchAbsolute = lines[1].trim();
-                currentPathSpec = path.relative(
-                  config.getTargetDir(),
-                  firstMatchAbsolute,
-                );
-                onDebugMessage(
-                  `Glob search for ${pathName} found ${firstMatchAbsolute}, using relative path: ${currentPathSpec}`,
-                );
-                resolvedSuccessfully = true;
+            try {
+              const globResult = await globTool.execute(
+                {
+                  pattern: `**/*${pathName}*`,
+                  path: dir,
+                },
+                signal,
+              );
+              if (
+                globResult.llmContent &&
+                typeof globResult.llmContent === 'string' &&
+                !globResult.llmContent.startsWith('No files found') &&
+                !globResult.llmContent.startsWith('Error:')
+              ) {
+                const lines = globResult.llmContent.split('\n');
+                if (lines.length > 1 && lines[1]) {
+                  const firstMatchAbsolute = lines[1].trim();
+                  currentPathSpec = path.relative(dir, firstMatchAbsolute);
+                  onDebugMessage(
+                    `Glob search for ${pathName} found ${firstMatchAbsolute}, using relative path: ${currentPathSpec}`,
+                  );
+                  resolvedSuccessfully = true;
+                } else {
+                  onDebugMessage(
+                    `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
+                  );
+                }
               } else {
                 onDebugMessage(
-                  `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
+                  `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
                 );
               }
-            } else {
+            } catch (globError) {
+              console.error(
+                `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
+              );
               onDebugMessage(
-                `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
+                `Error during glob search for ${pathName}. Path ${pathName} will be skipped.`,
               );
             }
-          } catch (globError) {
-            console.error(
-              `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
-            );
+          } else {
             onDebugMessage(
-              `Error during glob search for ${pathName}. Path ${pathName} will be skipped.`,
+              `Glob tool not found. Path ${pathName} will be skipped.`,
             );
           }
         } else {
+          console.error(
+            `Error stating path ${pathName}: ${getErrorMessage(error)}`,
+          );
           onDebugMessage(
-            `Glob tool not found. Path ${pathName} will be skipped.`,
+            `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
           );
         }
-      } else {
-        console.error(
-          `Error stating path ${pathName}: ${getErrorMessage(error)}`,
-        );
-        onDebugMessage(
-          `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
-        );
       }
-    }
-
-    if (resolvedSuccessfully) {
-      pathSpecsToRead.push(currentPathSpec);
-      atPathToResolvedSpecMap.set(originalAtPath, currentPathSpec);
-      contentLabelsForDisplay.push(pathName);
+      if (resolvedSuccessfully) {
+        pathSpecsToRead.push(currentPathSpec);
+        atPathToResolvedSpecMap.set(originalAtPath, currentPathSpec);
+        contentLabelsForDisplay.push(pathName);
+        break;
+      }
     }
   }
 
@@ -314,8 +328,7 @@ export async function handleAtCommand({
       if (
         i > 0 &&
         initialQueryText.length > 0 &&
-        !initialQueryText.endsWith(' ') &&
-        resolvedSpec
+        !initialQueryText.endsWith(' ')
       ) {
         // Add space if previous part was text and didn't end with space, or if previous was @path
         const prevPart = commandParts[i - 1];
