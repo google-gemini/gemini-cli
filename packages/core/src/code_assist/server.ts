@@ -92,6 +92,7 @@ export class CodeAssistServer implements ContentGenerator {
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<GenerateContentResponse> {
+    this._logApiRequest(toContents(req.contents), req.model, userPromptId);
     const resp = await this.requestPost<CaGenerateContentResponse>(
       'generateContent',
       toGenerateContentRequest(
