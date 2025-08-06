@@ -35,6 +35,7 @@
     "diff": "^7.0.0",
     "dotenv": "^17.1.0",
     "fdir": "^6.4.6",
+    "fzf": "^0.5.2",
     "glob": "^10.4.5",
     "google-auth-library": "^9.11.0",
     "html-to-text": "^9.0.5",
