@@ -693,7 +693,7 @@ export async function start_sandbox(
       // Use -f with groupadd to avoid errors if the group already exists.
       `groupadd -f -g ${gid} ${username}`,
       // Create user only if it doesn't exist. Use -o for non-unique UID.
-      `id -u ${username} &>/dev/null || useradd -o -u ${uid} -g ${gid} -d ${homeDir} -s /bin/bash ${username}`,
+      `id -u ${username} &>/dev/null || useradd -o -u ${uid} -g ${gid} -d ${homeDir} -s /bin/bash ${username} 2> /dev/null`,
     ].join(' && ');
 
     const originalCommand = finalEntrypoint[2];
@@ -888,13 +888,13 @@ async function ensureSandboxImageIsPresent(
   sandbox: string,
   image: string,
 ): Promise<boolean> {
-  console.info(`Checking for sandbox image: ${image}`);
+  console.error(`Checking for sandbox image: ${image}`);
   if (await imageExists(sandbox, image)) {
-    console.info(`Sandbox image ${image} found locally.`);
+    console.error(`Sandbox image ${image} found locally.`);
     return true;
   }
 
-  console.info(`Sandbox image ${image} not found locally.`);
+  console.error(`Sandbox image ${image} not found locally.`);
   if (image === LOCAL_DEV_SANDBOX_IMAGE_NAME) {
     // user needs to build the image themselves
     return false;
@@ -903,10 +903,10 @@ async function ensureSandboxImageIsPresent(
   if (await pullImage(sandbox, image)) {
     // After attempting to pull, check again to be certain
     if (await imageExists(sandbox, image)) {
-      console.info(`Sandbox image ${image} is now available after pulling.`);
+      console.error(`Sandbox image ${image} is now available after pulling.`);
       return true;
     } else {
-      console.warn(
+      console.error(
         `Sandbox image ${image} still not found after a pull attempt. This might indicate an issue with the image name or registry, or the pull command reported success but failed to make the image available.`,
       );
       return false;
