@@ -120,6 +120,8 @@ mkdir -p ~/.gemini
 cat >> ~/.gemini/.env <<'EOF'
 GOOGLE_CLOUD_PROJECT="your-project-id"
 GEMINI_API_KEY="your-gemini-api-key"
+# Optional: Custom API base URL (uncomment and modify if needed)
+# GEMINI_API_BASE_URL="https://your-custom-api.example.com"
 EOF
 ```
 
