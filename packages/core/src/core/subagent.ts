@@ -295,8 +295,8 @@ export class SubAgentScope {
       for (const toolName of toolsToLoad) {
         const tool = toolRegistry.getTool(toolName);
         if (tool) {
-          const confirmationDetails = await tool.shouldConfirmExecute(
-            {},
+          const invocation = tool.build({});
+          const confirmationDetails = await invocation.shouldConfirmExecute(
             new AbortController().signal,
           );
           if (confirmationDetails) {

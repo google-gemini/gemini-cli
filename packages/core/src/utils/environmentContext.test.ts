@@ -144,9 +144,11 @@ describe('getEnvironmentContext', () => {
   it('should include full file context when getFullContext is true', async () => {
     mockConfig.getFullContext = vi.fn().mockReturnValue(true);
     const mockReadManyFilesTool = {
-      execute: vi
-        .fn()
-        .mockResolvedValue({ llmContent: 'Full file content here' }),
+      build: vi.fn().mockReturnValue({
+        execute: vi
+          .fn()
+          .mockResolvedValue({ llmContent: 'Full file content here' }),
+      }),
     };
     mockToolRegistry.getTool.mockReturnValue(mockReadManyFilesTool);
 
@@ -157,19 +159,18 @@ describe('getEnvironmentContext', () => {
       '\n--- Full File Context ---\nFull file content here',
     );
     expect(mockToolRegistry.getTool).toHaveBeenCalledWith('read_many_files');
-    expect(mockReadManyFilesTool.execute).toHaveBeenCalledWith(
-      {
-        paths: ['**/*'],
-        useDefaultExcludes: true,
-      },
-      expect.any(AbortSignal),
-    );
+    expect(mockReadManyFilesTool.build).toHaveBeenCalledWith({
+      paths: ['**/*'],
+      useDefaultExcludes: true,
+    });
   });
 
   it('should handle read_many_files returning no content', async () => {
     mockConfig.getFullContext = vi.fn().mockReturnValue(true);
     const mockReadManyFilesTool = {
-      execute: vi.fn().mockResolvedValue({ llmContent: '' }),
+      build: vi.fn().mockReturnValue({
+        execute: vi.fn().mockResolvedValue({ llmContent: '' }),
+      }),
     };
     mockToolRegistry.getTool.mockReturnValue(mockReadManyFilesTool);
 
@@ -190,7 +191,9 @@ describe('getEnvironmentContext', () => {
   it('should handle errors when reading full file context', async () => {
     mockConfig.getFullContext = vi.fn().mockReturnValue(true);
     const mockReadManyFilesTool = {
-      execute: vi.fn().mockRejectedValue(new Error('Read error')),
+      build: vi.fn().mockReturnValue({
+        execute: vi.fn().mockRejectedValue(new Error('Read error')),
+      }),
     };
     mockToolRegistry.getTool.mockReturnValue(mockReadManyFilesTool);
 

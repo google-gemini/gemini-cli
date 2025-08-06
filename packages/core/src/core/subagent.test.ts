@@ -171,10 +171,12 @@ describe('subagent.ts', () => {
 
       it('should throw an error if a tool requires confirmation', async () => {
         const mockTool = {
-          shouldConfirmExecute: vi.fn().mockResolvedValue({
-            type: 'exec',
-            title: 'Confirm',
-            command: 'rm -rf /',
+          build: vi.fn().mockReturnValue({
+            shouldConfirmExecute: vi.fn().mockResolvedValue({
+              type: 'exec',
+              title: 'Confirm',
+              command: 'rm -rf /',
+            }),
           }),
         };
 
@@ -201,7 +203,9 @@ describe('subagent.ts', () => {
 
       it('should succeed if tools do not require confirmation', async () => {
         const mockTool = {
-          shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+          build: vi.fn().mockReturnValue({
+            shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+          }),
         };
         const { config } = await createMockConfig({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
