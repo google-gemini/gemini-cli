@@ -24,7 +24,7 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
-import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
+import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
 
@@ -57,6 +57,11 @@ export interface EditToolParams {
    * Whether the edit was modified manually by the user.
    */
   modified_by_user?: boolean;
+
+  /**
+   * Initially proposed string.
+   */
+  ai_proposed_string?: string;
 }
 
 interface CalculatedEdit {
@@ -435,11 +440,20 @@ Expectation for required parameters:
           'Proposed',
           DEFAULT_DIFF_OPTIONS,
         );
+        const originallyProposedContent =
+          params.ai_proposed_string || params.new_string;
+        const diffStat = getDiffStat(
+          fileName,
+          editData.currentContent ?? '',
+          originallyProposedContent,
+          params.new_string,
+        );
         displayResult = {
           fileDiff,
           fileName,
           originalContent: editData.currentContent,
           newContent: editData.newContent,
+          diffStat,
         };
       }
 
@@ -510,12 +524,16 @@ Expectation for required parameters:
         oldContent: string,
         modifiedProposedContent: string,
         originalParams: EditToolParams,
-      ): EditToolParams => ({
-        ...originalParams,
-        old_string: oldContent,
-        new_string: modifiedProposedContent,
-        modified_by_user: true,
-      }),
+      ): EditToolParams => {
+        const content = originalParams.new_string;
+        return {
+          ...originalParams,
+          ai_proposed_string: content,
+          old_string: oldContent,
+          new_string: modifiedProposedContent,
+          modified_by_user: true,
+        };
+      },
     };
   }
 }
