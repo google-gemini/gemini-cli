@@ -57,6 +57,7 @@ describe('handleAtCommand', () => {
         respectGeminiIgnore: true,
       }),
       getEnableRecursiveFileSearch: vi.fn(() => true),
+      getMcpServers: () => ({}), // Add mock for getMcpServers
       getWorkspaceContext: () => ({
         isPathWithinWorkspace: () => true,
         getDirectories: () => [testRootDir],

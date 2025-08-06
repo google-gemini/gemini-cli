@@ -136,7 +136,26 @@ export class ToolRegistry {
    * Registers a tool definition.
    * @param tool - The tool object containing schema and execution logic.
    */
+  private _restrictedToolsSet: Set<string> | undefined;
+
   registerTool(tool: Tool): void {
+    // Lazily compute and cache the set of all restricted tools for efficiency.
+    if (this._restrictedToolsSet === undefined) {
+      const mcpServers = this.config.getMcpServers() ?? {};
+      this._restrictedToolsSet = new Set(
+        Object.values(mcpServers).flatMap(
+          (serverConfig) => serverConfig.restrictedTools ?? [],
+        ),
+      );
+    }
+
+    if (this._restrictedToolsSet.has(tool.name)) {
+      console.warn(
+        `Tool "${tool.name}" is restricted and will not be registered.`,
+      );
+      return;
+    }
+
     if (this.tools.has(tool.name)) {
       if (tool instanceof DiscoveredMCPTool) {
         tool = tool.asFullyQualifiedTool();
