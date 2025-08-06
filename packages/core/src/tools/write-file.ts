@@ -248,7 +248,7 @@ export class WriteFileTool
         llmContent: 'Could not write file.',
         returnDisplay: errorMsg,
         error: {
-          message: errDetails.message,
+          message: errorMsg,
           type: ToolErrorType.FILE_WRITE_FAILURE,
         },
       };
