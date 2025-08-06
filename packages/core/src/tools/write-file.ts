@@ -318,13 +318,39 @@ export class WriteFileTool
         returnDisplay: displayResult,
       };
     } catch (error) {
-      const errorMsg = `Error writing to file: ${error instanceof Error ? error.message : String(error)}`;
+      // Capture detailed error information for debugging
+      let errorMsg: string;
+      let errorType = ToolErrorType.FILE_WRITE_FAILURE;
+      
+      if (isNodeError(error)) {
+        // Handle specific Node.js errors with their error codes
+        errorMsg = `Error writing to file: ${error.message} (${error.code})`;
+        
+        // Log specific error types for better debugging
+        if (error.code === 'EACCES') {
+          errorMsg = `Permission denied writing to file: ${params.file_path} (${error.code})`;
+        } else if (error.code === 'ENOSPC') {
+          errorMsg = `No space left on device: ${params.file_path} (${error.code})`;
+        } else if (error.code === 'EISDIR') {
+          errorMsg = `Target is a directory, not a file: ${params.file_path} (${error.code})`;
+        }
+        
+        // Include stack trace in debug mode for better troubleshooting
+        if (this.config.getDebugMode() && error.stack) {
+          console.error('Write file error stack:', error.stack);
+        }
+      } else if (error instanceof Error) {
+        errorMsg = `Error writing to file: ${error.message}`;
+      } else {
+        errorMsg = `Error writing to file: ${String(error)}`;
+      }
+      
       return {
         llmContent: 'Could not write file.',
         returnDisplay: `Error: ${errorMsg}`,
         error: {
           message: errorMsg,
-          type: ToolErrorType.FILE_WRITE_FAILURE,
+          type: errorType,
         },
       };
     }

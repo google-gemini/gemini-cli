@@ -13,6 +13,7 @@ import { Type } from '@google/genai';
 import {
   processSingleFileContent,
   getSpecificMimeType,
+  FileErrorType,
 } from '../utils/fileUtils.js';
 import { Config } from '../config/config.js';
 import {
@@ -150,12 +151,12 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     );
 
     if (result.error) {
-      // TODO: Refactor processSingleFileContent to return structured errors instead of relying on string matching.
-      // Determine the appropriate error type based on the error message
+      // Map structured error types to ToolErrorType
       let errorType = ToolErrorType.READ_CONTENT_FAILURE;
-      if (result.error.includes('File not found')) {
+      if (result.errorType === FileErrorType.FILE_NOT_FOUND) {
         errorType = ToolErrorType.FILE_NOT_FOUND;
       }
+      // IS_DIRECTORY and FILE_TOO_LARGE map to READ_CONTENT_FAILURE
 
       return {
         llmContent: 'Could not read file.',
