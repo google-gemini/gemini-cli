@@ -209,7 +209,7 @@ export class WriteFileTool
     if (validationError) {
       return {
         llmContent: 'Could not write file due to invalid parameters.',
-        returnDisplay: `Error: ${validationError}`,
+        returnDisplay: validationError,
         error: {
           message: validationError,
           type: ToolErrorType.INVALID_TOOL_PARAMS,
@@ -347,7 +347,7 @@ export class WriteFileTool
 
       return {
         llmContent: 'Could not write file.',
-        returnDisplay: `Error: ${errorMsg}`,
+        returnDisplay: errorMsg,
         error: {
           message: errorMsg,
           type: errorType,

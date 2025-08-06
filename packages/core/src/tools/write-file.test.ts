@@ -457,7 +457,7 @@ describe('WriteFileTool', () => {
       expect(result.llmContent).toBe(
         'Could not write file due to invalid parameters.',
       );
-      expect(result.returnDisplay).toMatch(/Error: File path must be absolute/);
+      expect(result.returnDisplay).toMatch(/File path must be absolute/);
       expect(result.error).toEqual({
         message: 'File path must be absolute: relative.txt',
         type: ToolErrorType.INVALID_TOOL_PARAMS,
@@ -472,7 +472,7 @@ describe('WriteFileTool', () => {
         'Could not write file due to invalid parameters.',
       );
       expect(result.returnDisplay).toContain(
-        'Error: File path must be within one of the workspace directories',
+        'File path must be within one of the workspace directories',
       );
       expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
     });
