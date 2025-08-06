@@ -14,7 +14,7 @@ import type { InstallVSCodeThemeToolParams, VSCodeTheme, CustomTheme } from './t
 import { convertVSCodeThemeToCustomTheme } from './theme-converter.js';
 import { generateThemeWithAI, createDefaultTheme } from './theme-generator.js';
 import { extractExtensionId, downloadVsix, extractThemeFromVsix } from './theme-extractor.js';
-import { saveThemeToSettings } from './theme-storage.js';
+import { saveThemeToFile } from './theme-storage.js';
 import { createColorMappingDisplay, createColorPalettePreview } from './theme-display.js';
 
 /**
@@ -80,7 +80,7 @@ Do you want to proceed?`,
 
   toolLocations(params: InstallVSCodeThemeToolParams): ToolLocation[] {
     return [
-      { path: '~/.gemini/settings.json' }
+      { path: '~/.gemini/themes' }
     ];
   }
 
@@ -132,11 +132,11 @@ Do you want to proceed?`,
       
       const customTheme = convertVSCodeThemeToCustomTheme(themeData);
 
-      // Step 5: Save theme to user settings
-      const themeName = await saveThemeToSettings(customTheme, signal);
+      // Step 5: Save theme to dedicated theme file
+      const _themeFilePath = await saveThemeToFile(customTheme);
 
       // Get debug info for detailed output
-      const debugInfo = (customTheme as any).debugInfo;
+      const debugInfo = customTheme.debugInfo;
       
       // Create detailed color mapping display with visual color blocks
       const colorMappingDetails = createColorMappingDisplay(debugInfo);
@@ -151,10 +151,10 @@ Do you want to proceed?`,
       const generatedColors = colorSources.filter(s => s.startsWith('Generated')).length;
 
       return {
-        llmContent: `Successfully installed VS Code theme "${themeName}" from ${params.marketplaceUrl}`,
+        llmContent: `Successfully installed VS Code theme "${customTheme.name}" from ${params.marketplaceUrl}`,
         returnDisplay: `✅ **Theme Installed Successfully!**
 
-🎨 **Theme Name**: ${themeName}
+🎨 **Theme Name**: ${customTheme.name}
 📦 **Source**: ${params.marketplaceUrl}
 🔧 **Method**: ${extractionMethod}
 
@@ -168,14 +168,14 @@ ${colorPalettePreview}
 • **Defaults Used**: ${defaultsUsed}/13
 • **Generated Colors**: ${generatedColors}/13
 
-The theme has been added to your custom themes and is now available for selection.
+The theme has been saved to your dedicated theme files and is now available for selection.
 
 **To use the theme:**
 1. Type \`/theme\` to open the theme selection dialog
-2. Look for "${themeName}" in the custom themes section
+2. Look for "${customTheme.name}" in the custom themes section
 3. Select it to apply the theme
 
-The theme will be automatically saved to your user settings and will persist across sessions.`,
+The theme will be automatically saved to your theme directory and will persist across sessions.`,
       };
     } catch (error) {
       const errorMessage = getErrorMessage(error);

@@ -5,15 +5,14 @@
  */
 
 import type { VSCodeTheme, ColorPalette } from './theme-types.js';
-import { generateThemeName } from './theme-converter.js';
 
 /**
  * Generates a theme using AI based on the theme name
  */
-export async function generateThemeWithAI(themeName: string, signal: AbortSignal): Promise<VSCodeTheme | null> {
+export async function generateThemeWithAI(themeName: string, _signal: AbortSignal): Promise<VSCodeTheme | null> {
   try {
-    // This would use the Gemini model to generate a theme based on the name
-    // For now, we'll create a basic theme that matches the name
+    // For now, use template-based generation as the AI integration requires proper config setup
+    // TODO: Implement proper AI generation when we have access to initialized GeminiClient
     
     const isDarkTheme = themeName.toLowerCase().includes('dark') || 
                        themeName.toLowerCase().includes('night') ||
@@ -28,7 +27,7 @@ export async function generateThemeWithAI(themeName: string, signal: AbortSignal
     // Generate a color palette based on the theme name
     const palette = generateColorPaletteFromName(themeName, themeType);
     
-    const aiGeneratedTheme: VSCodeTheme = {
+    const intelligentTheme: VSCodeTheme = {
       name: themeName,
       type: themeType,
       colors: {
@@ -71,7 +70,7 @@ export async function generateThemeWithAI(themeName: string, signal: AbortSignal
       ]
     };
     
-    return aiGeneratedTheme;
+    return intelligentTheme;
   } catch (error) {
     console.error('Failed to generate theme with AI:', error);
     return null;

@@ -5,7 +5,7 @@
  */
 
 import type { VSCodeTheme } from './theme-types.js';
-import { generateThemeName } from './theme-converter.js';
+import { extractVsixContent } from './vsix-utils.js';
 
 /**
  * Extracts extension ID from marketplace URL
@@ -33,7 +33,7 @@ export function extractExtensionId(marketplaceUrl: string): { publisher: string;
 /**
  * Downloads a VSIX file from the marketplace
  */
-export async function downloadVsix(vsixUrl: string, signal: AbortSignal): Promise<Buffer> {
+export async function downloadVsix(vsixUrl: string, _signal: AbortSignal): Promise<Buffer> {
   const { fetchWithTimeout } = await import('../utils/fetch.js');
   const response = await fetchWithTimeout(vsixUrl, 30000); // 30 second timeout
 
@@ -48,72 +48,53 @@ export async function downloadVsix(vsixUrl: string, signal: AbortSignal): Promis
 /**
  * Extracts theme data from a VSIX file
  */
-export async function extractThemeFromVsix(vsixBuffer: Buffer, signal: AbortSignal, extensionName?: string): Promise<VSCodeTheme | null> {
+export async function extractThemeFromVsix(vsixBuffer: Buffer, _signal: AbortSignal, extensionName?: string): Promise<VSCodeTheme | null> {
   try {
-    // TODO: Implement proper VSIX extraction
-    // This would extract the ZIP archive, find themes directory, parse JSON files
+    // VSIX files are ZIP archives - extract them
+    const vsixContent = await extractVsixContent(vsixBuffer);
     
-    // For now, return a realistic theme based on the extension name
-    // This simulates successful extraction of actual theme colors
-    const themeName = extensionName ? generateThemeName(extensionName) : 'Extracted Theme';
+    // Parse package.json to find theme contributions
+    const packageJson = vsixContent.files.get('extension/package.json');
+    if (!packageJson) {
+      console.warn('No package.json found in VSIX');
+      return null;
+    }
     
+    const manifest = JSON.parse(packageJson);
+    const themeContributions = manifest.contributes?.themes;
+    
+    if (!themeContributions || !Array.isArray(themeContributions) || themeContributions.length === 0) {
+      console.warn('No theme contributions found in extension');
+      return null;
+    }
+    
+    // For now, take the first theme. TODO: Handle multiple themes with user selection
+    const firstTheme = themeContributions[0];
+    const themePath = firstTheme.path;
+    
+    if (!themePath) {
+      console.warn('Theme path not specified in contribution');
+      return null;
+    }
+    
+    // Read the theme JSON file
+    const themeFilePath = `extension/${themePath}`;
+    const themeContent = vsixContent.files.get(themeFilePath);
+    
+    if (!themeContent) {
+      console.warn(`Theme file not found: ${themeFilePath}`);
+      return null;
+    }
+    
+    // Parse theme JSON
+    const themeData = JSON.parse(themeContent);
+    
+    // Convert to our VSCodeTheme format
     const extractedTheme: VSCodeTheme = {
-      name: themeName,
-      type: 'dark',
-              colors: {
-          'editor.background': '#2e3440',
-          'editor.foreground': '#d8dee9',
-          'button.background': '#5e81ac',
-          'editor.findMatchBackground': '#434c5e',
-          'editor.lineHighlightBackground': '#3b4252',
-          'editor.wordHighlightBackground': '#434c5e',
-          'editorGutter.addedBackground': '#a3be8c',
-          'editorGutter.modifiedBackground': '#ebcb8b',
-          'editorGutter.deletedBackground': '#bf616a',
-          'editorLineNumber.foreground': '#4c566a',
-          'terminal.background': '#2e3440',
-          'terminal.foreground': '#d8dee9',
-          'statusBar.background': '#3b4252',
-          'statusBar.foreground': '#d8dee9',
-          'diffEditor.insertedTextBackground': '#a3be8c',
-          'diffEditor.removedTextBackground': '#bf616a',
-          'gitDecoration.addedResourceForeground': '#a3be8c',
-          'gitDecoration.deletedResourceForeground': '#bf616a',
-        },
-      tokenColors: [
-        {
-          scope: 'keyword',
-          settings: { foreground: '#81a1c1' }
-        },
-        {
-          scope: 'string',
-          settings: { foreground: '#a3be8c' }
-        },
-        {
-          scope: 'comment',
-          settings: { foreground: '#616e87' }
-        },
-        {
-          scope: 'constant.numeric',
-          settings: { foreground: '#b48ead' }
-        },
-        {
-          scope: 'entity.name.class',
-          settings: { foreground: '#8fbcbb' }
-        },
-        {
-          scope: 'storage.type',
-          settings: { foreground: '#81a1c1' }
-        },
-        {
-          scope: 'variable',
-          settings: { foreground: '#d8dee9' }
-        },
-        {
-          scope: 'function',
-          settings: { foreground: '#88c0d0' }
-        }
-      ]
+      name: firstTheme.label || themeData.name || extensionName || 'Extracted Theme',
+      type: themeData.type === 'light' ? 'light' : 'dark',
+      colors: themeData.colors || {},
+      tokenColors: themeData.tokenColors || []
     };
     
     return extractedTheme;

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
@@ -45,17 +45,48 @@ export function ThemeDialog({
     string | undefined
   >(settings.merged.theme || DEFAULT_THEME.name);
 
-  // Generate theme items filtered by selected scope
-  const customThemes =
-    selectedScope === SettingScope.User
-      ? settings.user.settings.customThemes || {}
-      : settings.merged.customThemes || {};
+  // State for combined themes (settings + file-based)
+  const [combinedThemes, setCombinedThemes] = useState<CombinedThemes | null>(null);
+  const [_isLoadingThemes, setIsLoadingThemes] = useState(true);
+
+  // Load themes from both sources
+  useEffect(() => {
+    const loadThemes = async () => {
+      try {
+        const settingsThemes = selectedScope === SettingScope.User
+          ? settings.user.settings.customThemes || {}
+          : settings.merged.customThemes || {};
+        
+        const combined = await loadCombinedThemes(settingsThemes);
+        setCombinedThemes(combined);
+      } catch (error) {
+        console.warn('Failed to load combined themes:', error);
+        // Fallback to settings-only themes
+        const settingsThemes = selectedScope === SettingScope.User
+          ? settings.user.settings.customThemes || {}
+          : settings.merged.customThemes || {};
+        setCombinedThemes({
+          settingsThemes,
+          fileThemes: {},
+          allThemes: settingsThemes
+        });
+      } finally {
+        setIsLoadingThemes(false);
+      }
+    };
+
+    loadThemes();
+  }, [selectedScope, settings]);
+
+  // Generate theme items from combined sources
+  const customThemes = combinedThemes?.allThemes || {};
   const builtInThemes = themeManager
     .getAvailableThemes()
     .filter((theme) => theme.type !== 'custom');
   const customThemeNames = Object.keys(customThemes);
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-  // Generate theme items
+  
+  // Generate theme items with source indication
   const themeItems = [
     ...builtInThemes.map((theme) => ({
       label: theme.name,
@@ -63,12 +94,27 @@ export function ThemeDialog({
       themeNameDisplay: theme.name,
       themeTypeDisplay: capitalize(theme.type),
     })),
-    ...customThemeNames.map((name) => ({
-      label: name,
-      value: name,
-      themeNameDisplay: name,
-      themeTypeDisplay: 'Custom',
-    })),
+    ...customThemeNames.map((name) => {
+      // Determine source for display
+      const isFromFile = combinedThemes?.fileThemes[name] !== undefined;
+      const isFromSettings = combinedThemes?.settingsThemes[name] !== undefined;
+      
+      let typeDisplay = 'Custom';
+      if (isFromFile && isFromSettings) {
+        typeDisplay = 'Custom (File + Settings)';
+      } else if (isFromFile) {
+        typeDisplay = 'Custom (File)';
+      } else if (isFromSettings) {
+        typeDisplay = 'Custom (Settings)';
+      }
+      
+      return {
+        label: name,
+        value: name,
+        themeNameDisplay: name,
+        themeTypeDisplay: typeDisplay,
+      };
+    }),
   ];
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
 

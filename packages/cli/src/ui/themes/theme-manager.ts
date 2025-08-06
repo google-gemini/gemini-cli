@@ -26,6 +26,7 @@ import { SemanticColors } from './semantic-tokens.js';
 import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
 import { NoColorTheme } from './no-color.js';
+import { loadCombinedThemes } from './theme-loader.js';
 import process from 'node:process';
 
 export interface ThemeDisplay {
@@ -61,10 +62,41 @@ class ThemeManager {
   }
 
   /**
-   * Loads custom themes from settings.
+   * Loads custom themes from both settings and file-based storage.
    * @param customThemesSettings Custom themes from settings.
    */
-  loadCustomThemes(customThemesSettings?: Record<string, CustomTheme>): void {
+  async loadCustomThemes(customThemesSettings?: Record<string, CustomTheme>): Promise<void> {
+    this.customThemes.clear();
+
+    // Load themes from both sources
+    const combinedThemes = await loadCombinedThemes(customThemesSettings || {});
+
+    // Register all combined themes
+    for (const [name, customThemeConfig] of Object.entries(combinedThemes.allThemes)) {
+      const validation = validateCustomTheme(customThemeConfig);
+      if (validation.isValid) {
+        if (validation.warning) {
+          console.warn(`Theme "${name}": ${validation.warning}`);
+        }
+        const themeWithDefaults: CustomTheme = {
+          ...DEFAULT_THEME.colors,
+          ...customThemeConfig,
+          name: customThemeConfig.name || name,
+          type: 'custom',
+        };
+        this.customThemes.set(name, createCustomTheme(themeWithDefaults));
+      } else {
+        console.error(`Invalid custom theme "${name}": ${validation.error}`);
+      }
+    }
+  }
+
+  /**
+   * Legacy method for loading only settings-based themes (synchronous)
+   * @param customThemesSettings Custom themes from settings.
+   * @deprecated Use loadCustomThemes instead for full file + settings support
+   */
+  loadCustomThemesSync(customThemesSettings?: Record<string, CustomTheme>): void {
     this.customThemes.clear();
 
     if (!customThemesSettings) {

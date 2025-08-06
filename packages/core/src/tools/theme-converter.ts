@@ -135,10 +135,11 @@ export function convertVSCodeThemeToCustomTheme(vscodeTheme: VSCodeTheme): Custo
     Gray: grayInfo.color,
   };
 
-  // Store debug info for later use
-  (customTheme as any).debugInfo = debugInfo;
-
-  return customTheme as CustomTheme & { debugInfo: ThemeDebugInfo };
+  // Return theme with debug info in a type-safe way
+  return {
+    ...customTheme,
+    debugInfo,
+  };
 }
 
 /**
@@ -165,7 +166,7 @@ export function generateThemeName(originalName: string): string {
 /**
  * Generates a diff color based on a base color
  */
-export function generateDiffColor(baseColor: string, type: 'added' | 'removed'): string {
+export function generateDiffColor(baseColor: string, _type: 'added' | 'removed'): string {
   // Convert hex to RGB for manipulation
   const hex = baseColor.replace('#', '');
   const r = parseInt(hex.substr(0, 2), 16);
