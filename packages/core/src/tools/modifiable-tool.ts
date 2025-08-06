@@ -11,13 +11,14 @@ import fs from 'fs';
 import * as Diff from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { isNodeError } from '../utils/errors.js';
-import { Tool } from './tools.js';
+import { AnyDeclarativeTool, DeclarativeTool, ToolResult } from './tools.js';
 
 /**
- * A tool that supports a modify operation.
+ * A declarative tool that supports a modify operation.
  */
-export interface ModifiableTool<ToolParams> extends Tool<ToolParams> {
-  getModifyContext(abortSignal: AbortSignal): ModifyContext<ToolParams>;
+export interface ModifiableDeclarativeTool<TParams extends object>
+  extends DeclarativeTool<TParams, ToolResult> {
+  getModifyContext(abortSignal: AbortSignal): ModifyContext<TParams>;
 }
 
 export interface ModifyContext<ToolParams> {
@@ -39,9 +40,12 @@ export interface ModifyResult<ToolParams> {
   updatedDiff: string;
 }
 
-export function isModifiableTool<TParams>(
-  tool: Tool<TParams>,
-): tool is ModifiableTool<TParams> {
+/**
+ * Type guard to check if a declarative tool is modifiable.
+ */
+export function isModifiableDeclarativeTool(
+  tool: AnyDeclarativeTool,
+): tool is ModifiableDeclarativeTool<object> {
   return 'getModifyContext' in tool;
 }
 

@@ -24,7 +24,6 @@ import {
 import { Config } from '../config/config.js';
 import { UserTierId } from '../code_assist/types.js';
 import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
@@ -252,18 +251,15 @@ export class GeminiClient {
     // Add full file context if the flag is set
     if (this.config.getFullContext()) {
       try {
-        const readManyFilesTool = toolRegistry.getTool(
-          'read_many_files',
-        ) as ReadManyFilesTool;
+        const readManyFilesTool = toolRegistry.getTool('read_many_files');
         if (readManyFilesTool) {
+          const invocation = readManyFilesTool.build({
+            paths: ['**/*'], // Read everything recursively
+            useDefaultExcludes: true, // Use default excludes
+          });
+
           // Read all files in the target directory
-          const result = await readManyFilesTool.execute(
-            {
-              paths: ['**/*'], // Read everything recursively
-              useDefaultExcludes: true, // Use default excludes
-            },
-            AbortSignal.timeout(30000),
-          );
+          const result = await invocation.execute(AbortSignal.timeout(30000));
           if (result.llmContent) {
             initialParts.push({
               text: `\n--- Full File Context ---\n${result.llmContent}`,

@@ -7,7 +7,13 @@
 import path from 'path';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import { BaseTool, Icon, ToolLocation, ToolResult } from './tools.js';
+import {
+  BaseDeclarativeTool,
+  Icon,
+  ToolInvocation,
+  ToolLocation,
+  ToolResult,
+} from './tools.js';
 import { Type } from '@google/genai';
 import {
   processSingleFileContent,
@@ -39,10 +45,72 @@ export interface ReadFileToolParams {
   limit?: number;
 }
 
+class ReadFileToolInvocation
+  implements ToolInvocation<ReadFileToolParams, ToolResult>
+{
+  constructor(
+    private config: Config,
+    public params: ReadFileToolParams,
+  ) {}
+
+  getDescription(): string {
+    const relativePath = makeRelative(
+      this.params.absolute_path,
+      this.config.getTargetDir(),
+    );
+    return shortenPath(relativePath);
+  }
+
+  toolLocations(): ToolLocation[] {
+    return [{ path: this.params.absolute_path, line: this.params.offset }];
+  }
+
+  shouldConfirmExecute(): Promise<false> {
+    return Promise.resolve(false);
+  }
+
+  async execute(): Promise<ToolResult> {
+    const result = await processSingleFileContent(
+      this.params.absolute_path,
+      this.config.getTargetDir(),
+      this.params.offset,
+      this.params.limit,
+    );
+
+    if (result.error) {
+      return {
+        llmContent: result.error, // The detailed error for LLM
+        returnDisplay: result.returnDisplay || 'Error reading file', // User-friendly error
+      };
+    }
+
+    const lines =
+      typeof result.llmContent === 'string'
+        ? result.llmContent.split('\n').length
+        : undefined;
+    const mimetype = getSpecificMimeType(this.params.absolute_path);
+    recordFileOperationMetric(
+      this.config,
+      FileOperation.READ,
+      lines,
+      mimetype,
+      path.extname(this.params.absolute_path),
+    );
+
+    return {
+      llmContent: result.llmContent || '',
+      returnDisplay: result.returnDisplay || '',
+    };
+  }
+}
+
 /**
  * Implementation of the ReadFile tool logic
  */
-export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
+export class ReadFileTool extends BaseDeclarativeTool<
+  ReadFileToolParams,
+  ToolResult
+> {
   static readonly Name: string = 'read_file';
 
   constructor(private config: Config) {
@@ -75,7 +143,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     );
   }
 
-  validateToolParams(params: ReadFileToolParams): string | null {
+  protected validateToolParams(params: ReadFileToolParams): string | null {
     const errors = SchemaValidator.validate(this.schema.parameters, params);
     if (errors) {
       return errors;
@@ -106,67 +174,9 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     return null;
   }
 
-  getDescription(params: ReadFileToolParams): string {
-    if (
-      !params ||
-      typeof params.absolute_path !== 'string' ||
-      params.absolute_path.trim() === ''
-    ) {
-      return `Path unavailable`;
-    }
-    const relativePath = makeRelative(
-      params.absolute_path,
-      this.config.getTargetDir(),
-    );
-    return shortenPath(relativePath);
-  }
-
-  toolLocations(params: ReadFileToolParams): ToolLocation[] {
-    return [{ path: params.absolute_path, line: params.offset }];
-  }
-
-  async execute(
+  protected createInvocation(
     params: ReadFileToolParams,
-    _signal: AbortSignal,
-  ): Promise<ToolResult> {
-    const validationError = this.validateToolParams(params);
-    if (validationError) {
-      return {
-        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: validationError,
-      };
-    }
-
-    const result = await processSingleFileContent(
-      params.absolute_path,
-      this.config.getTargetDir(),
-      params.offset,
-      params.limit,
-    );
-
-    if (result.error) {
-      return {
-        llmContent: result.error, // The detailed error for LLM
-        returnDisplay: result.returnDisplay || 'Error reading file', // User-friendly error
-      };
-    }
-
-    const lines =
-      typeof result.llmContent === 'string'
-        ? result.llmContent.split('\n').length
-        : undefined;
-    const mimetype = getSpecificMimeType(params.absolute_path);
-    recordFileOperationMetric(
-      this.config,
-      FileOperation.READ,
-      lines,
-      mimetype,
-      path.extname(params.absolute_path),
-    );
-
-    return {
-      llmContent: result.llmContent || '',
-      returnDisplay: result.returnDisplay || '',
-    };
+  ): ToolInvocation<ReadFileToolParams, ToolResult> {
+    return new ReadFileToolInvocation(this.config, params);
   }
 }
