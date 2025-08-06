@@ -65,11 +65,8 @@ export interface CliArgs {
   ideModeFeature: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
- codex/update-readme-for-interrupt-mode-installation
   interrupt?: boolean | undefined;
-=======
   loadMemoryFromIncludeDirectories: boolean | undefined;
- main
 }
 
 export async function parseArguments(): Promise<CliArgs> {

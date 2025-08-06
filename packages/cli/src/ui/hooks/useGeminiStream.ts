@@ -136,11 +136,8 @@ export const useGeminiStream = (
   performMemoryRefresh: () => Promise<void>,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
- codex/update-readme-for-interrupt-mode-installation
   interruptMode = false,
-=======
-  onEditorClose: () => void,
- main
+  onEditorClose: () => void = () => {},
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
