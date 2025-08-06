@@ -332,6 +332,7 @@ Expectation for required parameters:
       type: 'edit',
       title: `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.config.getTargetDir()))}`,
       fileName,
+      filePath: params.file_path,
       fileDiff,
       originalContent: editData.currentContent,
       newContent: editData.newContent,
