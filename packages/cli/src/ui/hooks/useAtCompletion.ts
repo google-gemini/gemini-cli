@@ -128,7 +128,10 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
   useEffect(() => {
     if (!enabled) {
       // reset when first getting out of completion suggestions
-      if (state.status === AtCompletionStatus.READY || state.status === AtCompletionStatus.ERROR) {
+      if (
+        state.status === AtCompletionStatus.READY ||
+        state.status === AtCompletionStatus.ERROR
+      ) {
         dispatch({ type: 'RESET' });
       }
       return;
