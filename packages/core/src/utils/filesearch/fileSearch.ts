@@ -11,7 +11,7 @@ import picomatch from 'picomatch';
 import { Ignore } from './ignore.js';
 import { ResultCache } from './result-cache.js';
 import * as cache from './crawlCache.js';
-import { checkCanUseFzf, filterByFzf } from './fzfFilter.js';
+import { Fzf, FzfResultItem } from 'fzf';
 
 export type FileSearchOptions = {
   projectRoot: string;
@@ -78,6 +78,18 @@ export async function filter(
   return results;
 }
 
+/**
+ * Filters a list of paths based on a given pattern using fzf.
+ * @param allPaths The list of all paths to filter.
+ * @param pattern The fzf pattern to filter by.
+ * @returns The filtered and sorted list of paths.
+ */
+function filterByFzf(allPaths: string[], pattern: string) {
+  return new Fzf(allPaths)
+    .find(pattern)
+    .map((entry: FzfResultItem) => entry.item);
+}
+
 export type SearchOptions = {
   signal?: AbortSignal;
   maxResults?: number;
@@ -93,7 +105,6 @@ export class FileSearch {
   private readonly ignore: Ignore = new Ignore();
   private resultCache: ResultCache | undefined;
   private allFiles: string[] = [];
-  private canUseFzf = false;
 
   /**
    * Constructs a new `FileSearch` instance.
@@ -112,8 +123,6 @@ export class FileSearch {
     this.loadIgnoreRules();
     await this.crawlFiles();
     this.buildResultCache();
-
-    this.canUseFzf = await checkCanUseFzf();
   }
 
   /**
@@ -141,9 +150,9 @@ export class FileSearch {
       filteredCandidates = candidates;
     } else {
       // Apply the user's picomatch pattern filter
-      filteredCandidates = await (pattern.includes('*') || !this.canUseFzf
-        ? filter(candidates, pattern, options.signal)
-        : filterByFzf(this.allFiles, pattern));
+      filteredCandidates = pattern.includes('*')
+        ? await filter(candidates, pattern, options.signal)
+        : filterByFzf(this.allFiles, pattern);
       this.resultCache!.set(pattern, filteredCandidates);
     }
 
