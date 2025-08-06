@@ -70,6 +70,7 @@ export const Footer: React.FC<FooterProps> = ({
             {' ' + (debugMessage || '--debug')}
           </Text>
         )}
+        <Text color={Colors.Gray}> | /human</Text>
       </Box>
 
       {/* Middle Section: Centered Sandbox Info */}
