@@ -228,7 +228,10 @@ export class ShellExecutionService {
         });
       });
 
-      /** Cleans up a process (and it's accompanying state) that is exiting or erroring and returns output formatted output buffers and strings */
+      /**
+       * Cleans up a process (and it's accompanying state) that is exiting or
+       * erroring and returns output formatted output buffers and strings
+       */
       function cleanup() {
         exited = true;
         abortSignal.removeEventListener('abort', abortHandler);
