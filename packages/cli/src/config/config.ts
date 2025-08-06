@@ -51,6 +51,7 @@ export interface CliArgs {
   all_files: boolean | undefined;
   showMemoryUsage: boolean | undefined;
   show_memory_usage: boolean | undefined;
+  showNonInteractiveToolInfo: boolean | undefined;
   yolo: boolean | undefined;
   telemetry: boolean | undefined;
   checkpointing: boolean | undefined;
@@ -136,6 +137,11 @@ export async function parseArguments(): Promise<CliArgs> {
       'show_memory_usage',
       'Use --show-memory-usage instead. We will be removing --show_memory_usage in the coming weeks.',
     )
+    .option('show-non-interactive-tool-info', {
+      type: 'boolean',
+      description: 'Show tool usage in non-interactive mode',
+      default: false,
+    })
     .option('yolo', {
       alias: 'y',
       type: 'boolean',
@@ -425,6 +431,10 @@ export async function loadCliConfig(
       argv.showMemoryUsage ||
       argv.show_memory_usage ||
       settings.showMemoryUsage ||
+      false,
+    showNonInteractiveToolInfo:
+      argv.showNonInteractiveToolInfo ||
+      settings.showNonInteractiveToolInfo ||
       false,
     accessibility: settings.accessibility,
     telemetry: {

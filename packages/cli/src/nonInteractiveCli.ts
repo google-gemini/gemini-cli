@@ -99,12 +99,30 @@ export async function runNonInteractive(
             prompt_id,
           };
 
+          if (config.getShowNonInteractiveToolInfo()) {
+            console.error(`[INFO] Using tool: ${fc.name}`);
+          }
+
           const toolResponse = await executeToolCall(
             config,
             requestInfo,
             toolRegistry,
             abortController.signal,
           );
+
+          if (config.getShowNonInteractiveToolInfo()) {
+            if (toolResponse.error) {
+              console.error(
+                `[INFO] Tool ${fc.name} failed with error: ${
+                  toolResponse.resultDisplay || toolResponse.error.message
+                }`,
+              );
+            } else {
+              console.error(
+                `[INFO] Tool ${fc.name} output: ${toolResponse.resultDisplay}`,
+              );
+            }
+          }
 
           if (toolResponse.error) {
             console.error(
