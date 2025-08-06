@@ -248,6 +248,26 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "excludedProjectEnvVars": ["DEBUG", "DEBUG_MODE", "NODE_ENV"]
     ```
 
+- **`includeDirectories`** (array of strings):
+  - **Description:** Specifies an array of additional absolute or relative paths to include in the workspace context. This allows you to work with files across multiple directories as if they were one. Paths can use `~` to refer to the user's home directory. This setting can be combined with the `--include-directories` command-line flag.
+  - **Default:** `[]`
+  - **Example:**
+    ```json
+    "includeDirectories": [
+      "/path/to/another/project",
+      "../shared-library",
+      "~/common-utils"
+    ]
+    ```
+
+- **`loadMemoryFromIncludeDirectories`** (boolean):
+  - **Description:** Controls the behavior of the `/memory refresh` command. If set to `true`, `GEMINI.md` files should be loaded from all directories that are added. If set to `false`, `GEMINI.md` should only be loaded from the current directory.
+  - **Default:** `false`
+  - **Example:**
+    ```json
+    "loadMemoryFromIncludeDirectories": true
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -280,7 +300,9 @@ In addition to a project settings file, a project's `.gemini` directory can cont
       "tokenBudget": 100
     }
   },
-  "excludedProjectEnvVars": ["DEBUG", "DEBUG_MODE", "NODE_ENV"]
+  "excludedProjectEnvVars": ["DEBUG", "DEBUG_MODE", "NODE_ENV"],
+  "includeDirectories": ["path/to/dir1", "~/path/to/dir2", "../path/to/dir3"],
+  "loadMemoryFromIncludeDirectories": true
 }
 ```
 

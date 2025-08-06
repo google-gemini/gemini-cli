@@ -1,42 +1,79 @@
-name: Gemini Automated Issue Triage
+name: '🏷️ Gemini Automated Issue Triage'
 
 on:
   issues:
-    types: [opened, reopened]
+    types:
+      - 'opened'
+      - 'reopened'
+  issue_comment:
+    types:
+      - 'created'
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'issue number to triage'
+        required: true
+        type: 'number'
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.event.issue.number }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
+
+permissions:
+  contents: 'read'
+  id-token: 'write'
+  issues: 'write'
+  statuses: 'write'
 
 jobs:
   triage-issue:
+    if: >
+      github.repository == 'google-gemini/gemini-cli' &&
+      (github.event_name == 'issues' ||
+       github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'issue_comment' &&
+       contains(github.event.comment.body, '@gemini-cli /triage') &&
+       (github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'COLLABORATOR')))
     timeout-minutes: 5
-    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
-    permissions:
-      issues: write
-      contents: read
-      id-token: write
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.event.issue.number }}
-      cancel-in-progress: true
-    runs-on: ubuntu-latest
-    steps:
-      - name: Generate GitHub App Token
-        id: generate_token
-        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2
-        with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
+    runs-on: 'ubuntu-latest'
 
-      - name: Run Gemini Issue Triage
-        uses: google-gemini/gemini-cli-action@df3f890f003d28c60a2a09d2c29e0126e4d1e2ff
-        env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
+    steps:
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683'
+
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e'
         with:
-          version: 0.1.8-rc.0
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OTLP_GCP_WIF_PROVIDER: ${{ secrets.OTLP_GCP_WIF_PROVIDER }}
-          OTLP_GOOGLE_CLOUD_PROJECT: ${{ secrets.OTLP_GOOGLE_CLOUD_PROJECT }}
-          settings_json: |
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+
+      - name: 'Run Gemini Issue Triage'
+        uses: 'google-github-actions/run-gemini-cli@68d5a6d2e31ff01029205c58c6bf81cb3d72910b'
+        id: 'gemini_issue_triage'
+        env:
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          ISSUE_TITLE: '${{ github.event.issue.title }}'
+          ISSUE_BODY: '${{ github.event.issue.body }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number }}'
+          REPOSITORY: '${{ github.repository }}'
+        with:
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          settings: |-
             {
+              "maxSessionTurns": 25,
               "coreTools": [
                 "run_shell_command(gh label list)",
                 "run_shell_command(gh issue edit)",
@@ -45,12 +82,15 @@ jobs:
               "telemetry": {
                 "enabled": true,
                 "target": "gcp"
-              },
-              "sandbox": false
+              }
             }
-          prompt: |
+          prompt: |-
+            ## Role
+
             You are an issue triage assistant. Analyze the current GitHub issues apply the most appropriate existing labels. Do not remove labels titled help wanted or good first issue.
-            Steps:
+
+            ## Steps
+
             1. Run: `gh label list --repo ${{ github.repository }} --limit 100` to get all available labels.
             2. Review the issue title, body and any comments provided in the environment variables.
             3. Ignore any existing priorities or tags on the issue. Just report your findings.
@@ -59,7 +99,9 @@ jobs:
             7. For each issue please check if CLI version is present, this is usually in the output of the /about command  and will look like 0.1.5 for anything more than 6 versions older than the most recent should add the status/need-retesting label
             8. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label
             9. Use Area definitions mentioned below to help you narrow down issues
-            Guidelines:
+
+            ## Guidelines
+
             - Only use labels that already exist in the repository.
             - Do not add comments or modify the issue content.
             - Triage only the current issue.
@@ -143,3 +185,17 @@ jobs:
             - could also pertain to latency,
             - other general software performance like, memory usage, CPU consumption, and algorithmic efficiency.
             - Switching models from one to the other unexpectedly.
+
+      - name: 'Post Issue Triage Failure Comment'
+        if: |-
+          ${{ failure() && steps.gemini_issue_triage.outcome == 'failure' }}
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            github.rest.issues.createComment({
+              owner: '${{ github.repository }}'.split('/')[0],
+              repo: '${{ github.repository }}'.split('/')[1],
+              issue_number: '${{ github.event.issue.number }}',
+              body: 'There is a problem with the Gemini CLI issue triaging. Please check the [action logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.'
+            })
