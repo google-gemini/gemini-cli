@@ -468,6 +468,10 @@ export class CoreToolScheduler {
       const { request: reqInfo, tool: toolInstance } = toolCall;
       try {
         if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
+          this.setToolCallOutcome(
+            reqInfo.callId,
+            ToolConfirmationOutcome.ProceedAlways,
+          );
           this.setStatusInternal(reqInfo.callId, 'scheduled');
         } else {
           const confirmationDetails = await toolInstance.shouldConfirmExecute(
@@ -521,6 +525,10 @@ export class CoreToolScheduler {
               wrappedConfirmationDetails,
             );
           } else {
+            this.setToolCallOutcome(
+              reqInfo.callId,
+              ToolConfirmationOutcome.ProceedAlways,
+            );
             this.setStatusInternal(reqInfo.callId, 'scheduled');
           }
         }
@@ -555,13 +563,7 @@ export class CoreToolScheduler {
       await originalOnConfirm(outcome);
     }
 
-    this.toolCalls = this.toolCalls.map((call) => {
-      if (call.request.callId !== callId) return call;
-      return {
-        ...call,
-        outcome,
-      };
-    });
+    this.setToolCallOutcome(callId, outcome);
 
     if (outcome === ToolConfirmationOutcome.Cancel || signal.aborted) {
       this.setStatusInternal(
@@ -773,5 +775,15 @@ export class CoreToolScheduler {
     if (this.onToolCallsUpdate) {
       this.onToolCallsUpdate([...this.toolCalls]);
     }
+  }
+
+  private setToolCallOutcome(callId: string, outcome: ToolConfirmationOutcome) {
+    this.toolCalls = this.toolCalls.map((call) => {
+      if (call.request.callId !== callId) return call;
+      return {
+        ...call,
+        outcome,
+      };
+    });
   }
 }
