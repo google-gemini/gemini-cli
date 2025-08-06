@@ -21,7 +21,6 @@ import {
   EmbedContentResponse,
   GenerateContentParameters,
   GenerateContentResponse,
-  GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import * as readline from 'readline';
 import { ContentGenerator } from '../core/contentGenerator.js';
@@ -37,13 +36,9 @@ import {
 } from './converter.js';
 import {
   logApiRequest,
-  logApiResponse,
-  logApiError,
 } from '../telemetry/loggers.js';
 import {
   ApiRequestEvent,
-  ApiResponseEvent,
-  ApiErrorEvent,
 } from '../telemetry/types.js';
 import { Config } from '../config/config.js';
 
@@ -248,46 +243,6 @@ export class CodeAssistServer implements ContentGenerator {
     logApiRequest(
       this.config,
       new ApiRequestEvent(model, prompt_id, requestText),
-    );
-  }
-
-  private async _logApiResponse(
-    durationMs: number,
-    prompt_id: string,
-    usageMetadata?: GenerateContentResponseUsageMetadata,
-    responseText?: string,
-  ): Promise<void> {
-    logApiResponse(
-      this.config,
-      new ApiResponseEvent(
-        this.config.getModel(),
-        durationMs,
-        prompt_id,
-        this.config.getContentGeneratorConfig()?.authType,
-        usageMetadata,
-        responseText,
-      ),
-    );
-  }
-
-  private _logApiError(
-    durationMs: number,
-    error: unknown,
-    prompt_id: string,
-  ): void {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorType = error instanceof Error ? error.name : 'unknown';
-
-    logApiError(
-      this.config,
-      new ApiErrorEvent(
-        this.config.getModel(),
-        errorMessage,
-        durationMs,
-        prompt_id,
-        this.config.getContentGeneratorConfig()?.authType,
-        errorType,
-      ),
     );
   }
 }
