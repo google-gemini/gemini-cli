@@ -14,6 +14,7 @@ import {
 } from '../index.js';
 import { Config } from '../config/config.js';
 import { convertToFunctionResponse } from './coreToolScheduler.js';
+import { ToolCallDecision } from '../telemetry/types.js';
 
 /**
  * Executes a single tool call non-interactively.
@@ -64,7 +65,7 @@ export async function executeToolCall(
   try {
     // Directly execute without confirmation or live output handling
     const effectiveAbortSignal = abortSignal ?? new AbortController().signal;
-    const toolResult: ToolResult = await tool.execute(
+    const toolResult: ToolResult = await tool.buildAndExecute(
       toolCallRequest.args,
       effectiveAbortSignal,
       // No live output callback for non-interactive mode
@@ -87,6 +88,7 @@ export async function executeToolCall(
       error_type:
         toolResult.error === undefined ? undefined : toolResult.error.type,
       prompt_id: toolCallRequest.prompt_id,
+      decision: ToolCallDecision.AUTO_ACCEPT,
     });
 
     const response = convertToFunctionResponse(
