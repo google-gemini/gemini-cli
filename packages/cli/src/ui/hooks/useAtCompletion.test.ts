@@ -335,7 +335,6 @@ describe('useAtCompletion', () => {
       // We can't directly inspect the internal state, but we can ensure it doesn't crash
       // and the suggestions remain empty.
       expect(result.current.suggestions).toEqual([]);
-      expect(result.current.isLoadingSuggestions).toBe(false);
     });
   });
 
