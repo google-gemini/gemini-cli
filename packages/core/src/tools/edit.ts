@@ -26,7 +26,7 @@ import { Config, ApprovalMode } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
-import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
+import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
 
 /**
  * Parameters for the Edit tool
@@ -77,7 +77,7 @@ interface CalculatedEdit {
  */
 export class EditTool
   extends BaseTool<EditToolParams, ToolResult>
-  implements ModifiableTool<EditToolParams>
+  implements ModifiableDeclarativeTool<EditToolParams>
 {
   static readonly Name = 'replace';
 
