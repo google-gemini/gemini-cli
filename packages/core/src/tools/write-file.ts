@@ -367,7 +367,7 @@ export class WriteFileTool
         llmContent: 'Could not write file.',
         returnDisplay: errorMsg,
         error: {
-          message: error instanceof Error ? error.message : String(error),
+          message: errorMsg,
           type: errorType,
         },
       };
