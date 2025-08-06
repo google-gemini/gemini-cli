@@ -224,6 +224,7 @@ interface CoreToolSchedulerOptions {
   onToolCallsUpdate?: ToolCallsUpdateHandler;
   getPreferredEditor: () => EditorType | undefined;
   config: Config;
+  onEditorClose: () => void;
 }
 
 export class CoreToolScheduler {
@@ -234,6 +235,7 @@ export class CoreToolScheduler {
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
+  private onEditorClose: () => void;
 
   constructor(options: CoreToolSchedulerOptions) {
     this.config = options.config;
@@ -242,6 +244,7 @@ export class CoreToolScheduler {
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
+    this.onEditorClose = options.onEditorClose;
   }
 
   private setStatusInternal(
@@ -563,6 +566,7 @@ export class CoreToolScheduler {
           modifyContext as ModifyContext<typeof waitingToolCall.request.args>,
           editorType,
           signal,
+          this.onEditorClose,
         );
         this.setArgsInternal(callId, updatedParams);
         this.setStatusInternal(callId, 'awaiting_approval', {

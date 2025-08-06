@@ -523,6 +523,9 @@ export async function discoverPrompts(
   promptRegistry: PromptRegistry,
 ): Promise<Prompt[]> {
   try {
+    // Only request prompts if the server supports them.
+    if (mcpClient.getServerCapabilities()?.prompts == null) return [];
+
     const response = await mcpClient.request(
       { method: 'prompts/list', params: {} },
       ListPromptsResultSchema,
