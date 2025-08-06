@@ -639,4 +639,109 @@ describe('FileSearch', () => {
     // 3. Assert that the maxResults limit was respected, even with a cache hit.
     expect(limitedResults).toEqual(['file1.js', 'file2.js']);
   });
+
+  describe('with maxDepth', () => {
+    beforeEach(async () => {
+      tmpDir = await createTmpDir({
+        'file-root.txt': '',
+        level1: {
+          'file-level1.txt': '',
+          level2: {
+            'file-level2.txt': '',
+            level3: {
+              'file-level3.txt': '',
+            },
+          },
+        },
+      });
+    });
+
+    it('should only search top-level files when maxDepth is 0', async () => {
+      const fileSearch = new FileSearch({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: false,
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        maxDepth: 0,
+      });
+
+      await fileSearch.initialize();
+      const results = await fileSearch.search('');
+
+      expect(results).toEqual(['level1/', 'file-root.txt']);
+    });
+
+    it('should search one level deep when maxDepth is 1', async () => {
+      const fileSearch = new FileSearch({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: false,
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        maxDepth: 1,
+      });
+
+      await fileSearch.initialize();
+      const results = await fileSearch.search('');
+
+      expect(results).toEqual([
+        'level1/',
+        'level1/level2/',
+        'file-root.txt',
+        'level1/file-level1.txt',
+      ]);
+    });
+
+    it('should search two levels deep when maxDepth is 2', async () => {
+      const fileSearch = new FileSearch({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: false,
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        maxDepth: 2,
+      });
+
+      await fileSearch.initialize();
+      const results = await fileSearch.search('');
+
+      expect(results).toEqual([
+        'level1/',
+        'level1/level2/',
+        'level1/level2/level3/',
+        'file-root.txt',
+        'level1/file-level1.txt',
+        'level1/level2/file-level2.txt',
+      ]);
+    });
+
+    it('should perform a full recursive search when maxDepth is undefined', async () => {
+      const fileSearch = new FileSearch({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: false,
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        maxDepth: undefined, // Explicitly undefined
+      });
+
+      await fileSearch.initialize();
+      const results = await fileSearch.search('');
+
+      expect(results).toEqual([
+        'level1/',
+        'level1/level2/',
+        'level1/level2/level3/',
+        'file-root.txt',
+        'level1/file-level1.txt',
+        'level1/level2/file-level2.txt',
+        'level1/level2/level3/file-level3.txt',
+      ]);
+    });
+  });
 });

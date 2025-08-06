@@ -19,6 +19,7 @@ export type FileSearchOptions = {
   useGeminiignore: boolean;
   cache: boolean;
   cacheTtl: number;
+  maxDepth?: number;
 };
 
 export class AbortError extends Error {
@@ -256,6 +257,10 @@ export class FileSearch {
         const relativePath = path.relative(this.absoluteDir, dirPath);
         return dirFilter(`${relativePath}/`);
       });
+
+    if (this.options.maxDepth !== undefined) {
+      api.withMaxDepth(this.options.maxDepth);
+    }
 
     return api.crawl(this.absoluteDir).withPromise();
   }
