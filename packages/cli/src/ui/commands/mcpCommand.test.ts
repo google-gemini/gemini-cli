@@ -14,14 +14,9 @@ import {
   getMCPDiscoveryState,
   DiscoveredMCPTool,
 } from '@google/gemini-cli-core';
-import open from 'open';
+
 import { MessageActionReturn } from './types.js';
 import { Type, CallableTool } from '@google/genai';
-
-// Mock external dependencies
-vi.mock('open', () => ({
-  default: vi.fn(),
-}));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -71,6 +66,7 @@ describe('mcpCommand', () => {
     getToolRegistry: ReturnType<typeof vi.fn>;
     getMcpServers: ReturnType<typeof vi.fn>;
     getBlockedMcpServers: ReturnType<typeof vi.fn>;
+    getPromptRegistry: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -92,6 +88,10 @@ describe('mcpCommand', () => {
       }),
       getMcpServers: vi.fn().mockReturnValue({}),
       getBlockedMcpServers: vi.fn().mockReturnValue([]),
+      getPromptRegistry: vi.fn().mockResolvedValue({
+        getAllPrompts: vi.fn().mockReturnValue([]),
+        getPromptsByServer: vi.fn().mockReturnValue([]),
+      }),
     };
 
     mockContext = createMockCommandContext({
@@ -139,30 +139,15 @@ describe('mcpCommand', () => {
       mockConfig.getMcpServers = vi.fn().mockReturnValue({});
     });
 
-    it('should display a message with a URL when no MCP servers are configured in a sandbox', async () => {
-      process.env.SANDBOX = 'sandbox';
-
+    it('should display a message with a URL when no MCP servers are configured', async () => {
       const result = await mcpCommand.action!(mockContext, '');
 
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
         content:
-          'No MCP servers configured. Please open the following URL in your browser to view documentation:\nhttps://goo.gle/gemini-cli-docs-mcp',
+          'No MCP servers configured. Please view MCP documentation in your browser: https://goo.gle/gemini-cli-docs-mcp or use the cli /docs command',
       });
-      expect(open).not.toHaveBeenCalled();
-    });
-
-    it('should display a message and open a URL when no MCP servers are configured outside a sandbox', async () => {
-      const result = await mcpCommand.action!(mockContext, '');
-
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content:
-          'No MCP servers configured. Opening documentation in your browser: https://goo.gle/gemini-cli-docs-mcp',
-      });
-      expect(open).toHaveBeenCalledWith('https://goo.gle/gemini-cli-docs-mcp');
     });
   });
 
@@ -223,13 +208,13 @@ describe('mcpCommand', () => {
 
         // Server 2 - Connected
         expect(message).toContain(
-          '🟢 \u001b[1mserver2\u001b[0m - Ready (1 tools)',
+          '🟢 \u001b[1mserver2\u001b[0m - Ready (1 tool)',
         );
         expect(message).toContain('server2_tool1');
 
-        // Server 3 - Disconnected
+        // Server 3 - Disconnected but with cached tools, so shows as Ready
         expect(message).toContain(
-          '🔴 \u001b[1mserver3\u001b[0m - Disconnected (1 tools cached)',
+          '🟢 \u001b[1mserver3\u001b[0m - Ready (1 tool)',
         );
         expect(message).toContain('server3_tool1');
 
@@ -365,13 +350,13 @@ describe('mcpCommand', () => {
       if (isMessageAction(result)) {
         const message = result.content;
         expect(message).toContain(
-          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tools)',
+          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tool)',
         );
         expect(message).toContain('\u001b[36mserver1_tool1\u001b[0m');
         expect(message).toContain(
           '🔴 \u001b[1mserver2\u001b[0m - Disconnected (0 tools cached)',
         );
-        expect(message).toContain('No tools available');
+        expect(message).toContain('No tools or prompts available');
       }
     });
 
@@ -421,10 +406,10 @@ describe('mcpCommand', () => {
 
         // Check server statuses
         expect(message).toContain(
-          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tools)',
+          '🟢 \u001b[1mserver1\u001b[0m - Ready (1 tool)',
         );
         expect(message).toContain(
-          '🔄 \u001b[1mserver2\u001b[0m - Starting... (first startup may take longer) (tools will appear when ready)',
+          '🔄 \u001b[1mserver2\u001b[0m - Starting... (first startup may take longer) (tools and prompts will appear when ready)',
         );
       }
     });
@@ -994,6 +979,9 @@ describe('mcpCommand', () => {
             getBlockedMcpServers: vi.fn().mockReturnValue([]),
             getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
             getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+            getPromptRegistry: vi.fn().mockResolvedValue({
+              getPromptsByServer: vi.fn().mockReturnValue([]),
+            }),
           },
         },
       });

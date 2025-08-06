@@ -11,6 +11,8 @@ import {
   createTransport,
   isEnabled,
   discoverTools,
+  discoverPrompts,
+  hasValidTypes,
 } from './mcp-client.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -18,12 +20,16 @@ import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import * as GenAiLib from '@google/genai';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { AuthProviderType } from '../config/config.js';
+import { PromptRegistry } from '../prompts/prompt-registry.js';
+
+import { DiscoveredMCPTool } from './mcp-tool.js';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 vi.mock('@google/genai');
 vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
+vi.mock('./mcp-tool.js');
 
 describe('mcp-client', () => {
   afterEach(() => {
@@ -47,6 +53,332 @@ describe('mcp-client', () => {
 
       expect(tools.length).toBe(1);
       expect(mockedMcpToTool).toHaveBeenCalledOnce();
+    });
+
+    it('should log an error if there is an error discovering a tool', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      const testError = new Error('Invalid tool name');
+      vi.mocked(DiscoveredMCPTool).mockImplementation(
+        (
+          _mcpCallableTool: GenAiLib.CallableTool,
+          _serverName: string,
+          name: string,
+        ) => {
+          if (name === 'invalid tool name') {
+            throw testError;
+          }
+          return { name: 'validTool' } as DiscoveredMCPTool;
+        },
+      );
+
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'validTool',
+              },
+              {
+                name: 'invalid tool name', // this will fail validation
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(tools[0].name).toBe('validTool');
+      expect(consoleErrorSpy).toHaveBeenCalledOnce();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        `Error discovering tool: 'invalid tool name' from MCP server 'test-server': ${testError.message}`,
+      );
+    });
+
+    it('should skip tools if a parameter is missing a type', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'validTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: { type: 'string' },
+                  },
+                },
+              },
+              {
+                name: 'invalidTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: { description: 'a param with no type' },
+                  },
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('validTool');
+      expect(consoleWarnSpy).toHaveBeenCalledOnce();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
+          `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
+      );
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should skip tools if a nested parameter is missing a type', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'invalidTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: {
+                      type: 'object',
+                      properties: {
+                        nestedParam: {
+                          description: 'a nested param with no type',
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(0);
+      expect(consoleWarnSpy).toHaveBeenCalledOnce();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
+          `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
+      );
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should skip tool if an array item is missing a type', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'invalidTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: {
+                      type: 'array',
+                      items: {
+                        description: 'an array item with no type',
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(0);
+      expect(consoleWarnSpy).toHaveBeenCalledOnce();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
+          `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
+      );
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should discover tool with no properties in schema', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'validTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('validTool');
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should discover tool with empty properties object in schema', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'validTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {},
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('validTool');
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      consoleWarnSpy.mockRestore();
+    });
+  });
+
+  describe('discoverPrompts', () => {
+    const mockedPromptRegistry = {
+      registerPrompt: vi.fn(),
+    } as unknown as PromptRegistry;
+
+    it('should discover and log prompts', async () => {
+      const mockRequest = vi.fn().mockResolvedValue({
+        prompts: [
+          { name: 'prompt1', description: 'desc1' },
+          { name: 'prompt2' },
+        ],
+      });
+      const mockGetServerCapabilities = vi.fn().mockReturnValue({
+        prompts: {},
+      });
+      const mockedClient = {
+        getServerCapabilities: mockGetServerCapabilities,
+        request: mockRequest,
+      } as unknown as ClientLib.Client;
+
+      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
+
+      expect(mockGetServerCapabilities).toHaveBeenCalledOnce();
+      expect(mockRequest).toHaveBeenCalledWith(
+        { method: 'prompts/list', params: {} },
+        expect.anything(),
+      );
+    });
+
+    it('should do nothing if no prompts are discovered', async () => {
+      const mockRequest = vi.fn().mockResolvedValue({
+        prompts: [],
+      });
+      const mockGetServerCapabilities = vi.fn().mockReturnValue({
+        prompts: {},
+      });
+
+      const mockedClient = {
+        getServerCapabilities: mockGetServerCapabilities,
+        request: mockRequest,
+      } as unknown as ClientLib.Client;
+
+      const consoleLogSpy = vi
+        .spyOn(console, 'debug')
+        .mockImplementation(() => {});
+
+      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
+
+      expect(mockGetServerCapabilities).toHaveBeenCalledOnce();
+      expect(mockRequest).toHaveBeenCalledOnce();
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should do nothing if the server has no prompt support', async () => {
+      const mockRequest = vi.fn().mockResolvedValue({
+        prompts: [],
+      });
+      const mockGetServerCapabilities = vi.fn().mockReturnValue({});
+
+      const mockedClient = {
+        getServerCapabilities: mockGetServerCapabilities,
+        request: mockRequest,
+      } as unknown as ClientLib.Client;
+
+      const consoleLogSpy = vi
+        .spyOn(console, 'debug')
+        .mockImplementation(() => {});
+
+      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
+
+      expect(mockGetServerCapabilities).toHaveBeenCalledOnce();
+      expect(mockRequest).not.toHaveBeenCalled();
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should log an error if discovery fails', async () => {
+      const testError = new Error('test error');
+      testError.message = 'test error';
+      const mockRequest = vi.fn().mockRejectedValue(testError);
+      const mockGetServerCapabilities = vi.fn().mockReturnValue({
+        prompts: {},
+      });
+      const mockedClient = {
+        getServerCapabilities: mockGetServerCapabilities,
+        request: mockRequest,
+      } as unknown as ClientLib.Client;
+
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
+
+      expect(mockRequest).toHaveBeenCalledOnce();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        `Error discovering prompts from test-server: ${testError.message}`,
+      );
+
+      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -276,6 +608,165 @@ describe('mcp-client', () => {
       expect(isEnabled(namelessFuncDecl, serverName, mcpServerConfig)).toBe(
         false,
       );
+    });
+  });
+
+  describe('hasValidTypes', () => {
+    it('should return true for a valid schema with anyOf', () => {
+      const schema = {
+        anyOf: [{ type: 'string' }, { type: 'number' }],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with anyOf', () => {
+      const schema = {
+        anyOf: [{ type: 'string' }, { description: 'no type' }],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema with allOf', () => {
+      const schema = {
+        allOf: [
+          { type: 'string' },
+          { type: 'object', properties: { foo: { type: 'string' } } },
+        ],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with allOf', () => {
+      const schema = {
+        allOf: [{ type: 'string' }, { description: 'no type' }],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema with oneOf', () => {
+      const schema = {
+        oneOf: [{ type: 'string' }, { type: 'number' }],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with oneOf', () => {
+      const schema = {
+        oneOf: [{ type: 'string' }, { description: 'no type' }],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema with nested subschemas', () => {
+      const schema = {
+        anyOf: [
+          { type: 'string' },
+          {
+            allOf: [
+              { type: 'object', properties: { a: { type: 'string' } } },
+              { type: 'object', properties: { b: { type: 'number' } } },
+            ],
+          },
+        ],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with nested subschemas', () => {
+      const schema = {
+        anyOf: [
+          { type: 'string' },
+          {
+            allOf: [
+              { type: 'object', properties: { a: { type: 'string' } } },
+              { description: 'no type' },
+            ],
+          },
+        ],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a schema with a type and subschemas', () => {
+      const schema = {
+        type: 'string',
+        anyOf: [{ minLength: 1 }, { maxLength: 5 }],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for a schema with no type and no subschemas', () => {
+      const schema = {
+        description: 'a schema with no type',
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: { type: 'string' },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false if a parameter is missing a type', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: { description: 'a param with no type' },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return false if a nested parameter is missing a type', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: {
+            type: 'object',
+            properties: {
+              nestedParam: {
+                description: 'a nested param with no type',
+              },
+            },
+          },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return false if an array item is missing a type', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: {
+            type: 'array',
+            items: {
+              description: 'an array item with no type',
+            },
+          },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a schema with no properties', () => {
+      const schema = {
+        type: 'object',
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for a schema with an empty properties object', () => {
+      const schema = {
+        type: 'object',
+        properties: {},
+      };
+      expect(hasValidTypes(schema)).toBe(true);
     });
   });
 });

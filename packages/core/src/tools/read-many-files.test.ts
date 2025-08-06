@@ -13,6 +13,7 @@ import path from 'path';
 import fs from 'fs'; // Actual fs for setup
 import os from 'os';
 import { Config } from '../config/config.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 vi.mock('mime-types', () => {
   const lookup = (filename: string) => {
@@ -48,11 +49,11 @@ describe('ReadManyFilesTool', () => {
   let mockReadFileFn: Mock;
 
   beforeEach(async () => {
-    tempRootDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'read-many-files-root-'),
+    tempRootDir = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'read-many-files-root-')),
     );
-    tempDirOutsideRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'read-many-files-external-'),
+    tempDirOutsideRoot = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'read-many-files-external-')),
     );
     fs.writeFileSync(path.join(tempRootDir, '.geminiignore'), 'foo.*');
     const fileService = new FileDiscoveryService(tempRootDir);
@@ -64,6 +65,8 @@ describe('ReadManyFilesTool', () => {
         respectGeminiIgnore: true,
       }),
       getTargetDir: () => tempRootDir,
+      getWorkspaceDirs: () => [tempRootDir],
+      getWorkspaceContext: () => new WorkspaceContext(tempRootDir),
     } as Partial<Config> as Config;
     tool = new ReadManyFilesTool(mockConfig);
 
@@ -423,6 +426,218 @@ describe('ReadManyFilesTool', () => {
       expect(result.returnDisplay).not.toContain('foo.bar');
       expect(result.returnDisplay).not.toContain('foo.quux');
       expect(result.returnDisplay).toContain('bar.ts');
+    });
+
+    it('should read files from multiple workspace directories', async () => {
+      const tempDir1 = fs.realpathSync(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-dir-1-')),
+      );
+      const tempDir2 = fs.realpathSync(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-dir-2-')),
+      );
+      const fileService = new FileDiscoveryService(tempDir1);
+      const mockConfig = {
+        getFileService: () => fileService,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
+        getWorkspaceContext: () => new WorkspaceContext(tempDir1, [tempDir2]),
+        getTargetDir: () => tempDir1,
+      } as Partial<Config> as Config;
+      tool = new ReadManyFilesTool(mockConfig);
+
+      fs.writeFileSync(path.join(tempDir1, 'file1.txt'), 'Content1');
+      fs.writeFileSync(path.join(tempDir2, 'file2.txt'), 'Content2');
+
+      const params = { paths: ['*.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      const content = result.llmContent as string[];
+      if (!Array.isArray(content)) {
+        throw new Error(`llmContent is not an array: ${content}`);
+      }
+      const expectedPath1 = path.join(tempDir1, 'file1.txt');
+      const expectedPath2 = path.join(tempDir2, 'file2.txt');
+
+      expect(
+        content.some((c) =>
+          c.includes(`--- ${expectedPath1} ---\n\nContent1\n\n`),
+        ),
+      ).toBe(true);
+      expect(
+        content.some((c) =>
+          c.includes(`--- ${expectedPath2} ---\n\nContent2\n\n`),
+        ),
+      ).toBe(true);
+      expect(result.returnDisplay).toContain(
+        'Successfully read and concatenated content from **2 file(s)**',
+      );
+
+      fs.rmSync(tempDir1, { recursive: true, force: true });
+      fs.rmSync(tempDir2, { recursive: true, force: true });
+    });
+
+    it('should add a warning for truncated files', async () => {
+      createFile('file1.txt', 'Content1');
+      // Create a file that will be "truncated" by making it long
+      const longContent = Array.from({ length: 2500 }, (_, i) => `L${i}`).join(
+        '\n',
+      );
+      createFile('large-file.txt', longContent);
+
+      const params = { paths: ['*.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      const content = result.llmContent as string[];
+
+      const normalFileContent = content.find((c) => c.includes('file1.txt'));
+      const truncatedFileContent = content.find((c) =>
+        c.includes('large-file.txt'),
+      );
+
+      expect(normalFileContent).not.toContain(
+        '[WARNING: This file was truncated.',
+      );
+      expect(truncatedFileContent).toContain(
+        "[WARNING: This file was truncated. To view the full content, use the 'read_file' tool on this specific file.]",
+      );
+      // Check that the actual content is still there but truncated
+      expect(truncatedFileContent).toContain('L200');
+      expect(truncatedFileContent).not.toContain('L2400');
+    });
+  });
+
+  describe('Batch Processing', () => {
+    const createMultipleFiles = (count: number, contentPrefix = 'Content') => {
+      const files: string[] = [];
+      for (let i = 0; i < count; i++) {
+        const fileName = `file${i}.txt`;
+        createFile(fileName, `${contentPrefix} ${i}`);
+        files.push(fileName);
+      }
+      return files;
+    };
+
+    const createFile = (filePath: string, content = '') => {
+      const fullPath = path.join(tempRootDir, filePath);
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      fs.writeFileSync(fullPath, content);
+    };
+
+    it('should process files in parallel for performance', async () => {
+      // Mock detectFileType to add artificial delay to simulate I/O
+      const detectFileTypeSpy = vi.spyOn(
+        await import('../utils/fileUtils.js'),
+        'detectFileType',
+      );
+
+      // Create files
+      const fileCount = 4;
+      const files = createMultipleFiles(fileCount, 'Batch test');
+
+      // Mock with 100ms delay per file to simulate I/O operations
+      detectFileTypeSpy.mockImplementation(async (_filePath: string) => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return 'text';
+      });
+
+      const startTime = Date.now();
+      const params = { paths: files };
+      const result = await tool.execute(params, new AbortController().signal);
+      const endTime = Date.now();
+
+      const processingTime = endTime - startTime;
+
+      console.log(
+        `Processing time: ${processingTime}ms for ${fileCount} files`,
+      );
+
+      // Verify parallel processing performance improvement
+      // Parallel processing should complete in ~100ms (single file time)
+      // Sequential would take ~400ms (4 files × 100ms each)
+      expect(processingTime).toBeLessThan(200); // Should PASS with parallel implementation
+
+      // Verify all files were processed
+      const content = result.llmContent as string[];
+      expect(content).toHaveLength(fileCount);
+
+      // Cleanup mock
+      detectFileTypeSpy.mockRestore();
+    });
+
+    it('should handle batch processing errors gracefully', async () => {
+      // Create mix of valid and problematic files
+      createFile('valid1.txt', 'Valid content 1');
+      createFile('valid2.txt', 'Valid content 2');
+      createFile('valid3.txt', 'Valid content 3');
+
+      const params = {
+        paths: [
+          'valid1.txt',
+          'valid2.txt',
+          'nonexistent-file.txt', // This will fail
+          'valid3.txt',
+        ],
+      };
+
+      const result = await tool.execute(params, new AbortController().signal);
+      const content = result.llmContent as string[];
+
+      // Should successfully process valid files despite one failure
+      expect(content.length).toBeGreaterThanOrEqual(3);
+      expect(result.returnDisplay).toContain('Successfully read');
+
+      // Verify valid files were processed
+      const expectedPath1 = path.join(tempRootDir, 'valid1.txt');
+      const expectedPath3 = path.join(tempRootDir, 'valid3.txt');
+      expect(content.some((c) => c.includes(expectedPath1))).toBe(true);
+      expect(content.some((c) => c.includes(expectedPath3))).toBe(true);
+    });
+
+    it('should execute file operations concurrently', async () => {
+      // Track execution order to verify concurrency
+      const executionOrder: string[] = [];
+      const detectFileTypeSpy = vi.spyOn(
+        await import('../utils/fileUtils.js'),
+        'detectFileType',
+      );
+
+      const files = ['file1.txt', 'file2.txt', 'file3.txt'];
+      files.forEach((file) => createFile(file, 'test content'));
+
+      // Mock to track concurrent vs sequential execution
+      detectFileTypeSpy.mockImplementation(async (filePath: string) => {
+        const fileName = filePath.split('/').pop() || '';
+        executionOrder.push(`start:${fileName}`);
+
+        // Add delay to make timing differences visible
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        executionOrder.push(`end:${fileName}`);
+        return 'text';
+      });
+
+      await tool.execute({ paths: files }, new AbortController().signal);
+
+      console.log('Execution order:', executionOrder);
+
+      // Verify concurrent execution pattern
+      // In parallel execution: all "start:" events should come before all "end:" events
+      // In sequential execution: "start:file1", "end:file1", "start:file2", "end:file2", etc.
+
+      const startEvents = executionOrder.filter((e) =>
+        e.startsWith('start:'),
+      ).length;
+      const firstEndIndex = executionOrder.findIndex((e) =>
+        e.startsWith('end:'),
+      );
+      const startsBeforeFirstEnd = executionOrder
+        .slice(0, firstEndIndex)
+        .filter((e) => e.startsWith('start:')).length;
+
+      // For parallel processing, ALL start events should happen before the first end event
+      expect(startsBeforeFirstEnd).toBe(startEvents); // Should PASS with parallel implementation
+
+      detectFileTypeSpy.mockRestore();
     });
   });
 });

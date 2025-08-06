@@ -189,4 +189,81 @@ describe('bfsFileSearch', () => {
       expect(result.sort()).toEqual([target1, target2].sort());
     });
   });
+
+  it('should perform parallel directory scanning efficiently (performance test)', async () => {
+    // Create a more complex directory structure for performance testing
+    console.log('\n🚀 Testing Parallel BFS Performance...');
+
+    // Create 50 directories with multiple levels for faster test execution
+    for (let i = 0; i < 50; i++) {
+      await createEmptyDir(`dir${i}`);
+      await createEmptyDir(`dir${i}`, 'subdir1');
+      await createEmptyDir(`dir${i}`, 'subdir2');
+      await createEmptyDir(`dir${i}`, 'subdir1', 'deep');
+      if (i < 10) {
+        // Add target files in some directories
+        await createTestFile('content', `dir${i}`, 'GEMINI.md');
+        await createTestFile('content', `dir${i}`, 'subdir1', 'GEMINI.md');
+      }
+    }
+
+    // Run multiple iterations to ensure consistency
+    const iterations = 3;
+    const durations: number[] = [];
+    let foundFiles = 0;
+    let firstResultSorted: string[] | undefined;
+
+    for (let i = 0; i < iterations; i++) {
+      const searchStartTime = performance.now();
+      const result = await bfsFileSearch(testRootDir, {
+        fileName: 'GEMINI.md',
+        maxDirs: 200,
+        debug: false,
+      });
+      const duration = performance.now() - searchStartTime;
+      durations.push(duration);
+
+      // Verify consistency: all iterations should find the exact same files
+      if (firstResultSorted === undefined) {
+        foundFiles = result.length;
+        firstResultSorted = result.sort();
+      } else {
+        expect(result.sort()).toEqual(firstResultSorted);
+      }
+
+      console.log(`📊 Iteration ${i + 1}: ${duration.toFixed(2)}ms`);
+    }
+
+    const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
+    const maxDuration = Math.max(...durations);
+    const minDuration = Math.min(...durations);
+
+    console.log(`📊 Average Duration: ${avgDuration.toFixed(2)}ms`);
+    console.log(
+      `📊 Min/Max Duration: ${minDuration.toFixed(2)}ms / ${maxDuration.toFixed(2)}ms`,
+    );
+    console.log(`📁 Found ${foundFiles} GEMINI.md files`);
+    console.log(
+      `🏎️  Processing ~${Math.round(200 / (avgDuration / 1000))} dirs/second`,
+    );
+
+    // Verify we found the expected files
+    expect(foundFiles).toBe(20); // 10 dirs * 2 files each
+
+    // Performance expectation: check consistency rather than absolute time
+    const variance = maxDuration - minDuration;
+    const consistencyRatio = variance / avgDuration;
+
+    // Ensure reasonable performance (generous limit for CI environments)
+    expect(avgDuration).toBeLessThan(2000); // Very generous limit
+
+    // Ensure consistency across runs (variance should not be too high)
+    // More tolerant in CI environments where performance can be variable
+    const maxConsistencyRatio = process.env.CI ? 3.0 : 1.5;
+    expect(consistencyRatio).toBeLessThan(maxConsistencyRatio); // Max variance should be reasonable
+
+    console.log(
+      `✅ Performance test passed: avg=${avgDuration.toFixed(2)}ms, consistency=${(consistencyRatio * 100).toFixed(1)}% (threshold: ${(maxConsistencyRatio * 100).toFixed(0)}%)`,
+    );
+  });
 });

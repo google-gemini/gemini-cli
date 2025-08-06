@@ -122,9 +122,10 @@ export async function detectFileType(
 ): Promise<'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg'> {
   const ext = path.extname(filePath).toLowerCase();
 
-  // The mimetype for "ts" is MPEG transport stream (a video format) but we want
-  // to assume these are typescript files instead.
-  if (ext === '.ts') {
+  // The mimetype for various TypeScript extensions (ts, mts, cts, tsx) can be
+  // MPEG transport stream (a video format), but we want to assume these are
+  // TypeScript files instead.
+  if (['.ts', '.mts', '.cts'].includes(ext)) {
     return 'text';
   }
 
@@ -299,20 +300,27 @@ export async function processSingleFileContent(
           return line;
         });
 
-        const contentRangeTruncated = endLine < originalLineCount;
+        const contentRangeTruncated =
+          startLine > 0 || endLine < originalLineCount;
         const isTruncated = contentRangeTruncated || linesWereTruncatedInLength;
+        const llmContent = formattedLines.join('\n');
 
-        let llmTextContent = '';
+        // By default, return nothing to streamline the common case of a successful read_file.
+        let returnDisplay = '';
         if (contentRangeTruncated) {
-          llmTextContent += `[File content truncated: showing lines ${actualStartLine + 1}-${endLine} of ${originalLineCount} total lines. Use offset/limit parameters to view more.]\n`;
+          returnDisplay = `Read lines ${
+            actualStartLine + 1
+          }-${endLine} of ${originalLineCount} from ${relativePathForDisplay}`;
+          if (linesWereTruncatedInLength) {
+            returnDisplay += ' (some lines were shortened)';
+          }
         } else if (linesWereTruncatedInLength) {
-          llmTextContent += `[File content partially truncated: some lines exceeded maximum length of ${MAX_LINE_LENGTH_TEXT_FILE} characters.]\n`;
+          returnDisplay = `Read all ${originalLineCount} lines from ${relativePathForDisplay} (some lines were shortened)`;
         }
-        llmTextContent += formattedLines.join('\n');
 
         return {
-          llmContent: llmTextContent,
-          returnDisplay: isTruncated ? '(truncated)' : '',
+          llmContent,
+          returnDisplay,
           isTruncated,
           originalLineCount,
           linesShown: [actualStartLine + 1, endLine],
