@@ -100,7 +100,7 @@ export function recordToolCallMetrics(
   functionName: string,
   durationMs: number,
   success: boolean,
-  decision?: 'accept' | 'reject' | 'modify',
+  decision?: 'accept' | 'reject' | 'modify' | 'auto_accept',
 ): void {
   if (!toolCallCounter || !toolCallLatencyHistogram || !isMetricsInitialized)
     return;
