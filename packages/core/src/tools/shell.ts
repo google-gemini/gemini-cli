@@ -126,17 +126,29 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       if (path.isAbsolute(params.directory)) {
         return 'Directory cannot be absolute. Please refer to workspace directories by their name.';
       }
-      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
-      const matchingDirs = workspaceDirs.filter(
-        (dir) => path.basename(dir) === params.directory,
-      );
+      const workspaceContext = this.config.getWorkspaceContext();
+      const workspaceDirs = workspaceContext.getDirectories();
+      const possiblePaths: string[] = [];
 
-      if (matchingDirs.length === 0) {
+      for (const dir of workspaceDirs) {
+        const resolvedPath = path.join(dir, params.directory);
+        const exists = fs.existsSync(resolvedPath);
+        const within = workspaceContext.isPathWithinWorkspace(resolvedPath);
+        if (exists && within) {
+          if (!possiblePaths.includes(resolvedPath)) {
+            possiblePaths.push(resolvedPath);
+          }
+        }
+      }
+
+      if (possiblePaths.length === 0) {
         return `Directory '${params.directory}' is not a registered workspace directory.`;
       }
 
-      if (matchingDirs.length > 1) {
-        return `Directory name '${params.directory}' is ambiguous as it matches multiple workspace directories.`;
+      if (possiblePaths.length > 1) {
+        return `Directory '${params.directory}' is ambiguous as it exists in multiple workspace locations: ${possiblePaths.join(
+          ', ',
+        )}`;
       }
     }
     return null;
@@ -215,10 +227,24 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
             return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
           })();
 
-      const cwd = path.resolve(
-        this.config.getTargetDir(),
-        params.directory || '',
-      );
+      let cwd = this.config.getProjectRoot();
+      if (params.directory) {
+        const workspaceDirs = this.config
+          .getWorkspaceContext()
+          .getDirectories();
+        const possiblePaths: string[] = [];
+        for (const dir of workspaceDirs) {
+          const resolvedPath = path.join(dir, params.directory);
+          if (fs.existsSync(resolvedPath)) {
+            if (!possiblePaths.includes(resolvedPath)) {
+              possiblePaths.push(resolvedPath);
+            }
+          }
+        }
+        if (possiblePaths.length === 1) {
+          cwd = possiblePaths[0];
+        }
+      }
 
       let cumulativeStdout = '';
       let cumulativeStderr = '';
