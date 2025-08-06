@@ -208,7 +208,7 @@ const resumeCommand: SlashCommand = {
 
 const deleteCommand: SlashCommand = {
   name: 'delete',
-  description: 'Delete a conversation checkpoint. Usage: /chat delete <tag>',
+  description: 'Delete a conversation checkpoint. This action is irreversible. Usage: /chat delete <tag>',
   kind: CommandKind.BUILT_IN,
   action: async (context, args): Promise<MessageActionReturn> => {
     const tag = args.trim();
@@ -220,6 +220,17 @@ const deleteCommand: SlashCommand = {
       };
     }
 
+    // Confirmation step - simplified approach
+    const confirmationMessage = `Are you sure you want to delete the checkpoint '${tag}'? This action cannot be undone. Type '/chat delete ${tag} --confirm' to proceed.`;
+
+    if (args.trim() !== `${tag} --confirm`) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: confirmationMessage,
+      };
+    }
+
     const { logger } = context.services;
     await logger.initialize();
     const deleted = await logger.deleteCheckpoint(tag);
@@ -228,7 +239,7 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint '${tag}' has been deleted.`,
+        content: `Conversation checkpoint '${tag}' has been permanently deleted.`,
       };
     } else {
       return {
@@ -246,9 +257,76 @@ const deleteCommand: SlashCommand = {
   },
 };
 
+const exportCommand: SlashCommand = {
+  name: 'export',
+  description:
+    'Export a conversation checkpoint. Usage: /chat export <tag> --format <markdown|json>',
+  kind: CommandKind.BUILT_IN,
+  action: async (context, args): Promise<MessageActionReturn> => {
+    const [tag, formatFlag, format] = args.trim().split(/\s+/);
+
+    if (!tag) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /chat export <tag> --format <markdown|json>',
+      };
+    }
+
+    if (formatFlag !== '--format' || !format || !['markdown', 'json'].includes(format)) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: "Invalid format. Usage: /chat export <tag> --format <markdown|json>",
+      };
+    }
+
+    const { logger } = context.services;
+    await logger.initialize();
+    const conversation = await logger.loadCheckpoint(tag);
+
+    if (conversation.length === 0) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `No saved checkpoint found with tag: ${tag}.`,
+      };
+    }
+
+    let output = '';
+    if (format === 'json') {
+      output = JSON.stringify(conversation, null, 2);
+    } else {
+      for (const item of conversation) {
+        const role = item.role === 'user' ? 'You' : 'Gemini';
+        const text =
+          item.parts
+            ?.filter((m) => !!m.text)
+            .map((m) => m.text)
+            .join('') || '';
+        if (text) {
+          output += `**${role}**:\n\n${text}\n\n---\n\n`;
+        }
+      }
+    }
+
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: output,
+    };
+  },
+  completion: async (context, partialArg) => {
+    const chatDetails = await getSavedChatTags(context, true);
+    return chatDetails
+      .map((chat) => chat.name)
+      .filter((name) => name.startsWith(partialArg));
+  },
+};
+
 export const chatCommand: SlashCommand = {
   name: 'chat',
   description: 'Manage conversation history.',
   kind: CommandKind.BUILT_IN,
-  subCommands: [listCommand, saveCommand, resumeCommand, deleteCommand],
+  subCommands: [listCommand, saveCommand, resumeCommand, deleteCommand, exportCommand],
 };
