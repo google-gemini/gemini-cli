@@ -9,7 +9,14 @@ import {
   DetectedIde,
   getIdeDisplayName,
 } from '../ide/detect-ide.js';
-import { ideContext, IdeContextNotificationSchema } from '../ide/ideContext.js';
+import {
+  ideContext,
+  IdeContextNotificationSchema,
+  IdeDiffAcceptedNotificationSchema,
+  IdeDiffClosedNotificationSchema,
+  CloseDiffResponseSchema,
+  DiffUpdateResult,
+} from '../ide/ideContext.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
@@ -42,6 +49,7 @@ export class IdeClient {
   };
   private readonly currentIde: DetectedIde | undefined;
   private readonly currentIdeDisplayName: string | undefined;
+  private diffResponses = new Map<string, (result: DiffUpdateResult) => void>();
 
   private constructor() {
     this.currentIde = detectIde();
@@ -75,6 +83,75 @@ export class IdeClient {
     }
 
     await this.establishConnection(port);
+  }
+
+  /**
+   * A diff is accepted with any modifications if the user performs one of the
+   * following actions:
+   * - Clicks the checkbox icon in the IDE to accept
+   * - Runs `command+shift+p` > "Gemini CLI: Accept Diff in IDE" to accept
+   * - Selects "accept" in the CLI UI
+   * - Saves the file via `ctrl/command+s`
+   *
+   * A diff is rejected if the user performs one of the following actions:
+   * - Clicks the "x" icon in the IDE
+   * - Runs "Gemini CLI: Close Diff in IDE"
+   * - Selects "no" in the CLI UI
+   * - Closes the file
+   */
+  async openDiff(
+    filePath: string,
+    newContent?: string,
+  ): Promise<DiffUpdateResult> {
+    return new Promise<DiffUpdateResult>((resolve, reject) => {
+      this.diffResponses.set(filePath, resolve);
+      this.client
+        ?.callTool({
+          name: `openDiff`,
+          arguments: {
+            filePath,
+            newContent,
+          },
+        })
+        .catch((err) => {
+          logger.debug(`callTool for ${filePath} failed:`, err);
+          reject(err);
+        });
+    });
+  }
+
+  async closeDiff(filePath: string): Promise<string | undefined> {
+    try {
+      const result = await this.client?.callTool({
+        name: `closeDiff`,
+        arguments: {
+          filePath,
+        },
+      });
+
+      if (result) {
+        const parsed = CloseDiffResponseSchema.parse(result);
+        return parsed.content;
+      }
+    } catch (err) {
+      logger.debug(`callTool for ${filePath} failed:`, err);
+    }
+    return;
+  }
+
+  // Closes the diff. Instead of waiting for a notification,
+  // manually resolves the diff resolver as the desired outcome.
+  async resolveDiffFromCli(filePath: string, outcome: 'accepted' | 'rejected') {
+    const content = await this.closeDiff(filePath);
+    const resolver = this.diffResponses.get(filePath);
+    if (resolver) {
+      if (outcome === 'accepted') {
+        resolver({ status: 'accepted', content });
+      } else {
+        resolver({ status: 'rejected', content: undefined });
+      }
+      this.diffResponses.delete(filePath);
+    }
   }
 
   disconnect() {
@@ -175,6 +252,33 @@ export class IdeClient {
         `IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable`,
       );
     };
+    this.client.setNotificationHandler(
+      IdeDiffAcceptedNotificationSchema,
+      (notification) => {
+        const { filePath, content } = notification.params;
+        const resolver = this.diffResponses.get(filePath);
+        if (resolver) {
+          resolver({ status: 'accepted', content });
+          this.diffResponses.delete(filePath);
+        } else {
+          logger.debug(`No resolver found for ${filePath}`);
+        }
+      },
+    );
+
+    this.client.setNotificationHandler(
+      IdeDiffClosedNotificationSchema,
+      (notification) => {
+        const { filePath } = notification.params;
+        const resolver = this.diffResponses.get(filePath);
+        if (resolver) {
+          resolver({ status: 'rejected', content: undefined });
+          this.diffResponses.delete(filePath);
+        } else {
+          logger.debug(`No resolver found for ${filePath}`);
+        }
+      },
+    );
   }
 
   private async establishConnection(port: string) {
