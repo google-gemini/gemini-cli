@@ -16,6 +16,7 @@ import {
   SandboxConfig,
   GeminiClient,
   ideContext,
+  type AuthType,
 } from '@google/gemini-cli-core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
@@ -84,6 +85,7 @@ interface MockServerConfig {
   getAllGeminiMdFilenames: Mock<() => string[]>;
   getGeminiClient: Mock<() => GeminiClient | undefined>;
   getUserTier: Mock<() => Promise<string | undefined>>;
+  getIdeClient: Mock<() => { getCurrentIde: Mock<() => string | undefined> }>;
 }
 
 // Mock @google/gemini-cli-core and its Config class
@@ -157,6 +159,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getWorkspaceContext: vi.fn(() => ({
           getDirectories: vi.fn(() => []),
         })),
+        getIdeClient: vi.fn(() => ({
+          getCurrentIde: vi.fn(() => 'vscode'),
+        })),
       };
     });
 
@@ -182,6 +187,7 @@ vi.mock('./hooks/useGeminiStream', () => ({
     submitQuery: vi.fn(),
     initError: null,
     pendingHistoryItems: [],
+    thought: null,
   })),
 }));
 
@@ -233,7 +239,7 @@ vi.mock('./utils/updateCheck.js', () => ({
   checkForUpdates: vi.fn(),
 }));
 
-vi.mock('./config/auth.js', () => ({
+vi.mock('../config/auth.js', () => ({
   validateAuthMethod: vi.fn(),
 }));
 
