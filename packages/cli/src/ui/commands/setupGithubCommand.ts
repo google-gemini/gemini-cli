@@ -27,9 +27,8 @@ export const setupGithubCommand: SlashCommand = {
       throw new Error('Unable to determine the Git root directory.');
     }
 
-    // TODO(#5198): pin workflow versions for release controls
-    const version = 'main';
-    const workflowBaseUrl = `https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/heads/${version}/workflows/`;
+    const version = 'v0';
+    const workflowBaseUrl = `https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/tags/${version}/examples/workflows/`;
 
     const workflows = [
       'gemini-cli/gemini-cli.yml',
@@ -45,7 +44,8 @@ export const setupGithubCommand: SlashCommand = {
         const fileName = path.basename(workflow);
         return `curl -fsSL -o "${gitRootRepo}/.github/workflows/${fileName}" "${workflowBaseUrl}/${workflow}"`;
       }),
-      'echo "Workflows downloaded successfully."',
+      'echo "Workflows downloaded successfully. Follow steps in https://github.com/google-github-actions/run-gemini-cli/blob/v0/README.md#quick-start (skipping the /setup-github step) to complete setup."',
+      'open https://github.com/google-github-actions/run-gemini-cli/blob/v0/README.md#quick-start',
     ].join(' && ');
     return {
       type: 'tool',
