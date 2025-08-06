@@ -10,6 +10,8 @@ const mockEnsureCorrectEdit = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 
+import { IDEConnectionStatus } from '../ide/ide-client.js';
+
 vi.mock('../utils/editCorrector.js', () => ({
   ensureCorrectEdit: mockEnsureCorrectEdit,
 }));
@@ -809,6 +811,9 @@ describe('EditTool', () => {
       filePath = path.join(rootDir, testFile);
       ideClient = {
         openDiff: vi.fn(),
+        getConnectionStatus: vi.fn().mockReturnValue({
+          status: IDEConnectionStatus.Connected,
+        }),
       };
       (mockConfig as any).getIdeMode = () => true;
       (mockConfig as any).getIdeModeFeature = () => true;
