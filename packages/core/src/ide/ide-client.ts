@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ideContext, OpenFilesNotificationSchema } from '../ide/ideContext.js';
+import {
+  detectIde,
+  DetectedIde,
+  getIdeDisplayName,
+} from '../ide/detect-ide.js';
+import { ideContext, IdeContextNotificationSchema } from '../ide/ideContext.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
@@ -15,7 +20,7 @@ const logger = {
 
 export type IDEConnectionState = {
   status: IDEConnectionStatus;
-  details?: string;
+  details?: string; // User-facing
 };
 
 export enum IDEConnectionStatus {
@@ -28,42 +33,151 @@ export enum IDEConnectionStatus {
  * Manages the connection to and interaction with the IDE server.
  */
 export class IdeClient {
-  client: Client | undefined = undefined;
-  connectionStatus: IDEConnectionStatus = IDEConnectionStatus.Disconnected;
+  private static instance: IdeClient;
+  private client: Client | undefined = undefined;
+  private state: IDEConnectionState = {
+    status: IDEConnectionStatus.Disconnected,
+    details:
+      'IDE integration is currently disabled. To enable it, run /ide enable.',
+  };
+  private readonly currentIde: DetectedIde | undefined;
+  private readonly currentIdeDisplayName: string | undefined;
 
-  constructor() {
-    this.connectToMcpServer().catch((err) => {
-      logger.debug('Failed to initialize IdeClient:', err);
-    });
-  }
-
-  getConnectionStatus(): {
-    status: IDEConnectionStatus;
-    details?: string;
-  } {
-    let details: string | undefined;
-    if (this.connectionStatus === IDEConnectionStatus.Disconnected) {
-      if (!process.env['GEMINI_CLI_IDE_SERVER_PORT']) {
-        details = 'GEMINI_CLI_IDE_SERVER_PORT environment variable is not set.';
-      }
+  private constructor() {
+    this.currentIde = detectIde();
+    if (this.currentIde) {
+      this.currentIdeDisplayName = getIdeDisplayName(this.currentIde);
     }
-    return {
-      status: this.connectionStatus,
-      details,
-    };
   }
 
-  async connectToMcpServer(): Promise<void> {
-    this.connectionStatus = IDEConnectionStatus.Connecting;
-    const idePort = process.env['GEMINI_CLI_IDE_SERVER_PORT'];
-    if (!idePort) {
-      logger.debug(
-        'Unable to connect to IDE mode MCP server. GEMINI_CLI_IDE_SERVER_PORT environment variable is not set.',
-      );
-      this.connectionStatus = IDEConnectionStatus.Disconnected;
+  static getInstance(): IdeClient {
+    if (!IdeClient.instance) {
+      IdeClient.instance = new IdeClient();
+    }
+    return IdeClient.instance;
+  }
+
+  async connect(): Promise<void> {
+    this.setState(IDEConnectionStatus.Connecting);
+
+    if (!this.currentIde || !this.currentIdeDisplayName) {
+      this.setState(IDEConnectionStatus.Disconnected);
       return;
     }
 
+    if (!this.validateWorkspacePath()) {
+      return;
+    }
+
+    const port = this.getPortFromEnv();
+    if (!port) {
+      return;
+    }
+
+    await this.establishConnection(port);
+  }
+
+  disconnect() {
+    this.setState(
+      IDEConnectionStatus.Disconnected,
+      'IDE integration disabled. To enable it again, run /ide enable.',
+    );
+    this.client?.close();
+  }
+
+  getCurrentIde(): DetectedIde | undefined {
+    return this.currentIde;
+  }
+
+  getConnectionStatus(): IDEConnectionState {
+    return this.state;
+  }
+
+  getDetectedIdeDisplayName(): string | undefined {
+    return this.currentIdeDisplayName;
+  }
+
+  private setState(status: IDEConnectionStatus, details?: string) {
+    const isAlreadyDisconnected =
+      this.state.status === IDEConnectionStatus.Disconnected &&
+      status === IDEConnectionStatus.Disconnected;
+
+    // Only update details if the state wasn't already disconnected, so that
+    // the first detail message is preserved.
+    if (!isAlreadyDisconnected) {
+      this.state = { status, details };
+    }
+
+    if (status === IDEConnectionStatus.Disconnected) {
+      logger.debug('IDE integration disconnected:', details);
+      ideContext.clearIdeContext();
+    }
+  }
+
+  private validateWorkspacePath(): boolean {
+    const ideWorkspacePath = process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+    if (ideWorkspacePath === undefined) {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
+      );
+      return false;
+    }
+    if (ideWorkspacePath === '') {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `To use this feature, please open a single workspace folder in ${this.currentIdeDisplayName} and try again.`,
+      );
+      return false;
+    }
+    if (ideWorkspacePath !== process.cwd()) {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `Directory mismatch. Gemini CLI is running in a different location than the open workspace in ${this.currentIdeDisplayName}. Please run the CLI from the same directory as your project's root folder.`,
+      );
+      return false;
+    }
+    return true;
+  }
+
+  private getPortFromEnv(): string | undefined {
+    const port = process.env['GEMINI_CLI_IDE_SERVER_PORT'];
+    if (!port) {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
+      );
+      return undefined;
+    }
+    return port;
+  }
+
+  private registerClientHandlers() {
+    if (!this.client) {
+      return;
+    }
+
+    this.client.setNotificationHandler(
+      IdeContextNotificationSchema,
+      (notification) => {
+        ideContext.setIdeContext(notification.params);
+      },
+    );
+    this.client.onerror = (_error) => {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable`,
+      );
+    };
+    this.client.onclose = () => {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable`,
+      );
+    };
+  }
+
+  private async establishConnection(port: string) {
     let transport: StreamableHTTPClientTransport | undefined;
     try {
       this.client = new Client({
@@ -72,31 +186,16 @@ export class IdeClient {
         version: '1.0.0',
       });
       transport = new StreamableHTTPClientTransport(
-        new URL(`http://localhost:${idePort}/mcp`),
+        new URL(`http://localhost:${port}/mcp`),
       );
       await this.client.connect(transport);
-
-      this.client.setNotificationHandler(
-        OpenFilesNotificationSchema,
-        (notification) => {
-          ideContext.setOpenFilesContext(notification.params);
-        },
+      this.registerClientHandlers();
+      this.setState(IDEConnectionStatus.Connected);
+    } catch (_error) {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
       );
-      this.client.onerror = (error) => {
-        logger.debug('IDE MCP client error:', error);
-        this.connectionStatus = IDEConnectionStatus.Disconnected;
-        ideContext.clearOpenFilesContext();
-      };
-      this.client.onclose = () => {
-        logger.debug('IDE MCP client connection closed.');
-        this.connectionStatus = IDEConnectionStatus.Disconnected;
-        ideContext.clearOpenFilesContext();
-      };
-
-      this.connectionStatus = IDEConnectionStatus.Connected;
-    } catch (error) {
-      this.connectionStatus = IDEConnectionStatus.Disconnected;
-      logger.debug('Failed to connect to MCP server:', error);
       if (transport) {
         try {
           await transport.close();

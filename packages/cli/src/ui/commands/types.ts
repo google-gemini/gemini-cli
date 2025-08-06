@@ -59,6 +59,7 @@ export interface CommandContext {
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
     toggleVimEnabled: () => Promise<boolean>;
+    setGeminiMdFileCount: (count: number) => void;
   };
   // Session-specific data
   session: {
@@ -98,7 +99,7 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy';
+  dialog: 'auth' | 'theme' | 'editor' | 'privacy';
 }
 
 /**
@@ -156,6 +157,9 @@ export interface SlashCommand {
   description: string;
 
   kind: CommandKind;
+
+  // Optional metadata for extension commands
+  extensionName?: string;
 
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (

@@ -225,6 +225,7 @@ export class GeminiChat {
         );
         if (accepted !== false && accepted !== null) {
           this.config.setModel(fallbackModel);
+          this.config.setFallbackMode(true);
           return fallbackModel;
         }
         // Check if the model was switched manually in the handler
@@ -286,11 +287,14 @@ export class GeminiChat {
           );
         }
 
-        return this.contentGenerator.generateContent({
-          model: modelToUse,
-          contents: requestContents,
-          config: { ...this.generationConfig, ...params.config },
-        });
+        return this.contentGenerator.generateContent(
+          {
+            model: modelToUse,
+            contents: requestContents,
+            config: { ...this.generationConfig, ...params.config },
+          },
+          prompt_id,
+        );
       };
 
       response = await retryWithBackoff(apiCall, {
@@ -393,11 +397,14 @@ export class GeminiChat {
           );
         }
 
-        return this.contentGenerator.generateContentStream({
-          model: modelToUse,
-          contents: requestContents,
-          config: { ...this.generationConfig, ...params.config },
-        });
+        return this.contentGenerator.generateContentStream(
+          {
+            model: modelToUse,
+            contents: requestContents,
+            config: { ...this.generationConfig, ...params.config },
+          },
+          prompt_id,
+        );
       };
 
       // Note: Retrying streams can be complex. If generateContentStream itself doesn't handle retries

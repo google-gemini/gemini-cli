@@ -13,6 +13,8 @@ import {
   Config,
   GitService,
   Logger,
+  logSlashCommand,
+  SlashCommandEvent,
   ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
@@ -40,7 +42,6 @@ export const useSlashCommandProcessor = (
   clearItems: UseHistoryManagerReturn['clearItems'],
   loadHistory: UseHistoryManagerReturn['loadHistory'],
   refreshStatic: () => void,
-  setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   onDebugMessage: (message: string) => void,
   openThemeDialog: () => void,
   openAuthDialog: () => void,
@@ -50,6 +51,7 @@ export const useSlashCommandProcessor = (
   openPrivacyNotice: () => void,
   toggleVimEnabled: () => Promise<boolean>,
   setIsProcessing: (isProcessing: boolean) => void,
+  setGeminiMdFileCount: (count: number) => void,
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<readonly SlashCommand[]>([]);
@@ -103,6 +105,11 @@ export const useSlashCommandProcessor = (
           selectedAuthType: message.selectedAuthType,
           gcpProject: message.gcpProject,
         };
+      } else if (message.type === MessageType.HELP) {
+        historyItemContent = {
+          type: 'help',
+          timestamp: message.timestamp,
+        };
       } else if (message.type === MessageType.STATS) {
         historyItemContent = {
           type: 'stats',
@@ -136,7 +143,6 @@ export const useSlashCommandProcessor = (
     },
     [addItem],
   );
-
   const commandContext = useMemo(
     (): CommandContext => ({
       services: {
@@ -158,6 +164,7 @@ export const useSlashCommandProcessor = (
         setPendingItem: setPendingCompressionItem,
         toggleCorgiMode,
         toggleVimEnabled,
+        setGeminiMdFileCount,
       },
       session: {
         stats: session.stats,
@@ -180,8 +187,11 @@ export const useSlashCommandProcessor = (
       toggleCorgiMode,
       toggleVimEnabled,
       sessionShellAllowlist,
+      setGeminiMdFileCount,
     ],
   );
+
+  const ideMode = config?.getIdeMode();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -203,7 +213,7 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config]);
+  }, [config, ideMode]);
 
   const handleSlashCommand = useCallback(
     async (
@@ -233,6 +243,7 @@ export const useSlashCommandProcessor = (
         let currentCommands = commands;
         let commandToExecute: SlashCommand | undefined;
         let pathIndex = 0;
+        const canonicalPath: string[] = [];
 
         for (const part of commandPath) {
           // TODO: For better performance and architectural clarity, this two-pass
@@ -253,6 +264,7 @@ export const useSlashCommandProcessor = (
 
           if (foundCommand) {
             commandToExecute = foundCommand;
+            canonicalPath.push(foundCommand.name);
             pathIndex++;
             if (foundCommand.subCommands) {
               currentCommands = foundCommand.subCommands;
@@ -268,6 +280,17 @@ export const useSlashCommandProcessor = (
           const args = parts.slice(pathIndex).join(' ');
 
           if (commandToExecute.action) {
+            if (config) {
+              const resolvedCommandPath = canonicalPath;
+              const event = new SlashCommandEvent(
+                resolvedCommandPath[0],
+                resolvedCommandPath.length > 1
+                  ? resolvedCommandPath.slice(1).join(' ')
+                  : undefined,
+              );
+              logSlashCommand(config, event);
+            }
+
             const fullCommandContext: CommandContext = {
               ...commandContext,
               invocation: {
@@ -316,9 +339,6 @@ export const useSlashCommandProcessor = (
                   return { type: 'handled' };
                 case 'dialog':
                   switch (result.dialog) {
-                    case 'help':
-                      setShowHelp(true);
-                      return { type: 'handled' };
                     case 'auth':
                       openAuthDialog();
                       return { type: 'handled' };
@@ -445,7 +465,6 @@ export const useSlashCommandProcessor = (
     [
       config,
       addItem,
-      setShowHelp,
       openAuthDialog,
       commands,
       commandContext,

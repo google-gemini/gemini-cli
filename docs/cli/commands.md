@@ -17,11 +17,19 @@ Slash commands provide meta-level control over the CLI itself.
     - **`save`**
       - **Description:** Saves the current conversation history. You must add a `<tag>` for identifying the conversation state.
       - **Usage:** `/chat save <tag>`
+      - **Details on Checkpoint Location:** The default locations for saved chat checkpoints are:
+        - Linux/macOS: `~/.config/google-generative-ai/checkpoints/`
+        - Windows: `C:\Users\<YourUsername>\AppData\Roaming\google-generative-ai\checkpoints\`
+        - When you run `/chat list`, the CLI only scans these specific directories to find available checkpoints.
+        - **Note:** These checkpoints are for manually saving and resuming conversation states. For automatic checkpoints created before file modifications, see the [Checkpointing documentation](../checkpointing.md).
     - **`resume`**
       - **Description:** Resumes a conversation from a previous save.
       - **Usage:** `/chat resume <tag>`
     - **`list`**
       - **Description:** Lists available tags for chat state resumption.
+    - **`delete`**
+      - **Description:** Deletes a saved conversation checkpoint.
+      - **Usage:** `/chat delete <tag>`
 
 - **`/clear`**
   - **Description:** Clear the terminal screen, including the visible session history and scrollback within the CLI. The underlying session data (for history recall) might be preserved depending on the exact implementation, but the visual display is cleared.
@@ -32,6 +40,17 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **`/copy`**
   - **Description:** Copies the last output produced by Gemini CLI to your clipboard, for easy sharing or reuse.
+
+- **`/directory`** (or **`/dir`**)
+  - **Description:** Manage workspace directories for multi-directory support.
+  - **Sub-commands:**
+    - **`add`**:
+      - **Description:** Add a directory to the workspace. The path can be absolute or relative to the current working directory. Moreover, the reference from home directory is supported as well.
+      - **Usage:** `/directory add <path1>,<path2>`
+      - **Note:** Disabled in restrictive sandbox profiles. If you're using that, use `--include-directories` when starting the session instead.
+    - **`show`**:
+      - **Description:** Display all directories added by `/directory add` and `--include-directories`.
+      - **Usage:** `/directory show`
 
 - **`/editor`**
   - **Description:** Open a dialog for selecting supported editors.
@@ -105,6 +124,9 @@ Slash commands provide meta-level control over the CLI itself.
     - **Repeat last command:** Use `.` to repeat the last editing operation
     - **Persistent setting:** Vim mode preference is saved to `~/.gemini/settings.json` and restored between sessions
   - **Status indicator:** When enabled, shows `[NORMAL]` or `[INSERT]` in the footer
+
+- **`/init`**
+  - **Description:** To help users easily create a `GEMINI.md` file, this command analyzes the current directory and generates a tailored context file, making it simpler for them to provide project-specific instructions to the Gemini agent.
 
 ### Custom Commands
 
@@ -234,7 +256,7 @@ Please generate a Conventional Commit message based on the following git diff:
 
 ```diff
 !{git diff --staged}
-````
+```
 
 """
 
@@ -255,7 +277,7 @@ First, ensure the user commands directory exists, then create a `refactor` subdi
 ```bash
 mkdir -p ~/.gemini/commands/refactor
 touch ~/.gemini/commands/refactor/pure.toml
-````
+```
 
 **2. Add the content to the file:**
 

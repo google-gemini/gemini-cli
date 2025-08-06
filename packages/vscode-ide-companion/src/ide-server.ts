@@ -14,49 +14,27 @@ import {
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Server as HTTPServer } from 'node:http';
-import { RecentFilesManager } from './recent-files-manager.js';
+import { z } from 'zod';
+import { DiffManager } from './diff-manager.js';
+import { OpenFilesManager } from './open-files-manager.js';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
-const MAX_SELECTED_TEXT_LENGTH = 16384; // 16 KiB limit
 
-function sendOpenFilesChangedNotification(
+function sendIdeContextUpdateNotification(
   transport: StreamableHTTPServerTransport,
   log: (message: string) => void,
-  recentFilesManager: RecentFilesManager,
+  openFilesManager: OpenFilesManager,
 ) {
-  const editor = vscode.window.activeTextEditor;
-  const filePath =
-    editor && editor.document.uri.scheme === 'file'
-      ? editor.document.uri.fsPath
-      : '';
-  const selection = editor?.selection;
-  const cursor = selection
-    ? {
-        // This value is a zero-based index, but the vscode IDE is one-based.
-        line: selection.active.line + 1,
-        character: selection.active.character,
-      }
-    : undefined;
-  let selectedText = editor?.document.getText(selection) ?? undefined;
-  if (selectedText && selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
-    selectedText =
-      selectedText.substring(0, MAX_SELECTED_TEXT_LENGTH) + '... [TRUNCATED]';
-  }
+  const ideContext = openFilesManager.state;
+
   const notification: JSONRPCNotification = {
     jsonrpc: '2.0',
-    method: 'ide/openFilesChanged',
-    params: {
-      activeFile: filePath,
-      recentOpenFiles: recentFilesManager.recentFiles.filter(
-        (file) => file.filePath !== filePath,
-      ),
-      cursor,
-      selectedText,
-    },
+    method: 'ide/contextUpdate',
+    params: ideContext,
   };
   log(
-    `Sending active file changed notification: ${JSON.stringify(
+    `Sending IDE context update notification: ${JSON.stringify(
       notification,
       null,
       2,
@@ -69,32 +47,42 @@ export class IDEServer {
   private server: HTTPServer | undefined;
   private context: vscode.ExtensionContext | undefined;
   private log: (message: string) => void;
+  diffManager: DiffManager;
 
-  constructor(log: (message: string) => void) {
+  constructor(log: (message: string) => void, diffManager: DiffManager) {
     this.log = log;
+    this.diffManager = diffManager;
   }
 
   async start(context: vscode.ExtensionContext) {
     this.context = context;
+    const sessionsWithInitialNotification = new Set<string>();
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } =
       {};
-    const sessionsWithInitialNotification = new Set<string>();
 
     const app = express();
     app.use(express.json());
-    const mcpServer = createMcpServer();
+    const mcpServer = createMcpServer(this.diffManager);
 
-    const recentFilesManager = new RecentFilesManager(context);
-    const onDidChangeSubscription = recentFilesManager.onDidChange(() => {
+    const openFilesManager = new OpenFilesManager(context);
+    const onDidChangeSubscription = openFilesManager.onDidChange(() => {
       for (const transport of Object.values(transports)) {
-        sendOpenFilesChangedNotification(
+        sendIdeContextUpdateNotification(
           transport,
           this.log.bind(this),
-          recentFilesManager,
+          openFilesManager,
         );
       }
     });
     context.subscriptions.push(onDidChangeSubscription);
+    const onDidChangeDiffSubscription = this.diffManager.onDidChange(
+      (notification: JSONRPCNotification) => {
+        for (const transport of Object.values(transports)) {
+          transport.send(notification);
+        }
+      },
+    );
+    context.subscriptions.push(onDidChangeDiffSubscription);
 
     app.post('/mcp', async (req: Request, res: Response) => {
       const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
@@ -112,7 +100,6 @@ export class IDEServer {
             transports[newSessionId] = transport;
           },
         });
-
         const keepAlive = setInterval(() => {
           try {
             transport.send({ jsonrpc: '2.0', method: 'ping' });
@@ -191,10 +178,10 @@ export class IDEServer {
       }
 
       if (!sessionsWithInitialNotification.has(sessionId)) {
-        sendOpenFilesChangedNotification(
+        sendIdeContextUpdateNotification(
           transport,
           this.log.bind(this),
-          recentFilesManager,
+          openFilesManager,
         );
         sessionsWithInitialNotification.add(sessionId);
       }
@@ -236,13 +223,62 @@ export class IDEServer {
   }
 }
 
-const createMcpServer = () => {
+const createMcpServer = (diffManager: DiffManager) => {
   const server = new McpServer(
     {
       name: 'gemini-cli-companion-mcp-server',
       version: '1.0.0',
     },
     { capabilities: { logging: {} } },
+  );
+  server.registerTool(
+    'openDiff',
+    {
+      description:
+        '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejcted.',
+      inputSchema: z.object({
+        filePath: z.string(),
+        // TODO(chrstn): determine if this should be required or not.
+        newContent: z.string().optional(),
+      }).shape,
+    },
+    async ({
+      filePath,
+      newContent,
+    }: {
+      filePath: string;
+      newContent?: string;
+    }) => {
+      await diffManager.showDiff(filePath, newContent ?? '');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Showing diff for ${filePath}`,
+          },
+        ],
+      };
+    },
+  );
+  server.registerTool(
+    'closeDiff',
+    {
+      description: '(IDE Tool) Close an open diff view for a specific file.',
+      inputSchema: z.object({
+        filePath: z.string(),
+      }).shape,
+    },
+    async ({ filePath }: { filePath: string }) => {
+      await diffManager.closeDiff(filePath);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Closed diff for ${filePath}`,
+          },
+        ],
+      };
+    },
   );
   return server;
 };

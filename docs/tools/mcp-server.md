@@ -169,6 +169,7 @@ Use the `/mcp auth` command to manage OAuth authentication:
 - **`scopes`** (string[]): Required OAuth scopes
 - **`redirectUri`** (string): Custom redirect URI (defaults to `http://localhost:7777/oauth/callback`)
 - **`tokenParamName`** (string): Query parameter name for tokens in SSE URLs
+- **`audiences`** (string[]): Audiences the token is valid for
 
 #### Token Management
 
@@ -570,3 +571,120 @@ The MCP integration tracks several states:
 - **Conflict resolution:** Tool name conflicts between servers are resolved through automatic prefixing
 
 This comprehensive integration makes MCP servers a powerful way to extend the Gemini CLI's capabilities while maintaining security, reliability, and ease of use.
+
+## Returning Rich Content from Tools
+
+MCP tools are not limited to returning simple text. You can return rich, multi-part content, including text, images, audio, and other binary data in a single tool response. This allows you to build powerful tools that can provide diverse information to the model in a single turn.
+
+All data returned from the tool is processed and sent to the model as context for its next generation, enabling it to reason about or summarize the provided information.
+
+### How It Works
+
+To return rich content, your tool's response must adhere to the MCP specification for a [`CallToolResult`](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#tool-result). The `content` field of the result should be an array of `ContentBlock` objects. The Gemini CLI will correctly process this array, separating text from binary data and packaging it for the model.
+
+You can mix and match different content block types in the `content` array. The supported block types include:
+
+- `text`
+- `image`
+- `audio`
+- `resource` (embedded content)
+- `resource_link`
+
+### Example: Returning Text and an Image
+
+Here is an example of a valid JSON response from an MCP tool that returns both a text description and an image:
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Here is the logo you requested."
+    },
+    {
+      "type": "image",
+      "data": "BASE64_ENCODED_IMAGE_DATA_HERE",
+      "mimeType": "image/png"
+    },
+    {
+      "type": "text",
+      "text": "The logo was created in 2025."
+    }
+  ]
+}
+```
+
+When the Gemini CLI receives this response, it will:
+
+1.  Extract all the text and combine it into a single `functionResponse` part for the model.
+2.  Present the image data as a separate `inlineData` part.
+3.  Provide a clean, user-friendly summary in the CLI, indicating that both text and an image were received.
+
+This enables you to build sophisticated tools that can provide rich, multi-modal context to the Gemini model.
+
+## MCP Prompts as Slash Commands
+
+In addition to tools, MCP servers can expose predefined prompts that can be executed as slash commands within the Gemini CLI. This allows you to create shortcuts for common or complex queries that can be easily invoked by name.
+
+### Defining Prompts on the Server
+
+Here's a small example of a stdio MCP server that defines prompts:
+
+```ts
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+
+const server = new McpServer({
+  name: 'prompt-server',
+  version: '1.0.0',
+});
+
+server.registerPrompt(
+  'poem-writer',
+  {
+    title: 'Poem Writer',
+    description: 'Write a nice haiku',
+    argsSchema: { title: z.string(), mood: z.string().optional() },
+  },
+  ({ title, mood }) => ({
+    messages: [
+      {
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Write a haiku${mood ? ` with the mood ${mood}` : ''} called ${title}. Note that a haiku is 5 syllables followed by 7 syllables followed by 5 syllables `,
+        },
+      },
+    ],
+  }),
+);
+
+const transport = new StdioServerTransport();
+await server.connect(transport);
+```
+
+This can be included in `settings.json` under `mcpServers` with:
+
+```json
+"nodeServer": {
+  "command": "node",
+  "args": ["filename.ts"],
+}
+```
+
+### Invoking Prompts
+
+Once a prompt is discovered, you can invoke it using its name as a slash command. The CLI will automatically handle parsing arguments.
+
+```bash
+/poem-writer --title="Gemini CLI" --mood="reverent"
+```
+
+or, using positional arguments:
+
+```bash
+/poem-writer "Gemini CLI" reverent
+```
+
+When you run this command, the Gemini CLI executes the `prompts/get` method on the MCP server with the provided arguments. The server is responsible for substituting the arguments into the prompt template and returning the final prompt text. The CLI then sends this prompt to the model for execution. This provides a convenient way to automate and share common workflows.
