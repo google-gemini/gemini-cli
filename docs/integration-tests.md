@@ -109,10 +109,10 @@ To check for linting errors, run the following command:
 npm run lint
 ```
 
-You can include the `--fix` flag in the command to automatically fix any fixable linting errors:
+You can include the `:fix` flag in the command to automatically fix any fixable linting errors:
 
 ```bash
-npm run lint --fix
+npm run lint:fix
 ```
 
 ## Directory structure
@@ -132,7 +132,7 @@ This structure makes it easy to locate the artifacts for a specific test run, fi
 
 ## Continuous integration
 
-To ensure the integration tests are always run, a GitHub Actions workflow is defined in `.github/workflows/e2e.yml`. This workflow automatically runs the integration tests on every pull request and push to the `main` branch.
+To ensure the integration tests are always run, a GitHub Actions workflow is defined in `.github/workflows/e2e.yml`. This workflow automatically runs the integrations tests for pull requests against the `main` branch, or when a pull request is added to a merge queue.
 
 The workflow runs the tests in different sandboxing environments to ensure Gemini CLI is tested across each:
 

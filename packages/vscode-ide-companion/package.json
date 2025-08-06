@@ -1,0 +1,131 @@
+{
+  "name": "gemini-cli-vscode-ide-companion",
+  "displayName": "Gemini CLI Companion",
+  "description": "Enable Gemini CLI with direct access to your VS Code workspace.",
+  "version": "0.0.1",
+  "publisher": "google",
+  "icon": "assets/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/google-gemini/gemini-cli.git",
+    "directory": "packages/vscode-ide-companion"
+  },
+  "engines": {
+    "vscode": "^1.101.0"
+  },
+  "license": "LICENSE",
+  "preview": true,
+  "categories": [
+    "AI"
+  ],
+  "keywords": [
+    "gemini-cli",
+    "gemini cli",
+    "gemini",
+    "gemini code",
+    "cli",
+    "ide integration",
+    "ide companion"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "gemini-diff-editable"
+      }
+    ],
+    "commands": [
+      {
+        "command": "gemini.diff.accept",
+        "title": "Gemini CLI: Accept Current Diff",
+        "icon": "$(check)"
+      },
+      {
+        "command": "gemini.diff.cancel",
+        "title": "Cancel",
+        "icon": "$(close)"
+      },
+      {
+        "command": "gemini-cli.runGeminiCLI",
+        "title": "Gemini CLI: Run"
+      },
+      {
+        "command": "gemini-cli.showNotices",
+        "title": "Gemini CLI: View Third-Party Notices"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "gemini.diff.accept",
+          "when": "gemini.diff.isVisible"
+        },
+        {
+          "command": "gemini.diff.cancel",
+          "when": "gemini.diff.isVisible"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "gemini.diff.accept",
+          "when": "gemini.diff.isVisible",
+          "group": "navigation"
+        },
+        {
+          "command": "gemini.diff.cancel",
+          "when": "gemini.diff.isVisible",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "gemini.diff.accept",
+        "key": "ctrl+s",
+        "when": "gemini.diff.isVisible"
+      },
+      {
+        "command": "gemini.diff.accept",
+        "key": "cmd+s",
+        "when": "gemini.diff.isVisible"
+      }
+    ]
+  },
+  "main": "./dist/extension.cjs",
+  "type": "module",
+  "scripts": {
+    "vscode:prepublish": "npm run generate:notices && npm run check-types && npm run lint && node esbuild.js --production",
+    "build": "npm run compile",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "vsce package --no-dependencies",
+    "generate:notices": "node ./scripts/generate-notices.js",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "test:ci": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.101.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "esbuild": "^0.25.3",
+    "eslint": "^9.25.1",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.1",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "zod": "^3.25.76"
+  }
+}

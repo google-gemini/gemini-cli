@@ -7,19 +7,32 @@
 import { describe, it, expect, vi } from 'vitest';
 import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
+import { UserTierId } from './types.js';
 
 vi.mock('google-auth-library');
 
 describe('CodeAssistServer', () => {
   it('should be able to be constructed', () => {
     const auth = new OAuth2Client();
-    const server = new CodeAssistServer(auth, 'test-project');
+    const server = new CodeAssistServer(
+      auth,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
     expect(server).toBeInstanceOf(CodeAssistServer);
   });
 
   it('should call the generateContent endpoint', async () => {
     const client = new OAuth2Client();
-    const server = new CodeAssistServer(client, 'test-project');
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
     const mockResponse = {
       response: {
         candidates: [
@@ -37,10 +50,13 @@ describe('CodeAssistServer', () => {
     };
     vi.spyOn(server, 'requestPost').mockResolvedValue(mockResponse);
 
-    const response = await server.generateContent({
-      model: 'test-model',
-      contents: [{ role: 'user', parts: [{ text: 'request' }] }],
-    });
+    const response = await server.generateContent(
+      {
+        model: 'test-model',
+        contents: [{ role: 'user', parts: [{ text: 'request' }] }],
+      },
+      'user-prompt-id',
+    );
 
     expect(server.requestPost).toHaveBeenCalledWith(
       'generateContent',
@@ -54,7 +70,13 @@ describe('CodeAssistServer', () => {
 
   it('should call the generateContentStream endpoint', async () => {
     const client = new OAuth2Client();
-    const server = new CodeAssistServer(client, 'test-project');
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
     const mockResponse = (async function* () {
       yield {
         response: {
@@ -74,10 +96,13 @@ describe('CodeAssistServer', () => {
     })();
     vi.spyOn(server, 'requestStreamingPost').mockResolvedValue(mockResponse);
 
-    const stream = await server.generateContentStream({
-      model: 'test-model',
-      contents: [{ role: 'user', parts: [{ text: 'request' }] }],
-    });
+    const stream = await server.generateContentStream(
+      {
+        model: 'test-model',
+        contents: [{ role: 'user', parts: [{ text: 'request' }] }],
+      },
+      'user-prompt-id',
+    );
 
     for await (const res of stream) {
       expect(server.requestStreamingPost).toHaveBeenCalledWith(
@@ -91,7 +116,13 @@ describe('CodeAssistServer', () => {
 
   it('should call the onboardUser endpoint', async () => {
     const client = new OAuth2Client();
-    const server = new CodeAssistServer(client, 'test-project');
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
     const mockResponse = {
       name: 'operations/123',
       done: true,
@@ -113,9 +144,22 @@ describe('CodeAssistServer', () => {
 
   it('should call the loadCodeAssist endpoint', async () => {
     const client = new OAuth2Client();
-    const server = new CodeAssistServer(client, 'test-project');
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
     const mockResponse = {
-      // TODO: Add mock response
+      currentTier: {
+        id: UserTierId.FREE,
+        name: 'Free',
+        description: 'free tier',
+      },
+      allowedTiers: [],
+      ineligibleTiers: [],
+      cloudaicompanionProject: 'projects/test',
     };
     vi.spyOn(server, 'requestPost').mockResolvedValue(mockResponse);
 
@@ -127,12 +171,18 @@ describe('CodeAssistServer', () => {
       'loadCodeAssist',
       expect.any(Object),
     );
-    expect(response).toBe(mockResponse);
+    expect(response).toEqual(mockResponse);
   });
 
   it('should return 0 for countTokens', async () => {
     const client = new OAuth2Client();
-    const server = new CodeAssistServer(client, 'test-project');
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
     const mockResponse = {
       totalTokens: 100,
     };
@@ -147,7 +197,13 @@ describe('CodeAssistServer', () => {
 
   it('should throw an error for embedContent', async () => {
     const client = new OAuth2Client();
-    const server = new CodeAssistServer(client, 'test-project');
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
     await expect(
       server.embedContent({
         model: 'test-model',

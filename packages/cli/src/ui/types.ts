@@ -97,6 +97,11 @@ export type HistoryItemAbout = HistoryItemBase & {
   gcpProject: string;
 };
 
+export type HistoryItemHelp = HistoryItemBase & {
+  type: 'help';
+  timestamp: Date;
+};
+
 export type HistoryItemStats = HistoryItemBase & {
   type: 'stats';
   duration: string;
@@ -142,6 +147,7 @@ export type HistoryItemWithoutId =
   | HistoryItemInfo
   | HistoryItemError
   | HistoryItemAbout
+  | HistoryItemHelp
   | HistoryItemToolGroup
   | HistoryItemStats
   | HistoryItemModelStats
@@ -157,6 +163,7 @@ export enum MessageType {
   ERROR = 'error',
   USER = 'user',
   ABOUT = 'about',
+  HELP = 'help',
   STATS = 'stats',
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
@@ -182,6 +189,11 @@ export type Message =
       selectedAuthType: string;
       gcpProject: string;
       content?: string; // Optional content, not really used for ABOUT
+    }
+  | {
+      type: MessageType.HELP;
+      timestamp: Date;
+      content?: string; // Optional content, not really used for HELP
     }
   | {
       type: MessageType.STATS;
@@ -216,3 +228,26 @@ export interface ConsoleMessageItem {
   content: string;
   count: number;
 }
+
+/**
+ * Result type for a slash command that should immediately result in a prompt
+ * being submitted to the Gemini model.
+ */
+export interface SubmitPromptResult {
+  type: 'submit_prompt';
+  content: string;
+}
+
+/**
+ * Defines the result of the slash command processor for its consumer (useGeminiStream).
+ */
+export type SlashCommandProcessorResult =
+  | {
+      type: 'schedule_tool';
+      toolName: string;
+      toolArgs: Record<string, unknown>;
+    }
+  | {
+      type: 'handled'; // Indicates the command was processed and no further action is needed.
+    }
+  | SubmitPromptResult;
