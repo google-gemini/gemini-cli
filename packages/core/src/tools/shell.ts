@@ -255,9 +255,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
             returnDisplay: error,
           };
         }
-        if (paths.length === 1) {
-          cwd = paths[0];
-        }
+        cwd = paths[0];
       }
 
       let cumulativeStdout = '';
