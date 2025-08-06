@@ -152,14 +152,27 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
 
     if (result.error) {
       // Map structured error types to ToolErrorType
-      let errorType = ToolErrorType.READ_CONTENT_FAILURE;
-      if (result.errorType === FileErrorType.FILE_NOT_FOUND) {
-        errorType = ToolErrorType.FILE_NOT_FOUND;
+      let errorType: ToolErrorType;
+      let llmContent: string;
+
+      switch (result.errorType) {
+        case FileErrorType.FILE_NOT_FOUND:
+          errorType = ToolErrorType.FILE_NOT_FOUND;
+          llmContent = 'Could not read file.';
+          break;
+        case FileErrorType.IS_DIRECTORY:
+          errorType = ToolErrorType.INVALID_TOOL_PARAMS;
+          llmContent = 'Could not read file due to invalid parameters.';
+          break;
+        default:
+          // FILE_TOO_LARGE and other read errors map to READ_CONTENT_FAILURE
+          errorType = ToolErrorType.READ_CONTENT_FAILURE;
+          llmContent = 'Could not read file.';
+          break;
       }
-      // IS_DIRECTORY and FILE_TOO_LARGE map to READ_CONTENT_FAILURE
 
       return {
-        llmContent: 'Could not read file.',
+        llmContent,
         returnDisplay: result.returnDisplay || 'Error reading file',
         error: {
           message: result.error,
