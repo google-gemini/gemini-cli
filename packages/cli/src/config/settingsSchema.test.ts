@@ -192,7 +192,7 @@ describe('SettingsSchema', () => {
         includeDirectories: ['/path/to/dir'],
         loadMemoryFromIncludeDirectories: true,
       };
-      
+
       // TypeScript should not complain about these properties
       expect(settings.theme).toBe('dark');
       expect(settings.includeDirectories).toEqual(['/path/to/dir']);
@@ -208,9 +208,15 @@ describe('SettingsSchema', () => {
 
     it('should have loadMemoryFromIncludeDirectories setting in schema', () => {
       expect(SETTINGS_SCHEMA.loadMemoryFromIncludeDirectories).toBeDefined();
-      expect(SETTINGS_SCHEMA.loadMemoryFromIncludeDirectories.type).toBe('boolean');
-      expect(SETTINGS_SCHEMA.loadMemoryFromIncludeDirectories.category).toBe('General');
-      expect(SETTINGS_SCHEMA.loadMemoryFromIncludeDirectories.default).toBe(false);
+      expect(SETTINGS_SCHEMA.loadMemoryFromIncludeDirectories.type).toBe(
+        'boolean',
+      );
+      expect(SETTINGS_SCHEMA.loadMemoryFromIncludeDirectories.category).toBe(
+        'General',
+      );
+      expect(SETTINGS_SCHEMA.loadMemoryFromIncludeDirectories.default).toBe(
+        false,
+      );
     });
   });
 });

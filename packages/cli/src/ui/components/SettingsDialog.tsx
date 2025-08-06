@@ -74,7 +74,7 @@ export function SettingsDialog({
   );
 
   // Track the intended values for modified settings
-  const [modifiedValues, setModifiedValues] = useState<Map<string, any>>(
+  const [modifiedValues, setModifiedValues] = useState<Map<string, boolean>>(
     new Map(),
   );
 
@@ -185,7 +185,7 @@ export function SettingsDialog({
               return updated;
             });
 
-            setPendingSettings((prevPending) => {
+            setPendingSettings((_prevPending) => {
               let updatedPending = structuredClone(
                 settings.forScope(selectedScope).settings,
               );
