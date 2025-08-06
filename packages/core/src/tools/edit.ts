@@ -27,6 +27,7 @@ import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
+import { IDEConnectionStatus } from '../ide/ide-client.js';
 
 /**
  * Parameters for the Edit tool
@@ -330,7 +331,9 @@ Expectation for required parameters:
     );
     const ideClient = this.config.getIdeClient();
     const ideConfirmation =
-      this.config.getIdeMode() && ideClient
+      this.config.getIdeModeFeature() &&
+      this.config.getIdeMode() &&
+      ideClient?.getConnectionStatus().status === IDEConnectionStatus.Connected
         ? ideClient.openDiff(params.file_path, editData.newContent)
         : undefined;
 
