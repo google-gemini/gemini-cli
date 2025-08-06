@@ -1009,6 +1009,39 @@ describe('loadCliConfig ideModeFeature', () => {
   });
 });
 
+describe('loadCliConfig folderTrustFeature', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('should be false by default', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = {};
+    const argv = await parseArguments();
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFolderTrustFeature()).toBe(false);
+  });
+
+  it('should be true when settings.folderTrustFeature is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = { folderTrustFeature: true };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFolderTrustFeature()).toBe(true);
+  });
+});
+
 vi.mock('fs', async () => {
   const actualFs = await vi.importActual<typeof fs>('fs');
   const MOCK_CWD1 = process.cwd();
