@@ -21,7 +21,7 @@ export function getDiffStat(
   let aiAddedLines = 0;
   let aiRemovedLines = 0;
   let userAddedLines = 0;
-  let userDeletedLines = 0;
+  let userRemovedLines = 0;
 
   const patch = Diff.structuredPatch(
     fileName,
@@ -55,7 +55,7 @@ export function getDiffStat(
       if (line.startsWith('+')) {
         userAddedLines++;
       } else if (line.startsWith('-')) {
-        userDeletedLines++;
+        userRemovedLines++;
       }
     });
   });
@@ -63,6 +63,6 @@ export function getDiffStat(
     ai_added_lines: aiAddedLines,
     ai_removed_lines: aiRemovedLines,
     user_added_lines: userAddedLines,
-    user_removed_lines: userDeletedLines,
+    user_removed_lines: userRemovedLines,
   };
 }
