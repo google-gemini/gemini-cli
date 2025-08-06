@@ -19,6 +19,7 @@ export type FileSearchOptions = {
   useGeminiignore: boolean;
   cache: boolean;
   cacheTtl: number;
+  maxDepth?: number;
 };
 
 export class AbortError extends Error {
@@ -215,6 +216,7 @@ export class FileSearch {
       const cacheKey = cache.getCacheKey(
         this.absoluteDir,
         this.ignore.getFingerprint(),
+        this.options.maxDepth,
       );
       const cachedResults = cache.read(cacheKey);
 
@@ -230,6 +232,7 @@ export class FileSearch {
       const cacheKey = cache.getCacheKey(
         this.absoluteDir,
         this.ignore.getFingerprint(),
+        this.options.maxDepth,
       );
       cache.write(cacheKey, this.allFiles, this.options.cacheTtl * 1000);
     }
@@ -256,6 +259,10 @@ export class FileSearch {
         const relativePath = path.relative(this.absoluteDir, dirPath);
         return dirFilter(`${relativePath}/`);
       });
+
+    if (this.options.maxDepth !== undefined) {
+      api.withMaxDepth(this.options.maxDepth);
+    }
 
     return api.crawl(this.absoluteDir).withPromise();
   }

@@ -26,6 +26,17 @@ describe('CrawlCache', () => {
       const key2 = getCacheKey('/foo', 'baz');
       expect(key1).not.toBe(key2);
     });
+
+    it('should generate a different hash for different maxDepth values', () => {
+      const key1 = getCacheKey('/foo', 'bar', 1);
+      const key2 = getCacheKey('/foo', 'bar', 2);
+      const key3 = getCacheKey('/foo', 'bar', undefined);
+      const key4 = getCacheKey('/foo', 'bar');
+      expect(key1).not.toBe(key2);
+      expect(key1).not.toBe(key3);
+      expect(key2).not.toBe(key3);
+      expect(key3).toBe(key4);
+    });
   });
 
   describe('in-memory cache operations', () => {
