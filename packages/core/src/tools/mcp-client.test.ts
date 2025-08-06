@@ -58,7 +58,7 @@ describe('mcp-client', () => {
       const mockedClient = {} as unknown as ClientLib.Client;
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
-        .mockImplementation(() => {});
+        .mockImplementation(() => { });
 
       const testError = new Error('Invalid tool name');
       vi.mocked(DiscoveredMCPTool).mockImplementation(
@@ -96,6 +96,182 @@ describe('mcp-client', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         `Error discovering tool: 'invalid tool name' from MCP server 'test-server': ${testError.message}`,
       );
+    });
+
+    it('should skip tools if a parameter is missing a type', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => { });
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'validTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: { type: 'string' },
+                  },
+                },
+              },
+              {
+                name: 'invalidTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: { description: 'a param with no type' },
+                  },
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('validTool');
+      expect(consoleWarnSpy).toHaveBeenCalledOnce();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
+        `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
+      );
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should skip tools if a nested parameter is missing a type', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => { });
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'invalidTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: {
+                      type: 'object',
+                      properties: {
+                        nestedParam: {
+                          description: 'a nested param with no type',
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(0);
+      expect(consoleWarnSpy).toHaveBeenCalledOnce();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
+        `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
+      );
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should skip tool if an array item is missing a type', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => { });
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'invalidTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: {
+                      type: 'array',
+                      items: {
+                        description: 'an array item with no type',
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(0);
+      expect(consoleWarnSpy).toHaveBeenCalledOnce();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
+        `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
+      );
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should discover tool with no properties in schema', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => { });
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'validTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('validTool');
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should discover tool with empty properties object in schema', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => { });
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'validTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {},
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('validTool');
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      consoleWarnSpy.mockRestore();
     });
   });
 
@@ -143,7 +319,7 @@ describe('mcp-client', () => {
 
       const consoleLogSpy = vi
         .spyOn(console, 'debug')
-        .mockImplementation(() => {});
+        .mockImplementation(() => { });
 
       await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
 
@@ -167,7 +343,7 @@ describe('mcp-client', () => {
 
       const consoleLogSpy = vi
         .spyOn(console, 'debug')
-        .mockImplementation(() => {});
+        .mockImplementation(() => { });
 
       await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
 
@@ -192,7 +368,7 @@ describe('mcp-client', () => {
 
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
-        .mockImplementation(() => {});
+        .mockImplementation(() => { });
 
       await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
 

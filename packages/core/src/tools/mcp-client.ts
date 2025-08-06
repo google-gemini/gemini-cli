@@ -417,6 +417,46 @@ export async function connectAndDiscover(
 }
 
 /**
+ * Recursively validates that a JSON schema and all its nested properties and
+ * items have a `type` defined.
+ *
+ * @param schema The JSON schema to validate.
+ * @returns `true` if the schema is valid, `false` otherwise.
+ */
+function hasValidTypes(schema: unknown): boolean {
+  if (typeof schema !== 'object' || schema === null) {
+    // Not a schema object we can validate, or not a schema at all.
+    // Treat as valid as it has no properties to be invalid.
+    return true;
+  }
+
+  const s = schema as Record<string, unknown>;
+
+  if (!s.type) {
+    // The node itself is missing a type.
+    return false;
+  }
+
+  if (s.type === 'object' && s.properties) {
+    if (typeof s.properties === 'object' && s.properties !== null) {
+      for (const prop of Object.values(s.properties)) {
+        if (!hasValidTypes(prop)) {
+          return false;
+        }
+      }
+    }
+  }
+
+  if (s.type === 'array' && s.items) {
+    if (!hasValidTypes(s.items)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Discovers and sanitizes tools from a connected MCP client.
  * It retrieves function declarations from the client, filters out disabled tools,
  * generates valid names for them, and wraps them in `DiscoveredMCPTool` instances.
@@ -448,6 +488,15 @@ export async function discoverTools(
           continue;
         }
 
+        if (!hasValidTypes(funcDecl.parametersJsonSchema)) {
+          console.warn(
+            `Skipping tool '${funcDecl.name}' from MCP server '${mcpServerName}' ` +
+            `because it has missing types in its parameter schema. Please file an ` +
+            `issue with the owner of the MCP server.`,
+          );
+          continue;
+        }
+
         discoveredTools.push(
           new DiscoveredMCPTool(
             mcpCallableTool,
@@ -461,8 +510,7 @@ export async function discoverTools(
         );
       } catch (error) {
         console.error(
-          `Error discovering tool: '${
-            funcDecl.name
+          `Error discovering tool: '${funcDecl.name
           }' from MCP server '${mcpServerName}': ${(error as Error).message}`,
         );
       }
@@ -647,18 +695,18 @@ export async function connectToMcpServer(
           if (hasStoredTokens) {
             console.log(
               `Stored OAuth token for SSE server '${mcpServerName}' was rejected. ` +
-                `Please re-authenticate using: /mcp auth ${mcpServerName}`,
+              `Please re-authenticate using: /mcp auth ${mcpServerName}`,
             );
           } else {
             console.log(
               `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
-                `Please authenticate using: /mcp auth ${mcpServerName}`,
+              `Please authenticate using: /mcp auth ${mcpServerName}`,
             );
           }
         }
         throw new Error(
           `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
-            `Please authenticate using: /mcp auth ${mcpServerName}`,
+          `Please authenticate using: /mcp auth ${mcpServerName}`,
         );
       }
 
@@ -800,18 +848,18 @@ export async function connectToMcpServer(
             if (hasStoredTokens) {
               console.log(
                 `Stored OAuth token for SSE server '${mcpServerName}' was rejected. ` +
-                  `Please re-authenticate using: /mcp auth ${mcpServerName}`,
+                `Please re-authenticate using: /mcp auth ${mcpServerName}`,
               );
             } else {
               console.log(
                 `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
-                  `Please authenticate using: /mcp auth ${mcpServerName}`,
+                `Please authenticate using: /mcp auth ${mcpServerName}`,
               );
             }
           }
           throw new Error(
             `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
-              `Please authenticate using: /mcp auth ${mcpServerName}`,
+            `Please authenticate using: /mcp auth ${mcpServerName}`,
           );
         }
 
@@ -994,11 +1042,11 @@ export async function createTransport(
     if (!accessToken) {
       console.error(
         `MCP server '${mcpServerName}' requires OAuth authentication. ` +
-          `Please authenticate using the /mcp auth command.`,
+        `Please authenticate using the /mcp auth command.`,
       );
       throw new Error(
         `MCP server '${mcpServerName}' requires OAuth authentication. ` +
-          `Please authenticate using the /mcp auth command.`,
+        `Please authenticate using the /mcp auth command.`,
       );
     }
   } else {
