@@ -21,7 +21,6 @@ import {
   mcpServerRequiresOAuth,
   getErrorMessage,
 } from '@google/gemini-cli-core';
-import open from 'open';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
@@ -60,21 +59,11 @@ const getMcpStatus = async (
 
   if (serverNames.length === 0 && blockedMcpServers.length === 0) {
     const docsUrl = 'https://goo.gle/gemini-cli-docs-mcp';
-    if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: `No MCP servers configured. Please open the following URL in your browser to view documentation:\n${docsUrl}`,
-      };
-    } else {
-      // Open the URL in the browser
-      await open(docsUrl);
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: `No MCP servers configured. Opening documentation in your browser: ${docsUrl}`,
-      };
-    }
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `No MCP servers configured. Please view MCP documentation in your browser: ${docsUrl} or use the cli /docs command`,
+    };
   }
 
   // Check if any servers are still connecting
@@ -105,7 +94,15 @@ const getMcpStatus = async (
     const promptRegistry = await config.getPromptRegistry();
     const serverPrompts = promptRegistry.getPromptsByServer(serverName) || [];
 
-    const status = getMCPServerStatus(serverName);
+    const originalStatus = getMCPServerStatus(serverName);
+    const hasCachedItems = serverTools.length > 0 || serverPrompts.length > 0;
+
+    // If the server is "disconnected" but has prompts or cached tools, display it as Ready
+    // by using CONNECTED as the display status.
+    const status =
+      originalStatus === MCPServerStatus.DISCONNECTED && hasCachedItems
+        ? MCPServerStatus.CONNECTED
+        : originalStatus;
 
     // Add status indicator with descriptive text
     let statusIndicator = '';
@@ -271,11 +268,14 @@ const getMcpStatus = async (
       message += '  No tools or prompts available\n';
     } else if (serverTools.length === 0) {
       message += '  No tools available';
-      if (status === MCPServerStatus.DISCONNECTED && needsAuthHint) {
+      if (originalStatus === MCPServerStatus.DISCONNECTED && needsAuthHint) {
         message += ` ${COLOR_GREY}(type: "/mcp auth ${serverName}" to authenticate this server)${RESET_COLOR}`;
       }
       message += '\n';
-    } else if (status === MCPServerStatus.DISCONNECTED && needsAuthHint) {
+    } else if (
+      originalStatus === MCPServerStatus.DISCONNECTED &&
+      needsAuthHint
+    ) {
       // This case is for when serverTools.length > 0
       message += `  ${COLOR_GREY}(type: "/mcp auth ${serverName}" to authenticate this server)${RESET_COLOR}\n`;
     }

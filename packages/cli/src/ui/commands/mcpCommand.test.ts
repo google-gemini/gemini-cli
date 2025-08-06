@@ -14,14 +14,9 @@ import {
   getMCPDiscoveryState,
   DiscoveredMCPTool,
 } from '@google/gemini-cli-core';
-import open from 'open';
+
 import { MessageActionReturn } from './types.js';
 import { Type, CallableTool } from '@google/genai';
-
-// Mock external dependencies
-vi.mock('open', () => ({
-  default: vi.fn(),
-}));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -144,30 +139,15 @@ describe('mcpCommand', () => {
       mockConfig.getMcpServers = vi.fn().mockReturnValue({});
     });
 
-    it('should display a message with a URL when no MCP servers are configured in a sandbox', async () => {
-      process.env.SANDBOX = 'sandbox';
-
+    it('should display a message with a URL when no MCP servers are configured', async () => {
       const result = await mcpCommand.action!(mockContext, '');
 
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
         content:
-          'No MCP servers configured. Please open the following URL in your browser to view documentation:\nhttps://goo.gle/gemini-cli-docs-mcp',
+          'No MCP servers configured. Please view MCP documentation in your browser: https://goo.gle/gemini-cli-docs-mcp or use the cli /docs command',
       });
-      expect(open).not.toHaveBeenCalled();
-    });
-
-    it('should display a message and open a URL when no MCP servers are configured outside a sandbox', async () => {
-      const result = await mcpCommand.action!(mockContext, '');
-
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content:
-          'No MCP servers configured. Opening documentation in your browser: https://goo.gle/gemini-cli-docs-mcp',
-      });
-      expect(open).toHaveBeenCalledWith('https://goo.gle/gemini-cli-docs-mcp');
     });
   });
 
@@ -232,9 +212,9 @@ describe('mcpCommand', () => {
         );
         expect(message).toContain('server2_tool1');
 
-        // Server 3 - Disconnected
+        // Server 3 - Disconnected but with cached tools, so shows as Ready
         expect(message).toContain(
-          '🔴 \u001b[1mserver3\u001b[0m - Disconnected (1 tools cached)',
+          '🟢 \u001b[1mserver3\u001b[0m - Ready (1 tool)',
         );
         expect(message).toContain('server3_tool1');
 

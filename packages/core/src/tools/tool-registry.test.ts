@@ -30,7 +30,7 @@ import {
   Schema,
 } from '@google/genai';
 import { spawn } from 'node:child_process';
-import { IdeClient } from '../ide/ide-client.js';
+
 import fs from 'node:fs';
 
 import { McpClientManager } from './mcp-client-manager.js';
@@ -142,7 +142,6 @@ const baseConfigParams: ConfigParameters = {
   geminiMdFileCount: 0,
   approvalMode: ApprovalMode.DEFAULT,
   sessionId: 'test-session-id',
-  ideClient: IdeClient.getInstance(false),
 };
 
 describe('ToolRegistry', () => {
@@ -174,6 +173,10 @@ describe('ToolRegistry', () => {
     );
     vi.spyOn(config, 'getMcpServers');
     vi.spyOn(config, 'getMcpServerCommand');
+    vi.spyOn(config, 'getPromptRegistry').mockReturnValue({
+      clear: vi.fn(),
+      removePromptsByServer: vi.fn(),
+    } as any);
   });
 
   afterEach(() => {
@@ -334,27 +337,6 @@ describe('ToolRegistry', () => {
         'format',
         undefined,
       );
-    });
-
-    it('should discover tools using MCP servers defined in getMcpServers', async () => {
-      const discoverSpy = vi.spyOn(
-        McpClientManager.prototype,
-        'discoverAllMcpTools',
-      );
-      mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
-      vi.spyOn(config, 'getMcpServerCommand').mockReturnValue(undefined);
-      const mcpServerConfigVal = {
-        'my-mcp-server': {
-          command: 'mcp-server-cmd',
-          args: ['--port', '1234'],
-          trust: true,
-        },
-      };
-      vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
-
-      await toolRegistry.discoverAllTools();
-
-      expect(discoverSpy).toHaveBeenCalled();
     });
 
     it('should discover tools using MCP servers defined in getMcpServers', async () => {
