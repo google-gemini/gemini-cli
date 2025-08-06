@@ -495,15 +495,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     shellModeActive,
   });
 
+  const [userMessages, setUserMessages] = useState<string[]>([]);
+
   const handleUserCancel = useCallback(() => {
-    const lastUserItem = history
-      .slice()
-      .reverse()
-      .find((item) => item.type === 'user');
-    if (lastUserItem && typeof lastUserItem.text === 'string') {
-      buffer.setText(lastUserItem.text);
+    const lastUserMessage = userMessages.at(-1);
+    if (lastUserMessage) {
+      buffer.setText(lastUserMessage);
     }
-  }, [buffer, history]);
+  }, [buffer, userMessages]);
 
   const {
     streamingState,
@@ -617,7 +616,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, [config, config.getGeminiMdFileCount]);
 
   const logger = useLogger();
-  const [userMessages, setUserMessages] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchUserMessages = async () => {
