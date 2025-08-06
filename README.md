@@ -49,7 +49,7 @@ You have two options to install Gemini CLI.
 ### With Homebrew
 
 1. **Prerequisites:** Ensure you have [Homebrew](https://brew.sh/) installed.
-2. **Install the CLI** Execute the following command in your terminal:
+2. **Install the CLI:** Execute the following command in your terminal:
 
    ```bash
    brew install gemini-cli
