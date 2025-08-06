@@ -400,12 +400,6 @@ describe('validateToolParams', () => {
         createMockWorkspaceContext('/root', ['/users/test']),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
-    // Only one workspace dir contains 'test', so should be valid
-    vi.mocked(fs.existsSync).mockImplementation(
-      (p) =>
-        typeof p === 'string' &&
-        (p.endsWith('/root/test') || p.endsWith('/users/test/test')),
-    );
     // Simulate only /root/test exists
     vi.mocked(fs.existsSync).mockImplementation((p) => p === '/root/test');
     const result = shellTool.validateToolParams({
@@ -505,20 +499,16 @@ describe('validateToolParams', () => {
         const mockContext = createMockWorkspaceContext('/root', [
           '/users/test',
         ]);
-        // Mock isPathWithinWorkspace to return false for paths outside workspace
+        // Mock isPathWithinWorkspace to return false for /users/test/dir (simulating it's outside workspace)
         mockContext.isPathWithinWorkspace = vi
           .fn()
-          .mockImplementation(
-            (p) => p.startsWith('/root') || p.startsWith('/users/test'),
-          );
+          .mockImplementation((p) => p !== '/users/test/dir');
         return mockContext;
       },
     } as unknown as Config;
     const shellTool = new ShellTool(config);
-    // Directory exists but is outside workspace
-    vi.mocked(fs.existsSync).mockImplementation(
-      (p) => p === '/outside/workspace/dir',
-    );
+    // Directory exists at /users/test/dir but isPathWithinWorkspace returns false for it
+    vi.mocked(fs.existsSync).mockImplementation((p) => p === '/users/test/dir');
     const result = shellTool.validateToolParams({
       command: 'ls',
       directory: 'dir',

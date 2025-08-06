@@ -101,6 +101,44 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     return description;
   }
 
+  private _resolveDirectory(directory: string): {
+    paths: string[];
+    error: string | null;
+  } {
+    const workspaceContext = this.config.getWorkspaceContext();
+    const workspaceDirs = workspaceContext.getDirectories();
+    const possiblePaths: string[] = [];
+
+    for (const dir of workspaceDirs) {
+      const resolvedPath = path.join(dir, directory);
+      const exists = fs.existsSync(resolvedPath);
+      const within = workspaceContext.isPathWithinWorkspace(resolvedPath);
+      if (exists && within) {
+        if (!possiblePaths.includes(resolvedPath)) {
+          possiblePaths.push(resolvedPath);
+        }
+      }
+    }
+
+    if (possiblePaths.length === 0) {
+      return {
+        paths: [],
+        error: `Directory '${directory}' is not a registered workspace directory.`,
+      };
+    }
+
+    if (possiblePaths.length > 1) {
+      return {
+        paths: [],
+        error: `Directory '${directory}' is ambiguous as it exists in multiple workspace locations: ${possiblePaths.join(
+          ', ',
+        )}`,
+      };
+    }
+
+    return { paths: possiblePaths, error: null };
+  }
+
   validateToolParams(params: ShellToolParams): string | null {
     const commandCheck = isCommandAllowed(params.command, this.config);
     if (!commandCheck.allowed) {
@@ -126,29 +164,10 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       if (path.isAbsolute(params.directory)) {
         return 'Directory cannot be absolute. Please refer to workspace directories by their name.';
       }
-      const workspaceContext = this.config.getWorkspaceContext();
-      const workspaceDirs = workspaceContext.getDirectories();
-      const possiblePaths: string[] = [];
 
-      for (const dir of workspaceDirs) {
-        const resolvedPath = path.join(dir, params.directory);
-        const exists = fs.existsSync(resolvedPath);
-        const within = workspaceContext.isPathWithinWorkspace(resolvedPath);
-        if (exists && within) {
-          if (!possiblePaths.includes(resolvedPath)) {
-            possiblePaths.push(resolvedPath);
-          }
-        }
-      }
-
-      if (possiblePaths.length === 0) {
-        return `Directory '${params.directory}' is not a registered workspace directory.`;
-      }
-
-      if (possiblePaths.length > 1) {
-        return `Directory '${params.directory}' is ambiguous as it exists in multiple workspace locations: ${possiblePaths.join(
-          ', ',
-        )}`;
+      const { error } = this._resolveDirectory(params.directory);
+      if (error) {
+        return error;
       }
     }
     return null;
@@ -229,20 +248,15 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
       let cwd = this.config.getProjectRoot();
       if (params.directory) {
-        const workspaceDirs = this.config
-          .getWorkspaceContext()
-          .getDirectories();
-        const possiblePaths: string[] = [];
-        for (const dir of workspaceDirs) {
-          const resolvedPath = path.join(dir, params.directory);
-          if (fs.existsSync(resolvedPath)) {
-            if (!possiblePaths.includes(resolvedPath)) {
-              possiblePaths.push(resolvedPath);
-            }
-          }
+        const { paths, error } = this._resolveDirectory(params.directory);
+        if (error) {
+          return {
+            llmContent: error,
+            returnDisplay: error,
+          };
         }
-        if (possiblePaths.length === 1) {
-          cwd = possiblePaths[0];
+        if (paths.length === 1) {
+          cwd = paths[0];
         }
       }
 
