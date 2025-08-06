@@ -73,6 +73,11 @@ export function SettingsDialog({
     new Set(),
   );
 
+  // Track the intended values for modified settings
+  const [modifiedValues, setModifiedValues] = useState<Map<string, any>>(
+    new Map(),
+  );
+
   // Track restart-required settings across scope changes
   const [restartRequiredSettings, setRestartRequiredSettings] = useState<
     Set<string>
@@ -94,19 +99,13 @@ export function SettingsDialog({
       setPendingSettings((prevPending) => {
         let updatedPending = { ...prevPending };
 
-        // Reapply all modified settings to the new pending settings
+        // Reapply all modified settings to the new pending settings using stored values
         modifiedSettings.forEach((key) => {
-          const definition = getSettingDefinition(key);
-          if (definition) {
-            const originalValue = getSettingValue(
-              key,
-              settings.forScope(selectedScope).settings,
-              {},
-            );
-            const intendedValue = !originalValue;
+          const storedValue = modifiedValues.get(key);
+          if (storedValue !== undefined) {
             updatedPending = setPendingSettingValue(
               key,
-              intendedValue,
+              storedValue,
               updatedPending,
             );
           }
@@ -115,7 +114,7 @@ export function SettingsDialog({
         return updatedPending;
       });
     }
-  }, [selectedScope, modifiedSettings, settings]);
+  }, [selectedScope, modifiedSettings, modifiedValues, settings]);
 
   const generateSettingsItems = () => {
     const settingKeys = getDialogSettingKeys();
@@ -172,6 +171,13 @@ export function SettingsDialog({
               return updated;
             });
 
+            // Remove from modifiedValues as well
+            setModifiedValues((prev) => {
+              const updated = new Map(prev);
+              updated.delete(key);
+              return updated;
+            });
+
             // Also remove from restart-required settings if it was there
             setRestartRequiredSettings((prev) => {
               const updated = new Set(prev);
@@ -186,22 +192,27 @@ export function SettingsDialog({
 
               currentModifiedSettings.forEach((modifiedKey) => {
                 if (modifiedKey !== key) {
-                  const modifiedValue = getSettingValue(
-                    modifiedKey,
-                    prevPending,
-                    {},
-                  );
-                  updatedPending = setPendingSettingValue(
-                    modifiedKey,
-                    modifiedValue,
-                    updatedPending,
-                  );
+                  const modifiedValue = modifiedValues.get(modifiedKey);
+                  if (modifiedValue !== undefined) {
+                    updatedPending = setPendingSettingValue(
+                      modifiedKey,
+                      modifiedValue,
+                      updatedPending,
+                    );
+                  }
                 }
               });
 
               return updatedPending;
             });
           } else {
+            // For restart-required settings, store the actual value
+            setModifiedValues((prev) => {
+              const updated = new Map(prev);
+              updated.set(key, newValue);
+              return updated;
+            });
+
             setModifiedSettings((prev) => {
               const updated = new Set(prev).add(key);
               const needsRestart = hasRestartRequiredSettings(updated);
@@ -212,11 +223,7 @@ export function SettingsDialog({
                 needsRestart,
               );
               if (needsRestart) {
-                console.log(
-                  `[DEBUG SettingsDialog] Setting showRestartPrompt to true`,
-                );
                 setShowRestartPrompt(true);
-                // Track restart-required settings separately
                 setRestartRequiredSettings((prevRestart) =>
                   new Set(prevRestart).add(key),
                 );
