@@ -127,6 +127,13 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
   // Reacts to user input (`pattern`) ONLY.
   useEffect(() => {
     if (!enabled) {
+      // reset when first getting out of completion suggestions
+      if (
+        state.status === AtCompletionStatus.READY ||
+        state.status === AtCompletionStatus.ERROR
+      ) {
+        dispatch({ type: 'RESET' });
+      }
       return;
     }
     if (pattern === null) {
