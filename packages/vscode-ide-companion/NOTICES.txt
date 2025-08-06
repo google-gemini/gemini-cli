@@ -1,7 +1,7 @@
 This file contains third-party software notices and license terms.
 
 ============================================================
-@modelcontextprotocol/sdk@^1.15.1
+@modelcontextprotocol/sdk@^1.17.1
 (git+https://github.com/modelcontextprotocol/typescript-sdk.git)
 
 MIT License
