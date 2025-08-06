@@ -188,7 +188,7 @@ describe('ShellExecutionService', () => {
 
     it('handles errors that do not fire the exit event', async () => {
       const error = new Error('spawn abc ENOENT');
-      const {result} = await simulateExecution('touch cat.jpg', (cp) => {
+      const { result } = await simulateExecution('touch cat.jpg', (cp) => {
         cp.emit('error', error); // No exit event is fired.
       });
 
