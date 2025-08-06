@@ -122,9 +122,10 @@ export async function detectFileType(
 ): Promise<'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg'> {
   const ext = path.extname(filePath).toLowerCase();
 
-  // The mimetype for "ts" is MPEG transport stream (a video format) but we want
-  // to assume these are typescript files instead.
-  if (ext === '.ts') {
+  // The mimetype for various TypeScript extensions (ts, mts, cts, tsx) can be
+  // MPEG transport stream (a video format), but we want to assume these are
+  // TypeScript files instead.
+  if (['.ts', '.mts', '.cts'].includes(ext)) {
     return 'text';
   }
 
@@ -299,7 +300,8 @@ export async function processSingleFileContent(
           return line;
         });
 
-        const contentRangeTruncated = endLine < originalLineCount;
+        const contentRangeTruncated =
+          startLine > 0 || endLine < originalLineCount;
         const isTruncated = contentRangeTruncated || linesWereTruncatedInLength;
 
         let llmTextContent = '';

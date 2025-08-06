@@ -58,7 +58,11 @@ Add a `customThemes` block to your user, project, or system `settings.json` file
       "AccentYellow": "#E5C07B",
       "AccentRed": "#E06C75",
       "Comment": "#5C6370",
-      "Gray": "#ABB2BF"
+      "Gray": "#ABB2BF",
+      "DiffAdded": "#A6E3A1",
+      "DiffRemoved": "#F38BA8",
+      "DiffModified": "#89B4FA",
+      "GradientColors": ["#4796E4", "#847ACE", "#C3677F"]
     }
   }
 }
@@ -77,6 +81,9 @@ Add a `customThemes` block to your user, project, or system `settings.json` file
 - `AccentRed`
 - `Comment`
 - `Gray`
+- `DiffAdded` (optional, for added lines in diffs)
+- `DiffRemoved` (optional, for removed lines in diffs)
+- `DiffModified` (optional, for modified lines in diffs)
 
 **Required Properties:**
 

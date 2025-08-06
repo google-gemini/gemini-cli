@@ -1,0 +1,18 @@
+{
+  "name": "@google/gemini-cli-test-utils",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "node ../../scripts/build_package.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
