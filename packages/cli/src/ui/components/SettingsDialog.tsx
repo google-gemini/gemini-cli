@@ -281,10 +281,12 @@ export function SettingsDialog({
         const currentSetting = items[activeSettingIndex];
         if (currentSetting) {
           const defaultValue = getDefaultValue(currentSetting.value);
+          // Ensure defaultValue is a boolean for setPendingSettingValue
+          const booleanDefaultValue = typeof defaultValue === 'boolean' ? defaultValue : false;
 
           // Update pending settings to default value
           setPendingSettings((prev) =>
-            setPendingSettingValue(currentSetting.value, defaultValue, prev),
+            setPendingSettingValue(currentSetting.value, booleanDefaultValue, prev),
           );
 
           // Remove from modified settings since it's now at default
@@ -306,7 +308,7 @@ export function SettingsDialog({
             const immediateSettings = new Set([currentSetting.value]);
             const immediateSettingsObject = setPendingSettingValue(
               currentSetting.value,
-              defaultValue,
+              booleanDefaultValue,
               {},
             );
 

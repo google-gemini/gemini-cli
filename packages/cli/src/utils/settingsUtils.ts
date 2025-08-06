@@ -75,8 +75,7 @@ export function requiresRestart(key: string): boolean {
 /**
  * Get the default value for a setting
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getDefaultValue(key: string): any {
+export function getDefaultValue(key: string): SettingDefinition['default'] {
   return FLATTENED_SCHEMA[key]?.default;
 }
 
@@ -95,8 +94,7 @@ export function getRestartRequiredSettings(): string[] {
 function getNestedValue(
   obj: Record<string, unknown>,
   path: string[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): any {
+): unknown {
   const [first, ...rest] = path;
   if (!first || !(first in obj)) {
     return undefined;
@@ -119,8 +117,7 @@ export function getEffectiveValue(
   key: string,
   settings: Settings,
   mergedSettings: Settings,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): any {
+): SettingDefinition['default'] {
   const definition = getSettingDefinition(key);
   if (!definition) {
     return undefined;
@@ -131,13 +128,13 @@ export function getEffectiveValue(
   // Check the current scope's settings first
   let value = getNestedValue(settings as Record<string, unknown>, path);
   if (value !== undefined) {
-    return value;
+    return value as SettingDefinition['default'];
   }
 
   // Check the merged settings for an inherited value
   value = getNestedValue(mergedSettings as Record<string, unknown>, path);
   if (value !== undefined) {
-    return value;
+    return value as SettingDefinition['default'];
   }
 
   // Return default value if no value is set anywhere
@@ -261,7 +258,16 @@ export function getSettingValue(
   }
 
   const value = getEffectiveValue(key, settings, mergedSettings);
-  return value ?? definition.default;
+  // Ensure we return a boolean value, converting from the more general type
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  // Fall back to default value, ensuring it's a boolean
+  const defaultValue = definition.default;
+  if (typeof defaultValue === 'boolean') {
+    return defaultValue;
+  }
+  return false; // Final fallback
 }
 
 /**
@@ -269,7 +275,12 @@ export function getSettingValue(
  */
 export function isSettingModified(key: string, value: boolean): boolean {
   const defaultValue = getDefaultValue(key);
-  return value !== defaultValue;
+  // Handle type comparison properly
+  if (typeof defaultValue === 'boolean') {
+    return value !== defaultValue;
+  }
+  // If default is not a boolean, consider it modified if value is true
+  return value === true;
 }
 
 /**
@@ -374,9 +385,11 @@ export function saveModifiedSettings(
       // We need to set the whole parent object.
       const [parentKey] = path;
       if (parentKey) {
+        // Ensure value is a boolean for setPendingSettingValue
+        const booleanValue = typeof value === 'boolean' ? value : false;
         const newParentValue = setPendingSettingValue(
           settingKey,
-          value,
+          booleanValue,
           loadedSettings.forScope(scope).settings,
         )[parentKey as keyof Settings];
 
@@ -410,14 +423,15 @@ export function getDisplayValue(
     value = getSettingValue(key, settings, {});
   } else {
     // Fall back to the schema default when the key is unset in this scope
-    value = getDefaultValue(key) ?? false;
+    const defaultValue = getDefaultValue(key);
+    value = typeof defaultValue === 'boolean' ? defaultValue : false;
   }
 
   const valueString = String(value);
 
   // Check if value is different from default OR if it's in modified settings OR if there are pending changes
   const defaultValue = getDefaultValue(key);
-  const isChangedFromDefault = value !== defaultValue;
+  const isChangedFromDefault = typeof defaultValue === 'boolean' ? value !== defaultValue : value === true;
   const isInModifiedSettings = modifiedSettings.has(key);
   const hasPendingChanges =
     pendingSettings && settingExistsInScope(key, pendingSettings);
