@@ -13,7 +13,6 @@ import process from 'node:process';
 import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
-
 import { DebugProfiler } from './DebugProfiler.js';
 
 interface FooterProps {
