@@ -10,6 +10,8 @@ const mockEnsureCorrectEdit = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 
+import { IDEConnectionStatus } from '../ide/ide-client.js';
+
 vi.mock('../utils/editCorrector.js', () => ({
   ensureCorrectEdit: mockEnsureCorrectEdit,
 }));
@@ -26,7 +28,7 @@ vi.mock('../utils/editor.js', () => ({
 
 import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 import { EditTool, EditToolParams } from './edit.js';
-import { FileDiff } from './tools.js';
+import { FileDiff, ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'path';
 import fs from 'fs';
@@ -58,6 +60,9 @@ describe('EditTool', () => {
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
+      getIdeClient: () => undefined,
+      getIdeMode: () => false,
+      getIdeModeFeature: () => false,
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
       // Add other properties/methods of Config if EditTool uses them
       // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
@@ -794,6 +799,59 @@ describe('EditTool', () => {
         'File path must be within one of the workspace directories',
       );
       expect(error).toContain(rootDir);
+    });
+  });
+
+  describe('IDE mode', () => {
+    const testFile = 'edit_me.txt';
+    let filePath: string;
+    let ideClient: any;
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, testFile);
+      ideClient = {
+        openDiff: vi.fn(),
+        getConnectionStatus: vi.fn().mockReturnValue({
+          status: IDEConnectionStatus.Connected,
+        }),
+      };
+      (mockConfig as any).getIdeMode = () => true;
+      (mockConfig as any).getIdeModeFeature = () => true;
+      (mockConfig as any).getIdeClient = () => ideClient;
+    });
+
+    it('should call ideClient.openDiff and update params on confirmation', async () => {
+      const initialContent = 'some old content here';
+      const newContent = 'some new content here';
+      const modifiedContent = 'some modified content here';
+      fs.writeFileSync(filePath, initialContent);
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+      mockEnsureCorrectEdit.mockResolvedValueOnce({
+        params: { ...params, old_string: 'old', new_string: 'new' },
+        occurrences: 1,
+      });
+      ideClient.openDiff.mockResolvedValueOnce({
+        status: 'accepted',
+        content: modifiedContent,
+      });
+
+      const confirmation = await tool.shouldConfirmExecute(
+        params,
+        new AbortController().signal,
+      );
+
+      expect(ideClient.openDiff).toHaveBeenCalledWith(filePath, newContent);
+
+      if (confirmation && 'onConfirm' in confirmation) {
+        await confirmation.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+      }
+
+      expect(params.old_string).toBe(initialContent);
+      expect(params.new_string).toBe(modifiedContent);
     });
   });
 });
