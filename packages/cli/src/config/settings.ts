@@ -54,6 +54,7 @@ export enum SettingScope {
 
 
 
+
 export interface SettingsError {
   message: string;
   path: string;
@@ -107,6 +108,11 @@ export class LoadedSettings {
         ...(workspace.mcpServers || {}),
         ...(system.mcpServers || {}),
       },
+      includeDirectories: [
+        ...(system.includeDirectories || []),
+        ...(user.includeDirectories || []),
+        ...(workspace.includeDirectories || []),
+      ],
     };
   }
 
@@ -297,7 +303,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   const settingsErrors: SettingsError[] = [];
   const systemSettingsPath = getSystemSettingsPath();
 
-  // FIX: Resolve paths to their canonical representation to handle symlinks
+  // Resolve paths to their canonical representation to handle symlinks
   const resolvedWorkspaceDir = path.resolve(workspaceDir);
   const resolvedHomeDir = path.resolve(homedir());
 
@@ -352,7 +358,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     });
   }
 
-  // This comparison is now much more reliable.
   if (realWorkspaceDir !== realHomeDir) {
     // Load workspace settings
     try {
