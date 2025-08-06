@@ -138,7 +138,8 @@ describe('ReadFileTool', () => {
         returnDisplay:
           'File path must be absolute, but was relative: relative/path.txt. You must provide an absolute path.',
         error: {
-          message: 'File path must be absolute, but was relative: relative/path.txt. You must provide an absolute path.',
+          message:
+            'File path must be absolute, but was relative: relative/path.txt. You must provide an absolute path.',
           type: ToolErrorType.INVALID_TOOL_PARAMS,
         },
       });

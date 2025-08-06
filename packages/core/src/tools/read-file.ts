@@ -155,7 +155,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
       if (result.error.includes('File not found')) {
         errorType = ToolErrorType.FILE_NOT_FOUND;
       }
-      
+
       return {
         llmContent: 'Could not read file.',
         returnDisplay: result.returnDisplay || 'Error reading file',
