@@ -19,7 +19,6 @@ import { Type } from '@google/genai';
 import {
   processSingleFileContent,
   getSpecificMimeType,
-  FileErrorType,
 } from '../utils/fileUtils.js';
 import { Config } from '../config/config.js';
 import {
@@ -80,24 +79,40 @@ class ReadFileToolInvocation
     );
 
     if (result.error) {
-      // Map structured error types to ToolErrorType
+      // Map error messages to ToolErrorType
       let errorType: ToolErrorType;
       let llmContent: string;
 
-      switch (result.errorType) {
-        case FileErrorType.FILE_NOT_FOUND:
-          errorType = ToolErrorType.FILE_NOT_FOUND;
-          llmContent = 'Could not read file.';
-          break;
-        case FileErrorType.IS_DIRECTORY:
-          errorType = ToolErrorType.INVALID_TOOL_PARAMS;
-          llmContent = 'Could not read file due to invalid parameters.';
-          break;
-        default:
-          // FILE_TOO_LARGE and other read errors map to READ_CONTENT_FAILURE
-          errorType = ToolErrorType.READ_CONTENT_FAILURE;
-          llmContent = 'Could not read file.';
-          break;
+      // Check error message patterns to determine error type
+      if (
+        result.error.includes('File not found') ||
+        result.error.includes('does not exist') ||
+        result.error.includes('ENOENT')
+      ) {
+        errorType = ToolErrorType.FILE_NOT_FOUND;
+        llmContent =
+          'Could not read file because no file was found at the specified path.';
+      } else if (
+        result.error.includes('is a directory') ||
+        result.error.includes('EISDIR')
+      ) {
+        errorType = ToolErrorType.INVALID_TOOL_PARAMS;
+        llmContent =
+          'Could not read file because the provided path is a directory, not a file.';
+      } else if (
+        result.error.includes('too large') ||
+        result.error.includes('File size exceeds')
+      ) {
+        errorType = ToolErrorType.FILE_TOO_LARGE;
+        llmContent = result.error
+          ? `Could not read file. ${result.error}`
+          : 'Could not read file because it is too large.';
+      } else {
+        // Other read errors map to READ_CONTENT_FAILURE
+        errorType = ToolErrorType.READ_CONTENT_FAILURE;
+        llmContent = result.error
+          ? `Could not read file. ${result.error}`
+          : 'Could not read file.';
       }
 
       return {

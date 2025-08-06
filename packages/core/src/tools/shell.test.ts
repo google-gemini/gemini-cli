@@ -210,8 +210,8 @@ describe('ShellTool', () => {
         mockAbortSignal,
       );
 
-      expect(result.llmContent).toBe(
-        'Could not execute command due to invalid parameters.',
+      expect(result.llmContent).toContain(
+        'Could not execute command due to invalid parameters:',
       );
       expect(result.returnDisplay).toBe('Command cannot be empty.');
       expect(result.error).toEqual({
@@ -227,8 +227,8 @@ describe('ShellTool', () => {
         mockAbortSignal,
       );
 
-      expect(result.llmContent).toBe(
-        'Could not execute command due to invalid parameters.',
+      expect(result.llmContent).toContain(
+        'Could not execute command due to invalid parameters:',
       );
       expect(result.returnDisplay).toBe(
         "Directory 'nonexistent' is not a registered workspace directory.",

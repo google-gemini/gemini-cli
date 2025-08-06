@@ -74,7 +74,9 @@ describe('ReadFileTool', () => {
         absolute_path: path.join(tempRootDir, 'test.txt'),
         offset: -1,
       };
-      expect(() => tool.build(params)).toThrow('Offset must be a non-negative number');
+      expect(() => tool.build(params)).toThrow(
+        'Offset must be a non-negative number',
+      );
     });
 
     it('should throw error if limit is zero or negative', () => {
@@ -82,7 +84,9 @@ describe('ReadFileTool', () => {
         absolute_path: path.join(tempRootDir, 'test.txt'),
         limit: 0,
       };
-      expect(() => tool.build(params)).toThrow('Limit must be a positive number');
+      expect(() => tool.build(params)).toThrow(
+        'Limit must be a positive number',
+      );
     });
   });
 
@@ -162,7 +166,8 @@ describe('ReadFileTool', () => {
 
       const result = await invocation.execute(abortSignal);
       expect(result).toEqual({
-        llmContent: 'Could not read file.',
+        llmContent:
+          'Could not read file because no file was found at the specified path.',
         returnDisplay: 'File not found.',
         error: {
           message: `File not found: ${filePath}`,
@@ -198,7 +203,8 @@ describe('ReadFileTool', () => {
 
       const result = await invocation.execute(abortSignal);
       expect(result).toEqual({
-        llmContent: 'Could not read file due to invalid parameters.',
+        llmContent:
+          'Could not read file because the provided path is a directory, not a file.',
         returnDisplay: 'Path is a directory.',
         error: {
           message: `Path is a directory, not a file: ${dirPath}`,
@@ -220,8 +226,10 @@ describe('ReadFileTool', () => {
 
       const result = await invocation.execute(abortSignal);
       expect(result).toHaveProperty('error');
-      expect(result.error?.type).toBe(ToolErrorType.READ_CONTENT_FAILURE);
-      expect(result.error?.message).toContain('File size exceeds the 20MB limit');
+      expect(result.error?.type).toBe(ToolErrorType.FILE_TOO_LARGE);
+      expect(result.error?.message).toContain(
+        'File size exceeds the 20MB limit',
+      );
     });
 
     it('should handle text file with lines exceeding maximum length', async () => {
@@ -333,7 +341,9 @@ describe('ReadFileTool', () => {
       expect(result.llmContent).toBe(
         'Cannot display content of SVG file larger than 1MB: large.svg',
       );
-      expect(result.returnDisplay).toBe('Skipped large SVG file (>1MB): large.svg');
+      expect(result.returnDisplay).toBe(
+        'Skipped large SVG file (>1MB): large.svg',
+      );
     });
 
     it('should handle empty file', async () => {

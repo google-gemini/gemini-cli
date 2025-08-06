@@ -226,7 +226,7 @@ export class WriteFileTool
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
-        llmContent: 'Could not write file due to invalid parameters.',
+        llmContent: `Could not write file due to invalid parameters: ${validationError}`,
         returnDisplay: validationError,
         error: {
           message: validationError,
@@ -245,7 +245,7 @@ export class WriteFileTool
       const errDetails = correctedContentResult.error;
       const errorMsg = errDetails.code ? `Error checking existing file '${params.file_path}': ${errDetails.message} (${errDetails.code})` : `Error checking existing file: ${errDetails.message}`;
       return {
-        llmContent: 'Could not write file.',
+        llmContent: errorMsg,
         returnDisplay: errorMsg,
         error: {
           message: errorMsg,
@@ -338,7 +338,7 @@ export class WriteFileTool
     } catch (error) {
       // Capture detailed error information for debugging
       let errorMsg: string;
-      const errorType = ToolErrorType.FILE_WRITE_FAILURE;
+      let errorType = ToolErrorType.FILE_WRITE_FAILURE;
 
       if (isNodeError(error)) {
         // Handle specific Node.js errors with their error codes
@@ -347,10 +347,13 @@ export class WriteFileTool
         // Log specific error types for better debugging
         if (error.code === 'EACCES') {
           errorMsg = `Permission denied writing to file: ${params.file_path} (${error.code})`;
+          errorType = ToolErrorType.PERMISSION_DENIED;
         } else if (error.code === 'ENOSPC') {
           errorMsg = `No space left on device: ${params.file_path} (${error.code})`;
+          errorType = ToolErrorType.NO_SPACE_LEFT;
         } else if (error.code === 'EISDIR') {
           errorMsg = `Target is a directory, not a file: ${params.file_path} (${error.code})`;
+          errorType = ToolErrorType.TARGET_IS_DIRECTORY;
         }
 
         // Include stack trace in debug mode for better troubleshooting
@@ -364,7 +367,7 @@ export class WriteFileTool
       }
 
       return {
-        llmContent: 'Could not write file.',
+        llmContent: errorMsg,
         returnDisplay: errorMsg,
         error: {
           message: errorMsg,

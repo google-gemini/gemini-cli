@@ -187,7 +187,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     });
     if (validationError) {
       return {
-        llmContent: 'Could not execute command due to invalid parameters.',
+        llmContent: `Could not execute command due to invalid parameters: ${validationError}`,
         returnDisplay: validationError,
         error: {
           message: validationError,
