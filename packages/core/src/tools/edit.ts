@@ -359,12 +359,12 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           DEFAULT_DIFF_OPTIONS,
         );
         const originallyProposedContent =
-          params.ai_proposed_string || params.new_string;
+          this.params.ai_proposed_string || this.params.new_string;
         const diffStat = getDiffStat(
           fileName,
           editData.currentContent ?? '',
           originallyProposedContent,
-          params.new_string,
+          this.params.new_string,
         );
         displayResult = {
           fileDiff,
