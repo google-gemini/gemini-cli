@@ -5,8 +5,8 @@
  */
 
 import {
-  DiffAcceptedNotificationSchema,
-  DiffClosedNotificationSchema,
+  IdeDiffAcceptedNotificationSchema,
+  IdeDiffClosedNotificationSchema,
 } from '@google/gemini-cli-core';
 import { type JSONRPCNotification } from '@modelcontextprotocol/sdk/types.js';
 import * as path from 'node:path';
@@ -131,7 +131,7 @@ export class DiffManager {
       const modifiedContent = rightDoc.getText();
       await this.closeDiffEditor(uriToClose);
       this.onDidChangeEmitter.fire(
-        DiffClosedNotificationSchema.parse({
+        IdeDiffClosedNotificationSchema.parse({
           jsonrpc: '2.0',
           method: 'ide/diffClosed',
           params: {
@@ -162,7 +162,7 @@ export class DiffManager {
     await this.closeDiffEditor(rightDocUri);
 
     this.onDidChangeEmitter.fire(
-      DiffAcceptedNotificationSchema.parse({
+      IdeDiffAcceptedNotificationSchema.parse({
         jsonrpc: '2.0',
         method: 'ide/diffAccepted',
         params: {
@@ -192,7 +192,7 @@ export class DiffManager {
     await this.closeDiffEditor(rightDocUri);
 
     this.onDidChangeEmitter.fire(
-      DiffClosedNotificationSchema.parse({
+      IdeDiffClosedNotificationSchema.parse({
         jsonrpc: '2.0',
         method: 'ide/diffClosed',
         params: {

@@ -269,11 +269,12 @@ const createMcpServer = (diffManager: DiffManager) => {
     },
     async ({ filePath }: { filePath: string }) => {
       const content = await diffManager.closeDiff(filePath);
+      const response = { content: content ?? undefined };
       return {
         content: [
           {
             type: 'text',
-            text: content ?? '',
+            text: JSON.stringify(response),
           },
         ],
       };

@@ -331,7 +331,7 @@ describe('editor utils', () => {
           }),
         };
         (spawn as Mock).mockReturnValue(mockSpawn);
-        await openDiff('old.txt', 'new.txt', editor);
+        await openDiff('old.txt', 'new.txt', editor, () => {});
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
         expect(spawn).toHaveBeenCalledWith(
           diffCommand.command,
@@ -361,9 +361,9 @@ describe('editor utils', () => {
           }),
         };
         (spawn as Mock).mockReturnValue(mockSpawn);
-        await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
-          'spawn error',
-        );
+        await expect(
+          openDiff('old.txt', 'new.txt', editor, () => {}),
+        ).rejects.toThrow('spawn error');
       });
 
       it(`should reject if ${editor} exits with non-zero code`, async () => {
@@ -375,9 +375,9 @@ describe('editor utils', () => {
           }),
         };
         (spawn as Mock).mockReturnValue(mockSpawn);
-        await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
-          `${editor} exited with code 1`,
-        );
+        await expect(
+          openDiff('old.txt', 'new.txt', editor, () => {}),
+        ).rejects.toThrow(`${editor} exited with code 1`);
       });
     }
 
@@ -385,7 +385,7 @@ describe('editor utils', () => {
     for (const editor of execSyncEditors) {
       it(`should call execSync for ${editor} on non-windows`, async () => {
         Object.defineProperty(process, 'platform', { value: 'linux' });
-        await openDiff('old.txt', 'new.txt', editor);
+        await openDiff('old.txt', 'new.txt', editor, () => {});
         expect(execSync).toHaveBeenCalledTimes(1);
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
         const expectedCommand = `${
@@ -399,7 +399,7 @@ describe('editor utils', () => {
 
       it(`should call execSync for ${editor} on windows`, async () => {
         Object.defineProperty(process, 'platform', { value: 'win32' });
-        await openDiff('old.txt', 'new.txt', editor);
+        await openDiff('old.txt', 'new.txt', editor, () => {});
         expect(execSync).toHaveBeenCalledTimes(1);
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
         const expectedCommand = `${diffCommand.command} ${diffCommand.args.join(
@@ -417,10 +417,45 @@ describe('editor utils', () => {
         .spyOn(console, 'error')
         .mockImplementation(() => {});
       // @ts-expect-error Testing unsupported editor
-      await openDiff('old.txt', 'new.txt', 'foobar');
+      await openDiff('old.txt', 'new.txt', 'foobar', () => {});
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'No diff tool available. Install a supported editor.',
       );
+    });
+
+    describe('onEditorClose callback', () => {
+      it('should call onEditorClose for execSync editors', async () => {
+        (execSync as Mock).mockReturnValue(Buffer.from(`/usr/bin/`));
+        const onEditorClose = vi.fn();
+        await openDiff('old.txt', 'new.txt', 'vim', onEditorClose);
+        expect(execSync).toHaveBeenCalledTimes(1);
+        expect(onEditorClose).toHaveBeenCalledTimes(1);
+      });
+
+      it('should call onEditorClose for execSync editors when an error is thrown', async () => {
+        (execSync as Mock).mockImplementation(() => {
+          throw new Error('test error');
+        });
+        const onEditorClose = vi.fn();
+        openDiff('old.txt', 'new.txt', 'vim', onEditorClose);
+        expect(execSync).toHaveBeenCalledTimes(1);
+        expect(onEditorClose).toHaveBeenCalledTimes(1);
+      });
+
+      it('should not call onEditorClose for spawn editors', async () => {
+        const onEditorClose = vi.fn();
+        const mockSpawn = {
+          on: vi.fn((event, cb) => {
+            if (event === 'close') {
+              cb(0);
+            }
+          }),
+        };
+        (spawn as Mock).mockReturnValue(mockSpawn);
+        await openDiff('old.txt', 'new.txt', 'vscode', onEditorClose);
+        expect(spawn).toHaveBeenCalledTimes(1);
+        expect(onEditorClose).not.toHaveBeenCalled();
+      });
     });
   });
 

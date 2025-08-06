@@ -44,10 +44,10 @@ export const ToolConfirmationMessage: React.FC<
   const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
     if (confirmationDetails.type === 'edit') {
       const ideClient = config?.getIdeClient();
-      if (ideClient) {
+      if (config?.getIdeMode() && config?.getIdeModeFeature()) {
         const cliOutcome =
           outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
-        await ideClient.resolveDiffFromCli(
+        await ideClient?.resolveDiffFromCli(
           confirmationDetails.filePath,
           cliOutcome,
         );
@@ -132,18 +132,22 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedAlways,
       },
     );
-
-    if (!config?.getIdeMode()) {
+    if (config?.getIdeMode() && config?.getIdeModeFeature()) {
+      options.push({
+        label: 'No',
+        value: ToolConfirmationOutcome.Cancel,
+      });
+    } else {
       options.push({
         label: 'Modify with external editor',
         value: ToolConfirmationOutcome.ModifyWithEditor,
       });
+      options.push({
+        label: 'No, suggest changes (esc)',
+        value: ToolConfirmationOutcome.Cancel,
+      });
     }
 
-    options.push({
-      label: 'No, suggest changes (esc)',
-      value: ToolConfirmationOutcome.Cancel,
-    });
     bodyContent = (
       <DiffRenderer
         diffContent={confirmationDetails.fileDiff}

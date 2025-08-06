@@ -1007,16 +1007,6 @@ describe('loadCliConfig ideModeFeature', () => {
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeModeFeature()).toBe(false);
   });
-
-  it('should be false when settings.ideModeFeature is true, but SANDBOX is set', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    process.env.SANDBOX = 'true';
-    const settings: Settings = { ideModeFeature: true };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeModeFeature()).toBe(false);
-  });
 });
 
 vi.mock('fs', async () => {
