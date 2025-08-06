@@ -24,6 +24,7 @@ export async function createCodeAssistContentGenerator(
     const userData = await setupUser(authClient);
     return new CodeAssistServer(
       authClient,
+      config,
       userData.projectId,
       httpOptions,
       sessionId,
