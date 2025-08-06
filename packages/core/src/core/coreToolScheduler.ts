@@ -476,6 +476,30 @@ export class CoreToolScheduler {
           );
 
           if (confirmationDetails) {
+            // Allow IDE to resolve confirmation
+            if (
+              confirmationDetails.type === 'edit' &&
+              confirmationDetails.ideConfirmation
+            ) {
+              confirmationDetails.ideConfirmation.then((resolution) => {
+                if (resolution.status === 'accepted') {
+                  this.handleConfirmationResponse(
+                    reqInfo.callId,
+                    confirmationDetails.onConfirm,
+                    ToolConfirmationOutcome.ProceedOnce,
+                    signal,
+                  );
+                } else {
+                  this.handleConfirmationResponse(
+                    reqInfo.callId,
+                    confirmationDetails.onConfirm,
+                    ToolConfirmationOutcome.Cancel,
+                    signal,
+                  );
+                }
+              });
+            }
+
             const originalOnConfirm = confirmationDetails.onConfirm;
             const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
               ...confirmationDetails,
