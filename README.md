@@ -33,13 +33,13 @@ You have two options to install Gemini CLI.
 2. **Run the CLI:** Execute the following command in your terminal:
 
    ```bash
-   npx https://github.com/google-gemini/gemini-cli-interrupt
+   npx https://github.com/damdam775/gemini-cli-interrupt
    ```
 
    Add `--interrupt` to launch with interrupt mode already enabled:
 
    ```bash
-   npx https://github.com/google-gemini/gemini-cli-interrupt -- --interrupt
+   npx https://github.com/damdam775/gemini-cli-interrupt -- --interrupt
    ```
 
    Or install it with:

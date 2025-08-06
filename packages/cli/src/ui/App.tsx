@@ -519,11 +519,8 @@ const App = ({
     performMemoryRefresh,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
- codex/update-readme-for-interrupt-mode-installation
     interruptModeEnabled,
-=======
     refreshStatic,
- main
   );
 
   // Input handling
