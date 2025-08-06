@@ -34,6 +34,7 @@ import { Extension, annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
+import { loadAccelosCommands, createYargsOptionForCommand, AccelosCommandConfig } from './accelosCommands.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -70,9 +71,16 @@ export interface CliArgs {
   ideModeFeature: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
+  accelosPrompt: string | undefined;
+  // Dynamic accelos command options
+  accelosCommands?: AccelosCommandConfig[];
+  [key: string]: any;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
+  // Load accelos commands first
+  const accelosCommands = loadAccelosCommands();
+  
   const yargsInstance = yargs(hideBin(process.argv))
     .scriptName('gemini')
     .usage(
@@ -217,24 +225,36 @@ export async function parseArguments(): Promise<CliArgs> {
           coerce: (dirs: string[]) =>
             // Handle comma-separated values
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
-        })
-        .check((argv) => {
-          if (argv.prompt && argv.promptInteractive) {
-            throw new Error(
-              'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
-            );
-          }
-          return true;
         }),
     )
     // Register MCP subcommands
     .command(mcpCommand)
+
+  // Dynamically add accelos command options
+  for (const command of accelosCommands) {
+    yargsInstance.option(command.name, createYargsOptionForCommand(command));
+  }
+
+  yargsInstance
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
     .strict()
-    .demandCommand(0, 0); // Allow base command to run with no subcommands
+    .demandCommand(0, 0) // Allow base command to run with no subcommands
+    .check((argv: any) => {
+      if (argv.prompt && argv.promptInteractive) {
+        throw new Error(
+          'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
+        );
+      }
+      if (argv.accelosPrompt && (argv.prompt || argv.promptInteractive)) {
+        throw new Error(
+          'Cannot use --accelos-prompt with --prompt or --prompt-interactive',
+        );
+      }
+      return true;
+    });
 
   yargsInstance.wrap(yargsInstance.terminalWidth());
   const result = await yargsInstance.parse();
@@ -248,7 +268,9 @@ export async function parseArguments(): Promise<CliArgs> {
 
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
-  return result as unknown as CliArgs;
+  const cliArgs = result as unknown as CliArgs;
+  cliArgs.accelosCommands = accelosCommands;
+  return cliArgs;
 }
 
 // This function is now a thin wrapper around the server's implementation.
@@ -418,7 +440,7 @@ export async function loadCliConfig(
     loadMemoryFromIncludeDirectories:
       settings.loadMemoryFromIncludeDirectories || false,
     debugMode,
-    question,
+    question: argv.promptInteractive || argv.prompt || argv.accelosPrompt || '',
     fullContext: argv.allFiles || argv.all_files || false,
     coreTools: settings.coreTools || undefined,
     excludeTools,

@@ -61,6 +61,13 @@ export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
 }
 
+export interface AccelosSettings {
+  endpoint?: string;
+  apiKey?: string;
+  enabled?: boolean;
+  options?: Record<string, unknown>;
+}
+
 export interface SettingsError {
   message: string;
   path: string;

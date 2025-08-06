@@ -7,7 +7,7 @@
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
-import { loadCliConfig, parseArguments } from './config/config.js';
+import { loadCliConfig, parseArguments, CliArgs } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
 import v8 from 'node:v8';
@@ -42,6 +42,7 @@ import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
+import { getTriggeredAccelosCommand, executeAccelosCommand } from './config/accelosCommands.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -128,6 +129,7 @@ ${reason.stack}`
 }
 
 export async function main() {
+  console.log('[DEBUG] Entering main function');
   setupUnhandledRejectionHandler();
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
@@ -146,6 +148,31 @@ export async function main() {
   }
 
   const argv = await parseArguments();
+  
+  // Check if an accelos command was triggered
+  if (argv.accelosCommands && argv.accelosCommands.length > 0) {
+    const triggeredCommand = getTriggeredAccelosCommand(argv, argv.accelosCommands);
+    
+    if (triggeredCommand) {
+      try {
+        await executeAccelosCommand(triggeredCommand);
+        process.exit(0);
+      } catch (error) {
+        console.error('Accelos command execution failed:', error);
+        process.exit(1);
+      }
+    }
+  }
+  
+  // Early debug logging
+  if (argv.debug) {
+    console.debug('[DEBUG] Early argv check:', {
+      prompt: argv.prompt,
+      accelosPrompt: argv.accelosPrompt,
+      promptInteractive: argv.promptInteractive
+    });
+  }
+  
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(
     settings.merged,
@@ -247,11 +274,21 @@ export async function main() {
   }
 
   let input = config.getQuestion();
+  
+  // Debug logging
+  if (config.getDebugMode()) {
+    console.debug('[DEBUG] argv.accelosPrompt:', argv.accelosPrompt);
+    console.debug('[DEBUG] argv.prompt:', argv.prompt);
+    console.debug('[DEBUG] input from config.getQuestion():', input);
+  }
+  
   const startupWarnings = [
     ...(await getStartupWarnings()),
     ...(await getUserStartupWarnings(workspaceRoot)),
   ];
 
+  const shouldBeInteractive =
+    !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0 && !argv.prompt && !argv.accelosPrompt);
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {
     const version = await getCliVersion();

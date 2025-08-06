@@ -1,0 +1,28 @@
+{
+  "// This is an example settings file showing how to configure Accelos AI agent integration": "",
+  "// Copy relevant sections to your ~/.gemini/settings.json file": "",
+  
+  "accelos": {
+    "// Replace with your actual Accelos agent endpoint": "",
+    "endpoint": "https://your-accelos-agent.example.com/api",
+    
+    "// Replace with your actual API key": "",
+    "apiKey": "your-api-key-here",
+    
+    "// Enable/disable the Accelos integration": "",
+    "enabled": true,
+    
+    "// Additional options for your agent": "",
+    "options": {
+      "timeout": 30000,
+      "retries": 3,
+      "model": "your-preferred-model",
+      "temperature": 0.7,
+      "// Add any other configuration your agent needs": ""
+    }
+  },
+  
+  "// Other Gemini CLI settings can go here": "",
+  "theme": "default",
+  "showMemoryUsage": true
+}

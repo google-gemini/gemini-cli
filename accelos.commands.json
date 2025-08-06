@@ -1,0 +1,45 @@
+{
+  "// This file defines command options for the Gemini CLI Accelos integration": "",
+  "// Each command defines an option name, command, and arguments": "",
+  
+  "commands": [
+    {
+      "name": "init",
+      "description": "Initialize a new Accelos project or workspace",
+      "command": "scripts/static-ekg.sh",
+      "arguments": [],
+      "options": {
+      }
+    },
+    {
+      "name": "gen-guardrails", 
+      "description": "Generate guardrails for the current project",
+      "command": "a0",
+      "arguments": ["gen-guardrails"],
+      "options": {
+        "env": {
+        }
+      }
+    },
+    {
+      "name": "check-guardrails",
+      "description": "Check code against the guardrails deterministically",
+      "command": "./sdlc-linter", 
+      "arguments": ["analyze-git-diff"],
+      "options": {
+        "env": {
+        }
+      }
+    },
+    {
+      "name": "install-pre-commit-hook",
+      "description": "Install the check-guardrails as pre-commit hook",
+      "command": "install-precommit.sh", 
+      "arguments": [],
+      "options": {
+        "env": {
+        }
+      }
+    }
+  ]
+}
