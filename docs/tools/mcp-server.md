@@ -688,3 +688,114 @@ or, using positional arguments:
 ```
 
 When you run this command, the Gemini CLI executes the `prompts/get` method on the MCP server with the provided arguments. The server is responsible for substituting the arguments into the prompt template and returning the final prompt text. The CLI then sends this prompt to the model for execution. This provides a convenient way to automate and share common workflows.
+
+## Managing MCP Servers with `gemini mcp`
+
+While you can always configure MCP servers by manually editing your `settings.json` file, the Gemini CLI provides a convenient set of commands to manage your server configurations programmatically. These commands streamline the process of adding, listing, and removing MCP servers without needing to directly edit JSON files.
+
+### Adding a Server (`gemini mcp add`)
+
+The `add` command configures a new MCP server in your `settings.json`. Based on the scope (`-s, --scope`), it will be added to either the user config `~/.gemini/settings.json` or the project config `.gemini/settings.json` file.
+
+**Command:**
+
+```bash
+gemini mcp add [options] <name> <commandOrUrl> [args...]
+```
+
+- `<name>`: A unique name for the server.
+- `<commandOrUrl>`: The command to execute (for `stdio`) or the URL (for `http`/`sse`).
+- `[args...]`: Optional arguments for a `stdio` command.
+
+**Options (Flags):**
+
+- `-s, --scope`: Configuration scope (user or project). [default: "project"]
+- `-t, --transport`: Transport type (stdio, sse, http). [default: "stdio"]
+- `-e, --env`: Set environment variables (e.g. -e KEY=value).
+- `-H, --header`: Set HTTP headers for SSE and HTTP transports (e.g. -H "X-Api-Key: abc123" -H "Authorization: Bearer abc123").
+- `--timeout`: Set connection timeout in milliseconds.
+- `--trust`: Trust the server (bypass all tool call confirmation prompts).
+- `--description`: Set the description for the server.
+- `--include-tools`: A comma-separated list of tools to include.
+- `--exclude-tools`: A comma-separated list of tools to exclude.
+
+#### Adding an stdio server
+
+This is the default transport for running local servers.
+
+```bash
+# Basic syntax
+gemini mcp add <name> <command> [args...]
+
+# Example: Adding a local server
+gemini mcp add my-stdio-server -e API_KEY=123 /path/to/server arg1 arg2 arg3
+
+# Example: Adding a local python server
+gemini mcp add python-server python server.py --port 8080
+```
+
+#### Adding an HTTP server
+
+This transport is for servers that use the streamable HTTP transport.
+
+```bash
+# Basic syntax
+gemini mcp add --transport http <name> <url>
+
+# Example: Adding an HTTP server
+gemini mcp add --transport http http-server https://api.example.com/mcp/
+
+# Example: Adding an HTTP server with an authentication header
+gemini mcp add --transport http secure-http https://api.example.com/mcp/ --header "Authorization: Bearer abc123"
+```
+
+#### Adding an SSE server
+
+This transport is for servers that use Server-Sent Events (SSE).
+
+```bash
+# Basic syntax
+gemini mcp add --transport sse <name> <url>
+
+# Example: Adding an SSE server
+gemini mcp add --transport sse sse-server https://api.example.com/sse/
+
+# Example: Adding an SSE server with an authentication header
+gemini mcp add --transport sse secure-sse https://api.example.com/sse/ --header "Authorization: Bearer abc123"
+```
+
+### Listing Servers (`gemini mcp list`)
+
+To view all MCP servers currently configured, use the `list` command. It displays each server's name, configuration details, and connection status.
+
+**Command:**
+
+```bash
+gemini mcp list
+```
+
+**Example Output:**
+
+```sh
+✓ stdio-server: command: python3 server.py (stdio) - Connected
+✓ http-server: https://api.example.com/mcp (http) - Connected
+✗ sse-server: https://api.example.com/sse (sse) - Disconnected
+```
+
+### Removing a Server (`gemini mcp remove`)
+
+To delete a server from your configuration, use the `remove` command with the server's name.
+
+**Command:**
+
+```bash
+gemini mcp remove <name>
+```
+
+**Example:**
+
+```bash
+gemini mcp remove my-server
+```
+
+This will find and delete the "my-server" entry from the `mcpServers` object in the appropriate `settings.json` file based on the scope (`-s, --scope`).
