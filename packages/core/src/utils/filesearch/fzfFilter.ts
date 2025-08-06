@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 
 let canUseFzf: boolean | undefined = undefined;
 
@@ -20,7 +20,7 @@ export async function checkCanUseFzf() {
   }
 
   await new Promise<void>((resolve) => {
-    exec('fzf --version', (err) => {
+    execFile('fzf', ['--version'], (err) => {
       canUseFzf = err === null;
       resolve();
     });
@@ -32,8 +32,12 @@ export async function filterByFzf(
   allPaths: string[],
   pattern: string,
 ): Promise<string[]> {
-  const stdout = await new Promise<string>((resolve) => {
-    const { stdin } = exec(`fzf --filter "${pattern}"`, {}, (_err, stdout) => {
+  const stdout = await new Promise<string>((resolve, reject) => {
+    const { stdin } = execFile('fzf', ['--filter', pattern], (err, stdout) => {
+      // fzf exits with code 1 if there are no matches. This is not an error for us.
+      if (err && err.code !== 1) {
+        return reject(err);
+      }
       resolve(stdout);
     });
 
