@@ -196,9 +196,13 @@ describe('fileUtils', () => {
       vi.restoreAllMocks(); // Restore spies on actualNodeFs
     });
 
-    it('should detect typescript type by extension (ts)', async () => {
+    it('should detect typescript type by extension (ts, mts, cts, tsx)', async () => {
       expect(await detectFileType('file.ts')).toBe('text');
       expect(await detectFileType('file.test.ts')).toBe('text');
+      expect(await detectFileType('file.mts')).toBe('text');
+      expect(await detectFileType('vite.config.mts')).toBe('text');
+      expect(await detectFileType('file.cts')).toBe('text');
+      expect(await detectFileType('component.tsx')).toBe('text');
     });
 
     it('should detect image type by extension (png)', async () => {
@@ -424,6 +428,29 @@ describe('fileUtils', () => {
       expect(result.isTruncated).toBe(true);
       expect(result.originalLineCount).toBe(20);
       expect(result.linesShown).toEqual([6, 10]);
+    });
+
+    it('should identify truncation when reading the end of a file', async () => {
+      const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
+      actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
+
+      // Read from line 11 to 20. The start is not 0, so it's truncated.
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        10,
+        10,
+      );
+      const expectedContent = lines.slice(10, 20).join('\n');
+
+      expect(result.llmContent).toContain(expectedContent);
+      expect(result.llmContent).toContain(
+        '[File content truncated: showing lines 11-20 of 20 total lines. Use offset/limit parameters to view more.]',
+      );
+      expect(result.returnDisplay).toBe('Read lines 11-20 of 20 from test.txt');
+      expect(result.isTruncated).toBe(true); // This is the key check for the bug
+      expect(result.originalLineCount).toBe(20);
+      expect(result.linesShown).toEqual([11, 20]);
     });
 
     it('should handle limit exceeding file length', async () => {

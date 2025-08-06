@@ -12,6 +12,7 @@ With the Gemini CLI you can:
 - Query and edit large codebases in and beyond Gemini's 1M token context window.
 - Generate new apps from PDFs or sketches, using Gemini's multimodal capabilities.
 - Automate operational tasks, like querying pull requests or handling complex rebases.
+- Integrate with GitHub: Use the [Gemini CLI GitHub Action](https://github.com/google-github-actions/run-gemini-cli) for automated PR reviews, issue triage, and on-demand AI assistance directly in your repositories.
 - Use tools and MCP servers to connect new capabilities, including [media generation with Imagen,
   Veo or Lyria](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia)
 - Ground your queries with the [Google Search](https://ai.google.dev/gemini-api/docs/grounding)
@@ -45,7 +46,7 @@ You have two options to install Gemini CLI.
 ### With Homebrew
 
 1. **Prerequisites:** Ensure you have [Homebrew](https://brew.sh/) installed.
-2. **Install the CLI** Execute the following command in your terminal:
+2. **Install the CLI:** Execute the following command in your terminal:
 
    ```bash
    brew install gemini-cli
@@ -127,6 +128,15 @@ gemini
 
 Head over to the [troubleshooting guide](docs/troubleshooting.md) if you're
 having issues.
+
+## GitHub Integration
+
+Integrate Gemini CLI directly into your GitHub workflows with the [**Gemini CLI GitHub Action**](https://github.com/google-github-actions/run-gemini-cli). Key features include:
+
+- **Pull Request Reviews**: Automatically review pull requests when they're opened.
+- **Issue Triage**: Automatically triage and label GitHub issues.
+- **On-demand Collaboration**: Mention `@gemini-cli` in issues and pull requests for assistance and task delegation.
+- **Custom Workflows**: Set up your own scheduled tasks and event-driven automations.
 
 ## Popular tasks
 
