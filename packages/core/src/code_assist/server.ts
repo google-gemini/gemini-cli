@@ -39,7 +39,11 @@ import {
   logApiResponse,
   logApiError,
 } from '../telemetry/loggers.js';
-import { ApiRequestEvent, ApiResponseEvent, ApiErrorEvent } from '../telemetry/types.js';
+import {
+  ApiRequestEvent,
+  ApiResponseEvent,
+  ApiErrorEvent,
+} from '../telemetry/types.js';
 import { Config } from '../config/config.js';
 
 /** HTTP options to be used in each of the requests. */
@@ -54,7 +58,7 @@ export const CODE_ASSIST_API_VERSION = 'v1internal';
 export class CodeAssistServer implements ContentGenerator {
   constructor(
     readonly client: OAuth2Client,
-        readonly config: Config,
+    readonly config: Config,
     readonly projectId?: string,
     readonly httpOptions: HttpOptions = {},
     readonly sessionId?: string,
@@ -233,54 +237,54 @@ export class CodeAssistServer implements ContentGenerator {
   }
 
   private async _logApiRequest(
-      contents: Content[],
-      model: string,
-      prompt_id: string,
-    ): Promise<void> {
-      const requestText = this._getRequestTextFromContents(contents);
-      logApiRequest(
-        this.config,
-        new ApiRequestEvent(model, prompt_id, requestText),
-      );
-    }
-  
-    private async _logApiResponse(
-      durationMs: number,
-      prompt_id: string,
-      usageMetadata?: GenerateContentResponseUsageMetadata,
-      responseText?: string,
-    ): Promise<void> {
-      logApiResponse(
-        this.config,
-        new ApiResponseEvent(
-          this.config.getModel(),
-          durationMs,
-          prompt_id,
-          this.config.getContentGeneratorConfig()?.authType,
-          usageMetadata,
-          responseText,
-        ),
-      );
-    }
-  
-    private _logApiError(
-      durationMs: number,
-      error: unknown,
-      prompt_id: string,
-    ): void {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorType = error instanceof Error ? error.name : 'unknown';
-  
-      logApiError(
-        this.config,
-        new ApiErrorEvent(
-          this.config.getModel(),
-          errorMessage,
-          durationMs,
-          prompt_id,
-          this.config.getContentGeneratorConfig()?.authType,
-          errorType,
-        ),
-      );
-    }
+    contents: Content[],
+    model: string,
+    prompt_id: string,
+  ): Promise<void> {
+    const requestText = this._getRequestTextFromContents(contents);
+    logApiRequest(
+      this.config,
+      new ApiRequestEvent(model, prompt_id, requestText),
+    );
+  }
+
+  private async _logApiResponse(
+    durationMs: number,
+    prompt_id: string,
+    usageMetadata?: GenerateContentResponseUsageMetadata,
+    responseText?: string,
+  ): Promise<void> {
+    logApiResponse(
+      this.config,
+      new ApiResponseEvent(
+        this.config.getModel(),
+        durationMs,
+        prompt_id,
+        this.config.getContentGeneratorConfig()?.authType,
+        usageMetadata,
+        responseText,
+      ),
+    );
+  }
+
+  private _logApiError(
+    durationMs: number,
+    error: unknown,
+    prompt_id: string,
+  ): void {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorType = error instanceof Error ? error.name : 'unknown';
+
+    logApiError(
+      this.config,
+      new ApiErrorEvent(
+        this.config.getModel(),
+        errorMessage,
+        durationMs,
+        prompt_id,
+        this.config.getContentGeneratorConfig()?.authType,
+        errorType,
+      ),
+    );
+  }
 }
