@@ -10,6 +10,7 @@ import {
   SlashCommand,
   MessageActionReturn,
   CommandKind,
+  SlashCommandActionReturn,
 } from './types.js';
 import path from 'path';
 import { HistoryItemWithoutId, MessageType } from '../types.js';
@@ -96,7 +97,7 @@ const saveCommand: SlashCommand = {
   description:
     'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
   kind: CommandKind.BUILT_IN,
-  action: async (context, args): Promise<MessageActionReturn> => {
+  action: async (context, args): Promise<SlashCommandActionReturn | void> => {
     const tag = args.trim();
     if (!tag) {
       return {
@@ -108,6 +109,20 @@ const saveCommand: SlashCommand = {
 
     const { logger, config } = context.services;
     await logger.initialize();
+
+    if (!context.overwriteConfirmed) {
+      const exists = await logger.checkpointExists(tag);
+      if (exists) {
+        return {
+          type: 'confirm_overwrite',
+          tag,
+          originalInvocation: {
+            raw: context.invocation?.raw || `/chat save ${tag}`,
+          },
+        };
+      }
+    }
+
     const chat = await config?.getGeminiClient()?.getChat();
     if (!chat) {
       return {

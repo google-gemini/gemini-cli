@@ -37,6 +37,7 @@ import { AuthDialog } from './components/AuthDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
+import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
 import { Colors } from './colors.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { LoadedSettings } from '../config/settings.js';
@@ -467,6 +468,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     pendingHistoryItems: pendingSlashCommandHistoryItems,
     commandContext,
     shellConfirmationRequest,
+    overwriteConfirmRequest,
   } = useSlashCommandProcessor(
     config,
     settings,
@@ -852,6 +854,27 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
           {shellConfirmationRequest ? (
             <ShellConfirmationDialog request={shellConfirmationRequest} />
+          ) : overwriteConfirmRequest ? (
+            <Box flexDirection="column">
+              <Text>
+                A checkpoint with the tag{' '}
+                <Text color={Colors.AccentPurple}>
+                  {overwriteConfirmRequest.tag}
+                </Text>{' '}
+                already exists. Do you want to overwrite it?
+              </Text>
+              <Box height={1} />
+              <RadioButtonSelect
+                items={[
+                  { label: 'Yes', value: true },
+                  { label: 'No', value: false },
+                ]}
+                onSelect={(value: boolean) => {
+                  overwriteConfirmRequest.onConfirm(value);
+                }}
+              />
+              <Box height={1} />
+            </Box>
           ) : isThemeDialogOpen ? (
             <Box flexDirection="column">
               {themeError && (
