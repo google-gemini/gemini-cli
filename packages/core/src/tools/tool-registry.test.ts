@@ -30,7 +30,7 @@ import {
   Schema,
 } from '@google/genai';
 import { spawn } from 'node:child_process';
-import { IdeClient } from '../ide/ide-client.js';
+
 import fs from 'node:fs';
 
 vi.mock('node:fs');
@@ -140,7 +140,6 @@ const baseConfigParams: ConfigParameters = {
   geminiMdFileCount: 0,
   approvalMode: ApprovalMode.DEFAULT,
   sessionId: 'test-session-id',
-  ideClient: IdeClient.getInstance(false),
 };
 
 describe('ToolRegistry', () => {
@@ -172,6 +171,10 @@ describe('ToolRegistry', () => {
     );
     vi.spyOn(config, 'getMcpServers');
     vi.spyOn(config, 'getMcpServerCommand');
+    vi.spyOn(config, 'getPromptRegistry').mockReturnValue({
+      clear: vi.fn(),
+      removePromptsByServer: vi.fn(),
+    } as any);
     mockDiscoverMcpTools.mockReset().mockResolvedValue(undefined);
   });
 
@@ -353,7 +356,7 @@ describe('ToolRegistry', () => {
         mcpServerConfigVal,
         undefined,
         toolRegistry,
-        undefined,
+        config.getPromptRegistry(),
         false,
       );
     });
@@ -376,7 +379,7 @@ describe('ToolRegistry', () => {
         mcpServerConfigVal,
         undefined,
         toolRegistry,
-        undefined,
+        config.getPromptRegistry(),
         false,
       );
     });

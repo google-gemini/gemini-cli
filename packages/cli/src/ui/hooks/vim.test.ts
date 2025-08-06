@@ -1203,7 +1203,9 @@ describe('useVim hook', () => {
         });
 
         // Press escape to clear pending state
-        exitInsertMode(result);
+        act(() => {
+          result.current.handleInput({ name: 'escape' });
+        });
 
         // Now 'w' should just move cursor, not delete
         act(() => {
@@ -1214,6 +1216,69 @@ describe('useVim hook', () => {
         // w should move to next word after clearing pending state
         expect(testBuffer.vimMoveWordForward).toHaveBeenCalledWith(1);
       });
+    });
+
+    describe('NORMAL mode escape behavior', () => {
+      it('should pass escape through when no pending operator is active', () => {
+        mockVimContext.vimMode = 'NORMAL';
+        const { result } = renderVimHook();
+
+        const handled = result.current.handleInput({ name: 'escape' });
+
+        expect(handled).toBe(false);
+      });
+
+      it('should handle escape and clear pending operator', () => {
+        mockVimContext.vimMode = 'NORMAL';
+        const { result } = renderVimHook();
+
+        act(() => {
+          result.current.handleInput({ sequence: 'd' });
+        });
+
+        let handled: boolean | undefined;
+        act(() => {
+          handled = result.current.handleInput({ name: 'escape' });
+        });
+
+        expect(handled).toBe(true);
+      });
+    });
+  });
+
+  describe('Shell command pass-through', () => {
+    it('should pass through ctrl+r in INSERT mode', () => {
+      mockVimContext.vimMode = 'INSERT';
+      const { result } = renderVimHook();
+
+      const handled = result.current.handleInput({ name: 'r', ctrl: true });
+
+      expect(handled).toBe(false);
+    });
+
+    it('should pass through ! in INSERT mode when buffer is empty', () => {
+      mockVimContext.vimMode = 'INSERT';
+      const emptyBuffer = createMockBuffer('');
+      const { result } = renderVimHook(emptyBuffer);
+
+      const handled = result.current.handleInput({ sequence: '!' });
+
+      expect(handled).toBe(false);
+    });
+
+    it('should handle ! as input in INSERT mode when buffer is not empty', () => {
+      mockVimContext.vimMode = 'INSERT';
+      const nonEmptyBuffer = createMockBuffer('not empty');
+      const { result } = renderVimHook(nonEmptyBuffer);
+      const key = { sequence: '!', name: '!' };
+
+      act(() => {
+        result.current.handleInput(key);
+      });
+
+      expect(nonEmptyBuffer.handleInput).toHaveBeenCalledWith(
+        expect.objectContaining(key),
+      );
     });
   });
 
