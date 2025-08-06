@@ -21,7 +21,7 @@ const ProgressBar = ({ progress }: { progress: number }) => {
 };
 
 export const PlanSidebar = ({ width = 30 }: { width?: number }) => {
-  const { steps, currentStep } = usePlan();
+  const { steps, currentStep, rules } = usePlan();
   if (!steps.length) {
     return null;
   }
@@ -44,6 +44,14 @@ export const PlanSidebar = ({ width = 30 }: { width?: number }) => {
           <ProgressBar progress={step.progress} />
         </Box>
       ))}
+      {rules.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text color={Colors.AccentBlue}>Rules</Text>
+          {rules.map((rule, idx) => (
+            <Text key={idx}>- {rule}</Text>
+          ))}
+        </Box>
+      )}
     </Box>
   );
 };

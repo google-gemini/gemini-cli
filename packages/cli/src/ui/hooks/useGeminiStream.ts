@@ -149,7 +149,7 @@ export const useGeminiStream = (
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const interruptedResponseRef = useRef<string | null>(null);
   const { startNewPrompt, getPromptCount } = useSessionStats();
-  const { createPlanFromQuery } = usePlan();
+  const { createPlanFromQuery, steps, currentStep, addRule } = usePlan();
   const logger = useLogger();
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
@@ -248,6 +248,36 @@ export const useGeminiStream = (
     },
     [geminiClient, history],
   );
+
+  enum InterruptionCategory {
+    Continue,
+    StatusQuery,
+    Rule,
+    Replan,
+  }
+
+  const classifyInterruption = (text: string): InterruptionCategory => {
+    const lower = text.toLowerCase().trim();
+    if (['continue', 'ok', 'okay', 'go on'].includes(lower)) {
+      return InterruptionCategory.Continue;
+    }
+    if (
+      /where.*(progress|you)/.test(lower) ||
+      lower.includes('progress?') ||
+      lower.startsWith('wait')
+    ) {
+      return InterruptionCategory.StatusQuery;
+    }
+    if (
+      lower.startsWith('please') ||
+      lower.includes('always') ||
+      lower.includes('never') ||
+      lower.includes('rule')
+    ) {
+      return InterruptionCategory.Rule;
+    }
+    return InterruptionCategory.Replan;
+  };
 
   useInput((_input, key) => {
     if (streamingState === StreamingState.Responding && key.escape) {
@@ -696,37 +726,69 @@ export const useGeminiStream = (
       options?: { isContinuation: boolean },
       prompt_id?: string,
     ) => {
+      const queryText = partListToString(query);
+      const userMessageTimestamp = Date.now();
       let wasInterrupted = false;
       if (
         (streamingState === StreamingState.Responding ||
           streamingState === StreamingState.WaitingForConfirmation) &&
         !options?.isContinuation
       ) {
-        if (interruptMode) {
-          wasInterrupted = true;
-          turnCancelledRef.current = true;
-          abortControllerRef.current?.abort();
-          if (pendingHistoryItemRef.current) {
-            addItem(pendingHistoryItemRef.current, Date.now());
-            if (
-              pendingHistoryItemRef.current.type === 'gemini' ||
-              pendingHistoryItemRef.current.type === 'gemini_content'
-            ) {
-              interruptedResponseRef.current =
-                pendingHistoryItemRef.current.text;
+        const intent = classifyInterruption(queryText);
+        switch (intent) {
+          case InterruptionCategory.Continue:
+            addItem({ type: MessageType.USER, text: queryText }, userMessageTimestamp);
+            addItem(
+              { type: MessageType.INFO, text: 'Continuing with current plan.' },
+              Date.now(),
+            );
+            return;
+          case InterruptionCategory.StatusQuery:
+            addItem({ type: MessageType.USER, text: queryText }, userMessageTimestamp);
+            addItem(
+              {
+                type: MessageType.GEMINI,
+                text:
+                  steps.length > 0
+                    ? `Currently at step ${currentStep + 1}/${steps.length}: ${steps[currentStep].description}`
+                    : 'No active plan.',
+              },
+              Date.now(),
+            );
+            return;
+          case InterruptionCategory.Rule:
+            addItem({ type: MessageType.USER, text: queryText }, userMessageTimestamp);
+            addRule(queryText);
+            addItem(
+              { type: MessageType.INFO, text: `Rule noted: ${queryText}` },
+              Date.now(),
+            );
+            return;
+          case InterruptionCategory.Replan:
+            if (interruptMode) {
+              wasInterrupted = true;
+              turnCancelledRef.current = true;
+              abortControllerRef.current?.abort();
+              if (pendingHistoryItemRef.current) {
+                addItem(pendingHistoryItemRef.current, Date.now());
+                if (
+                  pendingHistoryItemRef.current.type === 'gemini' ||
+                  pendingHistoryItemRef.current.type === 'gemini_content'
+                ) {
+                  interruptedResponseRef.current =
+                    pendingHistoryItemRef.current.text;
+                }
+                setPendingHistoryItem(null);
+              }
+              setIsResponding(false);
+            } else {
+              return;
             }
-            setPendingHistoryItem(null);
-          }
-          setIsResponding(false);
-        } else {
-          return;
         }
       }
 
-      const userMessageTimestamp = Date.now();
-
       if (!options?.isContinuation) {
-        createPlanFromQuery(partListToString(query));
+        createPlanFromQuery(queryText);
         // Reset quota error flag when starting a new query (not a continuation)
         setModelSwitchedFromQuotaError(false);
         config.setQuotaErrorOccurred(false);
@@ -827,6 +889,10 @@ export const useGeminiStream = (
       handleLoopDetectedEvent,
       summarizeInterruption,
       interruptMode,
+      steps,
+      currentStep,
+      addRule,
+      createPlanFromQuery,
     ],
   );
 
