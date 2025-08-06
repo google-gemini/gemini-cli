@@ -69,15 +69,16 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     readonly trust?: boolean,
     nameOverride?: string,
   ) {
-    super(
-      nameOverride ?? generateValidName(serverToolName),
-      `${serverToolName} (${serverName} MCP Server)`,
+    super({
+      name: nameOverride ?? generateValidName(serverToolName),
+      displayName: `${serverToolName} (${serverName} MCP Server)`,
       description,
-      Icon.Hammer,
-      { type: Type.OBJECT }, // this is a dummy Schema for MCP, will be not be used to construct the FunctionDeclaration
-      true, // isOutputMarkdown
-      false, // canUpdateOutput
-    );
+      icon: Icon.Hammer,
+      parameterSchema: { type: Type.OBJECT }, // this is a dummy Schema for MCP, will be not be used to construct the FunctionDeclaration
+      hasSideEffects: true,
+      isOutputMarkdown: true,
+      canUpdateOutput: false,
+    });
   }
 
   asFullyQualifiedTool(): DiscoveredMCPTool {

@@ -31,9 +31,6 @@ import { getCliVersion } from './utils/version.js';
 import {
   ApprovalMode,
   Config,
-  EditTool,
-  ShellTool,
-  WriteFileTool,
   sessionId,
   logUserPrompt,
   AuthType,
@@ -335,7 +332,7 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
   }
 }
 
-async function loadNonInteractiveConfig(
+export async function loadNonInteractiveConfig(
   config: Config,
   extensions: Extension[],
   settings: LoadedSettings,
@@ -345,11 +342,11 @@ async function loadNonInteractiveConfig(
   if (config.getApprovalMode() !== ApprovalMode.YOLO) {
     // Everything is not allowed, ensure that only read-only tools are configured.
     const existingExcludeTools = settings.merged.excludeTools || [];
-    const interactiveTools = [
-      ShellTool.Name,
-      EditTool.Name,
-      WriteFileTool.Name,
-    ];
+    const toolRegistry = await config.getToolRegistry();
+    const interactiveTools = toolRegistry
+      .getAllTools()
+      .filter((tool) => tool.hasSideEffects)
+      .map((tool) => tool.name);
 
     const newExcludeTools = [
       ...new Set([...existingExcludeTools, ...interactiveTools]),

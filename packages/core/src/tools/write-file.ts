@@ -70,14 +70,14 @@ export class WriteFileTool
   static readonly Name: string = 'write_file';
 
   constructor(private readonly config: Config) {
-    super(
-      WriteFileTool.Name,
-      'WriteFile',
-      `Writes content to a specified file in the local filesystem.
+    super({
+      name: WriteFileTool.Name,
+      displayName: 'WriteFile',
+      description: `Writes content to a specified file in the local filesystem.
 
       The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
-      Icon.Pencil,
-      {
+      icon: Icon.Pencil,
+      parameterSchema: {
         properties: {
           file_path: {
             description:
@@ -92,7 +92,7 @@ export class WriteFileTool
         required: ['file_path', 'content'],
         type: Type.OBJECT,
       },
-    );
+    });
   }
 
   validateToolParams(params: WriteFileToolParams): string | null {

@@ -20,7 +20,7 @@ export class DiscoveredTool extends BaseTool<ToolParams, ToolResult> {
     private readonly config: Config,
     name: string,
     readonly description: string,
-    readonly parameterSchema: Record<string, unknown>,
+    readonly parameterSchema: Schema,
   ) {
     const discoveryCmd = config.getToolDiscoveryCommand()!;
     const callCommand = config.getToolCallCommand()!;
@@ -40,15 +40,16 @@ Error: Error or \`(none)\` if no error was reported for the subprocess.
 Exit Code: Exit code or \`(none)\` if terminated by signal.
 Signal: Signal number or \`(none)\` if no signal was received.
 `;
-    super(
+    super({
       name,
-      name,
+      displayName: name,
       description,
-      Icon.Hammer,
+      icon: Icon.Hammer,
       parameterSchema,
-      false, // isOutputMarkdown
-      false, // canUpdateOutput
-    );
+      hasSideEffects: true,
+      isOutputMarkdown: false,
+      canUpdateOutput: false,
+    });
   }
 
   async execute(params: ToolParams): Promise<ToolResult> {
@@ -341,7 +342,7 @@ export class ToolRegistry {
             this.config,
             func.name,
             func.description ?? '',
-            parameters as Record<string, unknown>,
+            parameters,
           ),
         );
       }
