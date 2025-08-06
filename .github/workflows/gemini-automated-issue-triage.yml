@@ -40,7 +40,8 @@ jobs:
               "coreTools": [
                 "run_shell_command(gh label list)",
                 "run_shell_command(gh issue edit)",
-                "run_shell_command(gh issue list)"
+                "run_shell_command(gh issue list)",
+                "run_shell_command(gh issue comment)"
               ],
               "telemetry": {
                 "enabled": true,
@@ -49,19 +50,37 @@ jobs:
               "sandbox": false
             }
           prompt: |
-            You are an issue triage assistant. Analyze the current GitHub issues apply the most appropriate existing labels. Do not remove labels titled help wanted or good first issue.
+            You are an issue triage assistant. You are going to perform the following two tasks: 
+
+            Task 1: Information Completeness Check
+            Steps:
+            1. Analyze the issue to determine if it contains enough information. Review the issue for:
+              - A clear problem description.
+              - Steps to reproduce (for bugs).
+              - CLI version number.
+              - Relevant logs or error messages.
+            2. Action (If Incomplete): If information is missing, perform the following steps:
+              - Add Label: First, run this command to apply the `status/need-information` label:
+              `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "status/need-information"`
+              - Post a Tailored Comment: Next, identify *only the specific information that is missing*. Construct a polite, concise comment asking for those items and post it using the `gh issue comment` command.
+              Example: If the user forgot to include reproduction steps and the version number, your generated command should look like this:
+              # Note: The --body content is an example. You will generate it based on what is missing.
+              `gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "Thanks for filing this issue! To help us investigate, could you please provide:\n\n*   **Steps to reproduce the issue.**\n*   **The version of the CLI you are using.**\n\nOnce we have these details, we can look into it further."`
+            3. Action (If Complete): If the issue has all required information, do not add a label or comment. Proceed directly to Task 2.
+
+            Task 2: Categorization and Labeling 
+            Analyze the current GitHub issues apply the most appropriate existing labels. Do not remove labels titled help wanted or good first issue.
             Steps:
             1. Run: `gh label list --repo ${{ github.repository }} --limit 100` to get all available labels.
             2. Review the issue title, body and any comments provided in the environment variables.
             3. Ignore any existing priorities or tags on the issue. Just report your findings.
             4. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. For area/* and kind/* limit yourself to only the single most applicable label in each case. 
-            6. Apply the selected labels to this issue using: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`
-            7. For each issue please check if CLI version is present, this is usually in the output of the /about command  and will look like 0.1.5 for anything more than 6 versions older than the most recent should add the status/need-retesting label
-            8. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label
-            9. Use Area definitions mentioned below to help you narrow down issues
+            5. Apply the selected labels to this issue using: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`
+            6. For each issue please check if CLI version is present, this is usually in the output of the /about command  and will look like 0.1.5 for anything more than 6 versions older than the most recent should add the status/need-retesting label
+            7. Use Area definitions mentioned below to help you narrow down issues
             Guidelines:
             - Only use labels that already exist in the repository.
-            - Do not add comments or modify the issue content.
+            - Do not add comments or modify the issue content in this task.
             - Triage only the current issue.
             - Apply only one area/ label
             - Apply only one kind/ label
