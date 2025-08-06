@@ -45,6 +45,10 @@ export enum SubagentTerminateMode {
    * Indicates that the subagent's execution successfully completed all its defined goals.
    */
   GOAL = 'GOAL',
+  /**
+   * Indicates that the subagent's execution terminated because it exceeded the maximum number of turns.
+   */
+  MAX_TURNS = 'MAX_TURNS',
 }
 
 /**
@@ -66,19 +70,42 @@ export interface OutputObject {
 }
 
 /**
- * Configures the prompt and expected behavior of the subagent.
- * This interface defines the essential parameters that guide the subagent's
- * interaction and task execution, including its plan, goals, and available tools.
+ * Configures the initial prompt for the subagent.
  */
 export interface PromptConfig {
-  /** A high-level plan or strategy for the subagent to follow. */
-  plan: string;
-  /** The specific goals the subagent is expected to achieve. */
-  goals: string;
-  /** A list of expected output objects and the variables they should emit. */
-  outputs: Record<string, string>;
-  /** A list of tool names (in the tool registry) or full function declarations that the subagent is permitted to use. */
+  /**
+   * A single system prompt string that defines the subagent's persona and instructions.
+   * Note: You should use either `systemPrompt` or `initialMessages`, but not both.
+   */
+  systemPrompt?: string;
+
+  /**
+   * An array of user/model content pairs to seed the chat history for few-shot prompting.
+   * Note: You should use either `systemPrompt` or `initialMessages`, but not both.
+   */
+  initialMessages?: Content[];
+}
+
+/**
+ * Configures the tools available to the subagent during its execution.
+ */
+export interface ToolConfig {
+  /**
+   * A list of tool names (from the tool registry) or full function declarations
+   * that the subagent is permitted to use.
+   */
   tools: Array<string | FunctionDeclaration>;
+}
+
+/**
+ * Configures the expected outputs for the subagent.
+ */
+export interface OutputConfig {
+  /**
+   * A record describing the variables the subagent is expected to emit.
+   * The subagent will be prompted to generate these values before terminating.
+   */
+  outputs: Record<string, string>;
 }
 
 /**
@@ -87,11 +114,19 @@ export interface PromptConfig {
  * such as temperature and top-p values, which influence the creativity and diversity of the model's output.
  */
 export interface ModelConfig {
-  /** The name or identifier of the model to be used. */
+  /**
+   * The name or identifier of the model to be used (e.g., 'gemini-2.5-pro').
+   *
+   * TODO: In the future, this needs to support 'auto' or some other string to support routing use cases.
+   */
   model: string;
-  /** The temperature for the model's sampling process. */
+  /**
+   * The temperature for the model's sampling process.
+   */
   temp: number;
-  /** The top-p value for nucleus sampling. */
+  /**
+   * The top-p value for nucleus sampling.
+   */
   top_p: number;
 }
 
@@ -99,10 +134,17 @@ export interface ModelConfig {
  * Configures the execution environment and constraints for the subagent.
  * This interface defines parameters that control the subagent's runtime behavior,
  * such as maximum execution time, to prevent infinite loops or excessive resource consumption.
+ *
+ * TODO: Consider adding max_tokens as a form of budgeting.
  */
 export interface RunConfig {
   /** The maximum execution time for the subagent in minutes. */
   max_time_minutes: number;
+  /**
+   * The maximum number of conversational turns (a user message + model response)
+   * before the execution is terminated. Helps prevent infinite loops.
+   */
+  max_turns?: number;
 }
 
 /**
@@ -197,78 +239,95 @@ export class SubAgentScope {
 
   /**
    * Constructs a new SubAgentScope instance.
+   * @param name - The name for the subagent, used for logging and identification.
    * @param runtimeContext - The shared runtime configuration and services.
    * @param promptConfig - Configuration for the subagent's prompt and behavior.
    * @param modelConfig - Configuration for the generative model parameters.
-   * @param runConfig - Configuration for the subagent's execution environment and constraints.
+   * @param runConfig - Configuration for the subagent's execution environment.
+   * @param toolConfig - Optional configuration for tools available to the subagent.
+   * @param outputConfig - Optional configuration for the subagent's expected outputs.
    */
   private constructor(
+    readonly name: string,
     readonly runtimeContext: Config,
     private readonly promptConfig: PromptConfig,
     private readonly modelConfig: ModelConfig,
     private readonly runConfig: RunConfig,
+    private readonly toolConfig?: ToolConfig,
+    private readonly outputConfig?: OutputConfig,
   ) {
-    this.subagentId = Math.random().toString(36).slice(2);
+    const randomPart = Math.random().toString(36).slice(2, 8);
+    this.subagentId = `${this.name}-${randomPart}`;
   }
 
   /**
    * Creates and validates a new SubAgentScope instance.
    * This factory method ensures that all tools provided in the prompt configuration
    * are valid for non-interactive use before creating the subagent instance.
+   * @param {string} name - The name of the subagent.
    * @param {Config} runtimeContext - The shared runtime configuration and services.
    * @param {PromptConfig} promptConfig - Configuration for the subagent's prompt and behavior.
    * @param {ModelConfig} modelConfig - Configuration for the generative model parameters.
-   * @param {RunConfig} runConfig - Configuration for the subagent's execution environment and constraints.
+   * @param {RunConfig} runConfig - Configuration for the subagent's execution environment.
+   * @param {ToolConfig} [toolConfig] - Optional configuration for tools.
+   * @param {OutputConfig} [outputConfig] - Optional configuration for expected outputs.
    * @returns {Promise<SubAgentScope>} A promise that resolves to a valid SubAgentScope instance.
    * @throws {Error} If any tool requires user confirmation.
    */
   static async create(
+    name: string,
     runtimeContext: Config,
     promptConfig: PromptConfig,
     modelConfig: ModelConfig,
     runConfig: RunConfig,
+    toolConfig?: ToolConfig,
+    outputConfig?: OutputConfig,
   ): Promise<SubAgentScope> {
-    const toolRegistry: ToolRegistry = await runtimeContext.getToolRegistry();
-    const toolsToLoad: string[] = [];
-    for (const tool of promptConfig.tools) {
-      if (typeof tool === 'string') {
-        toolsToLoad.push(tool);
+    if (toolConfig) {
+      const toolRegistry: ToolRegistry = await runtimeContext.getToolRegistry();
+      const toolsToLoad: string[] = [];
+      for (const tool of toolConfig.tools) {
+        if (typeof tool === 'string') {
+          toolsToLoad.push(tool);
+        }
       }
-    }
 
-    for (const toolName of toolsToLoad) {
-      const tool = toolRegistry.getTool(toolName);
-      if (tool) {
-        const confirmationDetails = await tool.shouldConfirmExecute(
-          {},
-          new AbortController().signal,
-        );
-        if (confirmationDetails) {
-          throw new Error(
-            `Tool "${toolName}" requires user confirmation and cannot be used in a non-interactive subagent.`,
+      for (const toolName of toolsToLoad) {
+        const tool = toolRegistry.getTool(toolName);
+        if (tool) {
+          const confirmationDetails = await tool.shouldConfirmExecute(
+            {},
+            new AbortController().signal,
           );
+          if (confirmationDetails) {
+            throw new Error(
+              `Tool "${toolName}" requires user confirmation and cannot be used in a non-interactive subagent.`,
+            );
+          }
         }
       }
     }
 
     return new SubAgentScope(
+      name,
       runtimeContext,
       promptConfig,
       modelConfig,
       runConfig,
+      toolConfig,
+      outputConfig,
     );
   }
 
   /**
    * Runs the subagent in a non-interactive mode.
    * This method orchestrates the subagent's execution loop, including prompt templating,
-   * tool execution, and termination conditions. It manages the chat history, handles
-   * tool calls, and determines when the subagent's goals are met or if a timeout occurs.
+   * tool execution, and termination conditions.
    * @param {ContextState} context - The current context state containing variables for prompt templating.
    * @returns {Promise<void>} A promise that resolves when the subagent has completed its execution.
    */
   async runNonInteractive(context: ContextState): Promise<void> {
-    const chat = await this.createChatObject();
+    const chat = await this.createChatObject(context);
 
     if (!chat) {
       this.output.terminate_reason = SubagentTerminateMode.ERROR;
@@ -280,40 +339,48 @@ export class SubAgentScope {
       await this.runtimeContext.getToolRegistry();
 
     // Prepare the list of tools available to the subagent.
-    const toolsToLoad: string[] = [];
     const toolsList: FunctionDeclaration[] = [];
-    for (const toolName of this.promptConfig.tools) {
-      if (typeof toolName === 'string') {
-        toolsToLoad.push(toolName);
-      } else {
-        toolsList.push(toolName);
+    if (this.toolConfig) {
+      const toolsToLoad: string[] = [];
+      for (const tool of this.toolConfig.tools) {
+        if (typeof tool === 'string') {
+          toolsToLoad.push(tool);
+        } else {
+          toolsList.push(tool);
+        }
       }
+      toolsList.push(
+        ...toolRegistry.getFunctionDeclarationsFiltered(toolsToLoad),
+      );
     }
-
-    toolsList.push(
-      ...toolRegistry.getFunctionDeclarationsFiltered(toolsToLoad),
-    );
-    toolsList.push(...this.getScopeLocalFuncDefs());
-
-    chat.setSystemInstruction(this.buildChatSystemPrompt(context));
+    // Add local scope functions if outputs are expected.
+    if (this.outputConfig && this.outputConfig.outputs) {
+      toolsList.push(...this.getScopeLocalFuncDefs());
+    }
 
     let currentMessages: Content[] = [
       { role: 'user', parts: [{ text: 'Get Started!' }] },
     ];
 
     const startTime = Date.now();
-    let promptCounter = 0;
+    let turnCounter = 0;
     try {
       while (true) {
-        // Check for timeout.
-        const duration = Date.now() - startTime;
-        const durationMin = duration / (1000 * 60);
+        // Check termination conditions.
+        if (
+          this.runConfig.max_turns &&
+          turnCounter >= this.runConfig.max_turns
+        ) {
+          this.output.terminate_reason = SubagentTerminateMode.MAX_TURNS;
+          break;
+        }
+        let durationMin = (Date.now() - startTime) / (1000 * 60);
         if (durationMin >= this.runConfig.max_time_minutes) {
           this.output.terminate_reason = SubagentTerminateMode.TIMEOUT;
           break;
         }
 
-        const promptId = `${this.runtimeContext.getSessionId()}#${this.subagentId}#${promptCounter++}`;
+        const promptId = `${this.runtimeContext.getSessionId()}#${this.subagentId}#${turnCounter++}`;
         const messageParams = {
           message: currentMessages[0]?.parts || [],
           config: {
@@ -322,24 +389,21 @@ export class SubAgentScope {
           },
         };
 
-        // Send the message to the GeminiChat object, which will manage its own history
         const responseStream = await chat.sendMessageStream(
           messageParams,
           promptId,
         );
 
-        // Combine all chunks in stream for proper processing.
         const functionCalls: FunctionCall[] = [];
         for await (const resp of responseStream) {
-          if (abortController.signal.aborted) {
-            console.error('Operation cancelled.');
-            return;
-          }
+          if (abortController.signal.aborted) return;
+          if (resp.functionCalls) functionCalls.push(...resp.functionCalls);
+        }
 
-          const calls = resp.functionCalls;
-          if (calls) {
-            functionCalls.push(...calls);
-          }
+        durationMin = (Date.now() - startTime) / (1000 * 60);
+        if (durationMin >= this.runConfig.max_time_minutes) {
+          this.output.terminate_reason = SubagentTerminateMode.TIMEOUT;
+          break;
         }
 
         if (functionCalls.length > 0) {
@@ -347,13 +411,19 @@ export class SubAgentScope {
             functionCalls,
             toolRegistry,
             abortController,
-            currentMessages,
             promptId,
           );
         } else {
-          // The model has stopped calling tools, which signals completion.
-          // Verify that all expected output variables have been emitted.
-          const remainingVars = Object.keys(this.promptConfig.outputs).filter(
+          // Model stopped calling tools. Check if goal is met.
+          if (
+            !this.outputConfig ||
+            Object.keys(this.outputConfig.outputs).length === 0
+          ) {
+            this.output.terminate_reason = SubagentTerminateMode.GOAL;
+            break;
+          }
+
+          const remainingVars = Object.keys(this.outputConfig.outputs).filter(
             (key) => !(key in this.output.emitted_vars),
           );
 
@@ -362,11 +432,18 @@ export class SubAgentScope {
             break;
           }
 
-          // If variables are missing, the loop continues, relying on the
-          // system prompt to guide the model to call self.emitvalue.
-          console.debug(
-            'Variables appear to be missing. Relying on model to call EmitValue.',
-          );
+          const nudgeMessage = `You have stopped calling tools but have not emitted the following required variables: ${remainingVars.join(
+            ', ',
+          )}. Please use the 'self.emitvalue' tool to emit them now, or continue working if necessary.`;
+
+          console.debug(nudgeMessage);
+
+          currentMessages = [
+            {
+              role: 'user',
+              parts: [{ text: nudgeMessage }],
+            },
+          ];
         }
       }
     } catch (error) {
@@ -384,7 +461,6 @@ export class SubAgentScope {
    * @param {FunctionCall[]} functionCalls - An array of `FunctionCall` objects to process.
    * @param {ToolRegistry} toolRegistry - The tool registry to look up and execute tools.
    * @param {AbortController} abortController - An `AbortController` to signal cancellation of tool executions.
-   * @param {Content[]} currentMessages - The current list of messages in the chat history, which will be updated with tool responses.
    * @returns {Promise<Content[]>} A promise that resolves to an array of `Content` parts representing the tool responses,
    *          which are then used to update the chat history.
    */
@@ -392,9 +468,8 @@ export class SubAgentScope {
     functionCalls: FunctionCall[],
     toolRegistry: ToolRegistry,
     abortController: AbortController,
-    currentMessages: Content[],
     promptId: string,
-  ) {
+  ): Promise<Content[]> {
     const toolResponseParts: Part[] = [];
 
     for (const functionCall of functionCalls) {
@@ -434,8 +509,6 @@ export class SubAgentScope {
         console.error(
           `Error executing tool ${functionCall.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
         );
-        // Continue to the next tool call instead of halting execution.
-        continue;
       }
 
       if (toolResponse.responseParts) {
@@ -454,48 +527,51 @@ export class SubAgentScope {
     // If all tool calls failed, inform the model so it can re-evaluate.
     if (functionCalls.length > 0 && toolResponseParts.length === 0) {
       toolResponseParts.push({
-        text: 'All tool calls failed. Please analyze the errors, review the plan, and try an alternative approach.',
+        text: 'All tool calls failed. Please analyze the errors and try an alternative approach.',
       });
     }
-    currentMessages = [{ role: 'user', parts: toolResponseParts }];
-    return currentMessages;
+
+    return [{ role: 'user', parts: toolResponseParts }];
   }
 
-  /**
-   * Creates an instance of `GeminiChat` unique for the subagent's purposes.
-   * It initializes the chat with environment variables and configures the content generator.
-   * @param {Content[]} [extraHistory] - Optional additional chat history to include.
-   * @returns {Promise<GeminiChat | undefined>} A promise that resolves to a `GeminiChat` instance, or undefined if creation fails.
-   */
-  private async createChatObject(extraHistory?: Content[]) {
+  private async createChatObject(context: ContextState) {
+    if (!this.promptConfig.systemPrompt && !this.promptConfig.initialMessages) {
+      throw new Error(
+        'PromptConfig must have either `systemPrompt` or `initialMessages` defined.',
+      );
+    }
+    if (this.promptConfig.systemPrompt && this.promptConfig.initialMessages) {
+      throw new Error(
+        'PromptConfig cannot have both `systemPrompt` and `initialMessages` defined.',
+      );
+    }
+
     const envParts = await getEnvironmentContext(this.runtimeContext);
-    const initialHistory: Content[] = [
-      {
-        role: 'user',
-        parts: envParts,
-      },
-      {
-        role: 'model',
-        parts: [{ text: 'Got it. Thanks for the context!' }],
-      },
+    const envHistory: Content[] = [
+      { role: 'user', parts: envParts },
+      { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
     ];
 
-    const start_history = [...initialHistory, ...(extraHistory ?? [])];
+    const start_history = [
+      ...envHistory,
+      ...(this.promptConfig.initialMessages ?? []),
+    ];
 
-    // The system instruction is set dynamically within the run loop to allow
-    // for context-based templating.
-    const systemInstruction = '';
+    const systemInstruction = this.promptConfig.systemPrompt
+      ? this.buildChatSystemPrompt(context)
+      : undefined;
 
     try {
-      const targetContentConfig: GenerateContentConfig = {
+      const generationConfig: GenerateContentConfig & {
+        systemInstruction?: string | Content;
+      } = {
         temperature: this.modelConfig.temp,
         topP: this.modelConfig.top_p,
       };
 
-      const generationConfig = {
-        systemInstruction,
-        ...targetContentConfig,
-      };
+      if (systemInstruction) {
+        generationConfig.systemInstruction = systemInstruction;
+      }
 
       const contentGenerator = await createContentGenerator(
         this.runtimeContext.getContentGeneratorConfig(),
@@ -554,37 +630,38 @@ export class SubAgentScope {
   }
 
   /**
-   * Builds the system prompt for the chat, incorporating the subagent's plan, goals, and available tools.
-   * This prompt is intentionally different from the main agent's prompt to allow for scoped work with specific tools or personas.
-   * @param {ContextState} context - The current context state containing variables for prompt templating.
-   * @returns {string} The complete system prompt for the chat.
+   * Builds the system prompt for the chat based on the provided configurations.
+   * It templates the base system prompt and appends instructions for emitting
+   * variables if an `OutputConfig` is provided.
+   * @param {ContextState} context - The context for templating.
+   * @returns {string} The complete system prompt.
    */
   private buildChatSystemPrompt(context: ContextState): string {
-    const templated_plan = templateString(this.promptConfig.plan, context);
-    let templated_goals = templateString(this.promptConfig.goals, context);
-
-    // Add variable emission goals..
-    for (const [key, value] of Object.entries(this.promptConfig.outputs)) {
-      templated_goals += `\n* Use the 'self.emitvalue' tool to emit the '${key}' key, with a value described as '${value}'`;
+    if (!this.promptConfig.systemPrompt) {
+      // This should ideally be caught in createChatObject, but serves as a safeguard.
+      return '';
     }
 
-    const input = `You are an expert AI that takes on all sorts of roles to accomplish tasks for the user. You will continue to iterate, and call tools until the goals are complete. 
-    
-Below is your plan or persona for this session:
-<THE_PLAN>
-${templated_plan}
-</THE_PLAN>
+    let finalPrompt = templateString(this.promptConfig.systemPrompt, context);
 
- Here are your goals for this session. Use the tools available to attempt to achieve these goals:
- <GOALS>
- ${templated_goals}
- </GOALS>
- 
- Important things:
- * You are running in non-interactive mode. You cannot ask the user for input.
- * You must determine if your goals are complete. Once you believe all goals have been met, do not call any more tools.
- `;
+    // Add instructions for emitting variables if needed.
+    if (this.outputConfig && this.outputConfig.outputs) {
+      let outputInstructions =
+        '\n\nAfter you have achieved all other goals, you MUST emit the required output variables. For each expected output, make one final call to the `self.emitvalue` tool.';
 
-    return input;
+      for (const [key, value] of Object.entries(this.outputConfig.outputs)) {
+        outputInstructions += `\n* Use 'self.emitvalue' to emit the '${key}' key, with a value described as: '${value}'`;
+      }
+      finalPrompt += outputInstructions;
+    }
+
+    // Add general non-interactive instructions.
+    finalPrompt += `
+
+Important Rules:
+ * You are running in a non-interactive mode. You CANNOT ask the user for input or clarification. You must proceed with the information you have.
+ * Once you believe all goals have been met and all required outputs have been emitted, stop calling tools.`;
+
+    return finalPrompt;
   }
 }
