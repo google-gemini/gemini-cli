@@ -30,7 +30,8 @@ export const setupGithubCommand: SlashCommand = {
       gitRootRepo = execSync('git rev-parse --show-toplevel', {
         encoding: 'utf-8',
       }).trim();
-    } catch {
+    } catch (_error) {
+      console.debug(`Failed to get top-level git repo:`, _error);
       throw new Error(
         'Unable to determine the GitHub repository. /setup-github must be run from a git repository.',
       );
