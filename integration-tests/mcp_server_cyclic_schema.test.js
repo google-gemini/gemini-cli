@@ -12,10 +12,10 @@
 
 import { test, describe, before } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { TestRig, validateModelOutput } from './test-helper.js';
+import { TestRig } from './test-helper.js';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
-import { writeFileSync } from 'fs';
+import { writeFileSync, readFileSync } from 'fs';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -121,7 +121,7 @@ rpc.on('initialize', async (params) => {
       tools: {}
     },
     serverInfo: {
-      name: 'addition-server',
+      name: 'cyclic-schema-server',
       version: '1.0.0'
     }
   };
@@ -192,6 +192,16 @@ describe('mcp server with cyclic tool schema is detected', () => {
     // Or, possibly it could mean that gemini has fixed the issue.
     const output = await rig.run('hello');
 
-    assert.match(output, /.*tool_with_cyclic_schema.*/);
+    // The error message is in a log file, so we need to extract the path and read it.
+    const match = output.match(/Full report available at: (.*\.json)/);
+    assert(match, `Could not find log file path in output: ${output}`);
+
+    const logFilePath = match[1];
+    const logFileContent = readFileSync(logFilePath, 'utf-8');
+
+    assert.match(
+      logFileContent,
+      / - tool_with_cyclic_schema \(cyclic-schema-server MCP Server\)/,
+    );
   });
 });

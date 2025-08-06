@@ -687,9 +687,7 @@ export class GeminiChat {
   private async maybeIncludeSchemaDepthContext(error: unknown): Promise<void> {
     // Check for potentially problematic cyclic tools with cyclic schemas
     // and include a recommendation to remove potentially problematic tools.
-    if (
-      isStructuredError(error) && isSchemaDepthError(error.message)
-    ) {
+    if (isStructuredError(error) && isSchemaDepthError(error.message)) {
       const tools = (await this.config.getToolRegistry()).getAllTools();
       const cyclicSchemaTools: string[] = [];
       for (const tool of tools) {
@@ -712,8 +710,7 @@ export class GeminiChat {
   }
 }
 
-
 /** Visible for Testing */
-export function isSchemaDepthError(errorMessage: String): boolean {
+export function isSchemaDepthError(errorMessage: string): boolean {
   return errorMessage.includes('maximum schema depth exceeded');
 }
