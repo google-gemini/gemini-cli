@@ -544,6 +544,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
     buffer.visualCursor;
   const scrollVisualRow = buffer.visualScrollRow;
+  const getActiveCompletion = () => {
+    if (commandSearchActive) return commandSearchCompletion;
+    if (reverseSearchActive) return reverseSearchCompletion;
+    return completion;
+  };
+
+  const activeCompletion = getActiveCompletion();
+  const shouldShowSuggestions =
+    completion.showSuggestions || reverseSearchActive || commandSearchActive;
 
   return (
     <>
@@ -617,42 +626,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           )}
         </Box>
       </Box>
-      {completion.showSuggestions &&
-        !reverseSearchActive &&
-        !commandSearchActive && (
-          <Box>
-            <SuggestionsDisplay
-              suggestions={completion.suggestions}
-              activeIndex={completion.activeSuggestionIndex}
-              isLoading={completion.isLoadingSuggestions}
-              width={suggestionsWidth}
-              scrollOffset={completion.visibleStartIndex}
-              userInput={buffer.text}
-              expandedIndex={expandedSuggestionIndex}
-            />
-          </Box>
-        )}
-      {reverseSearchActive && (
+      {shouldShowSuggestions && (
         <Box>
           <SuggestionsDisplay
-            suggestions={reverseSearchCompletion.suggestions}
-            activeIndex={reverseSearchCompletion.activeSuggestionIndex}
-            isLoading={reverseSearchCompletion.isLoadingSuggestions}
+            suggestions={activeCompletion.suggestions}
+            activeIndex={activeCompletion.activeSuggestionIndex}
+            isLoading={activeCompletion.isLoadingSuggestions}
             width={suggestionsWidth}
-            scrollOffset={reverseSearchCompletion.visibleStartIndex}
-            userInput={buffer.text}
-            expandedIndex={expandedSuggestionIndex}
-          />
-        </Box>
-      )}
-      {commandSearchActive && (
-        <Box>
-          <SuggestionsDisplay
-            suggestions={commandSearchCompletion.suggestions}
-            activeIndex={commandSearchCompletion.activeSuggestionIndex}
-            isLoading={commandSearchCompletion.isLoadingSuggestions}
-            width={suggestionsWidth}
-            scrollOffset={commandSearchCompletion.visibleStartIndex}
+            scrollOffset={activeCompletion.visibleStartIndex}
             userInput={buffer.text}
             expandedIndex={expandedSuggestionIndex}
           />

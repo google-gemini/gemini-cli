@@ -119,7 +119,6 @@ export function useReverseSearchCompletion(
     setSuggestions,
     setShowSuggestions,
     setActiveSuggestionIndex,
-    buffer.text,
   ]);
 
   const handleAutocomplete = useCallback(
