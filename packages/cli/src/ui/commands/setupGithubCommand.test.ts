@@ -61,6 +61,8 @@ describe('setupGithubCommand', () => {
     vi.mocked(child_process.execSync).mockReturnValue('');
     expect(() => {
       setupGithubCommand.action?.({} as CommandContext, '');
-    }).toThrow('Unable to determine the Git root directory.');
+    }).toThrow(
+      'Unable to determine the GitHub repository. /setup-github must be run from a git repository.',
+    );
   });
 });
