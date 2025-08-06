@@ -99,8 +99,8 @@ jobs:
 
       - name: Configure Git User
         run: |
-          git config user.name "gemini-cli[bot]"
-          git config user.email "gemini-cli-bot@google.com"
+          git config user.name "gemini-cli-robot"
+          git config user.email "gemini-cli-robot@google.com"
 
       - name: Create and switch to a release branch
         id: release_branch
