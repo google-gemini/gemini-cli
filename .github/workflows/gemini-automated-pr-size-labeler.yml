@@ -9,8 +9,8 @@ jobs:
     timeout-minutes: 5
     if: ${{ github.repository == 'google-gemini/gemini-cli' }} # Adapt to your repo
     permissions:
-      pull-requests: write 
-      contents: read 
+      pull-requests: write
+      contents: read
       id-token: write
 
     concurrency:
@@ -27,7 +27,7 @@ jobs:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.PRIVATE_KEY }}
 
-      - name: Run Gemini PR size and complexity labeller 
+      - name: Run Gemini PR size and complexity labeller
         uses: google-gemini/gemini-cli-action@df3f890f003d28c60a2a09d2c29e0126e4d1e2ff # Use the specific commit SHA
         env:
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
