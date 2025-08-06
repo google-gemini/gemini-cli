@@ -21,7 +21,7 @@ export const setupGithubCommand: SlashCommand = {
   action: (): SlashCommandActionReturn => {
     if (!isGitHubRepository()) {
       throw new Error(
-        'Unable to determine the Git repository. /setup-github must be run from a git repository.',
+        'Unable to determine the GitHub repository. /setup-github must be run from a git repository.',
       );
     }
 
@@ -32,7 +32,7 @@ export const setupGithubCommand: SlashCommand = {
       }).trim();
     } catch {
       throw new Error(
-        'Unable to determine the Git root directory. /setup-github must be run from a git repository.',
+        'Unable to determine the GitHub repository. /setup-github must be run from a git repository.',
       );
     }
 
@@ -53,7 +53,8 @@ export const setupGithubCommand: SlashCommand = {
         const fileName = path.basename(workflow);
         return `curl -fsSL -o "${gitRootRepo}/.github/workflows/${fileName}" "${workflowBaseUrl}/${workflow}"`;
       }),
-      'echo "Workflows downloaded successfully."',
+      'echo "Workflows downloaded successfully. Follow steps in https://github.com/google-github-actions/run-gemini-cli/blob/v0/README.md#quick-start (skipping the /setup-github step) to complete setup."',
+      'open https://github.com/google-github-actions/run-gemini-cli/blob/v0/README.md#quick-start',
     ].join(' && ');
     return {
       type: 'tool',
