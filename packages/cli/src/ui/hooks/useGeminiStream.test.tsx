@@ -21,6 +21,7 @@ import {
   EditorType,
   AuthType,
   GeminiEventType as ServerGeminiEventType,
+  AnyToolInvocation,
 } from '@google/gemini-cli-core';
 import { Part, PartListUnion } from '@google/genai';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -452,9 +453,13 @@ describe('useGeminiStream', () => {
         },
         tool: {
           name: 'tool1',
+          displayName: 'tool1',
           description: 'desc1',
-          getDescription: vi.fn(),
+          build: vi.fn(),
         } as any,
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
         startTime: Date.now(),
         endTime: Date.now(),
       } as TrackedCompletedToolCall,
@@ -469,9 +474,13 @@ describe('useGeminiStream', () => {
         responseSubmittedToGemini: false,
         tool: {
           name: 'tool2',
+          displayName: 'tool2',
           description: 'desc2',
-          getDescription: vi.fn(),
+          build: vi.fn(),
         } as any,
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
         startTime: Date.now(),
         liveOutput: '...',
       } as TrackedExecutingToolCall,
@@ -506,6 +515,12 @@ describe('useGeminiStream', () => {
         status: 'success',
         responseSubmittedToGemini: false,
         response: { callId: 'call1', responseParts: toolCall1ResponseParts },
+        tool: {
+          displayName: 'MockTool',
+        },
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
       } as TrackedCompletedToolCall,
       {
         request: {
@@ -584,6 +599,12 @@ describe('useGeminiStream', () => {
         status: 'cancelled',
         response: { callId: '1', responseParts: [{ text: 'cancelled' }] },
         responseSubmittedToGemini: false,
+        tool: {
+          displayName: 'mock tool',
+        },
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
       } as TrackedCancelledToolCall,
     ];
     const client = new MockedGeminiClientClass(mockConfig);
@@ -644,9 +665,13 @@ describe('useGeminiStream', () => {
       },
       tool: {
         name: 'toolA',
+        displayName: 'toolA',
         description: 'descA',
-        getDescription: vi.fn(),
+        build: vi.fn(),
       } as any,
+      invocation: {
+        getDescription: () => `Mock description`,
+      } as unknown as AnyToolInvocation,
       status: 'cancelled',
       response: {
         callId: 'cancel-1',
@@ -668,9 +693,13 @@ describe('useGeminiStream', () => {
       },
       tool: {
         name: 'toolB',
+        displayName: 'toolB',
         description: 'descB',
-        getDescription: vi.fn(),
+        build: vi.fn(),
       } as any,
+      invocation: {
+        getDescription: () => `Mock description`,
+      } as unknown as AnyToolInvocation,
       status: 'cancelled',
       response: {
         callId: 'cancel-2',
@@ -760,9 +789,13 @@ describe('useGeminiStream', () => {
         responseSubmittedToGemini: false,
         tool: {
           name: 'tool1',
+          displayName: 'tool1',
           description: 'desc',
-          getDescription: vi.fn(),
+          build: vi.fn(),
         } as any,
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
         startTime: Date.now(),
       } as TrackedExecutingToolCall,
     ];
@@ -980,8 +1013,13 @@ describe('useGeminiStream', () => {
           tool: {
             name: 'tool1',
             description: 'desc1',
-            getDescription: vi.fn(),
+            build: vi.fn().mockImplementation((_) => ({
+              getDescription: () => `Mock description`,
+            })),
           } as any,
+          invocation: {
+            getDescription: () => `Mock description`,
+          },
           startTime: Date.now(),
           liveOutput: '...',
         } as TrackedExecutingToolCall,
@@ -1131,9 +1169,13 @@ describe('useGeminiStream', () => {
         },
         tool: {
           name: 'save_memory',
+          displayName: 'save_memory',
           description: 'Saves memory',
-          getDescription: vi.fn(),
+          build: vi.fn(),
         } as any,
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
       };
 
       // Capture the onComplete callback
