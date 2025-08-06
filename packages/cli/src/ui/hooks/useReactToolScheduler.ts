@@ -17,7 +17,6 @@ import {
   OutputUpdateHandler,
   AllToolCallsCompleteHandler,
   ToolCallsUpdateHandler,
-  Tool,
   ToolCall,
   Status as CoreStatus,
   EditorType,
@@ -216,23 +215,20 @@ export function mapToDisplay(
 
   const toolDisplays = toolCalls.map(
     (trackedCall): IndividualToolCallDisplay => {
-      let displayName = trackedCall.request.name;
-      let description = '';
+      let displayName: string;
+      let description: string;
       let renderOutputAsMarkdown = false;
 
-      const currentToolInstance =
-        'tool' in trackedCall && trackedCall.tool
-          ? (trackedCall as { tool: Tool }).tool
-          : undefined;
-
-      if (currentToolInstance) {
-        displayName = currentToolInstance.displayName;
-        description = currentToolInstance.getDescription(
-          trackedCall.request.args,
-        );
-        renderOutputAsMarkdown = currentToolInstance.isOutputMarkdown;
-      } else if ('request' in trackedCall && 'args' in trackedCall.request) {
+      if (trackedCall.status === 'error') {
+        displayName =
+          trackedCall.tool === undefined
+            ? trackedCall.request.name
+            : trackedCall.tool.displayName;
         description = JSON.stringify(trackedCall.request.args);
+      } else {
+        displayName = trackedCall.tool.displayName;
+        description = trackedCall.invocation.getDescription();
+        renderOutputAsMarkdown = trackedCall.tool.isOutputMarkdown;
       }
 
       const baseDisplayProperties: Omit<
@@ -256,7 +252,6 @@ export function mapToDisplay(
         case 'error':
           return {
             ...baseDisplayProperties,
-            name: currentToolInstance?.displayName ?? trackedCall.request.name,
             status: mapCoreStatusToDisplayStatus(trackedCall.status),
             resultDisplay: trackedCall.response.resultDisplay,
             confirmationDetails: undefined,

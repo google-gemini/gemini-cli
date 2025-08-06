@@ -239,65 +239,62 @@ class GeminiAgent implements Agent {
       );
     }
 
-    let toolCallId;
-    const confirmationDetails = await tool.shouldConfirmExecute(
-      args,
-      abortSignal,
-    );
-    if (confirmationDetails) {
-      let content: acp.ToolCallContent | null = null;
-      if (confirmationDetails.type === 'edit') {
-        content = {
-          type: 'diff',
-          path: confirmationDetails.fileName,
-          oldText: confirmationDetails.originalContent,
-          newText: confirmationDetails.newContent,
-        };
-      }
-
-      const result = await this.client.requestToolCallConfirmation({
-        label: tool.getDescription(args),
-        icon: tool.icon,
-        content,
-        confirmation: toAcpToolCallConfirmation(confirmationDetails),
-        locations: tool.toolLocations(args),
-      });
-
-      await confirmationDetails.onConfirm(toToolCallOutcome(result.outcome));
-      switch (result.outcome) {
-        case 'reject':
-          return errorResponse(
-            new Error(`Tool "${fc.name}" not allowed to run by the user.`),
-          );
-
-        case 'cancel':
-          return errorResponse(
-            new Error(`Tool "${fc.name}" was canceled by the user.`),
-          );
-        case 'allow':
-        case 'alwaysAllow':
-        case 'alwaysAllowMcpServer':
-        case 'alwaysAllowTool':
-          break;
-        default: {
-          const resultOutcome: never = result.outcome;
-          throw new Error(`Unexpected: ${resultOutcome}`);
-        }
-      }
-
-      toolCallId = result.id;
-    } else {
-      const result = await this.client.pushToolCall({
-        icon: tool.icon,
-        label: tool.getDescription(args),
-        locations: tool.toolLocations(args),
-      });
-
-      toolCallId = result.id;
-    }
-
+    let toolCallId: number | undefined = undefined;
     try {
-      const toolResult: ToolResult = await tool.execute(args, abortSignal);
+      const invocation = tool.build(args);
+      const confirmationDetails =
+        await invocation.shouldConfirmExecute(abortSignal);
+      if (confirmationDetails) {
+        let content: acp.ToolCallContent | null = null;
+        if (confirmationDetails.type === 'edit') {
+          content = {
+            type: 'diff',
+            path: confirmationDetails.fileName,
+            oldText: confirmationDetails.originalContent,
+            newText: confirmationDetails.newContent,
+          };
+        }
+
+        const result = await this.client.requestToolCallConfirmation({
+          label: invocation.getDescription(),
+          icon: tool.icon,
+          content,
+          confirmation: toAcpToolCallConfirmation(confirmationDetails),
+          locations: invocation.toolLocations(),
+        });
+
+        await confirmationDetails.onConfirm(toToolCallOutcome(result.outcome));
+        switch (result.outcome) {
+          case 'reject':
+            return errorResponse(
+              new Error(`Tool "${fc.name}" not allowed to run by the user.`),
+            );
+
+          case 'cancel':
+            return errorResponse(
+              new Error(`Tool "${fc.name}" was canceled by the user.`),
+            );
+          case 'allow':
+          case 'alwaysAllow':
+          case 'alwaysAllowMcpServer':
+          case 'alwaysAllowTool':
+            break;
+          default: {
+            const resultOutcome: never = result.outcome;
+            throw new Error(`Unexpected: ${resultOutcome}`);
+          }
+        }
+        toolCallId = result.id;
+      } else {
+        const result = await this.client.pushToolCall({
+          icon: tool.icon,
+          label: invocation.getDescription(),
+          locations: invocation.toolLocations(),
+        });
+        toolCallId = result.id;
+      }
+
+      const toolResult: ToolResult = await invocation.execute(abortSignal);
       const toolCallContent = toToolCallContent(toolResult);
 
       await this.client.updateToolCall({
@@ -320,12 +317,13 @@ class GeminiAgent implements Agent {
       return convertToFunctionResponse(fc.name, callId, toolResult.llmContent);
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
-      await this.client.updateToolCall({
-        toolCallId,
-        status: 'error',
-        content: { type: 'markdown', markdown: error.message },
-      });
-
+      if (toolCallId) {
+        await this.client.updateToolCall({
+          toolCallId,
+          status: 'error',
+          content: { type: 'markdown', markdown: error.message },
+        });
+      }
       return errorResponse(error);
     }
   }
@@ -408,7 +406,7 @@ class GeminiAgent implements Agent {
               `Path ${pathName} not found directly, attempting glob search.`,
             );
             try {
-              const globResult = await globTool.execute(
+              const globResult = await globTool.buildAndExecute(
                 {
                   pattern: `**/*${pathName}*`,
                   path: this.config.getTargetDir(),
@@ -530,12 +528,15 @@ class GeminiAgent implements Agent {
       respectGitIgnore, // Use configuration setting
     };
 
-    const toolCall = await this.client.pushToolCall({
-      icon: readManyFilesTool.icon,
-      label: readManyFilesTool.getDescription(toolArgs),
-    });
+    let toolCallId: number | undefined = undefined;
     try {
-      const result = await readManyFilesTool.execute(toolArgs, abortSignal);
+      const invocation = readManyFilesTool.build(toolArgs);
+      const toolCall = await this.client.pushToolCall({
+        icon: readManyFilesTool.icon,
+        label: invocation.getDescription(),
+      });
+      toolCallId = toolCall.id;
+      const result = await invocation.execute(abortSignal);
       const content = toToolCallContent(result) || {
         type: 'markdown',
         markdown: `Successfully read: ${contentLabelsForDisplay.join(', ')}`,
@@ -578,14 +579,16 @@ class GeminiAgent implements Agent {
 
       return processedQueryParts;
     } catch (error: unknown) {
-      await this.client.updateToolCall({
-        toolCallId: toolCall.id,
-        status: 'error',
-        content: {
-          type: 'markdown',
-          markdown: `Error reading files (${contentLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
-        },
-      });
+      if (toolCallId) {
+        await this.client.updateToolCall({
+          toolCallId,
+          status: 'error',
+          content: {
+            type: 'markdown',
+            markdown: `Error reading files (${contentLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
+          },
+        });
+      }
       throw error;
     }
   }
