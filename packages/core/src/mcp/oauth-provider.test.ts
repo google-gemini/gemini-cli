@@ -431,6 +431,90 @@ describe('MCPOAuthProvider', () => {
 
       global.setTimeout = originalSetTimeout;
     });
+
+    it('should prioritize id_token over access_token when both are present', async () => {
+      // ARRANGE: Create a mock OIDC response with both token types
+      const mockOidcTokenResponse: OAuthTokenResponse = {
+        access_token: 'ya29.this-is-an-opaque-access-token',
+        id_token: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJoid-token-is-a-jwt.SflKxwRJSMeKKF2Q',
+        token_type: 'Bearer',
+        expires_in: 3600,
+      };
+
+      // Mock the fetch call to the token endpoint to return our OIDC response
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockOidcTokenResponse),
+      });
+
+      // Mock the callback server to provide the authorization code
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = { url: '/oauth/callback?code=auth_code_oidc&state=bW9ja19zdGF0ZV8xNl9ieXRlcw' };
+          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+          (callbackHandler as (req: unknown, res: unknown) => void)(mockReq, mockRes);
+        }, 10);
+      });
+      
+      // ACT: Run the authentication method
+      const result = await MCPOAuthProvider.authenticate('oidc-server', mockConfig);
+
+      // ASSERT: Check that the id_token was prioritized
+      expect(result.accessToken).toBe(mockOidcTokenResponse.id_token);
+      expect(MCPOAuthTokenStorage.saveToken).toHaveBeenCalledWith(
+        'oidc-server',
+        expect.objectContaining({
+          accessToken: mockOidcTokenResponse.id_token,
+        }),
+        mockConfig.clientId,
+        mockConfig.tokenUrl,
+        undefined,
+      );
+    });
+
+    it('should use access_token when id_token is not present', async () => {
+      // ARRANGE: Use the original mock response which only has an access_token
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTokenResponse), // mockTokenResponse is defined at the top of the file
+      });
+
+      // Mock the callback server
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = { url: '/oauth/callback?code=auth_code_legacy&state=bW9ja19zdGF0ZV8xNl9ieXRlcw' };
+          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+          (callbackHandler as (req: unknown, res: unknown) => void)(mockReq, mockRes);
+        }, 10);
+      });
+      
+      // ACT: Run the authentication method
+      const result = await MCPOAuthProvider.authenticate('legacy-server', mockConfig);
+
+      // ASSERT: Check that the access_token was used as a fallback
+      expect(result.accessToken).toBe(mockTokenResponse.access_token);
+      expect(MCPOAuthTokenStorage.saveToken).toHaveBeenCalledWith(
+        'legacy-server',
+        expect.objectContaining({
+          accessToken: mockTokenResponse.access_token,
+        }),
+        mockConfig.clientId,
+        mockConfig.tokenUrl,
+        undefined,
+      );
+    });
   });
 
   describe('refreshAccessToken', () => {
@@ -631,6 +715,85 @@ describe('MCPOAuthProvider', () => {
       );
 
       expect(result).toBeNull();
+    });
+
+    it('should prioritize new id_token when refreshing an expired token', async () => {
+      // ARRANGE: Setup an expired token in storage
+      const expiredCredentials = {
+        serverName: 'test-server',
+        token: { ...mockToken, expiresAt: Date.now() - 3600000 },
+        clientId: 'test-client-id',
+        tokenUrl: 'https://auth.example.com/token',
+        updatedAt: Date.now(),
+      };
+      vi.mocked(MCPOAuthTokenStorage.getToken).mockResolvedValue(expiredCredentials);
+      vi.mocked(MCPOAuthTokenStorage.isTokenExpired).mockReturnValue(true);
+
+      // ARRANGE: Mock the refresh response to include both token types
+      const mockOidcRefreshResponse = {
+        access_token: 'new_opaque_access_token',
+        id_token: 'new_id_token.jwt.string',
+        token_type: 'Bearer',
+        expires_in: 3600,
+      };
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockOidcRefreshResponse),
+      });
+
+      // ACT: Run getValidToken, which will trigger the refresh
+      const result = await MCPOAuthProvider.getValidToken('test-server', mockConfig);
+
+      // ASSERT: Check that the new id_token was prioritized
+      expect(result).toBe(mockOidcRefreshResponse.id_token);
+      expect(MCPOAuthTokenStorage.saveToken).toHaveBeenCalledWith(
+        'test-server',
+        expect.objectContaining({
+          accessToken: mockOidcRefreshResponse.id_token,
+        }),
+        'test-client-id',
+        'https://auth.example.com/token',
+        undefined,
+      );
+    });
+
+    it('should use new access_token when refreshing and id_token is not present', async () => {
+      // ARRANGE: Setup an expired token in storage
+      const expiredCredentials = {
+        serverName: 'test-server',
+        token: { ...mockToken, expiresAt: Date.now() - 3600000 },
+        clientId: 'test-client-id',
+        tokenUrl: 'https://auth.example.com/token',
+        updatedAt: Date.now(),
+      };
+      vi.mocked(MCPOAuthTokenStorage.getToken).mockResolvedValue(expiredCredentials);
+      vi.mocked(MCPOAuthTokenStorage.isTokenExpired).mockReturnValue(true);
+
+      // ARRANGE: Mock the refresh response to only include an access_token
+      const mockLegacyRefreshResponse = {
+        access_token: 'new_legacy_access_token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+      };
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockLegacyRefreshResponse),
+      });
+
+      // ACT: Run getValidToken, which will trigger the refresh
+      const result = await MCPOAuthProvider.getValidToken('test-server', mockConfig);
+
+      // ASSERT: Check that the new access_token was used as a fallback
+      expect(result).toBe(mockLegacyRefreshResponse.access_token);
+      expect(MCPOAuthTokenStorage.saveToken).toHaveBeenCalledWith(
+        'test-server',
+        expect.objectContaining({
+          accessToken: mockLegacyRefreshResponse.access_token,
+        }),
+        'test-client-id',
+        'https://auth.example.com/token',
+        undefined,
+      );
     });
   });
 
