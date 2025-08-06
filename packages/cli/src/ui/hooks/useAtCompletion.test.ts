@@ -433,7 +433,7 @@ describe('useAtCompletion', () => {
       await cleanupTmpDir(rootDir2);
     });
 
-    it.only('should perform a non-recursive search when enableRecursiveFileSearch is false', async () => {
+    it('should perform a non-recursive search when enableRecursiveFileSearch is false', async () => {
       const structure: FileSystemStructure = {
         'file.txt': '',
         src: {

@@ -216,6 +216,7 @@ export class FileSearch {
       const cacheKey = cache.getCacheKey(
         this.absoluteDir,
         this.ignore.getFingerprint(),
+        this.options.maxDepth,
       );
       const cachedResults = cache.read(cacheKey);
 
@@ -231,6 +232,7 @@ export class FileSearch {
       const cacheKey = cache.getCacheKey(
         this.absoluteDir,
         this.ignore.getFingerprint(),
+        this.options.maxDepth,
       );
       cache.write(cacheKey, this.allFiles, this.options.cacheTtl * 1000);
     }

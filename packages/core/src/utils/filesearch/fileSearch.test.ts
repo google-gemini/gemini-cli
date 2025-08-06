@@ -446,6 +446,46 @@ describe('FileSearch', () => {
 
       expect(crawlSpy).toHaveBeenCalledTimes(1);
     });
+
+    it('should miss the cache when maxDepth changes', async () => {
+      tmpDir = await createTmpDir({ 'file1.js': '' });
+      const getOptions = (maxDepth?: number) => ({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: false,
+        ignoreDirs: [],
+        cache: true,
+        cacheTtl: 10000,
+        maxDepth,
+      });
+
+      // 1. First search with maxDepth: 1, should trigger a crawl.
+      const fs1 = new FileSearch(getOptions(1));
+      const crawlSpy1 = vi.spyOn(
+        fs1 as FileSearchWithPrivateMethods,
+        'performCrawl',
+      );
+      await fs1.initialize();
+      expect(crawlSpy1).toHaveBeenCalledTimes(1);
+
+      // 2. Second search with maxDepth: 2, should be a cache miss and trigger a crawl.
+      const fs2 = new FileSearch(getOptions(2));
+      const crawlSpy2 = vi.spyOn(
+        fs2 as FileSearchWithPrivateMethods,
+        'performCrawl',
+      );
+      await fs2.initialize();
+      expect(crawlSpy2).toHaveBeenCalledTimes(1);
+
+      // 3. Third search with maxDepth: 1 again, should be a cache hit.
+      const fs3 = new FileSearch(getOptions(1));
+      const crawlSpy3 = vi.spyOn(
+        fs3 as FileSearchWithPrivateMethods,
+        'performCrawl',
+      );
+      await fs3.initialize();
+      expect(crawlSpy3).not.toHaveBeenCalled();
+    });
   });
 
   it('should handle empty or commented-only ignore files', async () => {
