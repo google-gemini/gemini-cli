@@ -190,8 +190,8 @@ describe('mcp server with cyclic tool schema is detected', () => {
     // If this test starts failing, check `isSchemaDepthError` from
     // geminiChat.ts to see if it needs to be updated.
     // Or, possibly it could mean that gemini has fixed the issue.
-    assert.throws(async () => { await rig.run('hello'); }, (error) => {
-      return `${error}`.includes('tool_with_cyclic_schema');
-    });
+    const output = await rig.run('hello');
+
+    assert.match(output, /.*tool_with_cyclic_schema.*/);
   });
 });

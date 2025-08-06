@@ -258,6 +258,11 @@ export class TestRig {
 
             result = filteredLines.join('\n');
           }
+          // If we have stderr output, include that also
+          if (stderr) {
+            result += `\n\nStdErr:\n${stderr}`;
+          }
+
           resolve(result);
         } else {
           reject(new Error(`Process exited with code ${code}:\n${stderr}`));
