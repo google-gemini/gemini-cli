@@ -308,6 +308,7 @@ export class WriteFileTool
           lines,
           mimetype,
           extension,
+          diffStat,
         );
       } else {
         recordFileOperationMetric(
@@ -316,6 +317,7 @@ export class WriteFileTool
           lines,
           mimetype,
           extension,
+          diffStat,
         );
       }
 
