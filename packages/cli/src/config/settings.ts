@@ -319,44 +319,15 @@ export function loadEnvironment(settings?: Settings): void {
     setUpCloudShellEnvironment(envFilePath);
   }
 
-  // If no settings provided, try to load workspace settings for exclusions
-  let resolvedSettings = settings;
-  if (!resolvedSettings) {
-    const workspaceSettingsPath = getWorkspaceSettingsPath(process.cwd());
-    try {
-      if (fs.existsSync(workspaceSettingsPath)) {
-        const workspaceContent = fs.readFileSync(
-          workspaceSettingsPath,
-          'utf-8',
-        );
-        const parsedWorkspaceSettings = JSON.parse(
-          stripJsonComments(workspaceContent),
-        ) as Settings;
-        resolvedSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
-      }
-    } catch (_e) {
-      // Ignore errors loading workspace settings
-    }
-  }
-
   if (envFilePath) {
-    // Manually parse and load environment variables to handle exclusions correctly.
-    // This avoids modifying environment variables that were already set from the shell.
+    // Load all environment variables without exclusions
+    // Exclusions will be handled by applyEnvironmentExclusions() later
     try {
       const envFileContent = fs.readFileSync(envFilePath, 'utf-8');
       const parsedEnv = dotenv.parse(envFileContent);
 
-      const excludedVars =
-        resolvedSettings?.excludedProjectEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
-      const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
-
       for (const key in parsedEnv) {
         if (Object.hasOwn(parsedEnv, key)) {
-          // If it's a project .env file, skip loading excluded variables.
-          if (isProjectEnvFile && excludedVars.includes(key)) {
-            continue;
-          }
-
           // Load variable only if it's not already set in the environment.
           if (!Object.hasOwn(process.env, key)) {
             process.env[key] = parsedEnv[key];
@@ -370,10 +341,35 @@ export function loadEnvironment(settings?: Settings): void {
 }
 
 /**
+ * Applies exclusion logic to remove excluded environment variables from process.env.
+ * This should be called after settings are loaded and merged.
+ */
+export function applyEnvironmentExclusions(settings: Settings): void {
+  const envFilePath = findEnvFile(process.cwd());
+  
+  if (envFilePath) {
+    const excludedVars = settings?.excludedProjectEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
+    const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
+    
+    if (isProjectEnvFile) {
+      // Remove excluded variables from process.env
+      for (const excludedVar of excludedVars) {
+        if (Object.hasOwn(process.env, excludedVar)) {
+          delete process.env[excludedVar];
+        }
+      }
+    }
+  }
+}
+
+/**
  * Loads settings from user and workspace directories.
  * Project settings override user settings.
  */
 export function loadSettings(workspaceDir: string): LoadedSettings {
+  // Load environment variables first (uses fallback logic for exclusions)
+  loadEnvironment();
+
   let systemSettings: Settings = {};
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};
@@ -478,8 +474,8 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     settingsErrors,
   );
 
-  // Load environment with merged settings
-  loadEnvironment(loadedSettings.merged);
+  // Apply exclusion logic using merged settings
+  applyEnvironmentExclusions(loadedSettings.merged);
 
   return loadedSettings;
 }
