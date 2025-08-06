@@ -14,6 +14,7 @@ export enum ToolCallDecision {
   ACCEPT = 'accept',
   REJECT = 'reject',
   MODIFY = 'modify',
+  AUTO_ACCEPT = 'auto_accept',
 }
 
 export function getDecisionFromOutcome(
@@ -27,6 +28,8 @@ export function getDecisionFromOutcome(
       return ToolCallDecision.ACCEPT;
     case ToolConfirmationOutcome.ModifyWithEditor:
       return ToolCallDecision.MODIFY;
+    case ToolConfirmationOutcome.ProceedAuto:
+      return ToolCallDecision.AUTO_ACCEPT;
     case ToolConfirmationOutcome.Cancel:
     default:
       return ToolCallDecision.REJECT;

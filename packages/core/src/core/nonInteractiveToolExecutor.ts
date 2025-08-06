@@ -88,7 +88,7 @@ export async function executeToolCall(
       error_type:
         toolResult.error === undefined ? undefined : toolResult.error.type,
       prompt_id: toolCallRequest.prompt_id,
-      decision: ToolCallDecision.ACCEPT,
+      decision: ToolCallDecision.AUTO_ACCEPT,
     });
 
     const response = convertToFunctionResponse(

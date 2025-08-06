@@ -468,7 +468,10 @@ export class CoreToolScheduler {
       const { request: reqInfo, tool: toolInstance } = toolCall;
       try {
         if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
-          this.setToolCallOutcome(reqInfo.callId, ToolConfirmationOutcome.ProceedAlways);
+          this.setToolCallOutcome(
+            reqInfo.callId,
+            ToolConfirmationOutcome.ProceedAuto,
+          );
           this.setStatusInternal(reqInfo.callId, 'scheduled');
         } else {
           const confirmationDetails = await toolInstance.shouldConfirmExecute(
@@ -498,7 +501,10 @@ export class CoreToolScheduler {
               wrappedConfirmationDetails,
             );
           } else {
-            this.setToolCallOutcome(reqInfo.callId, ToolConfirmationOutcome.ProceedAlways);
+            this.setToolCallOutcome(
+              reqInfo.callId,
+              ToolConfirmationOutcome.ProceedAuto,
+            );
             this.setStatusInternal(reqInfo.callId, 'scheduled');
           }
         }
