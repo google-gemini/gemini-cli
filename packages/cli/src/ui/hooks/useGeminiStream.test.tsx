@@ -407,6 +407,7 @@ describe('useGeminiStream', () => {
           false,
           () => {},
           () => {},
+          () => {},
         );
       },
       {
@@ -562,6 +563,7 @@ describe('useGeminiStream', () => {
         false,
         () => {},
         () => {},
+        () => {},
       ),
     );
 
@@ -634,6 +636,7 @@ describe('useGeminiStream', () => {
         () => {},
         () => Promise.resolve(),
         false,
+        () => {},
         () => {},
         () => {},
       ),
@@ -741,6 +744,7 @@ describe('useGeminiStream', () => {
         false,
         () => {},
         () => {},
+        () => {},
       ),
     );
 
@@ -846,6 +850,7 @@ describe('useGeminiStream', () => {
         () => {},
         () => Promise.resolve(),
         false,
+        () => {},
         () => {},
         () => {},
       ),
@@ -970,6 +975,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
+          () => {},
           () => {},
           cancelSubmitSpy,
         ),
@@ -1245,6 +1251,7 @@ describe('useGeminiStream', () => {
           false,
           () => {},
           () => {},
+          () => {},
         ),
       );
 
@@ -1297,6 +1304,7 @@ describe('useGeminiStream', () => {
           false,
           () => {},
           () => {},
+          () => {},
         ),
       );
 
@@ -1346,6 +1354,7 @@ describe('useGeminiStream', () => {
           false,
           () => {},
           () => {},
+          () => {},
         ),
       );
 
@@ -1391,6 +1400,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
+          () => {},
           () => {},
           () => {},
         ),
@@ -1439,6 +1449,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
+          () => {},
           () => {},
           () => {},
         ),
@@ -1529,6 +1540,7 @@ describe('useGeminiStream', () => {
             false,
             () => {},
             () => {},
+            () => {},
           ),
         );
 
@@ -1582,6 +1594,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
+          () => {},
           () => {},
           () => {},
         ),
@@ -1661,6 +1674,7 @@ describe('useGeminiStream', () => {
           false,
           () => {},
           () => {},
+          () => {},
         ),
       );
 
@@ -1712,6 +1726,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
+          () => {},
           () => {},
           () => {},
         ),
