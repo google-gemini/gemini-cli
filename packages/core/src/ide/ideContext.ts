@@ -59,9 +59,35 @@ export const IdeDiffClosedNotificationSchema = z.object({
   }),
 });
 
-export const CloseDiffResponseSchema = z.object({
-  content: z.string().optional(),
-});
+export const CloseDiffResponseSchema = z
+  .object({
+    content: z
+      .array(
+        z.object({
+          text: z.string(),
+          type: z.literal('text'),
+        }),
+      )
+      .min(1),
+  })
+  .transform((val, ctx) => {
+    try {
+      const parsed = JSON.parse(val.content[0].text);
+      const innerSchema = z.object({ content: z.string().optional() });
+      const validationResult = innerSchema.safeParse(parsed);
+      if (!validationResult.success) {
+        validationResult.error.issues.forEach((issue) => ctx.addIssue(issue));
+        return z.NEVER;
+      }
+      return validationResult.data;
+    } catch (_) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Invalid JSON in text content',
+      });
+      return z.NEVER;
+    }
+  });
 
 export type DiffUpdateResult =
   | {

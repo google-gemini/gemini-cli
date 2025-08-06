@@ -229,14 +229,26 @@ export class IdeClient {
     await this.establishConnection(port);
   }
 
+  /**
+   * A diff is accepted with any modifications if the user performs one of the
+   * following actions:
+   * - Clicks the checkbox icon in the IDE to accept
+   * - Runs `command+shift+p` > "Gemini CLI: Accept Diff in IDE" to accept
+   * - Selects "accept" in the CLI UI
+   * - Saves the file via `ctrl/command+s`
+   *
+   * A diff is rejected if the user performs one of the following actions:
+   * - Clicks the "x" icon in the IDE
+   * - Runs "Gemini CLI: Close Diff in IDE"
+   * - Selects "no" in the CLI UI
+   * - Closes the file
+   */
   async openDiff(
     filePath: string,
     newContent?: string,
   ): Promise<DiffUpdateResult> {
-    logger.debug(`Opening diff for ${filePath}`);
     return new Promise<DiffUpdateResult>((resolve, reject) => {
       this.diffResponses.set(filePath, resolve);
-      logger.debug(`Resolver stored for ${filePath}`);
       this.client
         ?.callTool({
           name: `openDiff`,
@@ -253,7 +265,6 @@ export class IdeClient {
   }
 
   async closeDiff(filePath: string): Promise<string | undefined> {
-    logger.debug(`Closing diff for ${filePath}`);
     try {
       const result = await this.client?.callTool({
         name: `closeDiff`,
@@ -261,16 +272,9 @@ export class IdeClient {
           filePath,
         },
       });
-      const textContent =
-        result?.content &&
-        Array.isArray(result.content) &&
-        result.content.length > 0 &&
-        result.content[0].type === 'text'
-          ? result.content[0].text
-          : undefined;
 
-      if (textContent) {
-        const parsed = CloseDiffResponseSchema.parse(JSON.parse(textContent));
+      if (result) {
+        const parsed = CloseDiffResponseSchema.parse(result);
         return parsed.content;
       }
     } catch (err) {
@@ -282,7 +286,6 @@ export class IdeClient {
   // Closes the diff. Instead of waiting for a notification,
   // manually resolves the diff resolver as the desired outcome.
   async resolveDiffFromCli(filePath: string, outcome: 'accepted' | 'rejected') {
-    logger.debug(`Resolving diff for ${filePath} from CLI with ${outcome}`);
     const content = await this.closeDiff(filePath);
     const resolver = this.diffResponses.get(filePath);
     if (resolver) {
