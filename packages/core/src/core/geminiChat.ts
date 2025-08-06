@@ -300,15 +300,14 @@ export class GeminiChat {
       };
 
       response = await retryWithBackoff(apiCall, {
-        shouldRetry: (error: Error) => {
-          // Check for likely cyclic schema errors, don't retry those.
-          if (isSchemaDepthError(error.message)) return false;
-          // Check error messages for status codes, or specific error names if known
-          if (error && error.message) {
+        shouldRetry: (error: unknown) => {
+          // Check for known error messages and codes.
+          if (error instanceof Error && error.message) {
+            if (isSchemaDepthError(error.message)) return false;
             if (error.message.includes('429')) return true;
             if (error.message.match(/5\d{2}/)) return true;
           }
-          return false;
+          return false; // Don't retry other errors by default
         },
         onPersistent429: async (authType?: string, error?: unknown) =>
           await this.handleFlashFallback(authType, error),
@@ -418,11 +417,10 @@ export class GeminiChat {
       // the stream. For simple 429/500 errors on initial call, this is fine.
       // If errors occur mid-stream, this setup won't resume the stream; it will restart it.
       const streamResponse = await retryWithBackoff(apiCall, {
-        shouldRetry: (error: Error) => {
-          // Check for likely cyclic schema errors, don't retry those.
-          if (isSchemaDepthError(error.message)) return false;
-          // Check error messages for status codes, or specific error names if known
-          if (error && error.message) {
+        shouldRetry: (error: unknown) => {
+          // Check for known error messages and codes.
+          if (error instanceof Error && error.message) {
+            if (isSchemaDepthError(error.message)) return false;
             if (error.message.includes('429')) return true;
             if (error.message.match(/5\d{2}/)) return true;
           }
