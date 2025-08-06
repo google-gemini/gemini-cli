@@ -243,7 +243,7 @@ export class WriteFileTool
 
     if (correctedContentResult.error) {
       const errDetails = correctedContentResult.error;
-      const errorMsg = `Error checking existing file: ${errDetails.message}`;
+      const errorMsg = errDetails.code ? `Error checking existing file '${params.file_path}': ${errDetails.message} (${errDetails.code})` : `Error checking existing file: ${errDetails.message}`;
       return {
         llmContent: 'Could not write file.',
         returnDisplay: errorMsg,
