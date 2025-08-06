@@ -476,6 +476,34 @@ describe('ReadManyFilesTool', () => {
       fs.rmSync(tempDir1, { recursive: true, force: true });
       fs.rmSync(tempDir2, { recursive: true, force: true });
     });
+
+    it('should add a warning for truncated files', async () => {
+      createFile('file1.txt', 'Content1');
+      // Create a file that will be "truncated" by making it long
+      const longContent = Array.from({ length: 2500 }, (_, i) => `L${i}`).join(
+        '\n',
+      );
+      createFile('large-file.txt', longContent);
+
+      const params = { paths: ['*.txt'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      const content = result.llmContent as string[];
+
+      const normalFileContent = content.find((c) => c.includes('file1.txt'));
+      const truncatedFileContent = content.find((c) =>
+        c.includes('large-file.txt'),
+      );
+
+      expect(normalFileContent).not.toContain(
+        '[WARNING: This file was truncated.',
+      );
+      expect(truncatedFileContent).toContain(
+        "[WARNING: This file was truncated. To view the full content, use the 'read_file' tool on this specific file.]",
+      );
+      // Check that the actual content is still there but truncated
+      expect(truncatedFileContent).toContain('L200');
+      expect(truncatedFileContent).not.toContain('L2400');
+    });
   });
 
   describe('Batch Processing', () => {

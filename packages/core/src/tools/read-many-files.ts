@@ -524,11 +524,15 @@ Use this tool when the user's query implies needing the content of several files
               '{filePath}',
               filePath,
             );
-            contentParts.push(
-              `${separator}\n\n${fileReadResult.llmContent}\n\n`,
-            );
+            let fileContentForLlm = '';
+            if (fileReadResult.isTruncated) {
+              fileContentForLlm += `[WARNING: This file was truncated. To view the full content, use the 'read_file' tool on this specific file.]\n\n`;
+            }
+            fileContentForLlm += fileReadResult.llmContent;
+            contentParts.push(`${separator}\n\n${fileContentForLlm}\n\n`);
           } else {
-            contentParts.push(fileReadResult.llmContent); // This is a Part for image/pdf
+            // This is a Part for image/pdf, which we don't add the separator to.
+            contentParts.push(fileReadResult.llmContent);
           }
 
           processedFilesRelativePaths.push(relativePathForDisplay);
