@@ -39,12 +39,12 @@
     "commands": [
       {
         "command": "gemini.diff.accept",
-        "title": "Gemini CLI: Accept Current Diff",
+        "title": "Gemini CLI: Accept Diff",
         "icon": "$(check)"
       },
       {
         "command": "gemini.diff.cancel",
-        "title": "Cancel",
+        "title": "Gemini CLI: Close Diff Editor",
         "icon": "$(close)"
       },
       {
