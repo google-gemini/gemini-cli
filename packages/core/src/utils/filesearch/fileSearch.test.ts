@@ -10,13 +10,24 @@ import * as path from 'path';
 import * as cache from './crawlCache.js';
 import { FileSearch, AbortError, filter } from './fileSearch.js';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
+import { checkCanUseFzf, filterByFzf } from './fzfFilter.js';
 
 type FileSearchWithPrivateMethods = FileSearch & {
   performCrawl: () => Promise<void>;
 };
 
+vi.mock('./fzfFilter', () => ({
+  checkCanUseFzf: vi.fn(),
+  filterByFzf: vi.fn(async () => []),
+}));
+
 describe('FileSearch', () => {
   let tmpDir: string;
+
+  beforeEach(async () => {
+    vi.mocked(checkCanUseFzf).mockResolvedValue(false);
+  });
+
   afterEach(async () => {
     if (tmpDir) {
       await cleanupTmpDir(tmpDir);
@@ -320,6 +331,26 @@ describe('FileSearch', () => {
     setTimeout(() => controller.abort(), 1);
 
     await expect(filterPromise).rejects.toThrow(AbortError);
+  });
+
+  it('should use fzf when available', async () => {
+    vi.mocked(checkCanUseFzf).mockResolvedValue(true);
+
+    tmpDir = await createTmpDir({});
+
+    const fileSearch = new FileSearch({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: true,
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+    });
+
+    await fileSearch.initialize();
+    await fileSearch.search('dummy');
+
+    expect(filterByFzf).toHaveBeenCalled();
   });
 
   describe('with in-memory cache', () => {
