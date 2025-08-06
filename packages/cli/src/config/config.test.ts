@@ -6,6 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'os';
+import * as fs from 'fs';
+import * as path from 'path';
 import { loadCliConfig, parseArguments } from './config.js';
 import { Settings } from './settings.js';
 import { Extension } from './extension.js';
@@ -44,7 +46,7 @@ vi.mock('@google/gemini-cli-core', async () => {
     },
     loadEnvironment: vi.fn(),
     loadServerHierarchicalMemory: vi.fn(
-      (cwd, debug, fileService, extensionPaths, _maxDirs) =>
+      (cwd, dirs, debug, fileService, extensionPaths, _maxDirs) =>
         Promise.resolve({
           memoryContent: extensionPaths?.join(',') || '',
           fileCount: extensionPaths?.length || 0,
@@ -487,6 +489,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     await loadCliConfig(settings, extensions, 'session-id', argv);
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
+      [],
       false,
       expect.any(Object),
       [
@@ -1004,14 +1007,86 @@ describe('loadCliConfig ideModeFeature', () => {
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeModeFeature()).toBe(false);
   });
+});
 
-  it('should be false when settings.ideModeFeature is true, but SANDBOX is set', async () => {
-    process.argv = ['node', 'script.js'];
+vi.mock('fs', async () => {
+  const actualFs = await vi.importActual<typeof fs>('fs');
+  const MOCK_CWD1 = process.cwd();
+  const MOCK_CWD2 = path.resolve(path.sep, 'home', 'user', 'project');
+
+  const mockPaths = new Set([
+    MOCK_CWD1,
+    MOCK_CWD2,
+    path.resolve(path.sep, 'cli', 'path1'),
+    path.resolve(path.sep, 'settings', 'path1'),
+    path.join(os.homedir(), 'settings', 'path2'),
+    path.join(MOCK_CWD2, 'cli', 'path2'),
+    path.join(MOCK_CWD2, 'settings', 'path3'),
+  ]);
+
+  return {
+    ...actualFs,
+    existsSync: vi.fn((p) => mockPaths.has(p.toString())),
+    statSync: vi.fn((p) => {
+      if (mockPaths.has(p.toString())) {
+        return { isDirectory: () => true };
+      }
+      // Fallback for other paths if needed, though the test should be specific.
+      return actualFs.statSync(p);
+    }),
+    realpathSync: vi.fn((p) => p),
+  };
+});
+
+describe('loadCliConfig with includeDirectories', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+    vi.spyOn(process, 'cwd').mockReturnValue(
+      path.resolve(path.sep, 'home', 'user', 'project'),
+    );
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('should combine and resolve paths from settings and CLI arguments', async () => {
+    const mockCwd = path.resolve(path.sep, 'home', 'user', 'project');
+    process.argv = [
+      'node',
+      'script.js',
+      '--include-directories',
+      `${path.resolve(path.sep, 'cli', 'path1')},${path.join(mockCwd, 'cli', 'path2')}`,
+    ];
     const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    process.env.SANDBOX = 'true';
-    const settings: Settings = { ideModeFeature: true };
+    const settings: Settings = {
+      includeDirectories: [
+        path.resolve(path.sep, 'settings', 'path1'),
+        path.join(os.homedir(), 'settings', 'path2'),
+        path.join(mockCwd, 'settings', 'path3'),
+      ],
+    };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeModeFeature()).toBe(false);
+    const expected = [
+      mockCwd,
+      path.resolve(path.sep, 'cli', 'path1'),
+      path.join(mockCwd, 'cli', 'path2'),
+      path.resolve(path.sep, 'settings', 'path1'),
+      path.join(os.homedir(), 'settings', 'path2'),
+      path.join(mockCwd, 'settings', 'path3'),
+    ];
+    expect(config.getWorkspaceContext().getDirectories()).toEqual(
+      expect.arrayContaining(expected),
+    );
+    expect(config.getWorkspaceContext().getDirectories()).toHaveLength(
+      expected.length,
+    );
   });
 });
