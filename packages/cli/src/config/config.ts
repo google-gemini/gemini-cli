@@ -456,7 +456,11 @@ export async function loadCliConfig(
     cwd: process.cwd(),
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
-    model: argv.model || settings.model || DEFAULT_GEMINI_MODEL,
+    model:
+      argv.model ||
+      settings.model ||
+      process.env.GEMINI_MODEL ||
+      DEFAULT_GEMINI_MODEL,
     extensionContextFilePaths,
     maxSessionTurns: settings.maxSessionTurns ?? -1,
     experimentalAcp: argv.experimentalAcp || false,

@@ -61,6 +61,7 @@ import {
   AuthType,
   type IdeContext,
   ideContext,
+  validateModel,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -173,6 +174,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     IdeContext | undefined
   >();
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [validationLogs, setValidationLogs] = useState<string[]>([]);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
@@ -180,6 +182,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setIdeContextState(ideContext.getIdeContext());
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    const runValidation = async () => {
+      const { effectiveModel, logs } = await validateModel(config);
+      config.setModel(effectiveModel);
+      setValidationLogs(logs);
+    };
+    runValidation();
+  }, [config]);
 
   useEffect(() => {
     const openDebugConsole = () => {
@@ -845,6 +856,22 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               {startupWarnings.map((warning, index) => (
                 <Text key={index} color={Colors.AccentYellow}>
                   {warning}
+                </Text>
+              ))}
+            </Box>
+          )}
+
+          {validationLogs.length > 0 && (
+            <Box
+              borderStyle="round"
+              borderColor={Colors.AccentYellow}
+              paddingX={1}
+              marginY={1}
+              flexDirection="column"
+            >
+              {validationLogs.map((log, index) => (
+                <Text key={index} color={Colors.AccentYellow}>
+                  {log}
                 </Text>
               ))}
             </Box>
