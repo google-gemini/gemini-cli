@@ -276,7 +276,7 @@ You can specify the authentication provider type using the `authProviderType` pr
 }
 ```
 #### HTTP-based MCP Server [NO-Auth]
-
+```json
 {
   "mcpServers": {
     "httpServer": {
@@ -288,7 +288,7 @@ You can specify the authentication provider type using the `authProviderType` pr
     }
   }
 }
-
+```
 #### HTTP-based MCP Server with Custom Headers
 
 ```json
