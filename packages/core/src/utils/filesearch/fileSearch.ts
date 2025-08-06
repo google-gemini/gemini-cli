@@ -59,7 +59,10 @@ function fastSort(results: string[]): string[] {
  * @returns The sorted list of paths.
  */
 function fancySort(results: string[]): string[] {
-  const collator = new Intl.Collator(undefined, { numeric: true });
+  const collator = new Intl.Collator(undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
 
   // Schwartzian transform with manual parsing to avoid calling path.parse repeatedly.
   const mapped = results.map((p) => {

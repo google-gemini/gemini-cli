@@ -793,6 +793,8 @@ describe('FileSearch', () => {
       // - Natural numeric sorting (`helper-2.ts` vs `helper-10.ts`)
       // - Extension length sorting (`Button.ts` vs `Button.test.ts`)
       // - Grouping of files within the same subdirectory
+      // - Case-insensitive sorting (`api.ts` vs `API.ts` vs `apple.ts`)
+      // - Subdirectory sorting
       const fancySortStructure = {
         src: {
           components: [
@@ -801,7 +803,14 @@ describe('FileSearch', () => {
             'Button.integration.test.ts',
             'Modal.ts',
           ],
-          utils: ['helper-10.ts', 'helper-2.ts'],
+          utils: {
+            'helper-10.ts': '',
+            'helper-2.ts': '',
+            'API.ts': '',
+            'api.ts': '',
+            'apple.ts': '',
+            access: ['access.ts', 'more.ts'],
+          },
           'App.ts': '',
         },
         'package.json': '',
@@ -816,7 +825,7 @@ describe('FileSearch', () => {
         ignoreDirs: [],
         cache: false,
         cacheTtl: 0,
-        fastSortThreshold: 20,
+        fastSortThreshold: 40,
       });
 
       await fileSearch.initialize();
@@ -825,11 +834,12 @@ describe('FileSearch', () => {
       // Expected order for fancySort:
       // 1. Dirs first, sorted by path.
       // 2. Root files, sorted by name.
-      // 3. Files sorted by dir, then name (numeric), then extension length.
+      // 3. Files sorted by dir, then name (numeric, case-insensitive), then extension length.
       expect(results).toEqual([
         'src/',
         'src/components/',
         'src/utils/',
+        'src/utils/access/',
         'package.json',
         'README.md',
         'src/App.ts',
@@ -837,8 +847,13 @@ describe('FileSearch', () => {
         'src/components/Button.test.ts',
         'src/components/Button.integration.test.ts',
         'src/components/Modal.ts',
+        'src/utils/API.ts',
+        'src/utils/api.ts',
+        'src/utils/apple.ts',
         'src/utils/helper-2.ts',
         'src/utils/helper-10.ts',
+        'src/utils/access/access.ts',
+        'src/utils/access/more.ts',
       ]);
     });
 
