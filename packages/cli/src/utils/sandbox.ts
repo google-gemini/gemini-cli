@@ -16,6 +16,7 @@ import {
 } from '../config/settings.js';
 import { promisify } from 'util';
 import { Config, SandboxConfig } from '@google/gemini-cli-core';
+import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 
 const execAsync = promisify(exec);
 
@@ -185,6 +186,12 @@ export async function start_sandbox(
   nodeArgs: string[] = [],
   cliConfig?: Config,
 ) {
+  const patcher = new ConsolePatcher({
+    debugMode: cliConfig?.getDebugMode() || !!process.env.DEBUG,
+    stderr: true,
+  });
+  patcher.patch();
+
   if (config.command === 'sandbox-exec') {
     // disallow BUILD_SANDBOX
     if (process.env.BUILD_SANDBOX) {
