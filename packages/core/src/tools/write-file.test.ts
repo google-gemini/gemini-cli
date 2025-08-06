@@ -14,6 +14,7 @@ import {
   type Mocked,
 } from 'vitest';
 import { WriteFileTool, WriteFileToolParams } from './write-file.js';
+import { ToolErrorType } from './tool-error.js';
 import {
   FileDiff,
   ToolConfirmationOutcome,
@@ -453,18 +454,23 @@ describe('WriteFileTool', () => {
     it('should return error if params are invalid (relative path)', async () => {
       const params = { file_path: 'relative.txt', content: 'test' };
       const result = await tool.execute(params, abortSignal);
-      expect(result.llmContent).toMatch(/Error: Invalid parameters provided/);
+      expect(result.llmContent).toBe('Could not write file due to invalid parameters.');
       expect(result.returnDisplay).toMatch(/Error: File path must be absolute/);
+      expect(result.error).toEqual({
+        message: 'File path must be absolute: relative.txt',
+        type: ToolErrorType.INVALID_TOOL_PARAMS,
+      });
     });
 
     it('should return error if params are invalid (path outside root)', async () => {
       const outsidePath = path.resolve(tempDir, 'outside-root.txt');
       const params = { file_path: outsidePath, content: 'test' };
       const result = await tool.execute(params, abortSignal);
-      expect(result.llmContent).toMatch(/Error: Invalid parameters provided/);
+      expect(result.llmContent).toBe('Could not write file due to invalid parameters.');
       expect(result.returnDisplay).toContain(
         'Error: File path must be within one of the workspace directories',
       );
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
     });
 
     it('should return error if _getCorrectedFileContent returns an error during execute', async () => {
@@ -479,10 +485,14 @@ describe('WriteFileTool', () => {
       });
 
       const result = await tool.execute(params, abortSignal);
-      expect(result.llmContent).toMatch(/Error checking existing file/);
+      expect(result.llmContent).toBe('Could not write file.');
       expect(result.returnDisplay).toMatch(
         /Error checking existing file: Simulated read error for execute/,
       );
+      expect(result.error).toEqual({
+        message: 'Simulated read error for execute',
+        type: ToolErrorType.FILE_WRITE_FAILURE,
+      });
 
       vi.spyOn(fs, 'readFileSync').mockImplementation(originalReadFileSync);
       fs.chmodSync(filePath, 0o600);

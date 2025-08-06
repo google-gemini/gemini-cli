@@ -8,6 +8,7 @@ import path from 'path';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { BaseTool, Icon, ToolLocation, ToolResult } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 import { Type } from '@google/genai';
 import {
   processSingleFileContent,
@@ -132,8 +133,12 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
-        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
+        llmContent: 'Could not read file due to invalid parameters.',
         returnDisplay: validationError,
+        error: {
+          message: validationError,
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
       };
     }
 
@@ -145,9 +150,19 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     );
 
     if (result.error) {
+      // Determine the appropriate error type based on the error message
+      let errorType = ToolErrorType.READ_CONTENT_FAILURE;
+      if (result.error.includes('File not found')) {
+        errorType = ToolErrorType.FILE_NOT_FOUND;
+      }
+      
       return {
-        llmContent: result.error, // The detailed error for LLM
-        returnDisplay: result.returnDisplay || 'Error reading file', // User-friendly error
+        llmContent: 'Could not read file.',
+        returnDisplay: result.returnDisplay || 'Error reading file',
+        error: {
+          message: result.error,
+          type: errorType,
+        },
       };
     }
 

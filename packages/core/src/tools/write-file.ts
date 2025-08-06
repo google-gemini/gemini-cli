@@ -17,6 +17,7 @@ import {
   ToolCallConfirmationDetails,
   Icon,
 } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
@@ -207,8 +208,12 @@ export class WriteFileTool
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
-        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
+        llmContent: 'Could not write file due to invalid parameters.',
         returnDisplay: `Error: ${validationError}`,
+        error: {
+          message: validationError,
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
       };
     }
 
@@ -222,8 +227,12 @@ export class WriteFileTool
       const errDetails = correctedContentResult.error;
       const errorMsg = `Error checking existing file: ${errDetails.message}`;
       return {
-        llmContent: `Error checking existing file ${params.file_path}: ${errDetails.message}`,
+        llmContent: 'Could not write file.',
         returnDisplay: errorMsg,
+        error: {
+          message: errDetails.message,
+          type: ToolErrorType.FILE_WRITE_FAILURE,
+        },
       };
     }
 
@@ -311,8 +320,12 @@ export class WriteFileTool
     } catch (error) {
       const errorMsg = `Error writing to file: ${error instanceof Error ? error.message : String(error)}`;
       return {
-        llmContent: `Error writing to file ${params.file_path}: ${errorMsg}`,
+        llmContent: 'Could not write file.',
         returnDisplay: `Error: ${errorMsg}`,
+        error: {
+          message: errorMsg,
+          type: ToolErrorType.FILE_WRITE_FAILURE,
+        },
       };
     }
   }

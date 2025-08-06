@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ReadFileTool, ReadFileToolParams } from './read-file.js';
+import { ToolErrorType } from './tool-error.js';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
@@ -131,11 +132,15 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = {
         absolute_path: 'relative/path.txt',
       };
-      expect(await tool.execute(params, abortSignal)).toEqual({
-        llmContent:
-          'Error: Invalid parameters provided. Reason: File path must be absolute, but was relative: relative/path.txt. You must provide an absolute path.',
+      const result = await tool.execute(params, abortSignal);
+      expect(result).toEqual({
+        llmContent: 'Could not read file due to invalid parameters.',
         returnDisplay:
           'File path must be absolute, but was relative: relative/path.txt. You must provide an absolute path.',
+        error: {
+          message: 'File path must be absolute, but was relative: relative/path.txt. You must provide an absolute path.',
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
       });
     });
 
@@ -143,9 +148,14 @@ describe('ReadFileTool', () => {
       const filePath = path.join(tempRootDir, 'nonexistent.txt');
       const params: ReadFileToolParams = { absolute_path: filePath };
 
-      expect(await tool.execute(params, abortSignal)).toEqual({
-        llmContent: `File not found: ${filePath}`,
+      const result = await tool.execute(params, abortSignal);
+      expect(result).toEqual({
+        llmContent: 'Could not read file.',
         returnDisplay: 'File not found.',
+        error: {
+          message: `File not found: ${filePath}`,
+          type: ToolErrorType.FILE_NOT_FOUND,
+        },
       });
     });
 
@@ -241,9 +251,14 @@ describe('ReadFileTool', () => {
           absolute_path: ignoredFilePath,
         };
         const expectedError = `File path '${ignoredFilePath}' is ignored by .geminiignore pattern(s).`;
-        expect(await tool.execute(params, abortSignal)).toEqual({
-          llmContent: `Error: Invalid parameters provided. Reason: ${expectedError}`,
+        const result = await tool.execute(params, abortSignal);
+        expect(result).toEqual({
+          llmContent: 'Could not read file due to invalid parameters.',
           returnDisplay: expectedError,
+          error: {
+            message: expectedError,
+            type: ToolErrorType.INVALID_TOOL_PARAMS,
+          },
         });
       });
 
@@ -257,9 +272,14 @@ describe('ReadFileTool', () => {
           absolute_path: filePath,
         };
         const expectedError = `File path '${filePath}' is ignored by .geminiignore pattern(s).`;
-        expect(await tool.execute(params, abortSignal)).toEqual({
-          llmContent: `Error: Invalid parameters provided. Reason: ${expectedError}`,
+        const result = await tool.execute(params, abortSignal);
+        expect(result).toEqual({
+          llmContent: 'Could not read file due to invalid parameters.',
           returnDisplay: expectedError,
+          error: {
+            message: expectedError,
+            type: ToolErrorType.INVALID_TOOL_PARAMS,
+          },
         });
       });
     });
