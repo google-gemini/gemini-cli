@@ -60,6 +60,7 @@ describe('EditTool', () => {
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
       getIdeClient: () => undefined,
       getIdeMode: () => false,
+      getIdeModeFeature: () => false,
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
       // Add other properties/methods of Config if EditTool uses them
       // Minimal other methods to satisfy Config type if needed by EditTool constructor or other direct uses:
@@ -810,6 +811,7 @@ describe('EditTool', () => {
         openDiff: vi.fn(),
       };
       (mockConfig as any).getIdeMode = () => true;
+      (mockConfig as any).getIdeModeFeature = () => true;
       (mockConfig as any).getIdeClient = () => ideClient;
     });
 
