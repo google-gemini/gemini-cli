@@ -92,6 +92,7 @@ class MockModifiableTool
         type: 'edit',
         title: 'Confirm Mock Tool',
         fileName: 'test.txt',
+        filePath: 'test.txt',
         fileDiff: 'diff',
         originalContent: 'originalContent',
         newContent: 'newContent',
@@ -434,6 +435,7 @@ describe('CoreToolScheduler edit cancellation', () => {
           type: 'edit',
           title: 'Confirm Edit',
           fileName: 'test.txt',
+          filePath: 'test.txt',
           fileDiff:
             '--- test.txt\n+++ test.txt\n@@ -1,1 +1,1 @@\n-old content\n+new content',
           originalContent: 'old content',
