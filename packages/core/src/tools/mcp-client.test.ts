@@ -12,6 +12,7 @@ import {
   isEnabled,
   discoverTools,
   discoverPrompts,
+  hasValidTypes,
 } from './mcp-client.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -607,6 +608,165 @@ describe('mcp-client', () => {
       expect(isEnabled(namelessFuncDecl, serverName, mcpServerConfig)).toBe(
         false,
       );
+    });
+  });
+
+  describe('hasValidTypes', () => {
+    it('should return true for a valid schema with anyOf', () => {
+      const schema = {
+        anyOf: [{ type: 'string' }, { type: 'number' }],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with anyOf', () => {
+      const schema = {
+        anyOf: [{ type: 'string' }, { description: 'no type' }],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema with allOf', () => {
+      const schema = {
+        allOf: [
+          { type: 'string' },
+          { type: 'object', properties: { foo: { type: 'string' } } },
+        ],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with allOf', () => {
+      const schema = {
+        allOf: [{ type: 'string' }, { description: 'no type' }],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema with oneOf', () => {
+      const schema = {
+        oneOf: [{ type: 'string' }, { type: 'number' }],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with oneOf', () => {
+      const schema = {
+        oneOf: [{ type: 'string' }, { description: 'no type' }],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema with nested subschemas', () => {
+      const schema = {
+        anyOf: [
+          { type: 'string' },
+          {
+            allOf: [
+              { type: 'object', properties: { a: { type: 'string' } } },
+              { type: 'object', properties: { b: { type: 'number' } } },
+            ],
+          },
+        ],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with nested subschemas', () => {
+      const schema = {
+        anyOf: [
+          { type: 'string' },
+          {
+            allOf: [
+              { type: 'object', properties: { a: { type: 'string' } } },
+              { description: 'no type' },
+            ],
+          },
+        ],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a schema with a type and subschemas', () => {
+      const schema = {
+        type: 'string',
+        anyOf: [{ minLength: 1 }, { maxLength: 5 }],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for a schema with no type and no subschemas', () => {
+      const schema = {
+        description: 'a schema with no type',
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: { type: 'string' },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false if a parameter is missing a type', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: { description: 'a param with no type' },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return false if a nested parameter is missing a type', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: {
+            type: 'object',
+            properties: {
+              nestedParam: {
+                description: 'a nested param with no type',
+              },
+            },
+          },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return false if an array item is missing a type', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: {
+            type: 'array',
+            items: {
+              description: 'an array item with no type',
+            },
+          },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a schema with no properties', () => {
+      const schema = {
+        type: 'object',
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for a schema with an empty properties object', () => {
+      const schema = {
+        type: 'object',
+        properties: {},
+      };
+      expect(hasValidTypes(schema)).toBe(true);
     });
   });
 });
