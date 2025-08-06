@@ -14,7 +14,7 @@ import { strict as assert } from 'node:assert';
 import { TestRig } from './test-helper.js';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
-import { writeFileSync, readFileSync } from 'fs';
+import { writeFileSync } from 'fs';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -191,16 +191,9 @@ describe('mcp server with cyclic tool schema is detected', () => {
     // Or, possibly it could mean that gemini has fixed the issue.
     const output = await rig.run('hello');
 
-    // The error message is in a log file, so we need to extract the path and read it.
-    const match = output.match(/Full report available at: (.*\.json)/);
-    assert(match, `Could not find log file path in output: ${output}`);
-
-    const logFilePath = match[1];
-    const logFileContent = readFileSync(logFilePath, 'utf-8');
-
     assert.match(
-      logFileContent,
-      / - tool_with_cyclic_schema \(cyclic-schema-server MCP Server\)/,
+      output,
+      /Skipping tool 'tool_with_cyclic_schema' from MCP server 'cyclic-schema-server' because it has missing types in its parameter schema/,
     );
   });
 });
