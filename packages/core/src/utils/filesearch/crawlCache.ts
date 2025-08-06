@@ -17,10 +17,14 @@ const cacheTimers = new Map<string, NodeJS.Timeout>();
 export const getCacheKey = (
   directory: string,
   ignoreContent: string,
+  maxDepth?: number,
 ): string => {
   const hash = crypto.createHash('sha256');
   hash.update(directory);
   hash.update(ignoreContent);
+  if (maxDepth !== undefined) {
+    hash.update(String(maxDepth));
+  }
   return hash.digest('hex');
 };
 
