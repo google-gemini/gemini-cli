@@ -150,6 +150,7 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     );
 
     if (result.error) {
+      // TODO: Refactor processSingleFileContent to return structured errors instead of relying on string matching.
       // Determine the appropriate error type based on the error message
       let errorType = ToolErrorType.READ_CONTENT_FAILURE;
       if (result.error.includes('File not found')) {
