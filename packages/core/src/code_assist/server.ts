@@ -25,6 +25,7 @@ import {
 } from '@google/genai';
 import * as readline from 'readline';
 import { ContentGenerator } from '../core/contentGenerator.js';
+import {toContents} from './converter.js';
 import { UserTierId } from './types.js';
 import {
   CaCountTokenResponse,
@@ -69,6 +70,7 @@ export class CodeAssistServer implements ContentGenerator {
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    this._logApiRequest(toContents(req.contents), req.model, userPromptId);
     const resps = await this.requestStreamingPost<CaGenerateContentResponse>(
       'streamGenerateContent',
       toGenerateContentRequest(
