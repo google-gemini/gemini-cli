@@ -181,8 +181,8 @@ describe('SettingsSchema', () => {
       expect(SETTINGS_SCHEMA.fileFiltering.showInDialog).toBe(false); // Changed to false
       expect(SETTINGS_SCHEMA.preferredEditor.showInDialog).toBe(false); // Changed to false
       expect(SETTINGS_SCHEMA.autoConfigureMaxOldSpaceSize.showInDialog).toBe(
-        false,
-      ); // Advanced
+        true,
+      ); 
     });
 
     it('should infer Settings type correctly', () => {
