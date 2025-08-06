@@ -320,12 +320,12 @@ export class WriteFileTool
     } catch (error) {
       // Capture detailed error information for debugging
       let errorMsg: string;
-      let errorType = ToolErrorType.FILE_WRITE_FAILURE;
-      
+      const errorType = ToolErrorType.FILE_WRITE_FAILURE;
+
       if (isNodeError(error)) {
         // Handle specific Node.js errors with their error codes
         errorMsg = `Error writing to file: ${error.message} (${error.code})`;
-        
+
         // Log specific error types for better debugging
         if (error.code === 'EACCES') {
           errorMsg = `Permission denied writing to file: ${params.file_path} (${error.code})`;
@@ -334,7 +334,7 @@ export class WriteFileTool
         } else if (error.code === 'EISDIR') {
           errorMsg = `Target is a directory, not a file: ${params.file_path} (${error.code})`;
         }
-        
+
         // Include stack trace in debug mode for better troubleshooting
         if (this.config.getDebugMode() && error.stack) {
           console.error('Write file error stack:', error.stack);
@@ -344,7 +344,7 @@ export class WriteFileTool
       } else {
         errorMsg = `Error writing to file: ${String(error)}`;
       }
-      
+
       return {
         llmContent: 'Could not write file.',
         returnDisplay: `Error: ${errorMsg}`,
