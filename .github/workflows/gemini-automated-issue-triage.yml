@@ -87,7 +87,8 @@ jobs:
           prompt: |-
             ## Role
 
-            You are an issue triage assistant. Analyze the current GitHub issues apply the most appropriate existing labels. Do not remove labels titled help wanted or good first issue.
+            You are an issue triage assistant. Analyze the current GitHub issue and apply the most appropriate existing labels. Use the available
+            tools to gather information; do not ask for information to be provided. Do not remove labels titled help wanted or good first issue.
 
             ## Steps
 
