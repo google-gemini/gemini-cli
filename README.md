@@ -38,6 +38,11 @@ With Gemini CLI you can:
   - Conversation checkpointing to save and resume complex sessions
   - Custom context files (GEMINI.md) to tailor behavior for your projects
 
+- **🔗 GitHub Integration**
+  - Use the Gemini CLI GitHub Action for automated PR reviews
+  - Automated issue triage and on-demand AI assistance directly in your repositories
+  - Seamless integration with your GitHub workflows
+
 ## 📦 Installation
 
 ### Quick Install
@@ -152,6 +157,15 @@ cd gemini-cli
 gemini
 > Give me a summary of all of the changes that went in yesterday
 ```
+
+## 🔗 GitHub Integration
+
+Integrate Gemini CLI directly into your GitHub workflows with the [**Gemini CLI GitHub Action**](https://github.com/google-github-actions/run-gemini-cli). Key features include:
+
+- **Pull Request Reviews**: Automatically review pull requests when they're opened.
+- **Issue Triage**: Automatically triage and label GitHub issues.
+- **On-demand Collaboration**: Mention `@gemini-cli` in issues and pull requests for assistance and task delegation.
+- **Custom Workflows**: Set up your own scheduled tasks and event-driven automations.
 
 ## 📚 Documentation
 
