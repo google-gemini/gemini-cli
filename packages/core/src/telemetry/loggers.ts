@@ -12,10 +12,11 @@ import {
   EVENT_API_REQUEST,
   EVENT_API_RESPONSE,
   EVENT_CLI_CONFIG,
+  EVENT_IDE_CONNECTION,
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
-  EVENT_FLASH_DECIDED_TO_CONTINUE,
+  EVENT_NEXT_SPEAKER_CHECK,
   SERVICE_NAME,
   EVENT_SLASH_COMMAND,
 } from './constants.js';
@@ -23,11 +24,12 @@ import {
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
+  IdeConnectionEvent,
   StartSessionEvent,
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
-  FlashDecidedToContinueEvent,
+  NextSpeakerCheckEvent,
   LoopDetectedEvent,
   SlashCommandEvent,
 } from './types.js';
@@ -314,22 +316,22 @@ export function logLoopDetected(
   logger.emit(logRecord);
 }
 
-export function logFlashDecidedToContinue(
+export function logNextSpeakerCheck(
   config: Config,
-  event: FlashDecidedToContinueEvent,
+  event: NextSpeakerCheckEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logFlashDecidedToContinueEvent(event);
+  ClearcutLogger.getInstance(config)?.logNextSpeakerCheck(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     ...event,
-    'event.name': EVENT_FLASH_DECIDED_TO_CONTINUE,
+    'event.name': EVENT_NEXT_SPEAKER_CHECK,
   };
 
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Flash decided to continue.`,
+    body: `Next speaker check.`,
     attributes,
   };
   logger.emit(logRecord);
@@ -351,6 +353,27 @@ export function logSlashCommand(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Slash command: ${event.command}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logIdeConnection(
+  config: Config,
+  event: IdeConnectionEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logIdeConnectionEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_IDE_CONNECTION,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Ide connection. Type: ${event.connection_type}.`,
     attributes,
   };
   logger.emit(logRecord);

@@ -32,6 +32,8 @@ import {
   ApiResponseEvent,
 } from '../telemetry/types.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { hasCycleInSchema } from '../tools/tools.js';
+import { isStructuredError } from '../utils/quotaErrorDetection.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -287,15 +289,22 @@ export class GeminiChat {
           );
         }
 
-        return this.contentGenerator.generateContent({
-          model: modelToUse,
-          contents: requestContents,
-          config: { ...this.generationConfig, ...params.config },
-        });
+        return this.contentGenerator.generateContent(
+          {
+            model: modelToUse,
+            contents: requestContents,
+            config: { ...this.generationConfig, ...params.config },
+          },
+          prompt_id,
+        );
       };
 
       response = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
+          // Check for likely cyclic schema errors, don't retry those.
+          if (error.message.includes('maximum schema depth exceeded'))
+            return false;
+          // Check error messages for status codes, or specific error names if known
           if (error && error.message) {
             if (error.message.includes('429')) return true;
             if (error.message.match(/5\d{2}/)) return true;
@@ -342,6 +351,7 @@ export class GeminiChat {
     } catch (error) {
       const durationMs = Date.now() - startTime;
       this._logApiError(durationMs, error, prompt_id);
+      await this.maybeIncludeSchemaDepthContext(error);
       this.sendPromise = Promise.resolve();
       throw error;
     }
@@ -394,11 +404,14 @@ export class GeminiChat {
           );
         }
 
-        return this.contentGenerator.generateContentStream({
-          model: modelToUse,
-          contents: requestContents,
-          config: { ...this.generationConfig, ...params.config },
-        });
+        return this.contentGenerator.generateContentStream(
+          {
+            model: modelToUse,
+            contents: requestContents,
+            config: { ...this.generationConfig, ...params.config },
+          },
+          prompt_id,
+        );
       };
 
       // Note: Retrying streams can be complex. If generateContentStream itself doesn't handle retries
@@ -407,6 +420,9 @@ export class GeminiChat {
       // If errors occur mid-stream, this setup won't resume the stream; it will restart it.
       const streamResponse = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
+          // Check for likely cyclic schema errors, don't retry those.
+          if (error.message.includes('maximum schema depth exceeded'))
+            return false;
           // Check error messages for status codes, or specific error names if known
           if (error && error.message) {
             if (error.message.includes('429')) return true;
@@ -437,6 +453,7 @@ export class GeminiChat {
       const durationMs = Date.now() - startTime;
       this._logApiError(durationMs, error, prompt_id);
       this.sendPromise = Promise.resolve();
+      await this.maybeIncludeSchemaDepthContext(error);
       throw error;
     }
   }
@@ -667,5 +684,33 @@ export class GeminiChat {
       typeof content.parts[0].thought === 'boolean' &&
       content.parts[0].thought === true
     );
+  }
+
+  private async maybeIncludeSchemaDepthContext(error: unknown): Promise<void> {
+    // Check for potentially problematic cyclic tools with cyclic schemas
+    // and include a recommendation to remove potentially problematic tools.
+    if (
+      isStructuredError(error) &&
+      error.message.includes('maximum schema depth exceeded')
+    ) {
+      const tools = (await this.config.getToolRegistry()).getAllTools();
+      const cyclicSchemaTools: string[] = [];
+      for (const tool of tools) {
+        if (
+          (tool.schema.parametersJsonSchema &&
+            hasCycleInSchema(tool.schema.parametersJsonSchema)) ||
+          (tool.schema.parameters && hasCycleInSchema(tool.schema.parameters))
+        ) {
+          cyclicSchemaTools.push(tool.displayName);
+        }
+      }
+      if (cyclicSchemaTools.length > 0) {
+        const extraDetails =
+          `\n\nThis error was probably caused by cyclic schema references in one of the following tools, try disabling them:\n\n - ` +
+          cyclicSchemaTools.join(`\n - `) +
+          `\n`;
+        error.message += extraDetails;
+      }
+    }
   }
 }

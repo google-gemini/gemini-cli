@@ -6,6 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'os';
+import * as fs from 'fs';
+import * as path from 'path';
 import { loadCliConfig, parseArguments } from './config.js';
 import { Settings } from './settings.js';
 import { Extension } from './extension.js';
@@ -35,14 +37,16 @@ vi.mock('@google/gemini-cli-core', async () => {
   );
   return {
     ...actualServer,
-    IdeClient: vi.fn().mockImplementation(() => ({
-      getConnectionStatus: vi.fn(),
-      initialize: vi.fn(),
-      shutdown: vi.fn(),
-    })),
+    IdeClient: {
+      getInstance: vi.fn().mockReturnValue({
+        getConnectionStatus: vi.fn(),
+        initialize: vi.fn(),
+        shutdown: vi.fn(),
+      }),
+    },
     loadEnvironment: vi.fn(),
     loadServerHierarchicalMemory: vi.fn(
-      (cwd, debug, fileService, extensionPaths, _maxDirs) =>
+      (cwd, dirs, debug, fileService, extensionPaths, _maxDirs) =>
         Promise.resolve({
           memoryContent: extensionPaths?.join(',') || '',
           fileCount: extensionPaths?.length || 0,
@@ -485,6 +489,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     await loadCliConfig(settings, extensions, 'session-id', argv);
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
+      [],
       false,
       expect.any(Object),
       [
@@ -492,6 +497,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         '/path/to/ext3/context1.md',
         '/path/to/ext3/context2.md',
       ],
+      'tree',
       {
         respectGitIgnore: false,
         respectGeminiIgnore: true,
@@ -914,7 +920,69 @@ describe('loadCliConfig extensions', () => {
   });
 });
 
-describe('loadCliConfig ideMode', () => {
+describe('loadCliConfig model selection', () => {
+  it('selects a model from settings.json if provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig(
+      {
+        model: 'gemini-9001-ultra',
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemini-9001-ultra');
+  });
+
+  it('uses the default gemini model if nothing is set', async () => {
+    process.argv = ['node', 'script.js']; // No model set.
+    const argv = await parseArguments();
+    const config = await loadCliConfig(
+      {
+        // No model set.
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemini-2.5-pro');
+  });
+
+  it('always prefers model from argvs', async () => {
+    process.argv = ['node', 'script.js', '--model', 'gemini-8675309-ultra'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig(
+      {
+        model: 'gemini-9001-ultra',
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemini-8675309-ultra');
+  });
+
+  it('selects the model from argvs if provided', async () => {
+    process.argv = ['node', 'script.js', '--model', 'gemini-8675309-ultra'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig(
+      {
+        // No model provided via settings.
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemini-8675309-ultra');
+  });
+});
+
+describe('loadCliConfig ideModeFeature', () => {
   const originalArgv = process.argv;
   const originalEnv = { ...process.env };
 
@@ -922,8 +990,6 @@ describe('loadCliConfig ideMode', () => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     process.env.GEMINI_API_KEY = 'test-api-key';
-    // Explicitly delete TERM_PROGRAM and SANDBOX before each test
-    delete process.env.TERM_PROGRAM;
     delete process.env.SANDBOX;
     delete process.env.GEMINI_CLI_IDE_SERVER_PORT;
   });
@@ -939,81 +1005,88 @@ describe('loadCliConfig ideMode', () => {
     const settings: Settings = {};
     const argv = await parseArguments();
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
+    expect(config.getIdeModeFeature()).toBe(false);
+  });
+});
+
+vi.mock('fs', async () => {
+  const actualFs = await vi.importActual<typeof fs>('fs');
+  const MOCK_CWD1 = process.cwd();
+  const MOCK_CWD2 = path.resolve(path.sep, 'home', 'user', 'project');
+
+  const mockPaths = new Set([
+    MOCK_CWD1,
+    MOCK_CWD2,
+    path.resolve(path.sep, 'cli', 'path1'),
+    path.resolve(path.sep, 'settings', 'path1'),
+    path.join(os.homedir(), 'settings', 'path2'),
+    path.join(MOCK_CWD2, 'cli', 'path2'),
+    path.join(MOCK_CWD2, 'settings', 'path3'),
+  ]);
+
+  return {
+    ...actualFs,
+    existsSync: vi.fn((p) => mockPaths.has(p.toString())),
+    statSync: vi.fn((p) => {
+      if (mockPaths.has(p.toString())) {
+        return { isDirectory: () => true };
+      }
+      // Fallback for other paths if needed, though the test should be specific.
+      return actualFs.statSync(p);
+    }),
+    realpathSync: vi.fn((p) => p),
+  };
+});
+
+describe('loadCliConfig with includeDirectories', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+    vi.spyOn(process, 'cwd').mockReturnValue(
+      path.resolve(path.sep, 'home', 'user', 'project'),
+    );
   });
 
-  it('should be false if --ide-mode is true but TERM_PROGRAM is not vscode', async () => {
-    process.argv = ['node', 'script.js', '--ide-mode'];
-    const settings: Settings = {};
-    const argv = await parseArguments();
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
   });
 
-  it('should be false if settings.ideMode is true but TERM_PROGRAM is not vscode', async () => {
-    process.argv = ['node', 'script.js'];
+  it('should combine and resolve paths from settings and CLI arguments', async () => {
+    const mockCwd = path.resolve(path.sep, 'home', 'user', 'project');
+    process.argv = [
+      'node',
+      'script.js',
+      '--include-directories',
+      `${path.resolve(path.sep, 'cli', 'path1')},${path.join(mockCwd, 'cli', 'path2')}`,
+    ];
     const argv = await parseArguments();
-    const settings: Settings = { ideMode: true };
+    const settings: Settings = {
+      includeDirectories: [
+        path.resolve(path.sep, 'settings', 'path1'),
+        path.join(os.homedir(), 'settings', 'path2'),
+        path.join(mockCwd, 'settings', 'path3'),
+      ],
+    };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
-  });
-
-  it('should be true when --ide-mode is set and TERM_PROGRAM is vscode', async () => {
-    process.argv = ['node', 'script.js', '--ide-mode'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(true);
-  });
-
-  it('should be true when settings.ideMode is true and TERM_PROGRAM is vscode', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
-    const settings: Settings = { ideMode: true };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(true);
-  });
-
-  it('should prioritize --ide-mode (true) over settings (false) when TERM_PROGRAM is vscode', async () => {
-    process.argv = ['node', 'script.js', '--ide-mode'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
-    const settings: Settings = { ideMode: false };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(true);
-  });
-
-  it('should prioritize --no-ide-mode (false) over settings (true) even when TERM_PROGRAM is vscode', async () => {
-    process.argv = ['node', 'script.js', '--no-ide-mode'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    const settings: Settings = { ideMode: true };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
-  });
-
-  it('should be false when --ide-mode is true, TERM_PROGRAM is vscode, but SANDBOX is set', async () => {
-    process.argv = ['node', 'script.js', '--ide-mode'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    process.env.SANDBOX = 'true';
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
-  });
-
-  it('should be false when settings.ideMode is true, TERM_PROGRAM is vscode, but SANDBOX is set', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    process.env.SANDBOX = 'true';
-    const settings: Settings = { ideMode: true };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
+    const expected = [
+      mockCwd,
+      path.resolve(path.sep, 'cli', 'path1'),
+      path.join(mockCwd, 'cli', 'path2'),
+      path.resolve(path.sep, 'settings', 'path1'),
+      path.join(os.homedir(), 'settings', 'path2'),
+      path.join(mockCwd, 'settings', 'path3'),
+    ];
+    expect(config.getWorkspaceContext().getDirectories()).toEqual(
+      expect.arrayContaining(expected),
+    );
+    expect(config.getWorkspaceContext().getDirectories()).toHaveLength(
+      expected.length,
+    );
   });
 });
