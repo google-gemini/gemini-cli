@@ -147,6 +147,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getGeminiClient: vi.fn(() => ({
           getUserTier: vi.fn(),
         })),
+        getContentGeneratorConfig: vi.fn(() => ({
+          apiKey: 'test-key',
+        })),
+        getProxy: vi.fn(),
         getCheckpointingEnabled: vi.fn(() => opts.checkpointing ?? true),
         getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
         setFlashFallbackHandler: vi.fn(),
