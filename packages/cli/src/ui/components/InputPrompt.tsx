@@ -240,9 +240,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.name === 'escape') {
-        if (reverseSearchActive) {
-          setReverseSearchActive(false);
-          reverseSearchCompletion.resetCompletionState();
+        const cancelSearch = (
+          setActive: (active: boolean) => void,
+          resetCompletion: () => void,
+        ) => {
+          setActive(false);
+          resetCompletion();
           buffer.setText(textBeforeReverseSearch);
           const offset = logicalPosToOffset(
             buffer.lines,
@@ -251,20 +254,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           );
           buffer.moveToOffset(offset);
           setExpandedSuggestionIndex(-1);
+        };
+
+        if (reverseSearchActive) {
+          cancelSearch(
+            setReverseSearchActive,
+            reverseSearchCompletion.resetCompletionState,
+          );
           return;
         }
 
         if (commandSearchActive) {
-          setCommandSearchActive(false);
-          commandSearchCompletion.resetCompletionState();
-          buffer.setText(textBeforeReverseSearch);
-          const offset = logicalPosToOffset(
-            buffer.lines,
-            cursorPosition[0],
-            cursorPosition[1],
+          cancelSearch(
+            setCommandSearchActive,
+            commandSearchCompletion.resetCompletionState,
           );
-          buffer.moveToOffset(offset);
-          setExpandedSuggestionIndex(-1);
           return;
         }
 
