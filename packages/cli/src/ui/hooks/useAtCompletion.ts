@@ -127,6 +127,13 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
   // Reacts to user input (`pattern`) ONLY.
   useEffect(() => {
     if (!enabled) {
+      // reset when first getting out of completion suggestions
+      if (
+        state.status === AtCompletionStatus.READY ||
+        state.status === AtCompletionStatus.ERROR
+      ) {
+        dispatch({ type: 'RESET' });
+      }
       return;
     }
     if (pattern === null) {
@@ -158,6 +165,9 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
             config?.getFileFilteringOptions()?.respectGeminiIgnore ?? true,
           cache: true,
           cacheTtl: 30, // 30 seconds
+          maxDepth: !(config?.getEnableRecursiveFileSearch() ?? true)
+            ? 0
+            : undefined,
         });
         await searcher.initialize();
         fileSearch.current = searcher;

@@ -49,7 +49,7 @@ describe('setupGithubCommand', () => {
       `curl -fsSL -o "${fakeRepoRoot}/.github/workflows/gemini-issue-automated-triage.yml"`,
       `curl -fsSL -o "${fakeRepoRoot}/.github/workflows/gemini-issue-scheduled-triage.yml"`,
       `curl -fsSL -o "${fakeRepoRoot}/.github/workflows/gemini-pr-review.yml"`,
-      'https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/heads/v0/examples/workflows/',
+      'https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/tags/v0/examples/workflows/',
     ];
 
     for (const substring of expectedSubstrings) {

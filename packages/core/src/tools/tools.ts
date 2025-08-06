@@ -228,6 +228,91 @@ export interface ToolResult {
   };
 }
 
+/**
+ * Detects cycles in a JSON schemas due to `$ref`s.
+ * @param schema The root of the JSON schema.
+ * @returns `true` if a cycle is detected, `false` otherwise.
+ */
+export function hasCycleInSchema(schema: object): boolean {
+  function resolveRef(ref: string): object | null {
+    if (!ref.startsWith('#/')) {
+      return null;
+    }
+    const path = ref.substring(2).split('/');
+    let current: unknown = schema;
+    for (const segment of path) {
+      if (
+        typeof current !== 'object' ||
+        current === null ||
+        !Object.prototype.hasOwnProperty.call(current, segment)
+      ) {
+        return null;
+      }
+      current = (current as Record<string, unknown>)[segment];
+    }
+    return current as object;
+  }
+
+  function traverse(
+    node: unknown,
+    visitedRefs: Set<string>,
+    pathRefs: Set<string>,
+  ): boolean {
+    if (typeof node !== 'object' || node === null) {
+      return false;
+    }
+
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        if (traverse(item, visitedRefs, pathRefs)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    if ('$ref' in node && typeof node.$ref === 'string') {
+      const ref = node.$ref;
+      if (ref === '#/' || pathRefs.has(ref)) {
+        // A ref to just '#/' is always a cycle.
+        return true; // Cycle detected!
+      }
+      if (visitedRefs.has(ref)) {
+        return false; // Bail early, we have checked this ref before.
+      }
+
+      const resolvedNode = resolveRef(ref);
+      if (resolvedNode) {
+        // Add it to both visited and the current path
+        visitedRefs.add(ref);
+        pathRefs.add(ref);
+        const hasCycle = traverse(resolvedNode, visitedRefs, pathRefs);
+        pathRefs.delete(ref); // Backtrack, leaving it in visited
+        return hasCycle;
+      }
+    }
+
+    // Crawl all the properties of node
+    for (const key in node) {
+      if (Object.prototype.hasOwnProperty.call(node, key)) {
+        if (
+          traverse(
+            (node as Record<string, unknown>)[key],
+            visitedRefs,
+            pathRefs,
+          )
+        ) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  return traverse(schema, new Set<string>(), new Set<string>());
+}
+
 export type ToolResultDisplay = string | FileDiff;
 
 export interface FileDiff {
