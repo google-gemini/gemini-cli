@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 export interface PlanStep {
   id: number;
@@ -18,6 +26,8 @@ interface PlanContextValue {
   currentStep: number;
   createPlanFromQuery: (query: string) => void;
   interruptPlan: (query: string) => void;
+  rules: string[];
+  addRule: (rule: string) => void;
 }
 
 const PlanContext = createContext<PlanContextValue>({
@@ -25,39 +35,75 @@ const PlanContext = createContext<PlanContextValue>({
   currentStep: 0,
   createPlanFromQuery: () => {},
   interruptPlan: () => {},
+  rules: [],
+  addRule: () => {},
 });
 
-const generateDefaultPlan = (query: string): PlanStep[] => {
-  return [
-    {
-      id: 1,
-      description: `Analyze request: ${query}`,
-      status: 'pending',
-      progress: 0,
-    },
-    {
-      id: 2,
-      description: 'Execute planned steps',
-      status: 'pending',
-      progress: 0,
-    },
-  ];
+const splitIntoSteps = (query: string): string[] =>
+  query
+    .split(/(?:,|\band\b|\bthen\b)/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+const generatePlanFromQuery = (query: string): PlanStep[] => {
+  const segments = splitIntoSteps(query);
+  if (!segments.length) {
+    return [
+      {
+        id: 1,
+        description: `Analyze request: ${query}`,
+        status: 'pending',
+        progress: 0,
+      },
+      {
+        id: 2,
+        description: 'Execute planned steps',
+        status: 'pending',
+        progress: 0,
+      },
+    ];
+  }
+  return segments.map((desc, idx) => ({
+    id: idx + 1,
+    description: desc.charAt(0).toUpperCase() + desc.slice(1),
+    status: idx === 0 ? 'in-progress' : 'pending',
+    progress: 0,
+  }));
 };
 
 export const PlanProvider = ({ children }: { children: ReactNode }) => {
   const [steps, setSteps] = useState<PlanStep[]>([]);
   const [currentStep, setCurrentStep] = useState<number>(0);
+  const [rules, setRules] = useState<string[]>([]);
+  const RULES_FILE = path.join(process.cwd(), 'rules.json');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await fs.readFile(RULES_FILE, 'utf8');
+        setRules(JSON.parse(data));
+      } catch {
+        // ignore if file doesn't exist
+      }
+    })();
+  }, [RULES_FILE]);
 
   const createPlanFromQuery = (query: string) => {
-    const newSteps = generateDefaultPlan(query).map((step, idx) =>
-      idx === 0 ? { ...step, status: 'in-progress' } : step,
-    );
+    const newSteps = generatePlanFromQuery(query);
     setSteps(newSteps);
     setCurrentStep(0);
   };
 
   const interruptPlan = (query: string) => {
     createPlanFromQuery(query);
+  };
+
+  const addRule = (rule: string) => {
+    setRules((prev) => {
+      const next = [...prev, rule];
+      fs.writeFile(RULES_FILE, JSON.stringify(next, null, 2)).catch(() => {});
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -98,7 +144,7 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <PlanContext.Provider
-      value={{ steps, currentStep, createPlanFromQuery, interruptPlan }}
+      value={{ steps, currentStep, createPlanFromQuery, interruptPlan, rules, addRule }}
     >
       {children}
     </PlanContext.Provider>
