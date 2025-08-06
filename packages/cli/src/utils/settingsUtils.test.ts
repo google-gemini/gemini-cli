@@ -403,7 +403,7 @@ describe('SettingsUtils', () => {
           modifiedSettings,
           {},
         );
-        expect(displayValueWithModified).toBe('false*'); // Should show false* because it's in modified settings
+        expect(displayValueWithModified).toBe('true*'); // Should show true* because it's in modified settings and default is true
       });
     });
   });

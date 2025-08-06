@@ -446,6 +446,15 @@ export const SETTINGS_SCHEMA = {
     requiresRestart: false,
     default: false,
     description: 'Whether to load memory files from include directories.',
+    showInDialog: true,
+  },
+  model: {
+    type: 'string',
+    label: 'Model',
+    category: 'General',
+    requiresRestart: false,
+    default: undefined as string | undefined,
+    description: 'The Gemini model to use for conversations.',
     showInDialog: false,
   },
 } as const;

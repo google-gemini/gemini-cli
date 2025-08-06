@@ -415,13 +415,14 @@ export function getDisplayValue(
 
   const valueString = String(value);
 
-  // Check if value is different from default OR if it's in modified settings
+  // Check if value is different from default OR if it's in modified settings OR if there are pending changes
   const defaultValue = getDefaultValue(key);
   const isChangedFromDefault = value !== defaultValue;
   const isInModifiedSettings = modifiedSettings.has(key);
+  const hasPendingChanges = pendingSettings && settingExistsInScope(key, pendingSettings);
 
-  // Add * indicator when value differs from default or is in modified settings
-  if (isChangedFromDefault || isInModifiedSettings) {
+  // Add * indicator when value differs from default, is in modified settings, or has pending changes
+  if (isChangedFromDefault || isInModifiedSettings || hasPendingChanges) {
     return `${valueString}*`; // * indicates changed from default value
   }
 
