@@ -14,12 +14,14 @@ import {
   SetCodeAssistGlobalUserSettingRequest,
 } from './types.js';
 import {
+  // Content,
   CountTokensParameters,
   CountTokensResponse,
   EmbedContentParameters,
   EmbedContentResponse,
   GenerateContentParameters,
   GenerateContentResponse,
+  // GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import * as readline from 'readline';
 import { ContentGenerator } from '../core/contentGenerator.js';
@@ -32,6 +34,12 @@ import {
   toCountTokenRequest,
   toGenerateContentRequest,
 } from './converter.js';
+// import {
+//   logApiRequest,
+//   logApiResponse,
+//   logApiError,
+// } from '../telemetry/loggers.js';
+// import { ApiRequestEvent, ApiResponseEvent, ApiErrorEvent } from '../telemetry/types.js';
 
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
@@ -217,4 +225,60 @@ export class CodeAssistServer implements ContentGenerator {
     const endpoint = process.env.CODE_ASSIST_ENDPOINT ?? CODE_ASSIST_ENDPOINT;
     return `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
   }
+
+  // private _getRequestTextFromContents(contents: Content[]): string {
+  //   return JSON.stringify(contents);
+  // }
+
+  // private async _logApiRequest(
+  //     contents: Content[],
+  //     model: string,
+  //     prompt_id: string,
+  //   ): Promise<void> {
+  //     const requestText = this._getRequestTextFromContents(contents);
+  //     logApiRequest(
+  //       this.config,
+  //       new ApiRequestEvent(model, prompt_id, requestText),
+  //     );
+  //   }
+  
+  //   private async _logApiResponse(
+  //     durationMs: number,
+  //     prompt_id: string,
+  //     usageMetadata?: GenerateContentResponseUsageMetadata,
+  //     responseText?: string,
+  //   ): Promise<void> {
+  //     logApiResponse(
+  //       this.config,
+  //       new ApiResponseEvent(
+  //         this.config.getModel(),
+  //         durationMs,
+  //         prompt_id,
+  //         this.config.getContentGeneratorConfig()?.authType,
+  //         usageMetadata,
+  //         responseText,
+  //       ),
+  //     );
+  //   }
+  
+  //   private _logApiError(
+  //     durationMs: number,
+  //     error: unknown,
+  //     prompt_id: string,
+  //   ): void {
+  //     const errorMessage = error instanceof Error ? error.message : String(error);
+  //     const errorType = error instanceof Error ? error.name : 'unknown';
+  
+  //     logApiError(
+  //       this.config,
+  //       new ApiErrorEvent(
+  //         this.config.getModel(),
+  //         errorMessage,
+  //         durationMs,
+  //         prompt_id,
+  //         this.config.getContentGeneratorConfig()?.authType,
+  //         errorType,
+  //       ),
+  //     );
+  //   }
 }
