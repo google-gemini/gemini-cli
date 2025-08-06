@@ -50,6 +50,7 @@ describe('useAtCompletion', () => {
         respectGitIgnore: true,
         respectGeminiIgnore: true,
       })),
+      getEnableRecursiveFileSearch: () => true,
     } as unknown as Config;
     vi.clearAllMocks();
   });
@@ -430,6 +431,43 @@ describe('useAtCompletion', () => {
 
       await cleanupTmpDir(rootDir1);
       await cleanupTmpDir(rootDir2);
+    });
+
+    it('should perform a non-recursive search when enableRecursiveFileSearch is false', async () => {
+      const structure: FileSystemStructure = {
+        'file.txt': '',
+        src: {
+          'index.js': '',
+        },
+      };
+      testRootDir = await createTmpDir(structure);
+
+      const nonRecursiveConfig = {
+        getEnableRecursiveFileSearch: () => false,
+        getFileFilteringOptions: vi.fn(() => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        })),
+      } as unknown as Config;
+
+      const { result } = renderHook(() =>
+        useTestHarnessForAtCompletion(
+          true,
+          '',
+          nonRecursiveConfig,
+          testRootDir,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      // Should only contain top-level items
+      expect(result.current.suggestions.map((s) => s.value)).toEqual([
+        'src/',
+        'file.txt',
+      ]);
     });
   });
 });
