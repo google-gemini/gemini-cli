@@ -21,7 +21,7 @@ export async function createCodeAssistContentGenerator(
     authType === AuthType.CLOUD_SHELL
   ) {
     const authClient = await getOauthClient(authType, config);
-    const userData = await setupUser(authClient);
+    const userData = await setupUser(authClient, config);
     return new CodeAssistServer(
       authClient,
       config,
