@@ -16,9 +16,39 @@ import {
   useInput,
   type Key as InkKeyType,
 } from 'ink';
+import { StreamingState, type HistoryItem, MessageType } from './types.js';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
+import { useGeminiStream } from './hooks/useGeminiStream.js';
+import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
+import { useThemeCommand } from './hooks/useThemeCommand.js';
+import { useAuthCommand } from './hooks/useAuthCommand.js';
+import { useEditorSettings } from './hooks/useEditorSettings.js';
+import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
+import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
+import { useConsoleMessages } from './hooks/useConsoleMessages.js';
+import { Header } from './components/Header.js';
+import { LoadingIndicator } from './components/LoadingIndicator.js';
+import { AutoAcceptIndicator } from './components/AutoAcceptIndicator.js';
+import { ShellModeIndicator } from './components/ShellModeIndicator.js';
+import { InputPrompt } from './components/InputPrompt.js';
+import { Footer } from './components/Footer.js';
+import { ThemeDialog } from './components/ThemeDialog.js';
+import { AuthDialog } from './components/AuthDialog.js';
+import { AuthInProgress } from './components/AuthInProgress.js';
+import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
+import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
+import { Colors } from './colors.js';
+import { loadHierarchicalGeminiMemory } from '../config/config.js';
+import { LoadedSettings } from '../config/settings.js';
+import { Tips } from './components/Tips.js';
+import { ConsolePatcher } from './utils/ConsolePatcher.js';
+import { registerCleanup } from '../utils/cleanup.js';
+import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
+import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
+import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
+import { IDEContextDetailDisplay } from './components/IDEContextDetailDisplay.js';
+import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
-import * as fs from 'fs';
-import ansiEscapes from 'ansi-escapes';
 import {
   getErrorMessage,
   type Config,
@@ -32,61 +62,30 @@ import {
   type IdeContext,
   ideContext,
 } from '@google/gemini-cli-core';
-import { StreamingState, type HistoryItem, MessageType } from './types.js';
-import { useTerminalSize } from './hooks/useTerminalSize.js';
-import { useGeminiStream } from './hooks/useGeminiStream.js';
-import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
-import { useThemeCommand } from './hooks/useThemeCommand.js';
-import { useAuthCommand } from './hooks/useAuthCommand.js';
-import { useEditorSettings } from './hooks/useEditorSettings.js';
-import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
-import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
-import { useConsoleMessages } from './hooks/useConsoleMessages.js';
-import { useHistory } from './hooks/useHistoryManager.js';
+import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
-import { useGitBranchName } from './hooks/useGitBranchName.js';
-import { Header } from './components/Header.js';
-import { LoadingIndicator } from './components/LoadingIndicator.js';
-import { AutoAcceptIndicator } from './components/AutoAcceptIndicator.js';
-import { ShellModeIndicator } from './components/ShellModeIndicator.js';
-import { InputPrompt } from './components/InputPrompt.js';
-import { Footer } from './components/Footer.js';
-import { ThemeDialog } from './components/ThemeDialog.js';
-import { AuthDialog } from './components/AuthDialog.js';
-import { AuthInProgress } from './components/AuthInProgress.js';
-import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
-import { Help } from './components/Help.js';
-import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
-import { Tips } from './components/Tips.js';
-import { ConsolePatcher } from './utils/ConsolePatcher.js';
-import { registerCleanup } from '../utils/cleanup.js';
-import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
-import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
-import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
-import { IDEContextDetailDisplay } from './components/IDEContextDetailDisplay.js';
-import { UpdateNotification } from './components/UpdateNotification.js';
-import { ShowMoreLines } from './components/ShowMoreLines.js';
-import { useTextBuffer } from './components/shared/text-buffer.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
 import {
   SessionStatsProvider,
   useSessionStats,
 } from './contexts/SessionContext.js';
-import { Colors } from './colors.js';
-import { loadHierarchicalGeminiMemory } from '../config/config.js';
-import { LoadedSettings } from '../config/settings.js';
-import { validateAuthMethod } from '../config/auth.js';
+import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useBracketedPaste } from './hooks/useBracketedPaste.js';
+import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useVimMode, VimModeProvider } from './contexts/VimModeContext.js';
 import { useVim } from './hooks/vim.js';
+import * as fs from 'fs';
+import { UpdateNotification } from './components/UpdateNotification.js';
 import {
   isProQuotaExceededError,
   isGenericQuotaExceededError,
   UserTierId,
 } from '@google/gemini-cli-core';
 import { UpdateObject } from './utils/updateCheck.js';
+import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
+import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
@@ -166,11 +165,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [ctrlDPressedOnce, setCtrlDPressedOnce] = useState(false);
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
-  const [isPlanMode, setIsPlanMode] = useState<boolean>(false);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
-<<<<<<< HEAD
-    
-=======
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
@@ -178,6 +173,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     IdeContext | undefined
   >();
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isPlanMode, setIsPlanMode] = useState<boolean>(false);
+  const [onEditorClose, setOnEditorClose] = useState<() => void>(() => () => {});
+  const [onCancelSubmit, setOnCancelSubmit] = useState<() => void>(() => () => {});
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
@@ -208,12 +206,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     };
   }, [handleNewMessage]);
 
->>>>>>> 1f0ad865444c07481385c39b272f9ec2b94d41b9
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
   }, []);
   const initialPromptSubmitted = useRef(false);
-
 
   const errorCount = useMemo(
     () =>
@@ -423,40 +419,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     };
 
     config.setFlashFallbackHandler(flashFallbackHandler);
-<<<<<<< HEAD
-  }, [config, addItem]);
-
-  const {
-    handleSlashCommand,
-    slashCommands,
-    pendingHistoryItems: pendingSlashCommandHistoryItems,
-  } = useSlashCommandProcessor(
-    config,
-    settings,
-    history,
-    addItem,
-    clearItems,
-    loadHistory,
-    refreshStatic,
-    setShowHelp,
-    setDebugMessage,
-    openThemeDialog,
-    openAuthDialog,
-    openEditorDialog,
-    performMemoryRefresh,
-    toggleCorgiMode,
-    showToolDescriptions,
-    setQuittingMessages,
-    setIsPlanMode,
-    openPrivacyNotice,
-  );
-    
-  const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
-=======
   }, [config, addItem, userTier]);
 
   // Terminal and UI setup
->>>>>>> 1f0ad865444c07481385c39b272f9ec2b94d41b9
   const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
   const { stdin, setRawMode } = useStdin();
   const isInitialMount = useRef(true);
@@ -559,10 +524,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     getPreferredEditor,
     onAuthError,
     performMemoryRefresh,
+    isPlanMode,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
-    refreshStatic,
-    handleUserCancel,
+    onEditorClose,
+    onCancelSubmit,
   );
 
   // Input handling
@@ -652,61 +618,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     if (config) {
       setGeminiMdFileCount(config.getGeminiMdFileCount());
     }
-<<<<<<< HEAD
-  }, [config]);
-
-  const getPreferredEditor = useCallback(() => {
-    const editorType = settings.merged.preferredEditor;
-    const isValidEditor = isEditorAvailable(editorType);
-    if (!isValidEditor) {
-      openEditorDialog();
-      return;
-    }
-    return editorType as EditorType;
-  }, [settings, openEditorDialog]);
-
-  const onAuthError = useCallback(() => {
-    setAuthError('reauth required');
-    openAuthDialog();
-  }, [openAuthDialog, setAuthError]);
-
-  const {
-    streamingState,
-    submitQuery,
-    initError,
-    pendingHistoryItems: pendingGeminiHistoryItems,
-    thought,
-  } = useGeminiStream(
-    config.getGeminiClient(),
-    history,
-    addItem,
-    setShowHelp,
-    config,
-    setDebugMessage,
-    handleSlashCommand,
-    shellModeActive,
-    getPreferredEditor,
-    onAuthError,
-    performMemoryRefresh,
-    isPlanMode,
-  );
-  pendingHistoryItems.push(...pendingGeminiHistoryItems);
-  const { elapsedTime, currentLoadingPhrase } =
-    useLoadingIndicator(streamingState);
-  const showAutoAcceptIndicator = useAutoAcceptIndicator({ config });
-
-  const handleFinalSubmit = useCallback(
-    (submittedValue: string) => {
-      const trimmedValue = submittedValue.trim();
-      if (trimmedValue.length > 0) {
-        submitQuery(trimmedValue);
-      }
-    },
-    [submitQuery],
-  );
-=======
   }, [config, config.getGeminiMdFileCount]);
->>>>>>> 1f0ad865444c07481385c39b272f9ec2b94d41b9
 
   const logger = useLogger();
 
@@ -1166,18 +1078,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             showMemoryUsage={
               config.getDebugMode() || config.getShowMemoryUsage()
             }
-<<<<<<< HEAD
-            promptTokenCount={sessionStats.currentResponse.promptTokenCount}
-            candidatesTokenCount={
-              sessionStats.currentResponse.candidatesTokenCount
-            }
-            totalTokenCount={sessionStats.currentResponse.totalTokenCount}
-            isPlanMode={isPlanMode}
-=======
             promptTokenCount={sessionStats.lastPromptTokenCount}
+            candidatesTokenCount={sessionStats.lastCandidatesTokenCount || 0}
+            totalTokenCount={sessionStats.lastTotalTokenCount || 0}
+            isPlanMode={isPlanMode}
             nightly={nightly}
             vimMode={vimModeEnabled ? vimMode : undefined}
->>>>>>> 1f0ad865444c07481385c39b272f9ec2b94d41b9
           />
         </Box>
       </Box>

@@ -213,6 +213,7 @@ export class Config {
   private userMemory: string;
   private geminiMdFileCount: number;
   private approvalMode: ApprovalMode;
+  private isPlanMode: boolean = false;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
@@ -513,6 +514,10 @@ export class Config {
 
   setApprovalMode(mode: ApprovalMode): void {
     this.approvalMode = mode;
+  }
+
+  setIsPlanMode(isPlanMode: boolean): void {
+    this.isPlanMode = isPlanMode;
   }
 
   getShowMemoryUsage(): boolean {

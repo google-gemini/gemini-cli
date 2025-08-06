@@ -85,5 +85,12 @@
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2"
+  },
+  "dependencies": {
+    "@types/picomatch": "^4.0.2",
+    "chardet": "^2.1.0",
+    "fdir": "^6.4.6",
+    "marked": "^16.1.2",
+    "picomatch": "^4.0.3"
   }
 }
