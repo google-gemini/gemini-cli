@@ -48,23 +48,23 @@ export interface ShellExecutionHandle {
  */
 export type ShellOutputEvent =
   | {
-    /** The event contains a chunk of output data. */
-    type: 'data';
-    /** The stream from which the data originated. */
-    stream: 'stdout' | 'stderr';
-    /** The decoded string chunk. */
-    chunk: string;
-  }
+      /** The event contains a chunk of output data. */
+      type: 'data';
+      /** The stream from which the data originated. */
+      stream: 'stdout' | 'stderr';
+      /** The decoded string chunk. */
+      chunk: string;
+    }
   | {
-    /** Signals that the output stream has been identified as binary. */
-    type: 'binary_detected';
-  }
+      /** Signals that the output stream has been identified as binary. */
+      type: 'binary_detected';
+    }
   | {
-    /** Provides progress updates for a binary stream. */
-    type: 'binary_progress';
-    /** The total number of bytes received so far. */
-    bytesReceived: number;
-  };
+      /** Provides progress updates for a binary stream. */
+      type: 'binary_progress';
+      /** The total number of bytes received so far. */
+      bytesReceived: number;
+    };
 
 /**
  * A centralized service for executing shell commands with robust process
@@ -176,7 +176,17 @@ export class ShellExecutionService {
       child.on('error', (err) => {
         const { stdout, stderr, finalBuffer } = cleanup();
         error = err;
-        resolve({ error, stdout, stderr, rawOutput: finalBuffer, output: '', exitCode: 1, signal: null, aborted: false, pid: child.pid });
+        resolve({
+          error,
+          stdout,
+          stderr,
+          rawOutput: finalBuffer,
+          output: stdout + (stderr ? `\n${stderr}` : ''),
+          exitCode: 1,
+          signal: null,
+          aborted: false,
+          pid: child.pid,
+        });
       });
 
       const abortHandler = async () => {
@@ -231,7 +241,7 @@ export class ShellExecutionService {
 
         const finalBuffer = Buffer.concat(outputChunks);
 
-        return { stdout, stderr, finalBuffer }
+        return { stdout, stderr, finalBuffer };
       }
     });
 
