@@ -430,6 +430,24 @@ export const SETTINGS_SCHEMA = {
     description: 'Disable update notification prompts.',
     showInDialog: false,
   },
+  includeDirectories: {
+    type: 'array',
+    label: 'Include Directories',
+    category: 'General',
+    requiresRestart: false,
+    default: [] as string[],
+    description: 'Additional directories to include in the workspace context.',
+    showInDialog: false,
+  },
+  loadMemoryFromIncludeDirectories: {
+    type: 'boolean',
+    label: 'Load Memory From Include Directories',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Whether to load memory files from include directories.',
+    showInDialog: false,
+  },
 } as const;
 
 type InferSettings<T extends SettingsSchema> = {

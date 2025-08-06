@@ -186,24 +186,31 @@ describe('SettingsSchema', () => {
     });
 
     it('should infer Settings type correctly', () => {
-      // This is a compile-time test - if it compiles, the types are working
+      // This test ensures that the Settings type is properly inferred from the schema
       const settings: Settings = {
         theme: 'dark',
-        showMemoryUsage: true,
-        accessibility: {
-          disableLoadingPhrases: true,
-        },
-        fileFiltering: {
-          respectGitIgnore: true,
-          enableRecursiveFileSearch: false,
-        },
+        includeDirectories: ['/path/to/dir'],
+        loadMemoryFromIncludeDirectories: true,
       };
-
-      expect(settings).toBeDefined();
+      
+      // TypeScript should not complain about these properties
       expect(settings.theme).toBe('dark');
-      expect(settings.showMemoryUsage).toBe(true);
-      expect(settings.accessibility?.disableLoadingPhrases).toBe(true);
-      expect(settings.fileFiltering?.respectGitIgnore).toBe(true);
+      expect(settings.includeDirectories).toEqual(['/path/to/dir']);
+      expect(settings.loadMemoryFromIncludeDirectories).toBe(true);
+    });
+
+    it('should have includeDirectories setting in schema', () => {
+      expect(SETTINGS_SCHEMA.includeDirectories).toBeDefined();
+      expect(SETTINGS_SCHEMA.includeDirectories.type).toBe('array');
+      expect(SETTINGS_SCHEMA.includeDirectories.category).toBe('General');
+      expect(SETTINGS_SCHEMA.includeDirectories.default).toEqual([]);
+    });
+
+    it('should have loadMemoryFromIncludeDirectories setting in schema', () => {
+      expect(SETTINGS_SCHEMA.loadMemoryFromIncludeDirectories).toBeDefined();
+      expect(SETTINGS_SCHEMA.loadMemoryFromIncludeDirectories.type).toBe('boolean');
+      expect(SETTINGS_SCHEMA.loadMemoryFromIncludeDirectories.category).toBe('General');
+      expect(SETTINGS_SCHEMA.loadMemoryFromIncludeDirectories.default).toBe(false);
     });
   });
 });
