@@ -63,6 +63,7 @@ vi.mock('../tools/memoryTool', () => ({
   DEFAULT_CONTEXT_FILENAME: 'GEMINI.md',
   GEMINI_CONFIG_DIR: '.gemini',
 }));
+vi.mock('../tools/human-loop');
 
 vi.mock('../core/contentGenerator.js', async (importOriginal) => {
   const actual =
