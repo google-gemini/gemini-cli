@@ -31,6 +31,7 @@ export default tseslint.config(
       'eslint.config.js',
       'packages/cli/dist/**',
       'packages/core/dist/**',
+      'packages/test-utils/dist/**',
       'packages/server/dist/**',
       'packages/vscode-ide-companion/dist/**',
       'bundle/**',
