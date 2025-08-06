@@ -35,6 +35,7 @@ export default tseslint.config(
       'packages/vscode-ide-companion/dist/**',
       'bundle/**',
       'package/bundle/**',
+      '.integration-tests/**',
     ],
   },
   eslint.configs.recommended,
