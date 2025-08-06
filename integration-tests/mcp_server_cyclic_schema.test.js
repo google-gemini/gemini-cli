@@ -5,9 +5,8 @@
  */
 
 /**
- * This test verifies MCP (Model Context Protocol) server integration.
- * It uses a minimal MCP server implementation that doesn't require
- * external dependencies, making it compatible with Docker sandbox mode.
+ * This test verifies we can match maximum schema depth errors from Gemini
+ * and then detect and warn about the potential tools that caused the error.
  */
 
 import { test, describe, before } from 'node:test';
