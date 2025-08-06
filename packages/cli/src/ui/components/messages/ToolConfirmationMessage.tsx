@@ -138,8 +138,6 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.Cancel,
       });
     } else {
-      // TODO(chrstnb): support edit tool in IDE mode.
-
       options.push({
         label: 'Modify with external editor',
         value: ToolConfirmationOutcome.ModifyWithEditor,

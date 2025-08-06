@@ -27,6 +27,7 @@ import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
+import { IDEConnectionStatus } from '../ide/ide-client.js';
 
 /**
  * Parameters for the Edit tool
@@ -328,6 +329,14 @@ Expectation for required parameters:
       'Proposed',
       DEFAULT_DIFF_OPTIONS,
     );
+    const ideClient = this.config.getIdeClient();
+    const ideConfirmation =
+      this.config.getIdeModeFeature() &&
+      this.config.getIdeMode() &&
+      ideClient?.getConnectionStatus().status === IDEConnectionStatus.Connected
+        ? ideClient.openDiff(params.file_path, editData.newContent)
+        : undefined;
+
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
       title: `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.config.getTargetDir()))}`,
@@ -340,7 +349,18 @@ Expectation for required parameters:
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
         }
+
+        if (ideConfirmation) {
+          const result = await ideConfirmation;
+          if (result.status === 'accepted' && result.content) {
+            // TODO(chrstn): See https://github.com/google-gemini/gemini-cli/pull/5618#discussion_r2255413084
+            // for info on a possible race condition where the file is modified on disk while being edited.
+            params.old_string = editData.currentContent ?? '';
+            params.new_string = result.content;
+          }
+        }
       },
+      ideConfirmation,
     };
     return confirmationDetails;
   }
