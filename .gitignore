@@ -38,4 +38,5 @@ packages/*/coverage/
 # Generated files
 packages/cli/src/generated/
 .integration-tests/
+.gemini-clipboard/
 packages/vscode-ide-companion/*.vsix
