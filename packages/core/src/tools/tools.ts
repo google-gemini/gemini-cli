@@ -376,7 +376,6 @@ export type ToolCallConfirmationDetails =
 export enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',
   ProceedAlways = 'proceed_always',
-  ProceedAuto = 'proceed_auto',
   ProceedAlwaysServer = 'proceed_always_server',
   ProceedAlwaysTool = 'proceed_always_tool',
   ModifyWithEditor = 'modify_with_editor',

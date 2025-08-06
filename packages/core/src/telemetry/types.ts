@@ -22,14 +22,13 @@ export function getDecisionFromOutcome(
 ): ToolCallDecision {
   switch (outcome) {
     case ToolConfirmationOutcome.ProceedOnce:
+      return ToolCallDecision.ACCEPT;
     case ToolConfirmationOutcome.ProceedAlways:
     case ToolConfirmationOutcome.ProceedAlwaysServer:
     case ToolConfirmationOutcome.ProceedAlwaysTool:
-      return ToolCallDecision.ACCEPT;
+      return ToolCallDecision.AUTO_ACCEPT;
     case ToolConfirmationOutcome.ModifyWithEditor:
       return ToolCallDecision.MODIFY;
-    case ToolConfirmationOutcome.ProceedAuto:
-      return ToolCallDecision.AUTO_ACCEPT;
     case ToolConfirmationOutcome.Cancel:
     default:
       return ToolCallDecision.REJECT;

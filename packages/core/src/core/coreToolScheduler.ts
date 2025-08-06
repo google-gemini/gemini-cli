@@ -470,7 +470,7 @@ export class CoreToolScheduler {
         if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
           this.setToolCallOutcome(
             reqInfo.callId,
-            ToolConfirmationOutcome.ProceedAuto,
+            ToolConfirmationOutcome.ProceedAlways,
           );
           this.setStatusInternal(reqInfo.callId, 'scheduled');
         } else {
@@ -503,7 +503,7 @@ export class CoreToolScheduler {
           } else {
             this.setToolCallOutcome(
               reqInfo.callId,
-              ToolConfirmationOutcome.ProceedAuto,
+              ToolConfirmationOutcome.ProceedAlways,
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled');
           }
