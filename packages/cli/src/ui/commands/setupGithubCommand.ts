@@ -28,7 +28,7 @@ export const setupGithubCommand: SlashCommand = {
     }
 
     const version = 'v0';
-    const workflowBaseUrl = `https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/heads/${version}/examples/workflows/`;
+    const workflowBaseUrl = `https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/tags/${version}/examples/workflows/`;
 
     const workflows = [
       'gemini-cli/gemini-cli.yml',
