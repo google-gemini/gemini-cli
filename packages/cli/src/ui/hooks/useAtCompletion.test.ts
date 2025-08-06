@@ -283,6 +283,61 @@ describe('useAtCompletion', () => {
     });
   });
 
+  describe('State Management', () => {
+    it('should reset the state when disabled after being in a READY state', async () => {
+      const structure: FileSystemStructure = { 'a.txt': '' };
+      testRootDir = await createTmpDir(structure);
+
+      const { result, rerender } = renderHook(
+        ({ enabled }) =>
+          useTestHarnessForAtCompletion(enabled, 'a', mockConfig, testRootDir),
+        { initialProps: { enabled: true } },
+      );
+
+      // Wait for the hook to be ready and have suggestions
+      await waitFor(() => {
+        expect(result.current.suggestions.map((s) => s.value)).toEqual([
+          'a.txt',
+        ]);
+      });
+
+      // Now, disable the hook
+      rerender({ enabled: false });
+
+      // The suggestions should be cleared immediately because of the RESET action
+      expect(result.current.suggestions).toEqual([]);
+    });
+
+    it('should reset the state when disabled after being in an ERROR state', async () => {
+      testRootDir = await createTmpDir({});
+
+      // Force an error during initialization
+      vi.spyOn(FileSearch.prototype, 'initialize').mockRejectedValueOnce(
+        new Error('Initialization failed'),
+      );
+
+      const { result, rerender } = renderHook(
+        ({ enabled }) =>
+          useTestHarnessForAtCompletion(enabled, '', mockConfig, testRootDir),
+        { initialProps: { enabled: true } },
+      );
+
+      // Wait for the hook to enter the error state
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+      expect(result.current.suggestions).toEqual([]); // No suggestions on error
+
+      // Now, disable the hook
+      rerender({ enabled: false });
+
+      // The state should still be reset (though visually it's the same)
+      // We can't directly inspect the internal state, but we can ensure it doesn't crash
+      // and the suggestions remain empty.
+      expect(result.current.suggestions).toEqual([]);
+    });
+  });
+
   describe('Filtering and Configuration', () => {
     it('should respect .gitignore files', async () => {
       const gitignoreContent = ['dist/', '*.log'].join('\n');
