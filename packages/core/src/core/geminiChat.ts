@@ -302,8 +302,7 @@ export class GeminiChat {
       response = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
           // Check for likely cyclic schema errors, don't retry those.
-          if (error.message.includes('maximum schema depth exceeded'))
-            return false;
+          if (isSchemaDepthError(error.message)) return false;
           // Check error messages for status codes, or specific error names if known
           if (error && error.message) {
             if (error.message.includes('429')) return true;
@@ -421,8 +420,7 @@ export class GeminiChat {
       const streamResponse = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
           // Check for likely cyclic schema errors, don't retry those.
-          if (error.message.includes('maximum schema depth exceeded'))
-            return false;
+          if (isSchemaDepthError(error.message)) return false;
           // Check error messages for status codes, or specific error names if known
           if (error && error.message) {
             if (error.message.includes('429')) return true;
@@ -690,8 +688,7 @@ export class GeminiChat {
     // Check for potentially problematic cyclic tools with cyclic schemas
     // and include a recommendation to remove potentially problematic tools.
     if (
-      isStructuredError(error) &&
-      error.message.includes('maximum schema depth exceeded')
+      isStructuredError(error) && isSchemaDepthError(error.message)
     ) {
       const tools = (await this.config.getToolRegistry()).getAllTools();
       const cyclicSchemaTools: string[] = [];
@@ -713,4 +710,10 @@ export class GeminiChat {
       }
     }
   }
+}
+
+
+/** Visible for Testing */
+export function isSchemaDepthError(errorMessage: String): boolean {
+  return errorMessage.includes('maximum schema depth exceeded');
 }
