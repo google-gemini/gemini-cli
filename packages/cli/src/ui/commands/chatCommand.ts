@@ -211,7 +211,13 @@ const deleteCommand: SlashCommand = {
   description: 'Delete a conversation checkpoint. This action is irreversible. Usage: /chat delete <tag>',
   kind: CommandKind.BUILT_IN,
   action: async (context, args): Promise<MessageActionReturn> => {
-    const tag = args.trim();
+    const trimmedArgs = args.trim();
+    const hasConfirm = trimmedArgs.endsWith('--confirm');
+    const tag = (hasConfirm
+      ? trimmedArgs.slice(0, -'--confirm'.length)
+      : trimmedArgs
+    ).trim();
+
     if (!tag) {
       return {
         type: 'message',
@@ -220,14 +226,11 @@ const deleteCommand: SlashCommand = {
       };
     }
 
-    // Confirmation step - simplified approach
-    const confirmationMessage = `Are you sure you want to delete the checkpoint '${tag}'? This action cannot be undone. Type '/chat delete ${tag} --confirm' to proceed.`;
-
-    if (args.trim() !== `${tag} --confirm`) {
+    if (!hasConfirm) {
       return {
         type: 'message',
         messageType: 'info',
-        content: confirmationMessage,
+        content: `Are you sure you want to delete the checkpoint '${tag}'? This action cannot be undone. Type '/chat delete ${tag} --confirm' to proceed.`,
       };
     }
 
@@ -300,8 +303,8 @@ const exportCommand: SlashCommand = {
       for (const item of conversation) {
         const role = item.role === 'user' ? 'You' : 'Gemini';
         const text =
-          item.parts
-            ?.filter((m) => !!m.text)
+          (item.parts || [])
+            .filter((m) => !!m.text)
             .map((m) => m.text)
             .join('') || '';
         if (text) {

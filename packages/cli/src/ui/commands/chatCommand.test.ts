@@ -44,7 +44,7 @@ describe('chatCommand', () => {
   let mockGetHistory: ReturnType<typeof vi.fn>;
 
   const getSubCommand = (
-    name: 'list' | 'save' | 'resume' | 'delete',
+    name: 'list' | 'save' | 'resume' | 'delete' | 'export',
   ): SlashCommand => {
     const subCommand = chatCommand.subCommands?.find(
       (cmd) => cmd.name === name,
@@ -69,9 +69,7 @@ describe('chatCommand', () => {
         config: {
           getProjectTempDir: () => '/tmp/gemini',
           getGeminiClient: () =>
-            ({
-              getChat: mockGetChat,
-            }) as unknown as GeminiClient,
+            ({ getChat: mockGetChat }) as unknown as GeminiClient,
         },
         logger: {
           saveCheckpoint: mockSaveCheckpoint,
@@ -90,7 +88,7 @@ describe('chatCommand', () => {
   it('should have the correct main command definition', () => {
     expect(chatCommand.name).toBe('chat');
     expect(chatCommand.description).toBe('Manage conversation history.');
-    expect(chatCommand.subCommands).toHaveLength(4);
+    expect(chatCommand.subCommands).toHaveLength(5);
   });
 
   describe('list subcommand', () => {
@@ -319,9 +317,19 @@ describe('chatCommand', () => {
       });
     });
 
+    it('should prompt for confirmation if --confirm is missing', async () => {
+      const result = await deleteCommand?.action?.(mockContext, tag);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: `Are you sure you want to delete the checkpoint '${tag}'? This action cannot be undone. Type '/chat delete ${tag} --confirm' to proceed.`, 
+      });
+      expect(mockDeleteCheckpoint).not.toHaveBeenCalled();
+    });
+
     it('should return an error if checkpoint is not found', async () => {
       mockDeleteCheckpoint.mockResolvedValue(false);
-      const result = await deleteCommand?.action?.(mockContext, tag);
+      const result = await deleteCommand?.action?.(mockContext, `${tag} --confirm`);
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
@@ -329,15 +337,21 @@ describe('chatCommand', () => {
       });
     });
 
-    it('should delete the conversation', async () => {
-      const result = await deleteCommand?.action?.(mockContext, tag);
+    it('should delete the conversation when --confirm is provided', async () => {
+      const result = await deleteCommand?.action?.(mockContext, `${tag} --confirm`);
 
       expect(mockDeleteCheckpoint).toHaveBeenCalledWith(tag);
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint '${tag}' has been deleted.`,
+        content: `Conversation checkpoint '${tag}' has been permanently deleted.`,
       });
+    });
+
+    it('should handle tags with spaces correctly', async () => {
+      const tagWithSpaces = 'my tag with spaces';
+      await deleteCommand?.action?.(mockContext, `"${tagWithSpaces}" --confirm`);
+      expect(mockDeleteCheckpoint).toHaveBeenCalledWith(`"${tagWithSpaces}"`);
     });
 
     describe('completion', () => {
@@ -350,7 +364,7 @@ describe('chatCommand', () => {
 
         mockFs.stat.mockImplementation(
           (async (_: string): Promise<Stats> =>
-            ({
+            ({ 
               mtime: new Date(),
             }) as Stats) as unknown as typeof fsPromises.stat,
         );
@@ -358,6 +372,82 @@ describe('chatCommand', () => {
         const result = await deleteCommand?.completion?.(mockContext, 'a');
 
         expect(result).toEqual(['alpha']);
+      });
+    });
+  });
+
+  describe('export subcommand', () => {
+    let exportCommand: SlashCommand;
+    const tag = 'my-export-tag';
+    const conversation: Content[] = [
+      { role: 'user', parts: [{ text: 'First question' }] },
+      { role: 'model', parts: [{ text: 'First answer' }] },
+      { role: 'user', parts: null as any }, // Test case for missing parts
+    ];
+
+    beforeEach(() => {
+      exportCommand = getSubCommand('export');
+      mockLoadCheckpoint.mockResolvedValue(conversation);
+    });
+
+    it('should return an error if tag is missing', async () => {
+      const result = await exportCommand?.action?.(mockContext, '');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /chat export <tag> --format <markdown|json>',
+      });
+    });
+
+    it('should return an error for invalid format', async () => {
+      const result = await exportCommand?.action?.(mockContext, `${tag} --format xml`);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: "Invalid format. Usage: /chat export <tag> --format <markdown|json>",
+      });
+    });
+
+    it('should inform if checkpoint is not found', async () => {
+      mockLoadCheckpoint.mockResolvedValue([]);
+      const result = await exportCommand?.action?.(mockContext, `${tag} --format json`);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: `No saved checkpoint found with tag: ${tag}.`,
+      });
+    });
+
+    it('should export the conversation to JSON', async () => {
+      const result = await exportCommand?.action?.(mockContext, `${tag} --format json`);
+      expect(mockLoadCheckpoint).toHaveBeenCalledWith(tag);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: JSON.stringify(conversation, null, 2),
+      });
+    });
+
+    it('should export the conversation to Markdown, handling missing parts gracefully', async () => {
+      const result = await exportCommand?.action?.(mockContext, `${tag} --format markdown`);
+      const expectedMarkdown = `**You**:
+
+First question
+
+---
+
+**Gemini**:
+
+First answer
+
+---
+
+`;
+      expect(mockLoadCheckpoint).toHaveBeenCalledWith(tag);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: expectedMarkdown,
       });
     });
   });
