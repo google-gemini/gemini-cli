@@ -58,7 +58,7 @@ describe('mcp-client', () => {
       const mockedClient = {} as unknown as ClientLib.Client;
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
-        .mockImplementation(() => { });
+        .mockImplementation(() => {});
 
       const testError = new Error('Invalid tool name');
       vi.mocked(DiscoveredMCPTool).mockImplementation(
@@ -102,7 +102,7 @@ describe('mcp-client', () => {
       const mockedClient = {} as unknown as ClientLib.Client;
       const consoleWarnSpy = vi
         .spyOn(console, 'warn')
-        .mockImplementation(() => { });
+        .mockImplementation(() => {});
       vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () =>
           Promise.resolve({
@@ -136,7 +136,7 @@ describe('mcp-client', () => {
       expect(consoleWarnSpy).toHaveBeenCalledOnce();
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
-        `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
+          `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
       );
       consoleWarnSpy.mockRestore();
     });
@@ -145,7 +145,7 @@ describe('mcp-client', () => {
       const mockedClient = {} as unknown as ClientLib.Client;
       const consoleWarnSpy = vi
         .spyOn(console, 'warn')
-        .mockImplementation(() => { });
+        .mockImplementation(() => {});
       vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () =>
           Promise.resolve({
@@ -176,7 +176,7 @@ describe('mcp-client', () => {
       expect(consoleWarnSpy).toHaveBeenCalledOnce();
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
-        `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
+          `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
       );
       consoleWarnSpy.mockRestore();
     });
@@ -185,7 +185,7 @@ describe('mcp-client', () => {
       const mockedClient = {} as unknown as ClientLib.Client;
       const consoleWarnSpy = vi
         .spyOn(console, 'warn')
-        .mockImplementation(() => { });
+        .mockImplementation(() => {});
       vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () =>
           Promise.resolve({
@@ -214,7 +214,7 @@ describe('mcp-client', () => {
       expect(consoleWarnSpy).toHaveBeenCalledOnce();
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
-        `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
+          `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
       );
       consoleWarnSpy.mockRestore();
     });
@@ -223,7 +223,7 @@ describe('mcp-client', () => {
       const mockedClient = {} as unknown as ClientLib.Client;
       const consoleWarnSpy = vi
         .spyOn(console, 'warn')
-        .mockImplementation(() => { });
+        .mockImplementation(() => {});
       vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () =>
           Promise.resolve({
@@ -250,7 +250,7 @@ describe('mcp-client', () => {
       const mockedClient = {} as unknown as ClientLib.Client;
       const consoleWarnSpy = vi
         .spyOn(console, 'warn')
-        .mockImplementation(() => { });
+        .mockImplementation(() => {});
       vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () =>
           Promise.resolve({
@@ -319,7 +319,7 @@ describe('mcp-client', () => {
 
       const consoleLogSpy = vi
         .spyOn(console, 'debug')
-        .mockImplementation(() => { });
+        .mockImplementation(() => {});
 
       await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
 
@@ -343,7 +343,7 @@ describe('mcp-client', () => {
 
       const consoleLogSpy = vi
         .spyOn(console, 'debug')
-        .mockImplementation(() => { });
+        .mockImplementation(() => {});
 
       await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
 
@@ -368,7 +368,7 @@ describe('mcp-client', () => {
 
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
-        .mockImplementation(() => { });
+        .mockImplementation(() => {});
 
       await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
 

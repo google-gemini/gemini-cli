@@ -491,8 +491,8 @@ export async function discoverTools(
         if (!hasValidTypes(funcDecl.parametersJsonSchema)) {
           console.warn(
             `Skipping tool '${funcDecl.name}' from MCP server '${mcpServerName}' ` +
-            `because it has missing types in its parameter schema. Please file an ` +
-            `issue with the owner of the MCP server.`,
+              `because it has missing types in its parameter schema. Please file an ` +
+              `issue with the owner of the MCP server.`,
           );
           continue;
         }
@@ -510,7 +510,8 @@ export async function discoverTools(
         );
       } catch (error) {
         console.error(
-          `Error discovering tool: '${funcDecl.name
+          `Error discovering tool: '${
+            funcDecl.name
           }' from MCP server '${mcpServerName}': ${(error as Error).message}`,
         );
       }
@@ -695,18 +696,18 @@ export async function connectToMcpServer(
           if (hasStoredTokens) {
             console.log(
               `Stored OAuth token for SSE server '${mcpServerName}' was rejected. ` +
-              `Please re-authenticate using: /mcp auth ${mcpServerName}`,
+                `Please re-authenticate using: /mcp auth ${mcpServerName}`,
             );
           } else {
             console.log(
               `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
-              `Please authenticate using: /mcp auth ${mcpServerName}`,
+                `Please authenticate using: /mcp auth ${mcpServerName}`,
             );
           }
         }
         throw new Error(
           `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
-          `Please authenticate using: /mcp auth ${mcpServerName}`,
+            `Please authenticate using: /mcp auth ${mcpServerName}`,
         );
       }
 
@@ -848,18 +849,18 @@ export async function connectToMcpServer(
             if (hasStoredTokens) {
               console.log(
                 `Stored OAuth token for SSE server '${mcpServerName}' was rejected. ` +
-                `Please re-authenticate using: /mcp auth ${mcpServerName}`,
+                  `Please re-authenticate using: /mcp auth ${mcpServerName}`,
               );
             } else {
               console.log(
                 `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
-                `Please authenticate using: /mcp auth ${mcpServerName}`,
+                  `Please authenticate using: /mcp auth ${mcpServerName}`,
               );
             }
           }
           throw new Error(
             `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
-            `Please authenticate using: /mcp auth ${mcpServerName}`,
+              `Please authenticate using: /mcp auth ${mcpServerName}`,
           );
         }
 
@@ -1042,11 +1043,11 @@ export async function createTransport(
     if (!accessToken) {
       console.error(
         `MCP server '${mcpServerName}' requires OAuth authentication. ` +
-        `Please authenticate using the /mcp auth command.`,
+          `Please authenticate using the /mcp auth command.`,
       );
       throw new Error(
         `MCP server '${mcpServerName}' requires OAuth authentication. ` +
-        `Please authenticate using the /mcp auth command.`,
+          `Please authenticate using the /mcp auth command.`,
       );
     }
   } else {
