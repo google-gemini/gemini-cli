@@ -133,7 +133,7 @@ gemini --include-directories ../lib,../docs
 
 #### Use specific model
 ```bash
-gemini -m gemini-2.5-flash-exp
+gemini -m gemini-2.5-flash
 ```
 
 #### Non-interactive mode for scripts
