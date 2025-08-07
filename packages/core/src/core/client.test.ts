@@ -184,6 +184,7 @@ describe('Gemini Client (client.ts)', () => {
         .mockReturnValue(contentGeneratorConfig),
       getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
       getModel: vi.fn().mockReturnValue('test-model'),
+      getGenerationConfig: vi.fn().mockReturnValue(undefined),
       getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
       getApiKey: vi.fn().mockReturnValue('test-key'),
       getVertexAI: vi.fn().mockReturnValue(false),
@@ -1303,18 +1304,22 @@ Here are some files the user has open, with the most recent at the top:
   });
 
   describe('Generation Config with Thinking Budget', () => {
-    it('should not set thinkingConfig when thinking_budget is not provided', () => {
-      const config = new Config({
-        sessionId: 'test-session',
-        model: 'gemini-2.5-pro',
-        generationConfig: {
-          temperature: 0.5,
-          topK: 20,
-          // thinking_budget not set
-        },
-      } as never);
+    const createMockConfig = (generationConfig?: any) => ({
+      getGenerationConfig: vi.fn().mockReturnValue(generationConfig),
+      getModel: vi.fn().mockReturnValue('gemini-2.5-pro'),
+      getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+      getProxy: vi.fn().mockReturnValue(null),
+      getSessionId: vi.fn().mockReturnValue('test-session'),
+    } as unknown as Config);
 
-      const client = new GeminiClient(config);
+    it('should not set thinkingConfig when thinking_budget is not provided', () => {
+      const mockConfig = createMockConfig({
+        temperature: 0.5,
+        topK: 20,
+        // thinking_budget not set
+      });
+
+      const client = new GeminiClient(mockConfig);
 
       expect(client['generateContentConfig']).toEqual({
         temperature: 0.5,
@@ -1325,17 +1330,13 @@ Here are some files the user has open, with the most recent at the top:
     });
 
     it('should set thinkingConfig when thinking_budget is provided', () => {
-      const config = new Config({
-        sessionId: 'test-session',
-        model: 'gemini-2.5-pro',
-        generationConfig: {
-          temperature: 0.5,
-          topK: 20,
-          thinking_budget: 512,
-        },
-      } as never);
+      const mockConfig = createMockConfig({
+        temperature: 0.5,
+        topK: 20,
+        thinking_budget: 512,
+      });
 
-      const client = new GeminiClient(config);
+      const client = new GeminiClient(mockConfig);
 
       expect(client['generateContentConfig']).toEqual({
         temperature: 0.5,
@@ -1348,15 +1349,11 @@ Here are some files the user has open, with the most recent at the top:
     });
 
     it('should set thinkingBudget to 0 to disable thinking', () => {
-      const config = new Config({
-        sessionId: 'test-session',
-        model: 'gemini-2.5-pro',
-        generationConfig: {
-          thinking_budget: 0,
-        },
-      } as never);
+      const mockConfig = createMockConfig({
+        thinking_budget: 0,
+      });
 
-      const client = new GeminiClient(config);
+      const client = new GeminiClient(mockConfig);
 
       expect(client['generateContentConfig']).toEqual({
         temperature: 0,
@@ -1368,16 +1365,12 @@ Here are some files the user has open, with the most recent at the top:
     });
 
     it('should use default temperature when not provided', () => {
-      const config = new Config({
-        sessionId: 'test-session',
-        model: 'gemini-2.5-pro',
-        generationConfig: {
-          // temperature not set
-          topK: 30,
-        },
-      } as never);
+      const mockConfig = createMockConfig({
+        // temperature not set
+        topK: 30,
+      });
 
-      const client = new GeminiClient(config);
+      const client = new GeminiClient(mockConfig);
 
       expect(client['generateContentConfig']).toEqual({
         temperature: 0, // default
@@ -1387,13 +1380,9 @@ Here are some files the user has open, with the most recent at the top:
     });
 
     it('should handle empty generationConfig', () => {
-      const config = new Config({
-        sessionId: 'test-session',
-        model: 'gemini-2.5-pro',
-        generationConfig: {},
-      } as never);
+      const mockConfig = createMockConfig({});
 
-      const client = new GeminiClient(config);
+      const client = new GeminiClient(mockConfig);
 
       expect(client['generateContentConfig']).toEqual({
         temperature: 0,
@@ -1402,13 +1391,9 @@ Here are some files the user has open, with the most recent at the top:
     });
 
     it('should handle undefined generationConfig', () => {
-      const config = new Config({
-        sessionId: 'test-session',
-        model: 'gemini-2.5-pro',
-        // generationConfig not provided
-      } as never);
+      const mockConfig = createMockConfig(undefined);
 
-      const client = new GeminiClient(config);
+      const client = new GeminiClient(mockConfig);
 
       expect(client['generateContentConfig']).toEqual({
         temperature: 0,
@@ -1417,16 +1402,12 @@ Here are some files the user has open, with the most recent at the top:
     });
 
     it('should handle partial generationConfig gracefully', () => {
-      const config = new Config({
-        sessionId: 'test-session',
-        model: 'gemini-2.5-pro',
-        generationConfig: {
-          temperature: 0.7,
-          // topK and thinking_budget not provided
-        },
-      } as never);
+      const mockConfig = createMockConfig({
+        temperature: 0.7,
+        // topK and thinking_budget not provided
+      });
 
-      const client = new GeminiClient(config);
+      const client = new GeminiClient(mockConfig);
 
       expect(client['generateContentConfig']).toEqual({
         temperature: 0.7,
@@ -1437,16 +1418,12 @@ Here are some files the user has open, with the most recent at the top:
     });
 
     it('should only add topK when explicitly set', () => {
-      const config = new Config({
-        sessionId: 'test-session',
-        model: 'gemini-2.5-pro',
-        generationConfig: {
-          topK: 25,
-          // temperature and thinking_budget not provided
-        },
-      } as never);
+      const mockConfig = createMockConfig({
+        topK: 25,
+        // temperature and thinking_budget not provided
+      });
 
-      const client = new GeminiClient(config);
+      const client = new GeminiClient(mockConfig);
 
       expect(client['generateContentConfig']).toEqual({
         temperature: 0, // default value
@@ -1456,16 +1433,12 @@ Here are some files the user has open, with the most recent at the top:
     });
 
     it('should only add thinkingConfig when thinking_budget is set', () => {
-      const config = new Config({
-        sessionId: 'test-session',
-        model: 'gemini-2.5-pro',
-        generationConfig: {
-          thinking_budget: 512,
-          // temperature and topK not provided
-        },
-      } as never);
+      const mockConfig = createMockConfig({
+        thinking_budget: 512,
+        // temperature and topK not provided
+      });
 
-      const client = new GeminiClient(config);
+      const client = new GeminiClient(mockConfig);
 
       expect(client['generateContentConfig']).toEqual({
         temperature: 0, // default value
@@ -1477,15 +1450,11 @@ Here are some files the user has open, with the most recent at the top:
     });
 
     it('should handle thinking_budget of 0 correctly', () => {
-      const config = new Config({
-        sessionId: 'test-session',
-        model: 'gemini-2.5-pro',
-        generationConfig: {
-          thinking_budget: 0,
-        },
-      } as never);
+      const mockConfig = createMockConfig({
+        thinking_budget: 0,
+      });
 
-      const client = new GeminiClient(config);
+      const client = new GeminiClient(mockConfig);
 
       expect(client['generateContentConfig']).toEqual({
         temperature: 0,
