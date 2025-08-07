@@ -21,14 +21,8 @@ import { retryWithBackoff } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { ContentGenerator, AuthType } from './contentGenerator.js';
 import { Config } from '../config/config.js';
-import {
-  logApiResponse,
-  logApiError,
-} from '../telemetry/loggers.js';
-import {
-  ApiErrorEvent,
-  ApiResponseEvent,
-} from '../telemetry/types.js';
+import { logApiResponse, logApiError } from '../telemetry/loggers.js';
+import { ApiErrorEvent, ApiResponseEvent } from '../telemetry/types.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
