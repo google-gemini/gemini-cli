@@ -1,6 +1,7 @@
 import os
 import subprocess
 import json
+import re
 
 GREEN = '\033[92m'
 RED = '\033[91m'
@@ -10,7 +11,7 @@ def print_ok(msg):
     print(f"{GREEN}{msg} [OK]{RESET}")
 
 def print_bad(msg):
-    print(f"{RED}{msg} [NOT IN GOOD SHAPE]{RESET}")
+    print(f"{RED}{msg}{RESET}")
 
 def check_node_version():
     print("Checking Node.js version...")
@@ -23,11 +24,11 @@ def check_node_version():
     except Exception as e:
         print_bad(f"Error running 'node -v': {e}")
         return
-    try:
-        major, minor, patch = map(int, version.split('.'))
-    except Exception:
+    match = re.match(r'(\d+)\.(\d+)\.(\d+)', version)
+    if not match:
         print_bad(f"Node.js version string is invalid: '{version}'")
         return
+    major, minor, patch = map(int, match.groups())
     if (major, minor, patch) < required:
         print_bad(f"Node.js version {version} is too old. Required: >=20.0.0")
     else:
@@ -52,16 +53,23 @@ def check_cli_version():
 
 def check_gcloud_auth():
     print("\nChecking gcloud authentication...")
+    adc_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if adc_path:
+        if os.path.exists(adc_path):
+            print_ok(f"Using credentials from GOOGLE_APPLICATION_CREDENTIALS: {adc_path}")
+            return
+        else:
+            print_bad(f"GOOGLE_APPLICATION_CREDENTIALS is set, but the file does not exist: {adc_path}")
+            return
+
     try:
         subprocess.check_output([
             "gcloud", "auth", "application-default", "print-access-token"
         ], stderr=subprocess.STDOUT, text=True)
         print_ok("gcloud ADC authentication is valid")
-        adc_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-        if adc_path and os.path.exists(adc_path):
-            print(f"  - Using credentials from GOOGLE_APPLICATION_CREDENTIALS: {adc_path}")
     except FileNotFoundError:
-        print_bad("gcloud command not found. Please ensure it is installed and in your PATH.")
+        print_bad("No ADC found: GOOGLE_APPLICATION_CREDENTIALS is not set and `gcloud` command not found.")
+        print("  - Try running 'gcloud auth application-default login' or setting GOOGLE_APPLICATION_CREDENTIALS.")
     except subprocess.CalledProcessError as e:
         print_bad(f"gcloud ADC authentication failed. See details below.")
         print("  - Try running 'gcloud auth application-default login' or setting GOOGLE_APPLICATION_CREDENTIALS.")
