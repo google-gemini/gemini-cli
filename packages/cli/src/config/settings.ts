@@ -112,8 +112,12 @@ export interface Settings {
 
   // Flag to be removed post-launch.
   ideModeFeature?: boolean;
+  folderTrustFeature?: boolean;
   /// IDE mode setting configured via slash command toggle.
   ideMode?: boolean;
+
+  // Setting to track if the user has seen the IDE integration nudge.
+  hasSeenIdeIntegrationNudge?: boolean;
 
   // Setting for disabling auto-update.
   disableAutoUpdate?: boolean;

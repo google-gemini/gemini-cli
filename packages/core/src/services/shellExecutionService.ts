@@ -174,7 +174,19 @@ export class ShellExecutionService {
       child.stdout.on('data', (data) => handleOutput(data, 'stdout'));
       child.stderr.on('data', (data) => handleOutput(data, 'stderr'));
       child.on('error', (err) => {
+        const { stdout, stderr, finalBuffer } = cleanup();
         error = err;
+        resolve({
+          error,
+          stdout,
+          stderr,
+          rawOutput: finalBuffer,
+          output: stdout + (stderr ? `\n${stderr}` : ''),
+          exitCode: 1,
+          signal: null,
+          aborted: false,
+          pid: child.pid,
+        });
       });
 
       const abortHandler = async () => {
@@ -200,18 +212,8 @@ export class ShellExecutionService {
 
       abortSignal.addEventListener('abort', abortHandler, { once: true });
 
-      child.on('exit', (code, signal) => {
-        exited = true;
-        abortSignal.removeEventListener('abort', abortHandler);
-
-        if (stdoutDecoder) {
-          stdout += stripAnsi(stdoutDecoder.decode());
-        }
-        if (stderrDecoder) {
-          stderr += stripAnsi(stderrDecoder.decode());
-        }
-
-        const finalBuffer = Buffer.concat(outputChunks);
+      child.on('exit', (code: number, signal: NodeJS.Signals) => {
+        const { stdout, stderr, finalBuffer } = cleanup();
 
         resolve({
           rawOutput: finalBuffer,
@@ -225,6 +227,25 @@ export class ShellExecutionService {
           pid: child.pid,
         });
       });
+
+      /**
+       * Cleans up a process (and it's accompanying state) that is exiting or
+       * erroring and returns output formatted output buffers and strings
+       */
+      function cleanup() {
+        exited = true;
+        abortSignal.removeEventListener('abort', abortHandler);
+        if (stdoutDecoder) {
+          stdout += stripAnsi(stdoutDecoder.decode());
+        }
+        if (stderrDecoder) {
+          stderr += stripAnsi(stderrDecoder.decode());
+        }
+
+        const finalBuffer = Buffer.concat(outputChunks);
+
+        return { stdout, stderr, finalBuffer };
+      }
     });
 
     return { pid: child.pid, result };
