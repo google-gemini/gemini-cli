@@ -1301,4 +1301,119 @@ Here are some files the user has open, with the most recent at the top:
       );
     });
   });
+
+  describe('Generation Config with Thinking Budget', () => {
+    it('should not set thinkingConfig when thinking_budget is not provided', () => {
+      const config = new Config({
+        sessionId: 'test-session',
+        model: 'gemini-2.5-pro',
+        generationConfig: {
+          temperature: 0.5,
+          topK: 20,
+          // thinking_budget not set
+        },
+      } as never);
+      
+      const client = new GeminiClient(config);
+      
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0.5,
+        topP: 1,
+        topK: 20,
+        // thinkingConfig should not be present
+      });
+    });
+
+    it('should set thinkingConfig when thinking_budget is provided', () => {
+      const config = new Config({
+        sessionId: 'test-session',
+        model: 'gemini-2.5-pro',
+        generationConfig: {
+          temperature: 0.5,
+          topK: 20,
+          thinking_budget: 512,
+        },
+      } as never);
+      
+      const client = new GeminiClient(config);
+      
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0.5,
+        topP: 1,
+        topK: 20,
+        thinkingConfig: {
+          thinkingBudget: 512,
+        },
+      });
+    });
+
+    it('should set thinkingBudget to 0 to disable thinking', () => {
+      const config = new Config({
+        sessionId: 'test-session',
+        model: 'gemini-2.5-pro',
+        generationConfig: {
+          thinking_budget: 0,
+        },
+      } as never);
+      
+      const client = new GeminiClient(config);
+      
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0,
+        topP: 1,
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
+      });
+    });
+
+    it('should use default temperature when not provided', () => {
+      const config = new Config({
+        sessionId: 'test-session',
+        model: 'gemini-2.5-pro',
+        generationConfig: {
+          // temperature not set
+          topK: 30,
+        },
+      } as never);
+      
+      const client = new GeminiClient(config);
+      
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0, // default
+        topP: 1,
+        topK: 30,
+      });
+    });
+
+    it('should handle empty generationConfig', () => {
+      const config = new Config({
+        sessionId: 'test-session',
+        model: 'gemini-2.5-pro',
+        generationConfig: {},
+      } as never);
+      
+      const client = new GeminiClient(config);
+      
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0,
+        topP: 1,
+      });
+    });
+
+    it('should handle undefined generationConfig', () => {
+      const config = new Config({
+        sessionId: 'test-session',
+        model: 'gemini-2.5-pro',
+        // generationConfig not provided
+      } as never);
+      
+      const client = new GeminiClient(config);
+      
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0,
+        topP: 1,
+      });
+    });
+  });
 });

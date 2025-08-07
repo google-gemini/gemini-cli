@@ -1122,4 +1122,133 @@ describe('loadCliConfig with includeDirectories', () => {
       expected.length,
     );
   });
+
+  describe('Generation Config Environment Variables', () => {
+    beforeEach(() => {
+      delete process.env.GEMINI_TEMPERATURE;
+      delete process.env.GEMINI_TOP_K;
+      delete process.env.GEMINI_THINKING_BUDGET;
+      process.env.GEMINI_API_KEY = 'test-api-key';
+    });
+
+    afterEach(() => {
+      delete process.env.GEMINI_TEMPERATURE;
+      delete process.env.GEMINI_TOP_K;
+      delete process.env.GEMINI_THINKING_BUDGET;
+    });
+
+    it('should use environment variables for generation config', async () => {
+      process.env.GEMINI_TEMPERATURE = '0.8';
+      process.env.GEMINI_TOP_K = '25';
+      process.env.GEMINI_THINKING_BUDGET = '1024';
+
+      const argv = await parseArguments();
+      const settings: Settings = {};
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      expect(config.getGenerationConfig()).toEqual({
+        temperature: 0.8,
+        topK: 25,
+        thinking_budget: 1024,
+      });
+    });
+
+    it('should override settings.json with environment variables', async () => {
+      process.env.GEMINI_TEMPERATURE = '1.5';
+      process.env.GEMINI_TOP_K = '50';
+
+      const argv = await parseArguments();
+      const settings: Settings = {
+        generationConfig: {
+          temperature: 0.5,
+          topK: 10,
+          thinking_budget: 512,
+        },
+      };
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      expect(config.getGenerationConfig()).toEqual({
+        temperature: 1.5, // from env
+        topK: 50, // from env
+        thinking_budget: 512, // from settings (no env var)
+      });
+    });
+
+    it('should handle invalid environment variable values gracefully', async () => {
+      process.env.GEMINI_TEMPERATURE = 'invalid';
+      process.env.GEMINI_TOP_K = '-5';
+      process.env.GEMINI_THINKING_BUDGET = 'abc';
+
+      const argv = await parseArguments();
+      const settings: Settings = {
+        generationConfig: {
+          temperature: 0.7,
+          topK: 20,
+        },
+      };
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      // Should fall back to settings when env vars are invalid
+      expect(config.getGenerationConfig()).toEqual({
+        temperature: 0.7, // from settings (env invalid)
+        topK: 20, // from settings (env invalid)
+        thinking_budget: undefined, // not set anywhere
+      });
+    });
+
+    it('should handle out of range environment variable values', async () => {
+      process.env.GEMINI_TEMPERATURE = '3.0'; // > 2.0
+      process.env.GEMINI_TOP_K = '0'; // not positive
+      process.env.GEMINI_THINKING_BUDGET = '-100'; // negative
+
+      const argv = await parseArguments();
+      const settings: Settings = {
+        generationConfig: {
+          temperature: 0.5,
+          topK: 15,
+          thinking_budget: 256,
+        },
+      };
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      // Should fall back to settings when env vars are out of range
+      expect(config.getGenerationConfig()).toEqual({
+        temperature: 0.5, // from settings (env out of range)
+        topK: 15, // from settings (env out of range)
+        thinking_budget: 256, // from settings (env out of range)
+      });
+    });
+
+    it('should set thinking budget to 0 from environment variable', async () => {
+      process.env.GEMINI_THINKING_BUDGET = '0';
+
+      const argv = await parseArguments();
+      const settings: Settings = {};
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      expect(config.getGenerationConfig()).toEqual({
+        temperature: undefined,
+        topK: undefined,
+        thinking_budget: 0,
+      });
+    });
+
+    it('should use settings when environment variables are not set', async () => {
+      const argv = await parseArguments();
+      const settings: Settings = {
+        generationConfig: {
+          temperature: 0.3,
+          topK: 5,
+          thinking_budget: 128,
+        },
+      };
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      expect(config.getGenerationConfig()).toEqual({
+        temperature: 0.3,
+        topK: 5,
+        thinking_budget: 128,
+      });
+    });
+  });
 });
