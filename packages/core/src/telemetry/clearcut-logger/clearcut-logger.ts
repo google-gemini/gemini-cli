@@ -51,6 +51,21 @@ export interface LogResponse {
   nextRequestWaitMs?: number;
 }
 
+
+/**
+ * Determine the surface that the user is currently using.  Compiled from a collection of 
+ * environment variables that are often set in those environments.
+ */
+function determineSurface(): string {
+  if(process.env.CLOUD_SHELL === 'true') {
+    return 'CLOUD_SHELL';
+  } else if (process.env.MONOSPACE_ENV === 'true') {
+    return 'FIREBASE_STUDIO';
+  } else {
+    return process.env.SURFACE || 'SURFACE_NOT_SET';
+  }
+}
+
 // Singleton class for batch posting log events to Clearcut. When a new event comes in, the elapsed time
 // is checked and events are flushed to Clearcut if at least a minute has passed since the last flush.
 export class ClearcutLogger {
@@ -237,10 +252,7 @@ export class ClearcutLogger {
   }
 
   logStartSessionEvent(event: StartSessionEvent): void {
-    const surface =
-      process.env.CLOUD_SHELL === 'true'
-        ? 'CLOUD_SHELL'
-        : process.env.SURFACE || 'SURFACE_NOT_SET';
+    const surface = determineSurface();
 
     const data = [
       {
