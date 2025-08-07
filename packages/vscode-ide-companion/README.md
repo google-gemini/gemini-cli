@@ -16,7 +16,7 @@ The Gemini CLI Companion extension seamlessly integrates [Gemini CLI](https://gi
 
 To use this extension, you'll need:
 
-- VS Code version 1.85.0 or newer
+- VS Code version 1.99.0 or newer
 - Gemini CLI (installed separately) running within the VS Code integrated terminal
 
 # Terms of Service and Privacy Notice
