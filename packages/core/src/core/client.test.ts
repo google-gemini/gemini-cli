@@ -1304,13 +1304,18 @@ Here are some files the user has open, with the most recent at the top:
   });
 
   describe('Generation Config with Thinking Budget', () => {
-    const createMockConfig = (generationConfig?: any) => ({
-      getGenerationConfig: vi.fn().mockReturnValue(generationConfig),
-      getModel: vi.fn().mockReturnValue('gemini-2.5-pro'),
-      getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
-      getProxy: vi.fn().mockReturnValue(null),
-      getSessionId: vi.fn().mockReturnValue('test-session'),
-    } as unknown as Config);
+    const createMockConfig = (generationConfig?: {
+      temperature?: number;
+      topK?: number;
+      thinking_budget?: number;
+    }) =>
+      ({
+        getGenerationConfig: vi.fn().mockReturnValue(generationConfig),
+        getModel: vi.fn().mockReturnValue('gemini-2.5-pro'),
+        getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+        getProxy: vi.fn().mockReturnValue(null),
+        getSessionId: vi.fn().mockReturnValue('test-session'),
+      }) as unknown as Config;
 
     it('should not set thinkingConfig when thinking_budget is not provided', () => {
       const mockConfig = createMockConfig({
