@@ -5,6 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
+import { darkSemanticColors } from './semantic-tokens.js';
 
 const atomOneDarkColors: ColorsTheme = {
   type: 'dark',
@@ -142,4 +143,5 @@ export const AtomOneDark: Theme = new Theme(
     },
   },
   atomOneDarkColors,
+  darkSemanticColors,
 );

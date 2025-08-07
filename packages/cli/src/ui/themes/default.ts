@@ -5,6 +5,7 @@
  */
 
 import { darkTheme, Theme } from './theme.js';
+import { darkSemanticColors } from './semantic-tokens.js';
 
 export const DefaultDark: Theme = new Theme(
   'Default',
@@ -146,4 +147,5 @@ export const DefaultDark: Theme = new Theme(
     },
   },
   darkTheme,
+  darkSemanticColors,
 );

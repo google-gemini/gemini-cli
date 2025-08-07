@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { shortenPath, tildeifyPath } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
@@ -67,22 +67,24 @@ export const Footer: React.FC<FooterProps> = ({
     >
       <Box>
         {debugMode && <DebugProfiler />}
-        {vimMode && <Text color={Colors.Gray}>[{vimMode}] </Text>}
+        {vimMode && <Text color={theme.text.secondary}>[{vimMode}] </Text>}
         {nightly ? (
-          <Gradient colors={Colors.GradientColors}>
+          <Gradient colors={theme.ui.gradient}>
             <Text>
               {displayPath}
               {branchName && <Text> ({branchName}*)</Text>}
             </Text>
           </Gradient>
         ) : (
-          <Text color={Colors.LightBlue}>
+          <Text color={theme.text.link}>
             {displayPath}
-            {branchName && <Text color={Colors.Gray}> ({branchName}*)</Text>}
+            {branchName && (
+              <Text color={theme.text.secondary}> ({branchName}*)</Text>
+            )}
           </Text>
         )}
         {debugMode && (
-          <Text color={Colors.AccentRed}>
+          <Text color={theme.status.error}>
             {' ' + (debugMessage || '--debug')}
           </Text>
         )}
@@ -102,20 +104,22 @@ export const Footer: React.FC<FooterProps> = ({
             {process.env.SANDBOX.replace(/^gemini-(?:cli-)?/, '')}
           </Text>
         ) : process.env.SANDBOX === 'sandbox-exec' ? (
-          <Text color={Colors.AccentYellow}>
+          <Text color={theme.status.warning}>
             macOS Seatbelt{' '}
-            <Text color={Colors.Gray}>({process.env.SEATBELT_PROFILE})</Text>
+            <Text color={theme.text.secondary}>
+              ({process.env.SEATBELT_PROFILE})
+            </Text>
           </Text>
         ) : (
-          <Text color={Colors.AccentRed}>
-            no sandbox <Text color={Colors.Gray}>(see /docs)</Text>
+          <Text color={theme.status.error}>
+            no sandbox <Text color={theme.text.secondary}>(see /docs)</Text>
           </Text>
         )}
       </Box>
 
       {/* Right Section: Gemini Label and Console Summary */}
       <Box alignItems="center" paddingTop={isNarrow ? 1 : 0}>
-        <Text color={Colors.AccentBlue}>
+        <Text color={theme.text.accent}>
           {isNarrow ? '' : ' '}
           {model}{' '}
           <ContextUsageDisplay
@@ -125,17 +129,17 @@ export const Footer: React.FC<FooterProps> = ({
         </Text>
         {corgiMode && (
           <Text>
-            <Text color={Colors.Gray}>| </Text>
-            <Text color={Colors.AccentRed}>▼</Text>
-            <Text color={Colors.Foreground}>(´</Text>
-            <Text color={Colors.AccentRed}>ᴥ</Text>
-            <Text color={Colors.Foreground}>`)</Text>
-            <Text color={Colors.AccentRed}>▼ </Text>
+            <Text color={theme.ui.symbol}>| </Text>
+            <Text color={theme.status.error}>▼</Text>
+            <Text color={theme.text.primary}>(´</Text>
+            <Text color={theme.status.error}>ᴥ</Text>
+            <Text color={theme.text.primary}>`)</Text>
+            <Text color={theme.status.error}>▼ </Text>
           </Text>
         )}
         {!showErrorDetails && errorCount > 0 && (
           <Box>
-            <Text color={Colors.Gray}>| </Text>
+            <Text color={theme.ui.symbol}>| </Text>
             <ConsoleSummaryDisplay errorCount={errorCount} />
           </Box>
         )}

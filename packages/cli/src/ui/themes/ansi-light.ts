@@ -5,6 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
+import { lightSemanticColors } from './semantic-tokens.js';
 
 const ansiLightColors: ColorsTheme = {
   type: 'light',
@@ -145,4 +146,5 @@ export const ANSILight: Theme = new Theme(
     },
   },
   ansiLightColors,
+  lightSemanticColors,
 );
