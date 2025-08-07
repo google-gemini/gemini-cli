@@ -368,7 +368,7 @@ function parseGenerationConfigFromEnv(settings: Settings):
     config.topK === undefined &&
     config.thinking_budget === undefined
   ) {
-    return undefined as any;
+    return undefined;
   }
 
   return config;
