@@ -133,12 +133,12 @@ gemini --include-directories ../lib,../docs
 
 #### Use specific model
 ```bash
-gemini --model gemini-2.0-flash-exp
+gemini -m gemini-2.5-flash-exp
 ```
 
 #### Non-interactive mode for scripts
 ```bash
-gemini "Explain the architecture of this codebase" --no-interactive
+gemini -p "Explain the architecture of this codebase"
 ```
 
 ### Quick Examples
