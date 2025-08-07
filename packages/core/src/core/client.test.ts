@@ -208,6 +208,7 @@ describe('Gemini Client (client.ts)', () => {
       getGeminiClient: vi.fn(),
       setFallbackMode: vi.fn(),
       getChatCompression: vi.fn().mockReturnValue(undefined),
+      getDebugMode: vi.fn().mockReturnValue(false),
     };
     const MockedConfig = vi.mocked(Config, true);
     MockedConfig.mockImplementation(
@@ -1321,6 +1322,7 @@ Here are some files the user has open, with the most recent at the top:
         getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
         getProxy: vi.fn().mockReturnValue(null),
         getSessionId: vi.fn().mockReturnValue('test-session'),
+        getDebugMode: vi.fn().mockReturnValue(false),
       }) as unknown as Config;
 
     it('should not set thinkingConfig when thinking_budget is not provided', () => {
