@@ -190,7 +190,10 @@ export class LoadedSettings {
       ...(workspace.generationConfig || {}),
       ...(system.generationConfig || {}),
     };
-    const hasGenerationConfig = user.generationConfig || workspace.generationConfig || system.generationConfig;
+    const hasGenerationConfig =
+      user.generationConfig ||
+      workspace.generationConfig ||
+      system.generationConfig;
 
     return {
       ...user,
