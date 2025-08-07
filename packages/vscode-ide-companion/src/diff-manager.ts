@@ -58,7 +58,12 @@ export class DiffManager {
   constructor(
     private readonly log: (message: string) => void,
     private readonly diffContentProvider: DiffContentProvider,
-  ) {}
+  ) {
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      this.updateDiffContext(editor);
+    });
+    this.updateDiffContext(vscode.window.activeTextEditor);
+  }
 
   /**
    * Creates and shows a new diff view.
@@ -196,6 +201,18 @@ export class DiffManager {
           content: modifiedContent,
         },
       }),
+    );
+  }
+
+  private async updateDiffContext(editor: vscode.TextEditor | undefined) {
+    const isVisible =
+      !!editor &&
+      editor.document.uri.scheme === DIFF_SCHEME &&
+      this.diffDocuments.has(editor.document.uri.toString());
+    await vscode.commands.executeCommand(
+      'setContext',
+      'gemini.diff.isVisible',
+      isVisible,
     );
   }
 
