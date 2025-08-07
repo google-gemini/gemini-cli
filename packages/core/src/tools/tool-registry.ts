@@ -366,6 +366,22 @@ export class ToolRegistry {
   }
 
   /**
+   * Retrieves a filtered list of tool schemas based on a list of tool names.
+   * @param toolNames - An array of tool names to include.
+   * @returns An array of FunctionDeclarations for the specified tools.
+   */
+  getFunctionDeclarationsFiltered(toolNames: string[]): FunctionDeclaration[] {
+    const declarations: FunctionDeclaration[] = [];
+    for (const name of toolNames) {
+      const tool = this.tools.get(name);
+      if (tool) {
+        declarations.push(tool.schema);
+      }
+    }
+    return declarations;
+  }
+
+  /**
    * Returns an array of all registered and discovered tool instances.
    */
   getAllTools(): AnyDeclarativeTool[] {
