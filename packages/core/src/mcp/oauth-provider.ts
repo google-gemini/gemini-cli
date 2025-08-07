@@ -370,7 +370,7 @@ export class MCPOAuthProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
       body: params.toString(),
     });
@@ -433,6 +433,7 @@ export class MCPOAuthProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
       },
       body: params.toString(),
     });
