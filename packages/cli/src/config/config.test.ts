@@ -1322,15 +1322,18 @@ describe('loadCliConfig with includeDirectories', () => {
       process.env.GEMINI_TEMPERATURE = '1.0';
       process.env.GEMINI_TOP_K = '30';
       process.env.GEMINI_THINKING_BUDGET = '500';
-      
+
       process.argv = [
         'node',
         'script.js',
-        '--temperature', '1.8',
-        '--top-k', '60',
-        '--thinking-budget', '2048',
+        '--temperature',
+        '1.8',
+        '--top-k',
+        '60',
+        '--thinking-budget',
+        '2048',
       ];
-      
+
       const argv = await parseArguments();
       const settings: Settings = {
         generationConfig: {
@@ -1339,9 +1342,9 @@ describe('loadCliConfig with includeDirectories', () => {
           thinking_budget: 256,
         },
       };
-      
+
       const config = await loadCliConfig(settings, [], 'test-session', argv);
-      
+
       // CLI flags should win
       expect(config.getGenerationConfig()).toEqual({
         temperature: 1.8,
@@ -1353,15 +1356,16 @@ describe('loadCliConfig with includeDirectories', () => {
     it('should handle partial CLI flags with env vars and settings fallback', async () => {
       process.env.GEMINI_TEMPERATURE = '1.2';
       process.env.GEMINI_TOP_K = '40';
-      
+
       process.argv = [
         'node',
         'script.js',
-        '--temperature', '0.2', // Override env var
+        '--temperature',
+        '0.2', // Override env var
         // No --top-k, should use env var
         // No --thinking-budget, should use settings
       ];
-      
+
       const argv = await parseArguments();
       const settings: Settings = {
         generationConfig: {
@@ -1370,9 +1374,9 @@ describe('loadCliConfig with includeDirectories', () => {
           thinking_budget: 512,
         },
       };
-      
+
       const config = await loadCliConfig(settings, [], 'test-session', argv);
-      
+
       expect(config.getGenerationConfig()).toEqual({
         temperature: 0.2, // from CLI
         topK: 40, // from env
@@ -1385,11 +1389,11 @@ describe('loadCliConfig with includeDirectories', () => {
       process.argv = ['node', 'script.js', '--temperature', '0'];
       let argv = await parseArguments();
       expect(argv.temperature).toBe(0);
-      
+
       process.argv = ['node', 'script.js', '--temperature', '1.5'];
       argv = await parseArguments();
       expect(argv.temperature).toBe(1.5);
-      
+
       process.argv = ['node', 'script.js', '--temperature', '2.0'];
       argv = await parseArguments();
       expect(argv.temperature).toBe(2.0);
@@ -1399,11 +1403,11 @@ describe('loadCliConfig with includeDirectories', () => {
       process.argv = ['node', 'script.js', '--top-k', '1'];
       let argv = await parseArguments();
       expect(argv.topK).toBe(1);
-      
+
       process.argv = ['node', 'script.js', '--top-k', '50'];
       argv = await parseArguments();
       expect(argv.topK).toBe(50);
-      
+
       process.argv = ['node', 'script.js', '--top-k', '100'];
       argv = await parseArguments();
       expect(argv.topK).toBe(100);
@@ -1414,11 +1418,11 @@ describe('loadCliConfig with includeDirectories', () => {
       process.argv = ['node', 'script.js', '--thinking-budget', '0'];
       let argv = await parseArguments();
       expect(argv.thinkingBudget).toBe(0);
-      
+
       process.argv = ['node', 'script.js', '--thinking-budget', '512'];
       argv = await parseArguments();
       expect(argv.thinkingBudget).toBe(512);
-      
+
       process.argv = ['node', 'script.js', '--thinking-budget', '1024'];
       argv = await parseArguments();
       expect(argv.thinkingBudget).toBe(1024);
@@ -1428,23 +1432,28 @@ describe('loadCliConfig with includeDirectories', () => {
       process.argv = [
         'node',
         'script.js',
-        '--model', 'gemini-2.5-pro',
-        '--temperature', '0.7',
+        '--model',
+        'gemini-2.5-pro',
+        '--temperature',
+        '0.7',
         '--debug',
         '--yolo',
-        '--top-k', '40',
-        '--prompt', 'test prompt',
-        '--thinking-budget', '512',
+        '--top-k',
+        '40',
+        '--prompt',
+        'test prompt',
+        '--thinking-budget',
+        '512',
       ];
-      
+
       const argv = await parseArguments();
-      
+
       // Check existing args still work
       expect(argv.model).toBe('gemini-2.5-pro');
       expect(argv.debug).toBe(true);
       expect(argv.yolo).toBe(true);
       expect(argv.prompt).toBe('test prompt');
-      
+
       // Check new args are parsed
       expect(argv.temperature).toBe(0.7);
       expect(argv.topK).toBe(40);
@@ -1459,7 +1468,7 @@ describe('loadCliConfig with includeDirectories', () => {
         '--top-k=30',
         '--thinking-budget=1000',
       ];
-      
+
       const argv = await parseArguments();
       expect(argv.temperature).toBe(1.5);
       expect(argv.topK).toBe(30);
@@ -1471,7 +1480,7 @@ describe('loadCliConfig with includeDirectories', () => {
       const argv = await parseArguments();
       const settings: Settings = {};
       const config = await loadCliConfig(settings, [], 'test-session', argv);
-      
+
       expect(config.getGenerationConfig()).toBeUndefined();
     });
 
@@ -1480,7 +1489,7 @@ describe('loadCliConfig with includeDirectories', () => {
       const argv = await parseArguments();
       const settings: Settings = {};
       const config = await loadCliConfig(settings, [], 'test-session', argv);
-      
+
       expect(config.getGenerationConfig()).toEqual({
         temperature: undefined,
         topK: undefined,
@@ -1492,19 +1501,22 @@ describe('loadCliConfig with includeDirectories', () => {
       process.argv = [
         'node',
         'script.js',
-        '-i', 'initial prompt',
-        '--temperature', '0.8',
-        '--top-k', '25',
+        '-i',
+        'initial prompt',
+        '--temperature',
+        '0.8',
+        '--top-k',
+        '25',
       ];
-      
+
       const argv = await parseArguments();
       expect(argv.promptInteractive).toBe('initial prompt');
       expect(argv.temperature).toBe(0.8);
       expect(argv.topK).toBe(25);
-      
+
       const settings: Settings = {};
       const config = await loadCliConfig(settings, [], 'test-session', argv);
-      
+
       expect(config.getGenerationConfig()).toEqual({
         temperature: 0.8,
         topK: 25,
@@ -1516,7 +1528,7 @@ describe('loadCliConfig with includeDirectories', () => {
       process.env.GEMINI_TEMPERATURE = '';
       process.env.GEMINI_TOP_K = '';
       process.env.GEMINI_THINKING_BUDGET = '';
-      
+
       const argv = await parseArguments();
       const settings: Settings = {
         generationConfig: {
@@ -1525,9 +1537,9 @@ describe('loadCliConfig with includeDirectories', () => {
           thinking_budget: 256,
         },
       };
-      
+
       const config = await loadCliConfig(settings, [], 'test-session', argv);
-      
+
       // Empty env vars should fall back to settings
       expect(config.getGenerationConfig()).toEqual({
         temperature: 0.5,
