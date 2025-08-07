@@ -12,7 +12,7 @@ import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
 import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
-
+import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
 
 interface FooterProps {
@@ -44,9 +44,6 @@ export const Footer: React.FC<FooterProps> = ({
   nightly,
   vimMode,
 }) => {
-  const limit = tokenLimit(model);
-  const percentage = promptTokenCount / limit;
-
   return (
     <Box justifyContent="space-between" width="100%">
       <Box>
@@ -104,9 +101,10 @@ export const Footer: React.FC<FooterProps> = ({
         <Text color={theme.text.link}>
           {' '}
           {model}{' '}
-          <Text color={theme.text.secondary}>
-            ({((1 - percentage) * 100).toFixed(0)}% context left)
-          </Text>
+          <ContextUsageDisplay
+            promptTokenCount={promptTokenCount}
+            model={model}
+          />
         </Text>
         {corgiMode && (
           <Text>
