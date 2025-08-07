@@ -224,7 +224,7 @@ export type Message =
     };
 
 export interface ConsoleMessageItem {
-  type: 'log' | 'warn' | 'error' | 'debug';
+  type: 'log' | 'warn' | 'error' | 'debug' | 'info';
   content: string;
   count: number;
 }
