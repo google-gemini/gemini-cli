@@ -196,6 +196,7 @@ export interface ConfigParameters {
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
   chatCompression?: ChatCompressionSettings;
+  interactive?: boolean;
 }
 
 export class Config {
@@ -258,6 +259,7 @@ export class Config {
   private readonly experimentalAcp: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly chatCompression: ChatCompressionSettings | undefined;
+  private readonly interactive: boolean;
   private initialized: boolean = false;
 
   constructor(params: ConfigParameters) {
@@ -324,6 +326,7 @@ export class Config {
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
     this.chatCompression = params.chatCompression;
+    this.interactive = params.interactive ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -684,6 +687,10 @@ export class Config {
 
   getChatCompression(): ChatCompressionSettings | undefined {
     return this.chatCompression;
+  }
+
+  isInteractive(): boolean {
+    return this.interactive;
   }
 
   async getGitService(): Promise<GitService> {

@@ -369,11 +369,11 @@ export async function loadCliConfig(
   const question = argv.promptInteractive || argv.prompt || '';
   const approvalMode =
     argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
-  const shouldBeInteractive =
+  const interactive =
     !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
   // In non-interactive and non-yolo mode, exclude interactive built in tools.
   const extraExcludes =
-    !shouldBeInteractive && approvalMode !== ApprovalMode.YOLO
+    !interactive && approvalMode !== ApprovalMode.YOLO
       ? [ShellTool.Name, EditTool.Name, WriteFileTool.Name]
       : undefined;
 
@@ -502,6 +502,7 @@ export async function loadCliConfig(
     ideModeFeature,
     chatCompression: settings.chatCompression,
     folderTrustFeature,
+    interactive,
   });
 }
 

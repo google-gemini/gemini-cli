@@ -1250,3 +1250,55 @@ describe('loadCliConfig tool exclusions', () => {
     expect(config.getExcludeTools()).not.toContain('write_file');
   });
 });
+
+describe('loadCliConfig interactive', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+  const originalIsTTY = process.stdin.isTTY;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+    process.stdin.isTTY = true;
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    process.stdin.isTTY = originalIsTTY;
+    vi.restoreAllMocks();
+  });
+
+  it('should be interactive if isTTY and no prompt', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.isInteractive()).toBe(true);
+  });
+
+  it('should be interactive if prompt-interactive is set', async () => {
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js', '--prompt-interactive', 'test'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.isInteractive()).toBe(true);
+  });
+
+  it('should not be interactive if not isTTY and no prompt', async () => {
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.isInteractive()).toBe(false);
+  });
+
+  it('should not be interactive if prompt is set', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--prompt', 'test'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.isInteractive()).toBe(false);
+  });
+});

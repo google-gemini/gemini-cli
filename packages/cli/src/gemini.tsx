@@ -251,11 +251,8 @@ export async function main() {
     ...(await getUserStartupWarnings(workspaceRoot)),
   ];
 
-  const shouldBeInteractive =
-    !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0);
-
   // Render UI, passing necessary config values. Check that there is no command line question.
-  if (shouldBeInteractive) {
+  if (config.isInteractive()) {
     const version = await getCliVersion();
     setWindowTitle(basename(workspaceRoot), settings);
     const instance = render(
