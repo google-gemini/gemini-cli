@@ -33,8 +33,7 @@ import {
 } from '../telemetry/types.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
-import { isStructuredError } from '../utils/quotaErrorDetection.js';
-import {StructuredError} from './turn.js';
+import { StructuredError } from './turn.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -379,10 +378,10 @@ export class GeminiChat {
    *   console.log(chunk.text);
    * }
    * ```
-  */
- async sendMessageStream(
-   params: SendMessageParameters,
-   prompt_id: string,
+   */
+  async sendMessageStream(
+    params: SendMessageParameters,
+    prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
@@ -438,8 +437,8 @@ export class GeminiChat {
       // for both success and failure response. The actual failure is still
       // propagated by the `await streamResponse`.
       this.sendPromise = Promise.resolve(streamResponse)
-      .then(() => undefined)
-      .catch(() => undefined);
+        .then(() => undefined)
+        .catch(() => undefined);
 
       const result = this.processStreamResponse(
         streamResponse,
@@ -458,50 +457,50 @@ export class GeminiChat {
 
   /**
    * Returns the chat history.
-  *
-  * @remarks
-  * The history is a list of contents alternating between user and model.
-  *
-  * There are two types of history:
-  * - The `curated history` contains only the valid turns between user and
-  * model, which will be included in the subsequent requests sent to the model.
-  * - The `comprehensive history` contains all turns, including invalid or
-  *   empty model outputs, providing a complete record of the history.
-  *
-  * The history is updated after receiving the response from the model,
-  * for streaming response, it means receiving the last chunk of the response.
-  *
-  * The `comprehensive history` is returned by default. To get the `curated
-  * history`, set the `curated` parameter to `true`.
-  *
-  * @param curated - whether to return the curated history or the comprehensive
-  *     history.
-  * @return History contents alternating between user and model for the entire
-  *     chat session.
-  */
- getHistory(curated: boolean = false): Content[] {
-   const history = curated
-   ? extractCuratedHistory(this.history)
-   : this.history;
-   // Deep copy the history to avoid mutating the history outside of the
-   // chat session.
-   return structuredClone(history);
+   *
+   * @remarks
+   * The history is a list of contents alternating between user and model.
+   *
+   * There are two types of history:
+   * - The `curated history` contains only the valid turns between user and
+   * model, which will be included in the subsequent requests sent to the model.
+   * - The `comprehensive history` contains all turns, including invalid or
+   *   empty model outputs, providing a complete record of the history.
+   *
+   * The history is updated after receiving the response from the model,
+   * for streaming response, it means receiving the last chunk of the response.
+   *
+   * The `comprehensive history` is returned by default. To get the `curated
+   * history`, set the `curated` parameter to `true`.
+   *
+   * @param curated - whether to return the curated history or the comprehensive
+   *     history.
+   * @return History contents alternating between user and model for the entire
+   *     chat session.
+   */
+  getHistory(curated: boolean = false): Content[] {
+    const history = curated
+      ? extractCuratedHistory(this.history)
+      : this.history;
+    // Deep copy the history to avoid mutating the history outside of the
+    // chat session.
+    return structuredClone(history);
   }
 
   /**
    * Clears the chat history.
-  */
- clearHistory(): void {
-   this.history = [];
+   */
+  clearHistory(): void {
+    this.history = [];
   }
 
   /**
    * Adds a new entry to the chat history.
-  *
-  * @param content - The content to add to the history.
-  */
- addHistory(content: Content): void {
-   this.history.push(content);
+   *
+   * @param content - The content to add to the history.
+   */
+  addHistory(content: Content): void {
+    this.history.push(content);
   }
   setHistory(history: Content[]): void {
     this.history = history;
@@ -515,9 +514,9 @@ export class GeminiChat {
     chunks: GenerateContentResponse[],
   ): GenerateContentResponseUsageMetadata | undefined {
     const lastChunkWithMetadata = chunks
-    .slice()
-    .reverse()
-    .find((chunk) => chunk.usageMetadata);
+      .slice()
+      .reverse()
+      .find((chunk) => chunk.usageMetadata);
 
     return lastChunkWithMetadata?.usageMetadata;
   }
@@ -525,7 +524,10 @@ export class GeminiChat {
   async maybeIncludeSchemaDepthContext(error: StructuredError): Promise<void> {
     // Check for potentially problematic cyclic tools with cyclic schemas
     // and include a recommendation to remove potentially problematic tools.
-    if (isSchemaDepthError(error.message) || isInvalidArgumentError(error.message)) {
+    if (
+      isSchemaDepthError(error.message) ||
+      isInvalidArgumentError(error.message)
+    ) {
       const tools = (await this.config.getToolRegistry()).getAllTools();
       const cyclicSchemaTools: string[] = [];
       for (const tool of tools) {
@@ -708,7 +710,6 @@ export class GeminiChat {
       content.parts[0].thought === true
     );
   }
-
 }
 
 /** Visible for Testing */
