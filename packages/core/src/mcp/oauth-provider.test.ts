@@ -236,10 +236,10 @@ describe('MCPOAuthProvider', () => {
         'https://discovered.auth.com/token',
         expect.objectContaining({
           method: 'POST',
-          headers: {
+          headers: expect.objectContaining({
             'Content-Type': 'application/x-www-form-urlencoded',
             Accept: 'application/json',
-          },
+          }),
         }),
       );
     });
@@ -464,10 +464,10 @@ describe('MCPOAuthProvider', () => {
         'https://auth.example.com/token',
         expect.objectContaining({
           method: 'POST',
-          headers: {
+          headers: expect.objectContaining({
             'Content-Type': 'application/x-www-form-urlencoded',
             Accept: 'application/json',
-          },
+          }),
           body: expect.stringContaining('grant_type=refresh_token'),
         }),
       );
