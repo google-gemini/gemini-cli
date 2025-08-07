@@ -244,8 +244,10 @@ describe('ReadFileTool', () => {
       >;
 
       const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain('[File content partially truncated');
-      expect(result.llmContent).toContain('... [truncated]');
+      expect(result.llmContent).toContain(
+        'IMPORTANT: The file content has been truncated',
+      );
+      expect(result.llmContent).toContain('--- FILE CONTENT (truncated) ---');
       expect(result.returnDisplay).toContain('some lines were shortened');
     });
 
@@ -376,15 +378,19 @@ describe('ReadFileTool', () => {
         ToolResult
       >;
 
-      expect(await invocation.execute(abortSignal)).toEqual({
-        llmContent: [
-          '[File content truncated: showing lines 6-8 of 20 total lines. Use offset/limit parameters to view more.]',
-          'Line 6',
-          'Line 7',
-          'Line 8',
-        ].join('\n'),
-        returnDisplay: 'Read lines 6-8 of 20 from paginated.txt',
-      });
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain(
+        'IMPORTANT: The file content has been truncated',
+      );
+      expect(result.llmContent).toContain(
+        'Status: Showing lines 6-8 of 20 total lines',
+      );
+      expect(result.llmContent).toContain('Line 6');
+      expect(result.llmContent).toContain('Line 7');
+      expect(result.llmContent).toContain('Line 8');
+      expect(result.returnDisplay).toBe(
+        'Read lines 6-8 of 20 from paginated.txt',
+      );
     });
 
     describe('with .geminiignore', () => {
