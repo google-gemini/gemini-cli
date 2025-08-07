@@ -614,6 +614,17 @@ export async function start_sandbox(
       args.push('--env', `COLORTERM=${process.env.COLORTERM}`);
     }
 
+    // Pass through IDE-specific environment variables
+    if (process.env.GEMINI_CLI_IDE_SERVER_PORT) {
+      args.push(
+        '--env',
+        `GEMINI_CLI_IDE_SERVER_PORT=${process.env.GEMINI_CLI_IDE_SERVER_PORT}`,
+      );
+    }
+    if (process.env.TERM_PROGRAM) {
+      args.push('--env', `TERM_PROGRAM=${process.env.TERM_PROGRAM}`);
+    }
+
     // copy VIRTUAL_ENV if under working directory
     // also mount-replace VIRTUAL_ENV directory with <project_settings>/sandbox.venv
     // sandbox can then set up this new VIRTUAL_ENV directory using sandbox.bashrc (see below)
