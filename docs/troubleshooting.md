@@ -88,6 +88,9 @@ This guide provides solutions to common issues and debugging tips, including top
 - **Pre-flight checks:**
   - Always run `npm run preflight` before committing code. This can catch many common issues related to formatting, linting, and type errors.
 
+- **Run the diagnostic tool:**
+  - The CLI includes a diagnostic tool to help you troubleshoot your environment. Run `gemini doctor` to check your Node.js version, gcloud authentication, and API endpoint configuration.
+
 ## Existing GitHub Issues similar to yours or creating new Issues
 
 If you encounter an issue that was not covered here in this _Troubleshooting guide_, consider searching the Gemini CLI [Issue tracker on GitHub](https://github.com/google-gemini/gemini-cli/issues). If you can't find an issue similar to yours, consider creating a new GitHub Issue with a detailed description. Pull requests are also welcome!

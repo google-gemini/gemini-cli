@@ -11,6 +11,7 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
+import { spawn } from 'child_process';
 import {
   Config,
   loadServerHierarchicalMemory,
@@ -232,6 +233,31 @@ export async function parseArguments(): Promise<CliArgs> {
     )
     // Register MCP subcommands
     .command(mcpCommand)
+    .command(
+      'doctor',
+      'Run a diagnostic check on your environment',
+      () => {},
+      () => {
+        const scriptPath = path.resolve(
+          process.cwd(),
+          'scripts',
+          'gemini-doctor.py',
+        );
+        const pythonProcess = spawn('python3', [scriptPath], {
+          stdio: 'inherit',
+        });
+        pythonProcess.on('error', (err) => {
+          console.error('Failed to start python3 process.', err);
+          console.error(
+            'Please ensure that python3 is installed and in your PATH.',
+          );
+          process.exit(1);
+        });
+        pythonProcess.on('close', (code) => {
+          process.exit(code);
+        });
+      },
+    )
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -241,6 +267,11 @@ export async function parseArguments(): Promise<CliArgs> {
 
   yargsInstance.wrap(yargsInstance.terminalWidth());
   const result = await yargsInstance.parse();
+
+  // Exit after doctor command
+  if (result._.length > 0 && result._[0] === 'doctor') {
+    process.exit(0);
+  }
 
   // Handle case where MCP subcommands are executed - they should exit the process
   // and not return to main CLI logic
