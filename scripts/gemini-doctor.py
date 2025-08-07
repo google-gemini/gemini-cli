@@ -35,8 +35,12 @@ def check_cli_version():
                 print_ok(f"Gemini CLI version {version} is OK.")
             else:
                 print_bad("Gemini CLI version not found in package.json.")
+    except FileNotFoundError:
+        print_bad("`package.json` not found in the current directory.")
+    except json.JSONDecodeError:
+        print_bad("`package.json` is not a valid JSON file.")
     except Exception as e:
-        print_bad(f"Could not read package.json: {e}")
+        print_bad(f"An unexpected error occurred while reading package.json: {e}")
 
 def check_gcloud_auth():
     print("\nChecking gcloud authentication...")
