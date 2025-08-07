@@ -206,6 +206,7 @@ describe('Gemini Client (client.ts)', () => {
       }),
       getGeminiClient: vi.fn(),
       setFallbackMode: vi.fn(),
+      getChatCompression: vi.fn().mockReturnValue(undefined),
     };
     const MockedConfig = vi.mocked(Config, true);
     MockedConfig.mockImplementation(
@@ -531,14 +532,19 @@ describe('Gemini Client (client.ts)', () => {
       expect(newChat).toBe(initialChat);
     });
 
-    it('should trigger summarization if token count is at threshold', async () => {
+    it('should trigger summarization if token count is at threshold with contextPercentageThreshold setting', async () => {
       const MOCKED_TOKEN_LIMIT = 1000;
+      const MOCKED_CONTEXT_PERCENTAGE_THRESHOLD = 0.5;
       vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+      vi.spyOn(client['config'], 'getChatCompression').mockReturnValue({
+        contextPercentageThreshold: MOCKED_CONTEXT_PERCENTAGE_THRESHOLD,
+      });
       mockGetHistory.mockReturnValue([
         { role: 'user', parts: [{ text: '...history...' }] },
       ]);
 
-      const originalTokenCount = 1000 * 0.7;
+      const originalTokenCount =
+        MOCKED_TOKEN_LIMIT * MOCKED_CONTEXT_PERCENTAGE_THRESHOLD;
       const newTokenCount = 100;
 
       mockCountTokens

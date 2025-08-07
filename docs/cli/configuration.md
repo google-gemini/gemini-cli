@@ -268,6 +268,18 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "loadMemoryFromIncludeDirectories": true
     ```
 
+- **`chatCompression`** (object):
+  - **Description:** Controls the settings for chat history compression, both automatic and
+    when manually invoked through the /compress command.
+  - **Properties:**
+    - **`contextPercentageThreshold`** (number): A value between 0 and 1 that specifies the token threshold for compression as a percentage of the model's total token limit. For example, a value of `0.6` will trigger compression when the chat history exceeds 60% of the token limit.
+  - **Example:**
+    ```json
+    "chatCompression": {
+      "contextPercentageThreshold": 0.6
+    }
+    ```
+
 ### Example `settings.json`:
 
 ```json
