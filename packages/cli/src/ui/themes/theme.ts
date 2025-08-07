@@ -32,7 +32,6 @@ export interface CustomTheme {
   type: 'custom';
   name: string;
 
-  // New semantic structure (all optional)
   text?: {
     primary?: string;
     secondary?: string;
