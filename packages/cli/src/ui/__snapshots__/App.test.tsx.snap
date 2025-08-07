@@ -1,76 +1,22 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`App UI > UI rendering > initial loading state > should render the initial loading state correctly on a narrow terminal 1`] = `
+exports[`App UI > should render correctly with the prompt input box 1`] = `
 "
-  ERROR  useStreamingContext must be used within a StreamingContextProvider
 
- src/ui/contexts/StreamingContext.tsx:17:11
-
- 14: export const useStreamingContext = (): StreamingState => {
- 15:   const context = React.useContext(StreamingContext);
- 16:   if (context === undefined) {
- 17:     throw new Error(
- 18:       'useStreamingContext must be used within a StreamingContextProvider',
- 19:     );
- 20:   }
-
- - useStreamingContext (src/ui/contexts/StreamingContext.tsx:17:11)
- - ShowMoreLines (src/ui/components/ShowMoreLines.tsx:19:26)
- -Object.react-stack-bott (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react
-  m-frame                -reconciler/cjs/react-reconciler.development.js:15859:20)
- -renderWithHoo (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reconcile
-  s            r/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionComp (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reco
-  nent              nciler/cjs/react-reconciler.development.js:6475:19)
- -beginWor (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reconciler/cjs
-          /react-reconciler.development.js:8009:18)
- -runWithFiberIn (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reconcil
-  EV            er/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfW (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reconcil
-  rk            er/cjs/react-reconciler.development.js:12834:22)
- -workLoopSyn (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reconciler/
-             cjs/react-reconciler.development.js:12644:41)
- -renderRootSy (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reconciler
-  c           /cjs/react-reconciler.development.js:12624:11)
-"
+╭────────────────────────────────────────────────────────────────────────────────────────╮
+│ >   Type your message or @path/to/file                                                 │
+╰────────────────────────────────────────────────────────────────────────────────────────╯
+/test/dir                no sandbox (see /docs)                  model (100% context left)"
 `;
 
-exports[`App UI > UI rendering > initial loading state > should render the initial loading state correctly on a wide terminal 1`] = `
-"
-  ERROR  useStreamingContext must be used within a StreamingContextProvider
+exports[`App UI > should render the initial UI correctly 1`] = `
+" I'm Feeling Lucky (esc to cancel, 0s)
 
- src/ui/contexts/StreamingContext.tsx:17:11
 
- 14: export const useStreamingContext = (): StreamingState => {
- 15:   const context = React.useContext(StreamingContext);
- 16:   if (context === undefined) {
- 17:     throw new Error(
- 18:       'useStreamingContext must be used within a StreamingContextProvider',
- 19:     );
- 20:   }
-
- - useStreamingContext (src/ui/contexts/StreamingContext.tsx:17:11)
- - ShowMoreLines (src/ui/components/ShowMoreLines.tsx:19:26)
- -Object.react-stack-bott (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react
-  m-frame                -reconciler/cjs/react-reconciler.development.js:15859:20)
- -renderWithHoo (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reconcile
-  s            r/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionComp (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reco
-  nent              nciler/cjs/react-reconciler.development.js:6475:19)
- -beginWor (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reconciler/cjs
-          /react-reconciler.development.js:8009:18)
- -runWithFiberIn (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reconcil
-  EV            er/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfW (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reconcil
-  rk            er/cjs/react-reconciler.development.js:12834:22)
- -workLoopSyn (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reconciler/
-             cjs/react-reconciler.development.js:12644:41)
- -renderRootSy (/Users/galzahavi/Documents/Work/gemini-cli/cli-narrow/node_modules/react-reconciler
-  c           /cjs/react-reconciler.development.js:12624:11)
-"
+/test/dir                no sandbox (see /docs)                  model (100% context left)"
 `;
 
-exports[`App UI > UI rendering > with prompt input box > should render correctly on a narrow terminal 1`] = `
+exports[`App UI > when in a narrow terminal > should render with a column layout 1`] = `
 "
 
 
@@ -81,14 +27,5 @@ dir
 
 no sandbox (see /docs)
 
-model (100% context left)"
-`;
-
-exports[`App UI > UI rendering > with prompt input box > should render correctly on a wide terminal 1`] = `
-"
-
-╭────────────────────────────────────────────────────────────────────────────────────────╮
-│ >   Type your message or @path/to/file                                                 │
-╰────────────────────────────────────────────────────────────────────────────────────────╯
-/test/dir                no sandbox (see /docs)                  model (100% context left)"
+model (100% context left)| ✖ 5 errors (ctrl+o for details)"
 `;

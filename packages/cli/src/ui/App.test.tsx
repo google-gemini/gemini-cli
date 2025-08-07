@@ -16,20 +16,19 @@ import {
   SandboxConfig,
   GeminiClient,
   ideContext,
-  AuthType,
+  type AuthType,
 } from '@google/gemini-cli-core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { StreamingState, ConsoleMessageItem } from './types.js';
-import { StreamingContext } from './contexts/StreamingContext.js';
 import { Tips } from './components/Tips.js';
 import { checkForUpdates, UpdateObject } from './utils/updateCheck.js';
 import { EventEmitter } from 'events';
 import { updateEventEmitter } from '../utils/updateEventEmitter.js';
-import * as useTerminalSize from './hooks/useTerminalSize.js';
 import * as auth from '../config/auth.js';
+import * as useTerminalSize from './hooks/useTerminalSize.js';
 
 // Define a more complete mock server config based on actual Config
 interface MockServerConfig {
@@ -261,6 +260,7 @@ describe('App UI', () => {
   let mockSettings: LoadedSettings;
   let mockVersion: string;
   let currentUnmount: (() => void) | undefined;
+
   const createMockSettings = (
     settings: {
       system?: Partial<Settings>;
@@ -289,12 +289,12 @@ describe('App UI', () => {
   };
 
   beforeEach(() => {
-    const ServerConfigMocked = vi.mocked(ServerConfig, true);
     vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
       columns: 120,
       rows: 24,
     });
 
+    const ServerConfigMocked = vi.mocked(ServerConfig, true);
     mockConfig = new ServerConfigMocked({
       embeddingModel: 'test-embedding-model',
       sandbox: undefined,
@@ -919,92 +919,36 @@ describe('App UI', () => {
     });
   });
 
-  describe('UI rendering', () => {
-    describe('initial loading state', () => {
-      beforeEach(() => {
-        vi.mocked(useGeminiStream).mockReturnValue({
-          streamingState: StreamingState.Streaming,
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
-          thought: null,
-        });
-      });
+  it('should render the initial UI correctly', () => {
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    expect(lastFrame()).toMatchSnapshot();
+  });
 
-      it('should render the initial loading state correctly on a wide terminal', () => {
-        const { lastFrame, unmount } = render(
-          <StreamingContext.Provider value={StreamingState.Streaming}>
-            <App
-              config={mockConfig as unknown as ServerConfig}
-              settings={mockSettings}
-              version={mockVersion}
-            />
-          </StreamingContext.Provider>,
-        );
-        currentUnmount = unmount;
-        expect(lastFrame()).toMatchSnapshot();
-      });
-
-      it('should render the initial loading state correctly on a narrow terminal', () => {
-        vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
-          columns: 79,
-          rows: 24,
-        });
-
-        const { lastFrame, unmount } = render(
-          <StreamingContext.Provider value={StreamingState.Streaming}>
-            <App
-              config={mockConfig as unknown as ServerConfig}
-              settings={mockSettings}
-              version={mockVersion}
-            />
-          </StreamingContext.Provider>,
-        );
-        currentUnmount = unmount;
-        expect(lastFrame()).toMatchSnapshot();
-      });
+  it('should render correctly with the prompt input box', () => {
+    vi.mocked(useGeminiStream).mockReturnValue({
+      streamingState: StreamingState.Idle,
+      submitQuery: vi.fn(),
+      initError: null,
+      pendingHistoryItems: [],
+      thought: null,
     });
 
-    describe('with prompt input box', () => {
-      beforeEach(() => {
-        vi.mocked(useGeminiStream).mockReturnValue({
-          streamingState: StreamingState.Idle,
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
-          thought: null,
-        });
-      });
-
-      it('should render correctly on a wide terminal', () => {
-        const { lastFrame, unmount } = render(
-          <App
-            config={mockConfig as unknown as ServerConfig}
-            settings={mockSettings}
-            version={mockVersion}
-          />,
-        );
-        currentUnmount = unmount;
-        expect(lastFrame()).toMatchSnapshot();
-      });
-
-      it('should render correctly on a narrow terminal', () => {
-        vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
-          columns: 79,
-          rows: 24,
-        });
-
-        const { lastFrame, unmount } = render(
-          <App
-            config={mockConfig as unknown as ServerConfig}
-            settings={mockSettings}
-            version={mockVersion}
-          />,
-        );
-        currentUnmount = unmount;
-        expect(lastFrame()).toMatchSnapshot();
-      });
-    });
+    const { lastFrame, unmount } = render(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   describe('with initial prompt from --prompt-interactive', () => {
@@ -1126,6 +1070,25 @@ describe('App UI', () => {
       currentUnmount = unmount;
 
       expect(validateAuthMethodSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when in a narrow terminal', () => {
+    it('should render with a column layout', () => {
+      vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
+        columns: 60,
+        rows: 24,
+      });
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      expect(lastFrame()).toMatchSnapshot();
     });
   });
 });

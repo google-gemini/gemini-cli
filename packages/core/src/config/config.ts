@@ -69,6 +69,10 @@ export interface BugCommandSettings {
   urlTemplate: string;
 }
 
+export interface ChatCompressionSettings {
+  contextPercentageThreshold?: number;
+}
+
 export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
@@ -191,6 +195,7 @@ export interface ConfigParameters {
   folderTrustFeature?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
+  chatCompression?: ChatCompressionSettings;
 }
 
 export class Config {
@@ -252,6 +257,7 @@ export class Config {
     | undefined;
   private readonly experimentalAcp: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
+  private readonly chatCompression: ChatCompressionSettings | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -316,6 +322,7 @@ export class Config {
     }
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
+    this.chatCompression = params.chatCompression;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -665,6 +672,10 @@ export class Config {
 
   getIdeClient(): IdeClient {
     return this.ideClient;
+  }
+
+  getChatCompression(): ChatCompressionSettings | undefined {
+    return this.chatCompression;
   }
 
   async getGitService(): Promise<GitService> {
