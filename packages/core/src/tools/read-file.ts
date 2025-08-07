@@ -104,15 +104,11 @@ class ReadFileToolInvocation
         result.error.includes('File size exceeds')
       ) {
         errorType = ToolErrorType.FILE_TOO_LARGE;
-        llmContent = result.error
-          ? `Could not read file. ${result.error}`
-          : 'Could not read file because it is too large.';
+        llmContent = `Could not read file. ${result.error}`;
       } else {
         // Other read errors map to READ_CONTENT_FAILURE
         errorType = ToolErrorType.READ_CONTENT_FAILURE;
-        llmContent = result.error
-          ? `Could not read file. ${result.error}`
-          : 'Could not read file.';
+        llmContent = `Could not read file. ${result.error}`;
       }
 
       return {
