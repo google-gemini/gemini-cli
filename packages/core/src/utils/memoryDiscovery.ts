@@ -96,22 +96,29 @@ async function getGeminiMdFilePathsInternal(
     currentWorkingDirectory,
   ]);
 
-  // Process all directories in parallel for improved performance
-  const pathPromises = Array.from(dirs).map((dir) =>
-    getGeminiMdFilePathsInternalForEachDir(
-      dir,
-      userHomePath,
-      debugMode,
-      fileService,
-      extensionContextFilePaths,
-      fileFilteringOptions,
-      maxDirs,
-    ),
-  );
+  // Process directories in parallel with concurrency limit to prevent EMFILE errors
+  const CONCURRENT_LIMIT = 10;
+  const dirsArray = Array.from(dirs);
+  const pathsArrays: string[][] = [];
 
-  const pathsArrays = await Promise.all(pathPromises);
+  for (let i = 0; i < dirsArray.length; i += CONCURRENT_LIMIT) {
+    const batch = dirsArray.slice(i, i + CONCURRENT_LIMIT);
+    const batchPromises = batch.map((dir) =>
+      getGeminiMdFilePathsInternalForEachDir(
+        dir,
+        userHomePath,
+        debugMode,
+        fileService,
+        extensionContextFilePaths,
+        fileFilteringOptions,
+        maxDirs,
+      ),
+    );
+    const batchResults = await Promise.all(batchPromises);
+    pathsArrays.push(...batchResults);
+  }
+
   const paths = pathsArrays.flat();
-
   return Array.from(new Set<string>(paths));
 }
 
@@ -229,42 +236,50 @@ async function readGeminiMdFiles(
   debugMode: boolean,
   importFormat: 'flat' | 'tree' = 'tree',
 ): Promise<GeminiFileContent[]> {
-  // Process all files in parallel for improved performance
-  const readPromises = filePaths.map(async (filePath) => {
-    try {
-      const content = await fs.readFile(filePath, 'utf-8');
+  // Process files in parallel with concurrency limit to prevent EMFILE errors
+  const CONCURRENT_LIMIT = 20; // Higher limit for file reads as they're typically faster
+  const results: GeminiFileContent[] = [];
 
-      // Process imports in the content
-      const processedResult = await processImports(
-        content,
-        path.dirname(filePath),
-        debugMode,
-        undefined,
-        undefined,
-        importFormat,
-      );
+  for (let i = 0; i < filePaths.length; i += CONCURRENT_LIMIT) {
+    const batch = filePaths.slice(i, i + CONCURRENT_LIMIT);
+    const batchPromises = batch.map(async (filePath) => {
+      try {
+        const content = await fs.readFile(filePath, 'utf-8');
 
-      if (debugMode)
-        logger.debug(
-          `Successfully read and processed imports: ${filePath} (Length: ${processedResult.content.length})`,
+        // Process imports in the content
+        const processedResult = await processImports(
+          content,
+          path.dirname(filePath),
+          debugMode,
+          undefined,
+          undefined,
+          importFormat,
         );
 
-      return { filePath, content: processedResult.content };
-    } catch (error: unknown) {
-      const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
-      if (!isTestEnv) {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.warn(
-          `Warning: Could not read ${getAllGeminiMdFilenames()} file at ${filePath}. Error: ${message}`,
-        );
+        if (debugMode)
+          logger.debug(
+            `Successfully read and processed imports: ${filePath} (Length: ${processedResult.content.length})`,
+          );
+
+        return { filePath, content: processedResult.content };
+      } catch (error: unknown) {
+        const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
+        if (!isTestEnv) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          logger.warn(
+            `Warning: Could not read ${getAllGeminiMdFilenames()} file at ${filePath}. Error: ${message}`,
+          );
+        }
+        if (debugMode) logger.debug(`Failed to read: ${filePath}`);
+        return { filePath, content: null }; // Still include it with null content
       }
-      if (debugMode) logger.debug(`Failed to read: ${filePath}`);
-      return { filePath, content: null }; // Still include it with null content
-    }
-  });
+    });
 
-  // Wait for all reads to complete
-  const results = await Promise.all(readPromises);
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults);
+  }
+
   return results;
 }
 

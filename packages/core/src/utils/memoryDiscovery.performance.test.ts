@@ -128,6 +128,9 @@ describe('memoryDiscovery performance', () => {
     expect(seqResults.length).toBe(parResults.length);
     expect(seqResults.length).toBe(numFiles);
 
+    // Deep equality check to ensure content and order are identical
+    expect(parResults).toEqual(seqResults);
+
     // Verify parallel is faster
     expect(parTime).toBeLessThan(seqTime);
 
