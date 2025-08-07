@@ -18,6 +18,7 @@ vi.mock('../../utils/gitUtils.js', () => ({
   isGitHubRepository: vi.fn(),
   getGitRepoRoot: vi.fn(),
   getLatestGitHubRelease: vi.fn(),
+  getGitHubRepoInfo: vi.fn(),
 }));
 
 describe('setupGithubCommand', async () => {
@@ -30,7 +31,9 @@ describe('setupGithubCommand', async () => {
   });
 
   it('returns a tool action to download github workflows and handles paths', async () => {
-    const fakeRepoRoot = '/github.com/fake/repo/root';
+    const fakeRepoOwner = 'fake';
+    const fakeRepoName = 'repo';
+    const fakeRepoRoot = `/github.com/${fakeRepoOwner}/${fakeRepoName}/root`;
     const fakeReleaseVersion = 'v1.2.3';
 
     vi.mocked(gitUtils.isGitHubRepository).mockReturnValueOnce(true);
@@ -38,6 +41,10 @@ describe('setupGithubCommand', async () => {
     vi.mocked(gitUtils.getLatestGitHubRelease).mockResolvedValueOnce(
       fakeReleaseVersion,
     );
+    vi.mocked(gitUtils.getGitHubRepoInfo).mockReturnValue({
+      owner: fakeRepoOwner,
+      repo: fakeRepoName,
+    });
 
     const result = (await setupGithubCommand.action?.(
       {} as CommandContext,
