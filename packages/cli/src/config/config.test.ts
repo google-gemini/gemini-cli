@@ -1042,6 +1042,58 @@ describe('loadCliConfig folderTrustFeature', () => {
   });
 });
 
+describe('loadCliConfig folderTrust', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('should be false if folderTrustFeature is false and folderTrust is false', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = {
+      folderTrustFeature: false,
+      folderTrust: false,
+    };
+    const argv = await parseArguments();
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFolderTrust()).toBe(false);
+  });
+
+  it('should be false if folderTrustFeature is true and folderTrust is false', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = { folderTrustFeature: true, folderTrust: false };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFolderTrust()).toBe(false);
+  });
+
+  it('should be false if folderTrustFeature is false and folderTrust is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = { folderTrustFeature: false, folderTrust: true };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFolderTrust()).toBe(false);
+  });
+
+  it('should be true when folderTrustFeature is true and folderTrust is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = { folderTrustFeature: true, folderTrust: true };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFolderTrust()).toBe(true);
+  });
+});
+
 vi.mock('fs', async () => {
   const actualFs = await vi.importActual<typeof fs>('fs');
   const MOCK_CWD1 = process.cwd();
