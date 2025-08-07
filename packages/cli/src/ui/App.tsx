@@ -126,7 +126,8 @@ const App = ({
   const { stdout } = useStdout();
   const nightly = version.includes('nightly');
   const { history, addItem, clearItems, loadHistory } = useHistory();
-  const { planHistory, currentPlanIndex, switchPlan } = usePlan();
+  const { planHistory, currentPlanIndex, switchPlan, confirmPlan, planConfirmed } =
+    usePlan();
 
   useEffect(() => {
     const cleanup = setUpdateHandler(addItem, setUpdateInfo);
@@ -629,12 +630,26 @@ const App = ({
     } else if (key.shift && key.rightArrow) {
       const newIndex = Math.min(planHistory.length - 1, currentPlanIndex + 1);
       switchPlan(newIndex);
-    } else if (!key.ctrl && !key.meta && ['1', '2', '3', '4'].includes(input)) {
-      const idx = Number(input) - 1;
-      switchPlan(idx);
-    } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
-      setConstrainHeight(false);
-    }
+      } else if (!key.ctrl && !key.meta && ['1', '2', '3', '4'].includes(input)) {
+        const idx = Number(input) - 1;
+        switchPlan(idx);
+      } else if (
+        key.return &&
+        planHistory.length > 0 &&
+        !planConfirmed &&
+        buffer.text.length === 0
+      ) {
+        confirmPlan();
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: `Plan ${currentPlanIndex + 1} confirmed.`,
+          },
+          Date.now(),
+        );
+      } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
+        setConstrainHeight(false);
+      }
   });
 
   useEffect(() => {

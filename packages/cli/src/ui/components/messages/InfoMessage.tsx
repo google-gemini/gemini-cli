@@ -10,19 +10,24 @@ import { Colors } from '../../colors.js';
 
 interface InfoMessageProps {
   text: string;
+  isInterrupt?: boolean;
 }
 
-export const InfoMessage: React.FC<InfoMessageProps> = ({ text }) => {
+export const InfoMessage: React.FC<InfoMessageProps> = ({
+  text,
+  isInterrupt = false,
+}) => {
   const prefix = 'ℹ ';
   const prefixWidth = prefix.length;
+  const color = isInterrupt ? Colors.AccentRed : Colors.AccentYellow;
 
   return (
     <Box flexDirection="row" marginTop={1}>
       <Box width={prefixWidth}>
-        <Text color={Colors.AccentYellow}>{prefix}</Text>
+        <Text color={color}>{prefix}</Text>
       </Box>
       <Box flexGrow={1}>
-        <Text wrap="wrap" color={Colors.AccentYellow}>
+        <Text wrap="wrap" color={color}>
           {text}
         </Text>
       </Box>

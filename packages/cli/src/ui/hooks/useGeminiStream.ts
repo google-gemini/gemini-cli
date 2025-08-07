@@ -297,15 +297,16 @@ export const useGeminiStream = (
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, Date.now());
       }
-      addItem(
-        {
-          type: MessageType.INFO,
-          text: interruptMode
-            ? 'Stream interrupted. Awaiting new input.'
-            : 'Request cancelled.',
-        },
-        Date.now(),
-      );
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: interruptMode
+              ? 'Stream interrupted. Awaiting new input.'
+              : 'Request cancelled.',
+            isInterrupt: true,
+          },
+          Date.now(),
+        );
       setPendingHistoryItem(null);
       setIsResponding(false);
     }
@@ -533,10 +534,14 @@ export const useGeminiStream = (
         }
         setPendingHistoryItem(null);
       }
-      addItem(
-        { type: MessageType.INFO, text: 'User cancelled the request.' },
-        userMessageTimestamp,
-      );
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: 'User cancelled the request.',
+            isInterrupt: true,
+          },
+          userMessageTimestamp,
+        );
       setIsResponding(false);
       setThought(null); // Reset thought when user cancels
     },
@@ -742,9 +747,13 @@ export const useGeminiStream = (
         switch (intent) {
           case InterruptionCategory.Continue:
             addItem(
-              { type: MessageType.INFO, text: 'Continuing with current plan.' },
+              {
+                type: MessageType.INFO,
+                text: 'Continuing with current plan.',
+                isInterrupt: true,
+              },
               Date.now(),
-            );
+              );
             return;
           case InterruptionCategory.StatusQuery:
             addItem(
@@ -761,9 +770,13 @@ export const useGeminiStream = (
           case InterruptionCategory.Rule:
             addRule(queryText);
             addItem(
-              { type: MessageType.INFO, text: `Rule noted: ${queryText}` },
+              {
+                type: MessageType.INFO,
+                text: `Rule noted: ${queryText}`,
+                isInterrupt: true,
+              },
               Date.now(),
-            );
+              );
             return;
           case InterruptionCategory.Replan:
             if (interruptMode) {

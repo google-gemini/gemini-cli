@@ -81,6 +81,7 @@ export type HistoryItemGeminiContent = HistoryItemBase & {
 export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
   text: string;
+  isInterrupt?: boolean;
 };
 
 export type HistoryItemError = HistoryItemBase & {

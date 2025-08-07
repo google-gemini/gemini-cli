@@ -31,6 +31,8 @@ interface PlanContextValue {
   planHistory: PlanStep[][];
   currentPlanIndex: number;
   switchPlan: (index: number) => void;
+  planConfirmed: boolean;
+  confirmPlan: () => void;
 }
 
 const PlanContext = createContext<PlanContextValue>({
@@ -43,6 +45,8 @@ const PlanContext = createContext<PlanContextValue>({
   planHistory: [],
   currentPlanIndex: -1,
   switchPlan: () => {},
+  planConfirmed: false,
+  confirmPlan: () => {},
 });
 
 const splitIntoSteps = (query: string): string[] =>
@@ -83,6 +87,7 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
   const [rules, setRules] = useState<string[]>([]);
   const [planHistory, setPlanHistory] = useState<PlanStep[][]>([]);
   const [currentPlanIndex, setCurrentPlanIndex] = useState<number>(-1);
+  const [planConfirmed, setPlanConfirmed] = useState<boolean>(false);
   const RULES_FILE = path.join(process.cwd(), 'rules.json');
 
   useEffect(() => {
@@ -97,14 +102,19 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
   }, [RULES_FILE]);
 
   const createPlanFromQuery = (query: string) => {
-    const newSteps = generatePlanFromQuery(query);
-    setPlanHistory((prev) => {
-      const next = [...prev, newSteps];
-      setCurrentPlanIndex(next.length - 1);
-      return next;
-    });
-    setSteps(newSteps);
+    const primary = generatePlanFromQuery(query);
+    const alternate = primary.map((s, idx) => ({
+      ...s,
+      id: idx + 1,
+      description: `${s.description} (alt)`,
+      status: idx === 0 ? 'in-progress' : 'pending',
+      progress: 0,
+    }));
+    setPlanHistory([primary, alternate]);
+    setCurrentPlanIndex(0);
+    setSteps(primary);
     setCurrentStep(0);
+    setPlanConfirmed(false);
   };
 
   const interruptPlan = (query: string) => {
@@ -125,6 +135,14 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
       setCurrentPlanIndex(index);
       setCurrentStep(0);
     }
+  };
+
+  const confirmPlan = () => {
+    setPlanHistory((prev) =>
+      prev.length > 0 ? [prev[currentPlanIndex]] : prev,
+    );
+    setCurrentPlanIndex(0);
+    setPlanConfirmed(true);
   };
 
   useEffect(() => {
@@ -172,11 +190,13 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
         interruptPlan,
         rules,
         addRule,
-        planHistory,
-        currentPlanIndex,
-        switchPlan,
-      }}
-    >
+      planHistory,
+      currentPlanIndex,
+      switchPlan,
+      planConfirmed,
+      confirmPlan,
+    }}
+  >
       {children}
     </PlanContext.Provider>
   );
