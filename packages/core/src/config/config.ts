@@ -149,6 +149,12 @@ export type FlashFallbackHandler = (
   error?: unknown,
 ) => Promise<boolean | string | null>;
 
+export interface GenerationConfig {
+  temperature?: number;
+  topK?: number;
+  thinking_budget?: number;
+}
+
 export interface ConfigParameters {
   sessionId: string;
   embeddingModel?: string;
@@ -183,6 +189,7 @@ export interface ConfigParameters {
   includeDirectories?: string[];
   bugCommand?: BugCommandSettings;
   model: string;
+  generationConfig?: GenerationConfig;
   extensionContextFilePaths?: string[];
   maxSessionTurns?: number;
   experimentalAcp?: boolean;
@@ -236,6 +243,7 @@ export class Config {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private readonly model: string;
+  private readonly generationConfig: GenerationConfig | undefined;
   private readonly extensionContextFilePaths: string[];
   private readonly noBrowser: boolean;
   private readonly ideModeFeature: boolean;
@@ -304,6 +312,7 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.generationConfig = params.generationConfig;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalAcp = params.experimentalAcp ?? false;
@@ -429,6 +438,10 @@ export class Config {
 
   getEmbeddingModel(): string {
     return this.embeddingModel;
+  }
+
+  getGenerationConfig(): GenerationConfig | undefined {
+    return this.generationConfig;
   }
 
   getSandbox(): SandboxConfig | undefined {

@@ -19,10 +19,10 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({ text }) => {
   return (
     <Box flexDirection="row" marginTop={1}>
       <Box width={prefixWidth}>
-        <Text color={Colors.AccentYellow}>{prefix}</Text>
+        <Text color={Colors.AccentCyan}>{prefix}</Text>
       </Box>
       <Box flexGrow={1}>
-        <Text wrap="wrap" color={Colors.AccentYellow}>
+        <Text wrap="wrap" color={Colors.AccentCyan}>
           {text}
         </Text>
       </Box>

@@ -184,6 +184,7 @@ describe('Gemini Client (client.ts)', () => {
         .mockReturnValue(contentGeneratorConfig),
       getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
       getModel: vi.fn().mockReturnValue('test-model'),
+      getGenerationConfig: vi.fn().mockReturnValue(undefined),
       getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
       getApiKey: vi.fn().mockReturnValue('test-key'),
       getVertexAI: vi.fn().mockReturnValue(false),
@@ -207,6 +208,7 @@ describe('Gemini Client (client.ts)', () => {
       getGeminiClient: vi.fn(),
       setFallbackMode: vi.fn(),
       getChatCompression: vi.fn().mockReturnValue(undefined),
+      getDebugMode: vi.fn().mockReturnValue(false),
     };
     const MockedConfig = vi.mocked(Config, true);
     MockedConfig.mockImplementation(
@@ -1305,6 +1307,175 @@ Here are some files the user has open, with the most recent at the top:
         fallbackModel,
         undefined,
       );
+    });
+  });
+
+  describe('Generation Config with Thinking Budget', () => {
+    const createMockConfig = (generationConfig?: {
+      temperature?: number;
+      topK?: number;
+      thinking_budget?: number;
+    }) =>
+      ({
+        getGenerationConfig: vi.fn().mockReturnValue(generationConfig),
+        getModel: vi.fn().mockReturnValue('gemini-2.5-pro'),
+        getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+        getProxy: vi.fn().mockReturnValue(null),
+        getSessionId: vi.fn().mockReturnValue('test-session'),
+        getDebugMode: vi.fn().mockReturnValue(false),
+      }) as unknown as Config;
+
+    it('should not set thinkingConfig when thinking_budget is not provided', () => {
+      const mockConfig = createMockConfig({
+        temperature: 0.5,
+        topK: 20,
+        // thinking_budget not set
+      });
+
+      const client = new GeminiClient(mockConfig);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0.5,
+        topP: 1,
+        topK: 20,
+        // thinkingConfig should not be present
+      });
+    });
+
+    it('should set thinkingConfig when thinking_budget is provided', () => {
+      const mockConfig = createMockConfig({
+        temperature: 0.5,
+        topK: 20,
+        thinking_budget: 512,
+      });
+
+      const client = new GeminiClient(mockConfig);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0.5,
+        topP: 1,
+        topK: 20,
+        thinkingConfig: {
+          thinkingBudget: 512,
+        },
+      });
+    });
+
+    it('should set thinkingBudget to 0 to disable thinking', () => {
+      const mockConfig = createMockConfig({
+        thinking_budget: 0,
+      });
+
+      const client = new GeminiClient(mockConfig);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0,
+        topP: 1,
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
+      });
+    });
+
+    it('should use default temperature when not provided', () => {
+      const mockConfig = createMockConfig({
+        // temperature not set
+        topK: 30,
+      });
+
+      const client = new GeminiClient(mockConfig);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0, // default
+        topP: 1,
+        topK: 30,
+      });
+    });
+
+    it('should handle empty generationConfig', () => {
+      const mockConfig = createMockConfig({});
+
+      const client = new GeminiClient(mockConfig);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0,
+        topP: 1,
+      });
+    });
+
+    it('should handle undefined generationConfig', () => {
+      const mockConfig = createMockConfig(undefined);
+
+      const client = new GeminiClient(mockConfig);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0,
+        topP: 1,
+      });
+    });
+
+    it('should handle partial generationConfig gracefully', () => {
+      const mockConfig = createMockConfig({
+        temperature: 0.7,
+        // topK and thinking_budget not provided
+      });
+
+      const client = new GeminiClient(mockConfig);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0.7,
+        topP: 1,
+        // topK not added when undefined
+        // thinkingConfig not added when undefined
+      });
+    });
+
+    it('should only add topK when explicitly set', () => {
+      const mockConfig = createMockConfig({
+        topK: 25,
+        // temperature and thinking_budget not provided
+      });
+
+      const client = new GeminiClient(mockConfig);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0, // default value
+        topP: 1,
+        topK: 25,
+      });
+    });
+
+    it('should only add thinkingConfig when thinking_budget is set', () => {
+      const mockConfig = createMockConfig({
+        thinking_budget: 512,
+        // temperature and topK not provided
+      });
+
+      const client = new GeminiClient(mockConfig);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0, // default value
+        topP: 1,
+        thinkingConfig: {
+          thinkingBudget: 512,
+        },
+      });
+    });
+
+    it('should handle thinking_budget of 0 correctly', () => {
+      const mockConfig = createMockConfig({
+        thinking_budget: 0,
+      });
+
+      const client = new GeminiClient(mockConfig);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0,
+        topP: 1,
+        thinkingConfig: {
+          thinkingBudget: 0, // Should explicitly set to 0 to disable thinking
+        },
+      });
     });
   });
 });

@@ -64,6 +64,12 @@ export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
 }
 
+export interface GenerationConfig {
+  temperature?: number;
+  topK?: number;
+  thinking_budget?: number;
+}
+
 export interface Settings {
   theme?: string;
   customThemes?: Record<string, CustomTheme>;
@@ -89,6 +95,9 @@ export interface Settings {
   autoConfigureMaxOldSpaceSize?: boolean;
   /** The model name to use (e.g 'gemini-9.0-pro') */
   model?: string;
+
+  /** Generation configuration parameters */
+  generationConfig?: GenerationConfig;
 
   // Git-aware file filtering settings
   fileFiltering?: {
@@ -178,6 +187,17 @@ export class LoadedSettings {
     const user = this.user.settings;
     const workspace = this.workspace.settings;
 
+    // Merge generation config only if at least one exists
+    const mergedGenerationConfig = {
+      ...(user.generationConfig || {}),
+      ...(workspace.generationConfig || {}),
+      ...(system.generationConfig || {}),
+    };
+    const hasGenerationConfig =
+      user.generationConfig ||
+      workspace.generationConfig ||
+      system.generationConfig;
+
     return {
       ...user,
       ...workspace,
@@ -192,6 +212,7 @@ export class LoadedSettings {
         ...(workspace.mcpServers || {}),
         ...(system.mcpServers || {}),
       },
+      ...(hasGenerationConfig && { generationConfig: mergedGenerationConfig }),
       includeDirectories: [
         ...(system.includeDirectories || []),
         ...(user.includeDirectories || []),
@@ -382,6 +403,48 @@ export function loadEnvironment(settings?: Settings): void {
 }
 
 /**
+ * Validates generation config parameters.
+ * Returns an error message if validation fails, or null if valid.
+ */
+function validateGenerationConfig(
+  config: GenerationConfig | undefined,
+): string | null {
+  if (!config) return null;
+
+  if (config.temperature !== undefined) {
+    if (
+      typeof config.temperature !== 'number' ||
+      config.temperature < 0 ||
+      config.temperature > 2.0
+    ) {
+      return 'temperature must be a number between 0.0 and 2.0';
+    }
+  }
+
+  if (config.topK !== undefined) {
+    if (
+      typeof config.topK !== 'number' ||
+      !Number.isInteger(config.topK) ||
+      config.topK < 1
+    ) {
+      return 'topK must be a positive integer';
+    }
+  }
+
+  if (config.thinking_budget !== undefined) {
+    if (
+      typeof config.thinking_budget !== 'number' ||
+      !Number.isInteger(config.thinking_budget) ||
+      config.thinking_budget < 0
+    ) {
+      return 'thinking_budget must be a non-negative integer';
+    }
+  }
+
+  return null;
+}
+
+/**
  * Loads settings from user and workspace directories.
  * Project settings override user settings.
  */
@@ -417,6 +480,17 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
         stripJsonComments(systemContent),
       ) as Settings;
       systemSettings = resolveEnvVarsInObject(parsedSystemSettings);
+
+      // Validate generation config
+      const validationError = validateGenerationConfig(
+        systemSettings.generationConfig,
+      );
+      if (validationError) {
+        settingsErrors.push({
+          message: `Invalid generationConfig: ${validationError}`,
+          path: systemSettingsPath,
+        });
+      }
     }
   } catch (error: unknown) {
     settingsErrors.push({
@@ -438,6 +512,17 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
         userSettings.theme = DefaultLight.name;
       } else if (userSettings.theme && userSettings.theme === 'VS2015') {
         userSettings.theme = DefaultDark.name;
+      }
+
+      // Validate generation config
+      const validationError = validateGenerationConfig(
+        userSettings.generationConfig,
+      );
+      if (validationError) {
+        settingsErrors.push({
+          message: `Invalid generationConfig: ${validationError}`,
+          path: USER_SETTINGS_PATH,
+        });
       }
     }
   } catch (error: unknown) {
@@ -463,6 +548,17 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
           workspaceSettings.theme === 'VS2015'
         ) {
           workspaceSettings.theme = DefaultDark.name;
+        }
+
+        // Validate generation config
+        const validationError = validateGenerationConfig(
+          workspaceSettings.generationConfig,
+        );
+        if (validationError) {
+          settingsErrors.push({
+            message: `Invalid generationConfig: ${validationError}`,
+            path: workspaceSettingsPath,
+          });
         }
       }
     } catch (error: unknown) {

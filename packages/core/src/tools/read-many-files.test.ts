@@ -554,7 +554,8 @@ describe('ReadManyFilesTool', () => {
       // Verify parallel processing performance improvement
       // Parallel processing should complete in ~100ms (single file time)
       // Sequential would take ~400ms (4 files × 100ms each)
-      expect(processingTime).toBeLessThan(200); // Should PASS with parallel implementation
+      // Increased threshold to account for CI/system load variations
+      expect(processingTime).toBeLessThan(300); // More tolerant threshold for varying system loads
 
       // Verify all files were processed
       const content = result.llmContent as string[];

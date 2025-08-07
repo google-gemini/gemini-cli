@@ -67,6 +67,9 @@ export interface CliArgs {
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
   loadMemoryFromIncludeDirectories: boolean | undefined;
+  temperature: number | undefined;
+  topK: number | undefined;
+  thinkingBudget: number | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -221,12 +224,69 @@ export async function parseArguments(): Promise<CliArgs> {
             'If true, when refreshing memory, GEMINI.md files should be loaded from all directories that are added. If false, GEMINI.md files should only be loaded from the primary working directory.',
           default: false,
         })
+        .option('temperature', {
+          type: 'number',
+          description:
+            'Generation temperature (0.0-2.0). Lower values are more focused, higher values are more creative.',
+        })
+        .option('top-k', {
+          type: 'number',
+          description:
+            'Top-K sampling parameter. Limits token selection to K most likely tokens.',
+        })
+        .option('thinking-budget', {
+          type: 'number',
+          description:
+            'Thinking budget for models with thinking capabilities. Set to 0 to disable thinking.',
+        })
         .check((argv) => {
           if (argv.prompt && argv.promptInteractive) {
             throw new Error(
               'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
             );
           }
+
+          // Validate temperature
+          if (argv.temperature !== undefined) {
+            if (
+              typeof argv.temperature !== 'number' ||
+              isNaN(argv.temperature)
+            ) {
+              throw new Error('--temperature must be a number');
+            }
+            if (argv.temperature < 0 || argv.temperature > 2.0) {
+              throw new Error('--temperature must be between 0.0 and 2.0');
+            }
+          }
+
+          // Validate top-k
+          if (argv.topK !== undefined) {
+            if (typeof argv.topK !== 'number' || isNaN(argv.topK)) {
+              throw new Error('--top-k must be a number');
+            }
+            if (!Number.isInteger(argv.topK) || argv.topK <= 0) {
+              throw new Error('--top-k must be a positive integer');
+            }
+          }
+
+          // Validate thinking-budget
+          if (argv.thinkingBudget !== undefined) {
+            if (
+              typeof argv.thinkingBudget !== 'number' ||
+              isNaN(argv.thinkingBudget)
+            ) {
+              throw new Error('--thinking-budget must be a number');
+            }
+            if (
+              !Number.isInteger(argv.thinkingBudget) ||
+              argv.thinkingBudget < 0
+            ) {
+              throw new Error(
+                '--thinking-budget must be a non-negative integer',
+              );
+            }
+          }
+
           return true;
         }),
     )
@@ -293,6 +353,100 @@ export async function loadHierarchicalGeminiMemory(
     fileFilteringOptions,
     settings.memoryDiscoveryMaxDirs,
   );
+}
+
+/**
+ * Parse and validate generation config from environment variables and CLI args
+ */
+function parseGenerationConfigFromEnv(
+  settings: Settings,
+  argv: CliArgs,
+):
+  | {
+      temperature?: number;
+      topK?: number;
+      thinking_budget?: number;
+    }
+  | undefined {
+  const config: {
+    temperature?: number;
+    topK?: number;
+    thinking_budget?: number;
+  } = {};
+
+  // Parse temperature - CLI args take precedence over env vars
+  if (argv.temperature !== undefined) {
+    config.temperature = argv.temperature;
+  } else if (
+    process.env.GEMINI_TEMPERATURE !== undefined &&
+    process.env.GEMINI_TEMPERATURE !== ''
+  ) {
+    const temp = parseFloat(process.env.GEMINI_TEMPERATURE);
+    if (!isNaN(temp) && temp >= 0 && temp <= 2.0) {
+      config.temperature = temp;
+    } else {
+      logger.warn(
+        `Invalid GEMINI_TEMPERATURE value: ${process.env.GEMINI_TEMPERATURE}. Must be between 0.0 and 2.0`,
+      );
+      // Fall back to settings value when env var is invalid
+      config.temperature = settings.generationConfig?.temperature;
+    }
+  } else {
+    config.temperature = settings.generationConfig?.temperature;
+  }
+
+  // Parse topK - CLI args take precedence over env vars
+  if (argv.topK !== undefined) {
+    config.topK = argv.topK;
+  } else if (
+    process.env.GEMINI_TOP_K !== undefined &&
+    process.env.GEMINI_TOP_K !== ''
+  ) {
+    const topK = parseInt(process.env.GEMINI_TOP_K, 10);
+    if (!isNaN(topK) && topK > 0) {
+      config.topK = topK;
+    } else {
+      logger.warn(
+        `Invalid GEMINI_TOP_K value: ${process.env.GEMINI_TOP_K}. Must be a positive integer`,
+      );
+      // Fall back to settings value when env var is invalid
+      config.topK = settings.generationConfig?.topK;
+    }
+  } else {
+    config.topK = settings.generationConfig?.topK;
+  }
+
+  // Parse thinking_budget - CLI args take precedence over env vars
+  if (argv.thinkingBudget !== undefined) {
+    config.thinking_budget = argv.thinkingBudget;
+  } else if (
+    process.env.GEMINI_THINKING_BUDGET !== undefined &&
+    process.env.GEMINI_THINKING_BUDGET !== ''
+  ) {
+    const budget = parseInt(process.env.GEMINI_THINKING_BUDGET, 10);
+    if (!isNaN(budget) && budget >= 0) {
+      config.thinking_budget = budget;
+    } else {
+      logger.warn(
+        `Invalid GEMINI_THINKING_BUDGET value: ${process.env.GEMINI_THINKING_BUDGET}. Must be a non-negative integer`,
+      );
+      // Fall back to settings value when env var is invalid
+      config.thinking_budget = settings.generationConfig?.thinking_budget;
+    }
+  } else {
+    config.thinking_budget = settings.generationConfig?.thinking_budget;
+  }
+
+  // Return undefined if no config values are set
+  if (
+    config.temperature === undefined &&
+    config.topK === undefined &&
+    config.thinking_budget === undefined
+  ) {
+    return undefined;
+  }
+
+  return config;
 }
 
 export async function loadCliConfig(
@@ -413,6 +567,7 @@ export async function loadCliConfig(
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
+  const generationConfig = parseGenerationConfigFromEnv(settings, argv);
 
   return new Config({
     sessionId,
@@ -472,6 +627,7 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
     model: argv.model || settings.model || DEFAULT_GEMINI_MODEL,
+    ...(generationConfig && { generationConfig }),
     extensionContextFilePaths,
     maxSessionTurns: settings.maxSessionTurns ?? -1,
     experimentalAcp: argv.experimentalAcp || false,

@@ -409,6 +409,7 @@ describe('loggers', () => {
       getToolRegistry: () => new ToolRegistry(cfg1),
       getFullContext: () => false,
       getUserMemory: () => 'user-memory',
+      getGenerationConfig: () => undefined,
     } as unknown as Config;
 
     const mockGeminiClient = new GeminiClient(cfg2);
