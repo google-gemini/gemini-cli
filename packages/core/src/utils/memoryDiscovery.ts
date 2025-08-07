@@ -95,9 +95,10 @@ async function getGeminiMdFilePathsInternal(
     ...includeDirectoriesToReadGemini,
     currentWorkingDirectory,
   ]);
-  const paths = [];
-  for (const dir of dirs) {
-    const pathsByDir = await getGeminiMdFilePathsInternalForEachDir(
+
+  // Process all directories in parallel for improved performance
+  const pathPromises = Array.from(dirs).map((dir) =>
+    getGeminiMdFilePathsInternalForEachDir(
       dir,
       userHomePath,
       debugMode,
@@ -105,9 +106,12 @@ async function getGeminiMdFilePathsInternal(
       extensionContextFilePaths,
       fileFilteringOptions,
       maxDirs,
-    );
-    paths.push(...pathsByDir);
-  }
+    ),
+  );
+
+  const pathsArrays = await Promise.all(pathPromises);
+  const paths = pathsArrays.flat();
+
   return Array.from(new Set<string>(paths));
 }
 
@@ -225,8 +229,8 @@ async function readGeminiMdFiles(
   debugMode: boolean,
   importFormat: 'flat' | 'tree' = 'tree',
 ): Promise<GeminiFileContent[]> {
-  const results: GeminiFileContent[] = [];
-  for (const filePath of filePaths) {
+  // Process all files in parallel for improved performance
+  const readPromises = filePaths.map(async (filePath) => {
     try {
       const content = await fs.readFile(filePath, 'utf-8');
 
@@ -240,11 +244,12 @@ async function readGeminiMdFiles(
         importFormat,
       );
 
-      results.push({ filePath, content: processedResult.content });
       if (debugMode)
         logger.debug(
           `Successfully read and processed imports: ${filePath} (Length: ${processedResult.content.length})`,
         );
+
+      return { filePath, content: processedResult.content };
     } catch (error: unknown) {
       const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
       if (!isTestEnv) {
@@ -253,10 +258,13 @@ async function readGeminiMdFiles(
           `Warning: Could not read ${getAllGeminiMdFilenames()} file at ${filePath}. Error: ${message}`,
         );
       }
-      results.push({ filePath, content: null }); // Still include it with null content
       if (debugMode) logger.debug(`Failed to read: ${filePath}`);
+      return { filePath, content: null }; // Still include it with null content
     }
-  }
+  });
+
+  // Wait for all reads to complete
+  const results = await Promise.all(readPromises);
   return results;
 }
 
