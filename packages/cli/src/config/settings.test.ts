@@ -1313,4 +1313,224 @@ describe('Settings Loading and Merging', () => {
       ]);
     });
   });
+
+  describe('GenerationConfig', () => {
+    it('should load generationConfig from user settings', () => {
+      const userSettingsContent = {
+        generationConfig: {
+          temperature: 0.5,
+          topK: 20,
+          thinking_budget: 512,
+        },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => p === USER_SETTINGS_PATH,
+      );
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.user.settings.generationConfig).toEqual({
+        temperature: 0.5,
+        topK: 20,
+        thinking_budget: 512,
+      });
+      expect(settings.merged.generationConfig).toEqual({
+        temperature: 0.5,
+        topK: 20,
+        thinking_budget: 512,
+      });
+    });
+
+    it('should load generationConfig from workspace settings', () => {
+      const workspaceSettingsContent = {
+        generationConfig: {
+          temperature: 0.8,
+          topK: 30,
+        },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.workspace.settings.generationConfig).toEqual({
+        temperature: 0.8,
+        topK: 30,
+      });
+      expect(settings.merged.generationConfig).toEqual({
+        temperature: 0.8,
+        topK: 30,
+      });
+    });
+
+    it('should merge generationConfig with system taking precedence', () => {
+      const userSettingsContent = {
+        generationConfig: {
+          temperature: 0.5,
+          topK: 20,
+          thinking_budget: 512,
+        },
+      };
+      const workspaceSettingsContent = {
+        generationConfig: {
+          temperature: 0.8,
+          topK: 30,
+        },
+      };
+      const systemSettingsContent = {
+        generationConfig: {
+          temperature: 1.0,
+        },
+      };
+
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      
+      // System overrides temperature, workspace provides topK, user provides thinking_budget
+      expect(settings.merged.generationConfig).toEqual({
+        temperature: 1.0,
+        topK: 30,
+        thinking_budget: 512,
+      });
+    });
+
+    it('should validate temperature range', () => {
+      const invalidSettingsContent = {
+        generationConfig: {
+          temperature: 2.5, // Invalid: > 2.0
+        },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => p === USER_SETTINGS_PATH,
+      );
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(invalidSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.errors).toHaveLength(1);
+      expect(settings.errors[0].message).toContain('temperature must be a number between 0.0 and 2.0');
+    });
+
+    it('should validate topK as positive integer', () => {
+      const invalidSettingsContent = {
+        generationConfig: {
+          topK: -5, // Invalid: negative
+        },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => p === USER_SETTINGS_PATH,
+      );
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(invalidSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.errors).toHaveLength(1);
+      expect(settings.errors[0].message).toContain('topK must be a positive integer');
+    });
+
+    it('should validate thinking_budget as non-negative integer', () => {
+      const invalidSettingsContent = {
+        generationConfig: {
+          thinking_budget: -100, // Invalid: negative
+        },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => p === USER_SETTINGS_PATH,
+      );
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(invalidSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.errors).toHaveLength(1);
+      expect(settings.errors[0].message).toContain('thinking_budget must be a non-negative integer');
+    });
+
+    it('should handle partial generationConfig', () => {
+      const partialSettingsContent = {
+        generationConfig: {
+          temperature: 0.7,
+          // topK and thinking_budget not specified
+        },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => p === USER_SETTINGS_PATH,
+      );
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(partialSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.user.settings.generationConfig).toEqual({
+        temperature: 0.7,
+      });
+      expect(settings.merged.generationConfig).toEqual({
+        temperature: 0.7,
+      });
+      expect(settings.errors).toHaveLength(0);
+    });
+
+    it('should have empty generationConfig if not in any settings file', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(false);
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.generationConfig).toEqual({});
+    });
+  });
 });
