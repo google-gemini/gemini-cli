@@ -34,24 +34,17 @@ describe('ClearcutLogger', () => {
 
   // A helper to get the internal events array for testing
   const getEvents = (l: ClearcutLogger): LogEventEntry[][] =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (l as any).events.toArray();
+    l['events'].toArray() as LogEventEntry[][];
 
-  const getEventsSize = (l: ClearcutLogger): number =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (l as any).events.size;
+  const getEventsSize = (l: ClearcutLogger): number => l['events'].size;
 
-  const getMaxEvents = (l: ClearcutLogger): number =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (l as any).max_events;
+  const getMaxEvents = (l: ClearcutLogger): number => l['max_events'];
 
   const getMaxRetryEvents = (l: ClearcutLogger): number =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (l as any).max_retry_events;
+    l['max_retry_events'];
 
   const requeueFailedEvents = (l: ClearcutLogger, events: LogEventEntry[][]) =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (l as any).requeueFailedEvents(events);
+    l['requeueFailedEvents'](events);
 
   beforeEach(() => {
     vi.useFakeTimers();

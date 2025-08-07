@@ -56,13 +56,26 @@ export interface LogEventEntry {
   source_extension_json: string;
 }
 
+export type EventValue = {
+  gemini_cli_key: EventMetadataKey | string;
+  value: string;
+};
+
+export type LogEvent = {
+  console_type: string;
+  application: number;
+  event_name: string;
+  event_metadata: EventValue[][];
+  client_email?: string;
+  client_install_id?: string;
+};
+
 // Singleton class for batch posting log events to Clearcut. When a new event comes in, the elapsed time
 // is checked and events are flushed to Clearcut if at least a minute has passed since the last flush.
 export class ClearcutLogger {
   private static instance: ClearcutLogger;
   private config?: Config;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Clearcut expects this format.
-  private readonly events: any = [];
+  private readonly events: FixedDeque<LogEventEntry[]>;
   private last_flush_time: number = Date.now();
   private flush_interval_ms: number = 1000 * 60; // Wait at least a minute before flushing events.
   private readonly max_events: number = 1000; // Maximum events to keep in memory
@@ -90,8 +103,7 @@ export class ClearcutLogger {
     ClearcutLogger.instance = undefined;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Clearcut expects this format.
-  enqueueLogEvent(event: any): void {
+  enqueueLogEvent(event: object): void {
     try {
       // Manually handle overflow for FixedDeque, which throws when full.
       const wasAtCapacity = this.events.size >= this.max_events;
@@ -119,7 +131,7 @@ export class ClearcutLogger {
     }
   }
 
-  createLogEvent(name: string, data: object[]): object {
+  createLogEvent(name: string, data: EventValue[]): LogEvent {
     const email = getCachedGoogleAccount();
     const totalAccounts = getLifetimeGoogleAccounts();
     data.push({
@@ -127,12 +139,11 @@ export class ClearcutLogger {
       value: totalAccounts.toString(),
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const logEvent: any = {
+    const logEvent: LogEvent = {
       console_type: 'GEMINI_CLI',
       application: 102,
       event_name: name,
-      event_metadata: [data] as object[],
+      event_metadata: [data],
     };
 
     // Should log either email or install ID, not both. See go/cloudmill-1p-oss-instrumentation#define-sessionable-id
@@ -315,7 +326,7 @@ export class ClearcutLogger {
         ? 'CLOUD_SHELL'
         : process.env.SURFACE || 'SURFACE_NOT_SET';
 
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
         value: event.model,
@@ -394,7 +405,7 @@ export class ClearcutLogger {
   }
 
   logNewPromptEvent(event: UserPromptEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_PROMPT_LENGTH,
         value: JSON.stringify(event.prompt_length),
@@ -418,7 +429,7 @@ export class ClearcutLogger {
   }
 
   logToolCallEvent(event: ToolCallEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
         value: JSON.stringify(event.function_name),
@@ -455,7 +466,7 @@ export class ClearcutLogger {
   }
 
   logApiRequestEvent(event: ApiRequestEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
         value: JSON.stringify(event.model),
@@ -471,7 +482,7 @@ export class ClearcutLogger {
   }
 
   logApiResponseEvent(event: ApiResponseEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_RESPONSE_MODEL,
         value: JSON.stringify(event.model),
@@ -528,7 +539,7 @@ export class ClearcutLogger {
   }
 
   logApiErrorEvent(event: ApiErrorEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_MODEL,
         value: JSON.stringify(event.model),
@@ -560,7 +571,7 @@ export class ClearcutLogger {
   }
 
   logFlashFallbackEvent(event: FlashFallbackEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
         value: JSON.stringify(event.auth_type),
@@ -578,7 +589,7 @@ export class ClearcutLogger {
   }
 
   logLoopDetectedEvent(event: LoopDetectedEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
         value: JSON.stringify(event.prompt_id),
@@ -594,7 +605,7 @@ export class ClearcutLogger {
   }
 
   logNextSpeakerCheck(event: NextSpeakerCheckEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
         value: JSON.stringify(event.prompt_id),
@@ -620,7 +631,7 @@ export class ClearcutLogger {
   }
 
   logSlashCommandEvent(event: SlashCommandEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_NAME,
         value: JSON.stringify(event.command),
@@ -639,7 +650,7 @@ export class ClearcutLogger {
   }
 
   logMalformedJsonResponseEvent(event: MalformedJsonResponseEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_MALFORMED_JSON_RESPONSE_MODEL,
@@ -654,7 +665,7 @@ export class ClearcutLogger {
   }
 
   logIdeConnectionEvent(event: IdeConnectionEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_IDE_CONNECTION_TYPE,
         value: JSON.stringify(event.connection_type),
@@ -666,7 +677,7 @@ export class ClearcutLogger {
   }
 
   logEndSessionEvent(event: EndSessionEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
         value: event?.session_id?.toString() ?? '',
@@ -733,11 +744,14 @@ export class ClearcutLogger {
       eventsToRetry.length - numEventsToRequeue,
     );
 
-    // Efficiently prepend by creating a temporary array and rebuilding the deque
-    const allEvents = [...eventsToRequeue, ...this.events];
-    this.events.clear();
-    for (const event of allEvents) {
-      this.events.push(event);
+    // Prepend events to the front of the deque to be retried first.
+    // We iterate backwards to maintain the original order of the failed events.
+    for (let i = eventsToRequeue.length - 1; i >= 0; i--) {
+      this.events.unshift(eventsToRequeue[i]);
+    }
+    // Clear any potential overflow
+    while (this.events.size > this.max_events) {
+      this.events.pop();
     }
 
     if (this.config?.getDebugMode()) {
