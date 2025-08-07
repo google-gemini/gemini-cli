@@ -52,8 +52,13 @@ export interface LogResponse {
 }
 
 /**
- * Determine the surface that the user is currently using.  Compiled from a collection of
- * environment variables that are often set in those environments.
+ * Determine the surface that the user is currently using.  Surface is effectively the
+ * distribution channel in which the user is using Gemini CLI.  Gemini CLI comes bundled
+ * w/ Firebase Studio and Cloud Shell.  Users that manually download themselves will
+ * likely be "SURFACE_NOT_SET".
+ *
+ * This is computed based upon a series of environment variables these distribution
+ * methods might have in their runtimes.
  */
 function determineSurface(): string {
   if (process.env.CLOUD_SHELL === 'true') {
