@@ -13,6 +13,7 @@ import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
   BugCommandSettings,
+  ChatCompressionSettings,
   TelemetrySettings,
   AuthType,
 } from '@google/gemini-cli-core';
@@ -112,8 +113,12 @@ export interface Settings {
 
   // Flag to be removed post-launch.
   ideModeFeature?: boolean;
+  folderTrustFeature?: boolean;
   /// IDE mode setting configured via slash command toggle.
   ideMode?: boolean;
+
+  // Setting to track if the user has seen the IDE integration nudge.
+  hasSeenIdeIntegrationNudge?: boolean;
 
   // Setting for disabling auto-update.
   disableAutoUpdate?: boolean;
@@ -130,6 +135,8 @@ export interface Settings {
   includeDirectories?: string[];
 
   loadMemoryFromIncludeDirectories?: boolean;
+
+  chatCompression?: ChatCompressionSettings;
 }
 
 export interface SettingsError {
@@ -190,6 +197,11 @@ export class LoadedSettings {
         ...(user.includeDirectories || []),
         ...(workspace.includeDirectories || []),
       ],
+      chatCompression: {
+        ...(system.chatCompression || {}),
+        ...(user.chatCompression || {}),
+        ...(workspace.chatCompression || {}),
+      },
     };
   }
 
@@ -380,7 +392,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   const settingsErrors: SettingsError[] = [];
   const systemSettingsPath = getSystemSettingsPath();
 
-  // FIX: Resolve paths to their canonical representation to handle symlinks
+  // Resolve paths to their canonical representation to handle symlinks
   const resolvedWorkspaceDir = path.resolve(workspaceDir);
   const resolvedHomeDir = path.resolve(homedir());
 
@@ -435,7 +447,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     });
   }
 
-  // This comparison is now much more reliable.
   if (realWorkspaceDir !== realHomeDir) {
     // Load workspace settings
     try {
@@ -478,6 +489,19 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     },
     settingsErrors,
   );
+
+  // Validate chatCompression settings
+  const chatCompression = loadedSettings.merged.chatCompression;
+  const threshold = chatCompression?.contextPercentageThreshold;
+  if (
+    threshold != null &&
+    (typeof threshold !== 'number' || threshold < 0 || threshold > 1)
+  ) {
+    console.warn(
+      `Invalid value for chatCompression.contextPercentageThreshold: "${threshold}". Please use a value between 0 and 1. Using default compression settings.`,
+    );
+    delete loadedSettings.merged.chatCompression;
+  }
 
   // Load environment with merged settings
   loadEnvironment(loadedSettings.merged);
