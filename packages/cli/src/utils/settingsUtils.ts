@@ -91,10 +91,7 @@ export function getRestartRequiredSettings(): string[] {
 /**
  * Recursively gets a value from a nested object using a key path array.
  */
-function getNestedValue(
-  obj: Record<string, unknown>,
-  path: string[],
-): unknown {
+function getNestedValue(obj: Record<string, unknown>, path: string[]): unknown {
   const [first, ...rest] = path;
   if (!first || !(first in obj)) {
     return undefined;
@@ -431,7 +428,8 @@ export function getDisplayValue(
 
   // Check if value is different from default OR if it's in modified settings OR if there are pending changes
   const defaultValue = getDefaultValue(key);
-  const isChangedFromDefault = typeof defaultValue === 'boolean' ? value !== defaultValue : value === true;
+  const isChangedFromDefault =
+    typeof defaultValue === 'boolean' ? value !== defaultValue : value === true;
   const isInModifiedSettings = modifiedSettings.has(key);
   const hasPendingChanges =
     pendingSettings && settingExistsInScope(key, pendingSettings);

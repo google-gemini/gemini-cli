@@ -252,8 +252,9 @@ export function SettingsDialog({
 
   // Scroll logic for settings
   const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
-  const showScrollUp = scrollOffset > 0;
-  const showScrollDown = scrollOffset + maxItemsToShow < items.length;
+  // Always show arrows for consistent UI and to indicate circular navigation
+  const showScrollUp = true;
+  const showScrollDown = true;
 
   useInput((input, key) => {
     if (key.tab) {
@@ -261,18 +262,22 @@ export function SettingsDialog({
     }
     if (focusSection === 'settings') {
       if (key.upArrow || input === 'k') {
-        if (activeSettingIndex > 0) {
-          setActiveSettingIndex(activeSettingIndex - 1);
-          if (activeSettingIndex - 1 < scrollOffset) {
-            setScrollOffset(scrollOffset - 1);
-          }
+        const newIndex = activeSettingIndex > 0 ? activeSettingIndex - 1 : items.length - 1;
+        setActiveSettingIndex(newIndex);
+        // Adjust scroll offset for wrap-around
+        if (newIndex === items.length - 1) {
+          setScrollOffset(Math.max(0, items.length - maxItemsToShow));
+        } else if (newIndex < scrollOffset) {
+          setScrollOffset(newIndex);
         }
       } else if (key.downArrow || input === 'j') {
-        if (activeSettingIndex < items.length - 1) {
-          setActiveSettingIndex(activeSettingIndex + 1);
-          if (activeSettingIndex + 1 >= scrollOffset + maxItemsToShow) {
-            setScrollOffset(scrollOffset + 1);
-          }
+        const newIndex = activeSettingIndex < items.length - 1 ? activeSettingIndex + 1 : 0;
+        setActiveSettingIndex(newIndex);
+        // Adjust scroll offset for wrap-around
+        if (newIndex === 0) {
+          setScrollOffset(0);
+        } else if (newIndex >= scrollOffset + maxItemsToShow) {
+          setScrollOffset(newIndex - maxItemsToShow + 1);
         }
       } else if (key.return || input === ' ') {
         items[activeSettingIndex]?.toggle();
@@ -282,11 +287,16 @@ export function SettingsDialog({
         if (currentSetting) {
           const defaultValue = getDefaultValue(currentSetting.value);
           // Ensure defaultValue is a boolean for setPendingSettingValue
-          const booleanDefaultValue = typeof defaultValue === 'boolean' ? defaultValue : false;
+          const booleanDefaultValue =
+            typeof defaultValue === 'boolean' ? defaultValue : false;
 
           // Update pending settings to default value
           setPendingSettings((prev) =>
-            setPendingSettingValue(currentSetting.value, booleanDefaultValue, prev),
+            setPendingSettingValue(
+              currentSetting.value,
+              booleanDefaultValue,
+              prev,
+            ),
           );
 
           // Remove from modified settings since it's now at default

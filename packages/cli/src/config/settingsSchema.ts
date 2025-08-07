@@ -11,6 +11,7 @@ import {
   AuthType,
 } from '@google/gemini-cli-core';
 import { CustomTheme } from '../ui/themes/theme.js';
+import { hasMagic } from 'glob';
 
 export interface SettingDefinition {
   type: 'boolean' | 'string' | 'number' | 'array' | 'object';
@@ -456,6 +457,24 @@ export const SETTINGS_SCHEMA = {
     default: undefined as string | undefined,
     description: 'The Gemini model to use for conversations.',
     showInDialog: false,
+  },
+  hasSeenIdeIntegrationNudge: {
+    type: 'boolean',
+    label: 'Has Seen IDE Integration Nudge',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Whether the user has seen the IDE integration nudge.',
+    showInDialog: false,
+  },
+  folderTrustFeature: {
+    type: 'boolean',
+    label: 'Folder Trust Feature',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Enable folder trust feature for enhanced security.',
+    showInDialog: true,
   },
 } as const;
 

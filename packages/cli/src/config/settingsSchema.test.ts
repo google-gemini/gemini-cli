@@ -30,6 +30,29 @@ describe('SettingsSchema', () => {
         'hideWindowTitle',
         'hideTips',
         'hideBanner',
+        'selectedAuthType',
+        'useExternalAuth',
+        'sandbox',
+        'coreTools',
+        'excludeTools',
+        'toolDiscoveryCommand',
+        'toolCallCommand',
+        'mcpServerCommand',
+        'mcpServers',
+        'allowMCPServers',
+        'excludeMCPServers',
+        'telemetry',
+        'bugCommand',
+        'summarizeToolOutput',
+        'ideModeFeature',
+        'dnsResolutionOrder',
+        'excludedProjectEnvVars',
+        'disableUpdateNag',
+        'includeDirectories',
+        'loadMemoryFromIncludeDirectories',
+        'model',
+        'hasSeenIdeIntegrationNudge',
+        'folderTrustFeature',
       ];
 
       expectedSettings.forEach((setting) => {
@@ -182,7 +205,7 @@ describe('SettingsSchema', () => {
       expect(SETTINGS_SCHEMA.preferredEditor.showInDialog).toBe(false); // Changed to false
       expect(SETTINGS_SCHEMA.autoConfigureMaxOldSpaceSize.showInDialog).toBe(
         true,
-      ); 
+      );
     });
 
     it('should infer Settings type correctly', () => {
@@ -217,6 +240,14 @@ describe('SettingsSchema', () => {
       expect(SETTINGS_SCHEMA.loadMemoryFromIncludeDirectories.default).toBe(
         false,
       );
+    });
+
+    it('should have folderTrustFeature setting in schema', () => {
+      expect(SETTINGS_SCHEMA.folderTrustFeature).toBeDefined();
+      expect(SETTINGS_SCHEMA.folderTrustFeature.type).toBe('boolean');
+      expect(SETTINGS_SCHEMA.folderTrustFeature.category).toBe('General');
+      expect(SETTINGS_SCHEMA.folderTrustFeature.default).toBe(false);
+      expect(SETTINGS_SCHEMA.folderTrustFeature.showInDialog).toBe(true);
     });
   });
 });
