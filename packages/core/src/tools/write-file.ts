@@ -26,12 +26,13 @@ import {
   ensureCorrectFileContent,
 } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
-import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
+import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
 import {
   recordFileOperationMetric,
   FileOperation,
 } from '../telemetry/metrics.js';
+import { IDEConnectionStatus } from '../ide/ide-client.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -65,7 +66,7 @@ interface GetCorrectedFileContentResult {
  */
 export class WriteFileTool
   extends BaseTool<WriteFileToolParams, ToolResult>
-  implements ModifiableTool<WriteFileToolParams>
+  implements ModifiableDeclarativeTool<WriteFileToolParams>
 {
   static readonly Name: string = 'write_file';
 
@@ -184,10 +185,19 @@ export class WriteFileTool
       DEFAULT_DIFF_OPTIONS,
     );
 
+    const ideClient = this.config.getIdeClient();
+    const ideConfirmation =
+      this.config.getIdeModeFeature() &&
+      this.config.getIdeMode() &&
+      ideClient.getConnectionStatus().status === IDEConnectionStatus.Connected
+        ? ideClient.openDiff(params.file_path, correctedContent)
+        : undefined;
+
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
       title: `Confirm Write: ${shortenPath(relativePath)}`,
       fileName,
+      filePath: params.file_path,
       fileDiff,
       originalContent,
       newContent: correctedContent,
@@ -195,7 +205,15 @@ export class WriteFileTool
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
         }
+
+        if (ideConfirmation) {
+          const result = await ideConfirmation;
+          if (result.status === 'accepted' && result.content) {
+            params.content = result.content;
+          }
+        }
       },
+      ideConfirmation,
     };
     return confirmationDetails;
   }
