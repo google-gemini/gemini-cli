@@ -24,6 +24,8 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   debug: (...args: any[]) => console.debug('[DEBUG] [IDEClient]', ...args),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  error: (...args: any[]) => console.error('[ERROR] [IDEClient]', ...args),
 };
 
 export type IDEConnectionState = {
@@ -210,10 +212,9 @@ export class IdeClient {
 
     if (status === IDEConnectionStatus.Disconnected) {
       if (logToConsole) {
-        console.log('IDE integration disconnected:', details);
-      } else {
-        logger.debug('IDE integration disconnected:', details);
+        logger.error(details);
       }
+      logger.debug(details);
       ideContext.clearIdeContext();
     }
   }

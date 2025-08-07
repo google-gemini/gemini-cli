@@ -54,10 +54,10 @@ export function IDEContextDetailDisplay({
               : basename;
 
             return (
-              <Link key={file.path} url={`file://${file.path}`}>
+              <Text>
                 - {displayName}
                 {file.isActive ? ' (active)' : ''}
-              </Link>
+              </Text>
             );
           })}
         </Box>
