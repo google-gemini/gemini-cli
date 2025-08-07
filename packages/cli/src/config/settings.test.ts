@@ -1415,7 +1415,7 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      
+
       // System overrides temperature, workspace provides topK, user provides thinking_budget
       expect(settings.merged.generationConfig).toEqual({
         temperature: 1.0,
@@ -1445,7 +1445,9 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.errors).toHaveLength(1);
-      expect(settings.errors[0].message).toContain('temperature must be a number between 0.0 and 2.0');
+      expect(settings.errors[0].message).toContain(
+        'temperature must be a number between 0.0 and 2.0',
+      );
     });
 
     it('should validate topK as positive integer', () => {
@@ -1469,7 +1471,9 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.errors).toHaveLength(1);
-      expect(settings.errors[0].message).toContain('topK must be a positive integer');
+      expect(settings.errors[0].message).toContain(
+        'topK must be a positive integer',
+      );
     });
 
     it('should validate thinking_budget as non-negative integer', () => {
@@ -1493,7 +1497,9 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.errors).toHaveLength(1);
-      expect(settings.errors[0].message).toContain('thinking_budget must be a non-negative integer');
+      expect(settings.errors[0].message).toContain(
+        'thinking_budget must be a non-negative integer',
+      );
     });
 
     it('should handle partial generationConfig', () => {
@@ -1526,11 +1532,11 @@ describe('Settings Loading and Merging', () => {
       expect(settings.errors).toHaveLength(0);
     });
 
-    it('should have empty generationConfig if not in any settings file', () => {
+    it('should have undefined generationConfig if not in any settings file', () => {
       (mockFsExistsSync as Mock).mockReturnValue(false);
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.generationConfig).toEqual({});
+      expect(settings.merged.generationConfig).toBeUndefined();
     });
   });
 });
