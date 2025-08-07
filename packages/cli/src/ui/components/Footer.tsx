@@ -7,13 +7,13 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { shortenPath, tildeifyPath, tokenLimit } from '@google/gemini-cli-core';
+import { shortenPath, tildeifyPath } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
 import path from 'node:path';
 import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
-
+import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
 
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -49,8 +49,6 @@ export const Footer: React.FC<FooterProps> = ({
   vimMode,
 }) => {
   const { columns: terminalWidth } = useTerminalSize();
-  const limit = tokenLimit(model);
-  const percentage = promptTokenCount / limit;
 
   const isNarrow = isNarrowWidth(terminalWidth);
 
@@ -120,9 +118,10 @@ export const Footer: React.FC<FooterProps> = ({
         <Text color={Colors.AccentBlue}>
           {isNarrow ? '' : ' '}
           {model}{' '}
-          <Text color={Colors.Gray}>
-            ({((1 - percentage) * 100).toFixed(0)}% context left)
-          </Text>
+          <ContextUsageDisplay
+            promptTokenCount={promptTokenCount}
+            model={model}
+          />
         </Text>
         {corgiMode && (
           <Text>
