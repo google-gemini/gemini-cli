@@ -523,6 +523,10 @@ export class Config {
     this.isPlanMode = isPlanMode;
   }
 
+  getIsPlanMode(): boolean {
+    return this.isPlanMode;
+  }
+
   getShowMemoryUsage(): boolean {
     return this.showMemoryUsage;
   }

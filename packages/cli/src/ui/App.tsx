@@ -500,6 +500,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     toggleVimEnabled,
     setIsProcessing,
     setGeminiMdFileCount,
+    setIsPlanMode,
   );
 
   const buffer = useTextBuffer({

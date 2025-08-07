@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { Content } from '@google/genai';
 import { HistoryItemWithoutId } from '../types.js';
 import { Config, GitService, Logger } from '@google/gemini-cli-core';
@@ -60,6 +61,7 @@ export interface CommandContext {
     toggleCorgiMode: () => void;
     toggleVimEnabled: () => Promise<boolean>;
     setGeminiMdFileCount: (count: number) => void;
+    setIsPlanMode: React.Dispatch<React.SetStateAction<boolean>>;
   };
   // Session-specific data
   session: {

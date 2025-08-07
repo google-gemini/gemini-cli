@@ -25,7 +25,7 @@ import {
 } from './turn.js';
 import { Config } from '../config/config.js';
 import { UserTierId } from '../code_assist/types.js';
-import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
+import { getCoreSystemPrompt, getPlanModeSystemPrompt, getCompressionPrompt } from './prompts.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
@@ -206,7 +206,9 @@ export class GeminiClient {
     ];
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const systemInstruction = this.config.getIsPlanMode() 
+        ? getPlanModeSystemPrompt(userMemory)
+        : getCoreSystemPrompt(userMemory);
       const generateContentConfigWithThinking = isThinkingSupported(
         this.config.getModel(),
       )
@@ -384,7 +386,9 @@ export class GeminiClient {
       model || this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const systemInstruction = this.config.getIsPlanMode() 
+        ? getPlanModeSystemPrompt(userMemory)
+        : getCoreSystemPrompt(userMemory);
       const requestConfig = {
         abortSignal,
         ...this.generateContentConfig,
@@ -494,7 +498,9 @@ export class GeminiClient {
 
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const systemInstruction = this.config.getIsPlanMode() 
+        ? getPlanModeSystemPrompt(userMemory)
+        : getCoreSystemPrompt(userMemory);
 
       const requestConfig = {
         abortSignal,
