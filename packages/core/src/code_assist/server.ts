@@ -14,7 +14,6 @@ import {
   SetCodeAssistGlobalUserSettingRequest,
 } from './types.js';
 import {
-  Content,
   CountTokensParameters,
   CountTokensResponse,
   EmbedContentParameters,
@@ -24,7 +23,6 @@ import {
 } from '@google/genai';
 import * as readline from 'readline';
 import { ContentGenerator } from '../core/contentGenerator.js';
-import { toContents } from './converter.js';
 import { UserTierId } from './types.js';
 import {
   CaCountTokenResponse,
@@ -34,9 +32,6 @@ import {
   toCountTokenRequest,
   toGenerateContentRequest,
 } from './converter.js';
-import { logApiRequest } from '../telemetry/loggers.js';
-import { ApiRequestEvent } from '../telemetry/types.js';
-import { Config } from '../config/config.js';
 
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
@@ -50,7 +45,6 @@ export const CODE_ASSIST_API_VERSION = 'v1internal';
 export class CodeAssistServer implements ContentGenerator {
   constructor(
     readonly client: OAuth2Client,
-    readonly config: Config,
     readonly projectId?: string,
     readonly httpOptions: HttpOptions = {},
     readonly sessionId?: string,
@@ -61,7 +55,6 @@ export class CodeAssistServer implements ContentGenerator {
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    this._logApiRequest(toContents(req.contents), req.model, userPromptId);
     const resps = await this.requestStreamingPost<CaGenerateContentResponse>(
       'streamGenerateContent',
       toGenerateContentRequest(
@@ -83,7 +76,6 @@ export class CodeAssistServer implements ContentGenerator {
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<GenerateContentResponse> {
-    this._logApiRequest(toContents(req.contents), req.model, userPromptId);
     const resp = await this.requestPost<CaGenerateContentResponse>(
       'generateContent',
       toGenerateContentRequest(
@@ -224,21 +216,5 @@ export class CodeAssistServer implements ContentGenerator {
   getMethodUrl(method: string): string {
     const endpoint = process.env.CODE_ASSIST_ENDPOINT ?? CODE_ASSIST_ENDPOINT;
     return `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
-  }
-
-  private _getRequestTextFromContents(contents: Content[]): string {
-    return JSON.stringify(contents);
-  }
-
-  private _logApiRequest(
-    contents: Content[],
-    model: string,
-    prompt_id: string,
-  ): void {
-    const requestText = this._getRequestTextFromContents(contents);
-    logApiRequest(
-      this.config,
-      new ApiRequestEvent(model, prompt_id, requestText),
-    );
   }
 }

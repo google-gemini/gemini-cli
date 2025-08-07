@@ -9,7 +9,6 @@ import { setupUser, ProjectIdRequiredError } from './setup.js';
 import { CodeAssistServer } from '../code_assist/server.js';
 import { OAuth2Client } from 'google-auth-library';
 import { GeminiUserTier, UserTierId } from './types.js';
-import { Config } from '../config/config.js';
 
 vi.mock('../code_assist/server.js');
 
@@ -48,9 +47,8 @@ describe('setupUser', () => {
     mockLoad.mockResolvedValue({
       currentTier: mockPaidTier,
     });
-    await setupUser({} as OAuth2Client, {} as Config);
+    await setupUser({} as OAuth2Client);
     expect(CodeAssistServer).toHaveBeenCalledWith(
-      {},
       {},
       'test-project',
       {},
@@ -65,9 +63,8 @@ describe('setupUser', () => {
       cloudaicompanionProject: 'server-project',
       currentTier: mockPaidTier,
     });
-    const projectId = await setupUser({} as OAuth2Client, {} as Config);
+    const projectId = await setupUser({} as OAuth2Client);
     expect(CodeAssistServer).toHaveBeenCalledWith(
-      {},
       {},
       undefined,
       {},
@@ -87,7 +84,7 @@ describe('setupUser', () => {
       throw new ProjectIdRequiredError();
     });
 
-    await expect(setupUser({} as OAuth2Client, {} as Config)).rejects.toThrow(
+    await expect(setupUser({} as OAuth2Client)).rejects.toThrow(
       ProjectIdRequiredError,
     );
   });

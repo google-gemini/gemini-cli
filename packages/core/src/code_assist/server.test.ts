@@ -8,60 +8,18 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
 import { UserTierId } from './types.js';
-import { Config } from '../config/config.js';
-import { WorkspaceContext } from '../utils/workspaceContext.js';
-import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 vi.mock('google-auth-library');
 
 describe('CodeAssistServer', () => {
-  let mockConfig: Config;
-  let mockWorkspaceContext: WorkspaceContext;
-  let mockFileService: FileDiscoveryService;
-  const mockPrimaryDir = '/home/user/project';
-  const mockSecondaryDir = '/home/user/other-project';
-
   beforeEach(() => {
     vi.resetAllMocks();
-
-    // Mock WorkspaceContext
-    mockWorkspaceContext = {
-      getDirectories: vi
-        .fn()
-        .mockReturnValue([mockPrimaryDir, mockSecondaryDir]),
-      isPathWithinWorkspace: vi
-        .fn()
-        .mockImplementation(
-          (path) =>
-            path.startsWith(mockPrimaryDir) ||
-            path.startsWith(mockSecondaryDir),
-        ),
-      addDirectory: vi.fn(),
-    } as unknown as WorkspaceContext;
-
-    // Mock FileService
-    mockFileService = {
-      shouldGitIgnoreFile: vi.fn().mockReturnValue(false),
-      shouldGeminiIgnoreFile: vi.fn().mockReturnValue(false),
-    } as unknown as FileDiscoveryService;
-
-    mockConfig = {
-      getTargetDir: vi.fn().mockReturnValue(mockPrimaryDir),
-      getWorkspaceContext: vi.fn().mockReturnValue(mockWorkspaceContext),
-      getFileService: vi.fn().mockReturnValue(mockFileService),
-      getFileFilteringOptions: vi.fn().mockReturnValue({
-        respectGitIgnore: true,
-        respectGeminiIgnore: true,
-      }),
-      getUsageStatisticsEnabled: () => true,
-    } as unknown as Config;
   });
 
   it('should be able to be constructed', () => {
     const auth = new OAuth2Client();
     const server = new CodeAssistServer(
       auth,
-      mockConfig,
       'test-project',
       {},
       'test-session',
@@ -74,7 +32,6 @@ describe('CodeAssistServer', () => {
     const client = new OAuth2Client();
     const server = new CodeAssistServer(
       client,
-      mockConfig,
       'test-project',
       {},
       'test-session',
@@ -119,7 +76,6 @@ describe('CodeAssistServer', () => {
     const client = new OAuth2Client();
     const server = new CodeAssistServer(
       client,
-      mockConfig,
       'test-project',
       {},
       'test-session',
@@ -166,7 +122,6 @@ describe('CodeAssistServer', () => {
     const client = new OAuth2Client();
     const server = new CodeAssistServer(
       client,
-      mockConfig,
       'test-project',
       {},
       'test-session',
@@ -195,7 +150,6 @@ describe('CodeAssistServer', () => {
     const client = new OAuth2Client();
     const server = new CodeAssistServer(
       client,
-      mockConfig,
       'test-project',
       {},
       'test-session',
@@ -228,7 +182,6 @@ describe('CodeAssistServer', () => {
     const client = new OAuth2Client();
     const server = new CodeAssistServer(
       client,
-      mockConfig,
       'test-project',
       {},
       'test-session',
@@ -250,7 +203,6 @@ describe('CodeAssistServer', () => {
     const client = new OAuth2Client();
     const server = new CodeAssistServer(
       client,
-      mockConfig,
       'test-project',
       {},
       'test-session',
