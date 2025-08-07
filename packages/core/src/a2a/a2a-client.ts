@@ -16,6 +16,7 @@ import {
   A2AClientOptions,
   AuthenticationHandler,
   HttpHeaders,
+  AuthHandlingFetch,
 } from '@a2a-js/sdk/client';
 import { extractContextId } from './utils.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -65,8 +66,15 @@ export class A2AClientManager {
 
     const options: A2AClientOptions = {
       agentCardPath: agent_card_path || AGENT_CARD_WELL_KNOWN_PATH,
-      authHandler: token ? new StaticBearerTokenAuth(token) : undefined,
     };
+
+    if (token) {
+      const staticTokenHandler = new StaticBearerTokenAuth(token);
+      options.fetchImpl = new AuthHandlingFetch(
+        fetch,
+        staticTokenHandler,
+      ) as unknown as typeof fetch;
+    }
 
     const a2aClient = new A2AClient(url, options);
     const agentCard = await a2aClient.getAgentCard();
