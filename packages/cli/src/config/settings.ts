@@ -113,9 +113,13 @@ export interface Settings {
 
   // Flag to be removed post-launch.
   ideModeFeature?: boolean;
-  folderTrustFeature?: boolean;
   /// IDE mode setting configured via slash command toggle.
   ideMode?: boolean;
+
+  // Flag to be removed post-launch.
+  folderTrustFeature?: boolean;
+  // Setting to track whether Folder trust is enabled.
+  folderTrust?: boolean;
 
   // Setting to track if the user has seen the IDE integration nudge.
   hasSeenIdeIntegrationNudge?: boolean;
@@ -178,9 +182,13 @@ export class LoadedSettings {
     const user = this.user.settings;
     const workspace = this.workspace.settings;
 
+    // folderTrust is not supported at workspace level.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { folderTrust, ...workspaceWithoutFolderTrust } = workspace;
+
     return {
       ...user,
-      ...workspace,
+      ...workspaceWithoutFolderTrust,
       ...system,
       customThemes: {
         ...(user.customThemes || {}),
