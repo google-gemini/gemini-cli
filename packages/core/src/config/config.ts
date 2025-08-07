@@ -188,6 +188,7 @@ export interface ConfigParameters {
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideModeFeature?: boolean;
+  folderTrustFeature?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
 }
@@ -234,6 +235,7 @@ export class Config {
   private readonly extensionContextFilePaths: string[];
   private readonly noBrowser: boolean;
   private readonly ideModeFeature: boolean;
+  private readonly folderTrustFeature: boolean;
   private ideMode: boolean;
   private ideClient: IdeClient;
   private inFallbackMode = false;
@@ -306,6 +308,7 @@ export class Config {
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.ideModeFeature = params.ideModeFeature ?? false;
+    this.folderTrustFeature = params.folderTrustFeature ?? false;
     this.ideMode = params.ideMode ?? false;
     this.ideClient = IdeClient.getInstance();
     if (this.ideMode && this.ideModeFeature) {
@@ -641,6 +644,10 @@ export class Config {
 
   getIdeModeFeature(): boolean {
     return this.ideModeFeature;
+  }
+
+  getFolderTrustFeature(): boolean {
+    return this.folderTrustFeature;
   }
 
   getIdeMode(): boolean {
