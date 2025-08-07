@@ -230,11 +230,11 @@ export class CodeAssistServer implements ContentGenerator {
     return JSON.stringify(contents);
   }
 
-  private async _logApiRequest(
+  private _logApiRequest(
     contents: Content[],
     model: string,
     prompt_id: string,
-  ): Promise<void> {
+  ): void {
     const requestText = this._getRequestTextFromContents(contents);
     logApiRequest(
       this.config,
