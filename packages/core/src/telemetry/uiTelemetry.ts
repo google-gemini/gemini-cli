@@ -11,12 +11,8 @@ import {
   EVENT_TOOL_CALL,
 } from './constants.js';
 
-import {
-  ApiErrorEvent,
-  ApiResponseEvent,
-  ToolCallEvent,
-  ToolCallDecision,
-} from './types.js';
+import { ToolCallDecision } from './tool-call-decision.js';
+import { ApiErrorEvent, ApiResponseEvent, ToolCallEvent } from './types.js';
 
 export type UiEvent =
   | (ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE })
