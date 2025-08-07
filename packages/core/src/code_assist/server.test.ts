@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
 import { UserTierId } from './types.js';
@@ -53,6 +53,7 @@ describe('CodeAssistServer', () => {
         respectGitIgnore: true,
         respectGeminiIgnore: true,
       }),
+      getUsageStatisticsEnabled: () => true,
     } as unknown as Config;
   });
 
