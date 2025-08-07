@@ -226,15 +226,18 @@ export async function parseArguments(): Promise<CliArgs> {
         })
         .option('temperature', {
           type: 'number',
-          description: 'Generation temperature (0.0-2.0). Lower values are more focused, higher values are more creative.',
+          description:
+            'Generation temperature (0.0-2.0). Lower values are more focused, higher values are more creative.',
         })
         .option('top-k', {
           type: 'number',
-          description: 'Top-K sampling parameter. Limits token selection to K most likely tokens.',
+          description:
+            'Top-K sampling parameter. Limits token selection to K most likely tokens.',
         })
         .option('thinking-budget', {
           type: 'number',
-          description: 'Thinking budget for models with thinking capabilities. Set to 0 to disable thinking.',
+          description:
+            'Thinking budget for models with thinking capabilities. Set to 0 to disable thinking.',
         })
         .check((argv) => {
           if (argv.prompt && argv.promptInteractive) {
@@ -242,17 +245,20 @@ export async function parseArguments(): Promise<CliArgs> {
               'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
             );
           }
-          
+
           // Validate temperature
           if (argv.temperature !== undefined) {
-            if (typeof argv.temperature !== 'number' || isNaN(argv.temperature)) {
+            if (
+              typeof argv.temperature !== 'number' ||
+              isNaN(argv.temperature)
+            ) {
               throw new Error('--temperature must be a number');
             }
             if (argv.temperature < 0 || argv.temperature > 2.0) {
               throw new Error('--temperature must be between 0.0 and 2.0');
             }
           }
-          
+
           // Validate top-k
           if (argv.topK !== undefined) {
             if (typeof argv.topK !== 'number' || isNaN(argv.topK)) {
@@ -262,17 +268,25 @@ export async function parseArguments(): Promise<CliArgs> {
               throw new Error('--top-k must be a positive integer');
             }
           }
-          
+
           // Validate thinking-budget
           if (argv.thinkingBudget !== undefined) {
-            if (typeof argv.thinkingBudget !== 'number' || isNaN(argv.thinkingBudget)) {
+            if (
+              typeof argv.thinkingBudget !== 'number' ||
+              isNaN(argv.thinkingBudget)
+            ) {
               throw new Error('--thinking-budget must be a number');
             }
-            if (!Number.isInteger(argv.thinkingBudget) || argv.thinkingBudget < 0) {
-              throw new Error('--thinking-budget must be a non-negative integer');
+            if (
+              !Number.isInteger(argv.thinkingBudget) ||
+              argv.thinkingBudget < 0
+            ) {
+              throw new Error(
+                '--thinking-budget must be a non-negative integer',
+              );
             }
           }
-          
+
           return true;
         }),
     )
