@@ -55,7 +55,7 @@ def check_gcloud_auth():
     print("\nChecking gcloud authentication...")
     adc_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     if adc_path:
-        if os.path.exists(adc_path):
+        if os.path.isfile(adc_path):
             print_ok(f"Using credentials from GOOGLE_APPLICATION_CREDENTIALS: {adc_path}")
             return
         else:
