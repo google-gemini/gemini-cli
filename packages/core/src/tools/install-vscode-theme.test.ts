@@ -149,13 +149,6 @@ describe('InstallVSCodeThemeTool', () => {
       expect(result.DiffRemoved).toBeDefined();
       expect(result.Comment).toBe('#6a9955');
       expect(result.Gray).toBe('#1e1e1e');
-
-      // Check debug info is included
-      expect(result.debugInfo).toBeDefined();
-      expect(result.debugInfo.themeName).toBe('Test');
-      expect(result.debugInfo.colorSources).toBeDefined();
-      expect(result.debugInfo.colorSources.Background).toBe('Theme color: editor.background');
-      expect(result.debugInfo.colorSources.AccentBlue).toBe('Theme token: keyword');
     });
 
     it('should generate clean theme names', () => {

@@ -19,7 +19,7 @@ import {
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
-  onSelect: (themeName: string | undefined, scope: SettingScope) => void;
+  onSelect: (themeName: string | undefined, scope: SettingScope) => void | Promise<void>;
 
   /** Callback function when a theme is highlighted */
   onHighlight: (themeName: string | undefined) => void;
@@ -129,8 +129,8 @@ export function ThemeDialog({
   const scopeItems = getScopeItems();
 
   const handleThemeSelect = useCallback(
-    (themeName: string) => {
-      onSelect(themeName, selectedScope);
+    async (themeName: string) => {
+      await onSelect(themeName, selectedScope);
     },
     [onSelect, selectedScope],
   );

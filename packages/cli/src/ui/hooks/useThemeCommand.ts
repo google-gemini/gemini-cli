@@ -16,7 +16,7 @@ interface UseThemeCommandReturn {
   handleThemeSelect: (
     themeName: string | undefined,
     scope: SettingScope,
-  ) => void; // Added scope
+  ) => Promise<void>; // Now returns Promise<void>
   handleThemeHighlight: (themeName: string | undefined) => void;
 }
 
@@ -26,6 +26,21 @@ export const useThemeCommand = (
   addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
 ): UseThemeCommandReturn => {
   const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(false);
+
+  // Load custom themes from both sources on startup
+  useEffect(() => {
+    const loadThemes = async () => {
+      try {
+        if (loadedSettings.merged.customThemes) {
+          await themeManager.loadCustomThemes(loadedSettings.merged.customThemes);
+        }
+      } catch (error) {
+        console.warn('Failed to load custom themes on startup:', error);
+      }
+    };
+    
+    loadThemes();
+  }, [loadedSettings.merged.customThemes]);
 
   // Check for invalid theme configuration on startup
   useEffect(() => {
@@ -73,7 +88,7 @@ export const useThemeCommand = (
   );
 
   const handleThemeSelect = useCallback(
-    (themeName: string | undefined, scope: SettingScope) => {
+    async (themeName: string | undefined, scope: SettingScope) => {
       try {
         // Merge user and workspace custom themes (workspace takes precedence)
         const mergedCustomThemes = {
@@ -90,10 +105,14 @@ export const useThemeCommand = (
         }
         loadedSettings.setValue(scope, 'theme', themeName); // Update the merged settings
         if (loadedSettings.merged.customThemes) {
-          themeManager.loadCustomThemes(loadedSettings.merged.customThemes);
+          // Use the new async method to load themes from both settings and files
+          await themeManager.loadCustomThemes(loadedSettings.merged.customThemes);
         }
         applyTheme(loadedSettings.merged.theme); // Apply the current theme
         setThemeError(null);
+      } catch (error) {
+        console.warn('Failed to load custom themes:', error);
+        setThemeError('Failed to load custom themes');
       } finally {
         setIsThemeDialogOpen(false); // Close the dialog
       }

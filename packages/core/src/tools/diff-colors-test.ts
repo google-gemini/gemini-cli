@@ -27,8 +27,8 @@ function testDiffColorExtraction() {
   };
 
   const result1 = convertVSCodeThemeToCustomTheme(themeWithDiffColors);
-  console.log(`   DiffAdded: ${result1.DiffAdded} (${result1.debugInfo.colorSources.DiffAdded})`);
-  console.log(`   DiffRemoved: ${result1.DiffRemoved} (${result1.debugInfo.colorSources.DiffRemoved})`);
+  console.log(`   DiffAdded: ${result1.DiffAdded}`);
+  console.log(`   DiffRemoved: ${result1.DiffRemoved}`);
 
   // Test 2: Theme without diff colors
   console.log('\n2. Theme WITHOUT diff colors:');
@@ -44,8 +44,8 @@ function testDiffColorExtraction() {
   };
 
   const result2 = convertVSCodeThemeToCustomTheme(themeWithoutDiffColors);
-  console.log(`   DiffAdded: ${result2.DiffAdded} (${result2.debugInfo.colorSources.DiffAdded})`);
-  console.log(`   DiffRemoved: ${result2.DiffRemoved} (${result2.debugInfo.colorSources.DiffRemoved})`);
+  console.log(`   DiffAdded: ${result2.DiffAdded}`);
+  console.log(`   DiffRemoved: ${result2.DiffRemoved}`);
 
   console.log('\n=== Summary ===');
   console.log('✅ When theme has diff colors: Extract from theme');

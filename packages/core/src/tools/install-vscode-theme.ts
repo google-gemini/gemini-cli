@@ -15,7 +15,7 @@ import { convertVSCodeThemeToCustomTheme } from './theme-converter.js';
 import { generateThemeWithAI, createDefaultTheme } from './theme-generator.js';
 import { extractExtensionId, downloadVsix, extractThemeFromVsix } from './theme-extractor.js';
 import { saveThemeToFile } from './theme-storage.js';
-import { createColorMappingDisplay, createColorPalettePreview } from './theme-display.js';
+import { createSimpleColorPreview } from './theme-display.js';
 
 /**
  * Tool for installing VS Code themes from marketplace URLs
@@ -134,21 +134,9 @@ Do you want to proceed?`,
 
       // Step 5: Save theme to dedicated theme file
       const _themeFilePath = await saveThemeToFile(customTheme);
-
-      // Get debug info for detailed output
-      const debugInfo = customTheme.debugInfo;
       
-      // Create detailed color mapping display with visual color blocks
-      const colorMappingDetails = createColorMappingDisplay(debugInfo);
-      
-      // Create color palette preview
-      const colorPalettePreview = createColorPalettePreview(debugInfo);
-
-      // Calculate statistics
-      const colorSources = Object.values(debugInfo.colorSources) as string[];
-      const colorsFound = colorSources.filter(s => s.startsWith('Theme color:') || s.startsWith('Theme token:')).length;
-      const defaultsUsed = colorSources.filter(s => s.startsWith('Default:')).length;
-      const generatedColors = colorSources.filter(s => s.startsWith('Generated')).length;
+      // Create simplified color palette preview
+      const colorPalettePreview = createSimpleColorPreview(customTheme);
 
       return {
         llmContent: `Successfully installed VS Code theme "${customTheme.name}" from ${params.marketplaceUrl}`,
@@ -158,15 +146,7 @@ Do you want to proceed?`,
 📦 **Source**: ${params.marketplaceUrl}
 🔧 **Method**: ${extractionMethod}
 
-**Color Mapping Details:**
-${colorMappingDetails}
-
 ${colorPalettePreview}
-
-**Theme Statistics:**
-• **Colors Found**: ${colorsFound}/13
-• **Defaults Used**: ${defaultsUsed}/13
-• **Generated Colors**: ${generatedColors}/13
 
 The theme has been saved to your dedicated theme files and is now available for selection.
 

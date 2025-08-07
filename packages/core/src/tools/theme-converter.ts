@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { VSCodeTheme, CustomTheme, ThemeDebugInfo } from './theme-types.js';
+import type { VSCodeTheme, CustomTheme } from './theme-types.js';
 
 /**
  * Converts a VS Code theme to a Gemini CLI custom theme
  */
-export function convertVSCodeThemeToCustomTheme(vscodeTheme: VSCodeTheme): CustomTheme & { debugInfo: ThemeDebugInfo } {
+export function convertVSCodeThemeToCustomTheme(vscodeTheme: VSCodeTheme): CustomTheme {
   const colors = vscodeTheme.colors;
   const tokenColors = vscodeTheme.tokenColors;
 
@@ -21,43 +21,27 @@ export function convertVSCodeThemeToCustomTheme(vscodeTheme: VSCodeTheme): Custo
     return token?.settings.foreground;
   };
 
-  // Helper function to get color with debug info
-  const getColorWithDebug = (key: string, fallback: string, source: string): { color: string; source: string } => {
-    const value = colors[key];
-    if (value) {
-      return { color: value, source: `Theme color: ${key}` };
-    }
-    return { color: fallback, source: `Default: ${source}` };
-  };
+  // Helper function to get color value
+  const getColor = (key: string, fallback: string): string => colors[key] || fallback;
 
-  const getScopeColorWithDebug = (scope: string, fallback: string, source: string): { color: string; source: string } => {
+  const getScopeColor = (scope: string, fallback: string): string => {
     const value = findColorByScope(scope);
-    if (value) {
-      return { color: value, source: `Theme token: ${scope}` };
-    }
-    return { color: fallback, source: `Default: ${source}` };
+    return value || fallback;
   };
 
-  // Get colors with debug info
-  const backgroundInfo = getColorWithDebug('editor.background', '#1e1e1e', 'Dark background');
-  const foregroundInfo = getColorWithDebug('editor.foreground', '#d4d4d4', 'Light foreground');
-  const lightBlueInfo = getColorWithDebug('button.background', '#007acc', 'Blue accent');
+  // Extract colors from theme
+  const background = getColor('editor.background', '#1e1e1e');
+  const foreground = getColor('editor.foreground', '#d4d4d4');
+  const lightBlue = getColor('button.background', '#007acc');
   
-  const accentBlueInfo = getScopeColorWithDebug('keyword', 
-    colors['editor.findMatchBackground'] || '#007acc', 'Keyword blue');
-  const accentPurpleInfo = getScopeColorWithDebug('storage.type', 
-    colors['editor.lineHighlightBackground'] || '#c586c0', 'Purple accent');
-  const accentCyanInfo = getScopeColorWithDebug('entity.name.class', 
-    colors['editor.wordHighlightBackground'] || '#4ec9b0', 'Cyan accent');
-  const accentGreenInfo = getScopeColorWithDebug('constant.numeric', 
-    colors['editorGutter.addedBackground'] || '#6a9955', 'Green accent');
-  const accentYellowInfo = getScopeColorWithDebug('string', 
-    colors['editorGutter.modifiedBackground'] || '#ce9178', 'Yellow accent');
-  const accentRedInfo = getScopeColorWithDebug('comment', 
-    colors['editorGutter.deletedBackground'] || '#f44747', 'Red accent');
-  const commentInfo = getScopeColorWithDebug('comment', 
-    colors['editorLineNumber.foreground'] || '#6a9955', 'Comment green');
-  const grayInfo = getColorWithDebug('editor.background', '#858585', 'Gray');
+  const accentBlue = getScopeColor('keyword', colors['editor.findMatchBackground'] || '#007acc');
+  const accentPurple = getScopeColor('storage.type', colors['editor.lineHighlightBackground'] || '#c586c0');
+  const accentCyan = getScopeColor('entity.name.class', colors['editor.wordHighlightBackground'] || '#4ec9b0');
+  const accentGreen = getScopeColor('constant.numeric', colors['editorGutter.addedBackground'] || '#6a9955');
+  const accentYellow = getScopeColor('string', colors['editorGutter.modifiedBackground'] || '#ce9178');
+  const accentRed = getScopeColor('comment', colors['editorGutter.deletedBackground'] || '#f44747');
+  const comment = getScopeColor('comment', colors['editorLineNumber.foreground'] || '#6a9955');
+  const gray = getColor('editor.background', '#858585');
 
   // Try to get diff colors from theme first, fallback to generation
   // Check multiple VS Code diff color properties
@@ -73,73 +57,29 @@ export function convertVSCodeThemeToCustomTheme(vscodeTheme: VSCodeTheme): Custo
                           colors['gitDecoration.deletedResourceForeground'] ||
                           colors['gitDecoration.modifiedResourceForeground'];
   
-  const diffAddedInfo = diffAddedColor ? 
-    { color: diffAddedColor, source: 'Theme color: diff/git colors' } :
-    { color: generateDiffColor(accentGreenInfo.color, 'added'), source: 'Generated diff added' };
-  
-  const diffRemovedInfo = diffRemovedColor ? 
-    { color: diffRemovedColor, source: 'Theme color: diff/git colors' } :
-    { color: generateDiffColor(accentRedInfo.color, 'removed'), source: 'Generated diff removed' };
-
-  // Store debug info for logging
-  const debugInfo: ThemeDebugInfo = {
-    themeName: generateThemeName(vscodeTheme.name || 'Imported Theme'),
-    colorSources: {
-      Background: backgroundInfo.source,
-      Foreground: foregroundInfo.source,
-      LightBlue: lightBlueInfo.source,
-      AccentBlue: accentBlueInfo.source,
-      AccentPurple: accentPurpleInfo.source,
-      AccentCyan: accentCyanInfo.source,
-      AccentGreen: accentGreenInfo.source,
-      AccentYellow: accentYellowInfo.source,
-      AccentRed: accentRedInfo.source,
-      DiffAdded: diffAddedInfo.source,
-      DiffRemoved: diffRemovedInfo.source,
-      Comment: commentInfo.source,
-      Gray: grayInfo.source,
-    },
-    colorValues: {
-      Background: backgroundInfo.color,
-      Foreground: foregroundInfo.color,
-      LightBlue: lightBlueInfo.color,
-      AccentBlue: accentBlueInfo.color,
-      AccentPurple: accentPurpleInfo.color,
-      AccentCyan: accentCyanInfo.color,
-      AccentGreen: accentGreenInfo.color,
-      AccentYellow: accentYellowInfo.color,
-      AccentRed: accentRedInfo.color,
-      DiffAdded: diffAddedInfo.color,
-      DiffRemoved: diffRemovedInfo.color,
-      Comment: commentInfo.color,
-      Gray: grayInfo.color,
-    }
-  };
+  const diffAdded = diffAddedColor || generateDiffColor(accentGreen, 'added');
+  const diffRemoved = diffRemovedColor || generateDiffColor(accentRed, 'removed');
 
   // Map VS Code colors to Gemini CLI theme structure
   const customTheme: CustomTheme = {
     type: 'custom',
-    name: debugInfo.themeName,
-    Background: backgroundInfo.color,
-    Foreground: foregroundInfo.color,
-    LightBlue: lightBlueInfo.color,
-    AccentBlue: accentBlueInfo.color,
-    AccentPurple: accentPurpleInfo.color,
-    AccentCyan: accentCyanInfo.color,
-    AccentGreen: accentGreenInfo.color,
-    AccentYellow: accentYellowInfo.color,
-    AccentRed: accentRedInfo.color,
-    DiffAdded: diffAddedInfo.color,
-    DiffRemoved: diffRemovedInfo.color,
-    Comment: commentInfo.color,
-    Gray: grayInfo.color,
+    name: generateThemeName(vscodeTheme.name || 'Imported Theme'),
+    Background: background,
+    Foreground: foreground,
+    LightBlue: lightBlue,
+    AccentBlue: accentBlue,
+    AccentPurple: accentPurple,
+    AccentCyan: accentCyan,
+    AccentGreen: accentGreen,
+    AccentYellow: accentYellow,
+    AccentRed: accentRed,
+    DiffAdded: diffAdded,
+    DiffRemoved: diffRemoved,
+    Comment: comment,
+    Gray: gray,
   };
 
-  // Return theme with debug info in a type-safe way
-  return {
-    ...customTheme,
-    debugInfo,
-  };
+  return customTheme;
 }
 
 /**
