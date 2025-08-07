@@ -17,12 +17,14 @@ import { GeminiChat } from './geminiChat.js';
 
 const mockSendMessageStream = vi.fn();
 const mockGetHistory = vi.fn();
+const mockMaybeIncludeSchemaDepthContext = vi.fn();
 
 vi.mock('@google/genai', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@google/genai')>();
   const MockChat = vi.fn().mockImplementation(() => ({
     sendMessageStream: mockSendMessageStream,
     getHistory: mockGetHistory,
+    maybeIncludeSchemaDepthContext: mockMaybeIncludeSchemaDepthContext,
   }));
   return {
     ...actual,
@@ -46,6 +48,7 @@ describe('Turn', () => {
   type MockedChatInstance = {
     sendMessageStream: typeof mockSendMessageStream;
     getHistory: typeof mockGetHistory;
+    maybeIncludeSchemaDepthContext: typeof mockMaybeIncludeSchemaDepthContext;
   };
   let mockChatInstance: MockedChatInstance;
 
@@ -54,6 +57,7 @@ describe('Turn', () => {
     mockChatInstance = {
       sendMessageStream: mockSendMessageStream,
       getHistory: mockGetHistory,
+      maybeIncludeSchemaDepthContext: mockMaybeIncludeSchemaDepthContext,
     };
     turn = new Turn(mockChatInstance as unknown as GeminiChat, 'prompt-id-1');
     mockGetHistory.mockReturnValue([]);
@@ -200,7 +204,7 @@ describe('Turn', () => {
         { role: 'model', parts: [{ text: 'Previous history' }] },
       ];
       mockGetHistory.mockReturnValue(historyContent);
-
+      mockMaybeIncludeSchemaDepthContext.mockResolvedValue(undefined);
       const events = [];
       for await (const event of turn.run(
         reqParts,
