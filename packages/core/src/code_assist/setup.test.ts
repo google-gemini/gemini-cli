@@ -51,6 +51,7 @@ describe('setupUser', () => {
     await setupUser({} as OAuth2Client, {} as Config);
     expect(CodeAssistServer).toHaveBeenCalledWith(
       {},
+      {},
       'test-project',
       {},
       '',
@@ -66,6 +67,7 @@ describe('setupUser', () => {
     });
     const projectId = await setupUser({} as OAuth2Client, {} as Config);
     expect(CodeAssistServer).toHaveBeenCalledWith(
+      {},
       {},
       undefined,
       {},
