@@ -135,12 +135,15 @@ export class GeminiClient {
         thinkingBudget: generationConfig.thinking_budget,
       };
     }
-    
+
     // Debug logging to verify generation config
     if (config.getDebugMode() || process.env.DEBUG) {
-      console.error('[GeminiClient] Generation config:', JSON.stringify(this.generateContentConfig, null, 2));
+      console.error(
+        '[GeminiClient] Generation config:',
+        JSON.stringify(this.generateContentConfig, null, 2),
+      );
     }
-    
+
     this.loopDetector = new LoopDetectionService(config);
     this.lastPromptId = this.config.getSessionId();
   }
