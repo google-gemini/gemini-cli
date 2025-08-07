@@ -614,21 +614,15 @@ export async function start_sandbox(
       args.push('--env', `COLORTERM=${process.env.COLORTERM}`);
     }
 
-    // Pass through IDE-specific environment variables
-    if (process.env.GEMINI_CLI_IDE_SERVER_PORT) {
-      args.push(
-        '--env',
-        `GEMINI_CLI_IDE_SERVER_PORT=${process.env.GEMINI_CLI_IDE_SERVER_PORT}`,
-      );
-    }
-    if (process.env.TERM_PROGRAM) {
-      args.push('--env', `TERM_PROGRAM=${process.env.TERM_PROGRAM}`);
-    }
-    if (process.env.GEMINI_CLI_IDE_WORKSPACE_PATH) {
-      args.push(
-        '--env',
-        `GEMINI_CLI_IDE_WORKSPACE_PATH=${process.env.GEMINI_CLI_IDE_WORKSPACE_PATH}`,
-      );
+    // Pass through IDE mode environment variables
+    for (const envVar of [
+      'GEMINI_CLI_IDE_SERVER_PORT',
+      'TERM_PROGRAM',
+      'GEMINI_CLI_IDE_WORKSPACE_PATH',
+    ]) {
+      if (process.env[envVar]) {
+        args.push('--env', `${envVar}=${process.env[envVar]}`);
+      }
     }
 
     // copy VIRTUAL_ENV if under working directory
