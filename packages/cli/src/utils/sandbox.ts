@@ -624,6 +624,12 @@ export async function start_sandbox(
     if (process.env.TERM_PROGRAM) {
       args.push('--env', `TERM_PROGRAM=${process.env.TERM_PROGRAM}`);
     }
+    if (process.env.GEMINI_CLI_IDE_WORKSPACE_PATH) {
+      args.push(
+        '--env',
+        `GEMINI_CLI_IDE_WORKSPACE_PATH=${process.env.GEMINI_CLI_IDE_WORKSPACE_PATH}`,
+      );
+    }
 
     // copy VIRTUAL_ENV if under working directory
     // also mount-replace VIRTUAL_ENV directory with <project_settings>/sandbox.venv
