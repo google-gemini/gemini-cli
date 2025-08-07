@@ -538,7 +538,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         </Box>
       </Box>
       {completion.showSuggestions && (
-        <Box>
+        <Box paddingRight={2}>
           <SuggestionsDisplay
             suggestions={completion.suggestions}
             activeIndex={completion.activeSuggestionIndex}
@@ -550,7 +550,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         </Box>
       )}
       {reverseSearchActive && (
-        <Box>
+        <Box paddingRight={2}>
           <SuggestionsDisplay
             suggestions={reverseSearchCompletion.suggestions}
             activeIndex={reverseSearchCompletion.activeSuggestionIndex}
