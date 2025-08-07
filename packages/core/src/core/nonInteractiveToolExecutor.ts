@@ -109,7 +109,6 @@ export async function executeToolCall(
       prompt_id: toolCallRequest.prompt_id,
       metadata,
       decision: ToolCallDecision.AUTO_ACCEPT,
-      metadata,
     });
 
     const response = convertToFunctionResponse(
