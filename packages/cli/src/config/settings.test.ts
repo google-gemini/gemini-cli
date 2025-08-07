@@ -310,6 +310,62 @@ describe('Settings Loading and Merging', () => {
       });
     });
 
+    it('should ignore folderTrust from workspace settings', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        folderTrust: true,
+      };
+      const workspaceSettingsContent = {
+        folderTrust: false, // This should be ignored
+      };
+      const systemSettingsContent = {
+        // No folderTrust here
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.folderTrust).toBe(true); // User setting should be used
+    });
+
+    it('should use system folderTrust over user setting', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        folderTrust: false,
+      };
+      const workspaceSettingsContent = {
+        folderTrust: true, // This should be ignored
+      };
+      const systemSettingsContent = {
+        folderTrust: true,
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.folderTrust).toBe(true); // System setting should be used
+    });
+
     it('should handle contextFileName correctly when only in user settings', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,

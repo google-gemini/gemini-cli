@@ -193,9 +193,11 @@ export interface ConfigParameters {
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideModeFeature?: boolean;
   folderTrustFeature?: boolean;
+  folderTrust?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
   chatCompression?: ChatCompressionSettings;
+  interactive?: boolean;
 }
 
 export class Config {
@@ -240,6 +242,7 @@ export class Config {
   private readonly noBrowser: boolean;
   private readonly ideModeFeature: boolean;
   private readonly folderTrustFeature: boolean;
+  private readonly folderTrust: boolean;
   private ideMode: boolean;
   private ideClient: IdeClient;
   private inFallbackMode = false;
@@ -258,6 +261,8 @@ export class Config {
   private readonly experimentalAcp: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly chatCompression: ChatCompressionSettings | undefined;
+  private readonly interactive: boolean;
+  private initialized: boolean = false;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -314,6 +319,7 @@ export class Config {
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.ideModeFeature = params.ideModeFeature ?? false;
     this.folderTrustFeature = params.folderTrustFeature ?? false;
+    this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
     this.ideClient = IdeClient.getInstance();
     if (this.ideMode && this.ideModeFeature) {
@@ -323,6 +329,7 @@ export class Config {
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
     this.chatCompression = params.chatCompression;
+    this.interactive = params.interactive ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -341,7 +348,14 @@ export class Config {
     }
   }
 
+  /**
+   * Must only be called once, throws if called again.
+   */
   async initialize(): Promise<void> {
+    if (this.initialized) {
+      throw Error('Config was already initialized');
+    }
+    this.initialized = true;
     // Initialize centralized FileDiscoveryService
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
@@ -648,12 +662,16 @@ export class Config {
     return this.ideModeFeature;
   }
 
+  getIdeMode(): boolean {
+    return this.ideMode;
+  }
+
   getFolderTrustFeature(): boolean {
     return this.folderTrustFeature;
   }
 
-  getIdeMode(): boolean {
-    return this.ideMode;
+  getFolderTrust(): boolean {
+    return this.folderTrust;
   }
 
   setIdeMode(value: boolean): void {
@@ -676,6 +694,10 @@ export class Config {
 
   getChatCompression(): ChatCompressionSettings | undefined {
     return this.chatCompression;
+  }
+
+  isInteractive(): boolean {
+    return this.interactive;
   }
 
   async getGitService(): Promise<GitService> {
