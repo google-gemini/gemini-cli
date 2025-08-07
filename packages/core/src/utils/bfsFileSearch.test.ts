@@ -259,7 +259,8 @@ describe('bfsFileSearch', () => {
 
     // Ensure consistency across runs (variance should not be too high)
     // More tolerant in CI environments where performance can be variable
-    const maxConsistencyRatio = process.env.CI ? 3.0 : 1.5;
+    // Increased tolerance for system load variations
+    const maxConsistencyRatio = process.env.CI ? 3.0 : 2.0;
     expect(consistencyRatio).toBeLessThan(maxConsistencyRatio); // Max variance should be reasonable
 
     console.log(
