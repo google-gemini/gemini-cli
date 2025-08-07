@@ -14,7 +14,7 @@ import {
 } from '../index.js';
 import { Config } from '../config/config.js';
 import { convertToFunctionResponse } from './coreToolScheduler.js';
-import { ToolCallDecision } from '../telemetry/types.js';
+import { ToolCallDecision } from '../telemetry/tool-call-decision.js';
 
 /**
  * Executes a single tool call non-interactively.
