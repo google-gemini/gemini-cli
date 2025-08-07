@@ -624,6 +624,7 @@ export async function loadCliConfig(
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
     ideModeFeature,
+    chatCompression: settings.chatCompression,
     folderTrustFeature,
   });
 }
