@@ -6,7 +6,6 @@
 
 import { type File, type IdeContext } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
-import Link from 'ink-link';
 import path from 'node:path';
 import { Colors } from '../colors.js';
 
@@ -54,7 +53,7 @@ export function IDEContextDetailDisplay({
               : basename;
 
             return (
-              <Text>
+              <Text key={file.path}>
                 - {displayName}
                 {file.isActive ? ' (active)' : ''}
               </Text>

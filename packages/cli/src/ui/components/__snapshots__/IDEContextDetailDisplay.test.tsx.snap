@@ -1,36 +1,14 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`IDEContextDetailDisplay > handles duplicate basenames 1`] = `
-"
-╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ VS Code Context (ctrl+e to toggle)                                                               │
-│                                                                                                  │
-│ Open files:                                                                                      │
-│ - bar.txt (foo) (active) (​undefined​)                                                           │
-│ - bar.txt (qux) (​undefined​)                                                                    │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
 exports[`IDEContextDetailDisplay > handles duplicate basenames by showing path hints 1`] = `
 "
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ VS Code Context (ctrl+e to toggle)                                                               │
 │                                                                                                  │
 │ Open files:                                                                                      │
-│ - bar.txt (/foo) (active) (​undefined​)                                                          │
-│ - bar.txt (/qux) (​undefined​)                                                                   │
-│ - unique.txt (​undefined​)                                                                       │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`IDEContextDetailDisplay > renders a list of open files 1`] = `
-"
-╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ VS Code Context (ctrl+e to toggle)                                                               │
-│                                                                                                  │
-│ Open files:                                                                                      │
-│ - bar.txt (active) (​undefined​)                                                                 │
-│ - baz.txt (​undefined​)                                                                          │
+│ - bar.txt (/foo) (active)                                                                        │
+│ - bar.txt (/qux)                                                                                 │
+│ - unique.txt                                                                                     │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
@@ -40,7 +18,7 @@ exports[`IDEContextDetailDisplay > renders a list of open files with active stat
 │ VS Code Context (ctrl+e to toggle)                                                               │
 │                                                                                                  │
 │ Open files:                                                                                      │
-│ - bar.txt (active) (​undefined​)                                                                 │
-│ - baz.txt (​undefined​)                                                                          │
+│ - bar.txt (active)                                                                               │
+│ - baz.txt                                                                                        │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
