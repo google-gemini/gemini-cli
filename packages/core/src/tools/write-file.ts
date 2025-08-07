@@ -74,7 +74,7 @@ export class WriteFileTool
     super(
       WriteFileTool.Name,
       'WriteFile',
-      `Writes content to a specified file in the local filesystem.
+      `Writes content to a specified file in the local filesystem. If the directory containing the file does not exist, it will be created automatically.
 
       The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
       Icon.Pencil,
@@ -82,7 +82,7 @@ export class WriteFileTool
         properties: {
           file_path: {
             description:
-              "The absolute path to the file to write to (e.g., '/home/user/project/file.txt'). Relative paths are not supported.",
+              "The absolute path to the file to write to (e.g., '/home/user/project/file.txt'). Relative paths are not supported. If the directory does not exist, it will be created automatically.",
             type: Type.STRING,
           },
           content: {
