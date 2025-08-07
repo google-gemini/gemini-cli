@@ -8,11 +8,15 @@ The Gemini CLI Companion extension seamlessly integrates [Gemini CLI](https://gi
 
 - Selection Context: Gemini CLI can easily access your cursor's position and selected text within the editor, giving it valuable context directly from your current work.
 
+- Native Diffing: Seamlessly view, modify, and accept code changes suggested by Gemini CLI directly within the editor.
+
+- Launch Gemini CLI: Quickly start a new Gemini CLI session from the Command Palette (Cmd+Shift+P or Ctrl+Shift+P) by running the "Gemini CLI: Run" command.
+
 # Requirements
 
 To use this extension, you'll need:
 
-- VS Code version 1.101.0 or newer
+- VS Code version 1.99.0 or newer
 - Gemini CLI (installed separately) running within the VS Code integrated terminal
 
 # Terms of Service and Privacy Notice
