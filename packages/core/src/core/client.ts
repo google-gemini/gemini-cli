@@ -93,10 +93,7 @@ export class GeminiClient {
   private chat?: GeminiChat;
   private contentGenerator?: ContentGenerator;
   private embeddingModel: string;
-  private generateContentConfig: GenerateContentConfig = {
-    temperature: 0,
-    topP: 1,
-  };
+  private generateContentConfig: GenerateContentConfig;
   private sessionTurnCount = 0;
   private readonly MAX_TURNS = 100;
   /**
@@ -119,6 +116,24 @@ export class GeminiClient {
     }
 
     this.embeddingModel = config.getEmbeddingModel();
+    
+    // Initialize generation config with defaults and user overrides
+    this.generateContentConfig = {
+      temperature: config.getGenerationConfig()?.temperature ?? 0,
+      topP: 1,  // Keep default topP for now as it's not in core parameters
+    };
+    
+    // Add topK if specified
+    if (config.getGenerationConfig()?.topK !== undefined) {
+      this.generateContentConfig.topK = config.getGenerationConfig()?.topK;
+    }
+    
+    // Add thinking budget if specified and model supports it
+    if (config.getGenerationConfig()?.thinking_budget !== undefined) {
+      this.generateContentConfig.thinkingConfig = {
+        thinkingBudget: config.getGenerationConfig().thinking_budget,
+      };
+    }
     this.loopDetector = new LoopDetectionService(config);
     this.lastPromptId = this.config.getSessionId();
   }
