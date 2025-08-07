@@ -21,16 +21,8 @@ import { retryWithBackoff } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { ContentGenerator, AuthType } from './contentGenerator.js';
 import { Config } from '../config/config.js';
-import {
-  logApiRequest,
-  logApiResponse,
-  logApiError,
-} from '../telemetry/loggers.js';
-import {
-  ApiErrorEvent,
-  ApiRequestEvent,
-  ApiResponseEvent,
-} from '../telemetry/types.js';
+import { logApiResponse, logApiError } from '../telemetry/loggers.js';
+import { ApiErrorEvent, ApiResponseEvent } from '../telemetry/types.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import { StructuredError } from './turn.js';
@@ -137,22 +129,6 @@ export class GeminiChat {
     private history: Content[] = [],
   ) {
     validateHistory(history);
-  }
-
-  private _getRequestTextFromContents(contents: Content[]): string {
-    return JSON.stringify(contents);
-  }
-
-  private async _logApiRequest(
-    contents: Content[],
-    model: string,
-    prompt_id: string,
-  ): Promise<void> {
-    const requestText = this._getRequestTextFromContents(contents);
-    logApiRequest(
-      this.config,
-      new ApiRequestEvent(model, prompt_id, requestText),
-    );
   }
 
   private async _logApiResponse(
@@ -273,8 +249,6 @@ export class GeminiChat {
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
 
-    this._logApiRequest(requestContents, this.config.getModel(), prompt_id);
-
     const startTime = Date.now();
     let response: GenerateContentResponse;
 
@@ -386,7 +360,6 @@ export class GeminiChat {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
-    this._logApiRequest(requestContents, this.config.getModel(), prompt_id);
 
     const startTime = Date.now();
 

@@ -35,11 +35,11 @@ import {
   logToolCall,
   logFlashFallback,
 } from './loggers.js';
+import { ToolCallDecision } from './tool-call-decision.js';
 import {
   ApiRequestEvent,
   ApiResponseEvent,
   StartSessionEvent,
-  ToolCallDecision,
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
