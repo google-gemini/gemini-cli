@@ -17,13 +17,21 @@ def check_node_version():
     required = (20, 0, 0)
     try:
         version = subprocess.check_output(["node", "-v"]).decode().strip().lstrip('v')
-        major, minor, patch = map(int, version.split('.'))
-        if (major, minor, patch) < required:
-            print_bad(f"Node.js version {version} is too old. Required: >=20.0.0")
-        else:
-            print_ok(f"Node.js version {version}")
+    except FileNotFoundError:
+        print_bad("Node.js not found: 'node' command is missing.")
+        return
     except Exception as e:
-        print_bad(f"Node.js not found: {e}")
+        print_bad(f"Error running 'node -v': {e}")
+        return
+    try:
+        major, minor, patch = map(int, version.split('.'))
+    except Exception:
+        print_bad(f"Node.js version string is invalid: '{version}'")
+        return
+    if (major, minor, patch) < required:
+        print_bad(f"Node.js version {version} is too old. Required: >=20.0.0")
+    else:
+        print_ok(f"Node.js version {version}")
 
 def check_cli_version():
     print("\nChecking Gemini CLI version...")

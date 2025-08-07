@@ -11,7 +11,8 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
-import { spawn } from 'child_process';
+import { spawnSync } from 'child_process';
+import { fileURLToPath } from 'url';
 import {
   Config,
   loadServerHierarchicalMemory,
@@ -238,24 +239,22 @@ export async function parseArguments(): Promise<CliArgs> {
       'Run a diagnostic check on your environment',
       () => {},
       () => {
+        // Resolve path relative to CLI source
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
         const scriptPath = path.resolve(
-          process.cwd(),
-          'scripts',
-          'gemini-doctor.py',
+          __dirname,
+          '../../../scripts/gemini-doctor.py',
         );
-        const pythonProcess = spawn('python3', [scriptPath], {
-          stdio: 'inherit',
-        });
-        pythonProcess.on('error', (err) => {
-          console.error('Failed to start python3 process.', err);
+        const result = spawnSync('python3', [scriptPath], { stdio: 'inherit' });
+        if (result.error) {
+          console.error('Failed to start python3 process.', result.error);
           console.error(
             'Please ensure that python3 is installed and in your PATH.',
           );
           process.exit(1);
-        });
-        pythonProcess.on('close', (code) => {
-          process.exit(code);
-        });
+        }
+        process.exit(result.status ?? 1);
       },
     )
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
@@ -267,11 +266,6 @@ export async function parseArguments(): Promise<CliArgs> {
 
   yargsInstance.wrap(yargsInstance.terminalWidth());
   const result = await yargsInstance.parse();
-
-  // Exit after doctor command
-  if (result._.length > 0 && result._[0] === 'doctor') {
-    process.exit(0);
-  }
 
   // Handle case where MCP subcommands are executed - they should exit the process
   // and not return to main CLI logic

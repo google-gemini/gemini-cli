@@ -56,7 +56,8 @@
   "files": [
     "bundle/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "scripts/"
   ],
   "devDependencies": {
     "@types/marked": "^5.0.2",
