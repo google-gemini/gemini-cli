@@ -183,6 +183,20 @@ export enum EventMetadataKey {
 
   // Logs the result of the next speaker check
   GEMINI_CLI_NEXT_SPEAKER_CHECK_RESULT = 44,
+
+  // ==========================================================================
+  // Malformed JSON Response Event Keys
+  // ==========================================================================
+
+  // Logs the model that produced the malformed JSON response.
+  GEMINI_CLI_MALFORMED_JSON_RESPONSE_MODEL = 45,
+
+  // ==========================================================================
+  // IDE Connection Event Keys
+  // ===========================================================================
+
+  // Logs the type of the IDE connection.
+  GEMINI_CLI_IDE_CONNECTION_TYPE = 46,
 }
 
 export function getEventMetadataKey(

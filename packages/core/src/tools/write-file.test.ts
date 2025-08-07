@@ -13,7 +13,7 @@ import {
   vi,
   type Mocked,
 } from 'vitest';
-import { WriteFileTool } from './write-file.js';
+import { WriteFileTool, WriteFileToolParams } from './write-file.js';
 import {
   FileDiff,
   ToolConfirmationOutcome,
@@ -55,6 +55,9 @@ const mockConfigInternal = {
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
   setApprovalMode: vi.fn(),
   getGeminiClient: vi.fn(), // Initialize as a plain mock function
+  getIdeClient: vi.fn(),
+  getIdeMode: vi.fn(() => false),
+  getIdeModeFeature: vi.fn(() => false),
   getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
   getApiKey: () => 'test-key',
   getModel: () => 'test-model',
@@ -110,6 +113,14 @@ describe('WriteFileTool', () => {
     mockConfigInternal.getGeminiClient.mockReturnValue(
       mockGeminiClientInstance,
     );
+    mockConfigInternal.getIdeClient.mockReturnValue({
+      openDiff: vi.fn(),
+      closeDiff: vi.fn(),
+      getIdeContext: vi.fn(),
+      subscribeToIdeContext: vi.fn(),
+      isCodeTrackerEnabled: vi.fn(),
+      getTrackedCode: vi.fn(),
+    });
 
     tool = new WriteFileTool(mockConfig);
 
@@ -200,6 +211,32 @@ describe('WriteFileTool', () => {
       };
       expect(tool.validateToolParams(params)).toMatch(
         `Path is a directory, not a file: ${dirAsFilePath}`,
+      );
+    });
+
+    it('should return error if the content is null', () => {
+      const dirAsFilePath = path.join(rootDir, 'a_directory');
+      fs.mkdirSync(dirAsFilePath);
+      const params = {
+        file_path: dirAsFilePath,
+        content: null,
+      } as unknown as WriteFileToolParams; // Intentionally non-conforming
+      expect(tool.validateToolParams(params)).toMatch(
+        `params/content must be string`,
+      );
+    });
+  });
+
+  describe('getDescription', () => {
+    it('should return error if the file_path is empty', () => {
+      const dirAsFilePath = path.join(rootDir, 'a_directory');
+      fs.mkdirSync(dirAsFilePath);
+      const params = {
+        file_path: '',
+        content: '',
+      };
+      expect(tool.getDescription(params)).toMatch(
+        `Model did not provide valid parameters for write file tool, missing or empty "file_path"`,
       );
     });
   });
@@ -474,7 +511,11 @@ describe('WriteFileTool', () => {
         params,
         abortSignal,
       );
-      if (typeof confirmDetails === 'object' && confirmDetails.onConfirm) {
+      if (
+        typeof confirmDetails === 'object' &&
+        'onConfirm' in confirmDetails &&
+        confirmDetails.onConfirm
+      ) {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
@@ -528,7 +569,11 @@ describe('WriteFileTool', () => {
         params,
         abortSignal,
       );
-      if (typeof confirmDetails === 'object' && confirmDetails.onConfirm) {
+      if (
+        typeof confirmDetails === 'object' &&
+        'onConfirm' in confirmDetails &&
+        confirmDetails.onConfirm
+      ) {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
@@ -569,7 +614,11 @@ describe('WriteFileTool', () => {
         params,
         abortSignal,
       );
-      if (typeof confirmDetails === 'object' && confirmDetails.onConfirm) {
+      if (
+        typeof confirmDetails === 'object' &&
+        'onConfirm' in confirmDetails &&
+        confirmDetails.onConfirm
+      ) {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 

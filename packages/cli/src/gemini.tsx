@@ -7,14 +7,16 @@
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
-import { loadCliConfig, parseArguments, CliArgs } from './config/config.js';
+import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
 import v8 from 'node:v8';
 import os from 'node:os';
+import dns from 'node:dns';
 import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
 import {
+  DnsResolutionOrder,
   LoadedSettings,
   loadSettings,
   SettingScope,
@@ -23,15 +25,11 @@ import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { loadExtensions, Extension } from './config/extension.js';
+import { loadExtensions } from './config/extension.js';
 import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
 import {
-  ApprovalMode,
   Config,
-  EditTool,
-  ShellTool,
-  WriteFileTool,
   sessionId,
   logUserPrompt,
   AuthType,
@@ -43,6 +41,23 @@ import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
+
+export function validateDnsResolutionOrder(
+  order: string | undefined,
+): DnsResolutionOrder {
+  const defaultValue: DnsResolutionOrder = 'ipv4first';
+  if (order === undefined) {
+    return defaultValue;
+  }
+  if (order === 'ipv4first' || order === 'verbatim') {
+    return order;
+  }
+  // We don't want to throw here, just warn and use the default.
+  console.warn(
+    `Invalid value for dnsResolutionOrder in settings: "${order}". Using default "${defaultValue}".`,
+  );
+  return defaultValue;
+}
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -138,6 +153,10 @@ export async function main() {
     argv,
   );
 
+  dns.setDefaultResultOrder(
+    validateDnsResolutionOrder(settings.merged.dnsResolutionOrder),
+  );
+
   if (argv.promptInteractive && !process.stdin.isTTY) {
     console.error(
       'Error: The --prompt-interactive flag is not supported when piping input from stdin.',
@@ -186,7 +205,10 @@ export async function main() {
       : [];
     const sandboxConfig = config.getSandbox();
     if (sandboxConfig) {
-      if (settings.merged.selectedAuthType) {
+      if (
+        settings.merged.selectedAuthType &&
+        !settings.merged.useExternalAuth
+      ) {
         // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
         try {
           const err = validateAuthMethod(settings.merged.selectedAuthType);
@@ -229,11 +251,8 @@ export async function main() {
     ...(await getUserStartupWarnings(workspaceRoot)),
   ];
 
-  const shouldBeInteractive =
-    !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0);
-
   // Render UI, passing necessary config values. Check that there is no command line question.
-  if (shouldBeInteractive) {
+  if (config.isInteractive()) {
     const version = await getCliVersion();
     setWindowTitle(basename(workspaceRoot), settings);
     const instance = render(
@@ -282,12 +301,10 @@ export async function main() {
     prompt_length: input.length,
   });
 
-  // Non-interactive mode handled by runNonInteractive
-  const nonInteractiveConfig = await loadNonInteractiveConfig(
+  const nonInteractiveConfig = await validateNonInteractiveAuth(
+    settings.merged.selectedAuthType,
+    settings.merged.useExternalAuth,
     config,
-    extensions,
-    settings,
-    argv,
   );
 
   await runNonInteractive(nonInteractiveConfig, input, prompt_id);
@@ -307,43 +324,4 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
       process.stdout.write(`\x1b]2;\x07`);
     });
   }
-}
-
-async function loadNonInteractiveConfig(
-  config: Config,
-  extensions: Extension[],
-  settings: LoadedSettings,
-  argv: CliArgs,
-) {
-  let finalConfig = config;
-  if (config.getApprovalMode() !== ApprovalMode.YOLO) {
-    // Everything is not allowed, ensure that only read-only tools are configured.
-    const existingExcludeTools = settings.merged.excludeTools || [];
-    const interactiveTools = [
-      ShellTool.Name,
-      EditTool.Name,
-      WriteFileTool.Name,
-    ];
-
-    const newExcludeTools = [
-      ...new Set([...existingExcludeTools, ...interactiveTools]),
-    ];
-
-    const nonInteractiveSettings = {
-      ...settings.merged,
-      excludeTools: newExcludeTools,
-    };
-    finalConfig = await loadCliConfig(
-      nonInteractiveSettings,
-      extensions,
-      config.getSessionId(),
-      argv,
-    );
-    await finalConfig.initialize();
-  }
-
-  return await validateNonInteractiveAuth(
-    settings.merged.selectedAuthType,
-    finalConfig,
-  );
 }

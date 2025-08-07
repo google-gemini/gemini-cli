@@ -20,6 +20,8 @@ import {
   LoopDetectedEvent,
   NextSpeakerCheckEvent,
   SlashCommandEvent,
+  MalformedJsonResponseEvent,
+  IdeConnectionEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
@@ -42,9 +44,30 @@ const flash_fallback_event_name = 'flash_fallback';
 const loop_detected_event_name = 'loop_detected';
 const next_speaker_check_event_name = 'next_speaker_check';
 const slash_command_event_name = 'slash_command';
+const malformed_json_response_event_name = 'malformed_json_response';
+const ide_connection_event_name = 'ide_connection';
 
 export interface LogResponse {
   nextRequestWaitMs?: number;
+}
+
+/**
+ * Determine the surface that the user is currently using.  Surface is effectively the
+ * distribution channel in which the user is using Gemini CLI.  Gemini CLI comes bundled
+ * w/ Firebase Studio and Cloud Shell.  Users that manually download themselves will
+ * likely be "SURFACE_NOT_SET".
+ *
+ * This is computed based upon a series of environment variables these distribution
+ * methods might have in their runtimes.
+ */
+function determineSurface(): string {
+  if (process.env.CLOUD_SHELL === 'true') {
+    return 'CLOUD_SHELL';
+  } else if (process.env.MONOSPACE_ENV === 'true') {
+    return 'FIREBASE_STUDIO';
+  } else {
+    return process.env.SURFACE || 'SURFACE_NOT_SET';
+  }
 }
 
 // Singleton class for batch posting log events to Clearcut. When a new event comes in, the elapsed time
@@ -233,7 +256,8 @@ export class ClearcutLogger {
   }
 
   logStartSessionEvent(event: StartSessionEvent): void {
-    const surface = process.env.SURFACE || 'SURFACE_NOT_SET';
+    const surface = determineSurface();
+
     const data = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
@@ -554,6 +578,33 @@ export class ClearcutLogger {
     }
 
     this.enqueueLogEvent(this.createLogEvent(slash_command_event_name, data));
+    this.flushIfNeeded();
+  }
+
+  logMalformedJsonResponseEvent(event: MalformedJsonResponseEvent): void {
+    const data = [
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_MALFORMED_JSON_RESPONSE_MODEL,
+        value: JSON.stringify(event.model),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(malformed_json_response_event_name, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logIdeConnectionEvent(event: IdeConnectionEvent): void {
+    const data = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_IDE_CONNECTION_TYPE,
+        value: JSON.stringify(event.connection_type),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(ide_connection_event_name, data));
     this.flushIfNeeded();
   }
 

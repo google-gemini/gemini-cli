@@ -12,32 +12,41 @@ import {
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   GeminiEventType,
+  ToolErrorType,
 } from '@google/gemini-cli-core';
 import { Content, Part, FunctionCall } from '@google/genai';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
+import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 
 export async function runNonInteractive(
   config: Config,
   input: string,
   prompt_id: string,
 ): Promise<void> {
-  await config.initialize();
-  // Handle EPIPE errors when the output is piped to a command that closes early.
-  process.stdout.on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EPIPE') {
-      // Exit gracefully if the pipe is closed.
-      process.exit(0);
-    }
+  const consolePatcher = new ConsolePatcher({
+    stderr: true,
+    debugMode: config.getDebugMode(),
   });
 
-  const geminiClient = config.getGeminiClient();
-  const toolRegistry: ToolRegistry = await config.getToolRegistry();
-
-  const abortController = new AbortController();
-  let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
-  let turnCount = 0;
   try {
+    consolePatcher.patch();
+    // Handle EPIPE errors when the output is piped to a command that closes early.
+    process.stdout.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EPIPE') {
+        // Exit gracefully if the pipe is closed.
+        process.exit(0);
+      }
+    });
+
+    const geminiClient = config.getGeminiClient();
+    const toolRegistry: ToolRegistry = await config.getToolRegistry();
+
+    const abortController = new AbortController();
+    let currentMessages: Content[] = [
+      { role: 'user', parts: [{ text: input }] },
+    ];
+    let turnCount = 0;
     while (true) {
       turnCount++;
       if (
@@ -97,15 +106,11 @@ export async function runNonInteractive(
           );
 
           if (toolResponse.error) {
-            const isToolNotFound = toolResponse.error.message.includes(
-              'not found in registry',
-            );
             console.error(
               `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
             );
-            if (!isToolNotFound) {
+            if (toolResponse.errorType === ToolErrorType.UNHANDLED_EXCEPTION)
               process.exit(1);
-            }
           }
 
           if (toolResponse.responseParts) {
@@ -136,6 +141,7 @@ export async function runNonInteractive(
     );
     process.exit(1);
   } finally {
+    consolePatcher.cleanup();
     if (isTelemetrySdkInitialized()) {
       await shutdownTelemetry();
     }
