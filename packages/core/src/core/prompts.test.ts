@@ -17,6 +17,9 @@ vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
 vi.mock('../tools/edit', () => ({ EditTool: { Name: 'replace' } }));
 vi.mock('../tools/glob', () => ({ GlobTool: { Name: 'glob' } }));
 vi.mock('../tools/grep', () => ({ GrepTool: { Name: 'search_file_content' } }));
+vi.mock('../tools/bm25-search', () => ({
+  BM25SearchTool: { Name: 'bm25_search' },
+}));
 vi.mock('../tools/read-file', () => ({ ReadFileTool: { Name: 'read_file' } }));
 vi.mock('../tools/read-many-files', () => ({
   ReadManyFilesTool: { Name: 'read_many_files' },

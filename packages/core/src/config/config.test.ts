@@ -51,6 +51,7 @@ vi.mock('../tools/ls');
 vi.mock('../tools/read-file');
 vi.mock('../tools/grep');
 vi.mock('../tools/glob');
+vi.mock('../tools/bm25-search');
 vi.mock('../tools/edit');
 vi.mock('../tools/shell');
 vi.mock('../tools/write-file');

@@ -106,7 +106,41 @@ The Gemini CLI provides a comprehensive suite of tools for interacting with the 
   ```
 - **Confirmation:** No.
 
-## 6. `replace` (Edit)
+## 6. `bm25_search` (BM25Search)
+
+`bm25_search` performs a sophisticated, relevance-based search using the BM25 algorithm. Instead of simple pattern matching, it breaks files into chunks and ranks them based on how relevant they are to the query, making it excellent for finding conceptually related code.
+
+- **Tool name:** `bm25_search`
+- **Display name:** BM25Search
+- **File:** `bm25-search.ts`
+- **Parameters:**
+  - `query` (string, required): The search query.
+  - `path` (string, optional): The absolute path to the directory to search within. If omitted, searches the current working directory.
+  - `include` (string, optional): A glob pattern to filter which files are searched (e.g., `"*.js"`, `"src/**"`).
+  - `chunk_size` (number, optional): The number of lines per chunk. Defaults to 100.
+  - `overlap` (number, optional): The number of lines to overlap between chunks. Defaults to 20.
+- **Behavior:**
+  - Splits files into smaller, overlapping chunks of text.
+  - Uses the BM25 algorithm to score how well each chunk matches the `query`.
+  - Returns the top 10 highest-scoring chunks, providing more contextually relevant results than a simple text search.
+- **Output (`llmContent`):** A formatted string of the top matches, e.g.:
+  ```
+  Found 2 matches for query "authentication logic":
+  ---
+  File: src/auth/service.ts (Lines 50-150)
+  Score: 0.8765
+  Content:
+  ... chunk content ...
+  ---
+  File: src/user/controller.ts (Lines 25-125)
+  Score: 0.7543
+  Content:
+  ... chunk content ...
+  ---
+  ```
+- **Confirmation:** No.
+
+## 7. `replace` (Edit)
 
 `replace` replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when `expected_replacements` is specified. This tool is designed for precise, targeted changes and requires significant context around the `old_string` to ensure it modifies the correct location.
 
