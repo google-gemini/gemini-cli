@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, {
+import {
   createContext,
   useContext,
   useState,
@@ -28,6 +28,9 @@ interface PlanContextValue {
   interruptPlan: (query: string) => void;
   rules: string[];
   addRule: (rule: string) => void;
+  planHistory: PlanStep[][];
+  currentPlanIndex: number;
+  switchPlan: (index: number) => void;
 }
 
 const PlanContext = createContext<PlanContextValue>({
@@ -37,6 +40,9 @@ const PlanContext = createContext<PlanContextValue>({
   interruptPlan: () => {},
   rules: [],
   addRule: () => {},
+  planHistory: [],
+  currentPlanIndex: -1,
+  switchPlan: () => {},
 });
 
 const splitIntoSteps = (query: string): string[] =>
@@ -75,6 +81,8 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
   const [steps, setSteps] = useState<PlanStep[]>([]);
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [rules, setRules] = useState<string[]>([]);
+  const [planHistory, setPlanHistory] = useState<PlanStep[][]>([]);
+  const [currentPlanIndex, setCurrentPlanIndex] = useState<number>(-1);
   const RULES_FILE = path.join(process.cwd(), 'rules.json');
 
   useEffect(() => {
@@ -90,6 +98,11 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
 
   const createPlanFromQuery = (query: string) => {
     const newSteps = generatePlanFromQuery(query);
+    setPlanHistory((prev) => {
+      const next = [...prev, newSteps];
+      setCurrentPlanIndex(next.length - 1);
+      return next;
+    });
     setSteps(newSteps);
     setCurrentStep(0);
   };
@@ -104,6 +117,14 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
       fs.writeFile(RULES_FILE, JSON.stringify(next, null, 2)).catch(() => {});
       return next;
     });
+  };
+
+  const switchPlan = (index: number) => {
+    if (index >= 0 && index < planHistory.length) {
+      setSteps(planHistory[index]);
+      setCurrentPlanIndex(index);
+      setCurrentStep(0);
+    }
   };
 
   useEffect(() => {
@@ -144,7 +165,17 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <PlanContext.Provider
-      value={{ steps, currentStep, createPlanFromQuery, interruptPlan, rules, addRule }}
+      value={{
+        steps,
+        currentStep,
+        createPlanFromQuery,
+        interruptPlan,
+        rules,
+        addRule,
+        planHistory,
+        currentPlanIndex,
+        switchPlan,
+      }}
     >
       {children}
     </PlanContext.Provider>
@@ -152,4 +183,3 @@ export const PlanProvider = ({ children }: { children: ReactNode }) => {
 };
 
 export const usePlan = () => useContext(PlanContext);
-

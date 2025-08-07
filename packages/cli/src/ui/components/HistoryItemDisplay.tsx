@@ -45,7 +45,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
 }) => (
   <Box flexDirection="column" key={item.id}>
     {/* Render standard message types */}
-    {item.type === 'user' && <UserMessage text={item.text} />}
+    {item.type === 'user' && (
+      <UserMessage text={item.text} isInterrupt={item.isInterrupt} />
+    )}
     {item.type === 'user_shell' && <UserShellMessage text={item.text} />}
     {item.type === 'gemini' && (
       <GeminiMessage

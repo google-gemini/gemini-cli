@@ -19,7 +19,7 @@ export const initCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   action: async (
     context: CommandContext,
-    _args: string,
+    args: string,
   ): Promise<SlashCommandActionReturn> => {
     if (!context.services.config) {
       return {
@@ -50,6 +50,8 @@ export const initCommand: SlashCommand = {
       },
       Date.now(),
     );
+
+    const userRequest = args.trim();
 
     return {
       type: 'submit_prompt',
@@ -87,6 +89,10 @@ You are an AI agent that brings the power of Gemini directly into the terminal. 
 **Final Output:**
 
 Write the complete content to the \`GEMINI.md\` file. The output must be well-formatted Markdown.
+
+${userRequest ? `\n**User Request:** ${userRequest}\n` : ''}
+
+Before writing, perform a brief web search for libraries, tools, or techniques relevant to this request. Identify MCP servers, external tools, and dependencies that could help. Draft a plan with high-level goals split into parts, each with steps and suggested alternative approaches. Record alternate plans where appropriate.
 `,
     };
   },

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
 import { Box, Text } from 'ink';
 import { usePlan } from '../contexts/PlanContext.js';
 import { Colors } from '../colors.js';
@@ -15,13 +14,15 @@ const ProgressBar = ({ progress }: { progress: number }) => {
   const remaining = width - completed;
   return (
     <Text>
-      [{'#'.repeat(completed)}{'.'.repeat(remaining)}] {Math.round(progress * 100)}%
+      [{'#'.repeat(completed)}
+      {'.'.repeat(remaining)}] {Math.round(progress * 100)}%
     </Text>
   );
 };
 
 export const PlanSidebar = ({ width = 30 }: { width?: number }) => {
-  const { steps, currentStep, rules } = usePlan();
+  const { steps, currentStep, rules, planHistory, currentPlanIndex } =
+    usePlan();
   if (!steps.length) {
     return null;
   }
@@ -34,7 +35,9 @@ export const PlanSidebar = ({ width = 30 }: { width?: number }) => {
       marginLeft={1}
       width={width}
     >
-      <Text color={Colors.AccentBlue}>Plan</Text>
+      <Text color={Colors.AccentBlue}>
+        Plan {currentPlanIndex + 1}/{planHistory.length}
+      </Text>
       {steps.map((step, idx) => (
         <Box key={step.id} flexDirection="column">
           <Text color={idx === currentStep ? Colors.AccentGreen : undefined}>
@@ -55,4 +58,3 @@ export const PlanSidebar = ({ width = 30 }: { width?: number }) => {
     </Box>
   );
 };
-

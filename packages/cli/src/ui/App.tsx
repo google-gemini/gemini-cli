@@ -76,6 +76,7 @@ import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useVimMode, VimModeProvider } from './contexts/VimModeContext.js';
 import { useVim } from './hooks/vim.js';
+import { usePlan, PlanProvider } from './contexts/PlanContext.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
 import {
@@ -90,7 +91,6 @@ import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
-import { PlanProvider } from './contexts/PlanContext.js';
 import { PlanSidebar } from './components/PlanSidebar.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
@@ -126,6 +126,7 @@ const App = ({
   const { stdout } = useStdout();
   const nightly = version.includes('nightly');
   const { history, addItem, clearItems, loadHistory } = useHistory();
+  const { planHistory, currentPlanIndex, switchPlan } = usePlan();
 
   useEffect(() => {
     const cleanup = setUpdateHandler(addItem, setUpdateInfo);
@@ -622,6 +623,15 @@ const App = ({
         },
         Date.now(),
       );
+    } else if (key.shift && key.leftArrow) {
+      const newIndex = Math.max(0, currentPlanIndex - 1);
+      switchPlan(newIndex);
+    } else if (key.shift && key.rightArrow) {
+      const newIndex = Math.min(planHistory.length - 1, currentPlanIndex + 1);
+      switchPlan(newIndex);
+    } else if (!key.ctrl && !key.meta && ['1', '2', '3', '4'].includes(input)) {
+      const idx = Number(input) - 1;
+      switchPlan(idx);
     } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
       setConstrainHeight(false);
     }
@@ -803,308 +813,309 @@ const App = ({
     <StreamingContext.Provider value={streamingState}>
       <Box>
         <Box flexDirection="column" width={mainAreaWidth}>
-        {/*
-         * The Static component is an Ink intrinsic in which there can only be 1 per application.
-         * Because of this restriction we're hacking it slightly by having a 'header' item here to
-         * ensure that it's statically rendered.
-         *
-         * Background on the Static Item: Anything in the Static component is written a single time
-         * to the console. Think of it like doing a console.log and then never using ANSI codes to
-         * clear that content ever again. Effectively it has a moving frame that every time new static
-         * content is set it'll flush content to the terminal and move the area which it's "clearing"
-         * down a notch. Without Static the area which gets erased and redrawn continuously grows.
-         */}
-        <Static
-          key={staticKey}
-          items={[
-            <Box flexDirection="column" key="header">
-              {!settings.merged.hideBanner && (
-                <Header
+          {/*
+           * The Static component is an Ink intrinsic in which there can only be 1 per application.
+           * Because of this restriction we're hacking it slightly by having a 'header' item here to
+           * ensure that it's statically rendered.
+           *
+           * Background on the Static Item: Anything in the Static component is written a single time
+           * to the console. Think of it like doing a console.log and then never using ANSI codes to
+           * clear that content ever again. Effectively it has a moving frame that every time new static
+           * content is set it'll flush content to the terminal and move the area which it's "clearing"
+           * down a notch. Without Static the area which gets erased and redrawn continuously grows.
+           */}
+          <Static
+            key={staticKey}
+            items={[
+              <Box flexDirection="column" key="header">
+                {!settings.merged.hideBanner && (
+                  <Header
+                    terminalWidth={mainAreaWidth}
+                    version={version}
+                    nightly={nightly}
+                  />
+                )}
+                {!settings.merged.hideTips && <Tips config={config} />}
+              </Box>,
+              ...history.map((h) => (
+                <HistoryItemDisplay
                   terminalWidth={mainAreaWidth}
-                  version={version}
-                  nightly={nightly}
+                  availableTerminalHeight={staticAreaMaxItemHeight}
+                  key={h.id}
+                  item={h}
+                  isPending={false}
+                  config={config}
+                  commands={slashCommands}
                 />
-              )}
-              {!settings.merged.hideTips && <Tips config={config} />}
-            </Box>,
-            ...history.map((h) => (
-              <HistoryItemDisplay
-                terminalWidth={mainAreaWidth}
-                availableTerminalHeight={staticAreaMaxItemHeight}
-                key={h.id}
-                item={h}
-                isPending={false}
-                config={config}
-                commands={slashCommands}
-              />
-            )),
-          ]}
-        >
-          {(item) => item}
-        </Static>
-        <OverflowProvider>
-          <Box ref={pendingHistoryItemRef} flexDirection="column">
-            {pendingHistoryItems.map((item, i) => (
-              <HistoryItemDisplay
-                key={i}
-                availableTerminalHeight={
-                  constrainHeight ? availableTerminalHeight : undefined
-                }
-                terminalWidth={mainAreaWidth}
-                // TODO(taehykim): It seems like references to ids aren't necessary in
-                // HistoryItemDisplay. Refactor later. Use a fake id for now.
-                item={{ ...item, id: 0 }}
-                isPending={true}
-                config={config}
-                isFocused={!isEditorDialogOpen}
-              />
-            ))}
-            <ShowMoreLines constrainHeight={constrainHeight} />
-          </Box>
-        </OverflowProvider>
-
-        <Box flexDirection="column" ref={mainControlsRef}>
-          {/* Move UpdateNotification to render update notification above input area */}
-          {updateInfo && <UpdateNotification message={updateInfo.message} />}
-          {startupWarnings.length > 0 && (
-            <Box
-              borderStyle="round"
-              borderColor={Colors.AccentYellow}
-              paddingX={1}
-              marginY={1}
-              flexDirection="column"
-            >
-              {startupWarnings.map((warning, index) => (
-                <Text key={index} color={Colors.AccentYellow}>
-                  {warning}
-                </Text>
+              )),
+            ]}
+          >
+            {(item) => item}
+          </Static>
+          <OverflowProvider>
+            <Box ref={pendingHistoryItemRef} flexDirection="column">
+              {pendingHistoryItems.map((item, i) => (
+                <HistoryItemDisplay
+                  key={i}
+                  availableTerminalHeight={
+                    constrainHeight ? availableTerminalHeight : undefined
+                  }
+                  terminalWidth={mainAreaWidth}
+                  // TODO(taehykim): It seems like references to ids aren't necessary in
+                  // HistoryItemDisplay. Refactor later. Use a fake id for now.
+                  item={{ ...item, id: 0 }}
+                  isPending={true}
+                  config={config}
+                  isFocused={!isEditorDialogOpen}
+                />
               ))}
+              <ShowMoreLines constrainHeight={constrainHeight} />
             </Box>
-          )}
+          </OverflowProvider>
 
-          {shellConfirmationRequest ? (
-            <ShellConfirmationDialog request={shellConfirmationRequest} />
-          ) : isThemeDialogOpen ? (
-            <Box flexDirection="column">
-              {themeError && (
-                <Box marginBottom={1}>
-                  <Text color={Colors.AccentRed}>{themeError}</Text>
-                </Box>
-              )}
-              <ThemeDialog
-                onSelect={handleThemeSelect}
-                onHighlight={handleThemeHighlight}
-                settings={settings}
-                availableTerminalHeight={
-                  constrainHeight
-                    ? terminalHeight - staticExtraHeight
-                    : undefined
-                }
-                terminalWidth={mainAreaWidth}
-              />
-            </Box>
-          ) : isAuthenticating ? (
-            <>
-              <AuthInProgress
-                onTimeout={() => {
-                  setAuthError('Authentication timed out. Please try again.');
-                  cancelAuthentication();
-                  openAuthDialog();
-                }}
-              />
-              {showErrorDetails && (
-                <OverflowProvider>
-                  <Box flexDirection="column">
-                    <DetailedMessagesDisplay
-                      messages={filteredConsoleMessages}
-                      maxHeight={
-                        constrainHeight ? debugConsoleMaxHeight : undefined
-                      }
-                      width={inputWidth}
-                    />
-                    <ShowMoreLines constrainHeight={constrainHeight} />
-                  </Box>
-                </OverflowProvider>
-              )}
-            </>
-          ) : isAuthDialogOpen ? (
-            <Box flexDirection="column">
-              <AuthDialog
-                onSelect={handleAuthSelect}
-                settings={settings}
-                initialErrorMessage={authError}
-              />
-            </Box>
-          ) : isEditorDialogOpen ? (
-            <Box flexDirection="column">
-              {editorError && (
-                <Box marginBottom={1}>
-                  <Text color={Colors.AccentRed}>{editorError}</Text>
-                </Box>
-              )}
-              <EditorSettingsDialog
-                onSelect={handleEditorSelect}
-                settings={settings}
-                onExit={exitEditorDialog}
-              />
-            </Box>
-          ) : showPrivacyNotice ? (
-            <PrivacyNotice
-              onExit={() => setShowPrivacyNotice(false)}
-              config={config}
-            />
-          ) : (
-            <>
-              <LoadingIndicator
-                thought={
-                  streamingState === StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.disableLoadingPhrases
-                    ? undefined
-                    : thought
-                }
-                currentLoadingPhrase={
-                  config.getAccessibility()?.disableLoadingPhrases
-                    ? undefined
-                    : currentLoadingPhrase
-                }
-                elapsedTime={elapsedTime}
-              />
-
+          <Box flexDirection="column" ref={mainControlsRef}>
+            {/* Move UpdateNotification to render update notification above input area */}
+            {updateInfo && <UpdateNotification message={updateInfo.message} />}
+            {startupWarnings.length > 0 && (
               <Box
-                marginTop={1}
-                display="flex"
-                justifyContent="space-between"
-                width="100%"
+                borderStyle="round"
+                borderColor={Colors.AccentYellow}
+                paddingX={1}
+                marginY={1}
+                flexDirection="column"
               >
-                <Box>
-                  {process.env.GEMINI_SYSTEM_MD && (
-                    <Text color={Colors.AccentRed}>|⌐■_■| </Text>
-                  )}
-                  {ctrlCPressedOnce ? (
-                    <Text color={Colors.AccentYellow}>
-                      Press Ctrl+C again to exit.
-                    </Text>
-                  ) : ctrlDPressedOnce ? (
-                    <Text color={Colors.AccentYellow}>
-                      Press Ctrl+D again to exit.
-                    </Text>
-                  ) : (
-                    <ContextSummaryDisplay
-                      ideContext={ideContextState}
-                      geminiMdFileCount={geminiMdFileCount}
-                      contextFileNames={contextFileNames}
-                      mcpServers={config.getMcpServers()}
-                      blockedMcpServers={config.getBlockedMcpServers()}
-                      showToolDescriptions={showToolDescriptions}
-                    />
-                  )}
-                </Box>
-                <Box>
-                  {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
-                    !shellModeActive && (
-                      <AutoAcceptIndicator
-                        approvalMode={showAutoAcceptIndicator}
+                {startupWarnings.map((warning, index) => (
+                  <Text key={index} color={Colors.AccentYellow}>
+                    {warning}
+                  </Text>
+                ))}
+              </Box>
+            )}
+
+            {shellConfirmationRequest ? (
+              <ShellConfirmationDialog request={shellConfirmationRequest} />
+            ) : isThemeDialogOpen ? (
+              <Box flexDirection="column">
+                {themeError && (
+                  <Box marginBottom={1}>
+                    <Text color={Colors.AccentRed}>{themeError}</Text>
+                  </Box>
+                )}
+                <ThemeDialog
+                  onSelect={handleThemeSelect}
+                  onHighlight={handleThemeHighlight}
+                  settings={settings}
+                  availableTerminalHeight={
+                    constrainHeight
+                      ? terminalHeight - staticExtraHeight
+                      : undefined
+                  }
+                  terminalWidth={mainAreaWidth}
+                />
+              </Box>
+            ) : isAuthenticating ? (
+              <>
+                <AuthInProgress
+                  onTimeout={() => {
+                    setAuthError('Authentication timed out. Please try again.');
+                    cancelAuthentication();
+                    openAuthDialog();
+                  }}
+                />
+                {showErrorDetails && (
+                  <OverflowProvider>
+                    <Box flexDirection="column">
+                      <DetailedMessagesDisplay
+                        messages={filteredConsoleMessages}
+                        maxHeight={
+                          constrainHeight ? debugConsoleMaxHeight : undefined
+                        }
+                        width={inputWidth}
+                      />
+                      <ShowMoreLines constrainHeight={constrainHeight} />
+                    </Box>
+                  </OverflowProvider>
+                )}
+              </>
+            ) : isAuthDialogOpen ? (
+              <Box flexDirection="column">
+                <AuthDialog
+                  onSelect={handleAuthSelect}
+                  settings={settings}
+                  initialErrorMessage={authError}
+                />
+              </Box>
+            ) : isEditorDialogOpen ? (
+              <Box flexDirection="column">
+                {editorError && (
+                  <Box marginBottom={1}>
+                    <Text color={Colors.AccentRed}>{editorError}</Text>
+                  </Box>
+                )}
+                <EditorSettingsDialog
+                  onSelect={handleEditorSelect}
+                  settings={settings}
+                  onExit={exitEditorDialog}
+                />
+              </Box>
+            ) : showPrivacyNotice ? (
+              <PrivacyNotice
+                onExit={() => setShowPrivacyNotice(false)}
+                config={config}
+              />
+            ) : (
+              <>
+                <LoadingIndicator
+                  thought={
+                    streamingState === StreamingState.WaitingForConfirmation ||
+                    config.getAccessibility()?.disableLoadingPhrases
+                      ? undefined
+                      : thought
+                  }
+                  currentLoadingPhrase={
+                    config.getAccessibility()?.disableLoadingPhrases
+                      ? undefined
+                      : currentLoadingPhrase
+                  }
+                  elapsedTime={elapsedTime}
+                />
+
+                <Box
+                  marginTop={1}
+                  display="flex"
+                  justifyContent="space-between"
+                  width="100%"
+                >
+                  <Box>
+                    {process.env.GEMINI_SYSTEM_MD && (
+                      <Text color={Colors.AccentRed}>|⌐■_■| </Text>
+                    )}
+                    {ctrlCPressedOnce ? (
+                      <Text color={Colors.AccentYellow}>
+                        Press Ctrl+C again to exit.
+                      </Text>
+                    ) : ctrlDPressedOnce ? (
+                      <Text color={Colors.AccentYellow}>
+                        Press Ctrl+D again to exit.
+                      </Text>
+                    ) : (
+                      <ContextSummaryDisplay
+                        ideContext={ideContextState}
+                        geminiMdFileCount={geminiMdFileCount}
+                        contextFileNames={contextFileNames}
+                        mcpServers={config.getMcpServers()}
+                        blockedMcpServers={config.getBlockedMcpServers()}
+                        showToolDescriptions={showToolDescriptions}
                       />
                     )}
-                  {interruptModeEnabled && !shellModeActive && (
-                    <InterruptModeIndicator />
-                  )}
-                  {shellModeActive && <ShellModeIndicator />}
-                </Box>
-              </Box>
-              {showIDEContextDetail && (
-                <IDEContextDetailDisplay
-                  ideContext={ideContextState}
-                  detectedIdeDisplay={config
-                    .getIdeClient()
-                    .getDetectedIdeDisplayName()}
-                />
-              )}
-              {showErrorDetails && (
-                <OverflowProvider>
-                  <Box flexDirection="column">
-                    <DetailedMessagesDisplay
-                      messages={filteredConsoleMessages}
-                      maxHeight={
-                        constrainHeight ? debugConsoleMaxHeight : undefined
-                      }
-                      width={inputWidth}
-                    />
-                    <ShowMoreLines constrainHeight={constrainHeight} />
                   </Box>
-                </OverflowProvider>
-              )}
+                  <Box>
+                    {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
+                      !shellModeActive && (
+                        <AutoAcceptIndicator
+                          approvalMode={showAutoAcceptIndicator}
+                        />
+                      )}
+                    {interruptModeEnabled && !shellModeActive && (
+                      <InterruptModeIndicator />
+                    )}
+                    {shellModeActive && <ShellModeIndicator />}
+                  </Box>
+                </Box>
+                {showIDEContextDetail && (
+                  <IDEContextDetailDisplay
+                    ideContext={ideContextState}
+                    detectedIdeDisplay={config
+                      .getIdeClient()
+                      .getDetectedIdeDisplayName()}
+                  />
+                )}
+                {showErrorDetails && (
+                  <OverflowProvider>
+                    <Box flexDirection="column">
+                      <DetailedMessagesDisplay
+                        messages={filteredConsoleMessages}
+                        maxHeight={
+                          constrainHeight ? debugConsoleMaxHeight : undefined
+                        }
+                        width={inputWidth}
+                      />
+                      <ShowMoreLines constrainHeight={constrainHeight} />
+                    </Box>
+                  </OverflowProvider>
+                )}
 
-              {isInputActive && (
-                <InputPrompt
-                  buffer={buffer}
-                  inputWidth={inputWidth}
-                  suggestionsWidth={suggestionsWidth}
-                  onSubmit={handleFinalSubmit}
-                  userMessages={userMessages}
-                  onClearScreen={handleClearScreen}
-                  config={config}
-                  slashCommands={slashCommands}
-                  commandContext={commandContext}
-                  shellModeActive={shellModeActive}
-                  setShellModeActive={setShellModeActive}
-                  focus={isFocused}
-                  vimHandleInput={vimHandleInput}
-                  placeholder={placeholder}
-                />
-              )}
-            </>
-          )}
+                {isInputActive && (
+                  <InputPrompt
+                    buffer={buffer}
+                    inputWidth={inputWidth}
+                    suggestionsWidth={suggestionsWidth}
+                    onSubmit={handleFinalSubmit}
+                    userMessages={userMessages}
+                    onClearScreen={handleClearScreen}
+                    config={config}
+                    slashCommands={slashCommands}
+                    commandContext={commandContext}
+                    shellModeActive={shellModeActive}
+                    setShellModeActive={setShellModeActive}
+                    focus={isFocused}
+                    vimHandleInput={vimHandleInput}
+                    placeholder={placeholder}
+                  />
+                )}
+              </>
+            )}
 
-          {initError && streamingState !== StreamingState.Responding && (
-            <Box
-              borderStyle="round"
-              borderColor={Colors.AccentRed}
-              paddingX={1}
-              marginBottom={1}
-            >
-              {history.find(
-                (item) =>
-                  item.type === 'error' && item.text?.includes(initError),
-              )?.text ? (
-                <Text color={Colors.AccentRed}>
-                  {
-                    history.find(
-                      (item) =>
-                        item.type === 'error' && item.text?.includes(initError),
-                    )?.text
-                  }
-                </Text>
-              ) : (
-                <>
+            {initError && streamingState !== StreamingState.Responding && (
+              <Box
+                borderStyle="round"
+                borderColor={Colors.AccentRed}
+                paddingX={1}
+                marginBottom={1}
+              >
+                {history.find(
+                  (item) =>
+                    item.type === 'error' && item.text?.includes(initError),
+                )?.text ? (
                   <Text color={Colors.AccentRed}>
-                    Initialization Error: {initError}
+                    {
+                      history.find(
+                        (item) =>
+                          item.type === 'error' &&
+                          item.text?.includes(initError),
+                      )?.text
+                    }
                   </Text>
-                  <Text color={Colors.AccentRed}>
-                    {' '}
-                    Please check API key and configuration.
-                  </Text>
-                </>
-              )}
-            </Box>
-          )}
-          <Footer
-            model={currentModel}
-            targetDir={config.getTargetDir()}
-            debugMode={config.getDebugMode()}
-            branchName={branchName}
-            debugMessage={debugMessage}
-            corgiMode={corgiMode}
-            errorCount={errorCount}
-            showErrorDetails={showErrorDetails}
-            showMemoryUsage={
-              config.getDebugMode() || config.getShowMemoryUsage()
-            }
-            promptTokenCount={sessionStats.lastPromptTokenCount}
-            nightly={nightly}
-            vimMode={vimModeEnabled ? vimMode : undefined}
-          />
-        </Box>
+                ) : (
+                  <>
+                    <Text color={Colors.AccentRed}>
+                      Initialization Error: {initError}
+                    </Text>
+                    <Text color={Colors.AccentRed}>
+                      {' '}
+                      Please check API key and configuration.
+                    </Text>
+                  </>
+                )}
+              </Box>
+            )}
+            <Footer
+              model={currentModel}
+              targetDir={config.getTargetDir()}
+              debugMode={config.getDebugMode()}
+              branchName={branchName}
+              debugMessage={debugMessage}
+              corgiMode={corgiMode}
+              errorCount={errorCount}
+              showErrorDetails={showErrorDetails}
+              showMemoryUsage={
+                config.getDebugMode() || config.getShowMemoryUsage()
+              }
+              promptTokenCount={sessionStats.lastPromptTokenCount}
+              nightly={nightly}
+              vimMode={vimModeEnabled ? vimMode : undefined}
+            />
+          </Box>
         </Box>
         <PlanSidebar width={sidebarWidth} />
       </Box>

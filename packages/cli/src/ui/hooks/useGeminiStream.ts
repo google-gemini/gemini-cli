@@ -729,22 +729,24 @@ export const useGeminiStream = (
       const queryText = partListToString(query);
       const userMessageTimestamp = Date.now();
       let wasInterrupted = false;
-      if (
+      const isInterrupt =
         (streamingState === StreamingState.Responding ||
           streamingState === StreamingState.WaitingForConfirmation) &&
-        !options?.isContinuation
-      ) {
+        !options?.isContinuation;
+      if (isInterrupt) {
+        addItem(
+          { type: MessageType.USER, text: queryText, isInterrupt: true },
+          userMessageTimestamp,
+        );
         const intent = classifyInterruption(queryText);
         switch (intent) {
           case InterruptionCategory.Continue:
-            addItem({ type: MessageType.USER, text: queryText }, userMessageTimestamp);
             addItem(
               { type: MessageType.INFO, text: 'Continuing with current plan.' },
               Date.now(),
             );
             return;
           case InterruptionCategory.StatusQuery:
-            addItem({ type: MessageType.USER, text: queryText }, userMessageTimestamp);
             addItem(
               {
                 type: MessageType.GEMINI,
@@ -757,7 +759,6 @@ export const useGeminiStream = (
             );
             return;
           case InterruptionCategory.Rule:
-            addItem({ type: MessageType.USER, text: queryText }, userMessageTimestamp);
             addRule(queryText);
             addItem(
               { type: MessageType.INFO, text: `Rule noted: ${queryText}` },
@@ -784,6 +785,9 @@ export const useGeminiStream = (
             } else {
               return;
             }
+            break;
+          default:
+            break;
         }
       }
 
@@ -893,6 +897,7 @@ export const useGeminiStream = (
       currentStep,
       addRule,
       createPlanFromQuery,
+      classifyInterruption,
     ],
   );
 
