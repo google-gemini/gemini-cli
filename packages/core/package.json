@@ -34,6 +34,8 @@
     "chardet": "^2.1.0",
     "diff": "^7.0.0",
     "dotenv": "^17.1.0",
+    "fdir": "^6.4.6",
+    "fzf": "^0.5.2",
     "glob": "^10.4.5",
     "google-auth-library": "^9.11.0",
     "html-to-text": "^9.0.5",
@@ -42,6 +44,7 @@
     "marked": "^15.0.12",
     "micromatch": "^4.0.8",
     "open": "^10.1.2",
+    "picomatch": "^4.0.1",
     "shell-quote": "^1.8.3",
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0",
@@ -49,10 +52,12 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@google/gemini-cli-test-utils": "file:../test-utils",
     "@types/diff": "^7.0.2",
     "@types/dotenv": "^6.1.1",
     "@types/micromatch": "^4.0.8",
     "@types/minimatch": "^5.1.2",
+    "@types/picomatch": "^4.0.1",
     "@types/ws": "^8.5.10",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"
