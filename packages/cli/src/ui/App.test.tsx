@@ -28,6 +28,7 @@ import { checkForUpdates, UpdateObject } from './utils/updateCheck.js';
 import { EventEmitter } from 'events';
 import { updateEventEmitter } from '../utils/updateEventEmitter.js';
 import * as auth from '../config/auth.js';
+import * as useTerminalSize from './hooks/useTerminalSize.js';
 
 // Define a more complete mock server config based on actual Config
 interface MockServerConfig {
@@ -243,6 +244,10 @@ vi.mock('../config/auth.js', () => ({
   validateAuthMethod: vi.fn(),
 }));
 
+vi.mock('../hooks/useTerminalSize.js', () => ({
+  useTerminalSize: vi.fn(),
+}));
+
 const mockedCheckForUpdates = vi.mocked(checkForUpdates);
 const { isGitRepository: mockedIsGitRepository } = vi.mocked(
   await import('@google/gemini-cli-core'),
@@ -284,6 +289,11 @@ describe('App UI', () => {
   };
 
   beforeEach(() => {
+    vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
+      columns: 120,
+      rows: 24,
+    });
+
     const ServerConfigMocked = vi.mocked(ServerConfig, true);
     mockConfig = new ServerConfigMocked({
       embeddingModel: 'test-embedding-model',
@@ -1060,6 +1070,25 @@ describe('App UI', () => {
       currentUnmount = unmount;
 
       expect(validateAuthMethodSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when in a narrow terminal', () => {
+    it('should render with a column layout', () => {
+      vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
+        columns: 60,
+        rows: 24,
+      });
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      expect(lastFrame()).toMatchSnapshot();
     });
   });
 });
