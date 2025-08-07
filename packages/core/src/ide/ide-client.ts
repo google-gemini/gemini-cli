@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs';
 import {
   detectIde,
   DetectedIde,
@@ -23,6 +24,8 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   debug: (...args: any[]) => console.debug('[DEBUG] [IDEClient]', ...args),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  error: (...args: any[]) => console.error('[ERROR] [IDEClient]', ...args),
 };
 
 export type IDEConnectionState = {
@@ -34,6 +37,16 @@ export enum IDEConnectionStatus {
   Connected = 'connected',
   Disconnected = 'disconnected',
   Connecting = 'connecting',
+}
+
+function getRealPath(path: string): string {
+  try {
+    return fs.realpathSync(path);
+  } catch (_e) {
+    // If realpathSync fails, it might be because the path doesn't exist.
+    // In that case, we can fall back to the original path.
+    return path;
+  }
 }
 
 /**
@@ -69,7 +82,15 @@ export class IdeClient {
     this.setState(IDEConnectionStatus.Connecting);
 
     if (!this.currentIde || !this.currentIdeDisplayName) {
-      this.setState(IDEConnectionStatus.Disconnected);
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: ${Object.values(
+          DetectedIde,
+        )
+          .map((ide) => getIdeDisplayName(ide))
+          .join(', ')}`,
+        true,
+      );
       return;
     }
 
@@ -174,7 +195,11 @@ export class IdeClient {
     return this.currentIdeDisplayName;
   }
 
-  private setState(status: IDEConnectionStatus, details?: string) {
+  private setState(
+    status: IDEConnectionStatus,
+    details?: string,
+    logToConsole = false,
+  ) {
     const isAlreadyDisconnected =
       this.state.status === IDEConnectionStatus.Disconnected &&
       status === IDEConnectionStatus.Disconnected;
@@ -186,7 +211,10 @@ export class IdeClient {
     }
 
     if (status === IDEConnectionStatus.Disconnected) {
-      logger.debug('IDE integration disconnected:', details);
+      if (logToConsole) {
+        logger.error(details);
+      }
+      logger.debug(details);
       ideContext.clearIdeContext();
     }
   }
@@ -197,6 +225,7 @@ export class IdeClient {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
+        true,
       );
       return false;
     }
@@ -204,13 +233,15 @@ export class IdeClient {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `To use this feature, please open a single workspace folder in ${this.currentIdeDisplayName} and try again.`,
+        true,
       );
       return false;
     }
-    if (ideWorkspacePath !== process.cwd()) {
+    if (getRealPath(ideWorkspacePath) !== getRealPath(process.cwd())) {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `Directory mismatch. Gemini CLI is running in a different location than the open workspace in ${this.currentIdeDisplayName}. Please run the CLI from the same directory as your project's root folder.`,
+        true,
       );
       return false;
     }
@@ -223,6 +254,7 @@ export class IdeClient {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
+        true,
       );
       return undefined;
     }
@@ -244,12 +276,14 @@ export class IdeClient {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable`,
+        true,
       );
     };
     this.client.onclose = () => {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable`,
+        true,
       );
     };
     this.client.setNotificationHandler(
@@ -299,6 +333,7 @@ export class IdeClient {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
+        true,
       );
       if (transport) {
         try {
