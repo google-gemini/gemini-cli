@@ -36,7 +36,9 @@ def check_node_version():
 def check_cli_version():
     print("\nChecking Gemini CLI version...")
     try:
-        with open("package.json") as f:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        package_json_path = os.path.join(script_dir, '..', 'package.json')
+        with open(package_json_path) as f:
             data = json.load(f)
             version = data.get("version")
             if version:
@@ -44,26 +46,26 @@ def check_cli_version():
             else:
                 print_bad("Gemini CLI version not found in package.json.")
     except FileNotFoundError:
-        print_bad("`package.json` not found in the current directory.")
-    except json.JSONDecodeError:
-        print_bad("`package.json` is not a valid JSON file.")
+        print_bad(f"`package.json` not found. Expected at: {package_json_path}")
     except Exception as e:
-        print_bad(f"An unexpected error occurred while reading package.json: {e}")
+        print_bad(f"Could not read package.json: {e}")
 
 def check_gcloud_auth():
     print("\nChecking gcloud authentication...")
-    adc_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-    if adc_path and os.path.exists(adc_path):
-        print_ok(f"ADC file found: {adc_path}")
-    else:
-        print_bad("ADC file not found or GOOGLE_APPLICATION_CREDENTIALS not set.")
     try:
-        subprocess.check_output(["gcloud", "auth", "application-default", "print-access-token"], stderr=subprocess.STDOUT, text=True)
-        print_ok("gcloud ADC authentication")
-    except subprocess.CalledProcessError as e:
-        print_bad(f"gcloud ADC authentication failed. gcloud output:\n{e.output}")
+        subprocess.check_output([
+            "gcloud", "auth", "application-default", "print-access-token"
+        ], stderr=subprocess.STDOUT, text=True)
+        print_ok("gcloud ADC authentication is valid")
+        adc_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        if adc_path and os.path.exists(adc_path):
+            print(f"  - Using credentials from GOOGLE_APPLICATION_CREDENTIALS: {adc_path}")
     except FileNotFoundError:
         print_bad("gcloud command not found. Please ensure it is installed and in your PATH.")
+    except subprocess.CalledProcessError as e:
+        print_bad(f"gcloud ADC authentication failed. See details below.")
+        print("  - Try running 'gcloud auth application-default login' or setting GOOGLE_APPLICATION_CREDENTIALS.")
+        print(f"  - gcloud output:\n{e.output}")
     except Exception as e:
         print_bad(f"An unexpected error occurred during gcloud ADC authentication: {e}")
 

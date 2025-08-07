@@ -13,6 +13,7 @@ import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import readPackageUp from 'read-package-up';
 import {
   Config,
   loadServerHierarchicalMemory,
@@ -238,20 +239,19 @@ export async function parseArguments(): Promise<CliArgs> {
       'doctor',
       'Run a diagnostic check on your environment',
       () => {},
-      () => {
-        // Resolve path relative to CLI source
-        const __filename = fileURLToPath(import.meta.url);
-        const __dirname = path.dirname(__filename);
-        const scriptPath = path.resolve(
-          __dirname,
-          '../../../scripts/gemini-doctor.py',
-        );
+      async () => {
+        // Dynamically find package root
+        const pkg = await readPackageUp();
+        if (!pkg || !pkg.path) {
+          console.error('Could not locate package.json.');
+          process.exit(1);
+        }
+        const packageRoot = path.dirname(pkg.path);
+        const scriptPath = path.join(packageRoot, 'scripts', 'gemini-doctor.py');
         const result = spawnSync('python3', [scriptPath], { stdio: 'inherit' });
         if (result.error) {
           console.error('Failed to start python3 process.', result.error);
-          console.error(
-            'Please ensure that python3 is installed and in your PATH.',
-          );
+          console.error('Please ensure that python3 is installed and in your PATH.');
           process.exit(1);
         }
         process.exit(result.status ?? 1);
