@@ -51,13 +51,12 @@ export interface LogResponse {
   nextRequestWaitMs?: number;
 }
 
-
 /**
- * Determine the surface that the user is currently using.  Compiled from a collection of 
+ * Determine the surface that the user is currently using.  Compiled from a collection of
  * environment variables that are often set in those environments.
  */
 function determineSurface(): string {
-  if(process.env.CLOUD_SHELL === 'true') {
+  if (process.env.CLOUD_SHELL === 'true') {
     return 'CLOUD_SHELL';
   } else if (process.env.MONOSPACE_ENV === 'true') {
     return 'FIREBASE_STUDIO';
