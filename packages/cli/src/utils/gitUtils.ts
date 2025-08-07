@@ -91,3 +91,28 @@ export const getLatestGitHubRelease = async (
     );
   }
 };
+
+/**
+ * getGitHubRepoInfo returns the owner and repository for a GitHub repo.
+ * @returns the owner and repository of the github repo.
+ * @throws error if the exec command fails.
+ */
+export function getGitHubRepoInfo(): { owner: string; repo: string } {
+  const remoteUrl = execSync('git remote get-url origin', {
+    encoding: 'utf-8',
+  }).trim();
+
+  // Matches either https://github.com/owner/repo.git or git@github.com:owner/repo.git
+  const match = remoteUrl.match(
+    /(?:https?:\/\/|git@)github\.com(?::|\/)([^/]+)\/([^/]+?)(?:\.git)?$/,
+  );
+
+  // If the regex fails match, throw an error.
+  if (!match || !match[1] || !match[2]) {
+    throw new Error(
+      `Owner & repo could not be extracted from remote URL: ${remoteUrl}`,
+    );
+  }
+
+  return { owner: match[1], repo: match[2] };
+}
