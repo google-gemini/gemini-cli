@@ -25,12 +25,12 @@ export const UserMessage: React.FC<UserMessageProps> = ({
     ? Colors.AccentPurple
     : isInterrupt
       ? Colors.AccentYellow
-      : Colors.Gray;
+      : Colors.AccentGreen;
   const borderColor = isSlashCommand
     ? Colors.AccentPurple
     : isInterrupt
       ? Colors.AccentYellow
-      : Colors.Gray;
+      : Colors.AccentGreen;
 
   return (
     <Box

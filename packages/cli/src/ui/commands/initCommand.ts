@@ -92,7 +92,7 @@ Write the complete content to the \`GEMINI.md\` file. The output must be well-fo
 
 ${userRequest ? `\n**User Request:** ${userRequest}\n` : ''}
 
-Before writing, perform a brief web search for libraries, tools, or techniques relevant to this request. Identify MCP servers, external tools, and dependencies that could help. Draft a plan with high-level goals split into parts, each with steps and suggested alternative approaches. Record alternate plans where appropriate.
+Before writing, perform a brief web search for libraries, tools, or techniques relevant to this request. Identify MCP servers, external tools, and dependencies that could help. Draft a primary plan along with at least one alternate plan option, outlining high-level goals split into parts with steps and suggested tools or libraries. Clearly label each plan and record alternate approaches where appropriate.
 `,
     };
   },
