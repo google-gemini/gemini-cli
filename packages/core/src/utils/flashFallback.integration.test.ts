@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Config } from '../config/config.js';
+import fs from 'node:fs';
 import {
   setSimulate429,
   disableSimulationAfterFallback,
@@ -17,10 +18,16 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { retryWithBackoff } from './retry.js';
 import { AuthType } from '../core/contentGenerator.js';
 
+vi.mock('node:fs');
+
 describe('Flash Fallback Integration', () => {
   let config: Config;
 
   beforeEach(() => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.statSync).mockReturnValue({
+      isDirectory: () => true,
+    } as fs.Stats);
     config = new Config({
       sessionId: 'test-session',
       targetDir: '/test',
@@ -78,14 +85,15 @@ describe('Flash Fallback Integration', () => {
         return status === 429;
       },
       onPersistent429: mockFallbackHandler,
-      authType: AuthType.LOGIN_WITH_GOOGLE_PERSONAL,
+      authType: AuthType.LOGIN_WITH_GOOGLE,
     });
 
     // Verify fallback was triggered
     expect(fallbackCalled).toBe(true);
     expect(fallbackModel).toBe(DEFAULT_GEMINI_FLASH_MODEL);
     expect(mockFallbackHandler).toHaveBeenCalledWith(
-      AuthType.LOGIN_WITH_GOOGLE_PERSONAL,
+      AuthType.LOGIN_WITH_GOOGLE,
+      expect.any(Error),
     );
     expect(result).toBe('success after fallback');
     // Should have: 2 failures, then fallback triggered, then 1 success after retry reset

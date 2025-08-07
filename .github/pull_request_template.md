@@ -4,11 +4,11 @@
 
 ## Dive Deeper
 
-<!-- more thoughts and in depth discussion here -->
+<!-- more thoughts and in-depth discussion here -->
 
 ## Reviewer Test Plan
 
-<!-- when a person reviewes your code they should ideally be pulling and running that code. How would they validate your change works and if relevant what are some good classes of example prompts and ways they can exercise your changes -->
+<!-- when a person reviews your code they should ideally be pulling and running that code. How would they validate your change works and if relevant what are some good classes of example prompts and ways they can exercise your changes -->
 
 ## Testing Matrix
 
@@ -24,4 +24,18 @@
 
 ## Linked issues / bugs
 
-<!-- Add links to any gh issues or other external bugs --->
+<!--
+Link to any related issues or bugs.
+
+**If this PR fully resolves the issue, use one of the following keywords to automatically close the issue when this PR is merged:**
+
+- Closes #<issue_number>
+- Fixes #<issue_number>
+- Resolves #<issue_number>
+
+*Example: `Resolves #123`*
+
+**If this PR is only related to an issue or is a partial fix, simply reference the issue number without a keyword:**
+
+*Example: `This PR makes progress on #456` or `Related to #789`*
+-->

@@ -7,10 +7,10 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { SlashCommand } from '../hooks/slashCommandProcessor.js';
+import { SlashCommand } from '../commands/types.js';
 
 interface Help {
-  commands: SlashCommand[];
+  commands: readonly SlashCommand[];
 }
 
 export const Help: React.FC<Help> = ({ commands }) => (
@@ -67,13 +67,25 @@ export const Help: React.FC<Help> = ({ commands }) => (
     {commands
       .filter((command) => command.description)
       .map((command: SlashCommand) => (
-        <Text key={command.name} color={Colors.Foreground}>
-          <Text bold color={Colors.AccentPurple}>
-            {' '}
-            /{command.name}
+        <Box key={command.name} flexDirection="column">
+          <Text color={Colors.Foreground}>
+            <Text bold color={Colors.AccentPurple}>
+              {' '}
+              /{command.name}
+            </Text>
+            {command.description && ' - ' + command.description}
           </Text>
-          {command.description && ' - ' + command.description}
-        </Text>
+          {command.subCommands &&
+            command.subCommands.map((subCommand) => (
+              <Text key={subCommand.name} color={Colors.Foreground}>
+                <Text bold color={Colors.AccentPurple}>
+                  {'   '}
+                  {subCommand.name}
+                </Text>
+                {subCommand.description && ' - ' + subCommand.description}
+              </Text>
+            ))}
+        </Box>
       ))}
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
@@ -91,27 +103,47 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        Enter
-      </Text>{' '}
-      - Send message
-    </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Shift+Enter
-      </Text>{' '}
-      - New line
-    </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Up/Down
-      </Text>{' '}
-      - Cycle through your prompt history
-    </Text>
-    <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
         Alt+Left/Right
       </Text>{' '}
       - Jump through words in the input
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Ctrl+C
+      </Text>{' '}
+      - Quit application
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        {process.platform === 'win32' ? 'Ctrl+Enter' : 'Ctrl+J'}
+      </Text>{' '}
+      {process.platform === 'linux'
+        ? '- New line (Alt+Enter works for certain linux distros)'
+        : '- New line'}
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Ctrl+L
+      </Text>{' '}
+      - Clear the screen
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        {process.platform === 'darwin' ? 'Ctrl+X / Meta+Enter' : 'Ctrl+X'}
+      </Text>{' '}
+      - Open input in external editor
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Ctrl+Y
+      </Text>{' '}
+      - Toggle YOLO mode
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Enter
+      </Text>{' '}
+      - Send message
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
@@ -121,9 +153,22 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        Ctrl+C
+        Shift+Tab
       </Text>{' '}
-      - Quit application
+      - Toggle auto-accepting edits
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text bold color={Colors.AccentPurple}>
+        Up/Down
+      </Text>{' '}
+      - Cycle through your prompt history
+    </Text>
+    <Box height={1} />
+    <Text color={Colors.Foreground}>
+      For a full list of shortcuts, see{' '}
+      <Text bold color={Colors.AccentPurple}>
+        docs/keyboard-shortcuts.md
+      </Text>
     </Text>
   </Box>
 );

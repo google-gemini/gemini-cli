@@ -15,14 +15,26 @@ interface UserMessageProps {
 export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
+  const isSlashCommand = text.startsWith('/');
+
+  const textColor = isSlashCommand ? Colors.AccentPurple : Colors.Gray;
+  const borderColor = isSlashCommand ? Colors.AccentPurple : Colors.Gray;
 
   return (
-    <Box flexDirection="row" marginY={1}>
+    <Box
+      borderStyle="round"
+      borderColor={borderColor}
+      flexDirection="row"
+      paddingX={2}
+      paddingY={0}
+      marginY={1}
+      alignSelf="flex-start"
+    >
       <Box width={prefixWidth}>
-        <Text color={Colors.Gray}>{prefix}</Text>
+        <Text color={textColor}>{prefix}</Text>
       </Box>
       <Box flexGrow={1}>
-        <Text wrap="wrap" color={Colors.Gray}>
+        <Text wrap="wrap" color={textColor}>
           {text}
         </Text>
       </Box>

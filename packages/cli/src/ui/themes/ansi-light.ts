@@ -9,7 +9,7 @@ import { type ColorsTheme, Theme } from './theme.js';
 const ansiLightColors: ColorsTheme = {
   type: 'light',
   Background: 'white',
-  Foreground: 'black',
+  Foreground: '#444',
   LightBlue: 'blue',
   AccentBlue: 'blue',
   AccentPurple: 'purple',
@@ -17,6 +17,8 @@ const ansiLightColors: ColorsTheme = {
   AccentGreen: 'green',
   AccentYellow: 'orange',
   AccentRed: 'red',
+  DiffAdded: '#E5F2E5',
+  DiffRemoved: '#FFE5E5',
   Comment: 'gray',
   Gray: 'gray',
   GradientColors: ['blue', 'green'],

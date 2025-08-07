@@ -55,7 +55,7 @@ if (process.env.DEBUG && !sandboxCommand) {
   }
 }
 
-nodeArgs.push('./packages/cli');
+nodeArgs.push(join(root, 'packages', 'cli'));
 nodeArgs.push(...process.argv.slice(2));
 
 const env = {
@@ -66,7 +66,7 @@ const env = {
 
 if (process.env.DEBUG) {
   // If this is not set, the debugger will pause on the outer process rather
-  // than the relauncehd process making it harder to debug.
+  // than the relaunched process making it harder to debug.
   env.GEMINI_CLI_NO_RELAUNCH = 'true';
 }
 const child = spawn('node', nodeArgs, { stdio: 'inherit', env });

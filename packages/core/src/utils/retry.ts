@@ -5,13 +5,24 @@
  */
 
 import { AuthType } from '../core/contentGenerator.js';
+import {
+  isProQuotaExceededError,
+  isGenericQuotaExceededError,
+} from './quotaErrorDetection.js';
+
+export interface HttpError extends Error {
+  status?: number;
+}
 
 export interface RetryOptions {
   maxAttempts: number;
   initialDelayMs: number;
   maxDelayMs: number;
   shouldRetry: (error: Error) => boolean;
-  onPersistent429?: (authType?: string) => Promise<string | null>;
+  onPersistent429?: (
+    authType?: string,
+    error?: unknown,
+  ) => Promise<string | boolean | null>;
   authType?: string;
 }
 
@@ -86,6 +97,59 @@ export async function retryWithBackoff<T>(
     } catch (error) {
       const errorStatus = getErrorStatus(error);
 
+      // Check for Pro quota exceeded error first - immediate fallback for OAuth users
+      if (
+        errorStatus === 429 &&
+        authType === AuthType.LOGIN_WITH_GOOGLE &&
+        isProQuotaExceededError(error) &&
+        onPersistent429
+      ) {
+        try {
+          const fallbackModel = await onPersistent429(authType, error);
+          if (fallbackModel !== false && fallbackModel !== null) {
+            // Reset attempt counter and try with new model
+            attempt = 0;
+            consecutive429Count = 0;
+            currentDelay = initialDelayMs;
+            // With the model updated, we continue to the next attempt
+            continue;
+          } else {
+            // Fallback handler returned null/false, meaning don't continue - stop retry process
+            throw error;
+          }
+        } catch (fallbackError) {
+          // If fallback fails, continue with original error
+          console.warn('Fallback to Flash model failed:', fallbackError);
+        }
+      }
+
+      // Check for generic quota exceeded error (but not Pro, which was handled above) - immediate fallback for OAuth users
+      if (
+        errorStatus === 429 &&
+        authType === AuthType.LOGIN_WITH_GOOGLE &&
+        !isProQuotaExceededError(error) &&
+        isGenericQuotaExceededError(error) &&
+        onPersistent429
+      ) {
+        try {
+          const fallbackModel = await onPersistent429(authType, error);
+          if (fallbackModel !== false && fallbackModel !== null) {
+            // Reset attempt counter and try with new model
+            attempt = 0;
+            consecutive429Count = 0;
+            currentDelay = initialDelayMs;
+            // With the model updated, we continue to the next attempt
+            continue;
+          } else {
+            // Fallback handler returned null/false, meaning don't continue - stop retry process
+            throw error;
+          }
+        } catch (fallbackError) {
+          // If fallback fails, continue with original error
+          console.warn('Fallback to Flash model failed:', fallbackError);
+        }
+      }
+
       // Track consecutive 429 errors
       if (errorStatus === 429) {
         consecutive429Count++;
@@ -97,17 +161,20 @@ export async function retryWithBackoff<T>(
       if (
         consecutive429Count >= 2 &&
         onPersistent429 &&
-        authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL
+        authType === AuthType.LOGIN_WITH_GOOGLE
       ) {
         try {
-          const fallbackModel = await onPersistent429(authType);
-          if (fallbackModel) {
+          const fallbackModel = await onPersistent429(authType, error);
+          if (fallbackModel !== false && fallbackModel !== null) {
             // Reset attempt counter and try with new model
             attempt = 0;
             consecutive429Count = 0;
             currentDelay = initialDelayMs;
             // With the model updated, we continue to the next attempt
             continue;
+          } else {
+            // Fallback handler returned null/false, meaning don't continue - stop retry process
+            throw error;
           }
         } catch (fallbackError) {
           // If fallback fails, continue with original error
@@ -133,7 +200,7 @@ export async function retryWithBackoff<T>(
         // Reset currentDelay for next potential non-429 error, or if Retry-After is not present next time
         currentDelay = initialDelayMs;
       } else {
-        // Fallback to exponential backoff with jitter
+        // Fall back to exponential backoff with jitter
         logRetryAttempt(attempt, error, errorStatus);
         // Add jitter: +/- 30% of currentDelay
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
@@ -153,7 +220,7 @@ export async function retryWithBackoff<T>(
  * @param error The error object.
  * @returns The HTTP status code, or undefined if not found.
  */
-function getErrorStatus(error: unknown): number | undefined {
+export function getErrorStatus(error: unknown): number | undefined {
   if (typeof error === 'object' && error !== null) {
     if ('status' in error && typeof error.status === 'number') {
       return error.status;

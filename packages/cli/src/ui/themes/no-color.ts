@@ -17,12 +17,14 @@ const noColorColorsTheme: ColorsTheme = {
   AccentGreen: '',
   AccentYellow: '',
   AccentRed: '',
+  DiffAdded: '',
+  DiffRemoved: '',
   Comment: '',
   Gray: '',
 };
 
 export const NoColorTheme: Theme = new Theme(
-  'No Color',
+  'NoColor',
   'dark',
   {
     hljs: {

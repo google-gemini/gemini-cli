@@ -5,8 +5,9 @@
  */
 
 import type { CSSProperties } from 'react';
+import { isValidColor, resolveColor } from './color-utils.js';
 
-export type ThemeType = 'light' | 'dark' | 'ansi';
+export type ThemeType = 'light' | 'dark' | 'ansi' | 'custom';
 
 export interface ColorsTheme {
   type: ThemeType;
@@ -19,9 +20,16 @@ export interface ColorsTheme {
   AccentGreen: string;
   AccentYellow: string;
   AccentRed: string;
+  DiffAdded: string;
+  DiffRemoved: string;
   Comment: string;
   Gray: string;
   GradientColors?: string[];
+}
+
+export interface CustomTheme extends ColorsTheme {
+  type: 'custom';
+  name: string;
 }
 
 export const lightTheme: ColorsTheme = {
@@ -35,8 +43,10 @@ export const lightTheme: ColorsTheme = {
   AccentGreen: '#3CA84B',
   AccentYellow: '#D5A40A',
   AccentRed: '#DD4C4C',
+  DiffAdded: '#C6EAD8',
+  DiffRemoved: '#FFCCCC',
   Comment: '#008000',
-  Gray: '#B7BECC',
+  Gray: '#97a0b0',
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
@@ -51,6 +61,8 @@ export const darkTheme: ColorsTheme = {
   AccentGreen: '#A6E3A1',
   AccentYellow: '#F9E2AF',
   AccentRed: '#F38BA8',
+  DiffAdded: '#28350B',
+  DiffRemoved: '#430000',
   Comment: '#6C7086',
   Gray: '#6C7086',
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
@@ -67,6 +79,8 @@ export const ansiTheme: ColorsTheme = {
   AccentGreen: 'green',
   AccentYellow: 'yellow',
   AccentRed: 'red',
+  DiffAdded: 'green',
+  DiffRemoved: 'red',
   Comment: 'gray',
   Gray: 'gray',
 };
@@ -82,173 +96,6 @@ export class Theme {
    * to Ink-compatible color strings (hex or name).
    */
   protected readonly _colorMap: Readonly<Record<string, string>>;
-
-  // --- Static Helper Data ---
-
-  // Mapping from common CSS color names (lowercase) to hex codes (lowercase)
-  // Excludes names directly supported by Ink
-  private static readonly cssNameToHexMap: Readonly<Record<string, string>> = {
-    aliceblue: '#f0f8ff',
-    antiquewhite: '#faebd7',
-    aqua: '#00ffff',
-    aquamarine: '#7fffd4',
-    azure: '#f0ffff',
-    beige: '#f5f5dc',
-    bisque: '#ffe4c4',
-    blanchedalmond: '#ffebcd',
-    blueviolet: '#8a2be2',
-    brown: '#a52a2a',
-    burlywood: '#deb887',
-    cadetblue: '#5f9ea0',
-    chartreuse: '#7fff00',
-    chocolate: '#d2691e',
-    coral: '#ff7f50',
-    cornflowerblue: '#6495ed',
-    cornsilk: '#fff8dc',
-    crimson: '#dc143c',
-    darkblue: '#00008b',
-    darkcyan: '#008b8b',
-    darkgoldenrod: '#b8860b',
-    darkgray: '#a9a9a9',
-    darkgrey: '#a9a9a9',
-    darkgreen: '#006400',
-    darkkhaki: '#bdb76b',
-    darkmagenta: '#8b008b',
-    darkolivegreen: '#556b2f',
-    darkorange: '#ff8c00',
-    darkorchid: '#9932cc',
-    darkred: '#8b0000',
-    darksalmon: '#e9967a',
-    darkseagreen: '#8fbc8f',
-    darkslateblue: '#483d8b',
-    darkslategray: '#2f4f4f',
-    darkslategrey: '#2f4f4f',
-    darkturquoise: '#00ced1',
-    darkviolet: '#9400d3',
-    deeppink: '#ff1493',
-    deepskyblue: '#00bfff',
-    dimgray: '#696969',
-    dimgrey: '#696969',
-    dodgerblue: '#1e90ff',
-    firebrick: '#b22222',
-    floralwhite: '#fffaf0',
-    forestgreen: '#228b22',
-    fuchsia: '#ff00ff',
-    gainsboro: '#dcdcdc',
-    ghostwhite: '#f8f8ff',
-    gold: '#ffd700',
-    goldenrod: '#daa520',
-    greenyellow: '#adff2f',
-    honeydew: '#f0fff0',
-    hotpink: '#ff69b4',
-    indianred: '#cd5c5c',
-    indigo: '#4b0082',
-    ivory: '#fffff0',
-    khaki: '#f0e68c',
-    lavender: '#e6e6fa',
-    lavenderblush: '#fff0f5',
-    lawngreen: '#7cfc00',
-    lemonchiffon: '#fffacd',
-    lightblue: '#add8e6',
-    lightcoral: '#f08080',
-    lightcyan: '#e0ffff',
-    lightgoldenrodyellow: '#fafad2',
-    lightgray: '#d3d3d3',
-    lightgrey: '#d3d3d3',
-    lightgreen: '#90ee90',
-    lightpink: '#ffb6c1',
-    lightsalmon: '#ffa07a',
-    lightseagreen: '#20b2aa',
-    lightskyblue: '#87cefa',
-    lightslategray: '#778899',
-    lightslategrey: '#778899',
-    lightsteelblue: '#b0c4de',
-    lightyellow: '#ffffe0',
-    lime: '#00ff00',
-    limegreen: '#32cd32',
-    linen: '#faf0e6',
-    maroon: '#800000',
-    mediumaquamarine: '#66cdaa',
-    mediumblue: '#0000cd',
-    mediumorchid: '#ba55d3',
-    mediumpurple: '#9370db',
-    mediumseagreen: '#3cb371',
-    mediumslateblue: '#7b68ee',
-    mediumspringgreen: '#00fa9a',
-    mediumturquoise: '#48d1cc',
-    mediumvioletred: '#c71585',
-    midnightblue: '#191970',
-    mintcream: '#f5fffa',
-    mistyrose: '#ffe4e1',
-    moccasin: '#ffe4b5',
-    navajowhite: '#ffdead',
-    navy: '#000080',
-    oldlace: '#fdf5e6',
-    olive: '#808000',
-    olivedrab: '#6b8e23',
-    orange: '#ffa500',
-    orangered: '#ff4500',
-    orchid: '#da70d6',
-    palegoldenrod: '#eee8aa',
-    palegreen: '#98fb98',
-    paleturquoise: '#afeeee',
-    palevioletred: '#db7093',
-    papayawhip: '#ffefd5',
-    peachpuff: '#ffdab9',
-    peru: '#cd853f',
-    pink: '#ffc0cb',
-    plum: '#dda0dd',
-    powderblue: '#b0e0e6',
-    purple: '#800080',
-    rebeccapurple: '#663399',
-    rosybrown: '#bc8f8f',
-    royalblue: '#4169e1',
-    saddlebrown: '#8b4513',
-    salmon: '#fa8072',
-    sandybrown: '#f4a460',
-    seagreen: '#2e8b57',
-    seashell: '#fff5ee',
-    sienna: '#a0522d',
-    silver: '#c0c0c0',
-    skyblue: '#87ceeb',
-    slateblue: '#6a5acd',
-    slategray: '#708090',
-    slategrey: '#708090',
-    snow: '#fffafa',
-    springgreen: '#00ff7f',
-    steelblue: '#4682b4',
-    tan: '#d2b48c',
-    teal: '#008080',
-    thistle: '#d8bfd8',
-    tomato: '#ff6347',
-    turquoise: '#40e0d0',
-    violet: '#ee82ee',
-    wheat: '#f5deb3',
-    whitesmoke: '#f5f5f5',
-    yellowgreen: '#9acd32',
-  };
-
-  // Define the set of Ink's named colors for quick lookup
-  private static readonly inkSupportedNames = new Set([
-    'black',
-    'red',
-    'green',
-    'yellow',
-    'blue',
-    'cyan',
-    'magenta',
-    'white',
-    'gray',
-    'grey',
-    'blackbright',
-    'redbright',
-    'greenbright',
-    'yellowbright',
-    'bluebright',
-    'cyanbright',
-    'magentabright',
-    'whitebright',
-  ]);
 
   /**
    * Creates a new Theme instance.
@@ -285,26 +132,7 @@ export class Theme {
    * @returns An Ink-compatible color string (hex or name), or undefined if not resolvable.
    */
   private static _resolveColor(colorValue: string): string | undefined {
-    const lowerColor = colorValue.toLowerCase();
-
-    // 1. Check if it's already a hex code
-    if (lowerColor.startsWith('#')) {
-      return lowerColor; // Use hex directly
-    }
-    // 2. Check if it's an Ink supported name (lowercase)
-    else if (Theme.inkSupportedNames.has(lowerColor)) {
-      return lowerColor; // Use Ink name directly
-    }
-    // 3. Check if it's a known CSS name we can map to hex
-    else if (Theme.cssNameToHexMap[lowerColor]) {
-      return Theme.cssNameToHexMap[lowerColor]; // Use mapped hex
-    }
-
-    // 4. Could not resolve
-    console.warn(
-      `[Theme] Could not resolve color "${colorValue}" to an Ink-compatible format.`,
-    );
-    return undefined;
+    return resolveColor(colorValue);
   }
 
   /**
@@ -331,11 +159,262 @@ export class Theme {
           inkTheme[key] = resolvedColor;
         }
         // If color is not resolvable, it's omitted from the map,
-        // allowing fallback to the default foreground color.
+        // this enables falling back to the default foreground color.
       }
       // We currently only care about the 'color' property for Ink rendering.
       // Other properties like background, fontStyle, etc., are ignored.
     }
     return inkTheme;
   }
+}
+
+/**
+ * Creates a Theme instance from a custom theme configuration.
+ * @param customTheme The custom theme configuration.
+ * @returns A new Theme instance.
+ */
+export function createCustomTheme(customTheme: CustomTheme): Theme {
+  // Generate CSS properties mappings based on the custom theme colors
+  const rawMappings: Record<string, CSSProperties> = {
+    hljs: {
+      display: 'block',
+      overflowX: 'auto',
+      padding: '0.5em',
+      background: customTheme.Background,
+      color: customTheme.Foreground,
+    },
+    'hljs-keyword': {
+      color: customTheme.AccentBlue,
+    },
+    'hljs-literal': {
+      color: customTheme.AccentBlue,
+    },
+    'hljs-symbol': {
+      color: customTheme.AccentBlue,
+    },
+    'hljs-name': {
+      color: customTheme.AccentBlue,
+    },
+    'hljs-link': {
+      color: customTheme.AccentBlue,
+      textDecoration: 'underline',
+    },
+    'hljs-built_in': {
+      color: customTheme.AccentCyan,
+    },
+    'hljs-type': {
+      color: customTheme.AccentCyan,
+    },
+    'hljs-number': {
+      color: customTheme.AccentGreen,
+    },
+    'hljs-class': {
+      color: customTheme.AccentGreen,
+    },
+    'hljs-string': {
+      color: customTheme.AccentYellow,
+    },
+    'hljs-meta-string': {
+      color: customTheme.AccentYellow,
+    },
+    'hljs-regexp': {
+      color: customTheme.AccentRed,
+    },
+    'hljs-template-tag': {
+      color: customTheme.AccentRed,
+    },
+    'hljs-subst': {
+      color: customTheme.Foreground,
+    },
+    'hljs-function': {
+      color: customTheme.Foreground,
+    },
+    'hljs-title': {
+      color: customTheme.Foreground,
+    },
+    'hljs-params': {
+      color: customTheme.Foreground,
+    },
+    'hljs-formula': {
+      color: customTheme.Foreground,
+    },
+    'hljs-comment': {
+      color: customTheme.Comment,
+      fontStyle: 'italic',
+    },
+    'hljs-quote': {
+      color: customTheme.Comment,
+      fontStyle: 'italic',
+    },
+    'hljs-doctag': {
+      color: customTheme.Comment,
+    },
+    'hljs-meta': {
+      color: customTheme.Gray,
+    },
+    'hljs-meta-keyword': {
+      color: customTheme.Gray,
+    },
+    'hljs-tag': {
+      color: customTheme.Gray,
+    },
+    'hljs-variable': {
+      color: customTheme.AccentPurple,
+    },
+    'hljs-template-variable': {
+      color: customTheme.AccentPurple,
+    },
+    'hljs-attr': {
+      color: customTheme.LightBlue,
+    },
+    'hljs-attribute': {
+      color: customTheme.LightBlue,
+    },
+    'hljs-builtin-name': {
+      color: customTheme.LightBlue,
+    },
+    'hljs-section': {
+      color: customTheme.AccentYellow,
+    },
+    'hljs-emphasis': {
+      fontStyle: 'italic',
+    },
+    'hljs-strong': {
+      fontWeight: 'bold',
+    },
+    'hljs-bullet': {
+      color: customTheme.AccentYellow,
+    },
+    'hljs-selector-tag': {
+      color: customTheme.AccentYellow,
+    },
+    'hljs-selector-id': {
+      color: customTheme.AccentYellow,
+    },
+    'hljs-selector-class': {
+      color: customTheme.AccentYellow,
+    },
+    'hljs-selector-attr': {
+      color: customTheme.AccentYellow,
+    },
+    'hljs-selector-pseudo': {
+      color: customTheme.AccentYellow,
+    },
+    'hljs-addition': {
+      backgroundColor: customTheme.AccentGreen,
+      display: 'inline-block',
+      width: '100%',
+    },
+    'hljs-deletion': {
+      backgroundColor: customTheme.AccentRed,
+      display: 'inline-block',
+      width: '100%',
+    },
+  };
+
+  return new Theme(customTheme.name, 'custom', rawMappings, customTheme);
+}
+
+/**
+ * Validates a custom theme configuration.
+ * @param customTheme The custom theme to validate.
+ * @returns An object with isValid boolean and error message if invalid.
+ */
+export function validateCustomTheme(customTheme: Partial<CustomTheme>): {
+  isValid: boolean;
+  error?: string;
+  warning?: string;
+} {
+  // Check required fields
+  const requiredFields: Array<keyof CustomTheme> = [
+    'name',
+    'Background',
+    'Foreground',
+    'LightBlue',
+    'AccentBlue',
+    'AccentPurple',
+    'AccentCyan',
+    'AccentGreen',
+    'AccentYellow',
+    'AccentRed',
+    // 'DiffAdded' and 'DiffRemoved' are not required as they were added after
+    // the theme format was defined.
+    'Comment',
+    'Gray',
+  ];
+
+  const recommendedFields: Array<keyof CustomTheme> = [
+    'DiffAdded',
+    'DiffRemoved',
+  ];
+
+  for (const field of requiredFields) {
+    if (!customTheme[field]) {
+      return {
+        isValid: false,
+        error: `Missing required field: ${field}`,
+      };
+    }
+  }
+
+  const missingFields: string[] = [];
+
+  for (const field of recommendedFields) {
+    if (!customTheme[field]) {
+      missingFields.push(field);
+    }
+  }
+
+  // Validate color format (basic hex validation)
+  const colorFields: Array<keyof CustomTheme> = [
+    'Background',
+    'Foreground',
+    'LightBlue',
+    'AccentBlue',
+    'AccentPurple',
+    'AccentCyan',
+    'AccentGreen',
+    'AccentYellow',
+    'AccentRed',
+    'DiffAdded',
+    'DiffRemoved',
+    'Comment',
+    'Gray',
+  ];
+
+  for (const field of colorFields) {
+    const color = customTheme[field] as string | undefined;
+    if (color !== undefined && !isValidColor(color)) {
+      return {
+        isValid: false,
+        error: `Invalid color format for ${field}: ${color}`,
+      };
+    }
+  }
+
+  // Validate theme name
+  if (customTheme.name && !isValidThemeName(customTheme.name)) {
+    return {
+      isValid: false,
+      error: `Invalid theme name: ${customTheme.name}`,
+    };
+  }
+
+  return {
+    isValid: true,
+    warning:
+      missingFields.length > 0
+        ? `Missing field(s) ${missingFields.join(', ')}`
+        : undefined,
+  };
+}
+
+/**
+ * Checks if a theme name is valid.
+ * @param name The theme name to validate.
+ * @returns True if the theme name is valid.
+ */
+function isValidThemeName(name: string): boolean {
+  // Theme name should be non-empty and not contain invalid characters
+  return name.trim().length > 0 && name.trim().length <= 50;
 }

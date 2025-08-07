@@ -8,7 +8,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../../colors.js';
 import crypto from 'crypto';
-import { colorizeCode } from '../../utils/CodeColorizer.js';
+import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 
 interface DiffLine {
@@ -93,6 +93,7 @@ interface DiffRendererProps {
   tabWidth?: number;
   availableTerminalHeight?: number;
   terminalWidth: number;
+  theme?: import('../../themes/theme.js').Theme;
 }
 
 const DEFAULT_TAB_WIDTH = 4; // Spaces per tab for normalization
@@ -103,6 +104,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight,
   terminalWidth,
+  theme,
 }) => {
   if (!diffContent || typeof diffContent !== 'string') {
     return <Text color={Colors.AccentYellow}>No diff content.</Text>;
@@ -146,6 +148,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
       language,
       availableTerminalHeight,
       terminalWidth,
+      theme,
     );
   } else {
     renderedOutput = renderDiffContent(
@@ -185,6 +188,18 @@ const renderDiffContent = (
       </Box>
     );
   }
+
+  const maxLineNumber = Math.max(
+    0,
+    ...displayableLines.map((l) => l.oldLine ?? 0),
+    ...displayableLines.map((l) => l.newLine ?? 0),
+  );
+  const gutterWidth = Math.max(1, maxLineNumber.toString().length);
+
+  const fileExtension = filename?.split('.').pop() || null;
+  const language = fileExtension
+    ? getLanguageFromExtension(fileExtension)
+    : null;
 
   // Calculate the minimum indentation across all displayable lines
   let baseIndentation = Infinity; // Start high to find the minimum
@@ -232,27 +247,25 @@ const renderDiffContent = (
         ) {
           acc.push(
             <Box key={`gap-${index}`}>
-              <Text wrap="truncate">{'═'.repeat(terminalWidth)}</Text>
+              <Text wrap="truncate" color={Colors.Gray}>
+                {'═'.repeat(terminalWidth)}
+              </Text>
             </Box>,
           );
         }
 
         const lineKey = `diff-line-${index}`;
         let gutterNumStr = '';
-        let color: string | undefined = undefined;
         let prefixSymbol = ' ';
-        let dim = false;
 
         switch (line.type) {
           case 'add':
             gutterNumStr = (line.newLine ?? '').toString();
-            color = 'green';
             prefixSymbol = '+';
             lastLineNumber = line.newLine ?? null;
             break;
           case 'del':
             gutterNumStr = (line.oldLine ?? '').toString();
-            color = 'red';
             prefixSymbol = '-';
             // For deletions, update lastLineNumber based on oldLine if it's advancing.
             // This helps manage gaps correctly if there are multiple consecutive deletions
@@ -263,7 +276,6 @@ const renderDiffContent = (
             break;
           case 'context':
             gutterNumStr = (line.newLine ?? '').toString();
-            dim = true;
             prefixSymbol = ' ';
             lastLineNumber = line.newLine ?? null;
             break;
@@ -275,13 +287,26 @@ const renderDiffContent = (
 
         acc.push(
           <Box key={lineKey} flexDirection="row">
-            <Text color={Colors.Gray}>{gutterNumStr.padEnd(4)} </Text>
-            <Text color={color} dimColor={dim}>
-              {prefixSymbol}{' '}
+            <Text color={Colors.Gray}>
+              {gutterNumStr.padStart(gutterWidth)}{' '}
             </Text>
-            <Text color={color} dimColor={dim} wrap="wrap">
-              {displayContent}
-            </Text>
+            {line.type === 'context' ? (
+              <>
+                <Text>{prefixSymbol} </Text>
+                <Text wrap="wrap">
+                  {colorizeLine(displayContent, language)}
+                </Text>
+              </>
+            ) : (
+              <Text
+                backgroundColor={
+                  line.type === 'add' ? Colors.DiffAdded : Colors.DiffRemoved
+                }
+                wrap="wrap"
+              >
+                {prefixSymbol} {colorizeLine(displayContent, language)}
+              </Text>
+            )}
           </Box>,
         );
         return acc;

@@ -127,10 +127,10 @@ export interface OnboardUserRequest {
 }
 
 /**
- * Represents LongrunningOperation proto
+ * Represents LongRunningOperation proto
  * http://google3/google/longrunning/operations.proto;rcl=698857719;l=107
  */
-export interface LongrunningOperationResponse {
+export interface LongRunningOperationResponse {
   name: string;
   done?: boolean;
   response?: OnboardUserResponse;
@@ -172,4 +172,14 @@ export interface OnboardUserStatus {
 export interface HelpLinkUrl {
   description: string;
   url: string;
+}
+
+export interface SetCodeAssistGlobalUserSettingRequest {
+  cloudaicompanionProject?: string;
+  freeTierDataCollectionOptin: boolean;
+}
+
+export interface CodeAssistGlobalUserSettingResponse {
+  cloudaicompanionProject?: string;
+  freeTierDataCollectionOptin: boolean;
 }
