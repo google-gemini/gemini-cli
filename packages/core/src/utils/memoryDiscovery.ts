@@ -103,17 +103,23 @@ async function getGeminiMdFilePathsInternal(
 
   for (let i = 0; i < dirsArray.length; i += CONCURRENT_LIMIT) {
     const batch = dirsArray.slice(i, i + CONCURRENT_LIMIT);
-    const batchPromises = batch.map((dir) =>
-      getGeminiMdFilePathsInternalForEachDir(
-        dir,
-        userHomePath,
-        debugMode,
-        fileService,
-        extensionContextFilePaths,
-        fileFilteringOptions,
-        maxDirs,
-      ),
-    );
+    const batchPromises = batch.map(async (dir) => {
+      try {
+        return await getGeminiMdFilePathsInternalForEachDir(
+          dir,
+          userHomePath,
+          debugMode,
+          fileService,
+          extensionContextFilePaths,
+          fileFilteringOptions,
+          maxDirs,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error(`Error discovering files in directory ${dir}: ${message}`);
+        return []; // Return an empty array to allow other directories to be processed
+      }
+    });
     const batchResults = await Promise.all(batchPromises);
     pathsArrays.push(...batchResults);
   }
