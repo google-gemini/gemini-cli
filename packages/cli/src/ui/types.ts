@@ -65,6 +65,7 @@ export interface HistoryItemBase {
 export type HistoryItemUser = HistoryItemBase & {
   type: 'user';
   text: string;
+  isInterrupt?: boolean;
 };
 
 export type HistoryItemGemini = HistoryItemBase & {

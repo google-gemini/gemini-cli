@@ -82,6 +82,20 @@ describe('initCommand', () => {
     );
   });
 
+  it('should include user request in prompt when provided', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    const result = await initCommand.action!(
+      mockContext,
+      'check the blender scene opened, and work with me on the plugin assetattach',
+    );
+
+    expect(result.type).toBe('submit_prompt');
+    expect(result.content).toContain(
+      '**User Request:** check the blender scene opened',
+    );
+  });
+
   it('should return an error if config is not available', async () => {
     // Arrange: Create a context without config
     const noConfigContext = createMockCommandContext();

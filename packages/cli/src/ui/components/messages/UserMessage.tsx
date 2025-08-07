@@ -10,15 +10,27 @@ import { Colors } from '../../colors.js';
 
 interface UserMessageProps {
   text: string;
+  isInterrupt?: boolean;
 }
 
-export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
+export const UserMessage: React.FC<UserMessageProps> = ({
+  text,
+  isInterrupt = false,
+}) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
   const isSlashCommand = text.startsWith('/');
 
-  const textColor = isSlashCommand ? Colors.AccentPurple : Colors.Gray;
-  const borderColor = isSlashCommand ? Colors.AccentPurple : Colors.Gray;
+  const textColor = isSlashCommand
+    ? Colors.AccentPurple
+    : isInterrupt
+      ? Colors.AccentYellow
+      : Colors.Gray;
+  const borderColor = isSlashCommand
+    ? Colors.AccentPurple
+    : isInterrupt
+      ? Colors.AccentYellow
+      : Colors.Gray;
 
   return (
     <Box
@@ -34,7 +46,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
         <Text color={textColor}>{prefix}</Text>
       </Box>
       <Box flexGrow={1}>
-        <Text wrap="wrap" color={textColor}>
+        <Text wrap="wrap" color={textColor} bold={isInterrupt}>
           {text}
         </Text>
       </Box>
