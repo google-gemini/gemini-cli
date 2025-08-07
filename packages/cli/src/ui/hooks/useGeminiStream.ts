@@ -215,6 +215,7 @@ export const useGeminiStream = (
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
+      model?: string;
     }> => {
       if (turnCancelledRef.current) {
         return { queryToSend: null, shouldProceed: false };
@@ -254,7 +255,10 @@ export const useGeminiStream = (
                 prompt_id,
               };
               scheduleToolCalls([toolCallRequest], abortSignal);
-              return { queryToSend: null, shouldProceed: false };
+              return {
+                queryToSend: null,
+                shouldProceed: false,
+              };
             }
             case 'submit_prompt': {
               localQueryToSendToGemini = slashCommandResult.content;
@@ -262,10 +266,14 @@ export const useGeminiStream = (
               return {
                 queryToSend: localQueryToSendToGemini,
                 shouldProceed: true,
+                model: slashCommandResult.model,
               };
             }
             case 'handled': {
-              return { queryToSend: null, shouldProceed: false };
+              return {
+                queryToSend: null,
+                shouldProceed: false,
+              };
             }
             default: {
               const unreachable: never = slashCommandResult;
@@ -291,7 +299,11 @@ export const useGeminiStream = (
             signal: abortSignal,
           });
           if (!atCommandResult.shouldProceed) {
-            return { queryToSend: null, shouldProceed: false };
+            return {
+              queryToSend: null,
+              shouldProceed: false,
+              model: undefined,
+            };
           }
           localQueryToSendToGemini = atCommandResult.processedQuery;
         } else {
@@ -311,9 +323,12 @@ export const useGeminiStream = (
         onDebugMessage(
           'Query processing resulted in null, not sending to Gemini.',
         );
-        return { queryToSend: null, shouldProceed: false };
+        return { queryToSend: null, shouldProceed: false, model: undefined };
       }
-      return { queryToSend: localQueryToSendToGemini, shouldProceed: true };
+      return {
+        queryToSend: localQueryToSendToGemini,
+        shouldProceed: true,
+      };
     },
     [
       config,
@@ -628,7 +643,7 @@ export const useGeminiStream = (
         prompt_id = config.getSessionId() + '########' + getPromptCount();
       }
 
-      const { queryToSend, shouldProceed } = await prepareQueryForGemini(
+      const { queryToSend, shouldProceed, model } = await prepareQueryForGemini(
         query,
         userMessageTimestamp,
         abortSignal,
@@ -652,6 +667,7 @@ export const useGeminiStream = (
           queryToSend,
           abortSignal,
           prompt_id!,
+          model,
         );
         const processingStatus = await processGeminiStreamEvents(
           stream,

@@ -587,6 +587,7 @@ describe('useGeminiStream', () => {
       expectedMergedResponse,
       expect.any(AbortSignal),
       'prompt-id-2',
+      undefined,
     );
   });
 
@@ -891,6 +892,7 @@ describe('useGeminiStream', () => {
         toolCallResponseParts,
         expect.any(AbortSignal),
         'prompt-id-4',
+        undefined,
       );
     });
 
@@ -1165,6 +1167,7 @@ describe('useGeminiStream', () => {
           'This is the actual prompt from the command file.',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
         );
 
         expect(mockScheduleToolCalls).not.toHaveBeenCalled();
@@ -1191,6 +1194,7 @@ describe('useGeminiStream', () => {
           '',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
         );
       });
     });

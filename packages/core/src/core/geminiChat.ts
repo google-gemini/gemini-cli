@@ -268,6 +268,7 @@ export class GeminiChat {
   async sendMessage(
     params: SendMessageParameters,
     prompt_id: string,
+    model?: string,
   ): Promise<GenerateContentResponse> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
@@ -280,7 +281,8 @@ export class GeminiChat {
 
     try {
       const apiCall = () => {
-        const modelToUse = this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
+        const modelToUse =
+          model || this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
 
         // Prevent Flash model calls immediately after quota error
         if (
@@ -383,6 +385,7 @@ export class GeminiChat {
   async sendMessageStream(
     params: SendMessageParameters,
     prompt_id: string,
+    model?: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
@@ -393,8 +396,7 @@ export class GeminiChat {
 
     try {
       const apiCall = () => {
-        const modelToUse = this.config.getModel();
-
+        const modelToUse = model || this.config.getModel();
         // Prevent Flash model calls immediately after quota error
         if (
           this.config.getQuotaErrorOccurred() &&
