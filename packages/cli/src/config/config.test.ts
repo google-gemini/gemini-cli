@@ -1123,3 +1123,42 @@ describe('loadCliConfig with includeDirectories', () => {
     );
   });
 });
+
+describe('loadCliConfig chatCompression', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('should pass chatCompression settings to the core config', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      chatCompression: {
+        contextPercentageThreshold: 0.5,
+      },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getChatCompression()).toEqual({
+      contextPercentageThreshold: 0.5,
+    });
+  });
+
+  it('should have undefined chatCompression if not in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getChatCompression()).toBeUndefined();
+  });
+});
