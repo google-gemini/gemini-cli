@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { glob } from 'glob';
@@ -22,6 +22,9 @@ import {
   Suggestion,
 } from '../components/SuggestionsDisplay.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
+import { TextBuffer } from '../components/shared/text-buffer.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
+import { toCodePoints } from '../utils/textUtils.js';
 
 export interface UseCompletionReturn {
   suggestions: Suggestion[];
@@ -35,12 +38,13 @@ export interface UseCompletionReturn {
   resetCompletionState: () => void;
   navigateUp: () => void;
   navigateDown: () => void;
+  handleAutocomplete: (indexToUse: number) => void;
 }
 
 export function useCompletion(
-  query: string,
+  buffer: TextBuffer,
+  dirs: readonly string[],
   cwd: string,
-  isActive: boolean,
   slashCommands: readonly SlashCommand[],
   commandContext: CommandContext,
   config?: Config,
@@ -122,13 +126,45 @@ export function useCompletion(
     });
   }, [suggestions.length]);
 
+  // Check if cursor is after @ or / without unescaped spaces
+  const isActive = useMemo(() => {
+    if (isSlashCommand(buffer.text.trim())) {
+      return true;
+    }
+
+    // For other completions like '@', we search backwards from the cursor.
+    const [row, col] = buffer.cursor;
+    const currentLine = buffer.lines[row] || '';
+    const codePoints = toCodePoints(currentLine);
+
+    for (let i = col - 1; i >= 0; i--) {
+      const char = codePoints[i];
+
+      if (char === ' ') {
+        // Check for unescaped spaces.
+        let backslashCount = 0;
+        for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+          backslashCount++;
+        }
+        if (backslashCount % 2 === 0) {
+          return false; // Inactive on unescaped space.
+        }
+      } else if (char === '@') {
+        // Active if we find an '@' before any unescaped space.
+        return true;
+      }
+    }
+
+    return false;
+  }, [buffer.text, buffer.cursor, buffer.lines]);
+
   useEffect(() => {
     if (!isActive) {
       resetCompletionState();
       return;
     }
 
-    const trimmedQuery = query.trimStart();
+    const trimmedQuery = buffer.text.trimStart();
 
     if (trimmedQuery.startsWith('/')) {
       // Always reset perfect match at the beginning of processing.
@@ -275,13 +311,13 @@ export function useCompletion(
     }
 
     // Handle At Command Completion
-    const atIndex = query.lastIndexOf('@');
+    const atIndex = buffer.text.lastIndexOf('@');
     if (atIndex === -1) {
       resetCompletionState();
       return;
     }
 
-    const partialPath = query.substring(atIndex + 1);
+    const partialPath = buffer.text.substring(atIndex + 1);
     const lastSlashIndex = partialPath.lastIndexOf('/');
     const baseDirRelative =
       lastSlashIndex === -1
@@ -292,8 +328,6 @@ export function useCompletion(
         ? partialPath
         : partialPath.substring(lastSlashIndex + 1),
     );
-
-    const baseDirAbsolute = path.resolve(cwd, baseDirRelative);
 
     let isMounted = true;
 
@@ -323,7 +357,7 @@ export function useCompletion(
 
           const entryPathRelative = path.join(currentRelativePath, entry.name);
           const entryPathFromRoot = path.relative(
-            cwd,
+            startDir,
             path.join(startDir, entry.name),
           );
 
@@ -382,31 +416,30 @@ export function useCompletion(
         respectGitIgnore?: boolean;
         respectGeminiIgnore?: boolean;
       },
+      searchDir: string,
       maxResults = 50,
     ): Promise<Suggestion[]> => {
       const globPattern = `**/${searchPrefix}*`;
       const files = await glob(globPattern, {
-        cwd,
+        cwd: searchDir,
         dot: searchPrefix.startsWith('.'),
         nocase: true,
       });
 
       const suggestions: Suggestion[] = files
-        .map((file: string) => {
-          const relativePath = path.relative(cwd, file);
-          return {
-            label: relativePath,
-            value: escapePath(relativePath),
-          };
-        })
-        .filter((s) => {
+        .filter((file) => {
           if (fileDiscoveryService) {
-            return !fileDiscoveryService.shouldIgnoreFile(
-              s.label,
-              filterOptions,
-            ); // relative path
+            return !fileDiscoveryService.shouldIgnoreFile(file, filterOptions);
           }
           return true;
+        })
+        .map((file: string) => {
+          const absolutePath = path.resolve(searchDir, file);
+          const label = path.relative(cwd, absolutePath);
+          return {
+            label,
+            value: escapePath(label),
+          };
         })
         .slice(0, maxResults);
 
@@ -424,64 +457,86 @@ export function useCompletion(
         config?.getFileFilteringOptions() ?? DEFAULT_FILE_FILTERING_OPTIONS;
 
       try {
-        // If there's no slash, or it's the root, do a recursive search from cwd
-        if (
-          partialPath.indexOf('/') === -1 &&
-          prefix &&
-          enableRecursiveSearch
-        ) {
-          if (fileDiscoveryService) {
-            fetchedSuggestions = await findFilesWithGlob(
-              prefix,
-              fileDiscoveryService,
-              filterOptions,
-            );
+        // If there's no slash, or it's the root, do a recursive search from workspace directories
+        for (const dir of dirs) {
+          let fetchedSuggestionsPerDir: Suggestion[] = [];
+          if (
+            partialPath.indexOf('/') === -1 &&
+            prefix &&
+            enableRecursiveSearch
+          ) {
+            if (fileDiscoveryService) {
+              fetchedSuggestionsPerDir = await findFilesWithGlob(
+                prefix,
+                fileDiscoveryService,
+                filterOptions,
+                dir,
+              );
+            } else {
+              fetchedSuggestionsPerDir = await findFilesRecursively(
+                dir,
+                prefix,
+                null,
+                filterOptions,
+              );
+            }
           } else {
-            fetchedSuggestions = await findFilesRecursively(
-              cwd,
-              prefix,
-              fileDiscoveryService,
-              filterOptions,
-            );
-          }
-        } else {
-          // Original behavior: list files in the specific directory
-          const lowerPrefix = prefix.toLowerCase();
-          const entries = await fs.readdir(baseDirAbsolute, {
-            withFileTypes: true,
-          });
+            // Original behavior: list files in the specific directory
+            const lowerPrefix = prefix.toLowerCase();
+            const baseDirAbsolute = path.resolve(dir, baseDirRelative);
+            const entries = await fs.readdir(baseDirAbsolute, {
+              withFileTypes: true,
+            });
 
-          // Filter entries using git-aware filtering
-          const filteredEntries = [];
-          for (const entry of entries) {
-            // Conditionally ignore dotfiles
-            if (!prefix.startsWith('.') && entry.name.startsWith('.')) {
-              continue;
+            // Filter entries using git-aware filtering
+            const filteredEntries = [];
+            for (const entry of entries) {
+              // Conditionally ignore dotfiles
+              if (!prefix.startsWith('.') && entry.name.startsWith('.')) {
+                continue;
+              }
+              if (!entry.name.toLowerCase().startsWith(lowerPrefix)) continue;
+
+              const relativePath = path.relative(
+                dir,
+                path.join(baseDirAbsolute, entry.name),
+              );
+              if (
+                fileDiscoveryService &&
+                fileDiscoveryService.shouldIgnoreFile(
+                  relativePath,
+                  filterOptions,
+                )
+              ) {
+                continue;
+              }
+
+              filteredEntries.push(entry);
             }
-            if (!entry.name.toLowerCase().startsWith(lowerPrefix)) continue;
 
-            const relativePath = path.relative(
-              cwd,
-              path.join(baseDirAbsolute, entry.name),
-            );
-            if (
-              fileDiscoveryService &&
-              fileDiscoveryService.shouldIgnoreFile(relativePath, filterOptions)
-            ) {
-              continue;
-            }
-
-            filteredEntries.push(entry);
+            fetchedSuggestionsPerDir = filteredEntries.map((entry) => {
+              const absolutePath = path.resolve(baseDirAbsolute, entry.name);
+              const label =
+                cwd === dir ? entry.name : path.relative(cwd, absolutePath);
+              const suggestionLabel = entry.isDirectory() ? label + '/' : label;
+              return {
+                label: suggestionLabel,
+                value: escapePath(suggestionLabel),
+              };
+            });
           }
-
-          fetchedSuggestions = filteredEntries.map((entry) => {
-            const label = entry.isDirectory() ? entry.name + '/' : entry.name;
-            return {
-              label,
-              value: escapePath(label), // Value for completion should be just the name part
-            };
-          });
+          fetchedSuggestions = [
+            ...fetchedSuggestions,
+            ...fetchedSuggestionsPerDir,
+          ];
         }
+
+        // Like glob, we always return forwardslashes, even in windows.
+        fetchedSuggestions = fetchedSuggestions.map((suggestion) => ({
+          ...suggestion,
+          label: suggestion.label.replace(/\\/g, '/'),
+          value: suggestion.value.replace(/\\/g, '/'),
+        }));
 
         // Sort by depth, then directories first, then alphabetically
         fetchedSuggestions.sort((a, b) => {
@@ -545,7 +600,8 @@ export function useCompletion(
       clearTimeout(debounceTimeout);
     };
   }, [
-    query,
+    buffer.text,
+    dirs,
     cwd,
     isActive,
     resetCompletionState,
@@ -553,6 +609,84 @@ export function useCompletion(
     commandContext,
     config,
   ]);
+
+  const handleAutocomplete = useCallback(
+    (indexToUse: number) => {
+      if (indexToUse < 0 || indexToUse >= suggestions.length) {
+        return;
+      }
+      const query = buffer.text;
+      const suggestion = suggestions[indexToUse].value;
+
+      if (query.trimStart().startsWith('/')) {
+        const hasTrailingSpace = query.endsWith(' ');
+        const parts = query
+          .trimStart()
+          .substring(1)
+          .split(/\s+/)
+          .filter(Boolean);
+
+        let isParentPath = false;
+        // If there's no trailing space, we need to check if the current query
+        // is already a complete path to a parent command.
+        if (!hasTrailingSpace) {
+          let currentLevel: readonly SlashCommand[] | undefined = slashCommands;
+          for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            const found: SlashCommand | undefined = currentLevel?.find(
+              (cmd) => cmd.name === part || cmd.altNames?.includes(part),
+            );
+
+            if (found) {
+              if (i === parts.length - 1 && found.subCommands) {
+                isParentPath = true;
+              }
+              currentLevel = found.subCommands as
+                | readonly SlashCommand[]
+                | undefined;
+            } else {
+              // Path is invalid, so it can't be a parent path.
+              currentLevel = undefined;
+              break;
+            }
+          }
+        }
+
+        // Determine the base path of the command.
+        // - If there's a trailing space, the whole command is the base.
+        // - If it's a known parent path, the whole command is the base.
+        // - If the last part is a complete argument, the whole command is the base.
+        // - Otherwise, the base is everything EXCEPT the last partial part.
+        const lastPart = parts.length > 0 ? parts[parts.length - 1] : '';
+        const isLastPartACompleteArg =
+          lastPart.startsWith('--') && lastPart.includes('=');
+
+        const basePath =
+          hasTrailingSpace || isParentPath || isLastPartACompleteArg
+            ? parts
+            : parts.slice(0, -1);
+        const newValue = `/${[...basePath, suggestion].join(' ')} `;
+
+        buffer.setText(newValue);
+      } else {
+        const atIndex = query.lastIndexOf('@');
+        if (atIndex === -1) return;
+        const pathPart = query.substring(atIndex + 1);
+        const lastSlashIndexInPath = pathPart.lastIndexOf('/');
+        let autoCompleteStartIndex = atIndex + 1;
+        if (lastSlashIndexInPath !== -1) {
+          autoCompleteStartIndex += lastSlashIndexInPath + 1;
+        }
+        buffer.replaceRangeByOffset(
+          autoCompleteStartIndex,
+          buffer.text.length,
+          suggestion,
+        );
+      }
+      resetCompletionState();
+    },
+    [resetCompletionState, buffer, suggestions, slashCommands],
+  );
 
   return {
     suggestions,
@@ -566,5 +700,6 @@ export function useCompletion(
     resetCompletionState,
     navigateUp,
     navigateDown,
+    handleAutocomplete,
   };
 }

@@ -151,6 +151,7 @@ describe('MCPOAuthProvider', () => {
         expect.objectContaining({ accessToken: 'access_token_123' }),
         'test-client-id',
         'https://auth.example.com/token',
+        undefined,
       );
     });
 
@@ -551,6 +552,7 @@ describe('MCPOAuthProvider', () => {
         expect.objectContaining({ accessToken: 'new_access_token' }),
         'test-client-id',
         'https://auth.example.com/token',
+        undefined,
       );
     });
 

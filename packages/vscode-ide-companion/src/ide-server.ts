@@ -14,33 +14,25 @@ import {
   type JSONRPCNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Server as HTTPServer } from 'node:http';
-import { RecentFilesManager } from './recent-files-manager.js';
+import { OpenFilesManager } from './open-files-manager.js';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 
-function sendOpenFilesChangedNotification(
+function sendIdeContextUpdateNotification(
   transport: StreamableHTTPServerTransport,
   log: (message: string) => void,
-  recentFilesManager: RecentFilesManager,
+  openFilesManager: OpenFilesManager,
 ) {
-  const editor = vscode.window.activeTextEditor;
-  const filePath =
-    editor && editor.document.uri.scheme === 'file'
-      ? editor.document.uri.fsPath
-      : '';
+  const ideContext = openFilesManager.state;
+
   const notification: JSONRPCNotification = {
     jsonrpc: '2.0',
-    method: 'ide/openFilesChanged',
-    params: {
-      activeFile: filePath,
-      recentOpenFiles: recentFilesManager.recentFiles.filter(
-        (file) => file.filePath !== filePath,
-      ),
-    },
+    method: 'ide/contextUpdate',
+    params: ideContext,
   };
   log(
-    `Sending active file changed notification: ${JSON.stringify(
+    `Sending IDE context update notification: ${JSON.stringify(
       notification,
       null,
       2,
@@ -68,17 +60,17 @@ export class IDEServer {
     app.use(express.json());
     const mcpServer = createMcpServer();
 
-    const recentFilesManager = new RecentFilesManager(context);
-    const disposable = recentFilesManager.onDidChange(() => {
+    const openFilesManager = new OpenFilesManager(context);
+    const onDidChangeSubscription = openFilesManager.onDidChange(() => {
       for (const transport of Object.values(transports)) {
-        sendOpenFilesChangedNotification(
+        sendIdeContextUpdateNotification(
           transport,
           this.log.bind(this),
-          recentFilesManager,
+          openFilesManager,
         );
       }
     });
-    context.subscriptions.push(disposable);
+    context.subscriptions.push(onDidChangeSubscription);
 
     app.post('/mcp', async (req: Request, res: Response) => {
       const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
@@ -175,10 +167,10 @@ export class IDEServer {
       }
 
       if (!sessionsWithInitialNotification.has(sessionId)) {
-        sendOpenFilesChangedNotification(
+        sendIdeContextUpdateNotification(
           transport,
           this.log.bind(this),
-          recentFilesManager,
+          openFilesManager,
         );
         sessionsWithInitialNotification.add(sessionId);
       }
@@ -227,32 +219,6 @@ const createMcpServer = () => {
       version: '1.0.0',
     },
     { capabilities: { logging: {} } },
-  );
-  server.registerTool(
-    'getOpenFiles',
-    {
-      description:
-        '(IDE Tool) Get the path of the file currently active in VS Code.',
-      inputSchema: {},
-    },
-    async () => {
-      const activeEditor = vscode.window.activeTextEditor;
-      const filePath = activeEditor ? activeEditor.document.uri.fsPath : '';
-      if (filePath) {
-        return {
-          content: [{ type: 'text', text: `Active file: ${filePath}` }],
-        };
-      } else {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'No file is currently active in the editor.',
-            },
-          ],
-        };
-      }
-    },
   );
   return server;
 };

@@ -27,10 +27,6 @@ import {
   logApiError,
 } from '../telemetry/loggers.js';
 import {
-  getStructuredResponse,
-  getStructuredResponseFromParts,
-} from '../utils/generateContentResponseUtilities.js';
-import {
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
@@ -142,11 +138,7 @@ export class GeminiChat {
   }
 
   private _getRequestTextFromContents(contents: Content[]): string {
-    return contents
-      .flatMap((content) => content.parts ?? [])
-      .map((part) => part.text)
-      .filter(Boolean)
-      .join('');
+    return JSON.stringify(contents);
   }
 
   private async _logApiRequest(
@@ -233,6 +225,7 @@ export class GeminiChat {
         );
         if (accepted !== false && accepted !== null) {
           this.config.setModel(fallbackModel);
+          this.config.setFallbackMode(true);
           return fallbackModel;
         }
         // Check if the model was switched manually in the handler
@@ -318,7 +311,7 @@ export class GeminiChat {
         durationMs,
         prompt_id,
         response.usageMetadata,
-        getStructuredResponse(response),
+        JSON.stringify(response),
       );
 
       this.sendPromise = (async () => {
@@ -554,12 +547,11 @@ export class GeminiChat {
           allParts.push(...content.parts);
         }
       }
-      const fullText = getStructuredResponseFromParts(allParts);
       await this._logApiResponse(
         durationMs,
         prompt_id,
         this.getFinalUsageMetadata(chunks),
-        fullText,
+        JSON.stringify(chunks),
       );
     }
     this.recordHistory(inputContent, outputContent);

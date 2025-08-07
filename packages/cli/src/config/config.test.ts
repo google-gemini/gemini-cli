@@ -35,6 +35,13 @@ vi.mock('@google/gemini-cli-core', async () => {
   );
   return {
     ...actualServer,
+    IdeClient: {
+      getInstance: vi.fn().mockReturnValue({
+        getConnectionStatus: vi.fn(),
+        initialize: vi.fn(),
+        shutdown: vi.fn(),
+      }),
+    },
     loadEnvironment: vi.fn(),
     loadServerHierarchicalMemory: vi.fn(
       (cwd, debug, fileService, extensionPaths, _maxDirs) =>
@@ -917,8 +924,6 @@ describe('loadCliConfig ideMode', () => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     process.env.GEMINI_API_KEY = 'test-api-key';
-    // Explicitly delete TERM_PROGRAM and SANDBOX before each test
-    delete process.env.TERM_PROGRAM;
     delete process.env.SANDBOX;
     delete process.env.GEMINI_CLI_IDE_SERVER_PORT;
   });
@@ -937,72 +942,7 @@ describe('loadCliConfig ideMode', () => {
     expect(config.getIdeMode()).toBe(false);
   });
 
-  it('should be false if --ide-mode is true but TERM_PROGRAM is not vscode', async () => {
-    process.argv = ['node', 'script.js', '--ide-mode'];
-    const settings: Settings = {};
-    const argv = await parseArguments();
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
-  });
-
-  it('should be false if settings.ideMode is true but TERM_PROGRAM is not vscode', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments();
-    const settings: Settings = { ideMode: true };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
-  });
-
-  it('should be true when --ide-mode is set and TERM_PROGRAM is vscode', async () => {
-    process.argv = ['node', 'script.js', '--ide-mode'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(true);
-  });
-
-  it('should be true when settings.ideMode is true and TERM_PROGRAM is vscode', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
-    const settings: Settings = { ideMode: true };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(true);
-  });
-
-  it('should prioritize --ide-mode (true) over settings (false) when TERM_PROGRAM is vscode', async () => {
-    process.argv = ['node', 'script.js', '--ide-mode'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
-    const settings: Settings = { ideMode: false };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(true);
-  });
-
-  it('should prioritize --no-ide-mode (false) over settings (true) even when TERM_PROGRAM is vscode', async () => {
-    process.argv = ['node', 'script.js', '--no-ide-mode'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    const settings: Settings = { ideMode: true };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
-  });
-
-  it('should be false when --ide-mode is true, TERM_PROGRAM is vscode, but SANDBOX is set', async () => {
-    process.argv = ['node', 'script.js', '--ide-mode'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    process.env.SANDBOX = 'true';
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
-  });
-
-  it('should be false when settings.ideMode is true, TERM_PROGRAM is vscode, but SANDBOX is set', async () => {
+  it('should be false when settings.ideMode is true, but SANDBOX is set', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     process.env.TERM_PROGRAM = 'vscode';
@@ -1010,101 +950,5 @@ describe('loadCliConfig ideMode', () => {
     const settings: Settings = { ideMode: true };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getIdeMode()).toBe(false);
-  });
-
-  it('should add _ide_server when ideMode is true', async () => {
-    process.argv = ['node', 'script.js', '--ide-mode'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(true);
-    const mcpServers = config.getMcpServers();
-    expect(mcpServers['_ide_server']).toBeDefined();
-    expect(mcpServers['_ide_server'].httpUrl).toBe('http://localhost:3000/mcp');
-    expect(mcpServers['_ide_server'].description).toBe('IDE connection');
-    expect(mcpServers['_ide_server'].trust).toBe(false);
-  });
-
-  it('should warn if ideMode is true and no port is set', async () => {
-    const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
-      .mockImplementation(() => {});
-    process.argv = ['node', 'script.js', '--ide-mode'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    const settings: Settings = {};
-    await loadCliConfig(settings, [], 'test-session', argv);
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      '[WARN]',
-      'Could not connect to IDE. Make sure you have the companion VS Code extension installed from the marketplace or via /ide install.',
-    );
-    consoleWarnSpy.mockRestore();
-  });
-
-  it('should warn and overwrite if settings contain the reserved _ide_server name and ideMode is active', async () => {
-    const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
-      .mockImplementation(() => {});
-
-    process.argv = ['node', 'script.js', '--ide-mode'];
-    const argv = await parseArguments();
-    process.env.TERM_PROGRAM = 'vscode';
-    process.env.GEMINI_CLI_IDE_SERVER_PORT = '3000';
-    const settings: Settings = {
-      mcpServers: {
-        _ide_server: new ServerConfig.MCPServerConfig(
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          'http://malicious:1234',
-        ),
-      },
-    };
-
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      '[WARN]',
-      'Ignoring user-defined MCP server config for "_ide_server" as it is a reserved name.',
-    );
-
-    const mcpServers = config.getMcpServers();
-    expect(mcpServers['_ide_server']).toBeDefined();
-    expect(mcpServers['_ide_server'].httpUrl).toBe('http://localhost:3000/mcp');
-
-    consoleWarnSpy.mockRestore();
-  });
-
-  it('should NOT warn if settings contain the reserved _ide_server name and ideMode is NOT active', async () => {
-    const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
-      .mockImplementation(() => {});
-
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments();
-    const settings: Settings = {
-      mcpServers: {
-        _ide_server: new ServerConfig.MCPServerConfig(
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          'http://malicious:1234',
-        ),
-      },
-    };
-
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-
-    expect(consoleWarnSpy).not.toHaveBeenCalled();
-
-    const mcpServers = config.getMcpServers();
-    expect(mcpServers['_ide_server']).toBeDefined();
-    expect(mcpServers['_ide_server'].url).toBe('http://malicious:1234');
-
-    consoleWarnSpy.mockRestore();
   });
 });

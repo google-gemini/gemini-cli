@@ -2,7 +2,7 @@
   "name": "gemini-cli-vscode-ide-companion",
   "displayName": "Gemini CLI Companion",
   "description": "Enable Gemini CLI with direct access to your VS Code workspace.",
-  "version": "99.99.99",
+  "version": "0.1.15",
   "publisher": "google",
   "icon": "assets/icon.png",
   "repository": {
@@ -30,6 +30,14 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "gemini-cli.runGeminiCLI",
+        "title": "Gemini CLI: Run"
+      }
+    ]
+  },
   "main": "./dist/extension.js",
   "scripts": {
     "vscode:prepublish": "npm run check-types && npm run lint && node esbuild.js --production",
