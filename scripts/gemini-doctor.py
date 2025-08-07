@@ -50,10 +50,14 @@ def check_gcloud_auth():
     else:
         print_bad("ADC file not found or GOOGLE_APPLICATION_CREDENTIALS not set.")
     try:
-        subprocess.check_output(["gcloud", "auth", "application-default", "print-access-token"], stderr=subprocess.STDOUT)
+        subprocess.check_output(["gcloud", "auth", "application-default", "print-access-token"], stderr=subprocess.STDOUT, text=True)
         print_ok("gcloud ADC authentication")
+    except subprocess.CalledProcessError as e:
+        print_bad(f"gcloud ADC authentication failed. gcloud output:\n{e.output}")
+    except FileNotFoundError:
+        print_bad("gcloud command not found. Please ensure it is installed and in your PATH.")
     except Exception as e:
-        print_bad(f"gcloud ADC authentication failed: {e}")
+        print_bad(f"An unexpected error occurred during gcloud ADC authentication: {e}")
 
 def check_env():
     print("\nChecking environment variables...")
