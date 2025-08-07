@@ -323,6 +323,8 @@ function parseGenerationConfigFromEnv(settings: Settings):
       logger.warn(
         `Invalid GEMINI_TEMPERATURE value: ${process.env.GEMINI_TEMPERATURE}. Must be between 0.0 and 2.0`,
       );
+      // Fall back to settings value when env var is invalid
+      config.temperature = settings.generationConfig?.temperature;
     }
   } else {
     config.temperature = settings.generationConfig?.temperature;
@@ -340,6 +342,8 @@ function parseGenerationConfigFromEnv(settings: Settings):
       logger.warn(
         `Invalid GEMINI_TOP_K value: ${process.env.GEMINI_TOP_K}. Must be a positive integer`,
       );
+      // Fall back to settings value when env var is invalid
+      config.topK = settings.generationConfig?.topK;
     }
   } else {
     config.topK = settings.generationConfig?.topK;
@@ -357,6 +361,8 @@ function parseGenerationConfigFromEnv(settings: Settings):
       logger.warn(
         `Invalid GEMINI_THINKING_BUDGET value: ${process.env.GEMINI_THINKING_BUDGET}. Must be a non-negative integer`,
       );
+      // Fall back to settings value when env var is invalid
+      config.thinking_budget = settings.generationConfig?.thinking_budget;
     }
   } else {
     config.thinking_budget = settings.generationConfig?.thinking_budget;
