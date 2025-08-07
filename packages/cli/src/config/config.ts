@@ -313,6 +313,8 @@ export async function loadCliConfig(
   const ideModeFeature =
     argv.ideModeFeature ?? settings.ideModeFeature ?? false;
 
+  const folderTrustFeature = settings.folderTrustFeature ?? false;
+
   const allExtensions = annotateActiveExtensions(
     extensions,
     argv.extensions || [],
@@ -481,6 +483,7 @@ export async function loadCliConfig(
     ideMode,
     ideModeFeature,
     chatCompression: settings.chatCompression,
+    folderTrustFeature,
   });
 }
 
