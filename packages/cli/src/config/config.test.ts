@@ -1250,5 +1250,70 @@ describe('loadCliConfig with includeDirectories', () => {
         thinking_budget: 128,
       });
     });
+
+    it('should work when no generation config is set anywhere', async () => {
+      // No env vars set (already deleted in beforeEach)
+      const argv = await parseArguments();
+      const settings: Settings = {}; // No generationConfig in settings
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      // Should have undefined generationConfig, not breaking the flow
+      expect(config.getGenerationConfig()).toBeUndefined();
+    });
+
+    it('should work with partial generation config from settings only', async () => {
+      // No env vars set
+      const argv = await parseArguments();
+      const settings: Settings = {
+        generationConfig: {
+          temperature: 0.5,
+          // topK and thinking_budget not set
+        },
+      };
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      expect(config.getGenerationConfig()).toEqual({
+        temperature: 0.5,
+        topK: undefined,
+        thinking_budget: undefined,
+      });
+    });
+
+    it('should work with partial generation config from env only', async () => {
+      process.env.GEMINI_TOP_K = '30';
+      // temperature and thinking_budget not set
+
+      const argv = await parseArguments();
+      const settings: Settings = {};
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      expect(config.getGenerationConfig()).toEqual({
+        temperature: undefined,
+        topK: 30,
+        thinking_budget: undefined,
+      });
+    });
+
+    it('should handle empty string environment variables as undefined', async () => {
+      process.env.GEMINI_TEMPERATURE = '';
+      process.env.GEMINI_TOP_K = '';
+      process.env.GEMINI_THINKING_BUDGET = '';
+
+      const argv = await parseArguments();
+      const settings: Settings = {
+        generationConfig: {
+          temperature: 0.9,
+          topK: 40,
+        },
+      };
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      // Empty strings should be treated as not set, falling back to settings
+      expect(config.getGenerationConfig()).toEqual({
+        temperature: 0.9,
+        topK: 40,
+        thinking_budget: undefined,
+      });
+    });
   });
 });

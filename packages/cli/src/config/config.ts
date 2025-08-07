@@ -298,11 +298,13 @@ export async function loadHierarchicalGeminiMemory(
 /**
  * Parse and validate generation config from environment variables
  */
-function parseGenerationConfigFromEnv(settings: Settings): {
-  temperature?: number;
-  topK?: number; 
-  thinking_budget?: number;
-} {
+function parseGenerationConfigFromEnv(settings: Settings):
+  | {
+      temperature?: number;
+      topK?: number;
+      thinking_budget?: number;
+    }
+  | undefined {
   const config: {
     temperature?: number;
     topK?: number;
@@ -310,39 +312,63 @@ function parseGenerationConfigFromEnv(settings: Settings): {
   } = {};
 
   // Parse temperature
-  if (process.env.GEMINI_TEMPERATURE !== undefined) {
+  if (
+    process.env.GEMINI_TEMPERATURE !== undefined &&
+    process.env.GEMINI_TEMPERATURE !== ''
+  ) {
     const temp = parseFloat(process.env.GEMINI_TEMPERATURE);
     if (!isNaN(temp) && temp >= 0 && temp <= 2.0) {
       config.temperature = temp;
     } else {
-      logger.warn(`Invalid GEMINI_TEMPERATURE value: ${process.env.GEMINI_TEMPERATURE}. Must be between 0.0 and 2.0`);
+      logger.warn(
+        `Invalid GEMINI_TEMPERATURE value: ${process.env.GEMINI_TEMPERATURE}. Must be between 0.0 and 2.0`,
+      );
     }
   } else {
     config.temperature = settings.generationConfig?.temperature;
   }
 
   // Parse topK
-  if (process.env.GEMINI_TOP_K !== undefined) {
+  if (
+    process.env.GEMINI_TOP_K !== undefined &&
+    process.env.GEMINI_TOP_K !== ''
+  ) {
     const topK = parseInt(process.env.GEMINI_TOP_K, 10);
     if (!isNaN(topK) && topK > 0) {
       config.topK = topK;
     } else {
-      logger.warn(`Invalid GEMINI_TOP_K value: ${process.env.GEMINI_TOP_K}. Must be a positive integer`);
+      logger.warn(
+        `Invalid GEMINI_TOP_K value: ${process.env.GEMINI_TOP_K}. Must be a positive integer`,
+      );
     }
   } else {
     config.topK = settings.generationConfig?.topK;
   }
 
   // Parse thinking_budget
-  if (process.env.GEMINI_THINKING_BUDGET !== undefined) {
+  if (
+    process.env.GEMINI_THINKING_BUDGET !== undefined &&
+    process.env.GEMINI_THINKING_BUDGET !== ''
+  ) {
     const budget = parseInt(process.env.GEMINI_THINKING_BUDGET, 10);
     if (!isNaN(budget) && budget >= 0) {
       config.thinking_budget = budget;
     } else {
-      logger.warn(`Invalid GEMINI_THINKING_BUDGET value: ${process.env.GEMINI_THINKING_BUDGET}. Must be a non-negative integer`);
+      logger.warn(
+        `Invalid GEMINI_THINKING_BUDGET value: ${process.env.GEMINI_THINKING_BUDGET}. Must be a non-negative integer`,
+      );
     }
   } else {
     config.thinking_budget = settings.generationConfig?.thinking_budget;
+  }
+
+  // Return undefined if no config values are set
+  if (
+    config.temperature === undefined &&
+    config.topK === undefined &&
+    config.thinking_budget === undefined
+  ) {
+    return undefined as any;
   }
 
   return config;
