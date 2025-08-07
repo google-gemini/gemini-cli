@@ -229,7 +229,7 @@ export class GeminiClient {
         ? {
             ...this.generateContentConfig,
             thinkingConfig: {
-              ...this.generateContentConfig.thinkingConfig,
+              ...(this.generateContentConfig.thinkingConfig || {}),
               includeThoughts: true,
             },
           }
