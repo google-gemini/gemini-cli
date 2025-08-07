@@ -38,9 +38,8 @@ import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
 import { Colors } from './colors.js';
-import { Help } from './components/Help.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
-import { LoadedSettings } from '../config/settings.js';
+import { LoadedSettings, SettingScope } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup } from '../utils/cleanup.js';
@@ -63,6 +62,10 @@ import {
   type IdeContext,
   ideContext,
 } from '@google/gemini-cli-core';
+import {
+  IdeIntegrationNudge,
+  IdeIntegrationNudgeResult,
+} from './IdeIntegrationNudge.js';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
@@ -116,6 +119,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const nightly = version.includes('nightly');
   const { history, addItem, clearItems, loadHistory } = useHistory();
 
+  const [idePromptAnswered, setIdePromptAnswered] = useState(false);
+  const currentIDE = config.getIdeClient().getCurrentIde();
+  const shouldShowIdePrompt =
+    config.getIdeModeFeature() &&
+    currentIDE &&
+    !config.getIdeMode() &&
+    !settings.merged.hasSeenIdeIntegrationNudge &&
+    !idePromptAnswered;
+
   useEffect(() => {
     const cleanup = setUpdateHandler(addItem, setUpdateInfo);
     return cleanup;
@@ -146,7 +158,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
-  const [showHelp, setShowHelp] = useState<boolean>(false);
   const [themeError, setThemeError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -278,6 +289,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     try {
       const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
         process.cwd(),
+        settings.merged.loadMemoryFromIncludeDirectories
+          ? config.getWorkspaceContext().getDirectories()
+          : [],
         config.getDebugMode(),
         config.getFileService(),
         settings.merged,
@@ -473,7 +487,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     clearItems,
     loadHistory,
     refreshStatic,
-    setShowHelp,
     setDebugMessage,
     openThemeDialog,
     openAuthDialog,
@@ -483,7 +496,26 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     openPrivacyNotice,
     toggleVimEnabled,
     setIsProcessing,
+    setGeminiMdFileCount,
   );
+
+  const buffer = useTextBuffer({
+    initialText: '',
+    viewport: { height: 10, width: inputWidth },
+    stdin,
+    setRawMode,
+    isValidPath,
+    shellModeActive,
+  });
+
+  const [userMessages, setUserMessages] = useState<string[]>([]);
+
+  const handleUserCancel = useCallback(() => {
+    const lastUserMessage = userMessages.at(-1);
+    if (lastUserMessage) {
+      buffer.setText(lastUserMessage);
+    }
+  }, [buffer, userMessages]);
 
   const {
     streamingState,
@@ -495,7 +527,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     config.getGeminiClient(),
     history,
     addItem,
-    setShowHelp,
     config,
     setDebugMessage,
     handleSlashCommand,
@@ -505,6 +536,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     performMemoryRefresh,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
+    refreshStatic,
+    handleUserCancel,
   );
 
   // Input handling
@@ -518,14 +551,26 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     [submitQuery],
   );
 
-  const buffer = useTextBuffer({
-    initialText: '',
-    viewport: { height: 10, width: inputWidth },
-    stdin,
-    setRawMode,
-    isValidPath,
-    shellModeActive,
-  });
+  const handleIdePromptComplete = useCallback(
+    (result: IdeIntegrationNudgeResult) => {
+      if (result === 'yes') {
+        handleSlashCommand('/ide install');
+        settings.setValue(
+          SettingScope.User,
+          'hasSeenIdeIntegrationNudge',
+          true,
+        );
+      } else if (result === 'dismiss') {
+        settings.setValue(
+          SettingScope.User,
+          'hasSeenIdeIntegrationNudge',
+          true,
+        );
+      }
+      setIdePromptAnswered(true);
+    },
+    [handleSlashCommand, settings],
+  );
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
   const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
@@ -587,6 +632,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     ) {
       setShowIDEContextDetail((prev) => !prev);
     } else if (key.ctrl && (input === 'c' || input === 'C')) {
+      if (isAuthenticating) {
+        // Let AuthInProgress component handle the input.
+        return;
+      }
       handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
     } else if (key.ctrl && (input === 'd' || input === 'D')) {
       if (buffer.text.length > 0) {
@@ -603,10 +652,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     if (config) {
       setGeminiMdFileCount(config.getGeminiMdFileCount());
     }
-  }, [config]);
+  }, [config, config.getGeminiMdFileCount]);
 
   const logger = useLogger();
-  const [userMessages, setUserMessages] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchUserMessages = async () => {
@@ -758,6 +806,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       </Box>
     );
   }
+
   const mainAreaWidth = Math.floor(terminalWidth * 0.9);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalHeight * 0.2, 5));
   // Arbitrary threshold to ensure that items in the static area are large
@@ -802,6 +851,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 item={h}
                 isPending={false}
                 config={config}
+                commands={slashCommands}
               />
             )),
           ]}
@@ -829,8 +879,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           </Box>
         </OverflowProvider>
 
-        {showHelp && <Help commands={slashCommands} />}
-
         <Box flexDirection="column" ref={mainControlsRef}>
           {/* Move UpdateNotification to render update notification above input area */}
           {updateInfo && <UpdateNotification message={updateInfo.message} />}
@@ -850,7 +898,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             </Box>
           )}
 
-          {shellConfirmationRequest ? (
+          {shouldShowIdePrompt ? (
+            <IdeIntegrationNudge
+              question="Do you want to connect your VS Code editor to Gemini CLI?"
+              description="If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in VS Code."
+              onComplete={handleIdePromptComplete}
+            />
+          ) : shellConfirmationRequest ? (
             <ShellConfirmationDialog request={shellConfirmationRequest} />
           ) : isThemeDialogOpen ? (
             <Box flexDirection="column">

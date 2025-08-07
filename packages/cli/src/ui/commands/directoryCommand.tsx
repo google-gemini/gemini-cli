@@ -8,6 +8,7 @@ import { SlashCommand, CommandContext, CommandKind } from './types.js';
 import { MessageType } from '../types.js';
 import * as os from 'os';
 import * as path from 'path';
+import { loadServerHierarchicalMemory } from '@google/gemini-cli-core';
 
 export function expandHomeDir(p: string): string {
   if (!p) {
@@ -16,7 +17,7 @@ export function expandHomeDir(p: string): string {
   let expandedPath = p;
   if (p.toLowerCase().startsWith('%userprofile%')) {
     expandedPath = os.homedir() + p.substring('%userprofile%'.length);
-  } else if (p.startsWith('~')) {
+  } else if (p === '~' || p.startsWith('~/')) {
     expandedPath = os.homedir() + p.substring(1);
   }
   return path.normalize(expandedPath);
@@ -88,6 +89,37 @@ export const directoryCommand: SlashCommand = {
             const error = e as Error;
             errors.push(`Error adding '${pathToAdd.trim()}': ${error.message}`);
           }
+        }
+
+        try {
+          if (config.shouldLoadMemoryFromIncludeDirectories()) {
+            const { memoryContent, fileCount } =
+              await loadServerHierarchicalMemory(
+                config.getWorkingDir(),
+                [
+                  ...config.getWorkspaceContext().getDirectories(),
+                  ...pathsToAdd,
+                ],
+                config.getDebugMode(),
+                config.getFileService(),
+                config.getExtensionContextFilePaths(),
+                context.services.settings.merged.memoryImportFormat || 'tree', // Use setting or default to 'tree'
+                config.getFileFilteringOptions(),
+                context.services.settings.merged.memoryDiscoveryMaxDirs,
+              );
+            config.setUserMemory(memoryContent);
+            config.setGeminiMdFileCount(fileCount);
+            context.ui.setGeminiMdFileCount(fileCount);
+          }
+          addItem(
+            {
+              type: MessageType.INFO,
+              text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
+            },
+            Date.now(),
+          );
+        } catch (error) {
+          errors.push(`Error refreshing memory: ${(error as Error).message}`);
         }
 
         if (added.length > 0) {

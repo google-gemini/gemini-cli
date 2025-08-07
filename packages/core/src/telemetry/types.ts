@@ -14,6 +14,7 @@ export enum ToolCallDecision {
   ACCEPT = 'accept',
   REJECT = 'reject',
   MODIFY = 'modify',
+  AUTO_ACCEPT = 'auto_accept',
 }
 
 export function getDecisionFromOutcome(
@@ -21,10 +22,11 @@ export function getDecisionFromOutcome(
 ): ToolCallDecision {
   switch (outcome) {
     case ToolConfirmationOutcome.ProceedOnce:
+      return ToolCallDecision.ACCEPT;
     case ToolConfirmationOutcome.ProceedAlways:
     case ToolConfirmationOutcome.ProceedAlwaysServer:
     case ToolConfirmationOutcome.ProceedAlwaysTool:
-      return ToolCallDecision.ACCEPT;
+      return ToolCallDecision.AUTO_ACCEPT;
     case ToolConfirmationOutcome.ModifyWithEditor:
       return ToolCallDecision.MODIFY;
     case ToolConfirmationOutcome.Cancel:
@@ -308,6 +310,23 @@ export class MalformedJsonResponseEvent {
   }
 }
 
+export enum IdeConnectionType {
+  START = 'start',
+  SESSION = 'session',
+}
+
+export class IdeConnectionEvent {
+  'event.name': 'ide_connection';
+  'event.timestamp': string; // ISO 8601
+  connection_type: IdeConnectionType;
+
+  constructor(connection_type: IdeConnectionType) {
+    this['event.name'] = 'ide_connection';
+    this['event.timestamp'] = new Date().toISOString();
+    this.connection_type = connection_type;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -320,4 +339,5 @@ export type TelemetryEvent =
   | LoopDetectedEvent
   | NextSpeakerCheckEvent
   | SlashCommandEvent
-  | MalformedJsonResponseEvent;
+  | MalformedJsonResponseEvent
+  | IdeConnectionEvent;

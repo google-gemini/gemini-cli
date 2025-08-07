@@ -169,13 +169,13 @@ export class TestRig {
     };
 
     if (typeof promptOrOptions === 'string') {
-      command += ` --prompt "${promptOrOptions}"`;
+      command += ` --prompt ${JSON.stringify(promptOrOptions)}`;
     } else if (
       typeof promptOrOptions === 'object' &&
       promptOrOptions !== null
     ) {
       if (promptOrOptions.prompt) {
-        command += ` --prompt "${promptOrOptions.prompt}"`;
+        command += ` --prompt ${JSON.stringify(promptOrOptions.prompt)}`;
       }
       if (promptOrOptions.stdin) {
         execOptions.input = promptOrOptions.stdin;
@@ -258,6 +258,11 @@ export class TestRig {
 
             result = filteredLines.join('\n');
           }
+          // If we have stderr output, include that also
+          if (stderr) {
+            result += `\n\nStdErr:\n${stderr}`;
+          }
+
           resolve(result);
         } else {
           reject(new Error(`Process exited with code ${code}:\n${stderr}`));

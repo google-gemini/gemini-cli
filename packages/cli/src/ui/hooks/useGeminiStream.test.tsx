@@ -21,6 +21,7 @@ import {
   EditorType,
   AuthType,
   GeminiEventType as ServerGeminiEventType,
+  AnyToolInvocation,
 } from '@google/gemini-cli-core';
 import { Part, PartListUnion } from '@google/genai';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -30,7 +31,6 @@ import {
   SlashCommandProcessorResult,
   StreamingState,
 } from '../types.js';
-import { Dispatch, SetStateAction } from 'react';
 import { LoadedSettings } from '../../config/settings.js';
 
 // --- MOCKS ---
@@ -257,7 +257,6 @@ describe('mergePartListUnions', () => {
 // --- Tests for useGeminiStream Hook ---
 describe('useGeminiStream', () => {
   let mockAddItem: Mock;
-  let mockSetShowHelp: Mock;
   let mockConfig: Config;
   let mockOnDebugMessage: Mock;
   let mockHandleSlashCommand: Mock;
@@ -269,7 +268,6 @@ describe('useGeminiStream', () => {
     vi.clearAllMocks(); // Clear mocks before each test
 
     mockAddItem = vi.fn();
-    mockSetShowHelp = vi.fn();
     // Define the mock for getGeminiClient
     const mockGetGeminiClient = vi.fn().mockImplementation(() => {
       // MockedGeminiClientClass is defined in the module scope by the previous change.
@@ -382,7 +380,6 @@ describe('useGeminiStream', () => {
         client: any;
         history: HistoryItem[];
         addItem: UseHistoryManagerReturn['addItem'];
-        setShowHelp: Dispatch<SetStateAction<boolean>>;
         config: Config;
         onDebugMessage: (message: string) => void;
         handleSlashCommand: (
@@ -400,7 +397,6 @@ describe('useGeminiStream', () => {
           props.client,
           props.history,
           props.addItem,
-          props.setShowHelp,
           props.config,
           props.onDebugMessage,
           props.handleSlashCommand,
@@ -410,6 +406,8 @@ describe('useGeminiStream', () => {
           () => Promise.resolve(),
           false,
           () => {},
+          () => {},
+          () => {},
         );
       },
       {
@@ -417,7 +415,6 @@ describe('useGeminiStream', () => {
           client,
           history: [],
           addItem: mockAddItem as unknown as UseHistoryManagerReturn['addItem'],
-          setShowHelp: mockSetShowHelp,
           config: mockConfig,
           onDebugMessage: mockOnDebugMessage,
           handleSlashCommand: mockHandleSlashCommand as unknown as (
@@ -458,9 +455,13 @@ describe('useGeminiStream', () => {
         },
         tool: {
           name: 'tool1',
+          displayName: 'tool1',
           description: 'desc1',
-          getDescription: vi.fn(),
+          build: vi.fn(),
         } as any,
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
         startTime: Date.now(),
         endTime: Date.now(),
       } as TrackedCompletedToolCall,
@@ -475,9 +476,13 @@ describe('useGeminiStream', () => {
         responseSubmittedToGemini: false,
         tool: {
           name: 'tool2',
+          displayName: 'tool2',
           description: 'desc2',
-          getDescription: vi.fn(),
+          build: vi.fn(),
         } as any,
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
         startTime: Date.now(),
         liveOutput: '...',
       } as TrackedExecutingToolCall,
@@ -512,6 +517,12 @@ describe('useGeminiStream', () => {
         status: 'success',
         responseSubmittedToGemini: false,
         response: { callId: 'call1', responseParts: toolCall1ResponseParts },
+        tool: {
+          displayName: 'MockTool',
+        },
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
       } as TrackedCompletedToolCall,
       {
         request: {
@@ -542,7 +553,6 @@ describe('useGeminiStream', () => {
         new MockedGeminiClientClass(mockConfig),
         [],
         mockAddItem,
-        mockSetShowHelp,
         mockConfig,
         mockOnDebugMessage,
         mockHandleSlashCommand,
@@ -551,6 +561,8 @@ describe('useGeminiStream', () => {
         () => {},
         () => Promise.resolve(),
         false,
+        () => {},
+        () => {},
         () => {},
       ),
     );
@@ -591,6 +603,12 @@ describe('useGeminiStream', () => {
         status: 'cancelled',
         response: { callId: '1', responseParts: [{ text: 'cancelled' }] },
         responseSubmittedToGemini: false,
+        tool: {
+          displayName: 'mock tool',
+        },
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
       } as TrackedCancelledToolCall,
     ];
     const client = new MockedGeminiClientClass(mockConfig);
@@ -610,7 +628,6 @@ describe('useGeminiStream', () => {
         client,
         [],
         mockAddItem,
-        mockSetShowHelp,
         mockConfig,
         mockOnDebugMessage,
         mockHandleSlashCommand,
@@ -619,6 +636,8 @@ describe('useGeminiStream', () => {
         () => {},
         () => Promise.resolve(),
         false,
+        () => {},
+        () => {},
         () => {},
       ),
     );
@@ -652,9 +671,13 @@ describe('useGeminiStream', () => {
       },
       tool: {
         name: 'toolA',
+        displayName: 'toolA',
         description: 'descA',
-        getDescription: vi.fn(),
+        build: vi.fn(),
       } as any,
+      invocation: {
+        getDescription: () => `Mock description`,
+      } as unknown as AnyToolInvocation,
       status: 'cancelled',
       response: {
         callId: 'cancel-1',
@@ -676,9 +699,13 @@ describe('useGeminiStream', () => {
       },
       tool: {
         name: 'toolB',
+        displayName: 'toolB',
         description: 'descB',
-        getDescription: vi.fn(),
+        build: vi.fn(),
       } as any,
+      invocation: {
+        getDescription: () => `Mock description`,
+      } as unknown as AnyToolInvocation,
       status: 'cancelled',
       response: {
         callId: 'cancel-2',
@@ -707,7 +734,6 @@ describe('useGeminiStream', () => {
         client,
         [],
         mockAddItem,
-        mockSetShowHelp,
         mockConfig,
         mockOnDebugMessage,
         mockHandleSlashCommand,
@@ -716,6 +742,8 @@ describe('useGeminiStream', () => {
         () => {},
         () => Promise.resolve(),
         false,
+        () => {},
+        () => {},
         () => {},
       ),
     );
@@ -769,9 +797,13 @@ describe('useGeminiStream', () => {
         responseSubmittedToGemini: false,
         tool: {
           name: 'tool1',
+          displayName: 'tool1',
           description: 'desc',
-          getDescription: vi.fn(),
+          build: vi.fn(),
         } as any,
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
         startTime: Date.now(),
       } as TrackedExecutingToolCall,
     ];
@@ -810,7 +842,6 @@ describe('useGeminiStream', () => {
         new MockedGeminiClientClass(mockConfig),
         [],
         mockAddItem,
-        mockSetShowHelp,
         mockConfig,
         mockOnDebugMessage,
         mockHandleSlashCommand,
@@ -819,6 +850,8 @@ describe('useGeminiStream', () => {
         () => {},
         () => Promise.resolve(),
         false,
+        () => {},
+        () => {},
         () => {},
       ),
     );
@@ -920,6 +953,44 @@ describe('useGeminiStream', () => {
       expect(result.current.streamingState).toBe(StreamingState.Idle);
     });
 
+    it('should call onCancelSubmit handler when escape is pressed', async () => {
+      const cancelSubmitSpy = vi.fn();
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        // Keep the stream open
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          mockConfig.getGeminiClient(),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          cancelSubmitSpy,
+        ),
+      );
+
+      // Start a query
+      await act(async () => {
+        result.current.submitQuery('test query');
+      });
+
+      simulateEscapeKeyPress();
+
+      expect(cancelSubmitSpy).toHaveBeenCalled();
+    });
+
     it('should not do anything if escape is pressed when not responding', () => {
       const { result } = renderTestHook();
 
@@ -990,8 +1061,13 @@ describe('useGeminiStream', () => {
           tool: {
             name: 'tool1',
             description: 'desc1',
-            getDescription: vi.fn(),
+            build: vi.fn().mockImplementation((_) => ({
+              getDescription: () => `Mock description`,
+            })),
           } as any,
+          invocation: {
+            getDescription: () => `Mock description`,
+          },
           startTime: Date.now(),
           liveOutput: '...',
         } as TrackedExecutingToolCall,
@@ -1141,9 +1217,13 @@ describe('useGeminiStream', () => {
         },
         tool: {
           name: 'save_memory',
+          displayName: 'save_memory',
           description: 'Saves memory',
-          getDescription: vi.fn(),
+          build: vi.fn(),
         } as any,
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
       };
 
       // Capture the onComplete callback
@@ -1161,7 +1241,6 @@ describe('useGeminiStream', () => {
           new MockedGeminiClientClass(mockConfig),
           [],
           mockAddItem,
-          mockSetShowHelp,
           mockConfig,
           mockOnDebugMessage,
           mockHandleSlashCommand,
@@ -1170,6 +1249,8 @@ describe('useGeminiStream', () => {
           () => {},
           mockPerformMemoryRefresh,
           false,
+          () => {},
+          () => {},
           () => {},
         ),
       );
@@ -1213,7 +1294,6 @@ describe('useGeminiStream', () => {
           new MockedGeminiClientClass(testConfig),
           [],
           mockAddItem,
-          mockSetShowHelp,
           testConfig,
           mockOnDebugMessage,
           mockHandleSlashCommand,
@@ -1222,6 +1302,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
+          () => {},
+          () => {},
           () => {},
         ),
       );
@@ -1262,7 +1344,6 @@ describe('useGeminiStream', () => {
           new MockedGeminiClientClass(mockConfig),
           [],
           mockAddItem,
-          mockSetShowHelp,
           mockConfig,
           mockOnDebugMessage,
           mockHandleSlashCommand,
@@ -1271,6 +1352,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
+          () => {},
+          () => {},
           () => {},
         ),
       );
@@ -1309,7 +1392,6 @@ describe('useGeminiStream', () => {
           new MockedGeminiClientClass(mockConfig),
           [],
           mockAddItem,
-          mockSetShowHelp,
           mockConfig,
           mockOnDebugMessage,
           mockHandleSlashCommand,
@@ -1318,6 +1400,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
+          () => {},
+          () => {},
           () => {},
         ),
       );
@@ -1357,7 +1441,6 @@ describe('useGeminiStream', () => {
           new MockedGeminiClientClass(mockConfig),
           [],
           mockAddItem,
-          mockSetShowHelp,
           mockConfig,
           mockOnDebugMessage,
           mockHandleSlashCommand,
@@ -1366,6 +1449,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
+          () => {},
+          () => {},
           () => {},
         ),
       );
@@ -1445,7 +1530,6 @@ describe('useGeminiStream', () => {
             new MockedGeminiClientClass(mockConfig),
             [],
             mockAddItem,
-            mockSetShowHelp,
             mockConfig,
             mockOnDebugMessage,
             mockHandleSlashCommand,
@@ -1454,6 +1538,8 @@ describe('useGeminiStream', () => {
             () => {},
             () => Promise.resolve(),
             false,
+            () => {},
+            () => {},
             () => {},
           ),
         );
@@ -1500,7 +1586,6 @@ describe('useGeminiStream', () => {
           new MockedGeminiClientClass(mockConfig),
           [],
           mockAddItem,
-          mockSetShowHelp,
           mockConfig,
           mockOnDebugMessage,
           mockHandleSlashCommand,
@@ -1509,6 +1594,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
+          () => {},
+          () => {},
           () => {},
         ),
       );
@@ -1577,7 +1664,6 @@ describe('useGeminiStream', () => {
           new MockedGeminiClientClass(mockConfig),
           [],
           mockAddItem,
-          mockSetShowHelp,
           mockConfig,
           mockOnDebugMessage,
           mockHandleSlashCommand,
@@ -1586,6 +1672,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
+          () => {},
+          () => {},
           () => {},
         ),
       );
@@ -1630,7 +1718,6 @@ describe('useGeminiStream', () => {
           new MockedGeminiClientClass(mockConfig),
           [],
           mockAddItem,
-          mockSetShowHelp,
           mockConfig,
           mockOnDebugMessage,
           mockHandleSlashCommand,
@@ -1639,6 +1726,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
+          () => {},
+          () => {},
           () => {},
         ),
       );
