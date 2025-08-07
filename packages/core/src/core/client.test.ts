@@ -1313,9 +1313,9 @@ Here are some files the user has open, with the most recent at the top:
           // thinking_budget not set
         },
       } as never);
-      
+
       const client = new GeminiClient(config);
-      
+
       expect(client['generateContentConfig']).toEqual({
         temperature: 0.5,
         topP: 1,
@@ -1334,9 +1334,9 @@ Here are some files the user has open, with the most recent at the top:
           thinking_budget: 512,
         },
       } as never);
-      
+
       const client = new GeminiClient(config);
-      
+
       expect(client['generateContentConfig']).toEqual({
         temperature: 0.5,
         topP: 1,
@@ -1355,9 +1355,9 @@ Here are some files the user has open, with the most recent at the top:
           thinking_budget: 0,
         },
       } as never);
-      
+
       const client = new GeminiClient(config);
-      
+
       expect(client['generateContentConfig']).toEqual({
         temperature: 0,
         topP: 1,
@@ -1376,9 +1376,9 @@ Here are some files the user has open, with the most recent at the top:
           topK: 30,
         },
       } as never);
-      
+
       const client = new GeminiClient(config);
-      
+
       expect(client['generateContentConfig']).toEqual({
         temperature: 0, // default
         topP: 1,
@@ -1392,9 +1392,9 @@ Here are some files the user has open, with the most recent at the top:
         model: 'gemini-2.5-pro',
         generationConfig: {},
       } as never);
-      
+
       const client = new GeminiClient(config);
-      
+
       expect(client['generateContentConfig']).toEqual({
         temperature: 0,
         topP: 1,
@@ -1407,12 +1407,92 @@ Here are some files the user has open, with the most recent at the top:
         model: 'gemini-2.5-pro',
         // generationConfig not provided
       } as never);
-      
+
       const client = new GeminiClient(config);
-      
+
       expect(client['generateContentConfig']).toEqual({
         temperature: 0,
         topP: 1,
+      });
+    });
+
+    it('should handle partial generationConfig gracefully', () => {
+      const config = new Config({
+        sessionId: 'test-session',
+        model: 'gemini-2.5-pro',
+        generationConfig: {
+          temperature: 0.7,
+          // topK and thinking_budget not provided
+        },
+      } as never);
+
+      const client = new GeminiClient(config);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0.7,
+        topP: 1,
+        // topK not added when undefined
+        // thinkingConfig not added when undefined
+      });
+    });
+
+    it('should only add topK when explicitly set', () => {
+      const config = new Config({
+        sessionId: 'test-session',
+        model: 'gemini-2.5-pro',
+        generationConfig: {
+          topK: 25,
+          // temperature and thinking_budget not provided
+        },
+      } as never);
+
+      const client = new GeminiClient(config);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0, // default value
+        topP: 1,
+        topK: 25,
+      });
+    });
+
+    it('should only add thinkingConfig when thinking_budget is set', () => {
+      const config = new Config({
+        sessionId: 'test-session',
+        model: 'gemini-2.5-pro',
+        generationConfig: {
+          thinking_budget: 512,
+          // temperature and topK not provided
+        },
+      } as never);
+
+      const client = new GeminiClient(config);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0, // default value
+        topP: 1,
+        thinkingConfig: {
+          thinkingBudget: 512,
+        },
+      });
+    });
+
+    it('should handle thinking_budget of 0 correctly', () => {
+      const config = new Config({
+        sessionId: 'test-session',
+        model: 'gemini-2.5-pro',
+        generationConfig: {
+          thinking_budget: 0,
+        },
+      } as never);
+
+      const client = new GeminiClient(config);
+
+      expect(client['generateContentConfig']).toEqual({
+        temperature: 0,
+        topP: 1,
+        thinkingConfig: {
+          thinkingBudget: 0, // Should explicitly set to 0 to disable thinking
+        },
       });
     });
   });
