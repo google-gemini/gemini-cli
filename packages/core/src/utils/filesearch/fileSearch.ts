@@ -139,6 +139,7 @@ export class FileSearch {
       // Use the cached result.
       filteredCandidates = candidates;
     } else {
+      let shouldCache = true;
       if (pattern.includes('*')) {
         filteredCandidates = await filter(candidates, pattern, options.signal);
       } else {
@@ -147,9 +148,15 @@ export class FileSearch {
           .then((results: Array<FzfResultItem<string>>) =>
             results.map((entry: FzfResultItem<string>) => entry.item),
           )
-          .catch(() => []);
+          .catch(() => {
+            shouldCache = false;
+            return [];
+          });
       }
-      this.resultCache!.set(pattern, filteredCandidates);
+
+      if (shouldCache) {
+        this.resultCache!.set(pattern, filteredCandidates);
+      }
     }
 
     // Trade-off: We apply a two-stage filtering process.
