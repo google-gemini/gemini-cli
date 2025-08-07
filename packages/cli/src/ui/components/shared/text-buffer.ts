@@ -5,6 +5,7 @@
  */
 
 import stripAnsi from 'strip-ansi';
+import { stripVTControlCharacters } from 'util';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
@@ -42,59 +43,44 @@ function isWordChar(ch: string | undefined): boolean {
 /**
  * Strip characters that can break terminal rendering.
  *
- * Strip ANSI escape codes and control characters except for line breaks.
- * Control characters such as delete break terminal UI rendering.
+ * Uses Node.js built-in stripVTControlCharacters to handle VT sequences,
+ * then filters remaining control characters that can disrupt display.
+ * 
+ * Characters stripped:
+ * - ANSI escape sequences (via strip-ansi)
+ * - VT control sequences (via Node.js util.stripVTControlCharacters)
+ * - C0 control chars (0x00-0x1F) except CR/LF which are handled elsewhere
+ * - C1 control chars (0x80-0x9F) that can cause display issues
+ * 
+ * Characters preserved:
+ * - All printable Unicode including emojis
+ * - DEL (0x7F) - handled functionally by applyOperations, not a display issue
+ * - CR/LF (0x0D/0x0A) - needed for line breaks
  */
 function stripUnsafeCharacters(str: string): string {
-  const stripped = stripAnsi(str);
-  return toCodePoints(stripped)
+  const strippedAnsi = stripAnsi(str);
+  const strippedVT = stripVTControlCharacters(strippedAnsi);
+  
+  return toCodePoints(strippedVT)
     .filter((char) => {
       const code = char.codePointAt(0);
-      if (code === undefined) {
-        return false;
-      }
-      // Allow all printable ASCII characters (0x20 to 0x7E)
-      if (code >= 0x20 && code <= 0x7e) {
-        return true;
-      }
-      // Allow common newline characters
-      if (code === 0x0a || code === 0x0d) {
-        return true;
-      }
-      // Allow characters in the Unicode Basic Multilingual Plane (BMP) that are not control characters
-      // This broadly includes most printable characters and many symbols, including emojis.
-      // Control characters in BMP are U+0000-U+001F, U+007F-U+009F.
-      // We already handled U+000A and U+000D.
-      if (code > 0x7e && (code < 0x007f || code > 0x009f)) {
-        return true;
-      }
-      // For characters outside BMP (e.g., some rare emojis, supplementary planes),
-      // we'll allow them if they are not explicitly control characters.
-      // This is a more permissive approach.
-      // A more robust solution might involve checking Unicode categories (e.g., L, M, N, P, S, Zs, Zl, Zp)
-      // but that would require a more complex library.
-      // For now, we'll assume anything not a control character is okay.
-      if (code > 0x9f && code < 0xe000) {
-        // Basic Multilingual Plane (BMP)
-        return true;
-      }
-      if (code >= 0xe000 && code <= 0xf8ff) {
-        // Private Use Area (BMP)
-        return true;
-      }
-      if (code >= 0xf0000 && code <= 0xffffd) {
-        // Supplementary Private Use Area-A
-        return true;
-      }
-      if (code >= 0x10000 && code <= 0x10ffff) {
-        // Supplementary Planes (includes many emojis)
-        return true;
-      }
-
-      // Explicitly disallow known problematic control characters
-      const isControlCharacter =
-        (code >= 0x00 && code <= 0x1f) || (code >= 0x7f && code <= 0x9f);
-      return !isControlCharacter;
+      if (code === undefined) return false;
+      
+      // Preserve CR/LF for line handling
+      if (code === 0x0a || code === 0x0d) return true;
+      
+      // Remove C0 control chars (except CR/LF) that can break display
+      // Examples: BELL(0x07) makes noise, BS(0x08) moves cursor, VT(0x0B), FF(0x0C) 
+      if (code >= 0x00 && code <= 0x1f) return false;
+      
+      // Remove C1 control chars (0x80-0x9F) - legacy 8-bit control codes
+      if (code >= 0x80 && code <= 0x9f) return false;
+      
+      // Preserve DEL (0x7F) - it's handled functionally by applyOperations as backspace
+      // and doesn't cause rendering issues when displayed
+      
+      // Preserve all other characters including Unicode/emojis
+      return true;
     })
     .join('');
 }
