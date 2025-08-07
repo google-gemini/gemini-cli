@@ -171,6 +171,7 @@ describe('subagent.ts', () => {
 
       it('should throw an error if a tool requires confirmation', async () => {
         const mockTool = {
+          schema: { parameters: { type: Type.OBJECT, properties: {} } },
           build: vi.fn().mockReturnValue({
             shouldConfirmExecute: vi.fn().mockResolvedValue({
               type: 'exec',
@@ -203,6 +204,7 @@ describe('subagent.ts', () => {
 
       it('should succeed if tools do not require confirmation', async () => {
         const mockTool = {
+          schema: { parameters: { type: Type.OBJECT, properties: {} } },
           build: vi.fn().mockReturnValue({
             shouldConfirmExecute: vi.fn().mockResolvedValue(null),
           }),
@@ -223,6 +225,54 @@ describe('subagent.ts', () => {
           toolConfig,
         );
         expect(scope).toBeInstanceOf(SubAgentScope);
+      });
+
+      it('should skip interactivity check and warn for tools with required parameters', async () => {
+        const consoleWarnSpy = vi
+          .spyOn(console, 'warn')
+          .mockImplementation(() => {});
+
+        const mockToolWithParams = {
+          schema: {
+            parameters: {
+              type: Type.OBJECT,
+              properties: {
+                path: { type: Type.STRING },
+              },
+              required: ['path'],
+            },
+          },
+          // build should not be called, but we mock it to be safe
+          build: vi.fn(),
+        };
+
+        const { config } = await createMockConfig({
+          getTool: vi.fn().mockReturnValue(mockToolWithParams),
+        });
+
+        const toolConfig: ToolConfig = { tools: ['tool_with_params'] };
+
+        // The creation should succeed without throwing
+        const scope = await SubAgentScope.create(
+          'test-agent',
+          config,
+          promptConfig,
+          defaultModelConfig,
+          defaultRunConfig,
+          toolConfig,
+        );
+
+        expect(scope).toBeInstanceOf(SubAgentScope);
+
+        // Check that the warning was logged
+        expect(consoleWarnSpy).toHaveBeenCalledWith(
+          'Cannot check tool "tool_with_params" for interactivity because it requires parameters. Assuming it is safe for non-interactive use.',
+        );
+
+        // Ensure build was never called
+        expect(mockToolWithParams.build).not.toHaveBeenCalled();
+
+        consoleWarnSpy.mockRestore();
       });
     });
 

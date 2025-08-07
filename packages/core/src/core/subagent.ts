@@ -295,6 +295,20 @@ export class SubAgentScope {
       for (const toolName of toolsToLoad) {
         const tool = toolRegistry.getTool(toolName);
         if (tool) {
+          const requiredParams = tool.schema.parameters?.required ?? [];
+          if (requiredParams.length > 0) {
+            // This check is imperfect. A tool might require parameters but still
+            // be interactive (e.g., `delete_file(path)`). However, we cannot
+            // build a generic invocation without knowing what dummy parameters
+            // to provide. Crashing here because `build({})` fails is worse
+            // than allowing a potential hang later if an interactive tool is
+            // used. This is a best-effort check.
+            console.warn(
+              `Cannot check tool "${toolName}" for interactivity because it requires parameters. Assuming it is safe for non-interactive use.`,
+            );
+            continue;
+          }
+
           const invocation = tool.build({});
           const confirmationDetails = await invocation.shouldConfirmExecute(
             new AbortController().signal,
