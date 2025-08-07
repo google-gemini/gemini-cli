@@ -24,7 +24,7 @@ import {
 } from '@google/genai';
 import * as readline from 'readline';
 import { ContentGenerator } from '../core/contentGenerator.js';
-import {toContents} from './converter.js';
+import { toContents } from './converter.js';
 import { UserTierId } from './types.js';
 import {
   CaCountTokenResponse,
@@ -34,12 +34,8 @@ import {
   toCountTokenRequest,
   toGenerateContentRequest,
 } from './converter.js';
-import {
-  logApiRequest,
-} from '../telemetry/loggers.js';
-import {
-  ApiRequestEvent,
-} from '../telemetry/types.js';
+import { logApiRequest } from '../telemetry/loggers.js';
+import { ApiRequestEvent } from '../telemetry/types.js';
 import { Config } from '../config/config.js';
 
 /** HTTP options to be used in each of the requests. */
