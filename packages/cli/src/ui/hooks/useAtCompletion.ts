@@ -194,7 +194,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
 
       slowSearchTimer.current = setTimeout(() => {
         dispatch({ type: 'SET_LOADING', payload: true });
-      }, 100);
+      }, 200);
 
       try {
         const results = await fileSearch.current.search(state.pattern, {
