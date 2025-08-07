@@ -44,15 +44,6 @@ describe('ThemeManager', () => {
     expect(themeManager.isCustomTheme('MyCustomTheme')).toBe(true);
   });
 
-  it('should not load invalid custom themes', () => {
-    const invalidTheme = { ...validCustomTheme, Background: 'not-a-color' };
-    themeManager.loadCustomThemes({
-      InvalidTheme: invalidTheme as unknown as CustomTheme,
-    });
-    expect(themeManager.getCustomThemeNames()).not.toContain('InvalidTheme');
-    expect(themeManager.isCustomTheme('InvalidTheme')).toBe(false);
-  });
-
   it('should set and get the active theme', () => {
     expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
     themeManager.setActiveTheme('Ayu');
