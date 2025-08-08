@@ -298,7 +298,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (reverseSearchActive || commandSearchActive) {
         const isCommandSearch = commandSearchActive;
-        setExpandedSuggestionIndex(-1);
 
         const sc = isCommandSearch
           ? commandSearchCompletion

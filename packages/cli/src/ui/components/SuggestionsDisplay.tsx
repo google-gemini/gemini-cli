@@ -67,10 +67,11 @@ export function SuggestionsDisplay({
         const textColor = isActive ? Colors.AccentPurple : Colors.Gray;
         const labelElement = (
           <PrepareLabel
-            label={suggestion.label}
+            label={suggestion.value}
             matchedIndex={suggestion.matchedIndex}
             userInput={userInput}
             textColor={textColor}
+            isExpanded={isExpanded}
           />
         );
 
@@ -87,7 +88,7 @@ export function SuggestionsDisplay({
                 </Box>
               ) : (
                 <Box flexGrow={1}>
-                  {!isExpanded && labelElement}
+                  {labelElement}
                   {isLong && !isExpanded && (
                     <Text>
                       {' '}
@@ -108,14 +109,6 @@ export function SuggestionsDisplay({
                 </Box>
               )}
             </Box>
-
-            {isExpanded && isLong && isActive && (
-              <Box flexGrow={1}>
-                <Text color={textColor} wrap="wrap">
-                  {suggestion.value}
-                </Text>
-              </Box>
-            )}
           </Box>
         );
       })}

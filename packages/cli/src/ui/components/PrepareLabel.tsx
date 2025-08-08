@@ -16,6 +16,7 @@ export interface PrepareLabelProps {
   userInput: string;
   textColor: string;
   highlightColor?: string;
+  isExpanded?: boolean;
 }
 
 const _PrepareLabel: React.FC<PrepareLabelProps> = ({
@@ -24,6 +25,7 @@ const _PrepareLabel: React.FC<PrepareLabelProps> = ({
   userInput,
   textColor,
   highlightColor = Colors.AccentYellow,
+  isExpanded = false,
 }) => {
   if (
     matchedIndex === undefined ||
@@ -31,32 +33,56 @@ const _PrepareLabel: React.FC<PrepareLabelProps> = ({
     matchedIndex >= label.length ||
     userInput.length === 0
   ) {
-    const truncatedLabel =
-      label.length > MAX_WIDTH ? label.slice(0, MAX_WIDTH) + '...' : label;
-    return <Text color={textColor}>{truncatedLabel}</Text>;
+    if (isExpanded) {
+      return <Text color={textColor}>{label}</Text>;
+    } else {
+      const truncatedLabel =
+        label.length > MAX_WIDTH ? label.slice(0, MAX_WIDTH) + '...' : label;
+      return <Text color={textColor}>{truncatedLabel}</Text>;
+    }
   }
 
   const matchLength = userInput.length;
-  const start = label.slice(
-    Math.max(0, matchedIndex - Math.round(MAX_WIDTH/2)),
-    matchedIndex,
-  );
+
+  if (isExpanded) {
+    const start = label.slice(0, matchedIndex);
+    const match = label.slice(matchedIndex, matchedIndex + matchLength);
+    const end = label.slice(matchedIndex + matchLength);
+
+    return (
+      <Text color={textColor}>
+        {start}
+        <Text color="black" bold backgroundColor={highlightColor}>
+          {match}
+        </Text>
+        {end}
+      </Text>
+    );
+  }
+
+  const availableSpace = MAX_WIDTH - matchLength;
+  const halfSpace = Math.floor(availableSpace / 2);
+  let startPos = Math.max(0, matchedIndex - halfSpace);
+  let endPos = Math.min(label.length, matchedIndex + matchLength + halfSpace);
+  if (endPos - startPos < MAX_WIDTH && startPos > 0) {
+    startPos = Math.max(0, endPos - MAX_WIDTH);
+  }
+
+  if (endPos - startPos < MAX_WIDTH && endPos < label.length) {
+    endPos = Math.min(label.length, startPos + MAX_WIDTH);
+  }
+
+  const start = label.slice(startPos, matchedIndex);
   const match = label.slice(matchedIndex, matchedIndex + matchLength);
-  const end = label.slice(
-    matchedIndex + matchLength,
-    Math.min(
-      label.length,
-      matchedIndex + matchLength + Math.round(MAX_WIDTH / 2),
-    ),
-  );
+  const end = label.slice(matchedIndex + matchLength, endPos);
 
   return (
-    <Text>
-      <Text color={textColor}>{start}</Text>
+    <Text color={textColor}>
+      {start}
       <Text color="black" bold backgroundColor={highlightColor}>
         {match}
       </Text>
-      <Text color={textColor}>{end}</Text>
+      {end}
     </Text>
   );
 };
