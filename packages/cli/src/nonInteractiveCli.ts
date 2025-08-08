@@ -58,6 +58,8 @@ export async function runNonInteractive(
         );
         return;
       }
+      console.debug(`\n\n# Turn ${turnCount} (${new Date().toISOString()})`);
+
       const functionCalls: FunctionCall[] = [];
 
       const responseStream = geminiClient.sendMessageStream(
@@ -66,13 +68,25 @@ export async function runNonInteractive(
         prompt_id,
       );
 
+      let firstContent = true;
       for await (const event of responseStream) {
         if (abortController.signal.aborted) {
           console.error('Operation cancelled.');
           return;
         }
 
-        if (event.type === GeminiEventType.Content) {
+        if (event.type === GeminiEventType.Thought) {
+          const thought = event.value;
+          console.debug(
+            '> Thought: **%s**  \n> %s  ',
+            thought.subject,
+            thought.description.replace(/\n/g, '  \n> '),
+          );
+        } else if (event.type === GeminiEventType.Content) {
+          if (firstContent && config.getDebugMode()) {
+            firstContent = false;
+            process.stderr.write('\n✦ ');
+          }
           process.stdout.write(event.value);
         } else if (event.type === GeminiEventType.ToolCallRequest) {
           const toolCallRequest = event.value;
@@ -98,12 +112,35 @@ export async function runNonInteractive(
             prompt_id,
           };
 
+          // Log the tool invocation
+          try {
+            const tool = toolRegistry.getTool(requestInfo.name);
+            if (tool) {
+              const invocation = tool.build(requestInfo.args);
+              const description = invocation.getDescription();
+              console.debug(`\n\n$ Calling: ${fc.name} (${description})`);
+            } else {
+              console.debug(`\n\n$ Calling: ${fc.name}`);
+            }
+          } catch (e) {
+            console.debug(`\n\n$ Calling: ${fc.name}`);
+          }
+
           const toolResponse = await executeToolCall(
             config,
             requestInfo,
             toolRegistry,
             abortController.signal,
           );
+
+          if (toolResponse.resultDisplay) {
+            let displayText = toolResponse.resultDisplay;
+            // the resultDisplay is FileDiff
+            if (typeof displayText !== 'string') {
+              displayText = displayText.fileDiff;
+            }
+            console.debug('`````````\n%s\n`````````', displayText);
+          }
 
           if (toolResponse.error) {
             console.error(
