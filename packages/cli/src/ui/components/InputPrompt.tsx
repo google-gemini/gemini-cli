@@ -276,7 +276,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             navigateDown();
             return;
           }
-          if (keyMatchers[Command.ACCEPT_SUGGESTION](key)) {
+          if (keyMatchers[Command.ACCEPT_SUGGESTION_REVERSE_SEARCH](key)) {
             reverseSearchCompletion.handleAutocomplete(activeSuggestionIndex);
             reverseSearchCompletion.resetCompletionState();
             setReverseSearchActive(false);
@@ -284,7 +284,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
         }
 
-        if (keyMatchers[Command.SUBMIT](key)) {
+        if (keyMatchers[Command.SUBMIT_REVERSE_SEARCH](key)) {
           const textToSubmit =
             showSuggestions && activeSuggestionIndex > -1
               ? suggestions[activeSuggestionIndex].value
@@ -305,7 +305,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // If the command is a perfect match, pressing enter should execute it.
-      if (completion.isPerfectMatch && keyMatchers[Command.SUBMIT](key)) {
+      if (completion.isPerfectMatch && keyMatchers[Command.RETURN](key)) {
         handleSubmitAndClear(buffer.text);
         return;
       }
