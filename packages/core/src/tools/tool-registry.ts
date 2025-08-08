@@ -178,6 +178,7 @@ export class ToolRegistry {
       this,
       this.config.getPromptRegistry(),
       this.config.getDebugMode(),
+      this.config.getVersion(),
     );
   }
 

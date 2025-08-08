@@ -304,6 +304,7 @@ export async function loadCliConfig(
   extensions: Extension[],
   sessionId: string,
   argv: CliArgs,
+  version?: string,
 ): Promise<Config> {
   const debugMode =
     argv.debug ||
@@ -484,6 +485,7 @@ export async function loadCliConfig(
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
     ideModeFeature,
+    version: version || (await getCliVersion()),
     chatCompression: settings.chatCompression,
     folderTrustFeature,
     interactive,

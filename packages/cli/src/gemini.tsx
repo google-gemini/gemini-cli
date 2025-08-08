@@ -151,6 +151,7 @@ export async function main() {
     extensions,
     sessionId,
     argv,
+    await getCliVersion(),
   );
 
   dns.setDefaultResultOrder(
