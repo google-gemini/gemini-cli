@@ -632,16 +632,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         </Box>
       </Box>
       {shouldShowSuggestions && (
-        <Box>
-      {completion.showSuggestions && (
         <Box paddingRight={2}>
           <SuggestionsDisplay
-            suggestions={completion.suggestions}
-            activeIndex={completion.activeSuggestionIndex}
-            isLoading={completion.isLoadingSuggestions}
+            suggestions={activeCompletion.suggestions}
+            activeIndex={activeCompletion.activeSuggestionIndex}
+            isLoading={activeCompletion.isLoadingSuggestions}
             width={suggestionsWidth}
-            scrollOffset={completion.visibleStartIndex}
+            scrollOffset={activeCompletion.visibleStartIndex}
             userInput={buffer.text}
+            expandedIndex={expandedSuggestionIndex}
           />
         </Box>
       )}
