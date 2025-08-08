@@ -183,26 +183,56 @@ export const useGeminiStream = (
     return StreamingState.Idle;
   }, [isResponding, toolCalls]);
 
-  useInput((_input, key) => {
-    if (streamingState === StreamingState.Responding && key.escape) {
-      if (turnCancelledRef.current) {
-        return;
-      }
-      turnCancelledRef.current = true;
-      abortControllerRef.current?.abort();
-      if (pendingHistoryItemRef.current) {
+  const cancelRequest = useCallback(() => {
+    if (turnCancelledRef.current) {
+      return;
+    }
+    turnCancelledRef.current = true;
+    abortControllerRef.current?.abort();
+    if (pendingHistoryItemRef.current) {
+      if (pendingHistoryItemRef.current.type === 'tool_group') {
+        // Mark any running tools as Canceled for the history view.
+        const updatedTools = (
+          pendingHistoryItemRef.current as HistoryItemToolGroup
+        ).tools.map((tool) =>
+          tool.status === ToolCallStatus.Pending ||
+          tool.status === ToolCallStatus.Confirming ||
+          tool.status === ToolCallStatus.Executing
+            ? { ...tool, status: ToolCallStatus.Canceled }
+            : tool,
+        );
+        const updatedToolGroup: HistoryItemToolGroup = {
+          ...(pendingHistoryItemRef.current as HistoryItemToolGroup),
+          tools: updatedTools,
+        };
+        addItem(updatedToolGroup, Date.now());
+      } else {
         addItem(pendingHistoryItemRef.current, Date.now());
       }
-      addItem(
-        {
-          type: MessageType.INFO,
-          text: 'Request cancelled.',
-        },
-        Date.now(),
-      );
-      setPendingHistoryItem(null);
-      onCancelSubmit();
-      setIsResponding(false);
+    }
+    addItem(
+      {
+        type: MessageType.INFO,
+        text: 'Request cancelled.',
+      },
+      Date.now(),
+    );
+    setPendingHistoryItem(null);
+    onCancelSubmit();
+    setIsResponding(false);
+    setThought(null); // Also reset any active "thought" display.
+  }, [
+    addItem,
+    onCancelSubmit,
+    pendingHistoryItemRef,
+    setPendingHistoryItem,
+    setIsResponding,
+    setThought,
+  ]);
+
+  useInput((_input, key) => {
+    if (streamingState === StreamingState.Responding && key.escape) {
+      cancelRequest();
     }
   });
 
@@ -954,5 +984,6 @@ export const useGeminiStream = (
     initError,
     pendingHistoryItems,
     thought,
+    cancelRequest,
   };
 };

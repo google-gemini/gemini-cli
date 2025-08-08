@@ -525,6 +525,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     initError,
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
+    cancelRequest,
   } = useGeminiStream(
     config.getGeminiClient(),
     history,
@@ -638,6 +639,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         // Let AuthInProgress component handle the input.
         return;
       }
+
+      if (streamingState === StreamingState.Responding) {
+        cancelRequest();
+        return;
+      }
+
       handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
     } else if (key.ctrl && (input === 'd' || input === 'D')) {
       if (buffer.text.length > 0) {
