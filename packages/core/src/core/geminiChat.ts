@@ -21,19 +21,11 @@ import { retryWithBackoff } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { ContentGenerator, AuthType } from './contentGenerator.js';
 import { Config } from '../config/config.js';
-import {
-  logApiRequest,
-  logApiResponse,
-  logApiError,
-} from '../telemetry/loggers.js';
-import {
-  ApiErrorEvent,
-  ApiRequestEvent,
-  ApiResponseEvent,
-} from '../telemetry/types.js';
+import { logApiResponse, logApiError } from '../telemetry/loggers.js';
+import { ApiErrorEvent, ApiResponseEvent } from '../telemetry/types.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
-import { isStructuredError } from '../utils/quotaErrorDetection.js';
+import { StructuredError } from './turn.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -137,22 +129,6 @@ export class GeminiChat {
     private history: Content[] = [],
   ) {
     validateHistory(history);
-  }
-
-  private _getRequestTextFromContents(contents: Content[]): string {
-    return JSON.stringify(contents);
-  }
-
-  private async _logApiRequest(
-    contents: Content[],
-    model: string,
-    prompt_id: string,
-  ): Promise<void> {
-    const requestText = this._getRequestTextFromContents(contents);
-    logApiRequest(
-      this.config,
-      new ApiRequestEvent(model, prompt_id, requestText),
-    );
   }
 
   private async _logApiResponse(
@@ -273,8 +249,6 @@ export class GeminiChat {
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
 
-    this._logApiRequest(requestContents, this.config.getModel(), prompt_id);
-
     const startTime = Date.now();
     let response: GenerateContentResponse;
 
@@ -352,7 +326,6 @@ export class GeminiChat {
     } catch (error) {
       const durationMs = Date.now() - startTime;
       this._logApiError(durationMs, error, prompt_id);
-      await this.maybeIncludeSchemaDepthContext(error);
       this.sendPromise = Promise.resolve();
       throw error;
     }
@@ -387,7 +360,6 @@ export class GeminiChat {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
-    this._logApiRequest(requestContents, this.config.getModel(), prompt_id);
 
     const startTime = Date.now();
 
@@ -452,7 +424,6 @@ export class GeminiChat {
       const durationMs = Date.now() - startTime;
       this._logApiError(durationMs, error, prompt_id);
       this.sendPromise = Promise.resolve();
-      await this.maybeIncludeSchemaDepthContext(error);
       throw error;
     }
   }
@@ -521,6 +492,34 @@ export class GeminiChat {
       .find((chunk) => chunk.usageMetadata);
 
     return lastChunkWithMetadata?.usageMetadata;
+  }
+
+  async maybeIncludeSchemaDepthContext(error: StructuredError): Promise<void> {
+    // Check for potentially problematic cyclic tools with cyclic schemas
+    // and include a recommendation to remove potentially problematic tools.
+    if (
+      isSchemaDepthError(error.message) ||
+      isInvalidArgumentError(error.message)
+    ) {
+      const tools = (await this.config.getToolRegistry()).getAllTools();
+      const cyclicSchemaTools: string[] = [];
+      for (const tool of tools) {
+        if (
+          (tool.schema.parametersJsonSchema &&
+            hasCycleInSchema(tool.schema.parametersJsonSchema)) ||
+          (tool.schema.parameters && hasCycleInSchema(tool.schema.parameters))
+        ) {
+          cyclicSchemaTools.push(tool.displayName);
+        }
+      }
+      if (cyclicSchemaTools.length > 0) {
+        const extraDetails =
+          `\n\nThis error was probably caused by cyclic schema references in one of the following tools, try disabling them with excludeTools:\n\n - ` +
+          cyclicSchemaTools.join(`\n - `) +
+          `\n`;
+        error.message += extraDetails;
+      }
+    }
   }
 
   private async *processStreamResponse(
@@ -684,34 +683,13 @@ export class GeminiChat {
       content.parts[0].thought === true
     );
   }
-
-  private async maybeIncludeSchemaDepthContext(error: unknown): Promise<void> {
-    // Check for potentially problematic cyclic tools with cyclic schemas
-    // and include a recommendation to remove potentially problematic tools.
-    if (isStructuredError(error) && isSchemaDepthError(error.message)) {
-      const tools = (await this.config.getToolRegistry()).getAllTools();
-      const cyclicSchemaTools: string[] = [];
-      for (const tool of tools) {
-        if (
-          (tool.schema.parametersJsonSchema &&
-            hasCycleInSchema(tool.schema.parametersJsonSchema)) ||
-          (tool.schema.parameters && hasCycleInSchema(tool.schema.parameters))
-        ) {
-          cyclicSchemaTools.push(tool.displayName);
-        }
-      }
-      if (cyclicSchemaTools.length > 0) {
-        const extraDetails =
-          `\n\nThis error was probably caused by cyclic schema references in one of the following tools, try disabling them:\n\n - ` +
-          cyclicSchemaTools.join(`\n - `) +
-          `\n`;
-        error.message += extraDetails;
-      }
-    }
-  }
 }
 
 /** Visible for Testing */
 export function isSchemaDepthError(errorMessage: string): boolean {
   return errorMessage.includes('maximum schema depth exceeded');
+}
+
+export function isInvalidArgumentError(errorMessage: string): boolean {
+  return errorMessage.includes('Request contains an invalid argument');
 }
