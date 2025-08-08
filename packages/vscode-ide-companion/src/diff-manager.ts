@@ -56,7 +56,7 @@ export class DiffManager {
   private diffDocuments = new Map<string, DiffInfo>();
 
   constructor(
-    private readonly logger: vscode.OutputChannel,
+    private readonly log: (message: string) => void,
     private readonly diffContentProvider: DiffContentProvider,
   ) {}
 
@@ -151,9 +151,7 @@ export class DiffManager {
   async acceptDiff(rightDocUri: vscode.Uri) {
     const diffInfo = this.diffDocuments.get(rightDocUri.toString());
     if (!diffInfo) {
-      this.logger.appendLine(
-        `No diff info found for ${rightDocUri.toString()}`,
-      );
+      this.log(`No diff info found for ${rightDocUri.toString()}`);
       return;
     }
 
@@ -179,9 +177,7 @@ export class DiffManager {
   async cancelDiff(rightDocUri: vscode.Uri) {
     const diffInfo = this.diffDocuments.get(rightDocUri.toString());
     if (!diffInfo) {
-      this.logger.appendLine(
-        `No diff info found for ${rightDocUri.toString()}`,
-      );
+      this.log(`No diff info found for ${rightDocUri.toString()}`);
       // Even if we don't have diff info, we should still close the editor.
       await this.closeDiffEditor(rightDocUri);
       return;
