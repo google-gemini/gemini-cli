@@ -5,6 +5,68 @@
  */
 
 import { Config } from '../config/config.js';
+import os from 'os';
+import { quote } from 'shell-quote';
+
+/**
+ * Defines the configuration required to execute a command string within a specific shell.
+ */
+export interface ShellConfiguration {
+  /** The path or name of the shell executable (e.g., 'bash', 'cmd.exe'). */
+  executable: string;
+  /**
+   * The arguments required by the shell to execute a subsequent string argument.
+   */
+  argsPrefix: string[];
+}
+
+/**
+ * Determines the appropriate shell configuration for the current platform.
+ *
+ * This ensures we can execute command strings predictably and securely across platforms
+ * using the `spawn(executable, [...argsPrefix, commandString], { shell: false })` pattern.
+ *
+ * @returns The ShellConfiguration for the current environment.
+ */
+export function getShellConfiguration(): ShellConfiguration {
+  if (os.platform() === 'win32') {
+    const executable = process.env.ComSpec || 'cmd.exe';
+    // Flags for CMD:
+    // /d: Skip execution of AutoRun commands.
+    // /s: Modifies the treatment of the command string (important for quoting).
+    // /c: Carries out the command specified by the string and then terminates.
+    return { executable, argsPrefix: ['/d', '/s', '/c'] };
+  }
+
+  // Unix-like systems (Linux, macOS)
+  return { executable: 'bash', argsPrefix: ['-c'] };
+}
+
+/**
+ * Export the platform detection constant for use in process management (e.g., killing processes).
+ */
+export const isWindows = os.platform() === 'win32';
+
+/**
+ * Escapes a string so that it can be safely used as a single argument
+ * in a shell command, preventing command injection.
+ *
+ * @param arg The argument string to escape.
+ * @returns The shell-escaped string.
+ */
+export function escapeShellArg(arg: string): string {
+  if (!arg) {
+    return '';
+  }
+
+  if (os.platform() === 'win32') {
+    // Simple Windows escaping for cmd.exe: wrap in double quotes and escape inner double quotes.
+    return `"${arg.replace(/"/g, '""')}"`;
+  } else {
+    // POSIX shell escaping using shell-quote.
+    return quote([arg]);
+  }
+}
 
 /**
  * Splits a shell command into a list of individual commands, respecting quotes.
