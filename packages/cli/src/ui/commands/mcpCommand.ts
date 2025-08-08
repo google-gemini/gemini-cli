@@ -507,6 +507,9 @@ const refreshCommand: SlashCommand = {
       await geminiClient.setTools();
     }
 
+    // Reload the slash commands to reflect the changes.
+    context.ui.reloadCommands();
+
     return getMcpStatus(context, false, false, false);
   },
 };

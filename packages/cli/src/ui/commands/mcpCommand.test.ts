@@ -985,6 +985,8 @@ describe('mcpCommand', () => {
           },
         },
       });
+      // Mock the reloadCommands function, which is new logic.
+      context.ui.reloadCommands = vi.fn();
 
       const refreshCommand = mcpCommand.subCommands?.find(
         (cmd) => cmd.name === 'refresh',
@@ -1002,6 +1004,7 @@ describe('mcpCommand', () => {
       );
       expect(mockToolRegistry.discoverMcpTools).toHaveBeenCalled();
       expect(mockGeminiClient.setTools).toHaveBeenCalled();
+      expect(context.ui.reloadCommands).toHaveBeenCalledTimes(1);
 
       expect(isMessageAction(result)).toBe(true);
       if (isMessageAction(result)) {
