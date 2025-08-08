@@ -11,11 +11,20 @@ import {
   EmbedContentParameters,
   EmbedContentResponse,
   GenerateContentParameters,
+  GenerateContentResponseUsageMetadata,
   GenerateContentResponse,
 } from '@google/genai';
-import { ApiRequestEvent } from '../telemetry/types.js';
+import {
+  ApiRequestEvent,
+  ApiResponseEvent,
+  ApiErrorEvent,
+} from '../telemetry/types.js';
 import { Config } from '../config/config.js';
-import { logApiRequest } from '../telemetry/loggers.js';
+import {
+  logApiError,
+  logApiRequest,
+  logApiResponse,
+} from '../telemetry/loggers.js';
 import { ContentGenerator } from './contentGenerator.js';
 import { toContents } from '../code_assist/converter.js';
 
@@ -40,20 +49,107 @@ export class LoggingContentGenerator implements ContentGenerator {
     );
   }
 
+  private _logApiResponse(
+    durationMs: number,
+    prompt_id: string,
+    usageMetadata?: GenerateContentResponseUsageMetadata,
+    responseText?: string,
+  ): void {
+    logApiResponse(
+      this.config,
+      new ApiResponseEvent(
+        this.config.getModel(),
+        durationMs,
+        prompt_id,
+        this.config.getContentGeneratorConfig()?.authType,
+        usageMetadata,
+        responseText,
+      ),
+    );
+  }
+
+  private _logApiError(
+    durationMs: number,
+    error: unknown,
+    prompt_id: string,
+  ): void {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorType = error instanceof Error ? error.name : 'unknown';
+
+    logApiError(
+      this.config,
+      new ApiErrorEvent(
+        this.config.getModel(),
+        errorMessage,
+        durationMs,
+        prompt_id,
+        this.config.getContentGeneratorConfig()?.authType,
+        errorType,
+      ),
+    );
+  }
+
   async generateContent(
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<GenerateContentResponse> {
+    const startTime = Date.now();
+
     this.logApiRequest(toContents(req.contents), req.model, userPromptId);
-    return this.wrapped.generateContent(req, userPromptId);
+    const generateContentPromise = this.wrapped.generateContent(
+      req,
+      userPromptId,
+    );
+    generateContentPromise
+      .then((response) => {
+        const durationMs = Date.now() - startTime;
+        this._logApiResponse(
+          durationMs,
+          userPromptId,
+          response.usageMetadata,
+          JSON.stringify(response),
+        );
+      })
+      .catch((error) => {
+        const durationMs = Date.now() - startTime;
+        this._logApiError(durationMs, error, userPromptId);
+      });
+    return generateContentPromise;
   }
 
   async generateContentStream(
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    const startTime = Date.now();
     this.logApiRequest(toContents(req.contents), req.model, userPromptId);
-    return this.wrapped.generateContentStream(req, userPromptId);
+    const generateContentPromise = this.wrapped.generateContentStream(
+      req,
+      userPromptId,
+    );
+    generateContentPromise.then(
+      async (generator) => {
+        let lastResponse: GenerateContentResponse | undefined;
+          for await (const response of generator) {
+            lastResponse = response;
+          }
+          const durationMs = Date.now() - startTime;
+          if (lastResponse) {
+            this._logApiResponse(
+              durationMs,
+              userPromptId,
+              lastResponse.usageMetadata,
+              JSON.stringify(lastResponse),
+            );
+          }
+      },
+      (error) => {
+        const durationMs = Date.now() - startTime;
+        this._logApiError(durationMs, error, userPromptId);
+        throw error;
+      },
+    );
+    return generateContentPromise;
   }
 
   async countTokens(req: CountTokensParameters): Promise<CountTokensResponse> {
