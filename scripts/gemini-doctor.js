@@ -68,10 +68,15 @@ function checkGcloudAuth() {
     execSync('gcloud auth application-default print-access-token', { stdio: 'ignore' });
     printOk('gcloud ADC authentication is valid');
   } catch (err) {
-    printBad('gcloud ADC authentication failed.');
-    console.log('  - Try running "gcloud auth application-default login" or setting GOOGLE_APPLICATION_CREDENTIALS.');
-    if (err.stdout) {
-      console.log('  - gcloud output:\n' + err.stdout.toString());
+    if (err.code === 'ENOENT') {
+      printBad('gcloud command not found.');
+      console.log('  - Please install the Google Cloud CLI (gcloud) and ensure it is in your PATH.');
+    } else {
+      printBad('gcloud ADC authentication failed.');
+      console.log('  - Try running "gcloud auth application-default login" or setting GOOGLE_APPLICATION_CREDENTIALS.');
+      if (err.stdout) {
+        console.log('  - gcloud output:\n' + err.stdout.toString());
+      }
     }
   }
 }
