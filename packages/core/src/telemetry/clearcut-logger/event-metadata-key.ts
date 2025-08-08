@@ -208,7 +208,7 @@ export enum EventMetadataKey {
   GEMINI_CLI_USER_ADDED_LINES = 49,
 
   // Logs user removed lines in edit/write tool response.
-  GEMINI_CLI_USER_REMOVED_LINES = 50,
+  GEMINI_CLI_user_deleted_LINES = 50,
 }
 
 export function getEventMetadataKey(

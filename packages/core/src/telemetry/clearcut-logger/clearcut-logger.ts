@@ -481,7 +481,7 @@ export class ClearcutLogger {
         ai_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
         ai_removed_lines: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
         user_added_lines: EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
-        user_removed_lines: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
+        user_deleted_lines: EventMetadataKey.GEMINI_CLI_user_deleted_LINES,
       };
 
       for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {
