@@ -281,6 +281,200 @@ describe('LoopDetectionService', () => {
 
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
+    it('should reset tracking when a table is detected', () => {
+      service.reset('');
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        service.addAndCheck(createContentEvent(repeatedContent));
+      }
+
+      // This should reset tracking and not trigger a loop
+      service.addAndCheck(createContentEvent('| Column 1 | Column 2 |'));
+
+      // Add more repeated content after table - should not trigger loop
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        const isLoop = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(isLoop).toBe(false);
+      }
+
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should reset tracking when a list item is detected', () => {
+      service.reset('');
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        service.addAndCheck(createContentEvent(repeatedContent));
+      }
+
+      // This should reset tracking and not trigger a loop
+      service.addAndCheck(createContentEvent('* List item'));
+
+      // Add more repeated content after list - should not trigger loop
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        const isLoop = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(isLoop).toBe(false);
+      }
+
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should reset tracking when a heading is detected', () => {
+      service.reset('');
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        service.addAndCheck(createContentEvent(repeatedContent));
+      }
+
+      // This should reset tracking and not trigger a loop
+      service.addAndCheck(createContentEvent('## Heading'));
+
+      // Add more repeated content after heading - should not trigger loop
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        const isLoop = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(isLoop).toBe(false);
+      }
+
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should reset tracking when a blockquote is detected', () => {
+      service.reset('');
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        service.addAndCheck(createContentEvent(repeatedContent));
+      }
+
+      // This should reset tracking and not trigger a loop
+      service.addAndCheck(createContentEvent('> Quote text'));
+
+      // Add more repeated content after blockquote - should not trigger loop
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+        const isLoop = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(isLoop).toBe(false);
+      }
+
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should reset tracking for various list item formats', () => {
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      // Test different list formats - make sure they start at beginning of line
+      const listFormats = [
+        '* Bullet item',
+        '- Dash item',
+        '+ Plus item',
+        '1. Numbered item',
+        '42. Another numbered item',
+      ];
+
+      listFormats.forEach((listFormat, index) => {
+        service.reset('');
+
+        // Build up to near threshold
+        for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+          service.addAndCheck(createContentEvent(repeatedContent));
+        }
+
+        // Reset should occur with list item - add newline to ensure it starts at beginning
+        service.addAndCheck(createContentEvent('\n' + listFormat));
+
+        // Should not trigger loop after reset - use different content to avoid any cached state issues
+        const newRepeatedContent = createRepetitiveContent(
+          index + 100,
+          CONTENT_CHUNK_SIZE,
+        );
+        for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+          const isLoop = service.addAndCheck(
+            createContentEvent(newRepeatedContent),
+          );
+          expect(isLoop).toBe(false);
+        }
+      });
+
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should reset tracking for various table formats', () => {
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      const tableFormats = [
+        '| Column 1 | Column 2 |',
+        '|---|---|',
+        '|++|++|',
+        '+---+---+',
+      ];
+
+      tableFormats.forEach((tableFormat, index) => {
+        service.reset('');
+
+        // Build up to near threshold
+        for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+          service.addAndCheck(createContentEvent(repeatedContent));
+        }
+
+        // Reset should occur with table format - add newline to ensure it starts at beginning
+        service.addAndCheck(createContentEvent('\n' + tableFormat));
+
+        // Should not trigger loop after reset - use different content to avoid any cached state issues
+        const newRepeatedContent = createRepetitiveContent(
+          index + 200,
+          CONTENT_CHUNK_SIZE,
+        );
+        for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+          const isLoop = service.addAndCheck(
+            createContentEvent(newRepeatedContent),
+          );
+          expect(isLoop).toBe(false);
+        }
+      });
+
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should reset tracking for various heading levels', () => {
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      const headingFormats = [
+        '# H1 Heading',
+        '## H2 Heading',
+        '### H3 Heading',
+        '#### H4 Heading',
+        '##### H5 Heading',
+        '###### H6 Heading',
+      ];
+
+      headingFormats.forEach((headingFormat, index) => {
+        service.reset('');
+
+        // Build up to near threshold
+        for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+          service.addAndCheck(createContentEvent(repeatedContent));
+        }
+
+        // Reset should occur with heading - add newline to ensure it starts at beginning
+        service.addAndCheck(createContentEvent('\n' + headingFormat));
+
+        // Should not trigger loop after reset - use different content to avoid any cached state issues
+        const newRepeatedContent = createRepetitiveContent(
+          index + 300,
+          CONTENT_CHUNK_SIZE,
+        );
+        for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
+          const isLoop = service.addAndCheck(
+            createContentEvent(newRepeatedContent),
+          );
+          expect(isLoop).toBe(false);
+        }
+      });
+
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
   });
 
   describe('Edge Cases', () => {

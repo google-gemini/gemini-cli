@@ -161,13 +161,19 @@ export class LoopDetectionService {
    *    as repetitive code structures are common and not necessarily loops.
    */
   private checkContentLoop(content: string): boolean {
-    // Code blocks can often contain repetitive syntax that is not indicative of a loop.
-    // To avoid false positives, we detect when we are inside a code block and
-    // temporarily disable loop detection.
+    // Different content elements can often contain repetitive syntax that is not indicative of a loop.
+    // To avoid false positives, we detect when we encounter different content types and
+    // reset tracking to avoid analyzing content that spans across different element boundaries.
     const numFences = (content.match(/```/g) ?? []).length;
-    if (numFences) {
-      // Reset tracking when a code fence is detected to avoid analyzing content
-      // that spans across code block boundaries.
+    const hasTable = /(^|\n)\s*(\|.*\||[|+-]{3,})/.test(content);
+    const hasListItem =
+      /(^|\n)\s*[*-+]\s/.test(content) || /(^|\n)\s*\d+\.\s/.test(content);
+    const hasHeading = /(^|\n)#+\s/.test(content);
+    const hasBlockquote = /(^|\n)>\s/.test(content);
+
+    if (numFences || hasTable || hasListItem || hasHeading || hasBlockquote) {
+      // Reset tracking when different content elements are detected to avoid analyzing content
+      // that spans across different element boundaries.
       this.resetContentTracking();
     }
 
