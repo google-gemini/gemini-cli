@@ -22,6 +22,9 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
 
+// Exit code used when user clears authentication method
+const EXIT_CODE_AUTH_CLEARED = 42;
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8'));
@@ -69,8 +72,16 @@ if (process.env.DEBUG) {
   // than the relaunched process making it harder to debug.
   env.GEMINI_CLI_NO_RELAUNCH = 'true';
 }
-const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
-
-child.on('close', (code) => {
-  process.exit(code);
-});
+function runCli() {
+  const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
+  child.on('close', (code, signal) => {
+    // If the child process exited with a special code for USER_CLEARED_AUTH_METHOD, restart CLI
+    if (code === EXIT_CODE_AUTH_CLEARED) {
+      console.log('\nAuth method cleared. Restarting Gemini CLI for new authentication...\n');
+      runCli();
+    } else {
+      process.exit(code);
+    }
+  });
+}
+runCli();
