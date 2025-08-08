@@ -611,67 +611,66 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     [handleSlashCommand],
   );
 
-  const handleGlobalKeypress = useCallback((key: Key) => {
-    let enteringConstrainHeightMode = false;
-    if (!constrainHeight) {
-      // Automatically re-enter constrain height mode if the user types
-      // anything. When constrainHeight==false, the user will experience
-      // significant flickering so it is best to disable it immediately when
-      // the user starts interacting with the app.
-      enteringConstrainHeightMode = true;
-      setConstrainHeight(true);
-    }
+  const handleGlobalKeypress = useCallback(
+    (key: Key) => {
+      let enteringConstrainHeightMode = false;
+      if (!constrainHeight) {
+        enteringConstrainHeightMode = true;
+        setConstrainHeight(true);
+      }
 
-    if (keyMatchers.showErrorDetails(key)) {
-      setShowErrorDetails((prev) => !prev);
-    } else if (keyMatchers.toggleToolDescriptions(key)) {
-      const newValue = !showToolDescriptions;
-      setShowToolDescriptions(newValue);
+      if (keyMatchers.showErrorDetails(key)) {
+        setShowErrorDetails((prev) => !prev);
+      } else if (keyMatchers.toggleToolDescriptions(key)) {
+        const newValue = !showToolDescriptions;
+        setShowToolDescriptions(newValue);
 
-      const mcpServers = config.getMcpServers();
-      if (Object.keys(mcpServers || {}).length > 0) {
-        handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
+        const mcpServers = config.getMcpServers();
+        if (Object.keys(mcpServers || {}).length > 0) {
+          handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
+        }
+      } else if (
+        keyMatchers.toggleIDEContextDetail(key) &&
+        config.getIdeMode() &&
+        ideContextState
+      ) {
+        // Show IDE status when in IDE mode and context is available.
+        handleSlashCommand('/ide status');
+      } else if (keyMatchers.quit(key)) {
+        // When authenticating, let AuthInProgress component handle Ctrl+C.
+        if (isAuthenticating) {
+          return;
+        }
+        handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+      } else if (keyMatchers.exit(key)) {
+        if (buffer.text.length > 0) {
+          return;
+        }
+        handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
+      } else if (keyMatchers.showMoreLines(key) && !enteringConstrainHeightMode) {
+        setConstrainHeight(false);
       }
-    } else if (
-      keyMatchers.toggleIDEContextDetail(key) &&
-      config.getIdeMode() &&
-      ideContextState
-    ) {
-      // Show IDE status when in IDE mode and context is available.
-      handleSlashCommand('/ide status');
-    } else if (keyMatchers.quit(key)) {
-      // When authenticating, let AuthInProgress component handle Ctrl+C.
-      if (isAuthenticating) {
-        return;
-      }
-      handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
-    } else if (keyMatchers.exit(key)) {
-      if (buffer.text.length > 0) {
-        // Do nothing if there is text in the input.
-        return;
-      }
-      handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
-    } else if (keyMatchers.showMoreLines(key) && !enteringConstrainHeightMode) {
-      setConstrainHeight(false);
-    }
-  }, [
-    constrainHeight,
-    setConstrainHeight,
-    setShowErrorDetails,
-    showToolDescriptions,
-    setShowToolDescriptions,
-    config,
-    ideContextState,
-    handleExit,
-    ctrlCPressedOnce,
-    setCtrlCPressedOnce,
-    ctrlCTimerRef,
-    buffer.text.length,
-    ctrlDPressedOnce,
-    setCtrlDPressedOnce,
-    ctrlDTimerRef,
-    handleSlashCommand,
-  ]);
+    },
+    [
+      constrainHeight,
+      setConstrainHeight,
+      setShowErrorDetails,
+      showToolDescriptions,
+      setShowToolDescriptions,
+      config,
+      ideContextState,
+      handleExit,
+      ctrlCPressedOnce,
+      setCtrlCPressedOnce,
+      ctrlCTimerRef,
+      buffer.text.length,
+      ctrlDPressedOnce,
+      setCtrlDPressedOnce,
+      ctrlDTimerRef,
+      handleSlashCommand,
+      isAuthenticating,
+    ],
+  );
 
   useKeypress(handleGlobalKeypress, { isActive: true });
 

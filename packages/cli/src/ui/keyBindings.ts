@@ -41,15 +41,19 @@ export const keyMatchers: KeyMatchers = {
   navigationDown: (key) => key.name === 'down',
 
   // Auto-completion
-  acceptSuggestion: (key) => key.name === 'tab' || (key.name === 'return' && !key.ctrl),
+  acceptSuggestion: (key) =>
+    key.name === 'tab' || (key.name === 'return' && !key.ctrl),
   escape: (key) => key.name === 'escape',
 
   // Text input
-  submit: (key) => key.name === 'return' && !key.ctrl && !key.meta && !key.paste,
-  newline: (key) => key.name === 'return' && (key.ctrl || key.meta || key.paste),
+  submit: (key) =>
+    key.name === 'return' && !key.ctrl && !key.meta && !key.paste,
+  newline: (key) =>
+    key.name === 'return' && (key.ctrl || key.meta || key.paste),
 
   // External tools
-  openExternalEditor: (key) => key.ctrl && (key.name === 'x' || key.sequence === '\x18'),
+  openExternalEditor: (key) =>
+    key.ctrl && (key.name === 'x' || key.sequence === '\x18'),
   pasteClipboardImage: (key) => key.ctrl && key.name === 'v',
 
   // App level bindings
