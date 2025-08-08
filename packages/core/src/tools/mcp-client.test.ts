@@ -317,7 +317,7 @@ describe('mcp-client', () => {
       expect(roots).toEqual({
         roots: [
           {
-            uri:  pathToFileURL('/test/dir').toString(),
+            uri: pathToFileURL('/test/dir').toString(),
             name: 'dir',
           },
           {
