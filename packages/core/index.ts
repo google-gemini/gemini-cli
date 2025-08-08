@@ -8,5 +8,6 @@ export * from './src/index.js';
 export {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  ALL_GEMINI_MODELS,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
 } from './src/config/models.js';

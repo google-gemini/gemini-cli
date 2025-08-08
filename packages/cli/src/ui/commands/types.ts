@@ -99,7 +99,7 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  dialog: 'auth' | 'theme' | 'editor' | 'privacy';
+  dialog: 'auth' | 'theme' | 'editor' | 'privacy' | 'model';
 }
 
 /**

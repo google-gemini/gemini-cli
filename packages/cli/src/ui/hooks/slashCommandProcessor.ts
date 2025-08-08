@@ -44,6 +44,7 @@ export const useSlashCommandProcessor = (
   loadHistory: UseHistoryManagerReturn['loadHistory'],
   refreshStatic: () => void,
   onDebugMessage: (message: string) => void,
+  openModelDialog: () => void,
   openThemeDialog: () => void,
   openAuthDialog: () => void,
   openEditorDialog: () => void,
@@ -340,6 +341,9 @@ export const useSlashCommandProcessor = (
                   return { type: 'handled' };
                 case 'dialog':
                   switch (result.dialog) {
+                    case 'model':
+                      openModelDialog();
+                      return { type: 'handled' };
                     case 'auth':
                       openAuthDialog();
                       return { type: 'handled' };
@@ -471,6 +475,7 @@ export const useSlashCommandProcessor = (
       commands,
       commandContext,
       addMessage,
+      openModelDialog,
       openThemeDialog,
       openPrivacyNotice,
       openEditorDialog,

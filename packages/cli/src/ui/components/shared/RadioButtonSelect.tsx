@@ -18,6 +18,7 @@ export interface RadioSelectItem<T> {
   disabled?: boolean;
   themeNameDisplay?: string;
   themeTypeDisplay?: string;
+  isSelectedIndicator?: string;
 }
 
 /**
@@ -211,6 +212,9 @@ export function RadioButtonSelect<T>({
             ) : (
               <Text color={textColor} wrap="truncate">
                 {item.label}
+                {isSelected && item.isSelectedIndicator && (
+                  <Text color={Colors.Gray}> {item.isSelectedIndicator}</Text>
+                )}
               </Text>
             )}
           </Box>
