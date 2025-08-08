@@ -24,9 +24,17 @@ describe('ide-installer', () => {
       expect(installer).toBeInstanceOf(Object);
     });
 
-    it('should return null for an unknown IDE', () => {
+    it('should return an OpenVSXInstaller for "vscodium"', () => {
+      const installer = getIdeInstaller(DetectedIde.VSCodium);
+      expect(installer).not.toBeNull();
+      expect(installer).toBeInstanceOf(Object);
+    });
+
+    it('should return a DefaultIDEInstaller for an unknown IDE', () => {
       const installer = getIdeInstaller('unknown' as DetectedIde);
-      expect(installer).toBeNull();
+      // Assuming DefaultIDEInstaller is the fallback
+      expect(installer).not.toBeNull();
+      expect(installer).toBeInstanceOf(Object);
     });
   });
 
@@ -56,6 +64,51 @@ describe('ide-installer', () => {
         const result = await installer.install();
         expect(result.success).toBe(false);
         expect(result.message).toContain('VS Code CLI not found');
+      });
+    });
+  });
+
+  describe('OpenVSXInstaller', () => {
+    let installer: IdeInstaller;
+    let execSyncSpy: vi.SpyInstance;
+
+    beforeEach(() => {
+      installer = getIdeInstaller(DetectedIde.VSCodium)!;
+      execSyncSpy = vi
+        .spyOn(child_process, 'execSync')
+        .mockImplementation(() => '');
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    describe('install', () => {
+      it('should call execSync with the correct command', async () => {
+        await installer.install();
+        expect(execSyncSpy).toHaveBeenCalledWith(
+          'npx ovsx get google.gemini-cli-vscode-ide-companion',
+          { stdio: 'pipe' },
+        );
+      });
+
+      it('should return a success message on successful installation', async () => {
+        const result = await installer.install();
+        expect(result.success).toBe(true);
+        expect(result.message).toContain(
+          'VS Code companion extension was installed successfully from OpenVSX',
+        );
+      });
+
+      it('should return a failure message on failed installation', async () => {
+        execSyncSpy.mockImplementation(() => {
+          throw new Error('Command failed');
+        });
+        const result = await installer.install();
+        expect(result.success).toBe(false);
+        expect(result.message).toContain(
+          'Failed to install VS Code companion extension from OpenVSX',
+        );
       });
     });
   });
