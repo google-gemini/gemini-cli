@@ -113,12 +113,16 @@ export async function runNonInteractive(
           };
 
           // Log the tool invocation
-          const tool = toolRegistry.getTool(requestInfo.name);
-          if (tool) {
-            const invocation = tool.build(requestInfo.args);
-            const description = invocation.getDescription();
-            console.debug(`\n\n$ Calling: ${fc.name} (${description})`);
-          } else {
+          try {
+            const tool = toolRegistry.getTool(requestInfo.name);
+            if (tool) {
+              const invocation = tool.build(requestInfo.args);
+              const description = invocation.getDescription();
+              console.debug(`\n\n$ Calling: ${fc.name} (${description})`);
+            } else {
+              console.debug(`\n\n$ Calling: ${fc.name}`);
+            }
+          } catch (e) {
             console.debug(`\n\n$ Calling: ${fc.name}`);
           }
 
