@@ -5,6 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
+import { lightSemanticColors } from './semantic-tokens.js';
 
 const xcodeColors: ColorsTheme = {
   type: 'light',
@@ -149,4 +150,5 @@ export const XCode: Theme = new Theme(
     },
   },
   xcodeColors,
+  lightSemanticColors,
 );
