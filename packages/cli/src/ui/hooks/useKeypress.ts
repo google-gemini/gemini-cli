@@ -6,7 +6,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useStdin } from 'ink';
-import readline from 'readline';
+import * as readline from 'node:readline';
 import { PassThrough } from 'stream';
 
 export interface Key {
@@ -43,7 +43,7 @@ export function useKeypress(
   }, [onKeypress]);
 
   useEffect(() => {
-    if (!isActive || !stdin.isTTY) {
+    if (!isActive || !stdin?.isTTY) {
       return;
     }
 
@@ -55,7 +55,8 @@ export function useKeypress(
     if (
       nodeMajorVersion < 20 ||
       process.env['PASTE_WORKAROUND'] === '1' ||
-      process.env['PASTE_WORKAROUND'] === 'true'
+      process.env['PASTE_WORKAROUND'] === 'true' ||
+      typeof readline?.createInterface !== 'function'
     ) {
       // Prior to node 20, node's built-in readline does not support bracketed
       // paste mode. We hack by detecting it with our own handler.

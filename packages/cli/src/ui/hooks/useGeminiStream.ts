@@ -95,7 +95,7 @@ export const useGeminiStream = (
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
   onEditorClose: () => void,
-  onCancelSubmit: () => void,
+  onCancelSubmit: () => void = () => {}, 
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -111,7 +111,7 @@ export const useGeminiStream = (
 
   // Update config when plan mode changes
   useEffect(() => {
-    if (config) {
+    if (config && (config as any).setIsPlanMode) {
       config.setIsPlanMode(isPlanMode);
     }
   }, [config, isPlanMode]);
@@ -210,7 +210,9 @@ export const useGeminiStream = (
         Date.now(),
       );
       setPendingHistoryItem(null);
-      onCancelSubmit();
+      if (typeof onCancelSubmit === 'function') {
+        onCancelSubmit();
+      }
       setIsResponding(false);
     }
   });
@@ -739,10 +741,6 @@ export const useGeminiStream = (
 
   const handleCompletedTools = useCallback(
     async (completedToolCallsFromScheduler: TrackedToolCall[]) => {
-      if (isResponding) {
-        return;
-      }
-
       const completedAndReadyToSubmitTools =
         completedToolCallsFromScheduler.filter(
           (
