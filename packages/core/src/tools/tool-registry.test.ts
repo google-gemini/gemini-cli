@@ -336,7 +336,7 @@ describe('ToolRegistry', () => {
         toolRegistry,
         config.getPromptRegistry(),
         false,
-        '/test/dir',
+        expect.any(Object),
       );
     });
 
@@ -360,7 +360,7 @@ describe('ToolRegistry', () => {
         toolRegistry,
         config.getPromptRegistry(),
         false,
-        '/test/dir',
+        expect.any(Object),
       );
     });
   });

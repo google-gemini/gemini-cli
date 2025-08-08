@@ -24,6 +24,7 @@ import { AuthProviderType } from '../config/config.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 
 import { DiscoveredMCPTool } from './mcp-tool.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -291,6 +292,9 @@ describe('mcp-client', () => {
       vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
         {} as SdkClientStdioLib.StdioClientTransport,
       );
+      const mockWorkspaceContext = {
+        getDirectories: vi.fn().mockReturnValue(['/test/dir', '/another/project']),
+      } as unknown as WorkspaceContext;
 
       await connectToMcpServer(
         'test-server',
@@ -298,7 +302,7 @@ describe('mcp-client', () => {
           command: 'test-command',
         },
         false,
-        '/test/dir',
+        mockWorkspaceContext,
       );
 
       expect(mockedClient.registerCapabilities).toHaveBeenCalledWith({
@@ -312,6 +316,10 @@ describe('mcp-client', () => {
           {
             uri: 'file:///test/dir',
             name: 'dir',
+          },
+          {
+            uri: 'file:///another/project',
+            name: 'project',
           },
         ],
       });
@@ -528,7 +536,9 @@ describe('mcp-client', () => {
     });
 
     it('should connect via command', async () => {
-      const mockedTransport = vi.mocked(SdkClientStdioLib.StdioClientTransport);
+      const mockedTransport = vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
 
       await createTransport(
         'test-server',
