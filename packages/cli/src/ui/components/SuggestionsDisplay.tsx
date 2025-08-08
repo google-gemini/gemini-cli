@@ -82,7 +82,7 @@ export function SuggestionsDisplay({
               )}
               {suggestion.description ? (
                 <Box flexGrow={1}>
-                  <Text color={textColor} wrap="wrap">
+                  <Text color={textColor} wrap="truncate">
                     {suggestion.description}
                   </Text>
                 </Box>
