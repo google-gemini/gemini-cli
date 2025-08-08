@@ -20,9 +20,11 @@ interface SuggestionsDisplayProps {
   width: number;
   scrollOffset: number;
   userInput: string;
+  expandedIndex?: number;
 }
 
 export const MAX_SUGGESTIONS_TO_SHOW = 8;
+export const MAX_SUGGESTION_WIDTH = 150; // Maximum width for the suggestion text
 
 export function SuggestionsDisplay({
   suggestions,
@@ -31,6 +33,7 @@ export function SuggestionsDisplay({
   width,
   scrollOffset,
   userInput,
+  expandedIndex,
 }: SuggestionsDisplayProps) {
   if (isLoading) {
     return (
@@ -59,34 +62,52 @@ export function SuggestionsDisplay({
       {visibleSuggestions.map((suggestion, index) => {
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
+        const isExpanded = originalIndex === expandedIndex;
+        const isLong = suggestion.value.length >= MAX_SUGGESTION_WIDTH;
         const textColor = isActive ? Colors.AccentPurple : Colors.Gray;
         const labelElement = (
           <PrepareLabel
-            label={suggestion.label}
+            label={suggestion.value}
             matchedIndex={suggestion.matchedIndex}
             userInput={userInput}
             textColor={textColor}
+            isExpanded={isExpanded}
           />
         );
 
         return (
-          <Box key={`${suggestion.value}-${originalIndex}`} width={width}>
+          <Box
+            key={`${suggestion.value}-${originalIndex}`}
+            flexDirection="column"
+            width={width}
+          >
             <Box flexDirection="row">
               {userInput.startsWith('/') ? (
-                // only use box model for (/) command mode
                 <Box width={20} flexShrink={0}>
                   {labelElement}
                 </Box>
               ) : (
-                labelElement
+                <Box flexGrow={1}>
+                  {labelElement}
+                  {isLong && !isExpanded && (
+                    <Text>
+                      {' '}
+                      (+{' '}
+                      {suggestion.value.split(' ').length -
+                        userInput.split(' ').length}{' '}
+                      words)
+                    </Text>
+                  )}
+                </Box>
               )}
-              {suggestion.description ? (
+
+              {suggestion.description && (
                 <Box flexGrow={1}>
                   <Text color={textColor} wrap="truncate">
                     {suggestion.description}
                   </Text>
                 </Box>
-              ) : null}
+              )}
             </Box>
           </Box>
         );
