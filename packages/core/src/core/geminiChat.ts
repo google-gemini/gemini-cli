@@ -206,7 +206,6 @@ export class GeminiChat {
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
 
-    const startTime = Date.now();
     let response: GenerateContentResponse;
 
     try {
@@ -247,7 +246,6 @@ export class GeminiChat {
           await this.handleFlashFallback(authType, error),
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
-      const durationMs = Date.now() - startTime;
 
       this.sendPromise = (async () => {
         const outputContent = response.candidates?.[0]?.content;
@@ -310,8 +308,6 @@ export class GeminiChat {
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
 
-    const startTime = Date.now();
-
     try {
       const apiCall = () => {
         const modelToUse = this.config.getModel();
@@ -362,12 +358,7 @@ export class GeminiChat {
         .then(() => undefined)
         .catch(() => undefined);
 
-      const result = this.processStreamResponse(
-        streamResponse,
-        userContent,
-        startTime,
-        prompt_id,
-      );
+      const result = this.processStreamResponse(streamResponse, userContent);
       return result;
     } catch (error) {
       this.sendPromise = Promise.resolve();
@@ -461,8 +452,6 @@ export class GeminiChat {
   private async *processStreamResponse(
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     inputContent: Content,
-    startTime: number,
-    prompt_id: string,
   ) {
     const outputContent: Content[] = [];
     const chunks: GenerateContentResponse[] = [];

@@ -128,31 +128,34 @@ export class LoggingContentGenerator implements ContentGenerator {
       throw error;
     }
 
-    const self = this;
-    async function* loggingStreamWrapper(): AsyncGenerator<GenerateContentResponse> {
-      let lastResponse: GenerateContentResponse | undefined;
-      try {
-        for await (const response of stream) {
-          lastResponse = response;
-          yield response;
-        }
-      } catch (error) {
-        const durationMs = Date.now() - startTime;
-        self._logApiError(durationMs, error, userPromptId);
-        throw error;
-      }
-      const durationMs = Date.now() - startTime;
-      if (lastResponse) {
-        self._logApiResponse(
-          durationMs,
-          userPromptId,
-          lastResponse.usageMetadata,
-          JSON.stringify(lastResponse),
-        );
-      }
-    }
+    return this.loggingStreamWrapper(stream, startTime, userPromptId);
+  }
 
-    return loggingStreamWrapper();
+  private async *loggingStreamWrapper(
+    stream: AsyncGenerator<GenerateContentResponse>,
+    startTime: number,
+    userPromptId: string,
+  ): AsyncGenerator<GenerateContentResponse> {
+    let lastResponse: GenerateContentResponse | undefined;
+    try {
+      for await (const response of stream) {
+        lastResponse = response;
+        yield response;
+      }
+    } catch (error) {
+      const durationMs = Date.now() - startTime;
+      this._logApiError(durationMs, error, userPromptId);
+      throw error;
+    }
+    const durationMs = Date.now() - startTime;
+    if (lastResponse) {
+      this._logApiResponse(
+        durationMs,
+        userPromptId,
+        lastResponse.usageMetadata,
+        JSON.stringify(lastResponse),
+      );
+    }
   }
 
   async countTokens(req: CountTokensParameters): Promise<CountTokensResponse> {
