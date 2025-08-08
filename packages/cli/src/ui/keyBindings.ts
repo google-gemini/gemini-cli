@@ -47,6 +47,9 @@ export enum Command {
   QUIT = 'quit',
   EXIT = 'exit',
   SHOW_MORE_LINES = 'showMoreLines',
+
+  // Shell commands
+  REVERSE_SEARCH = 'reverseSearch',
 }
 
 /**
@@ -106,4 +109,7 @@ export const keyMatchers: KeyMatchers = {
   [Command.QUIT]: (key) => key.ctrl && (key.name === 'c' || key.name === 'C'),
   [Command.EXIT]: (key) => key.ctrl && (key.name === 'd' || key.name === 'D'),
   [Command.SHOW_MORE_LINES]: (key) => key.ctrl && key.name === 's',
+
+  // Shell commands
+  [Command.REVERSE_SEARCH]: (key) => key.ctrl && key.name === 'r',
 };

@@ -246,7 +246,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
-      if (shellModeActive && key.ctrl && key.name === 'r') {
+      if (shellModeActive && keyMatchers[Command.REVERSE_SEARCH](key)) {
         setReverseSearchActive(true);
         setTextBeforeReverseSearch(buffer.text);
         setCursorPosition(buffer.cursor);
@@ -268,15 +268,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         } = reverseSearchCompletion;
 
         if (showSuggestions) {
-          if (key.name === 'up') {
+          if (keyMatchers[Command.NAVIGATION_UP](key)) {
             navigateUp();
             return;
           }
-          if (key.name === 'down') {
+          if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
             navigateDown();
             return;
           }
-          if (key.name === 'tab') {
+          if (keyMatchers[Command.ACCEPT_SUGGESTION](key)) {
             reverseSearchCompletion.handleAutocomplete(activeSuggestionIndex);
             reverseSearchCompletion.resetCompletionState();
             setReverseSearchActive(false);
@@ -284,7 +284,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
         }
 
-        if (key.name === 'return' && !key.ctrl) {
+        if (keyMatchers[Command.SUBMIT](key)) {
           const textToSubmit =
             showSuggestions && activeSuggestionIndex > -1
               ? suggestions[activeSuggestionIndex].value
@@ -296,13 +296,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         // Prevent up/down from falling through to regular history navigation
-        if (key.name === 'up' || key.name === 'down') {
+        if (
+          keyMatchers[Command.NAVIGATION_UP](key) ||
+          keyMatchers[Command.NAVIGATION_DOWN](key)
+        ) {
           return;
         }
       }
 
       // If the command is a perfect match, pressing enter should execute it.
-      if (completion.isPerfectMatch && key.name === 'return') {
+      if (completion.isPerfectMatch && keyMatchers[Command.SUBMIT](key)) {
         handleSubmitAndClear(buffer.text);
         return;
       }
