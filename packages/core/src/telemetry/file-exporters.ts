@@ -22,7 +22,7 @@ class FileExporter {
   }
 
   protected serialize(data: unknown): string {
-    return JSON.stringify(data, null, 2) + '\n';
+    return JSON.stringify(data, null, 0) + '\n';
   }
 
   shutdown(): Promise<void> {
