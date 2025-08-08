@@ -20,6 +20,7 @@ import {
   ListPromptsResultSchema,
   GetPromptResult,
   GetPromptResultSchema,
+  ListRootsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
 import { AuthProviderType, MCPServerConfig } from '../config/config.js';
@@ -33,6 +34,8 @@ import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { basename } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -306,6 +309,7 @@ export async function discoverMcpTools(
   toolRegistry: ToolRegistry,
   promptRegistry: PromptRegistry,
   debugMode: boolean,
+  targetDir: string,
 ): Promise<void> {
   mcpDiscoveryState = MCPDiscoveryState.IN_PROGRESS;
   try {
@@ -319,6 +323,7 @@ export async function discoverMcpTools(
           toolRegistry,
           promptRegistry,
           debugMode,
+          targetDir,
         ),
     );
     await Promise.all(discoveryPromises);
@@ -363,6 +368,7 @@ export async function connectAndDiscover(
   toolRegistry: ToolRegistry,
   promptRegistry: PromptRegistry,
   debugMode: boolean,
+  targetDir: string,
 ): Promise<void> {
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
@@ -372,6 +378,7 @@ export async function connectAndDiscover(
       mcpServerName,
       mcpServerConfig,
       debugMode,
+      targetDir,
     );
 
     mcpClient.onerror = (error) => {
@@ -655,11 +662,27 @@ export async function connectToMcpServer(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
+  targetDir: string,
 ): Promise<Client> {
   const mcpClient = new Client({
     name: 'gemini-cli-mcp-client',
     version: '0.0.1',
   });
+
+  mcpClient.registerCapabilities({
+    roots: {},
+  });
+  mcpClient.setRequestHandler(
+    ListRootsRequestSchema,
+    async () => ({
+      roots: [
+        {
+          uri: pathToFileURL(targetDir),
+          name: basename(targetDir),
+        },
+      ],
+    }),
+  );
 
   // patch Client.callTool to use request timeout as genai McpCallTool.callTool does not do it
   // TODO: remove this hack once GenAI SDK does callTool with request options

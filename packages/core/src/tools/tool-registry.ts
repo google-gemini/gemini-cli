@@ -178,6 +178,7 @@ export class ToolRegistry {
       this,
       this.config.getPromptRegistry(),
       this.config.getDebugMode(),
+      this.config.getTargetDir(),
     );
   }
 
@@ -199,6 +200,7 @@ export class ToolRegistry {
       this,
       this.config.getPromptRegistry(),
       this.config.getDebugMode(),
+      this.config.getTargetDir(),
     );
   }
 
@@ -225,6 +227,7 @@ export class ToolRegistry {
         this,
         this.config.getPromptRegistry(),
         this.config.getDebugMode(),
+        this.config.getTargetDir(),
       );
     }
   }

@@ -336,6 +336,7 @@ describe('ToolRegistry', () => {
         toolRegistry,
         config.getPromptRegistry(),
         false,
+        '/test/dir',
       );
     });
 
@@ -359,6 +360,7 @@ describe('ToolRegistry', () => {
         toolRegistry,
         config.getPromptRegistry(),
         false,
+        '/test/dir',
       );
     });
   });
