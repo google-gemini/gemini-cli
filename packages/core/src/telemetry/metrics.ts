@@ -204,7 +204,7 @@ export function recordFileOperationMetric(
     attributes.ai_added_lines = diffStat.ai_added_lines;
     attributes.ai_removed_lines = diffStat.ai_removed_lines;
     attributes.user_added_lines = diffStat.user_added_lines;
-    attributes.user_deleted_lines = diffStat.user_deleted_lines;
+    attributes.user_removed_lines = diffStat.user_removed_lines;
   }
   fileOperationCounter.add(1, attributes);
 }

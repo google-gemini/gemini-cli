@@ -60,6 +60,6 @@ export function getDiffStat(
     ai_added_lines: aiAddedLines,
     ai_removed_lines: aiRemovedLines,
     user_added_lines: userAddedLines,
-    user_deleted_lines: userRemovedLines,
+    user_removed_lines: userRemovedLines,
   };
 }

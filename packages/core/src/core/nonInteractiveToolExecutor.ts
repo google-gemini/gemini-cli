@@ -90,7 +90,7 @@ export async function executeToolCall(
           ai_added_lines: diffStat.ai_added_lines,
           ai_removed_lines: diffStat.ai_removed_lines,
           user_added_lines: diffStat.user_added_lines,
-          user_deleted_lines: diffStat.user_deleted_lines,
+          user_removed_lines: diffStat.user_removed_lines,
         };
       }
     }

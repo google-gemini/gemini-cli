@@ -505,7 +505,7 @@ export interface DiffStat {
   ai_removed_lines: number;
   ai_added_lines: number;
   user_added_lines: number;
-  user_deleted_lines: number;
+  user_removed_lines: number;
 }
 
 export interface ToolEditConfirmationDetails {
