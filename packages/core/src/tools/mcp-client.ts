@@ -366,33 +366,47 @@ export async function connectAndDiscover(
 ): Promise<void> {
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
+  let mcpClient: Client | undefined;
   try {
-    const mcpClient = await connectToMcpServer(
+    mcpClient = await connectToMcpServer(
       mcpServerName,
       mcpServerConfig,
       debugMode,
     );
-    try {
-      updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
-      mcpClient.onerror = (error) => {
-        console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
-        updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
-      };
-      await discoverPrompts(mcpServerName, mcpClient, promptRegistry);
 
-      const tools = await discoverTools(
-        mcpServerName,
-        mcpServerConfig,
-        mcpClient,
-      );
-      for (const tool of tools) {
-        toolRegistry.registerTool(tool);
-      }
-    } catch (error) {
-      mcpClient.close();
-      throw error;
+    mcpClient.onerror = (error) => {
+      console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
+      updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+    };
+
+    // Attempt to discover both prompts and tools
+    const prompts = await discoverPrompts(
+      mcpServerName,
+      mcpClient,
+      promptRegistry,
+    );
+    const tools = await discoverTools(
+      mcpServerName,
+      mcpServerConfig,
+      mcpClient,
+    );
+
+    // If we have neither prompts nor tools, it's a failed discovery
+    if (prompts.length === 0 && tools.length === 0) {
+      throw new Error('No prompts or tools found on the server.');
+    }
+
+    // If we found anything, the server is connected
+    updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
+
+    // Register any discovered tools
+    for (const tool of tools) {
+      toolRegistry.registerTool(tool);
     }
   } catch (error) {
+    if (mcpClient) {
+      mcpClient.close();
+    }
     console.error(
       `Error connecting to MCP server '${mcpServerName}': ${getErrorMessage(
         error,
@@ -400,6 +414,65 @@ export async function connectAndDiscover(
     );
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   }
+}
+
+/**
+ * Recursively validates that a JSON schema and all its nested properties and
+ * items have a `type` defined.
+ *
+ * @param schema The JSON schema to validate.
+ * @returns `true` if the schema is valid, `false` otherwise.
+ *
+ * @visiblefortesting
+ */
+export function hasValidTypes(schema: unknown): boolean {
+  if (typeof schema !== 'object' || schema === null) {
+    // Not a schema object we can validate, or not a schema at all.
+    // Treat as valid as it has no properties to be invalid.
+    return true;
+  }
+
+  const s = schema as Record<string, unknown>;
+
+  if (!s.type) {
+    // These keywords contain an array of schemas that should be validated.
+    //
+    // If no top level type was given, then they must each have a type.
+    let hasSubSchema = false;
+    const schemaArrayKeywords = ['anyOf', 'allOf', 'oneOf'];
+    for (const keyword of schemaArrayKeywords) {
+      const subSchemas = s[keyword];
+      if (Array.isArray(subSchemas)) {
+        hasSubSchema = true;
+        for (const subSchema of subSchemas) {
+          if (!hasValidTypes(subSchema)) {
+            return false;
+          }
+        }
+      }
+    }
+
+    // If the node itself is missing a type and had no subschemas, then it isn't valid.
+    if (!hasSubSchema) return false;
+  }
+
+  if (s.type === 'object' && s.properties) {
+    if (typeof s.properties === 'object' && s.properties !== null) {
+      for (const prop of Object.values(s.properties)) {
+        if (!hasValidTypes(prop)) {
+          return false;
+        }
+      }
+    }
+  }
+
+  if (s.type === 'array' && s.items) {
+    if (!hasValidTypes(s.items)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -423,13 +496,23 @@ export async function discoverTools(
     const tool = await mcpCallableTool.tool();
 
     if (!Array.isArray(tool.functionDeclarations)) {
-      throw new Error(`Server did not return valid function declarations.`);
+      // This is a valid case for a prompt-only server
+      return [];
     }
 
     const discoveredTools: DiscoveredMCPTool[] = [];
     for (const funcDecl of tool.functionDeclarations) {
       try {
         if (!isEnabled(funcDecl, mcpServerName, mcpServerConfig)) {
+          continue;
+        }
+
+        if (!hasValidTypes(funcDecl.parametersJsonSchema)) {
+          console.warn(
+            `Skipping tool '${funcDecl.name}' from MCP server '${mcpServerName}' ` +
+              `because it has missing types in its parameter schema. Please file an ` +
+              `issue with the owner of the MCP server.`,
+          );
           continue;
         }
 
@@ -454,7 +537,17 @@ export async function discoverTools(
     }
     return discoveredTools;
   } catch (error) {
-    throw new Error(`Error discovering tools: ${error}`);
+    if (
+      error instanceof Error &&
+      !error.message?.includes('Method not found')
+    ) {
+      console.error(
+        `Error discovering tools from ${mcpServerName}: ${getErrorMessage(
+          error,
+        )}`,
+      );
+    }
+    return [];
   }
 }
 
@@ -469,8 +562,11 @@ export async function discoverPrompts(
   mcpServerName: string,
   mcpClient: Client,
   promptRegistry: PromptRegistry,
-): Promise<void> {
+): Promise<Prompt[]> {
   try {
+    // Only request prompts if the server supports them.
+    if (mcpClient.getServerCapabilities()?.prompts == null) return [];
+
     const response = await mcpClient.request(
       { method: 'prompts/list', params: {} },
       ListPromptsResultSchema,
@@ -484,6 +580,7 @@ export async function discoverPrompts(
           invokeMcpPrompt(mcpServerName, mcpClient, prompt.name, params),
       });
     }
+    return response.prompts;
   } catch (error) {
     // It's okay if this fails, not all servers will have prompts.
     // Don't log an error if the method is not found, which is a common case.
@@ -497,6 +594,7 @@ export async function discoverPrompts(
         )}`,
       );
     }
+    return [];
   }
 }
 
