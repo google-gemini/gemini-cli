@@ -17,30 +17,6 @@ Gemini CLI is an open-source AI agent that brings the power of Gemini directly i
 - **💻 Terminal-first**: Designed for developers who live in the command line
 - **🛡️ Open source**: Apache 2.0 licensed
 
-## 📋 Key Features
-
-With Gemini CLI you can:
-
-- **Code Understanding & Generation**
-  - Query and edit large codebases
-  - Generate new apps from PDFs, images, or sketches using multimodal capabilities
-  - Debug issues and troubleshoot with natural language
-  
-- **Automation & Integration**
-  - Automate operational tasks like querying pull requests or handling complex rebases
-  - Use MCP servers to connect new capabilities, including [media generation with Imagen, Veo or Lyria](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia)
-  - Run non-interactively in scripts for workflow automation
-  
-- **Advanced Capabilities**
-  - Ground your queries with built-in [Google Search](https://ai.google.dev/gemini-api/docs/grounding) for real-time information
-  - Conversation checkpointing to save and resume complex sessions
-  - Custom context files (GEMINI.md) to tailor behavior for your projects
-
-- **🔗 GitHub Integration**
-  - Use the Gemini CLI GitHub Action for automated PR reviews
-  - Automated issue triage and on-demand AI assistance directly in your repositories
-  - Seamless integration with your GitHub workflows
-
 ## 📦 Installation
 
 ### Quick Install
@@ -65,6 +41,30 @@ brew install gemini-cli
 #### System Requirements
 - Node.js version 20 or higher
 - macOS, Linux, or Windows
+
+## 📋 Key Features
+
+With Gemini CLI you can:
+
+- **Code Understanding & Generation**
+  - Query and edit large codebases
+  - Generate new apps from PDFs, images, or sketches using multimodal capabilities
+  - Debug issues and troubleshoot with natural language
+  
+- **Automation & Integration**
+  - Automate operational tasks like querying pull requests or handling complex rebases
+  - Use MCP servers to connect new capabilities, including [media generation with Imagen, Veo or Lyria](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia)
+  - Run non-interactively in scripts for workflow automation
+  
+- **Advanced Capabilities**
+  - Ground your queries with built-in [Google Search](https://ai.google.dev/gemini-api/docs/grounding) for real-time information
+  - Conversation checkpointing to save and resume complex sessions
+  - Custom context files (GEMINI.md) to tailor behavior for your projects
+
+- **🔗 GitHub Integration**
+  - Use the Gemini CLI GitHub Action for automated PR reviews
+  - Automated issue triage and on-demand AI assistance directly in your repositories
+  - Seamless integration with your GitHub workflows
 
 ## 🔐 Authentication Options
 
