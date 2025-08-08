@@ -244,7 +244,7 @@ export class CoreToolScheduler {
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
   private onEditorClose: () => void;
-  private isCompleting = false;
+  private isFinalizingToolCalls = false;
   private requestQueue: Array<{
     request: ToolCallRequestInfo | ToolCallRequestInfo[];
     signal: AbortSignal;
@@ -463,7 +463,7 @@ export class CoreToolScheduler {
 
   private isRunning(): boolean {
     return (
-      this.isCompleting ||
+      this.isFinalizingToolCalls ||
       this.toolCalls.some(
         (call) =>
           call.status === 'executing' || call.status === 'awaiting_approval',
@@ -861,9 +861,9 @@ export class CoreToolScheduler {
       }
 
       if (this.onAllToolCallsComplete) {
-        this.isCompleting = true;
+        this.isFinalizingToolCalls = true;
         await this.onAllToolCallsComplete(completedCalls);
-        this.isCompleting = false;
+        this.isFinalizingToolCalls = false;
       }
       this.notifyToolCallsUpdate();
       // After completion, process the next item in the queue.
