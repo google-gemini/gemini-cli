@@ -125,7 +125,7 @@ export type OutputUpdateHandler = (
 
 export type AllToolCallsCompleteHandler = (
   completedToolCalls: CompletedToolCall[],
-) => void;
+) => Promise<void>;
 
 export type ToolCallsUpdateHandler = (toolCalls: ToolCall[]) => void;
 
@@ -244,6 +244,7 @@ export class CoreToolScheduler {
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
   private onEditorClose: () => void;
+  private isCompleting = false;
 
   constructor(options: CoreToolSchedulerOptions) {
     this.config = options.config;
@@ -455,9 +456,12 @@ export class CoreToolScheduler {
   }
 
   private isRunning(): boolean {
-    return this.toolCalls.some(
-      (call) =>
-        call.status === 'executing' || call.status === 'awaiting_approval',
+    return (
+      this.isCompleting ||
+      this.toolCalls.some(
+        (call) =>
+          call.status === 'executing' || call.status === 'awaiting_approval',
+      )
     );
   }
 
@@ -756,16 +760,16 @@ export class CoreToolScheduler {
         const liveOutputCallback =
           scheduledCall.tool.canUpdateOutput && this.outputUpdateHandler
             ? (outputChunk: string) => {
-                if (this.outputUpdateHandler) {
-                  this.outputUpdateHandler(callId, outputChunk);
-                }
-                this.toolCalls = this.toolCalls.map((tc) =>
-                  tc.request.callId === callId && tc.status === 'executing'
-                    ? { ...tc, liveOutput: outputChunk }
-                    : tc,
-                );
-                this.notifyToolCallsUpdate();
+              if (this.outputUpdateHandler) {
+                this.outputUpdateHandler(callId, outputChunk);
               }
+              this.toolCalls = this.toolCalls.map((tc) =>
+                tc.request.callId === callId && tc.status === 'executing'
+                  ? { ...tc, liveOutput: outputChunk }
+                  : tc,
+              );
+              this.notifyToolCallsUpdate();
+            }
             : undefined;
 
         invocation
@@ -822,7 +826,7 @@ export class CoreToolScheduler {
     }
   }
 
-  private checkAndNotifyCompletion(): void {
+  private async checkAndNotifyCompletion(): Promise<void> {
     const allCallsAreTerminal = this.toolCalls.every(
       (call) =>
         call.status === 'success' ||
@@ -839,7 +843,9 @@ export class CoreToolScheduler {
       }
 
       if (this.onAllToolCallsComplete) {
-        this.onAllToolCallsComplete(completedCalls);
+        this.isCompleting = true;
+        await this.onAllToolCallsComplete(completedCalls);
+        this.isCompleting = false;
       }
       this.notifyToolCallsUpdate();
     }
