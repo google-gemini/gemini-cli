@@ -4,76 +4,149 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Config } from '../config/config.js';
 import type { VSCodeTheme, ColorPalette } from './theme-types.js';
 
 /**
  * Generates a theme using AI based on the theme name
  */
-export async function generateThemeWithAI(themeName: string, _signal: AbortSignal): Promise<VSCodeTheme | null> {
+export async function generateThemeWithAI(themeName: string, signal: AbortSignal, config?: Config): Promise<VSCodeTheme | null> {
   try {
-    // For now, use template-based generation as the AI integration requires proper config setup
-    // TODO: Implement proper AI generation when we have access to initialized GeminiClient
+    if (!config) {
+      console.warn('No config provided for AI theme generation, falling back to default theme');
+      return createDefaultTheme(themeName);
+    }
+
+    const gemini = config.getGeminiClient();
+    if (!gemini) {
+      console.warn('No Gemini client available for AI theme generation, falling back to default theme');
+      return createDefaultTheme(themeName);
+    }
+
+    const chat = await gemini.startChat();
     
-    const isDarkTheme = themeName.toLowerCase().includes('dark') || 
-                       themeName.toLowerCase().includes('night') ||
-                       themeName.toLowerCase().includes('midnight');
-    
-    const isLightTheme = themeName.toLowerCase().includes('light') || 
-                        themeName.toLowerCase().includes('day') ||
-                        themeName.toLowerCase().includes('solar');
-    
-    const themeType = isDarkTheme ? 'dark' : isLightTheme ? 'light' : 'dark';
-    
-    // Generate a color palette based on the theme name
-    const palette = generateColorPaletteFromName(themeName, themeType);
-    
-    const intelligentTheme: VSCodeTheme = {
-      name: themeName,
-      type: themeType,
-      colors: {
-        'editor.background': palette.background,
-        'editor.foreground': palette.foreground,
-        'button.background': palette.accent,
-        'editor.findMatchBackground': palette.highlight,
-        'editor.lineHighlightBackground': palette.surface,
-        'editor.wordHighlightBackground': palette.surface,
-        'editorGutter.addedBackground': palette.success,
-        'editorGutter.modifiedBackground': palette.warning,
-        'editorGutter.deletedBackground': palette.error,
-        'editorLineNumber.foreground': palette.muted,
+    // First determine the theme type using AI
+    const themeTypeResponse = await chat.sendMessage(
+      {
+        message: `Analyze this theme name: "${themeName}"
+Should this be a light or dark theme? Consider:
+- Direct words like 'dark', 'light', 'night', 'day'
+- Theme context (e.g. 'midnight', 'solar', 'dawn')
+- Common associations (e.g. 'forest' -> dark, 'beach' -> light)
+
+Respond with just one word: "dark" or "light"`,
+        config: { abortSignal: signal }
       },
-      tokenColors: [
-        {
-          scope: 'keyword',
-          settings: { foreground: palette.keyword }
-        },
-        {
-          scope: 'string',
-          settings: { foreground: palette.string }
-        },
-        {
-          scope: 'comment',
-          settings: { foreground: palette.comment }
-        },
-        {
-          scope: 'constant.numeric',
-          settings: { foreground: palette.number }
-        },
-        {
-          scope: 'entity.name.class',
-          settings: { foreground: palette.class }
-        },
-        {
-          scope: 'storage.type',
-          settings: { foreground: palette.type }
+      'analyze-theme-type'
+    );
+
+    const themeType = (themeTypeResponse?.text || '').trim().toLowerCase() === 'light' ? 'light' : 'dark';
+
+    // Now generate a color palette using AI
+    const paletteResponse = await chat.sendMessage(
+      {
+        message: `Create a color palette for a VS Code theme named "${themeName}" (${themeType} theme).
+Consider the theme name's meaning and associations when choosing colors.
+Provide only a JSON object with these exact color properties (all values must be valid hex colors):
+{
+  "background": "#...",
+  "foreground": "#...",
+  "accent": "#...",
+  "highlight": "#...",
+  "surface": "#...",
+  "success": "#...",
+  "warning": "#...",
+  "error": "#...",
+  "muted": "#...",
+  "keyword": "#...",
+  "string": "#...",
+  "comment": "#...",
+  "number": "#...",
+  "class": "#...",
+  "type": "#..."
+}
+
+Ensure all colors have good contrast and work well together for code readability.
+For ${themeType} themes, follow these guidelines:
+- dark theme: darker background (#1e-3e range), lighter foreground (>=#d0)
+- light theme: lighter background (>=#f0), darker foreground (<=#2e)
+- accent/token colors: must have good contrast with the background
+
+Return only the JSON object, no explanation.`,
+        config: { abortSignal: signal }
+      },
+      'generate-color-palette'
+    );
+
+    const paletteText = paletteResponse?.text;
+    if (!paletteText) {
+      console.warn('No response from AI for color palette generation');
+      return createDefaultTheme(themeName);
+    }
+
+    try {
+      const palette = JSON.parse(paletteText) as ColorPalette;
+
+      // Validate all colors are hex format
+      const isValidHex = (color: string) => /^#[\da-f]{6}$/i.test(color);
+      for (const [key, value] of Object.entries(palette)) {
+        if (typeof value !== 'string' || !isValidHex(value)) {
+          console.warn(`Invalid color format for ${key}: ${value}, using default theme`);
+          return createDefaultTheme(themeName);
         }
-      ]
-    };
-    
-    return intelligentTheme;
+      }
+
+      const aiTheme: VSCodeTheme = {
+        name: themeName,
+        type: themeType,
+        colors: {
+          'editor.background': palette.background,
+          'editor.foreground': palette.foreground,
+          'button.background': palette.accent,
+          'editor.findMatchBackground': palette.highlight,
+          'editor.lineHighlightBackground': palette.surface,
+          'editor.wordHighlightBackground': palette.surface,
+          'editorGutter.addedBackground': palette.success,
+          'editorGutter.modifiedBackground': palette.warning,
+          'editorGutter.deletedBackground': palette.error,
+          'editorLineNumber.foreground': palette.muted,
+        },
+        tokenColors: [
+          {
+            scope: 'keyword',
+            settings: { foreground: palette.keyword }
+          },
+          {
+            scope: 'string',
+            settings: { foreground: palette.string }
+          },
+          {
+            scope: 'comment',
+            settings: { foreground: palette.comment }
+          },
+          {
+            scope: 'constant.numeric',
+            settings: { foreground: palette.number }
+          },
+          {
+            scope: 'entity.name.class',
+            settings: { foreground: palette.class }
+          },
+          {
+            scope: 'storage.type',
+            settings: { foreground: palette.type }
+          }
+        ]
+      };
+      
+      return aiTheme;
+    } catch (error) {
+      console.error('Failed to parse AI-generated color palette:', error);
+      return createDefaultTheme(themeName);
+    }
   } catch (error) {
     console.error('Failed to generate theme with AI:', error);
-    return null;
+    return createDefaultTheme(themeName);
   }
 }
 
@@ -126,63 +199,4 @@ export function createDefaultTheme(themeName: string): VSCodeTheme {
   };
   
   return defaultTheme;
-}
-
-/**
- * Generates a color palette based on theme name and type
- */
-export function generateColorPaletteFromName(themeName: string, themeType: 'dark' | 'light'): ColorPalette {
-  // Generate colors based on theme name and type
-  const name = themeName.toLowerCase();
-  
-  if (name.includes('nord')) {
-    return themeType === 'dark' ? {
-      background: '#2e3440', foreground: '#d8dee9', accent: '#5e81ac',
-      highlight: '#434c5e', surface: '#3b4252', success: '#a3be8c',
-      warning: '#ebcb8b', error: '#bf616a', muted: '#4c566a',
-      keyword: '#81a1c1', string: '#a3be8c', comment: '#616e87',
-      number: '#b48ead', class: '#8fbcbb', type: '#81a1c1'
-    } : {
-      background: '#eceff4', foreground: '#2e3440', accent: '#5e81ac',
-      highlight: '#d8dee9', surface: '#e5e9f0', success: '#a3be8c',
-      warning: '#ebcb8b', error: '#bf616a', muted: '#4c566a',
-      keyword: '#5e81ac', string: '#a3be8c', comment: '#616e87',
-      number: '#b48ead', class: '#8fbcbb', type: '#5e81ac'
-    };
-  }
-  
-  if (name.includes('dracula')) {
-    return {
-      background: '#282a36', foreground: '#f8f8f2', accent: '#bd93f9',
-      highlight: '#44475a', surface: '#44475a', success: '#50fa7b',
-      warning: '#ffb86c', error: '#ff5555', muted: '#6272a4',
-      keyword: '#ff79c6', string: '#f1fa8c', comment: '#6272a4',
-      number: '#bd93f9', class: '#8be9fd', type: '#ff79c6'
-    };
-  }
-  
-  if (name.includes('monokai')) {
-    return {
-      background: '#272822', foreground: '#f8f8f2', accent: '#f92672',
-      highlight: '#3e3d32', surface: '#3e3d32', success: '#a6e22e',
-      warning: '#e6db74', error: '#f92672', muted: '#75715e',
-      keyword: '#f92672', string: '#e6db74', comment: '#75715e',
-      number: '#ae81ff', class: '#a6e22e', type: '#f92672'
-    };
-  }
-  
-  // Default palette based on theme type
-  return themeType === 'dark' ? {
-    background: '#1e1e1e', foreground: '#d4d4d4', accent: '#007acc',
-    highlight: '#264f78', surface: '#2d2d30', success: '#6a9955',
-    warning: '#ce9178', error: '#f44747', muted: '#858585',
-    keyword: '#569cd6', string: '#ce9178', comment: '#6a9955',
-    number: '#b5cea8', class: '#4ec9b0', type: '#569cd6'
-  } : {
-    background: '#ffffff', foreground: '#000000', accent: '#007acc',
-    highlight: '#add6ff', surface: '#f3f3f3', success: '#6a9955',
-    warning: '#ce9178', error: '#f44747', muted: '#858585',
-    keyword: '#0000ff', string: '#a31515', comment: '#008000',
-    number: '#098658', class: '#267f99', type: '#0000ff'
-  };
 } 
