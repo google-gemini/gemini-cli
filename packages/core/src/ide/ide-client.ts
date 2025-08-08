@@ -211,16 +211,16 @@ export class IdeClient {
       this.state.status === IDEConnectionStatus.Disconnected &&
       status === IDEConnectionStatus.Disconnected;
 
-    // Only update details if the state wasn't already disconnected, so that
-    // the first detail message is preserved.
+    // Only update details & log to console if the state wasn't already
+    // disconnected, so that the first detail message is preserved.
     if (!isAlreadyDisconnected) {
       this.state = { status, details };
-    }
-
-    if (status === IDEConnectionStatus.Disconnected) {
       if (logToConsole) {
         logger.error(details);
       }
+    }
+
+    if (status === IDEConnectionStatus.Disconnected) {
       logger.debug(details);
       ideContext.clearIdeContext();
     }
