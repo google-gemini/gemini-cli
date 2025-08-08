@@ -159,6 +159,18 @@ export class ToolRegistry {
   }
 
   /**
+   * Removes all tools from a specific MCP server.
+   * @param serverName The name of the server to remove tools from.
+   */
+  removeMcpToolsByServer(serverName: string): void {
+    for (const [name, tool] of this.tools.entries()) {
+      if (tool instanceof DiscoveredMCPTool && tool.serverName === serverName) {
+        this.tools.delete(name);
+      }
+    }
+  }
+
+  /**
    * Discovers tools from project (if available and configured).
    * Can be called multiple times to update discovered tools.
    * This will discover tools from the command line and from MCP servers.
@@ -187,19 +199,10 @@ export class ToolRegistry {
    * This will NOT discover tools from the command line, only from MCP servers.
    */
   async discoverMcpTools(): Promise<void> {
-    // remove any previously discovered tools
-    this.removeDiscoveredTools();
-
-    this.config.getPromptRegistry().clear();
-
-    // discover tools using MCP servers, if configured
-    await discoverMcpTools(
-      this.config.getMcpServers() ?? {},
-      this.config.getMcpServerCommand(),
-      this,
-      this.config.getPromptRegistry(),
-      this.config.getDebugMode(),
-    );
+    const mcpServers = this.config.getMcpServers() ?? {};
+    for (const serverName in mcpServers) {
+      await this.discoverToolsForServer(serverName);
+    }
   }
 
   /**
