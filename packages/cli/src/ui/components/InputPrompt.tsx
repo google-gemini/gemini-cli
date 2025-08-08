@@ -25,6 +25,7 @@ import {
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
 import * as path from 'path';
+import { useReverseHistorySearch } from '../hooks/useReverseHistorySearch.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -93,6 +94,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     historyData,
     reverseSearchActive,
   );
+
   const resetCompletionState = completion.resetCompletionState;
   const resetReverseSearchCompletionState =
     reverseSearchCompletion.resetCompletionState;
@@ -129,12 +131,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const inputHistory = useInputHistory({
     userMessages,
-    onSubmit: handleSubmitAndClear,
     isActive:
       (!completion.showSuggestions || completion.suggestions.length === 1) &&
       !shellModeActive,
     currentQuery: buffer.text,
     onChange: customSetTextAndResetCompletionSignal,
+    onSubmit: handleSubmitAndClear,
+  });
+
+  const reverseHistorySearch = useReverseHistorySearch({
+    history: userMessages,
+    onSearch: (result) => {
+      buffer.setText(result);
+    },
   });
 
   // Effect to reset completion if history navigation just occurred and set the text
@@ -202,6 +211,42 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      if (reverseHistorySearch.isActive) {
+        if (key.ctrl && key.name === 'r') {
+          reverseHistorySearch.continueSearch();
+          return;
+        }
+
+        if (key.name === 'escape' || (key.name === 'return' && !key.ctrl)) {
+          reverseHistorySearch.stopSearch();
+          // Fall through to let the default handler process the key.
+        } else if (key.name === 'up') {
+          reverseHistorySearch.navigateUp();
+          return;
+        } else if (key.name === 'down') {
+          reverseHistorySearch.navigateDown();
+          return;
+        } else {
+          // This is a simplified input handler for the search term.
+          let currentTerm = reverseHistorySearch.searchTerm || '';
+          if (key.name === 'backspace') {
+            currentTerm = currentTerm.slice(0, -1);
+          } else if (key.sequence && !key.ctrl && !key.meta) {
+            currentTerm += key.sequence;
+          } else {
+            // Ignore other keys while in search mode
+            return;
+          }
+          reverseHistorySearch.startSearch(currentTerm);
+          return;
+        }
+      }
+
+      if (key.ctrl && key.name === 'r') {
+        reverseHistorySearch.startSearch(buffer.text);
+        return;
+      }
+
       /// We want to handle paste even when not focused to support drag and drop.
       if (!focus && !key.paste) {
         return;
@@ -455,6 +500,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,
+      reverseHistorySearch,
     ],
   );
 
@@ -483,6 +529,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             ) : (
               '! '
             )
+          ) : reverseHistorySearch.isActive ? (
+            <Text color={Colors.AccentCyan}>
+              (r)`{reverseHistorySearch.searchTerm}`:{' '}
+            </Text>
           ) : (
             '> '
           )}
