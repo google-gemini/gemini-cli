@@ -6,11 +6,11 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
 import {
   SuggestionsDisplay,
   MAX_SUGGESTION_WIDTH,
 } from './SuggestionsDisplay.js';
+import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { TextBuffer, logicalPosToOffset } from './shared/text-buffer.js';
 import { cpSlice, cpLen } from '../utils/textUtils.js';
@@ -562,20 +562,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     <>
       <Box
         borderStyle="round"
-        borderColor={shellModeActive ? Colors.AccentYellow : Colors.AccentBlue}
+        borderColor={
+          shellModeActive ? theme.status.warning : theme.border.focused
+        }
         paddingX={1}
       >
         <Text
-          color={shellModeActive ? Colors.AccentYellow : Colors.AccentPurple}
+          color={shellModeActive ? theme.status.warning : theme.text.accent}
         >
           {shellModeActive ? (
             reverseSearchActive ? (
-              <Text color={Colors.AccentCyan}>(r:) </Text>
+              <Text color={theme.text.link}>(r:) </Text>
             ) : (
               '! '
             )
           ) : commandSearchActive ? (
-            <Text color={Colors.AccentGreen}>(r:) </Text>
+            <Text color={theme.text.accent}>(r:) </Text>
           ) : (
             '> '
           )}
@@ -585,10 +587,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             focus ? (
               <Text>
                 {chalk.inverse(placeholder.slice(0, 1))}
-                <Text color={Colors.Gray}>{placeholder.slice(1)}</Text>
+                <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
               </Text>
             ) : (
-              <Text color={Colors.Gray}>{placeholder}</Text>
+              <Text color={theme.text.secondary}>{placeholder}</Text>
             )
           ) : (
             linesToRender.map((lineText, visualIdxInRenderedSet) => {
@@ -632,14 +634,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       </Box>
       {shouldShowSuggestions && (
         <Box>
+      {completion.showSuggestions && (
+        <Box paddingRight={2}>
           <SuggestionsDisplay
-            suggestions={activeCompletion.suggestions}
-            activeIndex={activeCompletion.activeSuggestionIndex}
-            isLoading={activeCompletion.isLoadingSuggestions}
+            suggestions={completion.suggestions}
+            activeIndex={completion.activeSuggestionIndex}
+            isLoading={completion.isLoadingSuggestions}
             width={suggestionsWidth}
-            scrollOffset={activeCompletion.visibleStartIndex}
+            scrollOffset={completion.visibleStartIndex}
             userInput={buffer.text}
-            expandedIndex={expandedSuggestionIndex}
           />
         </Box>
       )}
