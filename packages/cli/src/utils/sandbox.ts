@@ -617,8 +617,8 @@ export async function start_sandbox(
     // Pass through IDE mode environment variables
     for (const envVar of [
       'GEMINI_CLI_IDE_SERVER_PORT',
-      'TERM_PROGRAM',
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      'TERM_PROGRAM',
     ]) {
       if (process.env[envVar]) {
         args.push('--env', `${envVar}=${process.env[envVar]}`);
