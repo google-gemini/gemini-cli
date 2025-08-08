@@ -197,6 +197,18 @@ export enum EventMetadataKey {
 
   // Logs the type of the IDE connection.
   GEMINI_CLI_IDE_CONNECTION_TYPE = 46,
+
+  // Logs AI added lines in edit/write tool response.
+  GEMINI_CLI_AI_ADDED_LINES = 47,
+
+  // Logs AI removed lines in edit/write tool response.
+  GEMINI_CLI_AI_REMOVED_LINES = 48,
+
+  // Logs user added lines in edit/write tool response.
+  GEMINI_CLI_USER_ADDED_LINES = 49,
+
+  // Logs user removed lines in edit/write tool response.
+  GEMINI_CLI_USER_REMOVED_LINES = 50,
 }
 
 export function getEventMetadataKey(
