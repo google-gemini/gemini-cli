@@ -4,22 +4,45 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, describe, it, beforeEach } from 'vitest';
+import { expect, describe, it, beforeEach, vi, afterEach } from 'vitest';
 import {
   checkCommandPermissions,
+  escapeShellArg,
   getCommandRoots,
+  getShellConfiguration,
   isCommandAllowed,
   stripShellWrapper,
 } from './shell-utils.js';
 import { Config } from '../config/config.js';
 
+const mockPlatform = vi.hoisted(() => vi.fn());
+vi.mock('os', () => ({
+  default: {
+    platform: mockPlatform,
+  },
+  platform: mockPlatform,
+}));
+
+const mockQuote = vi.hoisted(() => vi.fn());
+vi.mock('shell-quote', () => ({
+  quote: mockQuote,
+}));
+
 let config: Config;
 
 beforeEach(() => {
+  mockPlatform.mockReturnValue('linux');
+  mockQuote.mockImplementation((args: string[]) =>
+    args.map((arg) => `'${arg}'`).join(' '),
+  );
   config = {
     getCoreTools: () => [],
     getExcludeTools: () => [],
   } as unknown as Config;
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
 });
 
 describe('isCommandAllowed', () => {
@@ -275,5 +298,107 @@ describe('stripShellWrapper', () => {
 
   it('should not strip anything if no wrapper is present', () => {
     expect(stripShellWrapper('ls -l')).toEqual('ls -l');
+  });
+});
+
+describe('escapeShellArg', () => {
+  describe('POSIX (Linux/macOS)', () => {
+    beforeEach(() => {
+      // Ensure platform is POSIX-like
+      mockPlatform.mockReturnValue('linux');
+    });
+
+    it('should use shell-quote for escaping', () => {
+      mockQuote.mockReturnValueOnce("'escaped value'");
+      const result = escapeShellArg('raw value');
+      expect(mockQuote).toHaveBeenCalledWith(['raw value']);
+      expect(result).toBe("'escaped value'");
+    });
+
+    it('should handle empty strings', () => {
+      const result = escapeShellArg('');
+      expect(result).toBe('');
+      expect(mockQuote).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Windows (cmd.exe)', () => {
+    beforeEach(() => {
+      // Ensure platform is Windows
+      mockPlatform.mockReturnValue('win32');
+    });
+
+    it('should wrap simple arguments in double quotes', () => {
+      const result = escapeShellArg('search term');
+      expect(result).toBe('"search term"');
+    });
+
+    it('should escape internal double quotes by doubling them', () => {
+      const result = escapeShellArg('He said "Hello"');
+      // cmd.exe escaping doubles the internal quotes when wrapped.
+      expect(result).toBe('"He said ""Hello"""');
+    });
+
+    it('should handle special characters (by quoting)', () => {
+      const result = escapeShellArg('foo&bar|baz');
+      // The implemented escaping just wraps it in quotes.
+      expect(result).toBe('"foo&bar|baz"');
+    });
+
+    it('should handle empty strings', () => {
+      const result = escapeShellArg('');
+      expect(result).toBe('');
+    });
+
+    it('should not use shell-quote on Windows', () => {
+      escapeShellArg('test');
+      expect(mockQuote).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('getShellConfiguration', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('should return bash configuration on Linux', () => {
+    mockPlatform.mockReturnValue('linux');
+    const config = getShellConfiguration();
+    expect(config.executable).toBe('bash');
+    expect(config.argsPrefix).toEqual(['-c']);
+  });
+
+  it('should return bash configuration on macOS (darwin)', () => {
+    mockPlatform.mockReturnValue('darwin');
+    const config = getShellConfiguration();
+    expect(config.executable).toBe('bash');
+    expect(config.argsPrefix).toEqual(['-c']);
+  });
+
+  it('should return cmd.exe configuration on Windows (fallback)', () => {
+    mockPlatform.mockReturnValue('win32');
+    // Ensure ComSpec is not set for this test to test the fallback
+    delete process.env.ComSpec;
+    const config = getShellConfiguration();
+    expect(config.executable).toBe('cmd.exe');
+    expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+  });
+
+  it('should respect ComSpec environment variable on Windows', () => {
+    mockPlatform.mockReturnValue('win32');
+    const customShell = 'C:\\Windows\\System32\\powershell.exe';
+    process.env.ComSpec = customShell;
+    const config = getShellConfiguration();
+    expect(config.executable).toBe(customShell);
+    // Note: We still use cmd.exe style arguments as the primary interface.
+    expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
   });
 });
