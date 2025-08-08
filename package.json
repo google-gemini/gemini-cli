@@ -48,7 +48,7 @@
     "release:version": "node scripts/version.js",
     "telemetry": "node scripts/telemetry.js",
     "clean": "node scripts/clean.js",
-    "doctor": "python3 scripts/gemini-doctor.py"
+    "doctor": "node scripts/gemini-doctor.js"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
