@@ -38,13 +38,16 @@ const _PrepareLabel: React.FC<PrepareLabelProps> = ({
 
   const matchLength = userInput.length;
   const start = label.slice(
-    Math.max(0, matchedIndex - 60 - matchLength),
+    Math.max(0, matchedIndex - Math.round(MAX_WIDTH/2)),
     matchedIndex,
   );
   const match = label.slice(matchedIndex, matchedIndex + matchLength);
   const end = label.slice(
     matchedIndex + matchLength,
-    Math.min(label.length, matchedIndex + matchLength + 60),
+    Math.min(
+      label.length,
+      matchedIndex + matchLength + Math.round(MAX_WIDTH / 2),
+    ),
   );
 
   return (

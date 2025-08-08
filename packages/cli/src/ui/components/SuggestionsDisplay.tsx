@@ -114,7 +114,6 @@ export function SuggestionsDisplay({
                 <Text color={textColor} wrap="wrap">
                   {suggestion.value}
                 </Text>
-                <Text color={Colors.Gray}>[← to collapse]</Text>
               </Box>
             )}
           </Box>
