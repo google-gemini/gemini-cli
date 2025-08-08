@@ -79,7 +79,7 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useVimMode, VimModeProvider } from './contexts/VimModeContext.js';
 import { useVim } from './hooks/vim.js';
 import { useKeypress, Key } from './hooks/useKeypress.js';
-import { keyMatchers } from './keyBindings.js';
+import { keyMatchers, Command } from './keyBindings.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
 import {
@@ -619,9 +619,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         setConstrainHeight(true);
       }
 
-      if (keyMatchers.showErrorDetails(key)) {
+      if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
         setShowErrorDetails((prev) => !prev);
-      } else if (keyMatchers.toggleToolDescriptions(key)) {
+      } else if (keyMatchers[Command.TOGGLE_TOOL_DESCRIPTIONS](key)) {
         const newValue = !showToolDescriptions;
         setShowToolDescriptions(newValue);
 
@@ -630,24 +630,27 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
         }
       } else if (
-        keyMatchers.toggleIDEContextDetail(key) &&
+        keyMatchers[Command.TOGGLE_IDE_CONTEXT_DETAIL](key) &&
         config.getIdeMode() &&
         ideContextState
       ) {
         // Show IDE status when in IDE mode and context is available.
         handleSlashCommand('/ide status');
-      } else if (keyMatchers.quit(key)) {
+      } else if (keyMatchers[Command.QUIT](key)) {
         // When authenticating, let AuthInProgress component handle Ctrl+C.
         if (isAuthenticating) {
           return;
         }
         handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
-      } else if (keyMatchers.exit(key)) {
+      } else if (keyMatchers[Command.EXIT](key)) {
         if (buffer.text.length > 0) {
           return;
         }
         handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
-      } else if (keyMatchers.showMoreLines(key) && !enteringConstrainHeightMode) {
+      } else if (
+        keyMatchers[Command.SHOW_MORE_LINES](key) &&
+        !enteringConstrainHeightMode
+      ) {
         setConstrainHeight(false);
       }
     },
