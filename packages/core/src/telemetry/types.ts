@@ -7,6 +7,7 @@
 import { GenerateContentResponseUsageMetadata } from '@google/genai';
 import { Config } from '../config/config.js';
 import { CompletedToolCall } from '../core/coreToolScheduler.js';
+import { FileDiff } from '../tools/tools.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   getDecisionFromOutcome,
@@ -105,6 +106,8 @@ export class ToolCallEvent {
   error?: string;
   error_type?: string;
   prompt_id: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  metadata?: { [key: string]: any };
 
   constructor(call: CompletedToolCall) {
     this['event.name'] = 'tool_call';
@@ -119,6 +122,23 @@ export class ToolCallEvent {
     this.error = call.response.error?.message;
     this.error_type = call.response.errorType;
     this.prompt_id = call.request.prompt_id;
+
+    if (
+      call.status === 'success' &&
+      typeof call.response.resultDisplay === 'object' &&
+      call.response.resultDisplay !== null &&
+      'diffStat' in call.response.resultDisplay
+    ) {
+      const diffStat = (call.response.resultDisplay as FileDiff).diffStat;
+      if (diffStat) {
+        this.metadata = {
+          ai_added_lines: diffStat.ai_added_lines,
+          ai_removed_lines: diffStat.ai_removed_lines,
+          user_added_lines: diffStat.user_added_lines,
+          user_removed_lines: diffStat.user_removed_lines,
+        };
+      }
+    }
   }
 }
 
