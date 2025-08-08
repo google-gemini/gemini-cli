@@ -120,8 +120,8 @@ function findImports(
     // Enhanced validation: only allow file paths, not workspace references
     if (
       importPath.length > 0 &&
-      (importPath[0] === '.' ||   // Relative paths like ./file.md
-       path.isAbsolute(importPath))) {  // Absolute paths on any platform
+      (importPath[0] === '.' || path.isAbsolute(importPath))
+    ) {
       // Exclude workspace syntax like @workspace/package (no leading ./ or /)
       imports.push({
         start: i,
@@ -139,7 +139,6 @@ function findImports(
 function isWhitespace(char: string): boolean {
   return char === ' ' || char === '\t' || char === '\n' || char === '\r';
 }
-
 
 function findCodeRegions(content: string): Array<[number, number]> {
   const regions: Array<[number, number]> = [];
