@@ -58,7 +58,17 @@ You can export all telemetry data to a file for local inspection.
 To enable file export, use the `--telemetry-outfile` flag with a path to your desired output file. This must be run using `--telemetry-target=local`.
 
 ```bash
-gemini --telemetry --telemetry-target=local --telemetry-outfile=/path/to/telemetry.log "your prompt"
+# Set your desired output file path
+TELEMETRY_FILE=".gemini/telemetry.log"
+
+# Run Gemini CLI with local telemetry
+# NOTE: --telemetry-otlp-endpoint="" is required to override the default
+# OTLP exporter and ensure telemetry is written to the local file.
+gemini --telemetry \
+  --telemetry-target=local \
+  --telemetry-otlp-endpoint="" \
+  --telemetry-outfile="$TELEMETRY_FILE" \
+  --prompt "What is OpenTelemetry?"
 ```
 
 ## Running an OTEL Collector
