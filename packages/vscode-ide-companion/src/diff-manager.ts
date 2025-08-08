@@ -54,15 +54,24 @@ export class DiffManager {
     new vscode.EventEmitter<JSONRPCNotification>();
   readonly onDidChange = this.onDidChangeEmitter.event;
   private diffDocuments = new Map<string, DiffInfo>();
+  private readonly subscriptions: vscode.Disposable[] = [];
 
   constructor(
     private readonly log: (message: string) => void,
     private readonly diffContentProvider: DiffContentProvider,
   ) {
-    vscode.window.onDidChangeActiveTextEditor((editor) => {
-      this.updateDiffContext(editor);
-    });
-    this.updateDiffContext(vscode.window.activeTextEditor);
+    this.subscriptions.push(
+      vscode.window.onDidChangeActiveTextEditor((editor) => {
+        this.onActiveEditorChange(editor);
+      }),
+    );
+    this.onActiveEditorChange(vscode.window.activeTextEditor);
+  }
+
+  dispose() {
+    for (const subscription of this.subscriptions) {
+      subscription.dispose();
+    }
   }
 
   /**
@@ -204,7 +213,7 @@ export class DiffManager {
     );
   }
 
-  private async updateDiffContext(editor: vscode.TextEditor | undefined) {
+  private async onActiveEditorChange(editor: vscode.TextEditor | undefined) {
     const isVisible =
       !!editor &&
       editor.document.uri.scheme === DIFF_SCHEME &&
