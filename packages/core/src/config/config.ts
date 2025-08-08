@@ -28,6 +28,7 @@ import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,
 } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
+import { getPlanningTool } from '../tools/planning-tool.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
@@ -197,6 +198,7 @@ export interface ConfigParameters {
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
   chatCompression?: ChatCompressionSettings;
+  usePlanningTool?: boolean;
   interactive?: boolean;
 }
 
@@ -261,6 +263,7 @@ export class Config {
   private readonly experimentalAcp: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly chatCompression: ChatCompressionSettings | undefined;
+  private readonly usePlanningTool: boolean;
   private readonly interactive: boolean;
   private initialized: boolean = false;
 
@@ -329,6 +332,7 @@ export class Config {
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
     this.chatCompression = params.chatCompression;
+    this.usePlanningTool = params.usePlanningTool ?? false;
     this.interactive = params.interactive ?? false;
 
     if (params.contextFileName) {
@@ -696,6 +700,10 @@ export class Config {
     return this.chatCompression;
   }
 
+  getUsePlanningTool(): boolean {
+    return this.usePlanningTool;
+  }
+
   isInteractive(): boolean {
     return this.interactive;
   }
@@ -755,6 +763,11 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
+
+    // Manually register the planning tool as it has a different structure
+    if (this.getUsePlanningTool()) {
+      registry.registerTool(getPlanningTool(this));
+    }
 
     await registry.discoverAllTools();
     return registry;

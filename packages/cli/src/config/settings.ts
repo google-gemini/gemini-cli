@@ -141,6 +141,8 @@ export interface Settings {
   loadMemoryFromIncludeDirectories?: boolean;
 
   chatCompression?: ChatCompressionSettings;
+
+  usePlanningTool?: boolean;
 }
 
 export interface SettingsError {

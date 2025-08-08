@@ -6,6 +6,7 @@
 
 import { reportError } from '../utils/errorReporting.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
+import { BaseTool, ToolResult } from '../tools/tools.js';
 import { Config } from '../config/config.js';
 import { ToolCallRequestInfo } from './turn.js';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
@@ -91,10 +92,10 @@ export interface PromptConfig {
  */
 export interface ToolConfig {
   /**
-   * A list of tool names (from the tool registry) or full function declarations
-   * that the subagent is permitted to use.
+   * A list of tool names (from the tool registry), full function declarations,
+   * or BaseTool instances that the subagent is permitted to use.
    */
-  tools: Array<string | FunctionDeclaration>;
+  tools: Array<string | FunctionDeclaration | BaseTool<object, ToolResult>>;
 }
 
 /**
@@ -145,6 +146,12 @@ export interface RunConfig {
    * before the execution is terminated. Helps prevent infinite loops.
    */
   max_turns?: number;
+}
+
+export interface SubAgentOptions {
+  toolConfig?: ToolConfig;
+  outputConfig?: OutputConfig;
+  onMessage?: (message: string) => void;
 }
 
 /**
@@ -236,6 +243,10 @@ export class SubAgentScope {
     emitted_vars: {},
   };
   private readonly subagentId: string;
+  private readonly toolConfig?: ToolConfig;
+  private readonly outputConfig?: OutputConfig;
+  private readonly onMessage?: (message: string) => void;
+  private readonly toolRegistry: ToolRegistry;
 
   /**
    * Constructs a new SubAgentScope instance.
@@ -244,8 +255,7 @@ export class SubAgentScope {
    * @param promptConfig - Configuration for the subagent's prompt and behavior.
    * @param modelConfig - Configuration for the generative model parameters.
    * @param runConfig - Configuration for the subagent's execution environment.
-   * @param toolConfig - Optional configuration for tools available to the subagent.
-   * @param outputConfig - Optional configuration for the subagent's expected outputs.
+   * @param options - Optional configurations for the subagent.
    */
   private constructor(
     readonly name: string,
@@ -253,25 +263,28 @@ export class SubAgentScope {
     private readonly promptConfig: PromptConfig,
     private readonly modelConfig: ModelConfig,
     private readonly runConfig: RunConfig,
-    private readonly toolConfig?: ToolConfig,
-    private readonly outputConfig?: OutputConfig,
+    toolRegistry: ToolRegistry,
+    options: SubAgentOptions = {},
   ) {
     const randomPart = Math.random().toString(36).slice(2, 8);
     this.subagentId = `${this.name}-${randomPart}`;
+    this.toolConfig = options.toolConfig;
+    this.outputConfig = options.outputConfig;
+    this.onMessage = options.onMessage;
+    this.toolRegistry = toolRegistry;
   }
 
   /**
    * Creates and validates a new SubAgentScope instance.
    * This factory method ensures that all tools provided in the prompt configuration
    * are valid for non-interactive use before creating the subagent instance.
-   * @param {string} name - The name of the subagent.
-   * @param {Config} runtimeContext - The shared runtime configuration and services.
-   * @param {PromptConfig} promptConfig - Configuration for the subagent's prompt and behavior.
-   * @param {ModelConfig} modelConfig - Configuration for the generative model parameters.
-   * @param {RunConfig} runConfig - Configuration for the subagent's execution environment.
-   * @param {ToolConfig} [toolConfig] - Optional configuration for tools.
-   * @param {OutputConfig} [outputConfig] - Optional configuration for expected outputs.
-   * @returns {Promise<SubAgentScope>} A promise that resolves to a valid SubAgentScope instance.
+   * @param name - The name of the subagent.
+   * @param runtimeContext - The shared runtime configuration and services.
+   * @param promptConfig - Configuration for the subagent's prompt and behavior.
+   * @param modelConfig - Configuration for the generative model parameters.
+   * @param runConfig - Configuration for the subagent's execution environment.
+   * @param options - Optional configurations for the subagent.
+   * @returns A promise that resolves to a valid SubAgentScope instance.
    * @throws {Error} If any tool requires user confirmation.
    */
   static async create(
@@ -280,44 +293,49 @@ export class SubAgentScope {
     promptConfig: PromptConfig,
     modelConfig: ModelConfig,
     runConfig: RunConfig,
-    toolConfig?: ToolConfig,
-    outputConfig?: OutputConfig,
+    options: SubAgentOptions = {},
   ): Promise<SubAgentScope> {
-    if (toolConfig) {
-      const toolRegistry: ToolRegistry = await runtimeContext.getToolRegistry();
-      const toolsToLoad: string[] = [];
-      for (const tool of toolConfig.tools) {
+    const subagentToolRegistry = new ToolRegistry(runtimeContext);
+    if (options.toolConfig) {
+      for (const tool of options.toolConfig.tools) {
         if (typeof tool === 'string') {
-          toolsToLoad.push(tool);
+          const toolFromRegistry = (
+            await runtimeContext.getToolRegistry()
+          ).getTool(tool);
+          if (toolFromRegistry) {
+            subagentToolRegistry.registerTool(toolFromRegistry);
+          }
+        } else if (tool instanceof BaseTool) {
+          subagentToolRegistry.registerTool(tool);
+        } else {
+          // This is a FunctionDeclaration, which we can't add to the registry.
+          // We'll rely on the validation below to catch any issues.
         }
       }
 
-      for (const toolName of toolsToLoad) {
-        const tool = toolRegistry.getTool(toolName);
-        if (tool) {
-          const requiredParams = tool.schema.parameters?.required ?? [];
-          if (requiredParams.length > 0) {
-            // This check is imperfect. A tool might require parameters but still
-            // be interactive (e.g., `delete_file(path)`). However, we cannot
-            // build a generic invocation without knowing what dummy parameters
-            // to provide. Crashing here because `build({})` fails is worse
-            // than allowing a potential hang later if an interactive tool is
-            // used. This is a best-effort check.
-            console.warn(
-              `Cannot check tool "${toolName}" for interactivity because it requires parameters. Assuming it is safe for non-interactive use.`,
-            );
-            continue;
-          }
-
-          const invocation = tool.build({});
-          const confirmationDetails = await invocation.shouldConfirmExecute(
-            new AbortController().signal,
+      for (const tool of subagentToolRegistry.getAllTools()) {
+        const requiredParams = tool.schema.parameters?.required ?? [];
+        if (requiredParams.length > 0) {
+          // This check is imperfect. A tool might require parameters but still
+          // be interactive (e.g., `delete_file(path)`). However, we cannot
+          // build a generic invocation without knowing what dummy parameters
+          // to provide. Crashing here because `build({})` fails is worse
+          // than allowing a potential hang later if an interactive tool is
+          // used. This is a best-effort check.
+          console.warn(
+            `Cannot check tool "${tool.name}" for interactivity because it requires parameters. Assuming it is safe for non-interactive use.`,
           );
-          if (confirmationDetails) {
-            throw new Error(
-              `Tool "${toolName}" requires user confirmation and cannot be used in a non-interactive subagent.`,
-            );
-          }
+          continue;
+        }
+
+        const invocation = tool.build({});
+        const confirmationDetails = await invocation.shouldConfirmExecute(
+          new AbortController().signal,
+        );
+        if (confirmationDetails) {
+          throw new Error(
+            `Tool "${tool.name}" requires user confirmation and cannot be used in a non-interactive subagent.`,
+          );
         }
       }
     }
@@ -328,8 +346,8 @@ export class SubAgentScope {
       promptConfig,
       modelConfig,
       runConfig,
-      toolConfig,
-      outputConfig,
+      subagentToolRegistry,
+      options,
     );
   }
 
@@ -341,44 +359,42 @@ export class SubAgentScope {
    * @returns {Promise<void>} A promise that resolves when the subagent has completed its execution.
    */
   async runNonInteractive(context: ContextState): Promise<void> {
-    const chat = await this.createChatObject(context);
-
-    if (!chat) {
-      this.output.terminate_reason = SubagentTerminateMode.ERROR;
-      return;
-    }
-
-    const abortController = new AbortController();
-    const toolRegistry: ToolRegistry =
-      await this.runtimeContext.getToolRegistry();
-
-    // Prepare the list of tools available to the subagent.
-    const toolsList: FunctionDeclaration[] = [];
-    if (this.toolConfig) {
-      const toolsToLoad: string[] = [];
-      for (const tool of this.toolConfig.tools) {
-        if (typeof tool === 'string') {
-          toolsToLoad.push(tool);
-        } else {
-          toolsList.push(tool);
-        }
-      }
-      toolsList.push(
-        ...toolRegistry.getFunctionDeclarationsFiltered(toolsToLoad),
-      );
-    }
-    // Add local scope functions if outputs are expected.
-    if (this.outputConfig && this.outputConfig.outputs) {
-      toolsList.push(...this.getScopeLocalFuncDefs());
-    }
-
-    let currentMessages: Content[] = [
-      { role: 'user', parts: [{ text: 'Get Started!' }] },
-    ];
-
     const startTime = Date.now();
     let turnCounter = 0;
     try {
+      const chat = await this.createChatObject(context);
+
+      if (!chat) {
+        this.output.terminate_reason = SubagentTerminateMode.ERROR;
+        return;
+      }
+
+      const abortController = new AbortController();
+
+      // Prepare the list of tools available to the subagent.
+      const toolsList: FunctionDeclaration[] = [];
+      if (this.toolConfig) {
+        const toolsToLoad: string[] = [];
+        for (const tool of this.toolConfig.tools) {
+          if (typeof tool === 'string') {
+            toolsToLoad.push(tool);
+          } else {
+            toolsList.push(tool);
+          }
+        }
+        toolsList.push(
+          ...this.toolRegistry.getFunctionDeclarationsFiltered(toolsToLoad),
+        );
+      }
+      // Add local scope functions if outputs are expected.
+      if (this.outputConfig && this.outputConfig.outputs) {
+        toolsList.push(...this.getScopeLocalFuncDefs());
+      }
+
+      let currentMessages: Content[] = [
+        { role: 'user', parts: [{ text: 'Get Started!' }] },
+      ];
+
       while (true) {
         // Check termination conditions.
         if (
@@ -409,9 +425,20 @@ export class SubAgentScope {
         );
 
         const functionCalls: FunctionCall[] = [];
+        let textResponse = '';
         for await (const resp of responseStream) {
           if (abortController.signal.aborted) return;
-          if (resp.functionCalls) functionCalls.push(...resp.functionCalls);
+          if (resp.functionCalls) {
+            functionCalls.push(...resp.functionCalls);
+          }
+          const text = resp.text;
+          if (text) {
+            textResponse += text;
+          }
+        }
+
+        if (this.onMessage && textResponse) {
+          this.onMessage(textResponse);
         }
 
         durationMin = (Date.now() - startTime) / (1000 * 60);
@@ -423,7 +450,7 @@ export class SubAgentScope {
         if (functionCalls.length > 0) {
           currentMessages = await this.processFunctionCalls(
             functionCalls,
-            toolRegistry,
+            this.toolRegistry,
             abortController,
             promptId,
           );
@@ -487,6 +514,12 @@ export class SubAgentScope {
     const toolResponseParts: Part[] = [];
 
     for (const functionCall of functionCalls) {
+      if (this.onMessage) {
+        const args = JSON.stringify(functionCall.args ?? {});
+        this.onMessage(
+          `Executing tool: ${functionCall.name} with args ${args}`,
+        );
+      }
       const callId = functionCall.id ?? `${functionCall.name}-${Date.now()}`;
       const requestInfo: ToolCallRequestInfo = {
         callId,
