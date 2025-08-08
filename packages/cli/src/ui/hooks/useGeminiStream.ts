@@ -208,7 +208,13 @@ export const useGeminiStream = (
     }
 
     // Persist any other pending history item (e.g., streaming text).
-    if (pendingHistoryItemRef.current) {
+    if (
+      pendingHistoryItemRef.current &&
+      !(
+        toolCalls.length > 0 &&
+        pendingHistoryItemRef.current.type === 'tool_group'
+      )
+    ) {
       addItem(pendingHistoryItemRef.current, Date.now());
     }
 
