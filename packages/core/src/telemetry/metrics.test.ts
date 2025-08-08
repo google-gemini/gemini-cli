@@ -221,5 +221,87 @@ describe('Telemetry Metrics', () => {
         mimetype: 'application/javascript',
       });
     });
+
+    it('should include diffStat when provided', () => {
+      initializeMetricsModule(mockConfig);
+      mockCounterAddFn.mockClear();
+
+      const diffStat = {
+        ai_added_lines: 5,
+        ai_removed_lines: 2,
+        user_added_lines: 3,
+        user_removed_lines: 1,
+      };
+
+      recordFileOperationMetricModule(
+        mockConfig,
+        FileOperation.UPDATE,
+        undefined,
+        undefined,
+        undefined,
+        diffStat,
+      );
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        operation: FileOperation.UPDATE,
+        ai_added_lines: 5,
+        ai_removed_lines: 2,
+        user_added_lines: 3,
+        user_removed_lines: 1,
+      });
+    });
+
+    it('should not include diffStat attributes when diffStat is not provided', () => {
+      initializeMetricsModule(mockConfig);
+      mockCounterAddFn.mockClear();
+
+      recordFileOperationMetricModule(
+        mockConfig,
+        FileOperation.UPDATE,
+        10,
+        'text/plain',
+        'txt',
+        undefined,
+      );
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        operation: FileOperation.UPDATE,
+        lines: 10,
+        mimetype: 'text/plain',
+        extension: 'txt',
+      });
+    });
+
+    it('should handle diffStat with all zero values', () => {
+      initializeMetricsModule(mockConfig);
+      mockCounterAddFn.mockClear();
+
+      const diffStat = {
+        ai_added_lines: 0,
+        ai_removed_lines: 0,
+        user_added_lines: 0,
+        user_removed_lines: 0,
+      };
+
+      recordFileOperationMetricModule(
+        mockConfig,
+        FileOperation.UPDATE,
+        undefined,
+        undefined,
+        undefined,
+        diffStat,
+      );
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        operation: FileOperation.UPDATE,
+        ai_added_lines: 0,
+        ai_removed_lines: 0,
+        user_added_lines: 0,
+        user_removed_lines: 0,
+      });
+    });
   });
 });
