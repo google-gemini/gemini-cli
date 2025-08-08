@@ -709,4 +709,78 @@ describe('CoreToolScheduler request queueing', () => {
     expect(onAllToolCallsComplete.mock.calls[0][0][0].status).toBe('success');
     expect(onAllToolCallsComplete.mock.calls[1][0][0].status).toBe('success');
   });
+
+  it('should handle two synchronous calls to schedule', async () => {
+    const mockTool = new MockTool();
+    const declarativeTool = mockTool;
+    const toolRegistry = {
+      getTool: () => declarativeTool,
+      getToolByName: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {} as any,
+      registerTool: () => {},
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    };
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.YOLO,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      toolRegistry: Promise.resolve(toolRegistry as any),
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const abortController = new AbortController();
+    const request1 = {
+      callId: '1',
+      name: 'mockTool',
+      args: { a: 1 },
+      isClientInitiated: false,
+      prompt_id: 'prompt-1',
+    };
+    const request2 = {
+      callId: '2',
+      name: 'mockTool',
+      args: { b: 2 },
+      isClientInitiated: false,
+      prompt_id: 'prompt-2',
+    };
+
+    // Schedule two calls synchronously.
+    const schedulePromise1 = scheduler.schedule(
+      [request1],
+      abortController.signal,
+    );
+    const schedulePromise2 = scheduler.schedule(
+      [request2],
+      abortController.signal,
+    );
+
+    // Wait for both promises to resolve.
+    await Promise.all([schedulePromise1, schedulePromise2]);
+
+    // Ensure the tool was called twice with the correct arguments.
+    expect(mockTool.executeFn).toHaveBeenCalledTimes(2);
+    expect(mockTool.executeFn).toHaveBeenCalledWith({ a: 1 });
+    expect(mockTool.executeFn).toHaveBeenCalledWith({ b: 2 });
+
+    // Ensure completion callbacks were called twice.
+    expect(onAllToolCallsComplete).toHaveBeenCalledTimes(2);
+  });
 });
