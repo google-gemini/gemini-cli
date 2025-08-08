@@ -101,8 +101,8 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     return description;
   }
 
-  private _resolveDirectory(directory: string): {
-    paths: string[];
+  private resolveDirectory(directory: string): {
+    path: string | null;
     error: string | null;
   } {
     const workspaceContext = this.config.getWorkspaceContext();
@@ -122,21 +122,21 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
     if (possiblePaths.length === 0) {
       return {
-        paths: [],
+        path: null,
         error: `Directory '${directory}' is not a registered workspace directory.`,
       };
     }
 
     if (possiblePaths.length > 1) {
       return {
-        paths: [],
+        path: null,
         error: `Directory '${directory}' is ambiguous as it exists in multiple workspace locations: ${possiblePaths.join(
           ', ',
         )}`,
       };
     }
 
-    return { paths: possiblePaths, error: null };
+    return { path: possiblePaths[0], error: null };
   }
 
   validateToolParams(params: ShellToolParams): string | null {
@@ -165,7 +165,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
         return 'Directory cannot be absolute. Please refer to workspace directories by their name.';
       }
 
-      const { error } = this._resolveDirectory(params.directory);
+      const { error } = this.resolveDirectory(params.directory);
       if (error) {
         return error;
       }
@@ -248,14 +248,16 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
       let cwd = this.config.getProjectRoot();
       if (params.directory) {
-        const { paths, error } = this._resolveDirectory(params.directory);
+        const { path: resolvedPath, error } = this.resolveDirectory(
+          params.directory,
+        );
         if (error) {
           return {
             llmContent: error,
             returnDisplay: error,
           };
         }
-        cwd = paths[0];
+        cwd = resolvedPath!;
       }
 
       let cumulativeStdout = '';
