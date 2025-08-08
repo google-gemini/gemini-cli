@@ -675,7 +675,7 @@ export async function connectToMcpServer(
   mcpClient.setRequestHandler(ListRootsRequestSchema, async () => ({
     roots: [
       {
-        uri: pathToFileURL(targetDir),
+        uri: pathToFileURL(targetDir).toString(),
         name: basename(targetDir),
       },
     ],
