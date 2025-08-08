@@ -137,9 +137,13 @@ export class LoggingContentGenerator implements ContentGenerator {
     userPromptId: string,
   ): AsyncGenerator<GenerateContentResponse> {
     let lastResponse: GenerateContentResponse | undefined;
+    let lastUsageMetadata: GenerateContentResponseUsageMetadata | undefined;
     try {
       for await (const response of stream) {
         lastResponse = response;
+        if (response.usageMetadata) {
+          lastUsageMetadata = response.usageMetadata;
+        }
         yield response;
       }
     } catch (error) {
@@ -152,7 +156,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       this._logApiResponse(
         durationMs,
         userPromptId,
-        lastResponse.usageMetadata,
+        lastUsageMetadata,
         JSON.stringify(lastResponse),
       );
     }
