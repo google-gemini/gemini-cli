@@ -79,6 +79,7 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useVimMode, VimModeProvider } from './contexts/VimModeContext.js';
 import { useVim } from './hooks/vim.js';
 import { useKeypress, Key } from './hooks/useKeypress.js';
+import { keyMatchers } from './keyBindings.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
 import {
@@ -621,9 +622,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       setConstrainHeight(true);
     }
 
-    if (key.ctrl && key.name === 'o') {
+    if (keyMatchers.showErrorDetails(key)) {
       setShowErrorDetails((prev) => !prev);
-    } else if (key.ctrl && key.name === 't') {
+    } else if (keyMatchers.toggleToolDescriptions(key)) {
       const newValue = !showToolDescriptions;
       setShowToolDescriptions(newValue);
 
@@ -632,26 +633,25 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
       }
     } else if (
-      key.ctrl &&
-      key.name === 'e' &&
+      keyMatchers.toggleIDEContextDetail(key) &&
       config.getIdeMode() &&
       ideContextState
     ) {
       // Show IDE status when in IDE mode and context is available.
       handleSlashCommand('/ide status');
-    } else if (key.ctrl && (key.name === 'c' || key.name === 'C')) {
+    } else if (keyMatchers.quit(key)) {
       // When authenticating, let AuthInProgress component handle Ctrl+C.
       if (isAuthenticating) {
         return;
       }
       handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
-    } else if (key.ctrl && (key.name === 'd' || key.name === 'D')) {
+    } else if (keyMatchers.exit(key)) {
       if (buffer.text.length > 0) {
         // Do nothing if there is text in the input.
         return;
       }
       handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
-    } else if (key.ctrl && key.name === 's' && !enteringConstrainHeightMode) {
+    } else if (keyMatchers.showMoreLines(key) && !enteringConstrainHeightMode) {
       setConstrainHeight(false);
     }
   }, [
