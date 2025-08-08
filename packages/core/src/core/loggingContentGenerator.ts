@@ -94,27 +94,22 @@ export class LoggingContentGenerator implements ContentGenerator {
     userPromptId: string,
   ): Promise<GenerateContentResponse> {
     const startTime = Date.now();
-
     this.logApiRequest(toContents(req.contents), req.model, userPromptId);
-    const generateContentPromise = this.wrapped.generateContent(
-      req,
-      userPromptId,
-    );
-    generateContentPromise
-      .then((response) => {
-        const durationMs = Date.now() - startTime;
-        this._logApiResponse(
-          durationMs,
-          userPromptId,
-          response.usageMetadata,
-          JSON.stringify(response),
-        );
-      })
-      .catch((error) => {
-        const durationMs = Date.now() - startTime;
-        this._logApiError(durationMs, error, userPromptId);
-      });
-    return generateContentPromise;
+    try {
+      const response = await this.wrapped.generateContent(req, userPromptId);
+      const durationMs = Date.now() - startTime;
+      this._logApiResponse(
+        durationMs,
+        userPromptId,
+        response.usageMetadata,
+        JSON.stringify(response),
+      );
+      return response;
+    } catch (error) {
+      const durationMs = Date.now() - startTime;
+      this._logApiError(durationMs, error, userPromptId);
+      throw error;
+    }
   }
 
   async generateContentStream(
@@ -123,33 +118,41 @@ export class LoggingContentGenerator implements ContentGenerator {
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const startTime = Date.now();
     this.logApiRequest(toContents(req.contents), req.model, userPromptId);
-    const generateContentPromise = this.wrapped.generateContentStream(
-      req,
-      userPromptId,
-    );
-    generateContentPromise.then(
-      async (generator) => {
-        let lastResponse: GenerateContentResponse | undefined;
-          for await (const response of generator) {
-            lastResponse = response;
-          }
-          const durationMs = Date.now() - startTime;
-          if (lastResponse) {
-            this._logApiResponse(
-              durationMs,
-              userPromptId,
-              lastResponse.usageMetadata,
-              JSON.stringify(lastResponse),
-            );
-          }
-      },
-      (error) => {
+
+    let stream: AsyncGenerator<GenerateContentResponse>;
+    try {
+      stream = await this.wrapped.generateContentStream(req, userPromptId);
+    } catch (error) {
+      const durationMs = Date.now() - startTime;
+      this._logApiError(durationMs, error, userPromptId);
+      throw error;
+    }
+
+    const self = this;
+    async function* loggingStreamWrapper(): AsyncGenerator<GenerateContentResponse> {
+      let lastResponse: GenerateContentResponse | undefined;
+      try {
+        for await (const response of stream) {
+          lastResponse = response;
+          yield response;
+        }
+      } catch (error) {
         const durationMs = Date.now() - startTime;
-        this._logApiError(durationMs, error, userPromptId);
+        self._logApiError(durationMs, error, userPromptId);
         throw error;
-      },
-    );
-    return generateContentPromise;
+      }
+      const durationMs = Date.now() - startTime;
+      if (lastResponse) {
+        self._logApiResponse(
+          durationMs,
+          userPromptId,
+          lastResponse.usageMetadata,
+          JSON.stringify(lastResponse),
+        );
+      }
+    }
+
+    return loggingStreamWrapper();
   }
 
   async countTokens(req: CountTokensParameters): Promise<CountTokensResponse> {
