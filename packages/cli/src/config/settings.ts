@@ -141,6 +141,7 @@ export interface Settings {
   loadMemoryFromIncludeDirectories?: boolean;
 
   chatCompression?: ChatCompressionSettings;
+  showLineNumbers?: boolean;
 }
 
 export interface SettingsError {
