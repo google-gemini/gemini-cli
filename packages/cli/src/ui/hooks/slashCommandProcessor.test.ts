@@ -99,6 +99,7 @@ describe('useSlashCommandProcessor', () => {
   const mockClearItems = vi.fn();
   const mockLoadHistory = vi.fn();
   const mockOpenThemeDialog = vi.fn();
+  const mockOpenModelDialog = vi.fn();
   const mockOpenAuthDialog = vi.fn();
   const mockSetQuittingMessages = vi.fn();
 
@@ -141,6 +142,7 @@ describe('useSlashCommandProcessor', () => {
         mockLoadHistory,
         vi.fn(), // refreshStatic
         vi.fn(), // onDebugMessage
+        mockOpenModelDialog, // openModelDialog
         mockOpenThemeDialog, // openThemeDialog
         mockOpenAuthDialog,
         vi.fn(), // openEditorDialog
@@ -870,6 +872,7 @@ describe('useSlashCommandProcessor', () => {
           vi.fn(), // toggleVimEnabled
           vi.fn().mockResolvedValue(false), // toggleVimEnabled
           vi.fn(), // setIsProcessing
+          vi.fn(), // setGeminiMdFileCount
         ),
       );
 
