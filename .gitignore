@@ -39,4 +39,3 @@ packages/*/coverage/
 packages/cli/src/generated/
 .integration-tests/
 packages/vscode-ide-companion/*.vsix
-._b00t_.toml
