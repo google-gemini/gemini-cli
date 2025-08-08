@@ -18,6 +18,7 @@ import {
   ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
+import { runExitCleanup } from '../../utils/cleanup.js';
 import {
   Message,
   MessageType,
@@ -370,7 +371,8 @@ export const useSlashCommandProcessor = (
                 }
                 case 'quit':
                   setQuittingMessages(result.messages);
-                  setTimeout(() => {
+                  setTimeout(async () => {
+                    await runExitCleanup();
                     process.exit(0);
                   }, 100);
                   return { type: 'handled' };
