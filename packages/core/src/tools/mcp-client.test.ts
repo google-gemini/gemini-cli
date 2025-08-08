@@ -25,6 +25,7 @@ import { PromptRegistry } from '../prompts/prompt-registry.js';
 
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { pathToFileURL } from 'node:url';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -316,11 +317,11 @@ describe('mcp-client', () => {
       expect(roots).toEqual({
         roots: [
           {
-            uri: 'file:///test/dir',
+            uri:  pathToFileURL('/test/dir').toString(),
             name: 'dir',
           },
           {
-            uri: 'file:///another/project',
+            uri: pathToFileURL('/another/project').toString(),
             name: 'project',
           },
         ],
