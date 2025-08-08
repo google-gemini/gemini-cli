@@ -293,7 +293,9 @@ describe('mcp-client', () => {
         {} as SdkClientStdioLib.StdioClientTransport,
       );
       const mockWorkspaceContext = {
-        getDirectories: vi.fn().mockReturnValue(['/test/dir', '/another/project']),
+        getDirectories: vi
+          .fn()
+          .mockReturnValue(['/test/dir', '/another/project']),
       } as unknown as WorkspaceContext;
 
       await connectToMcpServer(
@@ -536,9 +538,9 @@ describe('mcp-client', () => {
     });
 
     it('should connect via command', async () => {
-      const mockedTransport = vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
-        {} as SdkClientStdioLib.StdioClientTransport,
-      );
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
 
       await createTransport(
         'test-server',
