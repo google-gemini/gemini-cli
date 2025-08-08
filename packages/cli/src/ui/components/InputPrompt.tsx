@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
@@ -60,6 +60,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   vimHandleInput,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const [recentPasteTime, setRecentPasteTime] = useState<number | null>(null);
+  const submissionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -200,11 +202,43 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
   }, [buffer, config]);
 
+  // Function to handle safe submission with paste detection
+  const handleSafeSubmission = useCallback(
+    (textToSubmit: string) => {
+      const now = Date.now();
+      const timeSinceLastPaste = recentPasteTime
+        ? now - recentPasteTime
+        : Infinity;
+      const hasMultipleLines = textToSubmit.includes('\n');
+
+      // If content has multiple lines and was recently pasted (within 2 seconds), add a small delay
+      if (hasMultipleLines && timeSinceLastPaste < 2000) {
+        // Clear any existing timeout
+        if (submissionTimeoutRef.current) {
+          clearTimeout(submissionTimeoutRef.current);
+        }
+
+        // Add a 200ms delay to prevent accidental submission
+        submissionTimeoutRef.current = setTimeout(() => {
+          handleSubmitAndClear(textToSubmit);
+        }, 200);
+      } else {
+        handleSubmitAndClear(textToSubmit);
+      }
+    },
+    [recentPasteTime, handleSubmitAndClear],
+  );
+
   const handleInput = useCallback(
     (key: Key) => {
       /// We want to handle paste even when not focused to support drag and drop.
       if (!focus && !key.paste) {
         return;
+      }
+
+      // Track paste operations
+      if (key.paste) {
+        setRecentPasteTime(Date.now());
       }
 
       if (vimHandleInput && vimHandleInput(key)) {
@@ -289,7 +323,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             showSuggestions && activeSuggestionIndex > -1
               ? suggestions[activeSuggestionIndex].value
               : buffer.text;
-          handleSubmitAndClear(textToSubmit);
+          handleSafeSubmission(textToSubmit);
           reverseSearchCompletion.resetCompletionState();
           setReverseSearchActive(false);
           return;
@@ -303,7 +337,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // If the command is a perfect match, pressing enter should execute it.
       if (completion.isPerfectMatch && key.name === 'return') {
-        handleSubmitAndClear(buffer.text);
+        handleSafeSubmission(buffer.text);
         return;
       }
 
@@ -380,7 +414,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.backspace();
             buffer.newline();
           } else {
-            handleSubmitAndClear(buffer.text);
+            // Check if this might be an accidental submission from a failed paste detection
+            const now = Date.now();
+            const timeSinceLastPaste = recentPasteTime
+              ? now - recentPasteTime
+              : Infinity;
+            const hasMultipleLines = buffer.text.includes('\n');
+
+            // If content has multiple lines and was very recently modified, be more cautious
+            if (hasMultipleLines && timeSinceLastPaste < 500) {
+              // This might be from a paste that wasn't detected - add newline instead of submitting
+              buffer.newline();
+            } else {
+              handleSafeSubmission(buffer.text);
+            }
           }
         }
         return;
@@ -446,7 +493,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       setShellModeActive,
       onClearScreen,
       inputHistory,
-      handleSubmitAndClear,
       shellHistory,
       reverseSearchCompletion,
       handleClipboardImage,
@@ -455,7 +501,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,
+      handleSafeSubmission,
+      recentPasteTime,
     ],
+  );
+
+  // Cleanup submission timeout on unmount
+  useEffect(
+    () => () => {
+      if (submissionTimeoutRef.current) {
+        clearTimeout(submissionTimeoutRef.current);
+      }
+    },
+    [],
   );
 
   useKeypress(handleInput, { isActive: true });
