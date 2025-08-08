@@ -21,8 +21,8 @@ test('should be able to list a directory', async () => {
   await rig.poll(
     () => {
       // Check if the files exist in the test directory
-      const file1Path = join(rig.testDir, 'file1.txt');
-      const subdirPath = join(rig.testDir, 'subdir');
+      const file1Path = join(rig.testDir!, 'file1.txt');
+      const subdirPath = join(rig.testDir!, 'subdir');
       return existsSync(file1Path) && existsSync(subdirPath);
     },
     1000, // 1 second max wait

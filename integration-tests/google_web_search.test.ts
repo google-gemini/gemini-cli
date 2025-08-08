@@ -15,13 +15,16 @@ test('should be able to search the web', async () => {
   let result;
   try {
     result = await rig.run(`what is the weather in London`);
-  } catch (error) {
+  } catch (error: unknown) {
     // Network errors can occur in CI environments
     if (
-      error.message.includes('network') ||
-      error.message.includes('timeout')
+      (error as Error).message.includes('network') ||
+      (error as Error).message.includes('timeout')
     ) {
-      console.warn('Skipping test due to network error:', error.message);
+      console.warn(
+        'Skipping test due to network error:',
+        (error as Error).message,
+      );
       return; // Skip the test
     }
     throw error; // Re-throw if not a network error
