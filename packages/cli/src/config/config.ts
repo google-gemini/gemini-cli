@@ -248,10 +248,10 @@ export async function parseArguments(): Promise<CliArgs> {
         }
         const packageRoot = path.dirname(pkg.path);
         const scriptPath = path.join(packageRoot, 'scripts', 'gemini-doctor.js');
-        const result = spawnSync('python3', [scriptPath], { stdio: 'inherit' });
+        const result = spawnSync('node', [scriptPath], { stdio: 'inherit' });
         if (result.error) {
-          console.error('Failed to start python3 process.', result.error);
-          console.error('Please ensure that python3 is installed and in your PATH.');
+          console.error('Failed to start node process.', result.error);
+          console.error('Please ensure that node is installed and in your PATH.');
           process.exit(1);
         }
         process.exit(result.status ?? 1);
