@@ -18,6 +18,13 @@ vi.mock('vscode', () => ({
       show: vi.fn(),
       sendText: vi.fn(),
     })),
+    onDidChangeActiveTextEditor: vi.fn(),
+    activeTextEditor: undefined,
+    tabGroups: {
+      all: [],
+      close: vi.fn(),
+    },
+    showTextDocument: vi.fn(),
   },
   workspace: {
     workspaceFolders: [],
