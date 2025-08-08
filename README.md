@@ -92,6 +92,17 @@ The Vertex AI API provides a [free tier](https://cloud.google.com/vertex-ai/gene
 
 3. (Optionally) Add a billing account on your project to get access to [higher usage limits](https://cloud.google.com/vertex-ai/generative-ai/docs/quotas)
 
+### Set your Google Cloud project ID
+
+If you want the CLI to operate against your Google Cloud project, set one of these:
+
+```bash
+export GOOGLE_CLOUD_PROJECT="my-gcp-project"        # primary
+export GOOGLE_CLOUD_PROJECT_ID="my-gcp-project"     # fallback
+```
+
+The CLI will first read `GOOGLE_CLOUD_PROJECT`, and if that’s not set, it will fall back to `GOOGLE_CLOUD_PROJECT_ID`.
+
 For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
 
 ## Examples

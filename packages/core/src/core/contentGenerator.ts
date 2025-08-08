@@ -59,11 +59,13 @@ export type ContentGeneratorConfig = {
 export function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
-): ContentGeneratorConfig {
-  const geminiApiKey = process.env.GEMINI_API_KEY || undefined;
-  const googleApiKey = process.env.GOOGLE_API_KEY || undefined;
-  const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT || undefined;
-  const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION || undefined;
+
+): Promise<ContentGeneratorConfig> {
+
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const googleApiKey = process.env.GOOGLE_API_KEY;
+  const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT_ID;
+  const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION;
 
   // Use runtime model from config if available; otherwise, fall back to parameter or default
   const effectiveModel = config.getModel() || DEFAULT_GEMINI_MODEL;
