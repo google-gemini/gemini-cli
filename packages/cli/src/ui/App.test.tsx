@@ -203,6 +203,13 @@ vi.mock('./hooks/useAuthCommand', () => ({
   })),
 }));
 
+vi.mock('./hooks/useFolderTrust', () => ({
+  useFolderTrust: vi.fn(() => ({
+    isFolderTrustDialogOpen: false,
+    handleFolderTrustSelect: vi.fn(),
+  })),
+}));
+
 vi.mock('./hooks/useLogger', () => ({
   useLogger: vi.fn(() => ({
     getPreviousUserMessages: vi.fn().mockResolvedValue([]),
@@ -1089,6 +1096,27 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
       expect(lastFrame()).toMatchSnapshot();
+    });
+  });
+
+  describe('FolderTrustDialog', () => {
+    it('should display the folder trust dialog when isFolderTrustDialogOpen is true', async () => {
+      const { useFolderTrust } = await import('./hooks/useFolderTrust.js');
+      vi.mocked(useFolderTrust).mockReturnValue({
+        isFolderTrustDialogOpen: true,
+        handleFolderTrustSelect: vi.fn(),
+      });
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      await Promise.resolve();
+      expect(lastFrame()).toContain('Do you trust this folder?');
     });
   });
 });
