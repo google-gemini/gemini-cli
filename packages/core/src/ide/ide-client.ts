@@ -175,7 +175,14 @@ export class IdeClient {
     }
   }
 
-  disconnect() {
+  async disconnect() {
+    if (this.state.status === IDEConnectionStatus.Disconnected) {
+      return;
+    }
+    for (const filePath of this.diffResponses.keys()) {
+      await this.closeDiff(filePath);
+    }
+    this.diffResponses.clear();
     this.setState(
       IDEConnectionStatus.Disconnected,
       'IDE integration disabled. To enable it again, run /ide enable.',
