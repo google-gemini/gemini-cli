@@ -241,9 +241,9 @@ export async function parseArguments(): Promise<CliArgs> {
       () => {},
       async () => {
         // Dynamically find package root
-        const pkg = await readPackageUp();
+        const pkg = await readPackageUp({ cwd: path.dirname(fileURLToPath(import.meta.url)) });
         if (!pkg || !pkg.path) {
-          console.error('Could not locate package.json.');
+          console.error('Could not locate the package.json for gemini-cli.');
           process.exit(1);
         }
         const packageRoot = path.dirname(pkg.path);
