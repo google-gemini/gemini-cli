@@ -5,7 +5,15 @@
  */
 
 import { GeminiClient } from '@google/gemini-cli-core';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  beforeAll,
+  afterAll,
+} from 'vitest';
 import { compressCommand } from './compressCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
@@ -13,6 +21,15 @@ import { MessageType } from '../types.js';
 describe('compressCommand', () => {
   let context: ReturnType<typeof createMockCommandContext>;
   let mockTryCompressChat: ReturnType<typeof vi.fn>;
+
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-01-01T00:00:00.000Z'));
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
 
   beforeEach(() => {
     mockTryCompressChat = vi.fn();
@@ -73,6 +90,7 @@ describe('compressCommand', () => {
     expect(mockTryCompressChat).toHaveBeenCalledWith(
       expect.stringMatching(/^compress-\d+$/),
       true,
+      { instruction: '' },
     );
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
@@ -88,6 +106,18 @@ describe('compressCommand', () => {
     );
 
     expect(context.ui.setPendingItem).toHaveBeenNthCalledWith(2, null);
+  });
+
+  it('should pass instruction to tryCompressChat', async () => {
+    const compressedResult = {
+      originalTokenCount: 200,
+      newTokenCount: 100,
+    };
+    mockTryCompressChat.mockResolvedValue(compressedResult);
+
+    await compressCommand.action!(context, 'test instruction');
+
+    expect(mockTryCompressChat.mock.calls[0]).toMatchSnapshot();
   });
 
   it('should add an error message if tryCompressChat returns falsy', async () => {
