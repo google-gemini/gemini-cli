@@ -183,9 +183,10 @@ Logs are timestamped records of specific events. The following events are logged
     - `function_args`
     - `duration_ms`
     - `success` (boolean)
-    - `decision` (string: "accept", "reject", or "modify", if applicable)
+    - `decision` (string: "accept", "reject", "auto_accept", or "modify", if applicable)
     - `error` (if applicable)
     - `error_type` (if applicable)
+    - `metadata` (if applicable, dictionary of string -> any)
 
 - `gemini_cli.api_request`: This event occurs when making a request to Gemini API.
   - **Attributes**:
@@ -262,3 +263,7 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `lines` (Int, if applicable): Number of lines in the file.
     - `mimetype` (string, if applicable): Mimetype of the file.
     - `extension` (string, if applicable): File extension of the file.
+    - `ai_added_lines` (Int, if applicable): Number of lines added/changed by AI.
+    - `ai_removed_lines` (Int, if applicable): Number of lines removed/changed by AI.
+    - `user_added_lines` (Int, if applicable): Number of lines added/changed by user in AI proposed changes.
+    - `user_removed_lines` (Int, if applicable): Number of lines removed/changed by user in AI proposed changes.

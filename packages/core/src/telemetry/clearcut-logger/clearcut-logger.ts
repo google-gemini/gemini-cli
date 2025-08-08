@@ -476,6 +476,24 @@ export class ClearcutLogger {
       },
     ];
 
+    if (event.metadata) {
+      const metadataMapping: { [key: string]: EventMetadataKey } = {
+        ai_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
+        ai_removed_lines: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
+        user_added_lines: EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
+        user_removed_lines: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
+      };
+
+      for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {
+        if (event.metadata[key] !== undefined) {
+          data.push({
+            gemini_cli_key,
+            value: JSON.stringify(event.metadata[key]),
+          });
+        }
+      }
+    }
+
     const logEvent = this.createLogEvent(tool_call_event_name, data);
     this.enqueueLogEvent(logEvent);
     this.flushIfNeeded();
