@@ -477,29 +477,20 @@ export class ClearcutLogger {
     ];
 
     if (event.metadata) {
-      if (event.metadata.ai_added_lines !== undefined) {
-        data.push({
-          gemini_cli_key: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
-          value: JSON.stringify(event.metadata.ai_added_lines),
-        });
-      }
-      if (event.metadata.ai_removed_lines !== undefined) {
-        data.push({
-          gemini_cli_key: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
-          value: JSON.stringify(event.metadata.ai_removed_lines),
-        });
-      }
-      if (event.metadata.user_added_lines !== undefined) {
-        data.push({
-          gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
-          value: JSON.stringify(event.metadata.user_added_lines),
-        });
-      }
-      if (event.metadata.user_removed_lines !== undefined) {
-        data.push({
-          gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
-          value: JSON.stringify(event.metadata.user_removed_lines),
-        });
+      const metadataMapping: { [key: string]: EventMetadataKey } = {
+        ai_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
+        ai_removed_lines: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
+        user_added_lines: EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
+        user_removed_lines: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
+      };
+
+      for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {
+        if (event.metadata[key] !== undefined) {
+          data.push({
+            gemini_cli_key,
+            value: JSON.stringify(event.metadata[key]),
+          });
+        }
       }
     }
 
