@@ -18,7 +18,7 @@ import { homedir } from 'os';
 import * as Diff from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { tildeifyPath } from '../utils/paths.js';
-import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
+import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
   name: 'save_memory',
@@ -112,7 +112,7 @@ function ensureNewlineSeparation(currentContent: string): string {
 
 export class MemoryTool
   extends BaseTool<SaveMemoryParams, ToolResult>
-  implements ModifiableTool<SaveMemoryParams>
+  implements ModifiableDeclarativeTool<SaveMemoryParams>
 {
   private static readonly allowlist: Set<string> = new Set();
 
@@ -220,6 +220,7 @@ export class MemoryTool
       type: 'edit',
       title: `Confirm Memory Save: ${tildeifyPath(memoryFilePath)}`,
       fileName: memoryFilePath,
+      filePath: memoryFilePath,
       fileDiff,
       originalContent: currentContent,
       newContent,

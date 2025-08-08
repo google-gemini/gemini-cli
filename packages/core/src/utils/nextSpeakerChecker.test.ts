@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, Mock, afterEach } from 'vitest';
 import { Content, GoogleGenAI, Models } from '@google/genai';
-import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../config/models.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { GeminiClient } from '../core/client.js';
 import { Config } from '../config/config.js';
 import { checkNextSpeaker, NextSpeakerResponse } from './nextSpeakerChecker.js';
@@ -248,6 +248,6 @@ describe('checkNextSpeaker', () => {
     expect(mockGeminiClient.generateJson).toHaveBeenCalled();
     const generateJsonCall = (mockGeminiClient.generateJson as Mock).mock
       .calls[0];
-    expect(generateJsonCall[3]).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+    expect(generateJsonCall[3]).toBe(DEFAULT_GEMINI_FLASH_MODEL);
   });
 });

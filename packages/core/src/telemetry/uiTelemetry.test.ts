@@ -6,12 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UiTelemetryService } from './uiTelemetry.js';
-import {
-  ApiErrorEvent,
-  ApiResponseEvent,
-  ToolCallEvent,
-  ToolCallDecision,
-} from './types.js';
+import { ToolCallDecision } from './tool-call-decision.js';
+import { ApiErrorEvent, ApiResponseEvent, ToolCallEvent } from './types.js';
 import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
@@ -23,7 +19,8 @@ import {
   SuccessfulToolCall,
 } from '../core/coreToolScheduler.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import { Tool, ToolConfirmationOutcome } from '../tools/tools.js';
+import { ToolConfirmationOutcome } from '../tools/tools.js';
+import { MockTool } from '../test-utils/tools.js';
 
 const createFakeCompletedToolCall = (
   name: string,
@@ -39,12 +36,14 @@ const createFakeCompletedToolCall = (
     isClientInitiated: false,
     prompt_id: 'prompt-id-1',
   };
+  const tool = new MockTool(name);
 
   if (success) {
     return {
       status: 'success',
       request,
-      tool: { name } as Tool, // Mock tool
+      tool,
+      invocation: tool.build({}),
       response: {
         callId: request.callId,
         responseParts: {
@@ -65,6 +64,7 @@ const createFakeCompletedToolCall = (
     return {
       status: 'error',
       request,
+      tool,
       response: {
         callId: request.callId,
         responseParts: {
@@ -104,6 +104,7 @@ describe('UiTelemetryService', () => {
           [ToolCallDecision.ACCEPT]: 0,
           [ToolCallDecision.REJECT]: 0,
           [ToolCallDecision.MODIFY]: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
         },
         byName: {},
       },
@@ -362,6 +363,7 @@ describe('UiTelemetryService', () => {
           [ToolCallDecision.ACCEPT]: 1,
           [ToolCallDecision.REJECT]: 0,
           [ToolCallDecision.MODIFY]: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
         },
       });
     });
@@ -395,6 +397,7 @@ describe('UiTelemetryService', () => {
           [ToolCallDecision.ACCEPT]: 0,
           [ToolCallDecision.REJECT]: 1,
           [ToolCallDecision.MODIFY]: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
         },
       });
     });
@@ -434,11 +437,13 @@ describe('UiTelemetryService', () => {
         [ToolCallDecision.ACCEPT]: 0,
         [ToolCallDecision.REJECT]: 0,
         [ToolCallDecision.MODIFY]: 0,
+        [ToolCallDecision.AUTO_ACCEPT]: 0,
       });
       expect(tools.byName['test_tool'].decisions).toEqual({
         [ToolCallDecision.ACCEPT]: 0,
         [ToolCallDecision.REJECT]: 0,
         [ToolCallDecision.MODIFY]: 0,
+        [ToolCallDecision.AUTO_ACCEPT]: 0,
       });
     });
 
@@ -483,6 +488,7 @@ describe('UiTelemetryService', () => {
           [ToolCallDecision.ACCEPT]: 1,
           [ToolCallDecision.REJECT]: 1,
           [ToolCallDecision.MODIFY]: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
         },
       });
     });

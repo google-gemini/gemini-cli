@@ -114,8 +114,8 @@ describe('useAtCompletion', () => {
       expect(result.current.suggestions.map((s) => s.value)).toEqual([
         'src/',
         'src/components/',
-        'src/components/Button.tsx',
         'src/index.js',
+        'src/components/Button.tsx',
       ]);
     });
 
@@ -157,7 +157,7 @@ describe('useAtCompletion', () => {
       });
     });
 
-    it('should NOT show a loading indicator for subsequent searches that complete under 100ms', async () => {
+    it('should NOT show a loading indicator for subsequent searches that complete under 200ms', async () => {
       const structure: FileSystemStructure = { 'a.txt': '', 'b.txt': '' };
       testRootDir = await createTmpDir(structure);
 
@@ -186,7 +186,7 @@ describe('useAtCompletion', () => {
       expect(result.current.isLoadingSuggestions).toBe(false);
     });
 
-    it('should show a loading indicator and clear old suggestions for subsequent searches that take longer than 100ms', async () => {
+    it('should show a loading indicator and clear old suggestions for subsequent searches that take longer than 200ms', async () => {
       const structure: FileSystemStructure = { 'a.txt': '', 'b.txt': '' };
       testRootDir = await createTmpDir(structure);
 
@@ -194,7 +194,7 @@ describe('useAtCompletion', () => {
       const originalSearch = FileSearch.prototype.search;
       vi.spyOn(FileSearch.prototype, 'search').mockImplementation(
         async function (...args) {
-          await new Promise((resolve) => setTimeout(resolve, 200));
+          await new Promise((resolve) => setTimeout(resolve, 300));
           return originalSearch.apply(this, args);
         },
       );

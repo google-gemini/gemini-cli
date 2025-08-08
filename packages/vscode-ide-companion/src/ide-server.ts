@@ -5,15 +5,13 @@
  */
 
 import * as vscode from 'vscode';
+import { IdeContextNotificationSchema } from '@google/gemini-cli-core';
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import express, { Request, Response } from 'express';
+import express, { type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import {
-  isInitializeRequest,
-  type JSONRPCNotification,
-} from '@modelcontextprotocol/sdk/types.js';
-import { Server as HTTPServer } from 'node:http';
+import { type Server as HTTPServer } from 'node:http';
 import { z } from 'zod';
 import { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
@@ -28,11 +26,12 @@ function sendIdeContextUpdateNotification(
 ) {
   const ideContext = openFilesManager.state;
 
-  const notification: JSONRPCNotification = {
+  const notification = IdeContextNotificationSchema.parse({
     jsonrpc: '2.0',
     method: 'ide/contextUpdate',
     params: ideContext,
-  };
+  });
+
   log(
     `Sending IDE context update notification: ${JSON.stringify(
       notification,
@@ -76,7 +75,7 @@ export class IDEServer {
     });
     context.subscriptions.push(onDidChangeSubscription);
     const onDidChangeDiffSubscription = this.diffManager.onDidChange(
-      (notification: JSONRPCNotification) => {
+      (notification) => {
         for (const transport of Object.values(transports)) {
           transport.send(notification);
         }
@@ -269,12 +268,13 @@ const createMcpServer = (diffManager: DiffManager) => {
       }).shape,
     },
     async ({ filePath }: { filePath: string }) => {
-      await diffManager.closeDiff(filePath);
+      const content = await diffManager.closeDiff(filePath);
+      const response = { content: content ?? undefined };
       return {
         content: [
           {
             type: 'text',
-            text: `Closed diff for ${filePath}`,
+            text: JSON.stringify(response),
           },
         ],
       };

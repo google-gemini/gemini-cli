@@ -185,6 +185,16 @@ describe('ShellExecutionService', () => {
       expect(result.error).toBe(spawnError);
       expect(result.exitCode).toBe(1);
     });
+
+    it('handles errors that do not fire the exit event', async () => {
+      const error = new Error('spawn abc ENOENT');
+      const { result } = await simulateExecution('touch cat.jpg', (cp) => {
+        cp.emit('error', error); // No exit event is fired.
+      });
+
+      expect(result.error).toBe(error);
+      expect(result.exitCode).toBe(1);
+    });
   });
 
   describe('Aborting Commands', () => {

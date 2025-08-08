@@ -113,6 +113,7 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        chatCompression: {},
       });
       expect(settings.errors.length).toBe(0);
     });
@@ -147,6 +148,7 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        chatCompression: {},
       });
     });
 
@@ -181,6 +183,7 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        chatCompression: {},
       });
     });
 
@@ -213,6 +216,7 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        chatCompression: {},
       });
     });
 
@@ -251,6 +255,7 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        chatCompression: {},
       });
     });
 
@@ -301,7 +306,64 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        chatCompression: {},
       });
+    });
+
+    it('should ignore folderTrust from workspace settings', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        folderTrust: true,
+      };
+      const workspaceSettingsContent = {
+        folderTrust: false, // This should be ignored
+      };
+      const systemSettingsContent = {
+        // No folderTrust here
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.folderTrust).toBe(true); // User setting should be used
+    });
+
+    it('should use system folderTrust over user setting', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        folderTrust: false,
+      };
+      const workspaceSettingsContent = {
+        folderTrust: true, // This should be ignored
+      };
+      const systemSettingsContent = {
+        folderTrust: true,
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.folderTrust).toBe(true); // System setting should be used
     });
 
     it('should handle contextFileName correctly when only in user settings', () => {
@@ -622,6 +684,116 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.mcpServers).toEqual({});
     });
 
+    it('should merge chatCompression settings, with workspace taking precedence', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        chatCompression: { contextPercentageThreshold: 0.5 },
+      };
+      const workspaceSettingsContent = {
+        chatCompression: { contextPercentageThreshold: 0.8 },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.user.settings.chatCompression).toEqual({
+        contextPercentageThreshold: 0.5,
+      });
+      expect(settings.workspace.settings.chatCompression).toEqual({
+        contextPercentageThreshold: 0.8,
+      });
+      expect(settings.merged.chatCompression).toEqual({
+        contextPercentageThreshold: 0.8,
+      });
+    });
+
+    it('should handle chatCompression when only in user settings', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const userSettingsContent = {
+        chatCompression: { contextPercentageThreshold: 0.5 },
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.chatCompression).toEqual({
+        contextPercentageThreshold: 0.5,
+      });
+    });
+
+    it('should have chatCompression as an empty object if not in any settings file', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(false); // No settings files exist
+      (fs.readFileSync as Mock).mockReturnValue('{}');
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.chatCompression).toEqual({});
+    });
+
+    it('should ignore chatCompression if contextPercentageThreshold is invalid', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const userSettingsContent = {
+        chatCompression: { contextPercentageThreshold: 1.5 },
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.chatCompression).toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Invalid value for chatCompression.contextPercentageThreshold: "1.5". Please use a value between 0 and 1. Using default compression settings.',
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('should deep merge chatCompression settings', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        chatCompression: { contextPercentageThreshold: 0.5 },
+      };
+      const workspaceSettingsContent = {
+        chatCompression: {},
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.chatCompression).toEqual({
+        contextPercentageThreshold: 0.5,
+      });
+    });
+
     it('should merge includeDirectories from all scopes', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const systemSettingsContent = {
@@ -695,6 +867,7 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        chatCompression: {},
       });
 
       // Check that error objects are populated in settings.errors
@@ -1132,6 +1305,7 @@ describe('Settings Loading and Merging', () => {
           customThemes: {},
           mcpServers: {},
           includeDirectories: [],
+          chatCompression: {},
         });
       });
     });

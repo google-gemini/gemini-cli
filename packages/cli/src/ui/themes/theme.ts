@@ -5,7 +5,8 @@
  */
 
 import type { CSSProperties } from 'react';
-import { isValidColor, resolveColor } from './color-utils.js';
+import { SemanticColors } from './semantic-tokens.js';
+import { resolveColor } from './color-utils.js';
 
 export type ThemeType = 'light' | 'dark' | 'ansi' | 'custom';
 
@@ -27,9 +28,53 @@ export interface ColorsTheme {
   GradientColors?: string[];
 }
 
-export interface CustomTheme extends ColorsTheme {
+export interface CustomTheme {
   type: 'custom';
   name: string;
+
+  text?: {
+    primary?: string;
+    secondary?: string;
+    link?: string;
+    accent?: string;
+  };
+  background?: {
+    primary?: string;
+    diff?: {
+      added?: string;
+      removed?: string;
+    };
+  };
+  border?: {
+    default?: string;
+    focused?: string;
+  };
+  ui?: {
+    comment?: string;
+    symbol?: string;
+    gradient?: string[];
+  };
+  status?: {
+    error?: string;
+    success?: string;
+    warning?: string;
+  };
+
+  // Legacy properties (all optional)
+  Background?: string;
+  Foreground?: string;
+  LightBlue?: string;
+  AccentBlue?: string;
+  AccentPurple?: string;
+  AccentCyan?: string;
+  AccentGreen?: string;
+  AccentYellow?: string;
+  AccentRed?: string;
+  DiffAdded?: string;
+  DiffRemoved?: string;
+  Comment?: string;
+  Gray?: string;
+  GradientColors?: string[];
 }
 
 export const lightTheme: ColorsTheme = {
@@ -107,6 +152,7 @@ export class Theme {
     readonly type: ThemeType,
     rawMappings: Record<string, CSSProperties>,
     readonly colors: ColorsTheme,
+    readonly semanticColors: SemanticColors,
   ) {
     this._colorMap = Object.freeze(this._buildColorMap(rawMappings)); // Build and freeze the map
 
@@ -174,107 +220,127 @@ export class Theme {
  * @returns A new Theme instance.
  */
 export function createCustomTheme(customTheme: CustomTheme): Theme {
+  const colors: ColorsTheme = {
+    type: 'custom',
+    Background: customTheme.background?.primary ?? customTheme.Background ?? '',
+    Foreground: customTheme.text?.primary ?? customTheme.Foreground ?? '',
+    LightBlue: customTheme.text?.link ?? customTheme.LightBlue ?? '',
+    AccentBlue: customTheme.text?.link ?? customTheme.AccentBlue ?? '',
+    AccentPurple: customTheme.text?.accent ?? customTheme.AccentPurple ?? '',
+    AccentCyan: customTheme.text?.link ?? customTheme.AccentCyan ?? '',
+    AccentGreen: customTheme.status?.success ?? customTheme.AccentGreen ?? '',
+    AccentYellow: customTheme.status?.warning ?? customTheme.AccentYellow ?? '',
+    AccentRed: customTheme.status?.error ?? customTheme.AccentRed ?? '',
+    DiffAdded:
+      customTheme.background?.diff?.added ?? customTheme.DiffAdded ?? '',
+    DiffRemoved:
+      customTheme.background?.diff?.removed ?? customTheme.DiffRemoved ?? '',
+    Comment: customTheme.ui?.comment ?? customTheme.Comment ?? '',
+    Gray: customTheme.text?.secondary ?? customTheme.Gray ?? '',
+    GradientColors: customTheme.ui?.gradient ?? customTheme.GradientColors,
+  };
+
   // Generate CSS properties mappings based on the custom theme colors
   const rawMappings: Record<string, CSSProperties> = {
     hljs: {
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
-      background: customTheme.Background,
-      color: customTheme.Foreground,
+      background: colors.Background,
+      color: colors.Foreground,
     },
     'hljs-keyword': {
-      color: customTheme.AccentBlue,
+      color: colors.AccentBlue,
     },
     'hljs-literal': {
-      color: customTheme.AccentBlue,
+      color: colors.AccentBlue,
     },
     'hljs-symbol': {
-      color: customTheme.AccentBlue,
+      color: colors.AccentBlue,
     },
     'hljs-name': {
-      color: customTheme.AccentBlue,
+      color: colors.AccentBlue,
     },
     'hljs-link': {
-      color: customTheme.AccentBlue,
+      color: colors.AccentBlue,
       textDecoration: 'underline',
     },
     'hljs-built_in': {
-      color: customTheme.AccentCyan,
+      color: colors.AccentCyan,
     },
     'hljs-type': {
-      color: customTheme.AccentCyan,
+      color: colors.AccentCyan,
     },
     'hljs-number': {
-      color: customTheme.AccentGreen,
+      color: colors.AccentGreen,
     },
     'hljs-class': {
-      color: customTheme.AccentGreen,
+      color: colors.AccentGreen,
     },
     'hljs-string': {
-      color: customTheme.AccentYellow,
+      color: colors.AccentYellow,
     },
     'hljs-meta-string': {
-      color: customTheme.AccentYellow,
+      color: colors.AccentYellow,
     },
     'hljs-regexp': {
-      color: customTheme.AccentRed,
+      color: colors.AccentRed,
     },
     'hljs-template-tag': {
-      color: customTheme.AccentRed,
+      color: colors.AccentRed,
     },
     'hljs-subst': {
-      color: customTheme.Foreground,
+      color: colors.Foreground,
     },
     'hljs-function': {
-      color: customTheme.Foreground,
+      color: colors.Foreground,
     },
     'hljs-title': {
-      color: customTheme.Foreground,
+      color: colors.Foreground,
     },
     'hljs-params': {
-      color: customTheme.Foreground,
+      color: colors.Foreground,
     },
     'hljs-formula': {
-      color: customTheme.Foreground,
+      color: colors.Foreground,
     },
     'hljs-comment': {
-      color: customTheme.Comment,
+      color: colors.Comment,
       fontStyle: 'italic',
     },
     'hljs-quote': {
-      color: customTheme.Comment,
+      color: colors.Comment,
       fontStyle: 'italic',
     },
     'hljs-doctag': {
-      color: customTheme.Comment,
+      color: colors.Comment,
     },
     'hljs-meta': {
-      color: customTheme.Gray,
+      color: colors.Gray,
     },
     'hljs-meta-keyword': {
-      color: customTheme.Gray,
+      color: colors.Gray,
     },
     'hljs-tag': {
-      color: customTheme.Gray,
+      color: colors.Gray,
     },
     'hljs-variable': {
-      color: customTheme.AccentPurple,
+      color: colors.AccentPurple,
     },
     'hljs-template-variable': {
-      color: customTheme.AccentPurple,
+      color: colors.AccentPurple,
     },
     'hljs-attr': {
-      color: customTheme.LightBlue,
+      color: colors.LightBlue,
     },
     'hljs-attribute': {
-      color: customTheme.LightBlue,
+      color: colors.LightBlue,
     },
     'hljs-builtin-name': {
-      color: customTheme.LightBlue,
+      color: colors.LightBlue,
     },
     'hljs-section': {
-      color: customTheme.AccentYellow,
+      color: colors.AccentYellow,
     },
     'hljs-emphasis': {
       fontStyle: 'italic',
@@ -283,36 +349,72 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       fontWeight: 'bold',
     },
     'hljs-bullet': {
-      color: customTheme.AccentYellow,
+      color: colors.AccentYellow,
     },
     'hljs-selector-tag': {
-      color: customTheme.AccentYellow,
+      color: colors.AccentYellow,
     },
     'hljs-selector-id': {
-      color: customTheme.AccentYellow,
+      color: colors.AccentYellow,
     },
     'hljs-selector-class': {
-      color: customTheme.AccentYellow,
+      color: colors.AccentYellow,
     },
     'hljs-selector-attr': {
-      color: customTheme.AccentYellow,
+      color: colors.AccentYellow,
     },
     'hljs-selector-pseudo': {
-      color: customTheme.AccentYellow,
+      color: colors.AccentYellow,
     },
     'hljs-addition': {
-      backgroundColor: customTheme.AccentGreen,
+      backgroundColor: colors.AccentGreen,
       display: 'inline-block',
       width: '100%',
     },
     'hljs-deletion': {
-      backgroundColor: customTheme.AccentRed,
+      backgroundColor: colors.AccentRed,
       display: 'inline-block',
       width: '100%',
     },
   };
 
-  return new Theme(customTheme.name, 'custom', rawMappings, customTheme);
+  const semanticColors: SemanticColors = {
+    text: {
+      primary: colors.Foreground,
+      secondary: colors.Gray,
+      link: colors.AccentBlue,
+      accent: colors.AccentPurple,
+    },
+    background: {
+      primary: colors.Background,
+      diff: {
+        added: colors.DiffAdded,
+        removed: colors.DiffRemoved,
+      },
+    },
+    border: {
+      default: colors.Gray,
+      focused: colors.AccentBlue,
+    },
+    ui: {
+      comment: colors.Comment,
+      symbol: colors.Gray,
+      gradient: colors.GradientColors,
+    },
+    status: {
+      error: colors.AccentRed,
+      success: colors.AccentGreen,
+      warning: colors.AccentYellow,
+    },
+  };
+
+  return new Theme(
+    customTheme.name,
+    'custom',
+    rawMappings,
+    colors,
+    semanticColors,
+  );
 }
 
 /**
@@ -325,74 +427,7 @@ export function validateCustomTheme(customTheme: Partial<CustomTheme>): {
   error?: string;
   warning?: string;
 } {
-  // Check required fields
-  const requiredFields: Array<keyof CustomTheme> = [
-    'name',
-    'Background',
-    'Foreground',
-    'LightBlue',
-    'AccentBlue',
-    'AccentPurple',
-    'AccentCyan',
-    'AccentGreen',
-    'AccentYellow',
-    'AccentRed',
-    // 'DiffAdded' and 'DiffRemoved' are not required as they were added after
-    // the theme format was defined.
-    'Comment',
-    'Gray',
-  ];
-
-  const recommendedFields: Array<keyof CustomTheme> = [
-    'DiffAdded',
-    'DiffRemoved',
-  ];
-
-  for (const field of requiredFields) {
-    if (!customTheme[field]) {
-      return {
-        isValid: false,
-        error: `Missing required field: ${field}`,
-      };
-    }
-  }
-
-  const missingFields: string[] = [];
-
-  for (const field of recommendedFields) {
-    if (!customTheme[field]) {
-      missingFields.push(field);
-    }
-  }
-
-  // Validate color format (basic hex validation)
-  const colorFields: Array<keyof CustomTheme> = [
-    'Background',
-    'Foreground',
-    'LightBlue',
-    'AccentBlue',
-    'AccentPurple',
-    'AccentCyan',
-    'AccentGreen',
-    'AccentYellow',
-    'AccentRed',
-    'DiffAdded',
-    'DiffRemoved',
-    'Comment',
-    'Gray',
-  ];
-
-  for (const field of colorFields) {
-    const color = customTheme[field] as string | undefined;
-    if (color !== undefined && !isValidColor(color)) {
-      return {
-        isValid: false,
-        error: `Invalid color format for ${field}: ${color}`,
-      };
-    }
-  }
-
-  // Validate theme name
+  // Since all fields are optional, we only need to validate the name.
   if (customTheme.name && !isValidThemeName(customTheme.name)) {
     return {
       isValid: false,
@@ -402,10 +437,6 @@ export function validateCustomTheme(customTheme: Partial<CustomTheme>): {
 
   return {
     isValid: true,
-    warning:
-      missingFields.length > 0
-        ? `Missing field(s) ${missingFields.join(', ')}`
-        : undefined,
   };
 }
 

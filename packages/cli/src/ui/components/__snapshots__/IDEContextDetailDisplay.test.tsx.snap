@@ -1,0 +1,24 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`IDEContextDetailDisplay > handles duplicate basenames by showing path hints 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ VS Code Context (ctrl+e to toggle)                                                               │
+│                                                                                                  │
+│ Open files:                                                                                      │
+│ - bar.txt (/foo) (active)                                                                        │
+│ - bar.txt (/qux)                                                                                 │
+│ - unique.txt                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`IDEContextDetailDisplay > renders a list of open files with active status 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ VS Code Context (ctrl+e to toggle)                                                               │
+│                                                                                                  │
+│ Open files:                                                                                      │
+│ - bar.txt (active)                                                                               │
+│ - baz.txt                                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;

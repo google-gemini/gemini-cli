@@ -8,8 +8,8 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   modifyWithEditor,
   ModifyContext,
-  ModifiableTool,
-  isModifiableTool,
+  ModifiableDeclarativeTool,
+  isModifiableDeclarativeTool,
 } from './modifiable-tool.js';
 import { EditorType } from '../utils/editor.js';
 import fs from 'fs';
@@ -338,16 +338,16 @@ describe('isModifiableTool', () => {
     const mockTool = {
       name: 'test-tool',
       getModifyContext: vi.fn(),
-    } as unknown as ModifiableTool<TestParams>;
+    } as unknown as ModifiableDeclarativeTool<TestParams>;
 
-    expect(isModifiableTool(mockTool)).toBe(true);
+    expect(isModifiableDeclarativeTool(mockTool)).toBe(true);
   });
 
   it('should return false for objects without getModifyContext method', () => {
     const mockTool = {
       name: 'test-tool',
-    } as unknown as ModifiableTool<TestParams>;
+    } as unknown as ModifiableDeclarativeTool<TestParams>;
 
-    expect(isModifiableTool(mockTool)).toBe(false);
+    expect(isModifiableDeclarativeTool(mockTool)).toBe(false);
   });
 });

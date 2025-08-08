@@ -7,14 +7,16 @@
 import {
   EmbedContentParameters,
   GenerateContentConfig,
-  Part,
   SchemaUnion,
   PartListUnion,
   Content,
   Tool,
   GenerateContentResponse,
 } from '@google/genai';
-import { getFolderStructure } from '../utils/getFolderStructure.js';
+import {
+  getDirectoryContextString,
+  getEnvironmentContext,
+} from '../utils/environmentContext.js';
 import {
   Turn,
   ServerGeminiStreamEvent,
@@ -24,7 +26,6 @@ import {
 import { Config } from '../config/config.js';
 import { UserTierId } from '../code_assist/types.js';
 import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
@@ -183,115 +184,12 @@ export class GeminiClient {
 
     this.getChat().addHistory({
       role: 'user',
-      parts: [{ text: await this.getDirectoryContext() }],
+      parts: [{ text: await getDirectoryContextString(this.config) }],
     });
-  }
-
-  private async getDirectoryContext(): Promise<string> {
-    const workspaceContext = this.config.getWorkspaceContext();
-    const workspaceDirectories = workspaceContext.getDirectories();
-
-    const folderStructures = await Promise.all(
-      workspaceDirectories.map((dir) =>
-        getFolderStructure(dir, {
-          fileService: this.config.getFileService(),
-        }),
-      ),
-    );
-
-    const folderStructure = folderStructures.join('\n');
-    const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
-    const workingDirPreamble = `I'm currently working in the following directories:\n${dirList}\n Folder structures are as follows:\n${folderStructure}`;
-    return workingDirPreamble;
-  }
-
-  private async getEnvironment(): Promise<Part[]> {
-    const today = new Date().toLocaleDateString(undefined, {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    const platform = process.platform;
-
-    const workspaceContext = this.config.getWorkspaceContext();
-    const workspaceDirectories = workspaceContext.getDirectories();
-
-    const folderStructures = await Promise.all(
-      workspaceDirectories.map((dir) =>
-        getFolderStructure(dir, {
-          fileService: this.config.getFileService(),
-        }),
-      ),
-    );
-
-    const folderStructure = folderStructures.join('\n');
-
-    let workingDirPreamble: string;
-    if (workspaceDirectories.length === 1) {
-      workingDirPreamble = `I'm currently working in the directory: ${workspaceDirectories[0]}`;
-    } else {
-      const dirList = workspaceDirectories
-        .map((dir) => `  - ${dir}`)
-        .join('\n');
-      workingDirPreamble = `I'm currently working in the following directories:\n${dirList}`;
-    }
-
-    const context = `
-  This is the Gemini CLI. We are setting up the context for our chat.
-  Today's date is ${today}.
-  My operating system is: ${platform}
-  ${workingDirPreamble}
-  Here is the folder structure of the current working directories:\n
-  ${folderStructure}
-          `.trim();
-
-    const initialParts: Part[] = [{ text: context }];
-    const toolRegistry = await this.config.getToolRegistry();
-
-    // Add full file context if the flag is set
-    if (this.config.getFullContext()) {
-      try {
-        const readManyFilesTool = toolRegistry.getTool(
-          'read_many_files',
-        ) as ReadManyFilesTool;
-        if (readManyFilesTool) {
-          // Read all files in the target directory
-          const result = await readManyFilesTool.execute(
-            {
-              paths: ['**/*'], // Read everything recursively
-              useDefaultExcludes: true, // Use default excludes
-            },
-            AbortSignal.timeout(30000),
-          );
-          if (result.llmContent) {
-            initialParts.push({
-              text: `\n--- Full File Context ---\n${result.llmContent}`,
-            });
-          } else {
-            console.warn(
-              'Full context requested, but read_many_files returned no content.',
-            );
-          }
-        } else {
-          console.warn(
-            'Full context requested, but read_many_files tool not found.',
-          );
-        }
-      } catch (error) {
-        // Not using reportError here as it's a startup/config phase, not a chat/generation phase error.
-        console.error('Error reading full file context:', error);
-        initialParts.push({
-          text: '\n--- Error reading full file context ---',
-        });
-      }
-    }
-
-    return initialParts;
   }
 
   async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
-    const envParts = await this.getEnvironment();
+    const envParts = await getEnvironmentContext(this.config);
     const toolRegistry = await this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
@@ -698,12 +596,16 @@ export class GeminiClient {
       return null;
     }
 
+    const contextPercentageThreshold =
+      this.config.getChatCompression()?.contextPercentageThreshold;
+
     // Don't compress if not forced and we are under the limit.
-    if (
-      !force &&
-      originalTokenCount < this.COMPRESSION_TOKEN_THRESHOLD * tokenLimit(model)
-    ) {
-      return null;
+    if (!force) {
+      const threshold =
+        contextPercentageThreshold ?? this.COMPRESSION_TOKEN_THRESHOLD;
+      if (originalTokenCount < threshold * tokenLimit(model)) {
+        return null;
+      }
     }
 
     let compressBeforeIndex = findIndexAfterFraction(

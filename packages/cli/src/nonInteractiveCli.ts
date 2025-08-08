@@ -30,7 +30,6 @@ export async function runNonInteractive(
   });
 
   try {
-    await config.initialize();
     consolePatcher.patch();
     // Handle EPIPE errors when the output is piped to a command that closes early.
     process.stdout.on('error', (err: NodeJS.ErrnoException) => {

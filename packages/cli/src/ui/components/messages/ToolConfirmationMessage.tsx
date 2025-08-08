@@ -33,6 +33,7 @@ export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
 > = ({
   confirmationDetails,
+  config,
   isFocused = true,
   availableTerminalHeight,
   terminalWidth,
@@ -40,14 +41,29 @@ export const ToolConfirmationMessage: React.FC<
   const { onConfirm } = confirmationDetails;
   const childWidth = terminalWidth - 2; // 2 for padding
 
+  const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
+    if (confirmationDetails.type === 'edit') {
+      const ideClient = config?.getIdeClient();
+      if (config?.getIdeMode() && config?.getIdeModeFeature()) {
+        const cliOutcome =
+          outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
+        await ideClient?.resolveDiffFromCli(
+          confirmationDetails.filePath,
+          cliOutcome,
+        );
+      }
+    }
+    onConfirm(outcome);
+  };
+
   useInput((_, key) => {
     if (!isFocused) return;
     if (key.escape) {
-      onConfirm(ToolConfirmationOutcome.Cancel);
+      handleConfirm(ToolConfirmationOutcome.Cancel);
     }
   });
 
-  const handleSelect = (item: ToolConfirmationOutcome) => onConfirm(item);
+  const handleSelect = (item: ToolConfirmationOutcome) => handleConfirm(item);
 
   let bodyContent: React.ReactNode | null = null; // Removed contextDisplay here
   let question: string;
@@ -85,6 +101,7 @@ export const ToolConfirmationMessage: React.FC<
       HEIGHT_OPTIONS;
     return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
   }
+
   if (confirmationDetails.type === 'edit') {
     if (confirmationDetails.isModifying) {
       return (
@@ -114,15 +131,23 @@ export const ToolConfirmationMessage: React.FC<
         label: 'Yes, allow always',
         value: ToolConfirmationOutcome.ProceedAlways,
       },
-      {
+    );
+    if (config?.getIdeMode() && config?.getIdeModeFeature()) {
+      options.push({
+        label: 'No',
+        value: ToolConfirmationOutcome.Cancel,
+      });
+    } else {
+      options.push({
         label: 'Modify with external editor',
         value: ToolConfirmationOutcome.ModifyWithEditor,
-      },
-      {
+      });
+      options.push({
         label: 'No, suggest changes (esc)',
         value: ToolConfirmationOutcome.Cancel,
-      },
-    );
+      });
+    }
+
     bodyContent = (
       <DiffRenderer
         diffContent={confirmationDetails.fileDiff}

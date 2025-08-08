@@ -9,6 +9,7 @@ import { IDEServer } from './ide-server.js';
 import { DiffContentProvider, DiffManager } from './diff-manager.js';
 import { createLogger } from './utils/logger.js';
 
+const INFO_MESSAGE_SHOWN_KEY = 'geminiCliInfoMessageShown';
 const IDE_WORKSPACE_PATH_ENV_VAR = 'GEMINI_CLI_IDE_WORKSPACE_PATH';
 export const DIFF_SCHEME = 'gemini-diff';
 
@@ -41,7 +42,7 @@ export async function activate(context: vscode.ExtensionContext) {
   updateWorkspacePath(context);
 
   const diffContentProvider = new DiffContentProvider();
-  const diffManager = new DiffManager(logger, diffContentProvider);
+  const diffManager = new DiffManager(log, diffContentProvider);
 
   context.subscriptions.push(
     vscode.workspace.onDidCloseTextDocument((doc) => {
@@ -79,6 +80,25 @@ export async function activate(context: vscode.ExtensionContext) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log(`Failed to start IDE server: ${message}`);
+  }
+
+  if (!context.globalState.get(INFO_MESSAGE_SHOWN_KEY)) {
+    void vscode.window
+      .showInformationMessage(
+        'Gemini CLI Companion extension successfully installed. Please restart your terminal to enable full IDE integration.',
+        'Re-launch Gemini CLI',
+      )
+      .then(
+        (selection) => {
+          if (selection === 'Re-launch Gemini CLI') {
+            void vscode.commands.executeCommand('gemini-cli.runGeminiCLI');
+          }
+        },
+        (err) => {
+          log(`Failed to show information message: ${String(err)}`);
+        },
+      );
+    context.globalState.update(INFO_MESSAGE_SHOWN_KEY, true);
   }
 
   context.subscriptions.push(
