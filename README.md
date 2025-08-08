@@ -70,17 +70,24 @@ With Gemini CLI you can:
 
 Choose the authentication method that best fits your needs:
 
-### Option 1: OAuth login (Personal Google Account)
-**✨ Best for:** Individual developers (see [quota limits and terms of service](https://cloud.google.com/gemini/docs/quotas) for details)
+### Option 1: OAuth login (Using your Google Account)
+**✨ Best for:** Individual developers as well as anyone who has a Gemini Code Assist License. (see [quota limits and terms of service](https://cloud.google.com/gemini/docs/quotas) for details)
 
 **Benefits:**
 - **Free tier**: 60 requests/min and 1,000 requests/day
 - **Gemini 2.5 Pro** with 1M token context window
 - **No API key management** - just sign in with your Google account
-- **Automatic updates** to latest models
+- **Automatic updates** to latest models 
 
 #### Start Gemini CLI, then choose OAuth and follow the browser authentication flow when prompted
 ```bash
+gemini
+```
+
+#### If you are using a paid Code Assist License from your organization, remember to set the Google Cloud Project 
+```bash
+# Set your Google Cloud Project
+export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_NAME"
 gemini
 ```
 
