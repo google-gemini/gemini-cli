@@ -19,6 +19,10 @@ export enum ToolErrorType {
   FILE_WRITE_FAILURE = 'file_write_failure',
   READ_CONTENT_FAILURE = 'read_content_failure',
   ATTEMPT_TO_CREATE_EXISTING_FILE = 'attempt_to_create_existing_file',
+  FILE_TOO_LARGE = 'file_too_large',
+  PERMISSION_DENIED = 'permission_denied',
+  NO_SPACE_LEFT = 'no_space_left',
+  TARGET_IS_DIRECTORY = 'target_is_directory',
 
   // Edit-specific Errors
   EDIT_PREPARATION_FAILURE = 'edit_preparation_failure',
