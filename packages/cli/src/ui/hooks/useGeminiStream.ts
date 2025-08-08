@@ -189,27 +189,29 @@ export const useGeminiStream = (
     }
     turnCancelledRef.current = true;
     abortControllerRef.current?.abort();
-    if (pendingHistoryItemRef.current) {
-      if (pendingHistoryItemRef.current.type === 'tool_group') {
-        // Mark any running tools as Canceled for the history view.
-        const updatedTools = (
-          pendingHistoryItemRef.current as HistoryItemToolGroup
-        ).tools.map((tool) =>
-          tool.status === ToolCallStatus.Pending ||
-          tool.status === ToolCallStatus.Confirming ||
-          tool.status === ToolCallStatus.Executing
-            ? { ...tool, status: ToolCallStatus.Canceled }
-            : tool,
-        );
-        const updatedToolGroup: HistoryItemToolGroup = {
-          ...(pendingHistoryItemRef.current as HistoryItemToolGroup),
-          tools: updatedTools,
-        };
-        addItem(updatedToolGroup, Date.now());
-      } else {
-        addItem(pendingHistoryItemRef.current, Date.now());
-      }
+
+    // Persist any pending tool calls to history with a Canceled status.
+    if (toolCalls.length > 0) {
+      const toolGroupDisplay = mapTrackedToolCallsToDisplay(toolCalls);
+      const updatedTools = toolGroupDisplay.tools.map((tool) =>
+        tool.status === ToolCallStatus.Pending ||
+        tool.status === ToolCallStatus.Confirming ||
+        tool.status === ToolCallStatus.Executing
+          ? { ...tool, status: ToolCallStatus.Canceled }
+          : tool,
+      );
+      const updatedToolGroup: HistoryItemToolGroup = {
+        ...toolGroupDisplay,
+        tools: updatedTools,
+      };
+      addItem(updatedToolGroup, Date.now());
     }
+
+    // Persist any other pending history item (e.g., streaming text).
+    if (pendingHistoryItemRef.current) {
+      addItem(pendingHistoryItemRef.current, Date.now());
+    }
+
     addItem(
       {
         type: MessageType.INFO,
@@ -228,13 +230,8 @@ export const useGeminiStream = (
     setPendingHistoryItem,
     setIsResponding,
     setThought,
+    toolCalls,
   ]);
-
-  useInput((_input, key) => {
-    if (streamingState === StreamingState.Responding && key.escape) {
-      cancelRequest();
-    }
-  });
 
   const prepareQueryForGemini = useCallback(
     async (
@@ -977,6 +974,13 @@ export const useGeminiStream = (
     };
     saveRestorableToolCalls();
   }, [toolCalls, config, onDebugMessage, gitService, history, geminiClient]);
+
+  // Input Handling Effect
+  useInput((input, key) => {
+    if (streamingState === StreamingState.Responding && key.escape) {
+      cancelRequest();
+    }
+  });
 
   return {
     streamingState,
