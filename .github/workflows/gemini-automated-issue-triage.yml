@@ -75,6 +75,7 @@ jobs:
             {
               "maxSessionTurns": 25,
               "coreTools": [
+                "run_shell_command(echo)",
                 "run_shell_command(gh label list)",
                 "run_shell_command(gh issue edit)",
                 "run_shell_command(gh issue list)"
