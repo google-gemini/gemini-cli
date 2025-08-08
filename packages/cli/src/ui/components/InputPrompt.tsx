@@ -554,8 +554,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   };
 
   const activeCompletion = getActiveCompletion();
-  const shouldShowSuggestions =
-    completion.showSuggestions || reverseSearchActive || commandSearchActive;
+  const shouldShowSuggestions = activeCompletion.showSuggestions;
 
   return (
     <>

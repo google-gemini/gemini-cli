@@ -47,6 +47,7 @@ export function useReverseSearchCompletion(
     resetCompletionState,
     navigateUp,
     navigateDown,
+    setVisibleStartIndex,
   } = useCompletion();
 
   const debouncedQuery = useDebouncedValue(buffer.text, 100);
@@ -55,13 +56,26 @@ export function useReverseSearchCompletion(
   const prevQueryRef = useRef<string>('');
   const prevMatchesRef = useRef<Suggestion[]>([]);
 
+  // Clear incremental cache when activating reverse search
+  useEffect(() => {
+    if (reverseSearchActive) {
+      prevQueryRef.current = '';
+      prevMatchesRef.current = [];
+    }
+  }, [reverseSearchActive]);
+
+  // Also clear cache when history changes so new items are considered
+  useEffect(() => {
+    prevQueryRef.current = '';
+    prevMatchesRef.current = [];
+  }, [history]);
+
   const searchHistory = useCallback(
     (query: string, items: readonly string[]) => {
-      const lower = query.toLowerCase();
       const out: Suggestion[] = [];
       for (let i = 0; i < items.length; i++) {
         const cmd = items[i];
-        const idx = cmd.toLowerCase().indexOf(lower);
+        const idx = cmd.toLowerCase().indexOf(query);
         if (idx !== -1) {
           out.push({ label: cmd, value: cmd, matchedIndex: idx });
         }
@@ -96,11 +110,6 @@ export function useReverseSearchCompletion(
   useEffect(() => {
     if (!reverseSearchActive) {
       resetCompletionState();
-    }
-  }, [reverseSearchActive, resetCompletionState]);
-
-  useEffect(() => {
-    if (!reverseSearchActive) {
       return;
     }
 
@@ -108,17 +117,19 @@ export function useReverseSearchCompletion(
     const hasAny = matches.length > 0;
     setShowSuggestions(hasAny);
     setActiveSuggestionIndex(hasAny ? 0 : -1);
+    setVisibleStartIndex(0);
 
-    prevQueryRef.current = debouncedQuery;
+    prevQueryRef.current = debouncedQuery.toLowerCase();
     prevMatchesRef.current = matches;
   }, [
     debouncedQuery,
     matches,
     reverseSearchActive,
-    resetCompletionState,
     setSuggestions,
     setShowSuggestions,
     setActiveSuggestionIndex,
+    setVisibleStartIndex,
+    resetCompletionState,
   ]);
 
   const handleAutocomplete = useCallback(
