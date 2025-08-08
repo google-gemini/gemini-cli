@@ -245,6 +245,12 @@ export class CoreToolScheduler {
   private config: Config;
   private onEditorClose: () => void;
   private isCompleting = false;
+  private requestQueue: Array<{
+    request: ToolCallRequestInfo | ToolCallRequestInfo[];
+    signal: AbortSignal;
+    resolve: () => void;
+    reject: (reason?: Error) => void;
+  }> = [];
 
   constructor(options: CoreToolSchedulerOptions) {
     this.config = options.config;
@@ -479,7 +485,19 @@ export class CoreToolScheduler {
     }
   }
 
-  async schedule(
+  schedule(
+    request: ToolCallRequestInfo | ToolCallRequestInfo[],
+    signal: AbortSignal,
+  ): Promise<void> {
+    if (this.isRunning()) {
+      return new Promise((resolve, reject) => {
+        this.requestQueue.push({ request, signal, resolve, reject });
+      });
+    }
+    return this._schedule(request, signal);
+  }
+
+  private async _schedule(
     request: ToolCallRequestInfo | ToolCallRequestInfo[],
     signal: AbortSignal,
   ): Promise<void> {
@@ -760,16 +778,16 @@ export class CoreToolScheduler {
         const liveOutputCallback =
           scheduledCall.tool.canUpdateOutput && this.outputUpdateHandler
             ? (outputChunk: string) => {
-              if (this.outputUpdateHandler) {
-                this.outputUpdateHandler(callId, outputChunk);
+                if (this.outputUpdateHandler) {
+                  this.outputUpdateHandler(callId, outputChunk);
+                }
+                this.toolCalls = this.toolCalls.map((tc) =>
+                  tc.request.callId === callId && tc.status === 'executing'
+                    ? { ...tc, liveOutput: outputChunk }
+                    : tc,
+                );
+                this.notifyToolCallsUpdate();
               }
-              this.toolCalls = this.toolCalls.map((tc) =>
-                tc.request.callId === callId && tc.status === 'executing'
-                  ? { ...tc, liveOutput: outputChunk }
-                  : tc,
-              );
-              this.notifyToolCallsUpdate();
-            }
             : undefined;
 
         invocation
@@ -848,6 +866,13 @@ export class CoreToolScheduler {
         this.isCompleting = false;
       }
       this.notifyToolCallsUpdate();
+      // After completion, process the next item in the queue.
+      if (this.requestQueue.length > 0) {
+        const next = this.requestQueue.shift()!;
+        this._schedule(next.request, next.signal)
+          .then(next.resolve)
+          .catch(next.reject);
+      }
     }
   }
 
