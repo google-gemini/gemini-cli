@@ -113,7 +113,7 @@ export function removeMCPStatusChangeListener(
 /**
  * Update the status of an MCP server
  */
-function updateMCPServerStatus(
+export function updateMCPServerStatus(
   serverName: string,
   status: MCPServerStatus,
 ): void {
