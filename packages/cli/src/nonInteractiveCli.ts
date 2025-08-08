@@ -133,7 +133,7 @@ export async function runNonInteractive(
             let displayText = toolResponse.resultDisplay;
             // the resultDisplay is FileDiff
             if (typeof displayText !== 'string') {
-              displayText = `**${displayText.fileName}**\n${displayText.fileDiff}`;
+              displayText = displayText.fileDiff;
             }
             console.debug('`````````\n%s\n`````````', displayText);
           }
