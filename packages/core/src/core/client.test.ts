@@ -208,6 +208,7 @@ describe('Gemini Client (client.ts)', () => {
       getGeminiClient: vi.fn(),
       setFallbackMode: vi.fn(),
       getChatCompression: vi.fn().mockReturnValue(undefined),
+      getGenerationConfig: vi.fn().mockReturnValue(undefined),
     };
     const MockedConfig = vi.mocked(Config, true);
     MockedConfig.mockImplementation(
@@ -2006,6 +2007,159 @@ ${JSON.stringify(
       client.setHistory(historyWithThoughts, { stripThoughts: false });
 
       expect(mockChat.setHistory).toHaveBeenCalledWith(historyWithThoughts);
+    });
+
+    describe('GeminiClient generation config', () => {
+      describe('generation config from environment variables', () => {
+        beforeEach(() => {
+          vi.clearAllMocks();
+        });
+
+        it('should use default generation config when no env vars are set', () => {
+          // Create a mock config without generationConfig
+          const mockConfig = {
+            getProxy: vi.fn().mockReturnValue(undefined),
+            getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+            getGenerationConfig: vi.fn().mockReturnValue(undefined),
+          } as unknown as Config;
+
+          const client = new GeminiClient(mockConfig);
+
+          // Access private field for testing
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const clientConfig = (client as any).generateContentConfig;
+          expect(clientConfig).toEqual({
+            temperature: 0,
+            topP: 1,
+          });
+        });
+
+        it('should use generation config from Config when provided', () => {
+          const mockConfig = {
+            getProxy: vi.fn().mockReturnValue(undefined),
+            getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+            getGenerationConfig: vi.fn().mockReturnValue({
+              temperature: 1.2,
+              topK: 30,
+              thinking_budget: 2048,
+            }),
+          } as unknown as Config;
+
+          const client = new GeminiClient(mockConfig);
+
+          // Access private field for testing
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const clientConfig = (client as any).generateContentConfig;
+          expect(clientConfig).toEqual({
+            temperature: 1.2,
+            topP: 1,
+            topK: 30,
+          });
+        });
+
+        it('should use temperature from generation config', () => {
+          const mockConfig = {
+            getProxy: vi.fn().mockReturnValue(undefined),
+            getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+            getGenerationConfig: vi.fn().mockReturnValue({
+              temperature: 0.5,
+            }),
+          } as unknown as Config;
+
+          const client = new GeminiClient(mockConfig);
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const clientConfig = (client as any).generateContentConfig;
+          expect(clientConfig.temperature).toBe(0.5);
+          expect(clientConfig.topP).toBe(1);
+          expect(clientConfig.topK).toBeUndefined();
+        });
+
+        it('should use topK from generation config', () => {
+          const mockConfig = {
+            getProxy: vi.fn().mockReturnValue(undefined),
+            getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+            getGenerationConfig: vi.fn().mockReturnValue({
+              topK: 15,
+            }),
+          } as unknown as Config;
+
+          const client = new GeminiClient(mockConfig);
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const clientConfig = (client as any).generateContentConfig;
+          expect(clientConfig.temperature).toBe(0);
+          expect(clientConfig.topP).toBe(1);
+          expect(clientConfig.topK).toBe(15);
+        });
+
+        it('should handle thinking_budget in generation config for thinking models', () => {
+          const mockConfig = {
+            getProxy: vi.fn().mockReturnValue(undefined),
+            getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+            getGenerationConfig: vi.fn().mockReturnValue({
+              thinking_budget: 1024,
+            }),
+          } as unknown as Config;
+
+          new GeminiClient(mockConfig);
+
+          // Check that getGenerationConfig returns the thinking_budget
+          expect(mockConfig.getGenerationConfig()).toEqual({
+            thinking_budget: 1024,
+          });
+        });
+
+        it('should handle zero values correctly', () => {
+          const mockConfig = {
+            getProxy: vi.fn().mockReturnValue(undefined),
+            getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+            getGenerationConfig: vi.fn().mockReturnValue({
+              temperature: 0,
+              thinking_budget: 0,
+            }),
+          } as unknown as Config;
+
+          const client = new GeminiClient(mockConfig);
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const clientConfig = (client as any).generateContentConfig;
+          expect(clientConfig.temperature).toBe(0);
+
+          // Verify the config stores thinking_budget correctly
+          expect(mockConfig.getGenerationConfig()).toEqual({
+            temperature: 0,
+            thinking_budget: 0,
+          });
+        });
+
+        it('should not include topK when undefined', () => {
+          const mockConfig = {
+            getProxy: vi.fn().mockReturnValue(undefined),
+            getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+            getGenerationConfig: vi.fn().mockReturnValue({
+              temperature: 0.8,
+            }),
+          } as unknown as Config;
+
+          const client = new GeminiClient(mockConfig);
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const clientConfig = (client as any).generateContentConfig;
+          expect(clientConfig).toEqual({
+            temperature: 0.8,
+            topP: 1,
+          });
+          expect(clientConfig.topK).toBeUndefined();
+        });
+      });
     });
   });
 });

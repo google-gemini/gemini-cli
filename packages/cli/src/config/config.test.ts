@@ -1869,3 +1869,155 @@ describe('loadCliConfig trustedFolder', () => {
     });
   }
 });
+
+describe('environment variable generation config', () => {
+  let originalEnv: NodeJS.ProcessEnv;
+
+  beforeEach(() => {
+    originalEnv = { ...process.env };
+    // Clear any existing env vars
+    delete process.env.GEMINI_TEMPERATURE;
+    delete process.env.GEMINI_TOP_K;
+    delete process.env.GEMINI_THINKING_BUDGET;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('should parse GEMINI_TEMPERATURE from environment variable', async () => {
+    process.env.GEMINI_TEMPERATURE = '0.7';
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getGenerationConfig()).toEqual({
+      temperature: 0.7,
+    });
+  });
+
+  it('should parse GEMINI_TOP_K from environment variable', async () => {
+    process.env.GEMINI_TOP_K = '40';
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getGenerationConfig()).toEqual({
+      topK: 40,
+    });
+  });
+
+  it('should parse GEMINI_THINKING_BUDGET from environment variable', async () => {
+    process.env.GEMINI_THINKING_BUDGET = '1024';
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getGenerationConfig()).toEqual({
+      thinking_budget: 1024,
+    });
+  });
+
+  it('should parse all generation config environment variables together', async () => {
+    process.env.GEMINI_TEMPERATURE = '1.5';
+    process.env.GEMINI_TOP_K = '20';
+    process.env.GEMINI_THINKING_BUDGET = '512';
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getGenerationConfig()).toEqual({
+      temperature: 1.5,
+      topK: 20,
+      thinking_budget: 512,
+    });
+  });
+
+  it('should handle invalid GEMINI_TEMPERATURE value', async () => {
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    process.env.GEMINI_TEMPERATURE = '3.0'; // Out of range
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getGenerationConfig()).toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '[WARN]',
+      'Invalid GEMINI_TEMPERATURE value: 3.0. Must be between 0.0 and 2.0',
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it('should handle invalid GEMINI_TOP_K value', async () => {
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    process.env.GEMINI_TOP_K = '-5'; // Negative value
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getGenerationConfig()).toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '[WARN]',
+      'Invalid GEMINI_TOP_K value: -5. Must be a positive integer',
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it('should handle invalid GEMINI_THINKING_BUDGET value', async () => {
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    process.env.GEMINI_THINKING_BUDGET = '-100'; // Negative value
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getGenerationConfig()).toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '[WARN]',
+      'Invalid GEMINI_THINKING_BUDGET value: -100. Must be a non-negative integer',
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it('should return undefined when no generation config env vars are set', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getGenerationConfig()).toBeUndefined();
+  });
+
+  it('should handle empty string environment variables', async () => {
+    process.env.GEMINI_TEMPERATURE = '';
+    process.env.GEMINI_TOP_K = '';
+    process.env.GEMINI_THINKING_BUDGET = '';
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getGenerationConfig()).toBeUndefined();
+  });
+
+  it('should handle non-numeric environment variable values', async () => {
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    process.env.GEMINI_TEMPERATURE = 'abc';
+    process.env.GEMINI_TOP_K = 'xyz';
+    process.env.GEMINI_THINKING_BUDGET = 'not-a-number';
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getGenerationConfig()).toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalledTimes(3);
+    consoleSpy.mockRestore();
+  });
+
+  it('should accept zero for GEMINI_TEMPERATURE', async () => {
+    process.env.GEMINI_TEMPERATURE = '0';
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getGenerationConfig()).toEqual({
+      temperature: 0,
+    });
+  });
+
+  it('should accept zero for GEMINI_THINKING_BUDGET', async () => {
+    process.env.GEMINI_THINKING_BUDGET = '0';
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getGenerationConfig()).toEqual({
+      thinking_budget: 0,
+    });
+  });
+});
