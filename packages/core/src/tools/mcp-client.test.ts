@@ -13,6 +13,7 @@ import {
   discoverTools,
   discoverPrompts,
   hasValidTypes,
+  connectToMcpServer,
 } from './mcp-client.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -273,6 +274,47 @@ describe('mcp-client', () => {
       expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('validTool');
       expect(consoleWarnSpy).not.toHaveBeenCalled();
       consoleWarnSpy.mockRestore();
+    });
+  });
+
+  describe('connectToMcpServer', () => {
+    it('should register a roots/list handler', async () => {
+      const mockedClient = {
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        callTool: vi.fn(),
+        connect: vi.fn(),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+
+      await connectToMcpServer(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        false,
+        '/test/dir',
+      );
+
+      expect(mockedClient.registerCapabilities).toHaveBeenCalledWith({
+        roots: {},
+      });
+      expect(mockedClient.setRequestHandler).toHaveBeenCalledOnce();
+      const handler = mockedClient.setRequestHandler.mock.calls[0][1];
+      const roots = await handler();
+      expect(roots).toEqual({
+        roots: [
+          {
+            uri: 'file:///test/dir',
+            name: 'dir',
+          },
+        ],
+      });
     });
   });
 
