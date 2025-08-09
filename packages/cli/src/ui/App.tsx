@@ -20,6 +20,7 @@ import { StreamingState, type HistoryItem, MessageType } from './types.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
+import { useModelCommand } from './hooks/useModelCommand.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './hooks/useAuthCommand.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
@@ -33,6 +34,7 @@ import { AutoAcceptIndicator } from './components/AutoAcceptIndicator.js';
 import { ShellModeIndicator } from './components/ShellModeIndicator.js';
 import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
+import { ModelDialog } from './components/ModelDialog.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
 import { AuthDialog } from './components/AuthDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
@@ -232,6 +234,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         .reduce((total, msg) => total + msg.count, 0),
     [consoleMessages],
   );
+
+  const {
+    isModelDialogOpen,
+    openModelDialog,
+    handleModelSelect,
+    availableModels,
+    currentModel: currentModelFromHook,
+  } = useModelCommand(config, addItem);
 
   const {
     isThemeDialogOpen,
@@ -496,6 +506,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     loadHistory,
     refreshStatic,
     setDebugMessage,
+    openModelDialog,
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
@@ -912,6 +923,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             <FolderTrustDialog onSelect={handleFolderTrustSelect} />
           ) : shellConfirmationRequest ? (
             <ShellConfirmationDialog request={shellConfirmationRequest} />
+          ) : isModelDialogOpen ? (
+            <ModelDialog
+              onSelect={handleModelSelect}
+              currentModel={currentModelFromHook}
+              availableModels={availableModels}
+            />
           ) : isThemeDialogOpen ? (
             <Box flexDirection="column">
               {themeError && (
