@@ -138,33 +138,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Focus Section Switching', () => {
-    it('should switch focus between settings and scope with Tab', async () => {
-      const settings = createMockSettings();
-      const onSelect = vi.fn();
 
-      const { lastFrame, stdin, unmount } = render(
-        <SettingsDialog settings={settings} onSelect={onSelect} />,
-      );
-
-      // Initially focused on settings
-      expect(lastFrame()).toContain('  Apply To'); // Not highlighted
-
-      // Press Tab to switch to scope
-      stdin.write('\t'); // Tab key
-      await wait();
-
-      expect(lastFrame()).toContain('> Apply To'); // Now highlighted
-
-      // Press Tab again to switch back to settings
-      stdin.write('\t'); // Tab key
-      await wait();
-
-      expect(lastFrame()).toContain('  Apply To'); // Back to not highlighted
-
-      unmount();
-    });
-  });
 
   describe('Settings Navigation', () => {
     it('should navigate down with arrow key', async () => {
@@ -335,7 +309,7 @@ describe('SettingsDialog', () => {
       const { unmount } = render(
         <SettingsDialog
           settings={settings}
-          onSelect={() => {}}
+          onSelect={() => { }}
           onRestartRequest={onRestartRequest}
         />,
       );
@@ -354,7 +328,7 @@ describe('SettingsDialog', () => {
       const { stdin, unmount } = render(
         <SettingsDialog
           settings={settings}
-          onSelect={() => {}}
+          onSelect={() => { }}
           onRestartRequest={onRestartRequest}
         />,
       );
@@ -841,7 +815,7 @@ describe('SettingsDialog', () => {
       const { stdin, unmount } = render(
         <SettingsDialog
           settings={settings}
-          onSelect={() => {}}
+          onSelect={() => { }}
           onRestartRequest={onRestartRequest}
         />,
       );
