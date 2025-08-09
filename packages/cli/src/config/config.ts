@@ -304,6 +304,7 @@ export async function loadCliConfig(
   extensions: Extension[],
   sessionId: string,
   argv: CliArgs,
+  cwd: string = process.cwd(),
 ): Promise<Config> {
   const debugMode =
     argv.debug ||
@@ -345,7 +346,7 @@ export async function loadCliConfig(
     (e) => e.contextFiles,
   );
 
-  const fileService = new FileDiscoveryService(process.cwd());
+  const fileService = new FileDiscoveryService(cwd);
 
   const fileFiltering = {
     ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
@@ -358,7 +359,7 @@ export async function loadCliConfig(
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
-    process.cwd(),
+    cwd,
     settings.loadMemoryFromIncludeDirectories ? includeDirectories : [],
     debugMode,
     fileService,
@@ -376,7 +377,7 @@ export async function loadCliConfig(
     !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
   // In non-interactive and non-yolo mode, exclude interactive built in tools.
   const extraExcludes =
-    !interactive && approvalMode !== ApprovalMode.YOLO
+    !interactive && approvalMode !== ApprovalMode.YOLO && !argv.experimentalAcp
       ? [ShellTool.Name, EditTool.Name, WriteFileTool.Name]
       : undefined;
 
@@ -420,7 +421,7 @@ export async function loadCliConfig(
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
-    targetDir: process.cwd(),
+    targetDir: cwd,
     includeDirectories,
     loadMemoryFromIncludeDirectories:
       argv.loadMemoryFromIncludeDirectories ||
@@ -470,7 +471,7 @@ export async function loadCliConfig(
       process.env.https_proxy ||
       process.env.HTTP_PROXY ||
       process.env.http_proxy,
-    cwd: process.cwd(),
+    cwd,
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
     model: argv.model || settings.model || DEFAULT_GEMINI_MODEL,

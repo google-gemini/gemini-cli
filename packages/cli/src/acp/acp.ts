@@ -6,74 +6,126 @@
 
 /* ACP defines a schema for a simple (experimental) JSON-RPC protocol that allows GUI applications to interact with agents. */
 
-import { Icon } from '@google/gemini-cli-core';
+import { z } from 'zod';
+import * as schema from './schema.js';
+export * from './schema.js';
+
 import { WritableStream, ReadableStream } from 'node:stream/web';
 
-export class ClientConnection implements Client {
-  #connection: Connection<Agent>;
+export class AgentSideConnection implements Client {
+  #connection: Connection;
 
   constructor(
-    agent: (client: Client) => Agent,
+    toAgent: (conn: Client) => Agent,
     input: WritableStream<Uint8Array>,
     output: ReadableStream<Uint8Array>,
   ) {
-    this.#connection = new Connection(agent(this), input, output);
+    const agent = toAgent(this);
+
+    const handler = async (
+      method: string,
+      params: unknown,
+    ): Promise<unknown> => {
+      switch (method) {
+        case schema.AGENT_METHODS.initialize: {
+          const validatedParams = schema.initializeRequestSchema.parse(params);
+          return agent.initialize(validatedParams);
+        }
+        case schema.AGENT_METHODS.session_new: {
+          const validatedParams = schema.newSessionRequestSchema.parse(params);
+          return agent.newSession(validatedParams);
+        }
+        case schema.AGENT_METHODS.session_load: {
+          if (!agent.loadSession) {
+            throw RequestError.methodNotFound();
+          }
+          const validatedParams = schema.loadSessionRequestSchema.parse(params);
+          return agent.loadSession(validatedParams);
+        }
+        case schema.AGENT_METHODS.authenticate: {
+          const validatedParams =
+            schema.authenticateRequestSchema.parse(params);
+          return agent.authenticate(validatedParams);
+        }
+        case schema.AGENT_METHODS.session_prompt: {
+          const validatedParams = schema.promptRequestSchema.parse(params);
+          return agent.prompt(validatedParams);
+        }
+        case schema.AGENT_METHODS.session_cancel: {
+          const validatedParams = schema.cancelNotificationSchema.parse(params);
+          return agent.cancel(validatedParams);
+        }
+        default:
+          throw RequestError.methodNotFound(method);
+      }
+    };
+
+    this.#connection = new Connection(handler, input, output);
   }
 
   /**
-   * Streams part of an assistant response to the client
+   * Streams new content to the client including text, tool calls, etc.
    */
-  async streamAssistantMessageChunk(
-    params: StreamAssistantMessageChunkParams,
-  ): Promise<void> {
-    await this.#connection.sendRequest('streamAssistantMessageChunk', params);
+  async sessionUpdate(params: schema.SessionNotification): Promise<void> {
+    return await this.#connection.sendNotification(
+      schema.CLIENT_METHODS.session_update,
+      params,
+    );
   }
 
   /**
-   * Request confirmation before running a tool
+   * Request permission before running a tool
    *
-   * When allowed, the client returns a [`ToolCallId`] which can be used
-   * to update the tool call's `status` and `content` as it runs.
+   * The agent specifies a series of permission options with different granularity,
+   * and the client returns the chosen one.
    */
-  requestToolCallConfirmation(
-    params: RequestToolCallConfirmationParams,
-  ): Promise<RequestToolCallConfirmationResponse> {
-    return this.#connection.sendRequest('requestToolCallConfirmation', params);
+  async requestPermission(
+    params: schema.RequestPermissionRequest,
+  ): Promise<schema.RequestPermissionResponse> {
+    return await this.#connection.sendRequest(
+      schema.CLIENT_METHODS.session_request_permission,
+      params,
+    );
   }
 
-  /**
-   * pushToolCall allows the agent to start a tool call
-   * when it does not need to request permission to do so.
-   *
-   * The returned id can be used to update the UI for the tool
-   * call as needed.
-   */
-  pushToolCall(params: PushToolCallParams): Promise<PushToolCallResponse> {
-    return this.#connection.sendRequest('pushToolCall', params);
+  async readTextFile(
+    params: schema.ReadTextFileRequest,
+  ): Promise<schema.ReadTextFileResponse> {
+    return await this.#connection.sendRequest(
+      schema.CLIENT_METHODS.fs_read_text_file,
+      params,
+    );
   }
 
-  /**
-   * updateToolCall allows the agent to update the content and status of the tool call.
-   *
-   * The new content replaces what is currently displayed in the UI.
-   *
-   * The [`ToolCallId`] is included in the response of
-   * `pushToolCall` or `requestToolCallConfirmation` respectively.
-   */
-  async updateToolCall(params: UpdateToolCallParams): Promise<void> {
-    await this.#connection.sendRequest('updateToolCall', params);
+  async writeTextFile(
+    params: schema.WriteTextFileRequest,
+  ): Promise<schema.WriteTextFileResponse> {
+    return await this.#connection.sendRequest(
+      schema.CLIENT_METHODS.fs_write_text_file,
+      params,
+    );
   }
 }
 
-type AnyMessage = AnyRequest | AnyResponse;
+type AnyMessage = AnyRequest | AnyResponse | AnyNotification;
 
 type AnyRequest = {
-  id: number;
+  jsonrpc: '2.0';
+  id: string | number;
   method: string;
   params?: unknown;
 };
 
-type AnyResponse = { jsonrpc: '2.0'; id: number } & Result<unknown>;
+type AnyResponse = {
+  jsonrpc: '2.0';
+  id: string | number;
+} & Result<unknown>;
+
+type AnyNotification = {
+  jsonrpc: '2.0';
+  method: string;
+  params?: unknown;
+};
 
 type Result<T> =
   | {
@@ -86,7 +138,7 @@ type Result<T> =
 type ErrorResponse = {
   code: number;
   message: string;
-  data?: { details?: string };
+  data?: unknown;
 };
 
 type PendingResponse = {
@@ -94,23 +146,24 @@ type PendingResponse = {
   reject: (error: ErrorResponse) => void;
 };
 
-class Connection<D> {
-  #pendingResponses: Map<number, PendingResponse> = new Map();
+type MethodHandler = (method: string, params: unknown) => Promise<unknown>;
+
+class Connection {
+  #pendingResponses: Map<string | number, PendingResponse> = new Map();
   #nextRequestId: number = 0;
-  #delegate: D;
+  #handler: MethodHandler;
   #peerInput: WritableStream<Uint8Array>;
   #writeQueue: Promise<void> = Promise.resolve();
   #textEncoder: TextEncoder;
 
   constructor(
-    delegate: D,
+    handler: MethodHandler,
     peerInput: WritableStream<Uint8Array>,
     peerOutput: ReadableStream<Uint8Array>,
   ) {
+    this.#handler = handler;
     this.#peerInput = peerInput;
     this.#textEncoder = new TextEncoder();
-
-    this.#delegate = delegate;
     this.#receive(peerOutput);
   }
 
@@ -134,8 +187,9 @@ class Connection<D> {
   }
 
   async #processMessage(message: AnyMessage) {
-    if ('method' in message) {
-      const response = await this.#tryCallDelegateMethod(
+    if ('method' in message && 'id' in message) {
+      // It's a request
+      const response = await this.#tryCallHandler(
         message.method,
         message.params,
       );
@@ -145,26 +199,31 @@ class Connection<D> {
         id: message.id,
         ...response,
       });
-    } else {
-      this.#handleResponse(message);
+    } else if ('method' in message) {
+      // It's a notification
+      await this.#tryCallHandler(message.method, message.params);
+    } else if ('id' in message) {
+      // It's a response
+      this.#handleResponse(message as AnyResponse);
     }
   }
 
-  async #tryCallDelegateMethod(
+  async #tryCallHandler(
     method: string,
     params?: unknown,
   ): Promise<Result<unknown>> {
-    const methodName = method as keyof D;
-    if (typeof this.#delegate[methodName] !== 'function') {
-      return RequestError.methodNotFound(method).toResult();
-    }
-
     try {
-      const result = await this.#delegate[methodName](params);
+      const result = await this.#handler(method, params);
       return { result: result ?? null };
     } catch (error: unknown) {
       if (error instanceof RequestError) {
         return error.toResult();
+      }
+
+      if (error instanceof z.ZodError) {
+        return RequestError.invalidParams(
+          JSON.stringify(error.format(), undefined, 2),
+        ).toResult();
       }
 
       let details;
@@ -203,6 +262,10 @@ class Connection<D> {
     });
     await this.#sendMessage({ jsonrpc: '2.0', id, method, params });
     return responsePromise as Promise<Resp>;
+  }
+
+  async sendNotification<N>(method: string, params?: N): Promise<void> {
+    await this.#sendMessage({ jsonrpc: '2.0', method, params });
   }
 
   async #sendMessage(json: AnyMessage) {
@@ -259,6 +322,10 @@ export class RequestError extends Error {
     return new RequestError(-32603, 'Internal error', details);
   }
 
+  static authRequired(details?: string): RequestError {
+    return new RequestError(-32000, 'Authentication required', details);
+  }
+
   toResult<T>(): Result<T> {
     return {
       error: {
@@ -270,195 +337,30 @@ export class RequestError extends Error {
   }
 }
 
-// Protocol types
-
-export const LATEST_PROTOCOL_VERSION = '0.0.9';
-
-export type AssistantMessageChunk =
-  | {
-      text: string;
-    }
-  | {
-      thought: string;
-    };
-
-export type ToolCallConfirmation =
-  | {
-      description?: string | null;
-      type: 'edit';
-    }
-  | {
-      description?: string | null;
-      type: 'execute';
-      command: string;
-      rootCommand: string;
-    }
-  | {
-      description?: string | null;
-      type: 'mcp';
-      serverName: string;
-      toolDisplayName: string;
-      toolName: string;
-    }
-  | {
-      description?: string | null;
-      type: 'fetch';
-      urls: string[];
-    }
-  | {
-      description: string;
-      type: 'other';
-    };
-
-export type ToolCallContent =
-  | {
-      type: 'markdown';
-      markdown: string;
-    }
-  | {
-      type: 'diff';
-      newText: string;
-      oldText: string | null;
-      path: string;
-    };
-
-export type ToolCallStatus = 'running' | 'finished' | 'error';
-
-export type ToolCallId = number;
-
-export type ToolCallConfirmationOutcome =
-  | 'allow'
-  | 'alwaysAllow'
-  | 'alwaysAllowMcpServer'
-  | 'alwaysAllowTool'
-  | 'reject'
-  | 'cancel';
-
-/**
- * A part in a user message
- */
-export type UserMessageChunk =
-  | {
-      text: string;
-    }
-  | {
-      path: string;
-    };
-
-export interface StreamAssistantMessageChunkParams {
-  chunk: AssistantMessageChunk;
-}
-
-export interface RequestToolCallConfirmationParams {
-  confirmation: ToolCallConfirmation;
-  content?: ToolCallContent | null;
-  icon: Icon;
-  label: string;
-  locations?: ToolCallLocation[];
-}
-
-export interface ToolCallLocation {
-  line?: number | null;
-  path: string;
-}
-
-export interface PushToolCallParams {
-  content?: ToolCallContent | null;
-  icon: Icon;
-  label: string;
-  locations?: ToolCallLocation[];
-}
-
-export interface UpdateToolCallParams {
-  content: ToolCallContent | null;
-  status: ToolCallStatus;
-  toolCallId: ToolCallId;
-}
-
-export interface RequestToolCallConfirmationResponse {
-  id: ToolCallId;
-  outcome: ToolCallConfirmationOutcome;
-}
-
-export interface PushToolCallResponse {
-  id: ToolCallId;
-}
-
-export interface InitializeParams {
-  /**
-   * The version of the protocol that the client supports.
-   * This should be the latest version supported by the client.
-   */
-  protocolVersion: string;
-}
-
-export interface SendUserMessageParams {
-  chunks: UserMessageChunk[];
-}
-
-export interface InitializeResponse {
-  /**
-   * Indicates whether the agent is authenticated and
-   * ready to handle requests.
-   */
-  isAuthenticated: boolean;
-  /**
-   * The version of the protocol that the agent supports.
-   * If the agent supports the requested version, it should respond with the same version.
-   * Otherwise, the agent should respond with the latest version it supports.
-   */
-  protocolVersion: string;
-}
-
-export interface Error {
-  code: number;
-  data?: unknown;
-  message: string;
-}
-
 export interface Client {
-  streamAssistantMessageChunk(
-    params: StreamAssistantMessageChunkParams,
-  ): Promise<void>;
-
-  requestToolCallConfirmation(
-    params: RequestToolCallConfirmationParams,
-  ): Promise<RequestToolCallConfirmationResponse>;
-
-  pushToolCall(params: PushToolCallParams): Promise<PushToolCallResponse>;
-
-  updateToolCall(params: UpdateToolCallParams): Promise<void>;
+  requestPermission(
+    params: schema.RequestPermissionRequest,
+  ): Promise<schema.RequestPermissionResponse>;
+  sessionUpdate(params: schema.SessionNotification): Promise<void>;
+  writeTextFile(
+    params: schema.WriteTextFileRequest,
+  ): Promise<schema.WriteTextFileResponse>;
+  readTextFile(
+    params: schema.ReadTextFileRequest,
+  ): Promise<schema.ReadTextFileResponse>;
 }
 
 export interface Agent {
-  /**
-   * Initializes the agent's state. It should be called before any other method,
-   * and no other methods should be called until it has completed.
-   *
-   * If the agent is not authenticated, then the client should prompt the user to authenticate,
-   * and then call the `authenticate` method.
-   * Otherwise the client can send other messages to the agent.
-   */
-  initialize(params: InitializeParams): Promise<InitializeResponse>;
-
-  /**
-   * Begins the authentication process.
-   *
-   * This method should only be called if `initialize` indicates the user isn't already authenticated.
-   * The Promise MUST not resolve until authentication is complete.
-   */
-  authenticate(): Promise<void>;
-
-  /**
-   * Allows the user to send a message to the agent.
-   * This method should complete after the agent is finished, during
-   * which time the agent may update the client by calling
-   * streamAssistantMessageChunk and other methods.
-   */
-  sendUserMessage(params: SendUserMessageParams): Promise<void>;
-
-  /**
-   * Cancels the current generation.
-   */
-  cancelSendMessage(): Promise<void>;
+  initialize(
+    params: schema.InitializeRequest,
+  ): Promise<schema.InitializeResponse>;
+  newSession(
+    params: schema.NewSessionRequest,
+  ): Promise<schema.NewSessionResponse>;
+  loadSession?(
+    params: schema.LoadSessionRequest,
+  ): Promise<schema.LoadSessionResponse>;
+  authenticate(params: schema.AuthenticateRequest): Promise<void>;
+  prompt(params: schema.PromptRequest): Promise<schema.PromptResponse>;
+  cancel(params: schema.CancelNotification): Promise<void>;
 }

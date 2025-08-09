@@ -243,7 +243,7 @@ export async function main() {
   }
 
   if (config.getExperimentalAcp()) {
-    return runAcpPeer(config, settings);
+    return runAcpPeer(config, settings, extensions, argv);
   }
 
   let input = config.getQuestion();

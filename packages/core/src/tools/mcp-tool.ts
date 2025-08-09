@@ -10,7 +10,7 @@ import {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolMcpConfirmationDetails,
-  Icon,
+  Kind,
 } from './tools.js';
 import {
   CallableTool,
@@ -73,7 +73,7 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
       nameOverride ?? generateValidName(serverToolName),
       `${serverToolName} (${serverName} MCP Server)`,
       description,
-      Icon.Hammer,
+      Kind.Other,
       { type: Type.OBJECT }, // this is a dummy Schema for MCP, will be not be used to construct the FunctionDeclaration
       true, // isOutputMarkdown
       false, // canUpdateOutput
