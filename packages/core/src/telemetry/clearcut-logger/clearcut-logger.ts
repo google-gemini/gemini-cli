@@ -25,12 +25,9 @@ import {
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
+import { InstallationManager } from '../../utils/installationManager.js';
+import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
-import {
-  getCachedGoogleAccount,
-  getLifetimeGoogleAccounts,
-} from '../../utils/user_account.js';
-import { getInstallationId } from '../../utils/user_id.js';
 import { FixedDeque } from 'mnemonist';
 
 const start_session_event_name = 'start_session';
@@ -93,7 +90,9 @@ function determineSurface(): string {
 // is checked and events are flushed to Clearcut if at least a minute has passed since the last flush.
 export class ClearcutLogger {
   private static instance: ClearcutLogger;
-  private config?: Config;
+  private readonly config?: Config;
+  private readonly installationManager: InstallationManager;
+  private readonly userAccountManager: UserAccountManager;
   private readonly events: FixedDeque<LogEventEntry[]>;
   private last_flush_time: number = Date.now();
   private flush_interval_ms: number = 1000 * 60; // Wait at least a minute before flushing events.
@@ -105,6 +104,8 @@ export class ClearcutLogger {
   private constructor(config?: Config) {
     this.config = config;
     this.events = new FixedDeque<LogEventEntry[]>(Array, this.max_events);
+    this.installationManager = new InstallationManager(config.storage);
+    this.userAccountManager = new UserAccountManager(config.storage);
   }
 
   static getInstance(config?: Config): ClearcutLogger | undefined {
@@ -151,8 +152,8 @@ export class ClearcutLogger {
   }
 
   createLogEvent(name: string, data: EventValue[]): LogEvent {
-    const email = getCachedGoogleAccount();
-    const totalAccounts = getLifetimeGoogleAccounts();
+    const email = this.userAccountManager.getCachedGoogleAccount();
+    const totalAccounts = this.userAccountManager.getLifetimeGoogleAccounts();
     data.push({
       gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
       value: totalAccounts.toString(),
@@ -169,7 +170,7 @@ export class ClearcutLogger {
     if (email) {
       logEvent.client_email = email;
     } else {
-      logEvent.client_install_id = getInstallationId();
+      logEvent.client_install_id = this.installationManager.getInstallationId();
     }
 
     return logEvent;

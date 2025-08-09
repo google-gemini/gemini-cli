@@ -4,15 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as os from 'os';
+vi.mock('os');
+
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useShellHistory } from './useShellHistory.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as os from 'os';
 import * as crypto from 'crypto';
 
 vi.mock('fs/promises');
-vi.mock('os');
 vi.mock('crypto');
 
 const MOCKED_PROJECT_ROOT = '/test/project';
