@@ -15,7 +15,7 @@ import {
   SETTINGS_DIRECTORY_NAME,
 } from '../config/settings.js';
 import { promisify } from 'util';
-import { Config, SandboxConfig } from '@google/gemini-cli-core';
+import { Config, normalizePath, SandboxConfig } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 
 const execAsync = promisify(exec);
@@ -24,7 +24,7 @@ function getContainerPath(hostPath: string): string {
   if (os.platform() !== 'win32') {
     return hostPath;
   }
-  const withForwardSlashes = hostPath.replace(/\\/g, '/');
+  const withForwardSlashes = normalizePath(hostPath);
   const match = withForwardSlashes.match(/^([A-Z]):\/(.*)/i);
   if (match) {
     return `/${match[1].toLowerCase()}/${match[2]}`;

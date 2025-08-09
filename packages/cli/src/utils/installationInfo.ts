@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { isGitRepository } from '@google/gemini-cli-core';
+import { isGitRepository, normalizePath } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as childProcess from 'child_process';
@@ -39,8 +39,8 @@ export function getInstallationInfo(
 
   try {
     // Normalize path separators to forward slashes for consistent matching.
-    const realPath = fs.realpathSync(cliPath).replace(/\\/g, '/');
-    const normalizedProjectRoot = projectRoot?.replace(/\\/g, '/');
+    const realPath = normalizePath(fs.realpathSync(cliPath));
+    const normalizedProjectRoot = normalizePath(projectRoot);
     const isGit = isGitRepository(process.cwd());
 
     // Check for local git clone first

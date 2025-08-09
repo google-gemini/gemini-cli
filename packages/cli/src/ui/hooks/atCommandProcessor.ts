@@ -12,6 +12,7 @@ import {
   Config,
   getErrorMessage,
   isNodeError,
+  normalizePath,
   unescapePath,
 } from '@google/gemini-cli-core';
 import {
@@ -104,7 +105,7 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
     }
     const rawAtPath = query.substring(atIndex, pathEndIndex);
     // unescapePath expects the @ symbol to be present, and will handle it.
-    const atPath = unescapePath(rawAtPath);
+    const atPath = unescapePath(normalizePath(rawAtPath));
     parts.push({ type: 'atPath', content: atPath });
     currentIndex = pathEndIndex;
   }

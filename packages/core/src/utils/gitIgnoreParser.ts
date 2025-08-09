@@ -64,9 +64,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
       return false;
     }
 
-    // Even in windows, Ignore expects forward slashes.
-    const normalizedPath = relativePath.replace(/\\/g, '/');
-    return this.ig.ignores(normalizedPath);
+    return this.ig.ignores(relativePath);
   }
 
   getPatterns(): string[] {

@@ -327,18 +327,15 @@ Use this tool when the user's query implies needing the content of several files
       const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
 
       for (const dir of workspaceDirs) {
-        const entriesInDir = await glob(
-          searchPatterns.map((p) => p.replace(/\\/g, '/')),
-          {
-            cwd: dir,
-            ignore: effectiveExcludes,
-            nodir: true,
-            dot: true,
-            absolute: true,
-            nocase: true,
-            signal,
-          },
-        );
+        const entriesInDir = await glob(searchPatterns, {
+          cwd: dir,
+          ignore: effectiveExcludes,
+          nodir: true,
+          dot: true,
+          absolute: true,
+          nocase: true,
+          signal,
+        });
         for (const entry of entriesInDir) {
           allEntries.add(entry);
         }
@@ -437,9 +434,10 @@ Use this tool when the user's query implies needing the content of several files
     const fileProcessingPromises = sortedFiles.map(
       async (filePath): Promise<FileProcessingResult> => {
         try {
-          const relativePathForDisplay = path
-            .relative(this.config.getTargetDir(), filePath)
-            .replace(/\\/g, '/');
+          const relativePathForDisplay = path.relative(
+            this.config.getTargetDir(),
+            filePath,
+          );
 
           const fileType = await detectFileType(filePath);
 
@@ -488,9 +486,10 @@ Use this tool when the user's query implies needing the content of several files
             fileReadResult,
           };
         } catch (error) {
-          const relativePathForDisplay = path
-            .relative(this.config.getTargetDir(), filePath)
-            .replace(/\\/g, '/');
+          const relativePathForDisplay = path.relative(
+            this.config.getTargetDir(),
+            filePath,
+          );
 
           return {
             success: false,

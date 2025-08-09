@@ -260,9 +260,7 @@ export async function processSingleFileContent(
     }
 
     const fileType = await detectFileType(filePath);
-    const relativePathForDisplay = path
-      .relative(rootDirectory, filePath)
-      .replace(/\\/g, '/');
+    const relativePathForDisplay = path.relative(rootDirectory, filePath);
 
     switch (fileType) {
       case 'binary': {
@@ -364,9 +362,7 @@ export async function processSingleFileContent(
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const displayPath = path
-      .relative(rootDirectory, filePath)
-      .replace(/\\/g, '/');
+    const displayPath = path.relative(rootDirectory, filePath);
     return {
       llmContent: `Error reading file ${displayPath}: ${errorMessage}`,
       returnDisplay: `Error reading file ${displayPath}: ${errorMessage}`,
