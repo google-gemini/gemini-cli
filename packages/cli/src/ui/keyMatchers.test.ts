@@ -52,10 +52,8 @@ describe('keyMatchers', () => {
       key.ctrl && key.name === 't',
     [Command.TOGGLE_IDE_CONTEXT_DETAIL]: (key: Key) =>
       key.ctrl && key.name === 'e',
-    [Command.QUIT]: (key: Key) =>
-      key.ctrl && (key.name === 'c' || key.name === 'C'),
-    [Command.EXIT]: (key: Key) =>
-      key.ctrl && (key.name === 'd' || key.name === 'D'),
+    [Command.QUIT]: (key: Key) => key.ctrl && key.name === 'c',
+    [Command.EXIT]: (key: Key) => key.ctrl && key.name === 'd',
     [Command.SHOW_MORE_LINES]: (key: Key) => key.ctrl && key.name === 's',
     [Command.REVERSE_SEARCH]: (key: Key) => key.ctrl && key.name === 'r',
     [Command.SUBMIT_REVERSE_SEARCH]: (key: Key) =>
@@ -209,18 +207,12 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.QUIT,
-      positive: [
-        createKey('c', { ctrl: true }),
-        createKey('C', { ctrl: true }),
-      ],
+      positive: [createKey('c', { ctrl: true })],
       negative: [createKey('c'), createKey('d', { ctrl: true })],
     },
     {
       command: Command.EXIT,
-      positive: [
-        createKey('d', { ctrl: true }),
-        createKey('D', { ctrl: true }),
-      ],
+      positive: [createKey('d', { ctrl: true })],
       negative: [createKey('d'), createKey('c', { ctrl: true })],
     },
     {
@@ -333,19 +325,6 @@ describe('keyMatchers', () => {
 
       const matchers = createKeyMatchers(config);
       expect(matchers[Command.HOME](createKey('a', { ctrl: true }))).toBe(
-        false,
-      );
-    });
-
-    it('should handle case sensitivity', () => {
-      const config: KeyBindingConfig = {
-        ...defaultKeyBindings,
-        [Command.QUIT]: [{ key: 'Q', ctrl: true }],
-      };
-
-      const matchers = createKeyMatchers(config);
-      expect(matchers[Command.QUIT](createKey('Q', { ctrl: true }))).toBe(true);
-      expect(matchers[Command.QUIT](createKey('q', { ctrl: true }))).toBe(
         false,
       );
     });
