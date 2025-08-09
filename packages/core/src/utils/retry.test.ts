@@ -6,13 +6,8 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { retryWithBackoff } from './retry.js';
+import { retryWithBackoff, HttpError } from './retry.js';
 import { setSimulate429 } from './testUtils.js';
-
-// Define an interface for the error with a status property
-interface HttpError extends Error {
-  status?: number;
-}
 
 // Helper to create a mock function that fails a certain number of times
 const createFailingFunction = (
@@ -357,7 +352,10 @@ describe('retryWithBackoff', () => {
       // Should fail with original error when fallback is rejected
       expect(result).toBeInstanceOf(Error);
       expect(result.message).toBe('Rate limit exceeded');
-      expect(fallbackCallback).toHaveBeenCalledWith('oauth-personal');
+      expect(fallbackCallback).toHaveBeenCalledWith(
+        'oauth-personal',
+        expect.any(Error),
+      );
     });
 
     it('should handle mixed error types (only count consecutive 429s)', async () => {

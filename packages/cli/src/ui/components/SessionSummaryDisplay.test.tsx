@@ -5,48 +5,67 @@
  */
 
 import { render } from 'ink-testing-library';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
-import { type CumulativeStats } from '../contexts/SessionContext.js';
+import * as SessionContext from '../contexts/SessionContext.js';
+import { SessionMetrics } from '../contexts/SessionContext.js';
 
-describe('<SessionSummaryDisplay />', () => {
-  const mockStats: CumulativeStats = {
-    turnCount: 10,
-    promptTokenCount: 1000,
-    candidatesTokenCount: 2000,
-    totalTokenCount: 3500,
-    cachedContentTokenCount: 500,
-    toolUsePromptTokenCount: 200,
-    thoughtsTokenCount: 300,
-    apiTimeMs: 50234,
+vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof SessionContext>();
+  return {
+    ...actual,
+    useSessionStats: vi.fn(),
   };
+});
 
-  const mockDuration = '1h 23m 45s';
+const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 
-  it('renders correctly with given stats and duration', () => {
-    const { lastFrame } = render(
-      <SessionSummaryDisplay stats={mockStats} duration={mockDuration} />,
-    );
+const renderWithMockedStats = (metrics: SessionMetrics) => {
+  useSessionStatsMock.mockReturnValue({
+    stats: {
+      sessionStartTime: new Date(),
+      metrics,
+      lastPromptTokenCount: 0,
+      promptCount: 5,
+    },
 
-    expect(lastFrame()).toMatchSnapshot();
+    getPromptCount: () => 5,
+    startNewPrompt: vi.fn(),
   });
 
-  it('renders zero state correctly', () => {
-    const zeroStats: CumulativeStats = {
-      turnCount: 0,
-      promptTokenCount: 0,
-      candidatesTokenCount: 0,
-      totalTokenCount: 0,
-      cachedContentTokenCount: 0,
-      toolUsePromptTokenCount: 0,
-      thoughtsTokenCount: 0,
-      apiTimeMs: 0,
+  return render(<SessionSummaryDisplay duration="1h 23m 45s" />);
+};
+
+describe('<SessionSummaryDisplay />', () => {
+  it('renders the summary display with a title', () => {
+    const metrics: SessionMetrics = {
+      models: {
+        'gemini-2.5-pro': {
+          api: { totalRequests: 10, totalErrors: 1, totalLatencyMs: 50234 },
+          tokens: {
+            prompt: 1000,
+            candidates: 2000,
+            total: 3500,
+            cached: 500,
+            thoughts: 300,
+            tool: 200,
+          },
+        },
+      },
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        byName: {},
+      },
     };
 
-    const { lastFrame } = render(
-      <SessionSummaryDisplay stats={zeroStats} duration="0s" />,
-    );
+    const { lastFrame } = renderWithMockedStats(metrics);
+    const output = lastFrame();
 
-    expect(lastFrame()).toMatchSnapshot();
+    expect(output).toContain('Agent powering down. Goodbye!');
+    expect(output).toMatchSnapshot();
   });
 });

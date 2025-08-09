@@ -11,115 +11,108 @@ import {
   ToolRegistry,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
+  GeminiEventType,
+  ToolErrorType,
 } from '@google/gemini-cli-core';
-import {
-  Content,
-  Part,
-  FunctionCall,
-  GenerateContentResponse,
-} from '@google/genai';
+import { Content, Part, FunctionCall } from '@google/genai';
 import { listSessions, loadSession } from './utils/session.js';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
-
-function getResponseText(response: GenerateContentResponse): string | null {
-  if (response.candidates && response.candidates.length > 0) {
-    const candidate = response.candidates[0];
-    if (
-      candidate.content &&
-      candidate.content.parts &&
-      candidate.content.parts.length > 0
-    ) {
-      // We are running in headless mode so we don't need to return thoughts to STDOUT.
-      const thoughtPart = candidate.content.parts[0];
-      if (thoughtPart?.thought) {
-        return null;
-      }
-      return candidate.content.parts
-        .filter((part) => part.text)
-        .map((part) => part.text)
-        .join('');
-    }
-  }
-  return null;
-}
+import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 
 export async function runNonInteractive(
   config: Config,
   input: string,
   initialHistory: Content[] = [],
+  prompt_id: string,
 ): Promise<Content[]> {
-  // Handle EPIPE errors when the output is piped to a command that closes early.
-  process.stdout.on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EPIPE') {
-      // Exit gracefully if the pipe is closed.
-      process.exit(0);
-    }
+  const consolePatcher = new ConsolePatcher({
+    stderr: true,
+    debugMode: config.getDebugMode(),
   });
 
-  const geminiClient = config.getGeminiClient();
-  const toolRegistry: ToolRegistry = await config.getToolRegistry();
-
-  const chat = await geminiClient.getChat();
-  const abortController = new AbortController();
-  let currentMessages: Content[] =
-    initialHistory.length > 0
-      ? initialHistory
-      : [{ role: 'user', parts: [{ text: input }] }];
-
-  if (input.startsWith('/chat list-auto')) {
-    const sessions = await listSessions();
-    if (sessions.length === 0) {
-      process.stdout.write('No automatically saved sessions found.\n');
-    } else {
-      process.stdout.write('Automatically saved sessions:\n');
-      sessions.forEach((session) => {
-        process.stdout.write(
-          `  ${session.shortId} - ${session.fullId} - ${session.timestamp}\n`,
-        );
-      });
-    }
-    return currentMessages;
-  } else if (input.startsWith('/chat resume-auto ')) {
-    const sessionId = input.substring('/chat resume-auto '.length).trim();
-    if (sessionId) {
-      const loadedHistory = await loadSession(sessionId);
-      if (loadedHistory) {
-        process.stdout.write(`Session ${sessionId} loaded successfully.\n`);
-        return loadedHistory;
-      } else {
-        process.stdout.write(`Failed to load session ${sessionId}.\n`);
-      }
-    } else {
-      process.stdout.write('Please provide a session ID to resume.\n');
-    }
-    return currentMessages;
-  }
-
   try {
+    consolePatcher.patch();
+    // Handle EPIPE errors when the output is piped to a command that closes early.
+    process.stdout.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EPIPE') {
+        // Exit gracefully if the pipe is closed.
+        process.exit(0);
+      }
+    });
+
+    const geminiClient = config.getGeminiClient();
+    const toolRegistry: ToolRegistry = await config.getToolRegistry();
+
+    const abortController = new AbortController();
+    let currentMessages: Content[] =
+      initialHistory.length > 0
+        ? initialHistory
+        : [{ role: 'user', parts: [{ text: input }] }];
+
+    if (input.startsWith('/chat list-auto')) {
+      const sessions = await listSessions();
+      if (sessions.length === 0) {
+        process.stdout.write('No automatically saved sessions found.\n');
+      } else {
+        process.stdout.write('Automatically saved sessions:\n');
+        sessions.forEach((session) => {
+          process.stdout.write(
+            `  ${session.shortId} - ${session.fullId} - ${session.timestamp}\n`,
+          );
+        });
+      }
+      return currentMessages;
+    } else if (input.startsWith('/chat resume-auto ')) {
+      const sessionId = input.substring('/chat resume-auto '.length).trim();
+      if (sessionId) {
+        const loadedHistory = await loadSession(sessionId);
+        if (loadedHistory) {
+          process.stdout.write(`Session ${sessionId} loaded successfully.\n`);
+          return loadedHistory;
+        } else {
+          process.stdout.write(`Failed to load session ${sessionId}.\n`);
+        }
+      } else {
+        process.stdout.write('Please provide a session ID to resume.\n');
+      }
+      return currentMessages;
+    }
+    let turnCount = 0;
     while (true) {
+      turnCount++;
+      if (
+        config.getMaxSessionTurns() >= 0 &&
+        turnCount > config.getMaxSessionTurns()
+      ) {
+        console.error(
+          '\n Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
+        );
+        return currentMessages;
+      }
       const functionCalls: FunctionCall[] = [];
 
-      const responseStream = await chat.sendMessageStream({
-        message: currentMessages[0]?.parts || [], // Ensure parts are always provided
-        config: {
-          abortSignal: abortController.signal,
-          tools: [
-            { functionDeclarations: toolRegistry.getFunctionDeclarations() },
-          ],
-        },
-      });
+      const responseStream = geminiClient.sendMessageStream(
+        currentMessages[0]?.parts || [],
+        abortController.signal,
+        prompt_id,
+      );
 
-      for await (const resp of responseStream) {
+      for await (const event of responseStream) {
         if (abortController.signal.aborted) {
           return currentMessages;
         }
-        const textPart = getResponseText(resp);
-        if (textPart) {
-          process.stdout.write(textPart);
-        }
-        if (resp.functionCalls) {
-          functionCalls.push(...resp.functionCalls);
+
+        if (event.type === GeminiEventType.Content) {
+          process.stdout.write(event.value);
+        } else if (event.type === GeminiEventType.ToolCallRequest) {
+          const toolCallRequest = event.value;
+          const fc: FunctionCall = {
+            name: toolCallRequest.name,
+            args: toolCallRequest.args,
+            id: toolCallRequest.callId,
+          };
+          functionCalls.push(fc);
         }
       }
 
@@ -133,6 +126,7 @@ export async function runNonInteractive(
             name: fc.name as string,
             args: (fc.args ?? {}) as Record<string, unknown>,
             isClientInitiated: false,
+            prompt_id,
           };
 
           const toolResponse = await executeToolCall(
@@ -143,17 +137,11 @@ export async function runNonInteractive(
           );
 
           if (toolResponse.error) {
-            const isToolNotFound = toolResponse.error.message.includes(
-              'not found in registry',
-            );
             console.error(
               `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
             );
-            if (!isToolNotFound) {
-              throw new Error(
-                `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
-              );
-            }
+            if (toolResponse.errorType === ToolErrorType.UNHANDLED_EXCEPTION)
+              process.exit(1);
           }
 
           if (toolResponse.responseParts) {
@@ -179,11 +167,12 @@ export async function runNonInteractive(
     console.error(
       parseAndFormatApiError(
         error,
-        config.getContentGeneratorConfig().authType,
+        config.getContentGeneratorConfig()?.authType,
       ),
     );
     throw error; // Re-throw the error to be handled by the caller
   } finally {
+    consolePatcher.cleanup();
     if (isTelemetrySdkInitialized()) {
       await shutdownTelemetry();
     }

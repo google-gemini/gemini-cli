@@ -17,8 +17,12 @@ import { CompressionMessage } from './messages/CompressionMessage.js';
 import { Box } from 'ink';
 import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
+import { ModelStatsDisplay } from './ModelStatsDisplay.js';
+import { ToolStatsDisplay } from './ToolStatsDisplay.js';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import { Config } from '@google/gemini-cli-core';
+import { Help } from './Help.js';
+import { SlashCommand } from '../commands/types.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
@@ -27,6 +31,7 @@ interface HistoryItemDisplayProps {
   isPending: boolean;
   config?: Config;
   isFocused?: boolean;
+  commands?: readonly SlashCommand[];
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -35,6 +40,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   terminalWidth,
   isPending,
   config,
+  commands,
   isFocused = true,
 }) => (
   <Box flexDirection="column" key={item.id}>
@@ -69,16 +75,11 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         gcpProject={item.gcpProject}
       />
     )}
-    {item.type === 'stats' && (
-      <StatsDisplay
-        stats={item.stats}
-        lastTurnStats={item.lastTurnStats}
-        duration={item.duration}
-      />
-    )}
-    {item.type === 'quit' && (
-      <SessionSummaryDisplay stats={item.stats} duration={item.duration} />
-    )}
+    {item.type === 'help' && commands && <Help commands={commands} />}
+    {item.type === 'stats' && <StatsDisplay duration={item.duration} />}
+    {item.type === 'model_stats' && <ModelStatsDisplay />}
+    {item.type === 'tool_stats' && <ToolStatsDisplay />}
+    {item.type === 'quit' && <SessionSummaryDisplay duration={item.duration} />}
     {item.type === 'tool_group' && (
       <ToolGroupMessage
         toolCalls={item.tools}

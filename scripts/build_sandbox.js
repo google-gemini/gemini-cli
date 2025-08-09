@@ -18,7 +18,7 @@
 // limitations under the License.
 
 import { execSync } from 'child_process';
-import { chmodSync, readFileSync, rmSync } from 'fs';
+import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -40,6 +40,11 @@ const argv = yargs(hideBin(process.argv))
     alias: 'image',
     type: 'string',
     description: 'use <image> name for custom image',
+  })
+  .option('output-file', {
+    type: 'string',
+    description:
+      'Path to write the final image URI. Used for CI/CD pipeline integration.',
   }).argv;
 
 let sandboxCommand;
@@ -123,13 +128,32 @@ function buildImage(imageName, dockerfile) {
     readFileSync(join(process.cwd(), 'package.json'), 'utf-8'),
   ).version;
 
+  const imageTag =
+    process.env.GEMINI_SANDBOX_IMAGE_TAG || imageName.split(':')[1];
+  const finalImageName = `${imageName.split(':')[0]}:${imageTag}`;
+
   execSync(
     `${buildCommand} ${
       process.env.BUILD_SANDBOX_FLAGS || ''
-    } --build-arg CLI_VERSION_ARG=${npmPackageVersion} -f "${dockerfile}" -t "${imageName}" .`,
+    } --build-arg CLI_VERSION_ARG=${npmPackageVersion} -f "${dockerfile}" -t "${finalImageName}" .`,
     { stdio: buildStdout, shell: '/bin/bash' },
   );
-  console.log(`built ${imageName}`);
+  console.log(`built ${finalImageName}`);
+
+  // If an output file path was provided via command-line, write the final image URI to it.
+  if (argv.outputFile) {
+    console.log(
+      `Writing final image URI for CI artifact to: ${argv.outputFile}`,
+    );
+    // The publish step only supports one image. If we build multiple, only the last one
+    // will be published. Throw an error to make this failure explicit if the file already exists.
+    if (existsSync(argv.outputFile)) {
+      throw new Error(
+        `CI artifact file ${argv.outputFile} already exists. Refusing to overwrite.`,
+      );
+    }
+    writeFileSync(argv.outputFile, finalImageName);
+  }
 }
 
 if (baseImage && baseDockerfile) {

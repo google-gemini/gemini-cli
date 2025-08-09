@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Newline, Text } from 'ink';
+import { Box, Newline, Text, useInput } from 'ink';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import { usePrivacySettings } from '../hooks/usePrivacySettings.js';
 import { CloudPaidPrivacyNotice } from './CloudPaidPrivacyNotice.js';
@@ -23,15 +23,24 @@ export const CloudFreePrivacyNotice = ({
   const { privacyState, updateDataCollectionOptIn } =
     usePrivacySettings(config);
 
+  useInput((input, key) => {
+    if (privacyState.error && key.escape) {
+      onExit();
+    }
+  });
+
   if (privacyState.isLoading) {
     return <Text color={Colors.Gray}>Loading...</Text>;
   }
 
   if (privacyState.error) {
     return (
-      <Text color={Colors.AccentRed}>
-        Error loading Opt-in settings: {privacyState.error}
-      </Text>
+      <Box flexDirection="column" marginY={1}>
+        <Text color={Colors.AccentRed}>
+          Error loading Opt-in settings: {privacyState.error}
+        </Text>
+        <Text color={Colors.Gray}>Press Esc to exit.</Text>
+      </Box>
     );
   }
 
