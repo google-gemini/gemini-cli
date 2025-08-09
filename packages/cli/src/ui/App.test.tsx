@@ -1364,6 +1364,5 @@ describe('App UI', () => {
       // Verify cancelRequest was called
       expect(mockCancelRequest).toHaveBeenCalled();
     });
-
-    });
+  });
 });
