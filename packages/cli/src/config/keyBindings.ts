@@ -162,15 +162,9 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Original: key.ctrl && key.name === 'e'
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'e', ctrl: true }],
   // Original: key.ctrl && (key.name === 'c' || key.name === 'C')
-  [Command.QUIT]: [
-    { key: 'c', ctrl: true },
-    { key: 'C', ctrl: true },
-  ],
+  [Command.QUIT]: [{ key: 'c', ctrl: true }],
   // Original: key.ctrl && (key.name === 'd' || key.name === 'D')
-  [Command.EXIT]: [
-    { key: 'd', ctrl: true },
-    { key: 'D', ctrl: true },
-  ],
+  [Command.EXIT]: [{ key: 'd', ctrl: true }],
   // Original: key.ctrl && key.name === 's'
   [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],
 
