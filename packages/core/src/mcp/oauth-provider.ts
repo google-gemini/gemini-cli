@@ -145,8 +145,7 @@ export class MCPOAuthProvider {
   private static async discoverOAuthFromMCPServer(
     mcpServerUrl: string,
   ): Promise<MCPOAuthConfig | null> {
-    const baseUrl = OAuthUtils.extractBaseUrl(mcpServerUrl);
-    return OAuthUtils.discoverOAuthConfig(baseUrl);
+    return OAuthUtils.discoverOAuthConfig(mcpServerUrl);
   }
 
   /**
@@ -370,6 +369,7 @@ export class MCPOAuthProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
       },
       body: params.toString(),
     });
@@ -432,6 +432,7 @@ export class MCPOAuthProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
       },
       body: params.toString(),
     });
