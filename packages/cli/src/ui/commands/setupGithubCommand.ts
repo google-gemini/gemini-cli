@@ -126,12 +126,12 @@ export const setupGithubCommand: SlashCommand = {
 
           const destination = path.resolve(
             githubWorkflowsDir,
-            path.join(path.basename(workflow)),
+            path.basename(workflow),
           );
 
           const fileStream = fs.createWriteStream(destination, {
-            mode: 0o640,
-            flags: 'w',
+            mode: 0o644, // -rw-r--r--, user(rw), group(r), other(r)
+            flags: 'w', // write and overwrite
             flush: true,
           });
 
@@ -141,12 +141,10 @@ export const setupGithubCommand: SlashCommand = {
     }
 
     // Wait for all downloads to complete
-    try {
-      await Promise.all(downloads);
-    } catch (_error) {
+    await Promise.all(downloads).finally(() => {
+      // Stop existing downloads
       abortController.abort();
-      throw _error;
-    }
+    });
 
     // Print out a message
     const commands = [];
