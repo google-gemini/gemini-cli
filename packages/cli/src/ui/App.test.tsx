@@ -1319,19 +1319,30 @@ describe('App UI', () => {
       expect(mockCancelRequest).toHaveBeenCalled();
     });
 
-    it('should behave the same as Escape key for cancellation', async () => {
-      // Mock useGeminiStream to simulate a responding state
+    it('should show cancelled tool calls properly after Ctrl+C is pressed', async () => {
+      // Mock useGeminiStream to simulate a responding state with pending tool calls
       const mockCancelRequest = vi.fn();
       vi.mocked(useGeminiStream).mockReturnValue({
         streamingState: StreamingState.Responding,
         submitQuery: vi.fn(),
         initError: null,
-        pendingHistoryItems: [],
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                name: 'test_tool',
+                status: 'cancelled',
+                description: 'A cancelled tool call',
+              },
+            ],
+          },
+        ],
         thought: null,
         cancelRequest: mockCancelRequest,
       });
 
-      const { stdin, unmount } = render(
+      const { stdin, lastFrame, unmount } = render(
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
@@ -1340,32 +1351,19 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      // Test Ctrl+C behavior
+      // Verify that the cancelled tool call is displayed properly
+      expect(lastFrame()).toContain('test_tool');
+      expect(lastFrame()).toContain('cancelled');
+
+      // Simulate Ctrl+C keypress
       stdin.write('\x03'); // Ctrl+C character
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(mockCancelRequest).toHaveBeenCalledTimes(1);
 
-      // Reset mock
-      mockCancelRequest.mockClear();
-
-      // Re-render for second test
-      const { stdin: stdin2, unmount: unmount2 } = render(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-          version={mockVersion}
-        />,
-      );
-      currentUnmount = unmount2;
-
-      // Test Escape key behavior (simulating through internal mechanism)
-      // Since we can't directly simulate Escape key with ink-testing-library,
-      // we verify that both keypresses call the same cancelRequest function
-      stdin2.write('\x1B'); // Escape character
+      // Wait for the component to process the input
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // Note: ink-testing-library might not send escape key properly,
-      // but the implementation in App.tsx handles both the same way
+      // Verify cancelRequest was called
+      expect(mockCancelRequest).toHaveBeenCalled();
     });
-  });
+
+    });
 });

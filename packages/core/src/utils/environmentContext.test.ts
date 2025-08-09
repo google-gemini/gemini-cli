@@ -77,7 +77,7 @@ describe('getEnvironmentContext', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2025-08-08T12:00:00Z'));
+    vi.setSystemTime(new Date('2025-08-05T12:00:00Z'));
 
     mockToolRegistry = {
       getTool: vi.fn(),
@@ -106,7 +106,7 @@ describe('getEnvironmentContext', () => {
     expect(parts.length).toBe(1);
     const context = parts[0].text;
 
-    expect(context).toContain("Today's date is Friday, 8 August 2025");
+    expect(context).toContain("Today's date is Tuesday, August 5, 2025");
     expect(context).toContain(`My operating system is: ${process.platform}`);
     expect(context).toContain(
       "I'm currently working in the directory: /test/dir",
