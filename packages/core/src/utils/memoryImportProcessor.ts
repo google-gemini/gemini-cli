@@ -122,7 +122,6 @@ function findImports(
       importPath.length > 0 &&
       (importPath[0] === '.' || path.isAbsolute(importPath))
     ) {
-      // Exclude workspace syntax like @workspace/package (no leading ./ or /)
       imports.push({
         start: i,
         _end: j,
