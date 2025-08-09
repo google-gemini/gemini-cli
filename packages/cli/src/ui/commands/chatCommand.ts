@@ -5,6 +5,9 @@
  */
 
 import * as fsPromises from 'fs/promises';
+import React from 'react';
+import { Text } from 'ink';
+import { Colors } from '../colors.js';
 import {
   CommandContext,
   SlashCommand,
@@ -114,8 +117,14 @@ const saveCommand: SlashCommand = {
       const exists = await logger.checkpointExists(tag);
       if (exists) {
         return {
-          type: 'confirm_overwrite',
-          tag,
+          type: 'confirm_action',
+          prompt: React.createElement(
+            Text,
+            null,
+            'A checkpoint with the tag ',
+            React.createElement(Text, { color: Colors.AccentPurple }, tag),
+            ' already exists. Do you want to overwrite it?',
+          ),
           originalInvocation: {
             raw: context.invocation?.raw || `/chat save ${tag}`,
           },

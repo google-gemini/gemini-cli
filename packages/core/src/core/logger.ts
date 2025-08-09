@@ -312,10 +312,9 @@ export class Logger {
 
   async checkpointExists(tag: string): Promise<boolean> {
     if (!this.initialized) {
-      console.error(
+      throw new Error(
         'Logger not initialized. Cannot check for checkpoint existence.',
       );
-      return false;
     }
     const filePath = this._checkpointPath(tag);
     try {

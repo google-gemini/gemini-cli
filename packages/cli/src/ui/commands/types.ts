@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { type ReactNode } from 'react';
 import { Content } from '@google/genai';
 import { HistoryItemWithoutId } from '../types.js';
 import { Config, GitService, Logger } from '@google/gemini-cli-core';
@@ -137,10 +138,10 @@ export interface ConfirmShellCommandsActionReturn {
   };
 }
 
-export interface ConfirmOverwriteActionReturn {
-  type: 'confirm_overwrite';
-  /** The tag of the checkpoint to be overwritten. */
-  tag: string;
+export interface ConfirmActionReturn {
+  type: 'confirm_action';
+  /** The React node to display as the confirmation prompt. */
+  prompt: ReactNode;
   /** The original invocation context to be re-run after confirmation. */
   originalInvocation: {
     raw: string;
@@ -155,7 +156,7 @@ export type SlashCommandActionReturn =
   | LoadHistoryActionReturn
   | SubmitPromptActionReturn
   | ConfirmShellCommandsActionReturn
-  | ConfirmOverwriteActionReturn;
+  | ConfirmActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',

@@ -63,11 +63,10 @@ export const useSlashCommandProcessor = (
         approvedCommands?: string[],
       ) => void;
     }>(null);
-  const [overwriteConfirmRequest, setOverwriteConfirmRequest] =
-    useState<null | {
-      tag: string;
-      onConfirm: (confirmed: boolean) => void;
-    }>(null);
+  const [confirmationRequest, setConfirmationRequest] = useState<null | {
+    prompt: React.ReactNode;
+    onConfirm: (confirmed: boolean) => void;
+  }>(null);
 
   const [sessionShellAllowlist, setSessionShellAllowlist] = useState(
     new Set<string>(),
@@ -428,14 +427,14 @@ export const useSlashCommandProcessor = (
                     new Set(approvedCommands),
                   );
                 }
-                case 'confirm_overwrite': {
+                case 'confirm_action': {
                   const { confirmed } = await new Promise<{
                     confirmed: boolean;
                   }>((resolve) => {
-                    setOverwriteConfirmRequest({
-                      tag: result.tag,
+                    setConfirmationRequest({
+                      prompt: result.prompt,
                       onConfirm: (resolvedConfirmed) => {
-                        setOverwriteConfirmRequest(null);
+                        setConfirmationRequest(null);
                         resolve({ confirmed: resolvedConfirmed });
                       },
                     });
@@ -445,7 +444,7 @@ export const useSlashCommandProcessor = (
                     addItem(
                       {
                         type: MessageType.INFO,
-                        text: 'Save operation cancelled.',
+                        text: 'Operation cancelled.',
                       },
                       Date.now(),
                     );
@@ -514,7 +513,7 @@ export const useSlashCommandProcessor = (
       setShellConfirmationRequest,
       setSessionShellAllowlist,
       setIsProcessing,
-      setOverwriteConfirmRequest,
+      setConfirmationRequest,
     ],
   );
 
@@ -524,6 +523,6 @@ export const useSlashCommandProcessor = (
     pendingHistoryItems,
     commandContext,
     shellConfirmationRequest,
-    overwriteConfirmRequest,
+    confirmationRequest,
   };
 };

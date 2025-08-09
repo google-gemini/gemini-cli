@@ -468,7 +468,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     pendingHistoryItems: pendingSlashCommandHistoryItems,
     commandContext,
     shellConfirmationRequest,
-    overwriteConfirmRequest,
+    confirmationRequest,
   } = useSlashCommandProcessor(
     config,
     settings,
@@ -854,26 +854,20 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
           {shellConfirmationRequest ? (
             <ShellConfirmationDialog request={shellConfirmationRequest} />
-          ) : overwriteConfirmRequest ? (
+          ) : confirmationRequest ? (
             <Box flexDirection="column">
-              <Text>
-                A checkpoint with the tag{' '}
-                <Text color={Colors.AccentPurple}>
-                  {overwriteConfirmRequest.tag}
-                </Text>{' '}
-                already exists. Do you want to overwrite it?
-              </Text>
-              <Box height={1} />
-              <RadioButtonSelect
-                items={[
-                  { label: 'Yes', value: true },
-                  { label: 'No', value: false },
-                ]}
-                onSelect={(value: boolean) => {
-                  overwriteConfirmRequest.onConfirm(value);
-                }}
-              />
-              <Box height={1} />
+                {confirmationRequest.prompt}
+              <Box paddingY={1}>
+                <RadioButtonSelect
+                  items={[
+                    { label: 'Yes', value: true },
+                    { label: 'No', value: false },
+                  ]}
+                  onSelect={(value: boolean) => {
+                    confirmationRequest.onConfirm(value);
+                  }}
+                />
+              </Box>
             </Box>
           ) : isThemeDialogOpen ? (
             <Box flexDirection="column">
