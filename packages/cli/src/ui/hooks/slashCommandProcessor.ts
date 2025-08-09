@@ -64,6 +64,11 @@ export const useSlashCommandProcessor = (
         approvedCommands?: string[],
       ) => void;
     }>(null);
+  const [confirmationRequest, setConfirmationRequest] = useState<null | {
+    prompt: React.ReactNode;
+    onConfirm: (confirmed: boolean) => void;
+  }>(null);
+
   const [sessionShellAllowlist, setSessionShellAllowlist] = useState(
     new Set<string>(),
   );
@@ -220,6 +225,7 @@ export const useSlashCommandProcessor = (
     async (
       rawQuery: PartListUnion,
       oneTimeShellAllowlist?: Set<string>,
+      overwriteConfirmed?: boolean,
     ): Promise<SlashCommandProcessorResult | false> => {
       setIsProcessing(true);
       try {
@@ -299,6 +305,7 @@ export const useSlashCommandProcessor = (
                 name: commandToExecute.name,
                 args,
               },
+              overwriteConfirmed,
             };
 
             // If a one-time list is provided for a "Proceed" action, temporarily
@@ -422,6 +429,36 @@ export const useSlashCommandProcessor = (
                     new Set(approvedCommands),
                   );
                 }
+                case 'confirm_action': {
+                  const { confirmed } = await new Promise<{
+                    confirmed: boolean;
+                  }>((resolve) => {
+                    setConfirmationRequest({
+                      prompt: result.prompt,
+                      onConfirm: (resolvedConfirmed) => {
+                        setConfirmationRequest(null);
+                        resolve({ confirmed: resolvedConfirmed });
+                      },
+                    });
+                  });
+
+                  if (!confirmed) {
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: 'Operation cancelled.',
+                      },
+                      Date.now(),
+                    );
+                    return { type: 'handled' };
+                  }
+
+                  return await handleSlashCommand(
+                    result.originalInvocation.raw,
+                    undefined,
+                    true,
+                  );
+                }
                 default: {
                   const unhandled: never = result;
                   throw new Error(
@@ -478,6 +515,7 @@ export const useSlashCommandProcessor = (
       setShellConfirmationRequest,
       setSessionShellAllowlist,
       setIsProcessing,
+      setConfirmationRequest,
     ],
   );
 
@@ -487,5 +525,6 @@ export const useSlashCommandProcessor = (
     pendingHistoryItems,
     commandContext,
     shellConfirmationRequest,
+    confirmationRequest,
   };
 };
