@@ -5,7 +5,7 @@
  */
 
 import { execSync } from 'child_process';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import { ProxyAgent } from 'undici';
 
 /**
  * Checks if a directory is within a git repository hosted on GitHub.
@@ -57,9 +57,6 @@ export const getLatestGitHubRelease = async (
 ): Promise<string> => {
   try {
     const controller = new AbortController();
-    if (proxy) {
-      setGlobalDispatcher(new ProxyAgent(proxy));
-    }
 
     const endpoint = `https://api.github.com/repos/google-github-actions/run-gemini-cli/releases/latest`;
 
@@ -70,8 +67,9 @@ export const getLatestGitHubRelease = async (
         'Content-Type': 'application/json',
         'X-GitHub-Api-Version': '2022-11-28',
       },
-      signal: controller.signal,
-    });
+      dispatcher: proxy ? new ProxyAgent(proxy) : undefined,
+      signal: AbortSignal.any([AbortSignal.timeout(30_000), controller.signal]),
+    } as RequestInit);
 
     if (!response.ok) {
       throw new Error(
