@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Readable } from 'node:stream';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs/promises';
