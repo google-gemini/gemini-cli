@@ -983,7 +983,10 @@ export const useGeminiStream = (
 
   // Input Handling Effect
   useInput((input, key) => {
-    if (streamingState === StreamingState.Responding && key.escape) {
+    if (
+      streamingState === StreamingState.Responding &&
+      (key.escape || (key.ctrl && input === 'c'))
+    ) {
       cancelRequest();
     }
   });
