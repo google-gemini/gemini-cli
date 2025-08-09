@@ -32,6 +32,8 @@ export enum Command {
 
   // Auto-completion
   ACCEPT_SUGGESTION = 'acceptSuggestion',
+  COMPLETION_UP = 'completionUp',
+  COMPLETION_DOWN = 'completionDown',
 
   // Text input
   SUBMIT = 'submit',
@@ -121,6 +123,9 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Auto-completion
   // Original: key.name === 'tab' || (key.name === 'return' && !key.ctrl)
   [Command.ACCEPT_SUGGESTION]: [{ key: 'tab' }, { key: 'return', ctrl: false }],
+  // Completion navigation (arrow or Ctrl+P/N)
+  [Command.COMPLETION_UP]: [{ key: 'up' }, { key: 'p', ctrl: true }],
+  [Command.COMPLETION_DOWN]: [{ key: 'down' }, { key: 'n', ctrl: true }],
 
   // Text input
   // Original: key.name === 'return' && !key.ctrl && !key.meta && !key.paste
