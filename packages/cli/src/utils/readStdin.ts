@@ -5,6 +5,9 @@
  */
 
 export async function readStdin(): Promise<string> {
+  if (process.stdin.isTTY) {
+    return '';
+  }
   return new Promise((resolve, reject) => {
     let data = '';
     process.stdin.setEncoding('utf8');
