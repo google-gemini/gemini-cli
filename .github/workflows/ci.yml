@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run lockfile check
+        run: npm run check:lockfile
+
       - name: Run formatter check
         run: |
           npm run format
