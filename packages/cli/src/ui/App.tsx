@@ -856,7 +856,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             <ShellConfirmationDialog request={shellConfirmationRequest} />
           ) : confirmationRequest ? (
             <Box flexDirection="column">
-                {confirmationRequest.prompt}
+              {confirmationRequest.prompt}
               <Box paddingY={1}>
                 <RadioButtonSelect
                   items={[
