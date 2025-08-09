@@ -336,6 +336,7 @@ describe('ToolRegistry', () => {
         toolRegistry,
         config.getPromptRegistry(),
         false,
+        expect.any(Object),
       );
     });
 
@@ -359,6 +360,7 @@ describe('ToolRegistry', () => {
         toolRegistry,
         config.getPromptRegistry(),
         false,
+        expect.any(Object),
       );
     });
   });
