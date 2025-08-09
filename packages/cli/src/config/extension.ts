@@ -8,6 +8,7 @@ import { MCPServerConfig, GeminiCLIExtension } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
@@ -78,13 +79,16 @@ function loadExtension(extensionDir: string): Extension | null {
 
   try {
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
-    const config = JSON.parse(configContent) as ExtensionConfig;
+    let config = JSON.parse(configContent) as ExtensionConfig;
+
     if (!config.name || !config.version) {
       console.error(
         `Invalid extension config in ${configFilePath}: missing name or version.`,
       );
       return null;
     }
+
+    config = resolveEnvVarsInObject(config);
 
     const contextFiles = getContextFileNames(config)
       .map((contextFileName) => path.join(extensionDir, contextFileName))
