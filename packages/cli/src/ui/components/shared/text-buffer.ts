@@ -1371,6 +1371,17 @@ export function useTextBuffer({
         }
       }
 
+      // For paste operations, clean control characters but preserve the processed content
+      if (paste) {
+        const cleanedText = ch.replace(
+          // eslint-disable-next-line no-control-regex
+          /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,
+          '',
+        );
+        dispatch({ type: 'insert', payload: cleanedText });
+        return;
+      }
+
       let currentText = '';
       for (const char of toCodePoints(ch)) {
         if (char.codePointAt(0) === 127) {
@@ -1622,6 +1633,12 @@ export function useTextBuffer({
       sequence: string;
     }): void => {
       const { sequence: input } = key;
+
+      // Handle paste operations with special care
+      if (key.paste && input) {
+        insert(input, { paste: true });
+        return;
+      }
 
       if (
         key.name === 'return' ||
