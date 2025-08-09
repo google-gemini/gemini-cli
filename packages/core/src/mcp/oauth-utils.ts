@@ -41,7 +41,6 @@ export interface OAuthProtectedResourceMetadata {
  * Utility class for common OAuth operations.
  */
 export class OAuthUtils {
-
   /**
    * Construct a new URL with a .well-known segment from an
    * existing URL, according to IETF RFC 8414 sec 3:
@@ -54,10 +53,13 @@ export class OAuthUtils {
    * @param wellKnownSegment The well-known segment to insert
    * @returns The constructed URL
    */
-  static constructRfc841WellKnownUrl(originalUrl: string, wellKnownSegment: string): string {
+  static constructRfc841WellKnownUrl(
+    originalUrl: string,
+    wellKnownSegment: string,
+  ): string {
     const url = new URL(originalUrl);
     const base = `${url.protocol}//${url.host}`;
-    return new URL( wellKnownSegment + url.pathname, base).toString();
+    return new URL(wellKnownSegment + url.pathname, base).toString();
   }
 
   /**
@@ -65,8 +67,14 @@ export class OAuthUtils {
    */
   static buildWellKnownUrls(baseUrl: string) {
     return {
-      protectedResource: this.constructRfc841WellKnownUrl(baseUrl, '/.well-known/oauth-protected-resource'),
-      authorizationServer: this.constructRfc841WellKnownUrl(baseUrl, '/.well-known/oauth-authorization-server'),
+      protectedResource: this.constructRfc841WellKnownUrl(
+        baseUrl,
+        '/.well-known/oauth-protected-resource',
+      ),
+      authorizationServer: this.constructRfc841WellKnownUrl(
+        baseUrl,
+        '/.well-known/oauth-authorization-server',
+      ),
     };
   }
 
@@ -142,9 +150,7 @@ export class OAuthUtils {
     serverUrl: string,
   ): Promise<MCPOAuthConfig | null> {
     try {
-      console.debug(
-        `discoverOAuthConfig serverUrl: ${serverUrl}`,
-      );
+      console.debug(`discoverOAuthConfig serverUrl: ${serverUrl}`);
       const wellKnownUrls = this.buildWellKnownUrls(serverUrl);
       console.debug(
         `Trying OAuth discovery via: ${wellKnownUrls.protectedResource}`,
@@ -157,11 +163,13 @@ export class OAuthUtils {
 
       if (resourceMetadata?.authorization_servers?.length) {
         // Use the first authorization server
-        const authServerMetadataUrl =
-          this.constructRfc841WellKnownUrl(resourceMetadata.authorization_servers[0],
-                                      '/.well-known/oauth-authorization-server');
+        const authServerMetadataUrl = this.constructRfc841WellKnownUrl(
+          resourceMetadata.authorization_servers[0],
+          '/.well-known/oauth-authorization-server',
+        );
         console.debug(
-          'Retrieving authz server metadata:', authServerMetadataUrl
+          'Retrieving authz server metadata:',
+          authServerMetadataUrl,
         );
 
         const authServerMetadata = await this.fetchAuthorizationServerMetadata(
@@ -248,9 +256,10 @@ export class OAuthUtils {
       return null;
     }
 
-    const authServerMetadataUrl =
-      this.constructRfc841WellKnownUrl(resourceMetadata.authorization_servers[0],
-                                  '/.well-known/oauth-authorization-server');
+    const authServerMetadataUrl = this.constructRfc841WellKnownUrl(
+      resourceMetadata.authorization_servers[0],
+      '/.well-known/oauth-authorization-server',
+    );
     const authServerMetadata = await this.fetchAuthorizationServerMetadata(
       authServerMetadataUrl,
     );
@@ -263,17 +272,6 @@ export class OAuthUtils {
     }
 
     return null;
-  }
-
-  /**
-   * Extract base URL from an MCP server URL.
-   *
-   * @param mcpServerUrl The MCP server URL
-   * @returns The base URL
-   */
-  static extractBaseUrl(mcpServerUrl: string): string {
-    const serverUrl = new URL(mcpServerUrl);
-    return `${serverUrl.protocol}//${serverUrl.host}`;
   }
 
   /**
