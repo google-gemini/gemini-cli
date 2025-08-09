@@ -312,17 +312,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (completion.showSuggestions) {
         if (completion.suggestions.length > 1) {
-          if (
-            keyMatchers[Command.NAVIGATION_UP](key) ||
-            keyMatchers[Command.HISTORY_UP](key)
-          ) {
+          if (keyMatchers[Command.COMPLETION_UP](key)) {
             completion.navigateUp();
             return;
           }
-          if (
-            keyMatchers[Command.NAVIGATION_DOWN](key) ||
-            keyMatchers[Command.HISTORY_DOWN](key)
-          ) {
+          if (keyMatchers[Command.COMPLETION_DOWN](key)) {
             completion.navigateDown();
             return;
           }
