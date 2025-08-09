@@ -421,6 +421,8 @@ export class ClearcutLogger {
   }
 
   logNewPromptEvent(event: UserPromptEvent): void {
+    const surface = determineSurface();
+
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_PROMPT_LENGTH,
@@ -438,6 +440,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
         value: JSON.stringify(event.auth_type),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(new_prompt_event_name, data));
@@ -445,6 +451,8 @@ export class ClearcutLogger {
   }
 
   logToolCallEvent(event: ToolCallEvent): void {
+    const surface = determineSurface();
+
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
@@ -474,6 +482,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_ERROR_TYPE,
         value: JSON.stringify(event.error_type),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
     ];
 
     if (event.metadata) {
@@ -500,6 +512,8 @@ export class ClearcutLogger {
   }
 
   logApiRequestEvent(event: ApiRequestEvent): void {
+    const surface = determineSurface();
+
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
@@ -509,6 +523,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
         value: JSON.stringify(event.prompt_id),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(api_request_event_name, data));
@@ -516,6 +534,8 @@ export class ClearcutLogger {
   }
 
   logApiResponseEvent(event: ApiResponseEvent): void {
+    const surface = determineSurface();
+
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_RESPONSE_MODEL,
@@ -566,6 +586,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
         value: JSON.stringify(event.auth_type),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(api_response_event_name, data));
@@ -573,6 +597,8 @@ export class ClearcutLogger {
   }
 
   logApiErrorEvent(event: ApiErrorEvent): void {
+    const surface = determineSurface();
+
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_MODEL,
@@ -598,6 +624,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
         value: JSON.stringify(event.auth_type),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(api_error_event_name, data));
@@ -605,6 +635,8 @@ export class ClearcutLogger {
   }
 
   logFlashFallbackEvent(event: FlashFallbackEvent): void {
+    const surface = determineSurface();
+
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
@@ -613,6 +645,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
         value: this.config?.getSessionId() ?? '',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
       },
     ];
 
@@ -623,6 +659,8 @@ export class ClearcutLogger {
   }
 
   logLoopDetectedEvent(event: LoopDetectedEvent): void {
+    const surface = determineSurface();
+
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
@@ -632,6 +670,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_LOOP_DETECTED_TYPE,
         value: JSON.stringify(event.loop_type),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(loop_detected_event_name, data));
@@ -639,6 +681,8 @@ export class ClearcutLogger {
   }
 
   logNextSpeakerCheck(event: NextSpeakerCheckEvent): void {
+    const surface = determineSurface();
+
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
@@ -656,6 +700,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
         value: this.config?.getSessionId() ?? '',
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
     ];
 
     this.enqueueLogEvent(
@@ -665,10 +713,16 @@ export class ClearcutLogger {
   }
 
   logSlashCommandEvent(event: SlashCommandEvent): void {
+    const surface = determineSurface();
+
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_NAME,
         value: JSON.stringify(event.command),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
       },
     ];
 
@@ -684,11 +738,17 @@ export class ClearcutLogger {
   }
 
   logMalformedJsonResponseEvent(event: MalformedJsonResponseEvent): void {
+    const surface = determineSurface();
+
     const data: EventValue[] = [
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_MALFORMED_JSON_RESPONSE_MODEL,
         value: JSON.stringify(event.model),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
       },
     ];
 
@@ -699,10 +759,16 @@ export class ClearcutLogger {
   }
 
   logIdeConnectionEvent(event: IdeConnectionEvent): void {
+    const surface = determineSurface();
+
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_IDE_CONNECTION_TYPE,
         value: JSON.stringify(event.connection_type),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
       },
     ];
 
@@ -711,10 +777,16 @@ export class ClearcutLogger {
   }
 
   logEndSessionEvent(event: EndSessionEvent): void {
+    const surface = determineSurface();
+
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
         value: event?.session_id?.toString() ?? '',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
       },
     ];
 
