@@ -12,12 +12,15 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express, { type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { type Server as HTTPServer } from 'node:http';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
 import { z } from 'zod';
 import { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
+const PORT_FILE = '.gemini/ide-server-port';
 
 function sendIdeContextUpdateNotification(
   transport: StreamableHTTPServerTransport,
@@ -197,6 +200,15 @@ export class IDEServer {
           port.toString(),
         );
         this.log(`IDE server listening on port ${port}`);
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (workspaceFolder) {
+          const portFile = path.join(workspaceFolder.uri.fsPath, PORT_FILE);
+          fs.mkdir(path.dirname(portFile), { recursive: true })
+            .then(() => fs.writeFile(portFile, port.toString()))
+            .catch((err) => {
+              this.log(`Failed to write port to file: ${err}`);
+            });
+        }
       }
     });
   }
@@ -218,6 +230,15 @@ export class IDEServer {
 
     if (this.context) {
       this.context.environmentVariableCollection.clear();
+    }
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (workspaceFolder) {
+      const portFile = path.join(workspaceFolder.uri.fsPath, PORT_FILE);
+      try {
+        await fs.unlink(portFile);
+      } catch (err) {
+        // Ignore errors if the file doesn't exist.
+      }
     }
   }
 }
