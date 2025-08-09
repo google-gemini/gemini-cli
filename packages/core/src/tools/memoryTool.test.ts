@@ -203,7 +203,17 @@ describe('MemoryTool', () => {
       );
       expect(memoryTool.schema).toBeDefined();
       expect(memoryTool.schema.name).toBe('save_memory');
-      expect(memoryTool.schema.parameters?.properties?.fact).toBeDefined();
+      expect(memoryTool.schema.parametersJsonSchema).toStrictEqual({
+        type: 'object',
+        properties: {
+          fact: {
+            type: 'string',
+            description:
+              'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
+          },
+        },
+        required: ['fact'],
+      });
     });
 
     it('should call performAddMemoryEntry with correct parameters and return success', async () => {
