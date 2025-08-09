@@ -12,7 +12,6 @@ import {
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
 import { CustomTheme } from '../ui/themes/theme.js';
-import { hasMagic } from 'glob';
 
 export interface SettingDefinition {
   type: 'boolean' | 'string' | 'number' | 'array' | 'object';

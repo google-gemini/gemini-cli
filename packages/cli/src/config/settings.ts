@@ -11,10 +11,6 @@ import * as dotenv from 'dotenv';
 import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
-  BugCommandSettings,
-  ChatCompressionSettings,
-  TelemetrySettings,
-  AuthType,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -64,8 +60,6 @@ export interface SummarizeToolOutputSettings {
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
 }
-
-
 
 export interface SettingsError {
   message: string;

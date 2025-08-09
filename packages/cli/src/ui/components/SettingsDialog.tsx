@@ -262,7 +262,8 @@ export function SettingsDialog({
     }
     if (focusSection === 'settings') {
       if (key.upArrow || input === 'k') {
-        const newIndex = activeSettingIndex > 0 ? activeSettingIndex - 1 : items.length - 1;
+        const newIndex =
+          activeSettingIndex > 0 ? activeSettingIndex - 1 : items.length - 1;
         setActiveSettingIndex(newIndex);
         // Adjust scroll offset for wrap-around
         if (newIndex === items.length - 1) {
@@ -271,7 +272,8 @@ export function SettingsDialog({
           setScrollOffset(newIndex);
         }
       } else if (key.downArrow || input === 'j') {
-        const newIndex = activeSettingIndex < items.length - 1 ? activeSettingIndex + 1 : 0;
+        const newIndex =
+          activeSettingIndex < items.length - 1 ? activeSettingIndex + 1 : 0;
         setActiveSettingIndex(newIndex);
         // Adjust scroll offset for wrap-around
         if (newIndex === 0) {
