@@ -11,6 +11,9 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
+import { spawnSync } from 'child_process';
+import { fileURLToPath } from 'url';
+import readPackageUp from 'read-package-up';
 import {
   Config,
   loadServerHierarchicalMemory,
@@ -236,6 +239,28 @@ export async function parseArguments(): Promise<CliArgs> {
     )
     // Register MCP subcommands
     .command(mcpCommand)
+    .command(
+      'doctor',
+      'Run a diagnostic check on your environment',
+      () => {},
+      async () => {
+        // Dynamically find package root
+        const pkg = await readPackageUp({ cwd: path.dirname(fileURLToPath(import.meta.url)) });
+        if (!pkg || !pkg.path) {
+          console.error('Could not locate the package.json for gemini-cli.');
+          process.exit(1);
+        }
+        const packageRoot = path.dirname(pkg.path);
+        const scriptPath = path.join(packageRoot, 'scripts', 'gemini-doctor.js');
+        const result = spawnSync('node', [scriptPath], { stdio: 'inherit' });
+        if (result.error) {
+          console.error('Failed to start node process.', result.error);
+          console.error('Please ensure that node is installed and in your PATH.');
+          process.exit(1);
+        }
+        process.exit(result.status ?? 1);
+      },
+    )
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()

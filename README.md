@@ -223,3 +223,18 @@ For details on the terms of service and privacy notice applicable to your use of
 ## Security Disclosures
 
 Please see our [security disclosure process](SECURITY.md). All [security advisories](https://github.com/google-gemini/gemini-cli/security/advisories) are managed on Github.
+
+## Diagnostic Tool
+
+To check your environment setup, you can use the built-in diagnostic tool:
+
+- Run with npm:
+  ```sh
+  npm run doctor
+  ```
+- Or, after building and linking your CLI locally:
+  ```sh
+  gemini doctor
+  ```
+
+This tool will check your Node.js version, Gemini CLI version, gcloud authentication, environment variables, and API endpoint configuration. Results are color-coded for easy review.
