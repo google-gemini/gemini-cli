@@ -369,6 +369,9 @@ export async function loadCliConfig(
   );
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
+  
+  const coreTools = mergeCoreTools(settings, activeExtensions);
+
   const question = argv.promptInteractive || argv.prompt || '';
   const approvalMode =
     argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
@@ -385,6 +388,7 @@ export async function loadCliConfig(
     activeExtensions,
     extraExcludes,
   );
+
   const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
 
   if (!argv.allowedMcpServerNames) {
@@ -429,7 +433,7 @@ export async function loadCliConfig(
     debugMode,
     question,
     fullContext: argv.allFiles || argv.all_files || false,
-    coreTools: settings.coreTools || undefined,
+    coreTools,
     excludeTools,
     toolDiscoveryCommand: settings.toolDiscoveryCommand,
     toolCallCommand: settings.toolCallCommand,
@@ -558,4 +562,45 @@ function mergeExcludeTools(
     }
   }
   return [...allExcludeTools];
+}
+
+function mergeCoreTools(
+  settings: Settings,
+  extensions: Extension[],
+): string[] | undefined {
+  const isConfigured =
+    settings.coreTools !== undefined ||
+    extensions.some((e) => e.config.coreTools !== undefined);
+
+  if (!isConfigured) {
+    return undefined;
+  }
+
+  const allCoreTools = new Set<string>();
+
+  if (settings.coreTools) {
+    if (Array.isArray(settings.coreTools)) {
+      for (const tool of settings.coreTools) {
+        allCoreTools.add(tool);
+      }
+    } else {
+      logger.warn('Settings has a non-array value for coreTools. Skipping.');
+    }
+  }
+
+  for (const extension of extensions) {
+    if (extension.config.coreTools) {
+      if (Array.isArray(extension.config.coreTools)) {
+        for (const tool of extension.config.coreTools) {
+          allCoreTools.add(tool);
+        }
+      } else {
+        logger.warn(
+          `Extension "${extension.config.name}" has a non-array value for coreTools. Skipping.`,
+        );
+      }
+    }
+  }
+
+  return [...allCoreTools];
 }
