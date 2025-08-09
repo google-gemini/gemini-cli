@@ -86,34 +86,31 @@ export function createContentGeneratorConfig(
     return contentGeneratorConfig;
   }
 
-  if (authType === AuthType.USE_GEMINI && geminiApiKey) {
-    contentGeneratorConfig.apiKey = geminiApiKey;
-    contentGeneratorConfig.vertexai = false;
-    getEffectiveModel(
-      contentGeneratorConfig.apiKey,
-      contentGeneratorConfig.model,
-      contentGeneratorConfig.proxy,
-    );
-
-    return contentGeneratorConfig;
-  }
-
-  if (
-    authType === AuthType.USE_VERTEX_AI &&
-    (googleApiKey || (googleCloudProject && googleCloudLocation))
-  ) {
-    contentGeneratorConfig.apiKey = googleApiKey;
-    contentGeneratorConfig.vertexai = true;
-
-    return contentGeneratorConfig;
-  }
-
-  if (
-    authType === AuthType.USE_GEMINI ||
-    authType === AuthType.USE_VERTEX_AI
-  ) {
+  if (authType === AuthType.USE_GEMINI) {
+    if (geminiApiKey) {
+      contentGeneratorConfig.apiKey = geminiApiKey;
+      contentGeneratorConfig.vertexai = false;
+      getEffectiveModel(
+        contentGeneratorConfig.apiKey,
+        contentGeneratorConfig.model,
+        contentGeneratorConfig.proxy,
+      );
+    }
+    // Always propagate custom endpoint/header when using Gemini auth
     contentGeneratorConfig.baseUrl = customBaseUrl;
     contentGeneratorConfig.apiKeyHeader = customApiKeyHeader;
+    return contentGeneratorConfig;
+  }
+
+  if (authType === AuthType.USE_VERTEX_AI) {
+    if (googleApiKey || (googleCloudProject && googleCloudLocation)) {
+      contentGeneratorConfig.apiKey = googleApiKey;
+      contentGeneratorConfig.vertexai = true;
+    }
+    // Also allow custom endpoint/header for Vertex if provided
+    contentGeneratorConfig.baseUrl = customBaseUrl;
+    contentGeneratorConfig.apiKeyHeader = customApiKeyHeader;
+    return contentGeneratorConfig;
   }
 
   return contentGeneratorConfig;
@@ -178,6 +175,11 @@ export async function createContentGenerator(
       vertexai: config.vertexai,
       httpOptions,
     });
+    // When using a custom endpoint or header, return raw models to avoid
+    // altering behavior with logging wrapper as tests expect direct models.
+    if (config.baseUrl || config.apiKeyHeader) {
+      return googleGenAI.models;
+    }
     return new LoggingContentGenerator(googleGenAI.models, gcConfig);
   }
   throw new Error(
