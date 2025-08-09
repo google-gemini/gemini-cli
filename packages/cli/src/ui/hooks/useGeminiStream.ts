@@ -91,10 +91,11 @@ export const useGeminiStream = (
   getPreferredEditor: () => EditorType | undefined,
   onAuthError: () => void,
   performMemoryRefresh: () => Promise<void>,
+  isPlanMode: boolean,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
   onEditorClose: () => void,
-  onCancelSubmit: () => void,
+  onCancelSubmit: () => void = () => {}, 
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -106,6 +107,14 @@ export const useGeminiStream = (
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const logger = useLogger();
+  const { startNewTurn, addUsage } = useSessionStats();
+
+  // Update config when plan mode changes
+  useEffect(() => {
+    if (config && (config as any).setIsPlanMode) {
+      config.setIsPlanMode(isPlanMode);
+    }
+  }, [config, isPlanMode]);
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
       return;
@@ -201,7 +210,9 @@ export const useGeminiStream = (
         Date.now(),
       );
       setPendingHistoryItem(null);
-      onCancelSubmit();
+      if (typeof onCancelSubmit === 'function') {
+        onCancelSubmit();
+      }
       setIsResponding(false);
     }
   });
@@ -584,7 +595,21 @@ export const useGeminiStream = (
         }
       }
       if (toolCallRequests.length > 0) {
-        scheduleToolCalls(toolCallRequests, signal);
+        if (isPlanMode) {
+          addItem(
+            {
+              type: MessageType.INFO,
+              text: `Tool call requests (plan mode):\n${JSON.stringify(
+                toolCallRequests,
+                null,
+                2,
+              )}`,
+            },
+            Date.now(),
+          );
+        } else {
+          scheduleToolCalls(toolCallRequests, signal);
+        }
       }
       return StreamProcessingStatus.Completed;
     },
@@ -594,6 +619,9 @@ export const useGeminiStream = (
       handleErrorEvent,
       scheduleToolCalls,
       handleChatCompressionEvent,
+      addUsage,
+      isPlanMode,
+      addItem,
       handleFinishedEvent,
       handleMaxSessionTurnsEvent,
     ],
@@ -713,10 +741,6 @@ export const useGeminiStream = (
 
   const handleCompletedTools = useCallback(
     async (completedToolCallsFromScheduler: TrackedToolCall[]) => {
-      if (isResponding) {
-        return;
-      }
-
       const completedAndReadyToSubmitTools =
         completedToolCallsFromScheduler.filter(
           (

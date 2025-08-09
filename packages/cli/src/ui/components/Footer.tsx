@@ -30,6 +30,10 @@ interface FooterProps {
   showErrorDetails: boolean;
   showMemoryUsage?: boolean;
   promptTokenCount: number;
+  // Optional props for backward compatibility with plan-mode branch
+  candidatesTokenCount?: number;
+  totalTokenCount?: number;
+  isPlanMode?: boolean;
   nightly: boolean;
   vimMode?: string;
 }
@@ -45,6 +49,9 @@ export const Footer: React.FC<FooterProps> = ({
   showErrorDetails,
   showMemoryUsage,
   promptTokenCount,
+  candidatesTokenCount,
+  totalTokenCount,
+  isPlanMode,
   nightly,
   vimMode,
 }) => {
@@ -119,6 +126,11 @@ export const Footer: React.FC<FooterProps> = ({
 
       {/* Right Section: Gemini Label and Console Summary */}
       <Box alignItems="center" paddingTop={isNarrow ? 1 : 0}>
+        {isPlanMode !== undefined && (
+          <Text color={theme.text.secondary}>
+            {isPlanMode ? 'Plan Mode' : 'Agent Mode'} |{' '}
+          </Text>
+        )}
         <Text color={theme.text.accent}>
           {isNarrow ? '' : ' '}
           {model}{' '}

@@ -190,6 +190,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     IdeContext | undefined
   >();
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isPlanMode, setIsPlanMode] = useState<boolean>(false);
+  const [onEditorClose, setOnEditorClose] = useState<() => void>(() => () => {});
+  const [onCancelSubmit, setOnCancelSubmit] = useState<() => void>(() => () => {});
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
@@ -505,6 +508,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     toggleVimEnabled,
     setIsProcessing,
     setGeminiMdFileCount,
+    setIsPlanMode,
   );
 
   const buffer = useTextBuffer({
@@ -542,10 +546,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     getPreferredEditor,
     onAuthError,
     performMemoryRefresh,
+    isPlanMode,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
-    refreshStatic,
-    handleUserCancel,
+    onEditorClose,
+    onCancelSubmit,
   );
 
   // Input handling
@@ -1120,6 +1125,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               config.getDebugMode() || config.getShowMemoryUsage()
             }
             promptTokenCount={sessionStats.lastPromptTokenCount}
+            candidatesTokenCount={sessionStats.lastCandidatesTokenCount || 0}
+            totalTokenCount={sessionStats.lastTotalTokenCount || 0}
+            isPlanMode={isPlanMode}
             nightly={nightly}
             vimMode={vimModeEnabled ? vimMode : undefined}
           />

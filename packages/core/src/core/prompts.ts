@@ -295,6 +295,44 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
   return `${basePrompt}${memorySuffix}`;
 }
 
+export function getPlanModeSystemPrompt(userMemory?: string): string {
+  const basePrompt = getCoreSystemPrompt(userMemory);
+
+  const planModeInstructions = `
+
+# PLAN MODE ACTIVE
+
+**IMPORTANT: You are currently in PLAN MODE. This means:**
+
+1. **DO NOT execute file modification tools** like '${EditTool.Name}', '${WriteFileTool.Name}', or destructive '${ShellTool.Name}' commands
+2. **DO NOT create, edit, or delete files** - you are in planning and analysis mode only
+3. **Instead of executing tools, describe your planned actions** in detail to the user
+4. **Focus on analysis, planning, and explanation** rather than implementation
+
+## Available Tools in Plan Mode:
+- **Read-only tools**: '${ReadFileTool.Name}', '${ReadManyFilesTool.Name}', '${GrepTool.Name}', '${GlobTool.Name}', '${LSTool.Name}', '${MemoryTool.Name}'
+- **Safe shell commands**: Non-destructive commands like \`ls\`, \`find\`, \`git status\`, \`git log\`, etc.
+
+## Your Role in Plan Mode:
+- **Analyze** the codebase and understand the user's requirements
+- **Plan** the implementation approach in detail
+- **Explain** what changes would be needed and why
+- **Outline** the specific tool calls you would make in agent mode
+- **Provide** step-by-step implementation guidance
+
+## Example Plan Mode Response:
+Instead of executing tools, provide responses like:
+"To implement this feature, I would:
+1. Use '${ReadFileTool.Name}' to examine the current authentication module
+2. Use '${EditTool.Name}' to modify the login function at lines 45-60
+3. Use '${WriteFileTool.Name}' to create a new test file for the updated functionality
+4. Use '${ShellTool.Name}' to run the test suite to verify the changes"
+
+Remember: You are in PLAN MODE - describe and plan, don't execute file modifications.`;
+
+  return `${basePrompt}${planModeInstructions}`;
+}
+
 /**
  * Provides the system prompt for the history compression process.
  * This prompt instructs the model to act as a specialized state manager,
