@@ -7,7 +7,7 @@
 import path from 'node:path';
 import * as fs from 'node:fs';
 import { Writable } from 'node:stream';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import { ProxyAgent } from 'undici';
 
 import { CommandContext } from '../../ui/commands/types.js';
 import {
