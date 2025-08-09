@@ -22,7 +22,37 @@ export interface UseInputHistoryStoreReturn {
  */
 export function useInputHistoryStore(): UseInputHistoryStoreReturn {
   const [inputHistory, setInputHistory] = useState<string[]>([]);
+  const [pastSessionMessages, setPastSessionMessages] = useState<string[]>([]);
+  const [currentSessionMessages, setCurrentSessionMessages] = useState<
+    string[]
+  >([]);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  /**
+   * Recalculate the complete input history from past and current sessions.
+   * Applies the same deduplication logic as the previous implementation.
+   */
+  const recalculateHistory = useCallback(
+    (currentSession: string[], pastSession: string[]) => {
+      // Combine current session (newest first) + past session (newest first)
+      const combinedMessages = [...currentSession, ...pastSession];
+
+      // Deduplicate consecutive identical messages (same algorithm as before)
+      const deduplicatedMessages: string[] = [];
+      if (combinedMessages.length > 0) {
+        deduplicatedMessages.push(combinedMessages[0]); // Add the newest one unconditionally
+        for (let i = 1; i < combinedMessages.length; i++) {
+          if (combinedMessages[i] !== combinedMessages[i - 1]) {
+            deduplicatedMessages.push(combinedMessages[i]);
+          }
+        }
+      }
+
+      // Reverse to oldest first for useInputHistory
+      setInputHistory(deduplicatedMessages.reverse());
+    },
+    [],
+  );
 
   /**
    * Initialize input history from logger with past session data.
@@ -34,35 +64,41 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
 
       try {
         const pastMessages = (await logger.getPreviousUserMessages()) || [];
-        // Logger returns newest first, reverse to get oldest first
-        setInputHistory(pastMessages.reverse());
+        setPastSessionMessages(pastMessages); // Store as newest first
+        recalculateHistory([], pastMessages);
         setIsInitialized(true);
       } catch (error) {
         // Start with empty history even if logger initialization fails
         console.warn('Failed to initialize input history from logger:', error);
-        setInputHistory([]);
+        setPastSessionMessages([]);
+        recalculateHistory([], []);
         setIsInitialized(true);
       }
     },
-    [isInitialized],
+    [isInitialized, recalculateHistory],
   );
 
   /**
    * Add new input to history.
-   * Applies the same deduplication logic as the current implementation.
+   * Recalculates the entire history with deduplication.
    */
-  const addInput = useCallback((input: string) => {
-    const trimmedInput = input.trim();
-    if (!trimmedInput) return;
+  const addInput = useCallback(
+    (input: string) => {
+      const trimmedInput = input.trim();
+      if (!trimmedInput) return; // Filter empty/whitespace-only inputs
 
-    setInputHistory((prev) => {
-      // Remove consecutive duplicate messages (same as current implementation)
-      if (prev.length > 0 && prev[prev.length - 1] === trimmedInput) {
-        return prev;
-      }
-      return [...prev, trimmedInput];
-    });
-  }, []);
+      // Add to current session messages
+      const newCurrentSession = [...currentSessionMessages, trimmedInput];
+      setCurrentSessionMessages(newCurrentSession);
+
+      // Recalculate entire history (same as previous implementation)
+      recalculateHistory(
+        newCurrentSession.slice().reverse(), // Convert to newest first
+        pastSessionMessages,
+      );
+    },
+    [currentSessionMessages, pastSessionMessages, recalculateHistory],
+  );
 
   return {
     inputHistory,
