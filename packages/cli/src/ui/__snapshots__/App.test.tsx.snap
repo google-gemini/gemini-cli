@@ -13,6 +13,9 @@ exports[`App UI > should render the initial UI correctly 1`] = `
 " I'm Feeling Lucky (esc to cancel, 0s)
 
 
+╭────────────────────────────────────────────────────────────────────────────────────────╮
+│ >   Type your message or @path/to/file                                                 │
+╰────────────────────────────────────────────────────────────────────────────────────────╯
 /test/dir                no sandbox (see /docs)                  model (100% context left)"
 `;
 

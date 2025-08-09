@@ -96,6 +96,7 @@ import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
+import { PendingMessagesDisplay } from './components/PendingMessagesDisplay.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -191,6 +192,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     IdeContext | undefined
   >();
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [pendingMessages, setPendingMessages] = useState<string[]>([]);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
@@ -554,12 +556,26 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
-      if (trimmedValue.length > 0) {
+      if (trimmedValue.length === 0) {
+        return;
+      }
+
+      if (streamingState !== StreamingState.Idle) {
+        setPendingMessages((prev) => [...prev, trimmedValue]);
+      } else {
         submitQuery(trimmedValue);
       }
     },
-    [submitQuery],
+    [submitQuery, streamingState],
   );
+
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle && pendingMessages.length > 0) {
+      const combinedMessage = pendingMessages.join('\n');
+      setPendingMessages([]);
+      submitQuery(combinedMessage);
+    }
+  }, [streamingState, pendingMessages, submitQuery]);
 
   const handleIdePromptComplete = useCallback(
     (result: IdeIntegrationNudgeResult) => {
@@ -724,7 +740,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, [history, logger]);
 
   const isInputActive =
-    streamingState === StreamingState.Idle && !initError && !isProcessing;
+    !isProcessing &&
+    streamingState !== StreamingState.WaitingForConfirmation &&
+    !initError;
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -1092,23 +1110,28 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 </OverflowProvider>
               )}
 
-              {isInputActive && (
-                <InputPrompt
-                  buffer={buffer}
-                  inputWidth={inputWidth}
-                  suggestionsWidth={suggestionsWidth}
-                  onSubmit={handleFinalSubmit}
-                  userMessages={userMessages}
-                  onClearScreen={handleClearScreen}
-                  config={config}
-                  slashCommands={slashCommands}
-                  commandContext={commandContext}
-                  shellModeActive={shellModeActive}
-                  setShellModeActive={setShellModeActive}
-                  focus={isFocused}
-                  vimHandleInput={vimHandleInput}
-                  placeholder={placeholder}
-                />
+              {isInputActive ? (
+                <>
+                  <PendingMessagesDisplay messages={pendingMessages} />
+                  <InputPrompt
+                    buffer={buffer}
+                    inputWidth={inputWidth}
+                    suggestionsWidth={suggestionsWidth}
+                    onSubmit={handleFinalSubmit}
+                    userMessages={userMessages}
+                    onClearScreen={handleClearScreen}
+                    config={config}
+                    slashCommands={slashCommands}
+                    commandContext={commandContext}
+                    shellModeActive={shellModeActive}
+                    setShellModeActive={setShellModeActive}
+                    focus={isFocused}
+                    vimHandleInput={vimHandleInput}
+                    placeholder={placeholder}
+                  />
+                </>
+              ) : (
+                <PendingMessagesDisplay messages={pendingMessages} />
               )}
             </>
           )}
