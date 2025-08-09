@@ -1119,4 +1119,250 @@ describe('App UI', () => {
       expect(lastFrame()).toContain('Do you trust this folder?');
     });
   });
+
+  describe('Ctrl+C handling', () => {
+    it('should cancel an in-progress stream when Ctrl+C is pressed during streaming', async () => {
+      // Mock useGeminiStream to simulate a responding state
+      const mockCancelRequest = vi.fn();
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Responding,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelRequest: mockCancelRequest,
+      });
+
+      const { stdin, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Simulate Ctrl+C keypress
+      stdin.write('\x03'); // Ctrl+C character
+
+      // Wait for the component to process the input
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Verify cancelRequest was called
+      expect(mockCancelRequest).toHaveBeenCalled();
+    });
+
+    it('should show "Press Ctrl+C again to exit" message when Ctrl+C is pressed during idle state', async () => {
+      // Mock useGeminiStream to simulate an idle state
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Idle,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+      });
+
+      // Mock useFolderTrust to return false for isFolderTrustDialogOpen
+      const originalUseFolderTrust = await import('./hooks/useFolderTrust.js');
+      const useFolderTrustSpy = vi
+        .spyOn(originalUseFolderTrust, 'useFolderTrust')
+        .mockImplementation(() => ({
+          isFolderTrustDialogOpen: false,
+          handleFolderTrustSelect: vi.fn(),
+        }));
+
+      // Mock useSlashCommandProcessor
+      const mockHandleSlashCommand = vi.fn();
+      const originalUseSlashCommandProcessor = await import(
+        './hooks/slashCommandProcessor.js'
+      );
+      const useSlashCommandProcessorSpy = vi
+        .spyOn(originalUseSlashCommandProcessor, 'useSlashCommandProcessor')
+        .mockReturnValue({
+          handleSlashCommand: mockHandleSlashCommand,
+          slashCommands: [],
+          pendingHistoryItems: [],
+          commandContext: {},
+          shellConfirmationRequest: null,
+        });
+
+      const { stdin, lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Capture initial frame
+      const initialFrame = lastFrame();
+
+      // Simulate Ctrl+C keypress
+      stdin.write('\x03'); // Ctrl+C character
+
+      // Wait for the component to process the input
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Check that the message is shown in the current render instance
+      expect(lastFrame()).toContain('Press Ctrl+C again to exit.');
+      // Also verify that it's different from the initial frame
+      expect(lastFrame()).not.toEqual(initialFrame);
+
+      // Clean up mocks
+      useFolderTrustSpy.mockRestore();
+      useSlashCommandProcessorSpy.mockRestore();
+    });
+
+    it('should exit the application when Ctrl+C is pressed twice quickly', async () => {
+      // Mock useGeminiStream to simulate an idle state
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Idle,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+      });
+
+      // Mock useFolderTrust to return false for isFolderTrustDialogOpen
+      const originalUseFolderTrust = await import('./hooks/useFolderTrust.js');
+      const useFolderTrustSpy = vi
+        .spyOn(originalUseFolderTrust, 'useFolderTrust')
+        .mockImplementation(() => ({
+          isFolderTrustDialogOpen: false,
+          handleFolderTrustSelect: vi.fn(),
+        }));
+
+      // Mock handleSlashCommand to track if /quit was called
+      const mockHandleSlashCommand = vi.fn();
+      const originalUseSlashCommandProcessor = await import(
+        './hooks/slashCommandProcessor.js'
+      );
+      const useSlashCommandProcessorSpy = vi
+        .spyOn(originalUseSlashCommandProcessor, 'useSlashCommandProcessor')
+        .mockReturnValue({
+          handleSlashCommand: mockHandleSlashCommand,
+          slashCommands: [],
+          pendingHistoryItems: [],
+          commandContext: {},
+          shellConfirmationRequest: null,
+        });
+
+      const { stdin, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Simulate first Ctrl+C keypress
+      stdin.write('\x03'); // Ctrl+C character
+
+      // Wait a bit (but less than the timeout duration)
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Simulate second Ctrl+C keypress
+      stdin.write('\x03'); // Ctrl+C character
+
+      // Wait for the component to process the input
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Verify /quit command was called
+      expect(mockHandleSlashCommand).toHaveBeenCalledWith('/quit');
+
+      // Clean up mocks
+      useFolderTrustSpy.mockRestore();
+      useSlashCommandProcessorSpy.mockRestore();
+    });
+
+    it('should cancel pending tool calls when Ctrl+C is pressed during streaming', async () => {
+      // Mock useGeminiStream to simulate a responding state with pending tool calls
+      const mockCancelRequest = vi.fn();
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Responding,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                name: 'test_tool',
+                status: 'pending',
+                description: 'A test tool call',
+              },
+            ],
+          },
+        ],
+        thought: null,
+        cancelRequest: mockCancelRequest,
+      });
+
+      const { stdin, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Simulate Ctrl+C keypress
+      stdin.write('\x03'); // Ctrl+C character
+
+      // Wait for the component to process the input
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Verify cancelRequest was called (which should handle tool call cancellation)
+      expect(mockCancelRequest).toHaveBeenCalled();
+    });
+
+    it('should show cancelled tool calls properly after Ctrl+C is pressed', async () => {
+      // Mock useGeminiStream to simulate a responding state with pending tool calls
+      const mockCancelRequest = vi.fn();
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Responding,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                name: 'test_tool',
+                status: 'cancelled',
+                description: 'A cancelled tool call',
+              },
+            ],
+          },
+        ],
+        thought: null,
+        cancelRequest: mockCancelRequest,
+      });
+
+      const { stdin, lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Verify that the cancelled tool call is displayed properly
+      expect(lastFrame()).toContain('test_tool');
+      expect(lastFrame()).toContain('cancelled');
+
+      // Simulate Ctrl+C keypress
+      stdin.write('\x03'); // Ctrl+C character
+
+      // Wait for the component to process the input
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Verify cancelRequest was called
+      expect(mockCancelRequest).toHaveBeenCalled();
+    });
+  });
 });

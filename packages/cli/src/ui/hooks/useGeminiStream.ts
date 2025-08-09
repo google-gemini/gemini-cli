@@ -183,28 +183,61 @@ export const useGeminiStream = (
     return StreamingState.Idle;
   }, [isResponding, toolCalls]);
 
-  useInput((_input, key) => {
-    if (streamingState === StreamingState.Responding && key.escape) {
-      if (turnCancelledRef.current) {
-        return;
-      }
-      turnCancelledRef.current = true;
-      abortControllerRef.current?.abort();
-      if (pendingHistoryItemRef.current) {
-        addItem(pendingHistoryItemRef.current, Date.now());
-      }
-      addItem(
-        {
-          type: MessageType.INFO,
-          text: 'Request cancelled.',
-        },
-        Date.now(),
-      );
-      setPendingHistoryItem(null);
-      onCancelSubmit();
-      setIsResponding(false);
+  const cancelRequest = useCallback(() => {
+    if (turnCancelledRef.current) {
+      return;
     }
-  });
+    turnCancelledRef.current = true;
+    abortControllerRef.current?.abort();
+
+    // Persist any pending tool calls to history with a Canceled status.
+    if (toolCalls.length > 0) {
+      const toolGroupDisplay = mapTrackedToolCallsToDisplay(toolCalls);
+      const updatedTools = toolGroupDisplay.tools.map((tool) =>
+        tool.status === ToolCallStatus.Pending ||
+        tool.status === ToolCallStatus.Confirming ||
+        tool.status === ToolCallStatus.Executing
+          ? { ...tool, status: ToolCallStatus.Canceled }
+          : tool,
+      );
+      const updatedToolGroup: HistoryItemToolGroup = {
+        ...toolGroupDisplay,
+        tools: updatedTools,
+      };
+      addItem(updatedToolGroup, Date.now());
+    }
+
+    // Persist any other pending history item (e.g., streaming text).
+    if (
+      pendingHistoryItemRef.current &&
+      !(
+        toolCalls.length > 0 &&
+        pendingHistoryItemRef.current.type === 'tool_group'
+      )
+    ) {
+      addItem(pendingHistoryItemRef.current, Date.now());
+    }
+
+    addItem(
+      {
+        type: MessageType.INFO,
+        text: 'Request cancelled.',
+      },
+      Date.now(),
+    );
+    setPendingHistoryItem(null);
+    onCancelSubmit();
+    setIsResponding(false);
+    setThought(null); // Also reset any active "thought" display.
+  }, [
+    addItem,
+    onCancelSubmit,
+    pendingHistoryItemRef,
+    setPendingHistoryItem,
+    setIsResponding,
+    setThought,
+    toolCalls,
+  ]);
 
   const prepareQueryForGemini = useCallback(
     async (
@@ -948,11 +981,22 @@ export const useGeminiStream = (
     saveRestorableToolCalls();
   }, [toolCalls, config, onDebugMessage, gitService, history, geminiClient]);
 
+  // Input Handling Effect
+  useInput((input, key) => {
+    if (
+      streamingState === StreamingState.Responding &&
+      (key.escape || (key.ctrl && input === 'c'))
+    ) {
+      cancelRequest();
+    }
+  });
+
   return {
     streamingState,
     submitQuery,
     initError,
     pendingHistoryItems,
     thought,
+    cancelRequest,
   };
 };
