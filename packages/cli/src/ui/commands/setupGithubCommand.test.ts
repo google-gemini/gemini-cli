@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Readable } from 'node:stream';
+import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+
 import { vi, describe, expect, it, afterEach, beforeEach } from 'vitest';
 import * as gitUtils from '../../utils/gitUtils.js';
 import { setupGithubCommand } from './setupGithubCommand.js';
@@ -22,19 +27,35 @@ vi.mock('../../utils/gitUtils.js', () => ({
 }));
 
 describe('setupGithubCommand', async () => {
-  beforeEach(() => {
+  let scratchDir = '';
+
+  beforeEach(async () => {
     vi.resetAllMocks();
+    scratchDir = await fs.mkdtemp(path.join(os.tmpdir(), ''));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
+    if (scratchDir) await fs.rm(scratchDir, { recursive: true });
   });
 
   it('returns a tool action to download github workflows and handles paths', async () => {
     const fakeRepoOwner = 'fake';
     const fakeRepoName = 'repo';
-    const fakeRepoRoot = `/github.com/${fakeRepoOwner}/${fakeRepoName}/root`;
+    const fakeRepoRoot = scratchDir;
     const fakeReleaseVersion = 'v1.2.3';
+
+    const workflows = [
+      'gemini-cli.yml',
+      'gemini-issue-automated-triage.yml',
+      'gemini-issue-scheduled-triage.yml',
+      'gemini-pr-review.yml',
+    ];
+    for (const workflow of workflows) {
+      vi.mocked(global.fetch).mockReturnValueOnce(
+        Promise.resolve(new Response(workflow)),
+      );
+    }
 
     vi.mocked(gitUtils.isGitHubRepository).mockReturnValueOnce(true);
     vi.mocked(gitUtils.getGitRepoRoot).mockReturnValueOnce(fakeRepoRoot);
@@ -55,16 +76,22 @@ describe('setupGithubCommand', async () => {
 
     const expectedSubstrings = [
       `set -eEuo pipefail`,
-      `mkdir -p "${fakeRepoRoot}/.github/workflows"`,
-      `curl --fail --location --output "/github.com/fake/repo/root/.github/workflows/gemini-cli.yml" --show-error --silent`,
-      `curl --fail --location --output "/github.com/fake/repo/root/.github/workflows/gemini-issue-automated-triage.yml" --show-error --silent`,
-      `curl --fail --location --output "/github.com/fake/repo/root/.github/workflows/gemini-issue-scheduled-triage.yml" --show-error --silent`,
-      `curl --fail --location --output "/github.com/fake/repo/root/.github/workflows/gemini-pr-review.yml" --show-error --silent`,
-      `https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/tags/`,
+      `open "https://github.com/google-github-actions/run-gemini-cli`,
     ];
 
     for (const substring of expectedSubstrings) {
       expect(command).toContain(substring);
+    }
+
+    for (const workflow of workflows) {
+      const workflowFile = path.join(
+        scratchDir,
+        '.github',
+        'workflows',
+        workflow,
+      );
+      const contents = await fs.readFile(workflowFile, 'utf8');
+      expect(contents).toContain(workflow);
     }
   });
 });
