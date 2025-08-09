@@ -138,8 +138,6 @@ describe('SettingsDialog', () => {
     });
   });
 
-
-
   describe('Settings Navigation', () => {
     it('should navigate down with arrow key', async () => {
       const settings = createMockSettings();
@@ -309,7 +307,7 @@ describe('SettingsDialog', () => {
       const { unmount } = render(
         <SettingsDialog
           settings={settings}
-          onSelect={() => { }}
+          onSelect={() => {}}
           onRestartRequest={onRestartRequest}
         />,
       );
@@ -328,7 +326,7 @@ describe('SettingsDialog', () => {
       const { stdin, unmount } = render(
         <SettingsDialog
           settings={settings}
-          onSelect={() => { }}
+          onSelect={() => {}}
           onRestartRequest={onRestartRequest}
         />,
       );
@@ -815,7 +813,7 @@ describe('SettingsDialog', () => {
       const { stdin, unmount } = render(
         <SettingsDialog
           settings={settings}
-          onSelect={() => { }}
+          onSelect={() => {}}
           onRestartRequest={onRestartRequest}
         />,
       );
