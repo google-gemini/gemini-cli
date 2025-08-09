@@ -5,6 +5,7 @@
  */
 
 import {
+  FileDiff,
   logToolCall,
   ToolCallRequestInfo,
   ToolCallResponseInfo,
@@ -14,7 +15,7 @@ import {
 } from '../index.js';
 import { Config } from '../config/config.js';
 import { convertToFunctionResponse } from './coreToolScheduler.js';
-import { ToolCallDecision } from '../telemetry/types.js';
+import { ToolCallDecision } from '../telemetry/tool-call-decision.js';
 
 /**
  * Executes a single tool call non-interactively.
@@ -75,6 +76,24 @@ export async function executeToolCall(
 
     const tool_display = toolResult.returnDisplay;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let metadata: { [key: string]: any } = {};
+    if (
+      toolResult.error === undefined &&
+      typeof tool_display === 'object' &&
+      tool_display !== null &&
+      'diffStat' in tool_display
+    ) {
+      const diffStat = (tool_display as FileDiff).diffStat;
+      if (diffStat) {
+        metadata = {
+          ai_added_lines: diffStat.ai_added_lines,
+          ai_removed_lines: diffStat.ai_removed_lines,
+          user_added_lines: diffStat.user_added_lines,
+          user_removed_lines: diffStat.user_removed_lines,
+        };
+      }
+    }
     const durationMs = Date.now() - startTime;
     logToolCall(config, {
       'event.name': 'tool_call',
@@ -88,6 +107,7 @@ export async function executeToolCall(
       error_type:
         toolResult.error === undefined ? undefined : toolResult.error.type,
       prompt_id: toolCallRequest.prompt_id,
+      metadata,
       decision: ToolCallDecision.AUTO_ACCEPT,
     });
 

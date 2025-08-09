@@ -30,8 +30,8 @@ import {
   getCachedGoogleAccount,
   getLifetimeGoogleAccounts,
 } from '../../utils/user_account.js';
-import { HttpError, retryWithBackoff } from '../../utils/retry.js';
 import { getInstallationId } from '../../utils/user_id.js';
+import { FixedDeque } from 'mnemonist';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -51,18 +51,60 @@ export interface LogResponse {
   nextRequestWaitMs?: number;
 }
 
+export interface LogEventEntry {
+  event_time_ms: number;
+  source_extension_json: string;
+}
+
+export type EventValue = {
+  gemini_cli_key: EventMetadataKey | string;
+  value: string;
+};
+
+export type LogEvent = {
+  console_type: string;
+  application: number;
+  event_name: string;
+  event_metadata: EventValue[][];
+  client_email?: string;
+  client_install_id?: string;
+};
+
+/**
+ * Determine the surface that the user is currently using.  Surface is effectively the
+ * distribution channel in which the user is using Gemini CLI.  Gemini CLI comes bundled
+ * w/ Firebase Studio and Cloud Shell.  Users that manually download themselves will
+ * likely be "SURFACE_NOT_SET".
+ *
+ * This is computed based upon a series of environment variables these distribution
+ * methods might have in their runtimes.
+ */
+function determineSurface(): string {
+  if (process.env.CLOUD_SHELL === 'true') {
+    return 'CLOUD_SHELL';
+  } else if (process.env.MONOSPACE_ENV === 'true') {
+    return 'FIREBASE_STUDIO';
+  } else {
+    return process.env.SURFACE || 'SURFACE_NOT_SET';
+  }
+}
+
 // Singleton class for batch posting log events to Clearcut. When a new event comes in, the elapsed time
 // is checked and events are flushed to Clearcut if at least a minute has passed since the last flush.
 export class ClearcutLogger {
   private static instance: ClearcutLogger;
   private config?: Config;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Clearcut expects this format.
-  private readonly events: any = [];
+  private readonly events: FixedDeque<LogEventEntry[]>;
   private last_flush_time: number = Date.now();
   private flush_interval_ms: number = 1000 * 60; // Wait at least a minute before flushing events.
+  private readonly max_events: number = 1000; // Maximum events to keep in memory
+  private readonly max_retry_events: number = 100; // Maximum failed events to retry
+  private flushing: boolean = false; // Prevent concurrent flush operations
+  private pendingFlush: boolean = false; // Track if a flush was requested during an ongoing flush
 
   private constructor(config?: Config) {
     this.config = config;
+    this.events = new FixedDeque<LogEventEntry[]>(Array, this.max_events);
   }
 
   static getInstance(config?: Config): ClearcutLogger | undefined {
@@ -74,17 +116,41 @@ export class ClearcutLogger {
     return ClearcutLogger.instance;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Clearcut expects this format.
-  enqueueLogEvent(event: any): void {
-    this.events.push([
-      {
-        event_time_ms: Date.now(),
-        source_extension_json: safeJsonStringify(event),
-      },
-    ]);
+  /** For testing purposes only. */
+  static clearInstance(): void {
+    // @ts-expect-error - ClearcutLogger is a singleton, but we need to clear it for tests.
+    ClearcutLogger.instance = undefined;
   }
 
-  createLogEvent(name: string, data: object[]): object {
+  enqueueLogEvent(event: object): void {
+    try {
+      // Manually handle overflow for FixedDeque, which throws when full.
+      const wasAtCapacity = this.events.size >= this.max_events;
+
+      if (wasAtCapacity) {
+        this.events.shift(); // Evict oldest element to make space.
+      }
+
+      this.events.push([
+        {
+          event_time_ms: Date.now(),
+          source_extension_json: safeJsonStringify(event),
+        },
+      ]);
+
+      if (wasAtCapacity && this.config?.getDebugMode()) {
+        console.debug(
+          `ClearcutLogger: Dropped old event to prevent memory leak (queue size: ${this.events.size})`,
+        );
+      }
+    } catch (error) {
+      if (this.config?.getDebugMode()) {
+        console.error('ClearcutLogger: Failed to enqueue log event.', error);
+      }
+    }
+  }
+
+  createLogEvent(name: string, data: EventValue[]): LogEvent {
     const email = getCachedGoogleAccount();
     const totalAccounts = getLifetimeGoogleAccounts();
     data.push({
@@ -92,12 +158,11 @@ export class ClearcutLogger {
       value: totalAccounts.toString(),
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const logEvent: any = {
+    const logEvent: LogEvent = {
       console_type: 'GEMINI_CLI',
       application: 102,
       event_name: name,
-      event_metadata: [data] as object[],
+      event_metadata: [data],
     };
 
     // Should log either email or install ID, not both. See go/cloudmill-1p-oss-instrumentation#define-sessionable-id
@@ -121,16 +186,25 @@ export class ClearcutLogger {
   }
 
   async flushToClearcut(): Promise<LogResponse> {
+    if (this.flushing) {
+      if (this.config?.getDebugMode()) {
+        console.debug(
+          'ClearcutLogger: Flush already in progress, marking pending flush.',
+        );
+      }
+      this.pendingFlush = true;
+      return Promise.resolve({});
+    }
+    this.flushing = true;
+
     if (this.config?.getDebugMode()) {
       console.log('Flushing log events to Clearcut.');
     }
-    const eventsToSend = [...this.events];
-    if (eventsToSend.length === 0) {
-      return {};
-    }
+    const eventsToSend = this.events.toArray() as LogEventEntry[][];
+    this.events.clear();
 
-    const flushFn = () =>
-      new Promise<Buffer>((resolve, reject) => {
+    return new Promise<{ buffer: Buffer; statusCode?: number }>(
+      (resolve, reject) => {
         const request = [
           {
             log_source_name: 'CONCORD',
@@ -144,6 +218,7 @@ export class ClearcutLogger {
           path: '/log',
           method: 'POST',
           headers: { 'Content-Length': Buffer.byteLength(body) },
+          timeout: 30000, // 30-second timeout
         };
         const bufs: Buffer[] = [];
         const req = https.request(
@@ -152,49 +227,77 @@ export class ClearcutLogger {
             agent: this.getProxyAgent(),
           },
           (res) => {
-            if (
-              res.statusCode &&
-              (res.statusCode < 200 || res.statusCode >= 300)
-            ) {
-              const err: HttpError = new Error(
-                `Request failed with status ${res.statusCode}`,
-              );
-              err.status = res.statusCode;
-              res.resume();
-              return reject(err);
-            }
+            res.on('error', reject); // Handle stream errors
             res.on('data', (buf) => bufs.push(buf));
-            res.on('end', () => resolve(Buffer.concat(bufs)));
+            res.on('end', () => {
+              try {
+                const buffer = Buffer.concat(bufs);
+                // Check if we got a successful response
+                if (
+                  res.statusCode &&
+                  res.statusCode >= 200 &&
+                  res.statusCode < 300
+                ) {
+                  resolve({ buffer, statusCode: res.statusCode });
+                } else {
+                  // HTTP error - reject with status code for retry handling
+                  reject(
+                    new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`),
+                  );
+                }
+              } catch (e) {
+                reject(e);
+              }
+            });
           },
         );
-        req.on('error', reject);
+        req.on('error', (e) => {
+          // Network-level error
+          reject(e);
+        });
+        req.on('timeout', () => {
+          if (!req.destroyed) {
+            req.destroy(new Error('Request timeout after 30 seconds'));
+          }
+        });
         req.end(body);
+      },
+    )
+      .then(({ buffer }) => {
+        try {
+          this.last_flush_time = Date.now();
+          return this.decodeLogResponse(buffer) || {};
+        } catch (error: unknown) {
+          console.error('Error decoding log response:', error);
+          return {};
+        }
+      })
+      .catch((error: unknown) => {
+        // Handle both network-level and HTTP-level errors
+        if (this.config?.getDebugMode()) {
+          console.error('Error flushing log events:', error);
+        }
+
+        // Re-queue failed events for retry
+        this.requeueFailedEvents(eventsToSend);
+
+        // Return empty response to maintain the Promise<LogResponse> contract
+        return {};
+      })
+      .finally(() => {
+        this.flushing = false;
+
+        // If a flush was requested while we were flushing, flush again
+        if (this.pendingFlush) {
+          this.pendingFlush = false;
+          // Fire and forget the pending flush
+          this.flushToClearcut().catch((error) => {
+            if (this.config?.getDebugMode()) {
+              console.debug('Error in pending flush to Clearcut:', error);
+            }
+          });
+        }
       });
-
-    try {
-      const responseBuffer = await retryWithBackoff(flushFn, {
-        maxAttempts: 3,
-        initialDelayMs: 200,
-        shouldRetry: (err: unknown) => {
-          if (!(err instanceof Error)) return false;
-          const status = (err as HttpError).status as number | undefined;
-          // If status is not available, it's likely a network error
-          if (status === undefined) return true;
-
-          // Retry on 429 (Too many Requests) and 5xx server errors.
-          return status === 429 || (status >= 500 && status < 600);
-        },
-      });
-
-      this.events.splice(0, eventsToSend.length);
-      this.last_flush_time = Date.now();
-      return this.decodeLogResponse(responseBuffer) || {};
-    } catch (error) {
-      if (this.config?.getDebugMode()) {
-        console.error('Clearcut flush failed after multiple retries.', error);
-      }
-      return {};
-    }
   }
 
   // Visible for testing. Decodes protobuf-encoded response from Clearcut server.
@@ -237,12 +340,9 @@ export class ClearcutLogger {
   }
 
   logStartSessionEvent(event: StartSessionEvent): void {
-    const surface =
-      process.env.CLOUD_SHELL === 'true'
-        ? 'CLOUD_SHELL'
-        : process.env.SURFACE || 'SURFACE_NOT_SET';
+    const surface = determineSurface();
 
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
         value: event.model,
@@ -321,7 +421,7 @@ export class ClearcutLogger {
   }
 
   logNewPromptEvent(event: UserPromptEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_PROMPT_LENGTH,
         value: JSON.stringify(event.prompt_length),
@@ -345,7 +445,7 @@ export class ClearcutLogger {
   }
 
   logToolCallEvent(event: ToolCallEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
         value: JSON.stringify(event.function_name),
@@ -376,13 +476,31 @@ export class ClearcutLogger {
       },
     ];
 
+    if (event.metadata) {
+      const metadataMapping: { [key: string]: EventMetadataKey } = {
+        ai_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
+        ai_removed_lines: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
+        user_added_lines: EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
+        user_removed_lines: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
+      };
+
+      for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {
+        if (event.metadata[key] !== undefined) {
+          data.push({
+            gemini_cli_key,
+            value: JSON.stringify(event.metadata[key]),
+          });
+        }
+      }
+    }
+
     const logEvent = this.createLogEvent(tool_call_event_name, data);
     this.enqueueLogEvent(logEvent);
     this.flushIfNeeded();
   }
 
   logApiRequestEvent(event: ApiRequestEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
         value: JSON.stringify(event.model),
@@ -398,7 +516,7 @@ export class ClearcutLogger {
   }
 
   logApiResponseEvent(event: ApiResponseEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_RESPONSE_MODEL,
         value: JSON.stringify(event.model),
@@ -455,7 +573,7 @@ export class ClearcutLogger {
   }
 
   logApiErrorEvent(event: ApiErrorEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_MODEL,
         value: JSON.stringify(event.model),
@@ -487,7 +605,7 @@ export class ClearcutLogger {
   }
 
   logFlashFallbackEvent(event: FlashFallbackEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
         value: JSON.stringify(event.auth_type),
@@ -505,7 +623,7 @@ export class ClearcutLogger {
   }
 
   logLoopDetectedEvent(event: LoopDetectedEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
         value: JSON.stringify(event.prompt_id),
@@ -521,7 +639,7 @@ export class ClearcutLogger {
   }
 
   logNextSpeakerCheck(event: NextSpeakerCheckEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
         value: JSON.stringify(event.prompt_id),
@@ -547,7 +665,7 @@ export class ClearcutLogger {
   }
 
   logSlashCommandEvent(event: SlashCommandEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_NAME,
         value: JSON.stringify(event.command),
@@ -566,7 +684,7 @@ export class ClearcutLogger {
   }
 
   logMalformedJsonResponseEvent(event: MalformedJsonResponseEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_MALFORMED_JSON_RESPONSE_MODEL,
@@ -581,7 +699,7 @@ export class ClearcutLogger {
   }
 
   logIdeConnectionEvent(event: IdeConnectionEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_IDE_CONNECTION_TYPE,
         value: JSON.stringify(event.connection_type),
@@ -593,7 +711,7 @@ export class ClearcutLogger {
   }
 
   logEndSessionEvent(event: EndSessionEvent): void {
-    const data = [
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
         value: event?.session_id?.toString() ?? '',
@@ -622,5 +740,58 @@ export class ClearcutLogger {
   shutdown() {
     const event = new EndSessionEvent(this.config);
     this.logEndSessionEvent(event);
+  }
+
+  private requeueFailedEvents(eventsToSend: LogEventEntry[][]): void {
+    // Add the events back to the front of the queue to be retried, but limit retry queue size
+    const eventsToRetry = eventsToSend.slice(-this.max_retry_events); // Keep only the most recent events
+
+    // Log a warning if we're dropping events
+    if (
+      eventsToSend.length > this.max_retry_events &&
+      this.config?.getDebugMode()
+    ) {
+      console.warn(
+        `ClearcutLogger: Dropping ${
+          eventsToSend.length - this.max_retry_events
+        } events due to retry queue limit. Total events: ${
+          eventsToSend.length
+        }, keeping: ${this.max_retry_events}`,
+      );
+    }
+
+    // Determine how many events can be re-queued
+    const availableSpace = this.max_events - this.events.size;
+    const numEventsToRequeue = Math.min(eventsToRetry.length, availableSpace);
+
+    if (numEventsToRequeue === 0) {
+      if (this.config?.getDebugMode()) {
+        console.debug(
+          `ClearcutLogger: No events re-queued (queue size: ${this.events.size})`,
+        );
+      }
+      return;
+    }
+
+    // Get the most recent events to re-queue
+    const eventsToRequeue = eventsToRetry.slice(
+      eventsToRetry.length - numEventsToRequeue,
+    );
+
+    // Prepend events to the front of the deque to be retried first.
+    // We iterate backwards to maintain the original order of the failed events.
+    for (let i = eventsToRequeue.length - 1; i >= 0; i--) {
+      this.events.unshift(eventsToRequeue[i]);
+    }
+    // Clear any potential overflow
+    while (this.events.size > this.max_events) {
+      this.events.pop();
+    }
+
+    if (this.config?.getDebugMode()) {
+      console.debug(
+        `ClearcutLogger: Re-queued ${numEventsToRequeue} events for retry (queue size: ${this.events.size})`,
+      );
+    }
   }
 }

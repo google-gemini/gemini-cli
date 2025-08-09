@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "Gemini CLI",
   "repository": {
     "type": "git",
@@ -25,12 +25,13 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.17"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.18"
   },
   "dependencies": {
     "@google/gemini-cli-core": "file:../core",
     "@google/genai": "1.9.0",
     "@iarna/toml": "^2.2.5",
+    "@modelcontextprotocol/sdk": "^1.15.1",
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
@@ -52,6 +53,7 @@
     "string-width": "^7.1.0",
     "strip-ansi": "^7.1.0",
     "strip-json-comments": "^3.1.1",
+    "undici": "^7.10.0",
     "update-notifier": "^7.3.1",
     "yargs": "^17.7.2",
     "zod": "^3.23.8"

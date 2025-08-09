@@ -55,7 +55,7 @@ jobs:
           private-key: '${{ secrets.PRIVATE_KEY }}'
 
       - name: 'Run Gemini Issue Triage'
-        uses: 'google-github-actions/run-gemini-cli@68d5a6d2e31ff01029205c58c6bf81cb3d72910b'
+        uses: 'google-github-actions/run-gemini-cli@20351b5ea2b4179431f1ae8918a246a0808f8747'
         id: 'gemini_issue_triage'
         env:
           GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
@@ -75,6 +75,7 @@ jobs:
             {
               "maxSessionTurns": 25,
               "coreTools": [
+                "run_shell_command(echo)",
                 "run_shell_command(gh label list)",
                 "run_shell_command(gh issue edit)",
                 "run_shell_command(gh issue list)"
@@ -87,26 +88,27 @@ jobs:
           prompt: |-
             ## Role
 
-            You are an issue triage assistant. Analyze the current GitHub issues apply the most appropriate existing labels. Do not remove labels titled help wanted or good first issue.
+            You are an issue triage assistant. Analyze the current GitHub issue and apply the most appropriate existing labels. Use the available
+            tools to gather information; do not ask for information to be provided. Do not remove labels titled help wanted or good first issue.
 
             ## Steps
 
             1. Run: `gh label list --repo ${{ github.repository }} --limit 100` to get all available labels.
-            2. Review the issue title, body and any comments provided in the environment variables.
+            2. Review the issue title and body provided in the environment variables: "${ISSUE_TITLE}" and "${ISSUE_BODY}".
             3. Ignore any existing priorities or tags on the issue. Just report your findings.
             4. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. For area/* and kind/* limit yourself to only the single most applicable label in each case. 
-            6. Apply the selected labels to this issue using: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`
-            7. For each issue please check if CLI version is present, this is usually in the output of the /about command  and will look like 0.1.5 for anything more than 6 versions older than the most recent should add the status/need-retesting label
-            8. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label
-            9. Use Area definitions mentioned below to help you narrow down issues
+            6. Apply the selected labels to this issue using: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`.
+            7. For each issue please check if CLI version is present, this is usually in the output of the /about command  and will look like 0.1.5 for anything more than 6 versions older than the most recent should add the status/need-retesting label.
+            8. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label.
+            9. Use Area definitions mentioned below to help you narrow down issues.
 
             ## Guidelines
 
             - Only use labels that already exist in the repository.
             - Do not add comments or modify the issue content.
             - Triage only the current issue.
-            - Apply only one area/ label
-            - Apply only one kind/ label
+            - Apply only one area/ label.
+            - Apply only one kind/ label.
             - Apply all applicable sub-area/* and priority/* labels based on the issue content. It's ok to have multiple of these.
             - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
             Categorization Guidelines: 

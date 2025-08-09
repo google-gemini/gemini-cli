@@ -9,11 +9,13 @@ import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import {
   BaseDeclarativeTool,
+  BaseToolInvocation,
   Icon,
   ToolInvocation,
   ToolLocation,
   ToolResult,
 } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 import { PartUnion, Type } from '@google/genai';
 import {
   processSingleFileContent,
@@ -45,13 +47,16 @@ export interface ReadFileToolParams {
   limit?: number;
 }
 
-class ReadFileToolInvocation
-  implements ToolInvocation<ReadFileToolParams, ToolResult>
-{
+class ReadFileToolInvocation extends BaseToolInvocation<
+  ReadFileToolParams,
+  ToolResult
+> {
   constructor(
     private config: Config,
-    public params: ReadFileToolParams,
-  ) {}
+    params: ReadFileToolParams,
+  ) {
+    super(params);
+  }
 
   getDescription(): string {
     const relativePath = makeRelative(
@@ -61,12 +66,8 @@ class ReadFileToolInvocation
     return shortenPath(relativePath);
   }
 
-  toolLocations(): ToolLocation[] {
+  override toolLocations(): ToolLocation[] {
     return [{ path: this.params.absolute_path, line: this.params.offset }];
-  }
-
-  shouldConfirmExecute(): Promise<false> {
-    return Promise.resolve(false);
   }
 
   async execute(): Promise<ToolResult> {
@@ -78,9 +79,45 @@ class ReadFileToolInvocation
     );
 
     if (result.error) {
+      // Map error messages to ToolErrorType
+      let errorType: ToolErrorType;
+      let llmContent: string;
+
+      // Check error message patterns to determine error type
+      if (
+        result.error.includes('File not found') ||
+        result.error.includes('does not exist') ||
+        result.error.includes('ENOENT')
+      ) {
+        errorType = ToolErrorType.FILE_NOT_FOUND;
+        llmContent =
+          'Could not read file because no file was found at the specified path.';
+      } else if (
+        result.error.includes('is a directory') ||
+        result.error.includes('EISDIR')
+      ) {
+        errorType = ToolErrorType.INVALID_TOOL_PARAMS;
+        llmContent =
+          'Could not read file because the provided path is a directory, not a file.';
+      } else if (
+        result.error.includes('too large') ||
+        result.error.includes('File size exceeds')
+      ) {
+        errorType = ToolErrorType.FILE_TOO_LARGE;
+        llmContent = `Could not read file. ${result.error}`;
+      } else {
+        // Other read errors map to READ_CONTENT_FAILURE
+        errorType = ToolErrorType.READ_CONTENT_FAILURE;
+        llmContent = `Could not read file. ${result.error}`;
+      }
+
       return {
-        llmContent: result.error, // The detailed error for LLM
-        returnDisplay: result.returnDisplay || 'Error reading file', // User-friendly error
+        llmContent,
+        returnDisplay: result.returnDisplay || 'Error reading file',
+        error: {
+          message: result.error,
+          type: errorType,
+        },
       };
     }
 
