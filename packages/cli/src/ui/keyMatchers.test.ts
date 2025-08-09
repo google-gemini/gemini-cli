@@ -21,7 +21,8 @@ describe('keyMatchers', () => {
   });
 
   // Original hard-coded logic (for comparison)
-  const originalMatchers = {
+  const originalMatchers: Record<Command, (key: Key) => boolean> = {
+    [Command.RETURN]: (key: Key) => key.name === 'return',
     [Command.HOME]: (key: Key) => key.ctrl && key.name === 'a',
     [Command.END]: (key: Key) => key.ctrl && key.name === 'e',
     [Command.KILL_LINE_RIGHT]: (key: Key) => key.ctrl && key.name === 'k',
@@ -34,6 +35,10 @@ describe('keyMatchers', () => {
     [Command.NAVIGATION_DOWN]: (key: Key) => key.name === 'down',
     [Command.ACCEPT_SUGGESTION]: (key: Key) =>
       key.name === 'tab' || (key.name === 'return' && !key.ctrl),
+    [Command.COMPLETION_UP]: (key: Key) =>
+      key.name === 'up' || (key.ctrl && key.name === 'p'),
+    [Command.COMPLETION_DOWN]: (key: Key) =>
+      key.name === 'down' || (key.ctrl && key.name === 'n'),
     [Command.ESCAPE]: (key: Key) => key.name === 'escape',
     [Command.SUBMIT]: (key: Key) =>
       key.name === 'return' && !key.ctrl && !key.meta && !key.paste,
@@ -47,10 +52,8 @@ describe('keyMatchers', () => {
       key.ctrl && key.name === 't',
     [Command.TOGGLE_IDE_CONTEXT_DETAIL]: (key: Key) =>
       key.ctrl && key.name === 'e',
-    [Command.QUIT]: (key: Key) =>
-      key.ctrl && (key.name === 'c' || key.name === 'C'),
-    [Command.EXIT]: (key: Key) =>
-      key.ctrl && (key.name === 'd' || key.name === 'D'),
+    [Command.QUIT]: (key: Key) => key.ctrl && key.name === 'c',
+    [Command.EXIT]: (key: Key) => key.ctrl && key.name === 'd',
     [Command.SHOW_MORE_LINES]: (key: Key) => key.ctrl && key.name === 's',
     [Command.REVERSE_SEARCH]: (key: Key) => key.ctrl && key.name === 'r',
     [Command.SUBMIT_REVERSE_SEARCH]: (key: Key) =>
@@ -62,6 +65,11 @@ describe('keyMatchers', () => {
   // Test data for each command with positive and negative test cases
   const testCases = [
     // Basic bindings
+    {
+      command: Command.RETURN,
+      positive: [createKey('return')],
+      negative: [createKey('r')],
+    },
     {
       command: Command.ESCAPE,
       positive: [createKey('escape'), createKey('escape', { ctrl: true })],
@@ -140,6 +148,16 @@ describe('keyMatchers', () => {
       positive: [createKey('tab'), createKey('return')],
       negative: [createKey('return', { ctrl: true }), createKey('space')],
     },
+    {
+      command: Command.COMPLETION_UP,
+      positive: [createKey('up'), createKey('p', { ctrl: true })],
+      negative: [createKey('p'), createKey('down')],
+    },
+    {
+      command: Command.COMPLETION_DOWN,
+      positive: [createKey('down'), createKey('n', { ctrl: true })],
+      negative: [createKey('n'), createKey('up')],
+    },
 
     // Text input
     {
@@ -194,18 +212,12 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.QUIT,
-      positive: [
-        createKey('c', { ctrl: true }),
-        createKey('C', { ctrl: true }),
-      ],
+      positive: [createKey('c', { ctrl: true })],
       negative: [createKey('c'), createKey('d', { ctrl: true })],
     },
     {
       command: Command.EXIT,
-      positive: [
-        createKey('d', { ctrl: true }),
-        createKey('D', { ctrl: true }),
-      ],
+      positive: [createKey('d', { ctrl: true })],
       negative: [createKey('d'), createKey('c', { ctrl: true })],
     },
     {
@@ -318,19 +330,6 @@ describe('keyMatchers', () => {
 
       const matchers = createKeyMatchers(config);
       expect(matchers[Command.HOME](createKey('a', { ctrl: true }))).toBe(
-        false,
-      );
-    });
-
-    it('should handle case sensitivity', () => {
-      const config: KeyBindingConfig = {
-        ...defaultKeyBindings,
-        [Command.QUIT]: [{ key: 'Q', ctrl: true }],
-      };
-
-      const matchers = createKeyMatchers(config);
-      expect(matchers[Command.QUIT](createKey('Q', { ctrl: true }))).toBe(true);
-      expect(matchers[Command.QUIT](createKey('q', { ctrl: true }))).toBe(
         false,
       );
     });
