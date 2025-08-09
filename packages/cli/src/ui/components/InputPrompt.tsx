@@ -6,7 +6,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { TextBuffer, logicalPosToOffset } from './shared/text-buffer.js';
@@ -469,15 +469,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     <>
       <Box
         borderStyle="round"
-        borderColor={shellModeActive ? Colors.AccentYellow : Colors.AccentBlue}
+        borderColor={
+          shellModeActive ? theme.status.warning : theme.border.focused
+        }
         paddingX={1}
       >
         <Text
-          color={shellModeActive ? Colors.AccentYellow : Colors.AccentPurple}
+          color={shellModeActive ? theme.status.warning : theme.text.accent}
         >
           {shellModeActive ? (
             reverseSearchActive ? (
-              <Text color={Colors.AccentCyan}>(r:) </Text>
+              <Text color={theme.text.link}>(r:) </Text>
             ) : (
               '! '
             )
@@ -490,10 +492,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             focus ? (
               <Text>
                 {chalk.inverse(placeholder.slice(0, 1))}
-                <Text color={Colors.Gray}>{placeholder.slice(1)}</Text>
+                <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
               </Text>
             ) : (
-              <Text color={Colors.Gray}>{placeholder}</Text>
+              <Text color={theme.text.secondary}>{placeholder}</Text>
             )
           ) : (
             linesToRender.map((lineText, visualIdxInRenderedSet) => {
@@ -536,7 +538,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         </Box>
       </Box>
       {completion.showSuggestions && (
-        <Box>
+        <Box paddingRight={2}>
           <SuggestionsDisplay
             suggestions={completion.suggestions}
             activeIndex={completion.activeSuggestionIndex}
@@ -548,7 +550,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         </Box>
       )}
       {reverseSearchActive && (
-        <Box>
+        <Box paddingRight={2}>
           <SuggestionsDisplay
             suggestions={reverseSearchCompletion.suggestions}
             activeIndex={reverseSearchCompletion.activeSuggestionIndex}
