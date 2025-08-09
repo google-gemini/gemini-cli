@@ -93,6 +93,8 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { useSettingsCommand } from './hooks/useSettingsCommand.js';
+import { SettingsDialog } from './components/SettingsDialog.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
@@ -240,6 +242,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     handleThemeSelect,
     handleThemeHighlight,
   } = useThemeCommand(settings, setThemeError, addItem);
+
+  const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
+    useSettingsCommand();
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect } =
     useFolderTrust(settings);
@@ -504,6 +509,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     toggleCorgiMode,
     setQuittingMessages,
     openPrivacyNotice,
+    openSettingsDialog,
     toggleVimEnabled,
     setIsProcessing,
     setGeminiMdFileCount,
@@ -969,6 +975,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 terminalWidth={mainAreaWidth}
               />
             </Box>
+          ) : isSettingsDialogOpen ? (
+            <Box flexDirection="column">
+              <SettingsDialog
+                settings={settings}
+                onSelect={() => closeSettingsDialog()}
+                onRestartRequest={() => process.exit(0)}
+              />
+            </Box>
           ) : isAuthenticating ? (
             <>
               <AuthInProgress
@@ -1155,7 +1169,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             errorCount={errorCount}
             showErrorDetails={showErrorDetails}
             showMemoryUsage={
-              config.getDebugMode() || config.getShowMemoryUsage()
+              config.getDebugMode() || settings.merged.showMemoryUsage || false
             }
             promptTokenCount={sessionStats.lastPromptTokenCount}
             nightly={nightly}
