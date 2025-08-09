@@ -216,7 +216,7 @@ describe('chatCommand', () => {
       });
     });
 
-    it('should return confirm_overwrite if checkpoint already exists', async () => {
+    it('should return confirm_action if checkpoint already exists', async () => {
       mockCheckpointExists.mockResolvedValue(true);
       mockContext.invocation = {
         raw: `/chat save ${tag}`,
@@ -228,11 +228,12 @@ describe('chatCommand', () => {
 
       expect(mockCheckpointExists).toHaveBeenCalledWith(tag);
       expect(mockSaveCheckpoint).not.toHaveBeenCalled();
-      expect(result).toEqual({
-        type: 'confirm_overwrite',
-        tag,
+      expect(result).toMatchObject({
+        type: 'confirm_action',
         originalInvocation: { raw: `/chat save ${tag}` },
       });
+      // Check that prompt is a React element
+      expect(result).toHaveProperty('prompt');
     });
 
     it('should save the conversation if overwrite is confirmed', async () => {

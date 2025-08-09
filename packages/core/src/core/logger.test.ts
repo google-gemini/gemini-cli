@@ -584,16 +584,11 @@ describe('Logger', () => {
       expect(exists).toBe(false);
     });
 
-    it('should return false if logger is not initialized', async () => {
+    it('should throw an error if logger is not initialized', async () => {
       const uninitializedLogger = new Logger(testSessionId);
       uninitializedLogger.close();
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
 
-      const exists = await uninitializedLogger.checkpointExists(tag);
-      expect(exists).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      await expect(uninitializedLogger.checkpointExists(tag)).rejects.toThrow(
         'Logger not initialized. Cannot check for checkpoint existence.',
       );
     });
