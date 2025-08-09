@@ -157,7 +157,7 @@ function toVertexGenerateContentRequest(
   };
 }
 
-function toContents(contents: ContentListUnion): Content[] {
+export function toContents(contents: ContentListUnion): Content[] {
   if (Array.isArray(contents)) {
     // it's a Content[] or a PartsUnion[]
     return contents.map(toContent);

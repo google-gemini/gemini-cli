@@ -9,6 +9,7 @@ import {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
+  ChatCompressionSettings,
 } from '@google/gemini-cli-core';
 import { CustomTheme } from '../ui/themes/theme.js';
 import { hasMagic } from 'glob';
@@ -474,6 +475,33 @@ export const SETTINGS_SCHEMA = {
     requiresRestart: false,
     default: false,
     description: 'Enable folder trust feature for enhanced security.',
+    showInDialog: true,
+  },
+  folderTrust: {
+    type: 'boolean',
+    label: 'Folder Trust',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Setting to track whether Folder trust is enabled.',
+    showInDialog: true,
+  },
+  chatCompression: {
+    type: 'object',
+    label: 'Chat Compression',
+    category: 'General',
+    requiresRestart: false,
+    default: undefined as ChatCompressionSettings | undefined,
+    description: 'Chat compression settings.',
+    showInDialog: false,
+  },
+  showLineNumbers: {
+    type: 'boolean',
+    label: 'Show Line Numbers',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Show line numbers in the chat.',
     showInDialog: true,
   },
 } as const;
