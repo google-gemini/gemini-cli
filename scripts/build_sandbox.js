@@ -151,7 +151,8 @@ function buildImage(imageName, dockerfile) {
 
   try {
     execSync(
-      `${sandboxCommand} build ${buildCommandArgs} ${process.env.BUILD_SANDBOX_FLAGS || ''
+      `${sandboxCommand} build ${buildCommandArgs} ${
+        process.env.BUILD_SANDBOX_FLAGS || ''
       } --build-arg CLI_VERSION_ARG=${npmPackageVersion} -f "${dockerfile}" -t "${imageName}" .`,
       { stdio: buildStdout, shell: shellToUse },
     );
