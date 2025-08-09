@@ -696,6 +696,14 @@ export class Config {
     return this.chatCompression;
   }
 
+  getBaseUrl(): string | undefined {
+    return this.contentGeneratorConfig?.baseUrl;
+  }
+
+  getApiKeyHeader(): string | undefined {
+    return this.contentGeneratorConfig?.apiKeyHeader;
+  }
+
   isInteractive(): boolean {
     return this.interactive;
   }
