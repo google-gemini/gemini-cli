@@ -66,6 +66,11 @@ describe('keyMatchers', () => {
   const testCases = [
     // Basic bindings
     {
+      command: Command.RETURN,
+      positive: [createKey('return')],
+      negative: [createKey('r')],
+    },
+    {
       command: Command.ESCAPE,
       positive: [createKey('escape'), createKey('escape', { ctrl: true })],
       negative: [createKey('e'), createKey('esc')],
