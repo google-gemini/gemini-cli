@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
@@ -41,6 +41,7 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
 }
 
@@ -58,9 +59,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  onEscapePromptChange,
   vimHandleInput,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const [escPressCount, setEscPressCount] = useState(0);
+  const [showEscapePrompt, setShowEscapePrompt] = useState(false);
+  const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -97,6 +102,32 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const resetCompletionState = completion.resetCompletionState;
   const resetReverseSearchCompletionState =
     reverseSearchCompletion.resetCompletionState;
+
+  const resetEscapeState = useCallback(() => {
+    if (escapeTimerRef.current) {
+      clearTimeout(escapeTimerRef.current);
+      escapeTimerRef.current = null;
+    }
+    setEscPressCount(0);
+    setShowEscapePrompt(false);
+  }, []);
+
+  // Notify parent component about escape prompt state changes
+  useEffect(() => {
+    if (onEscapePromptChange) {
+      onEscapePromptChange(showEscapePrompt);
+    }
+  }, [showEscapePrompt, onEscapePromptChange]);
+
+  // Clear escape prompt timer on unmount
+  useEffect(
+    () => () => {
+      if (escapeTimerRef.current) {
+        clearTimeout(escapeTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
@@ -212,6 +243,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Reset ESC count and hide prompt on any non-ESC key
+      if (key.name !== 'escape') {
+        if (escPressCount > 0 || showEscapePrompt) {
+          resetEscapeState();
+        }
+      }
+
       if (
         key.sequence === '!' &&
         buffer.text === '' &&
@@ -237,13 +275,36 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
         if (shellModeActive) {
           setShellModeActive(false);
+          resetEscapeState();
           return;
         }
 
         if (completion.showSuggestions) {
           completion.resetCompletionState();
+          resetEscapeState();
           return;
         }
+
+        // Handle double ESC for clearing input
+        if (escPressCount === 0) {
+          if (buffer.text === '') {
+            return;
+          }
+          setEscPressCount(1);
+          setShowEscapePrompt(true);
+          if (escapeTimerRef.current) {
+            clearTimeout(escapeTimerRef.current);
+          }
+          escapeTimerRef.current = setTimeout(() => {
+            resetEscapeState();
+          }, 500);
+        } else {
+          // clear input and immediately reset state
+          buffer.setText('');
+          resetCompletionState();
+          resetEscapeState();
+        }
+        return;
       }
 
       if (shellModeActive && keyMatchers[Command.REVERSE_SEARCH](key)) {
@@ -418,7 +479,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (buffer.text.length > 0) {
           buffer.setText('');
           resetCompletionState();
-          return;
         }
         return;
       }
@@ -461,6 +521,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchCompletion,
       handleClipboardImage,
       resetCompletionState,
+      escPressCount,
+      showEscapePrompt,
+      resetEscapeState,
       vimHandleInput,
       reverseSearchActive,
       textBeforeReverseSearch,
