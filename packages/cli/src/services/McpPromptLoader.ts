@@ -135,6 +135,8 @@ export class McpPromptLoader implements ICommandLoader {
               return {
                 type: 'submit_prompt',
                 content: JSON.stringify(result.messages[0].content.text),
+                promptName: prompt.name,
+                promptArgs: promptInputs,
               };
             } catch (error) {
               return {

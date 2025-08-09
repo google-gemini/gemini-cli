@@ -171,6 +171,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [currentModel, setCurrentModel] = useState(config.getModel());
   const [shellModeActive, setShellModeActive] = useState(false);
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
+  const [showPromptDetails, setShowPromptDetails] = useState<boolean>(false);
   const [showToolDescriptions, setShowToolDescriptions] =
     useState<boolean>(false);
 
@@ -652,6 +653,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       }
       handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
     } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
+      setShowPromptDetails((prev) => !prev);
       setConstrainHeight(false);
     }
   });
@@ -949,6 +951,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                         constrainHeight ? debugConsoleMaxHeight : undefined
                       }
                       width={inputWidth}
+                      title="Debug Console"
+                      shortcut="ctrl+o to close"
                     />
                     <ShowMoreLines constrainHeight={constrainHeight} />
                   </Box>
@@ -1048,6 +1052,37 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                         constrainHeight ? debugConsoleMaxHeight : undefined
                       }
                       width={inputWidth}
+                      title="Debug Console"
+                      shortcut="ctrl+o to close"
+                    />
+                    <ShowMoreLines constrainHeight={constrainHeight} />
+                  </Box>
+                </OverflowProvider>
+              )}
+              {showPromptDetails && (
+                <OverflowProvider>
+                  <Box flexDirection="column">
+                    <DetailedMessagesDisplay
+                      messages={[
+                        {
+                          type: 'debug',
+                          content:
+                            history
+                              .slice()
+                              .reverse()
+                              .find(
+                                (item) =>
+                                  item.type === 'gemini' && !!item.details,
+                              )?.details || 'No prompt details found.',
+                          count: 1,
+                        },
+                      ]}
+                      maxHeight={
+                        constrainHeight ? debugConsoleMaxHeight : undefined
+                      }
+                      width={inputWidth}
+                      title="Prompt Details"
+                      shortcut="ctrl+s to close"
                     />
                     <ShowMoreLines constrainHeight={constrainHeight} />
                   </Box>
