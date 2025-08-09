@@ -370,6 +370,7 @@ export class MCPOAuthProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
       },
       body: params.toString(),
     });
@@ -378,6 +379,13 @@ export class MCPOAuthProvider {
       const errorText = await response.text();
       throw new Error(
         `Token exchange failed: ${response.status} - ${errorText}`,
+      );
+    }
+
+    const contentType = response.headers?.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error(
+        `Token exchange failed: Expected JSON response but received Content-Type: ${contentType || 'undefined'}`,
       );
     }
 
@@ -432,6 +440,7 @@ export class MCPOAuthProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
       },
       body: params.toString(),
     });
@@ -440,6 +449,13 @@ export class MCPOAuthProvider {
       const errorText = await response.text();
       throw new Error(
         `Token refresh failed: ${response.status} - ${errorText}`,
+      );
+    }
+
+    const contentType = response.headers?.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error(
+        `Token refresh failed: Expected JSON response but received Content-Type: ${contentType || 'undefined'}`,
       );
     }
 
