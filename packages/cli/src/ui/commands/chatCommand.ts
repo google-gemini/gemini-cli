@@ -5,11 +5,15 @@
  */
 
 import * as fsPromises from 'fs/promises';
+import React from 'react';
+import { Text } from 'ink';
+import { Colors } from '../colors.js';
 import {
   CommandContext,
   SlashCommand,
   MessageActionReturn,
   CommandKind,
+  SlashCommandActionReturn,
 } from './types.js';
 import path from 'path';
 import { HistoryItemWithoutId, MessageType } from '../types.js';
@@ -96,7 +100,7 @@ const saveCommand: SlashCommand = {
   description:
     'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
   kind: CommandKind.BUILT_IN,
-  action: async (context, args): Promise<MessageActionReturn> => {
+  action: async (context, args): Promise<SlashCommandActionReturn | void> => {
     const tag = args.trim();
     if (!tag) {
       return {
@@ -108,6 +112,26 @@ const saveCommand: SlashCommand = {
 
     const { logger, config } = context.services;
     await logger.initialize();
+
+    if (!context.overwriteConfirmed) {
+      const exists = await logger.checkpointExists(tag);
+      if (exists) {
+        return {
+          type: 'confirm_action',
+          prompt: React.createElement(
+            Text,
+            null,
+            'A checkpoint with the tag ',
+            React.createElement(Text, { color: Colors.AccentPurple }, tag),
+            ' already exists. Do you want to overwrite it?',
+          ),
+          originalInvocation: {
+            raw: context.invocation?.raw || `/chat save ${tag}`,
+          },
+        };
+      }
+    }
+
     const chat = await config?.getGeminiClient()?.getChat();
     if (!chat) {
       return {

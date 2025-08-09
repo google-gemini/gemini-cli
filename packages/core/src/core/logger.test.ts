@@ -565,6 +565,52 @@ describe('Logger', () => {
     });
   });
 
+  describe('checkpointExists', () => {
+    const tag = 'exists-test';
+    let taggedFilePath: string;
+
+    beforeEach(() => {
+      taggedFilePath = path.join(TEST_GEMINI_DIR, `checkpoint-${tag}.json`);
+    });
+
+    it('should return true if the checkpoint file exists', async () => {
+      await fs.writeFile(taggedFilePath, '{}');
+      const exists = await logger.checkpointExists(tag);
+      expect(exists).toBe(true);
+    });
+
+    it('should return false if the checkpoint file does not exist', async () => {
+      const exists = await logger.checkpointExists('non-existent-tag');
+      expect(exists).toBe(false);
+    });
+
+    it('should throw an error if logger is not initialized', async () => {
+      const uninitializedLogger = new Logger(testSessionId);
+      uninitializedLogger.close();
+
+      await expect(uninitializedLogger.checkpointExists(tag)).rejects.toThrow(
+        'Logger not initialized. Cannot check for checkpoint existence.',
+      );
+    });
+
+    it('should re-throw an error if fs.access fails for reasons other than not existing', async () => {
+      vi.spyOn(fs, 'access').mockRejectedValueOnce(
+        new Error('EACCES: permission denied'),
+      );
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      await expect(logger.checkpointExists(tag)).rejects.toThrow(
+        'EACCES: permission denied',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        `Failed to check checkpoint existence for ${taggedFilePath}:`,
+        expect.any(Error),
+      );
+    });
+  });
+
   describe('close', () => {
     it('should reset logger state', async () => {
       await logger.logMessage(MessageSenderType.USER, 'A message');

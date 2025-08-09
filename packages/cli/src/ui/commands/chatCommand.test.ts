@@ -168,8 +168,12 @@ describe('chatCommand', () => {
   describe('save subcommand', () => {
     let saveCommand: SlashCommand;
     const tag = 'my-tag';
+    let mockCheckpointExists: ReturnType<typeof vi.fn>;
+
     beforeEach(() => {
       saveCommand = getSubCommand('save');
+      mockCheckpointExists = vi.fn().mockResolvedValue(false);
+      mockContext.services.logger.checkpointExists = mockCheckpointExists;
     });
 
     it('should return an error if tag is missing', async () => {
@@ -191,7 +195,7 @@ describe('chatCommand', () => {
       });
     });
 
-    it('should save the conversation', async () => {
+    it('should save the conversation if checkpoint does not exist', async () => {
       const history: HistoryItemWithoutId[] = [
         {
           type: 'user',
@@ -199,8 +203,52 @@ describe('chatCommand', () => {
         },
       ];
       mockGetHistory.mockReturnValue(history);
+      mockCheckpointExists.mockResolvedValue(false);
+
       const result = await saveCommand?.action?.(mockContext, tag);
 
+      expect(mockCheckpointExists).toHaveBeenCalledWith(tag);
+      expect(mockSaveCheckpoint).toHaveBeenCalledWith(history, tag);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: `Conversation checkpoint saved with tag: ${tag}.`,
+      });
+    });
+
+    it('should return confirm_action if checkpoint already exists', async () => {
+      mockCheckpointExists.mockResolvedValue(true);
+      mockContext.invocation = {
+        raw: `/chat save ${tag}`,
+        name: 'save',
+        args: tag,
+      };
+
+      const result = await saveCommand?.action?.(mockContext, tag);
+
+      expect(mockCheckpointExists).toHaveBeenCalledWith(tag);
+      expect(mockSaveCheckpoint).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        type: 'confirm_action',
+        originalInvocation: { raw: `/chat save ${tag}` },
+      });
+      // Check that prompt is a React element
+      expect(result).toHaveProperty('prompt');
+    });
+
+    it('should save the conversation if overwrite is confirmed', async () => {
+      const history: HistoryItemWithoutId[] = [
+        {
+          type: 'user',
+          text: 'hello',
+        },
+      ];
+      mockGetHistory.mockReturnValue(history);
+      mockContext.overwriteConfirmed = true;
+
+      const result = await saveCommand?.action?.(mockContext, tag);
+
+      expect(mockCheckpointExists).not.toHaveBeenCalled(); // Should skip existence check
       expect(mockSaveCheckpoint).toHaveBeenCalledWith(history, tag);
       expect(result).toEqual({
         type: 'message',

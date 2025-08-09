@@ -310,6 +310,29 @@ export class Logger {
     }
   }
 
+  async checkpointExists(tag: string): Promise<boolean> {
+    if (!this.initialized) {
+      throw new Error(
+        'Logger not initialized. Cannot check for checkpoint existence.',
+      );
+    }
+    const filePath = this._checkpointPath(tag);
+    try {
+      await fs.access(filePath);
+      return true;
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === 'ENOENT') {
+        return false;
+      }
+      console.error(
+        `Failed to check checkpoint existence for ${filePath}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
   close(): void {
     this.initialized = false;
     this.logFilePath = undefined;
