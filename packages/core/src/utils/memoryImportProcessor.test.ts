@@ -108,6 +108,98 @@ describe('memoryImportProcessor', () => {
   });
 
   describe('processImports', () => {
+    it('should reject workspace-style imports and not process them as file paths (PR #5438 regression test)', async () => {
+      const content = `# Test Document
+        
+These workspace-style imports should NOT be processed:
+@workspace/package
+@company/internal-lib
+@scoped/package-name
+@myorg/shared-utils
+
+But these file imports SHOULD be processed:
+@./local-file.md
+@../parent-file.md`;
+      
+      const basePath = testPath('test', 'path');
+      const projectRoot = testPath('test');
+      const localContent = 'Local file content';
+      const parentContent = 'Parent file content';
+      
+      // Mock fs.lstat for findProjectRoot
+      mockedFs.lstat.mockImplementation((path) => {
+        if (path.toString().endsWith('.git')) {
+          return Promise.resolve({ isDirectory: () => true } as any);
+        }
+        return Promise.reject(new Error('Not found'));
+      });
+
+      // Mock successful file reads for valid paths
+      mockedFs.access.mockImplementation((filePath) => {
+        const pathStr = filePath.toString();
+        if (pathStr.includes('local-file.md') || pathStr.includes('parent-file.md')) {
+          return Promise.resolve();
+        }
+        return Promise.reject(new Error('File not found'));
+      });
+      
+      mockedFs.readFile.mockImplementation((filePath) => {
+        const pathStr = filePath.toString();
+        if (pathStr.includes('local-file.md')) {
+          return Promise.resolve(localContent);
+        }
+        if (pathStr.includes('parent-file.md')) {
+          return Promise.resolve(parentContent);
+        }
+        return Promise.reject(new Error('File not found'));
+      });
+
+      const result = await processImports(content, basePath, true, undefined, projectRoot);
+
+      // Workspace-style imports should remain unchanged in the output (not processed as file imports)
+      expect(result.content).toContain('@workspace/package');
+      expect(result.content).toContain('@company/internal-lib');
+      expect(result.content).toContain('@scoped/package-name');
+      expect(result.content).toContain('@myorg/shared-utils');
+      
+      // These should NOT appear as import comments (they weren't processed)
+      expect(result.content).not.toContain('<!-- Imported from: workspace/package -->');
+      expect(result.content).not.toContain('<!-- Imported from: company/internal-lib -->');
+      expect(result.content).not.toContain('<!-- Imported from: scoped/package-name -->');
+      expect(result.content).not.toContain('<!-- Imported from: myorg/shared-utils -->');
+      expect(result.content).not.toContain('<!-- Import failed: workspace/package');
+      expect(result.content).not.toContain('<!-- Import failed: company/internal-lib');
+      
+      // Valid file imports should be processed successfully
+      expect(result.content).toContain('<!-- Imported from: ./local-file.md -->');
+      expect(result.content).toContain(localContent);
+      expect(result.content).toContain('<!-- Imported from: ../parent-file.md -->');
+      expect(result.content).toContain(parentContent);
+      
+      // These should NOT trigger file access checks for workspace packages
+      expect(mockedFs.access).not.toHaveBeenCalledWith(
+        expect.stringContaining('workspace')
+      );
+      expect(mockedFs.access).not.toHaveBeenCalledWith(
+        expect.stringContaining('company')
+      );
+      expect(mockedFs.access).not.toHaveBeenCalledWith(
+        expect.stringContaining('scoped')
+      );
+      
+      // But should trigger access checks for valid file paths
+      expect(mockedFs.access).toHaveBeenCalledWith(
+        path.resolve(basePath, './local-file.md')
+      );
+      
+      // Verify only the valid file imports triggered reads (not workspace imports)
+      expect(mockedFs.readFile).toHaveBeenCalledTimes(2);
+      expect(mockedFs.readFile).not.toHaveBeenCalledWith(
+        expect.stringContaining('workspace'),
+        'utf-8'
+      );
+    });
+
     it('should process basic md file imports', async () => {
       const content = 'Some content @./test.md more content';
       const basePath = testPath('test', 'path');
