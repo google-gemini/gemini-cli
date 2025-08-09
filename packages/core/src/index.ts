@@ -45,6 +45,7 @@ export * from './utils/filesearch/fileSearch.js';
 // Export services
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
+export * from './services/chatRecordingService.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';
