@@ -244,6 +244,7 @@ export class GeminiClient {
     prompt_id: string,
     turns: number = this.MAX_TURNS,
     originalModel?: string,
+    consecutiveContinuations: number = 0,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id);
@@ -260,6 +261,15 @@ export class GeminiClient {
     // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
     const boundedTurns = Math.min(turns, this.MAX_TURNS);
     if (!boundedTurns) {
+      return new Turn(this.getChat(), prompt_id);
+    }
+
+    // Prevent infinite "Please continue" loops by limiting consecutive continuations
+    const MAX_CONSECUTIVE_CONTINUATIONS = 3;
+    if (consecutiveContinuations >= MAX_CONSECUTIVE_CONTINUATIONS) {
+      console.warn(
+        `Stopping conversation after ${MAX_CONSECUTIVE_CONTINUATIONS} consecutive "Please continue" messages to prevent infinite loops.`,
+      );
       return new Turn(this.getChat(), prompt_id);
     }
 
@@ -360,12 +370,14 @@ export class GeminiClient {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
+        // Increment consecutiveContinuations to track "Please continue" loops
         yield* this.sendMessageStream(
           nextRequest,
           signal,
           prompt_id,
           boundedTurns - 1,
           initialModel,
+          consecutiveContinuations + 1,
         );
       }
     }
