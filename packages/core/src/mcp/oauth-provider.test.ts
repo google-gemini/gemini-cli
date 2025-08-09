@@ -39,6 +39,17 @@ vi.mock('node:http', () => ({
   createServer: vi.fn(() => mockHttpServer),
 }));
 
+// Helper function to create mock headers
+const createMockHeaders = (contentType?: string | null) => ({
+  get: (name: string) => {
+    const headerName = name.toLowerCase();
+    if (headerName === 'content-type') {
+      return contentType === undefined ? 'application/json' : contentType;
+    }
+    return null;
+  },
+});
+
 describe('MCPOAuthProvider', () => {
   const mockConfig: MCPOAuthConfig = {
     enabled: true,
@@ -136,6 +147,7 @@ describe('MCPOAuthProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockTokenResponse),
+        headers: createMockHeaders(),
       });
 
       const result = await MCPOAuthProvider.authenticate(
@@ -183,10 +195,12 @@ describe('MCPOAuthProvider', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockResourceMetadata),
+          headers: createMockHeaders(),
         })
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockAuthServerMetadata),
+          headers: createMockHeaders(),
         });
 
       // Patch config after discovery
@@ -223,6 +237,7 @@ describe('MCPOAuthProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockTokenResponse),
+        headers: createMockHeaders(),
       });
 
       const result = await MCPOAuthProvider.authenticate(
@@ -301,6 +316,7 @@ describe('MCPOAuthProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockTokenResponse),
+        headers: createMockHeaders(),
       });
 
       const result = await MCPOAuthProvider.authenticate(
@@ -437,6 +453,120 @@ describe('MCPOAuthProvider', () => {
 
       global.setTimeout = originalSetTimeout;
     });
+
+    it('should handle invalid Content-Type in token response', async () => {
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange with invalid Content-Type
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTokenResponse),
+        headers: createMockHeaders('text/html'),
+      });
+
+      await expect(
+        MCPOAuthProvider.authenticate('test-server', mockConfig),
+      ).rejects.toThrow(
+        'Token exchange failed: Expected JSON response but received Content-Type: text/html',
+      );
+    });
+
+    it('should handle missing Content-Type header in token response', async () => {
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange with missing Content-Type header
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTokenResponse),
+        headers: createMockHeaders(null),
+      });
+
+      await expect(
+        MCPOAuthProvider.authenticate('test-server', mockConfig),
+      ).rejects.toThrow(
+        'Token exchange failed: Expected JSON response but received Content-Type: undefined',
+      );
+    });
+
+    it('should handle response without headers object', async () => {
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange without headers object (headers: undefined)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTokenResponse),
+        // headers: undefined
+      });
+
+      await expect(
+        MCPOAuthProvider.authenticate('test-server', mockConfig),
+      ).rejects.toThrow(
+        'Token exchange failed: Expected JSON response but received Content-Type: undefined',
+      );
+    });
   });
 
   describe('refreshAccessToken', () => {
@@ -451,6 +581,7 @@ describe('MCPOAuthProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(refreshResponse),
+        headers: createMockHeaders(),
       });
 
       const result = await MCPOAuthProvider.refreshAccessToken(
@@ -477,6 +608,7 @@ describe('MCPOAuthProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockTokenResponse),
+        headers: createMockHeaders(),
       });
 
       await MCPOAuthProvider.refreshAccessToken(
@@ -503,6 +635,42 @@ describe('MCPOAuthProvider', () => {
           'https://auth.example.com/token',
         ),
       ).rejects.toThrow('Token refresh failed: 400 - Invalid refresh token');
+    });
+
+    it('should handle invalid Content-Type in refresh token response', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTokenResponse),
+        headers: createMockHeaders('text/plain'),
+      });
+
+      await expect(
+        MCPOAuthProvider.refreshAccessToken(
+          mockConfig,
+          'refresh_token',
+          'https://auth.example.com/token',
+        ),
+      ).rejects.toThrow(
+        'Token refresh failed: Expected JSON response but received Content-Type: text/plain',
+      );
+    });
+
+    it('should handle missing Content-Type in refresh token response', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTokenResponse),
+        headers: createMockHeaders(null),
+      });
+
+      await expect(
+        MCPOAuthProvider.refreshAccessToken(
+          mockConfig,
+          'refresh_token',
+          'https://auth.example.com/token',
+        ),
+      ).rejects.toThrow(
+        'Token refresh failed: Expected JSON response but received Content-Type: undefined',
+      );
     });
   });
 
@@ -553,6 +721,7 @@ describe('MCPOAuthProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(refreshResponse),
+        headers: createMockHeaders(),
       });
 
       const result = await MCPOAuthProvider.getValidToken(
@@ -673,6 +842,7 @@ describe('MCPOAuthProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockTokenResponse),
+        headers: createMockHeaders(),
       });
 
       await MCPOAuthProvider.authenticate('test-server', mockConfig);
@@ -718,6 +888,7 @@ describe('MCPOAuthProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockTokenResponse),
+        headers: createMockHeaders(),
       });
 
       await MCPOAuthProvider.authenticate('test-server', mockConfig);
@@ -766,6 +937,7 @@ describe('MCPOAuthProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockTokenResponse),
+        headers: createMockHeaders(),
       });
 
       const configWithParamsInUrl = {
@@ -815,6 +987,7 @@ describe('MCPOAuthProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockTokenResponse),
+        headers: createMockHeaders(),
       });
 
       const configWithFragment = {

@@ -382,6 +382,13 @@ export class MCPOAuthProvider {
       );
     }
 
+    const contentType = response.headers?.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error(
+        `Token exchange failed: Expected JSON response but received Content-Type: ${contentType || 'undefined'}`,
+      );
+    }
+
     return (await response.json()) as OAuthTokenResponse;
   }
 
@@ -442,6 +449,13 @@ export class MCPOAuthProvider {
       const errorText = await response.text();
       throw new Error(
         `Token refresh failed: ${response.status} - ${errorText}`,
+      );
+    }
+
+    const contentType = response.headers?.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error(
+        `Token refresh failed: Expected JSON response but received Content-Type: ${contentType || 'undefined'}`,
       );
     }
 
