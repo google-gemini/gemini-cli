@@ -115,6 +115,37 @@ gemini
 > Give me a summary of all of the changes that went in yesterday
 ```
 
+## Chat Persistence
+
+Continue your conversations across CLI sessions! Gemini CLI automatically saves your chat history and allows you to resume conversations later.
+
+### Save and Resume Conversations
+
+```bash
+# Save your current conversation
+/chat save my-project-work
+
+# List all saved conversations
+/chat list
+
+# Resume a previous conversation
+/chat resume my-project-work
+
+# Delete old conversations
+/chat delete my-project-work
+```
+
+### Storage Location
+
+Your chat history is saved locally:
+- **Linux/macOS:** `~/.config/google-generative-ai/checkpoints/`
+- **Windows:** `C:\Users\<YourUsername>\AppData\Roaming\google-generative-ai\checkpoints\`
+
+This is perfect for:
+- Continuing work on long-term projects
+- Switching between different codebases
+- Preserving context across development sessions
+
 ### Next steps
 
 - Learn how to [contribute to or build from the source](./CONTRIBUTING.md).
@@ -139,6 +170,20 @@ Integrate Gemini CLI directly into your GitHub workflows with the [**Gemini CLI 
 - **Custom Workflows**: Set up your own scheduled tasks and event-driven automations.
 
 ## Popular tasks
+
+### Continue previous work sessions
+
+```text
+> /chat list
+```
+
+```text
+> /chat resume yesterday-debugging
+```
+
+```text
+> Let's continue fixing that authentication bug we were working on
+```
 
 ### Explore a new codebase
 
