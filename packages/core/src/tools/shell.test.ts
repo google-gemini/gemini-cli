@@ -164,6 +164,7 @@ describe('ShellTool', () => {
         addPersistentApproval: vi.fn(),
         addSessionApproval: vi.fn(),
       },
+      getShellToolRcFile: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const bus = createMockMessageBus();
@@ -484,6 +485,25 @@ EOF`;
         expect.any(Object),
       );
       expect(mockShellExecutionService.mock.calls[0][0]).toMatch(/\nEOF\n\)\n/);
+    });
+
+    it('should source rcfile when shellToolRcFile setting is present', async () => {
+      const rcFilePath = '~/.geminirc';
+      (mockConfig.getShellToolRcFile as Mock).mockReturnValue(rcFilePath);
+
+      const invocation = shellTool.build({ command: 'my-command' });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+      resolveShellExecution();
+      await promise;
+
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        expect.stringContaining(`source ${rcFilePath} && my-command`),
+        expect.any(String),
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.any(Object),
+      );
     });
 
     it('should format error messages correctly', async () => {

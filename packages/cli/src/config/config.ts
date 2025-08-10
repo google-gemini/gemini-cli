@@ -925,6 +925,7 @@ export async function loadCliConfig(
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
     mcpServerCommand,
+    shellToolRcFile: settings.tools?.shell?.rcFile,
     mcpServers,
     mcpEnablementCallbacks,
     mcpEnabled,

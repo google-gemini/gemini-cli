@@ -462,13 +462,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const combinedController = new AbortController();
 
     const onAbort = () => combinedController.abort();
+    let strippedCommandWithRc = strippedCommand;
+    const rcFilePath = this.context.config.getShellToolRcFile();
+    if (rcFilePath) {
+      strippedCommandWithRc = `source ${rcFilePath} && ${strippedCommand}`;
+    }
+
     try {
       tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-shell-'));
       tempFilePath = path.join(tempDir, 'pgrep.tmp');
 
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = this.wrapCommandForPgrep(
-        strippedCommand,
+        strippedCommandWithRc,
         tempFilePath,
         isWindows,
       );

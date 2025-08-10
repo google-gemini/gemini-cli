@@ -602,6 +602,7 @@ export interface ConfigParameters {
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
   mcpServerCommand?: string;
+  shellToolRcFile?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   mcpEnablementCallbacks?: McpEnablementCallbacks;
   userMemory?: string | HierarchicalMemory;
@@ -779,6 +780,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
+  private readonly shellToolRcFile: string | undefined;
   private readonly mcpEnabled: boolean;
   private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
@@ -1047,6 +1049,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
+    this.shellToolRcFile = params.shellToolRcFile;
     this.mcpServers = params.mcpServers;
     this.mcpEnablementCallbacks = params.mcpEnablementCallbacks;
     this.mcpEnabled = params.mcpEnabled ?? true;
@@ -2316,6 +2319,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getMcpServerCommand(): string | undefined {
     return this.mcpServerCommand;
+  }
+
+  getShellToolRcFile(): string | undefined {
+    return this.shellToolRcFile;
   }
 
   /**
