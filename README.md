@@ -139,7 +139,7 @@ Continue your conversations across CLI sessions! Gemini CLI automatically saves 
 
 Your chat history is saved locally:
 - **Linux/macOS:** `~/.config/google-generative-ai/checkpoints/`
-- **Windows:** `C:\Users\<YourUsername>\AppData\Roaming\google-generative-ai\checkpoints\`
+- **Windows:** `%APPDATA%\google-generative-ai\checkpoints\`
 
 This is perfect for:
 - Continuing work on long-term projects
