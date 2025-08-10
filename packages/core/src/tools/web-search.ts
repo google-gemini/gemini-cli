@@ -167,12 +167,19 @@ export class WebSearchTool extends BaseTool<
           // Sort insertions by index in descending order to avoid shifting subsequent indices
           insertions.sort((a, b) => b.index - a.index);
 
-          const responseChars = modifiedResponseText.split(''); // Use new variable
-          insertions.forEach((insertion) => {
-            // Fixed arrow function syntax
-            responseChars.splice(insertion.index, 0, insertion.marker);
-          });
-          modifiedResponseText = responseChars.join(''); // Assign back to modifiedResponseText
+          // Use TextEncoder/TextDecoder since segment indices are UTF-8 byte positions
+          const encoder = new TextEncoder();
+          let responseBytes = encoder.encode(modifiedResponseText);
+          for (const ins of insertions) {
+            const pos = Math.min(ins.index, responseBytes.length);
+            const marker = encoder.encode(ins.marker);
+            const buffer = new Uint8Array(responseBytes.length + marker.length);
+            buffer.set(responseBytes.subarray(0, pos), 0);
+            buffer.set(marker, pos);
+            buffer.set(responseBytes.subarray(pos), pos + marker.length);
+            responseBytes = buffer;
+          }
+          modifiedResponseText = new TextDecoder().decode(responseBytes);
         }
 
         if (sourceListFormatted.length > 0) {
