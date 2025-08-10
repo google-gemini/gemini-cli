@@ -341,6 +341,16 @@ export const SETTINGS_SCHEMA = {
     description: 'Command to start an MCP server.',
     showInDialog: false,
   },
+  shellToolRcFile: {
+    type: 'string',
+    label: 'Shell Tool RC File',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: undefined as string | undefined,
+    description:
+      'The path to a bash file (e.g., .bashrc) to source before executing shell commands.',
+    showInDialog: false,
+  },
   mcpServers: {
     type: 'object',
     label: 'MCP Servers',

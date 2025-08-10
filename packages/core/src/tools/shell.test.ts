@@ -57,6 +57,7 @@ describe('ShellTool', () => {
       getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
       getWorkspaceContext: () => createMockWorkspaceContext('.'),
       getGeminiClient: vi.fn(),
+      getShellToolRcFile: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     shellTool = new ShellTool(mockConfig);
@@ -174,6 +175,28 @@ describe('ShellTool', () => {
       await promise;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         'dir',
+        expect.any(String),
+        expect.any(Function),
+        mockAbortSignal,
+      );
+    });
+
+    it('should source rcfile when shellToolRcFile setting is present', async () => {
+      const rcFilePath = '~/.geminirc';
+      (mockConfig.getShellToolRcFile as Mock).mockReturnValue(rcFilePath);
+
+      const promise = shellTool.execute(
+        { command: 'my-command' },
+        mockAbortSignal,
+      );
+      resolveShellExecution();
+      await promise;
+
+      const expectedCommandRegex = new RegExp(
+        `^\\{ source ${rcFilePath} && my-command`,
+      );
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        expect.stringMatching(expectedCommandRegex),
         expect.any(String),
         expect.any(Function),
         mockAbortSignal,

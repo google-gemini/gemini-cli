@@ -209,13 +209,19 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       .toString('hex')}.tmp`;
     const tempFilePath = path.join(os.tmpdir(), tempFileName);
 
+    let commandToExecute = strippedCommand;
+    const rcFilePath = this.config.getShellToolRcFile();
+    if (rcFilePath) {
+      commandToExecute = `source ${rcFilePath} && ${commandToExecute}`;
+    }
+
     try {
       // pgrep is not available on Windows, so we can't get background PIDs
-      const commandToExecute = isWindows
-        ? strippedCommand
+      const finalCommandToExecute = isWindows
+        ? commandToExecute
         : (() => {
             // wrap command to append subprocess pids (via pgrep) to temporary file
-            let command = strippedCommand.trim();
+            let command = commandToExecute.trim();
             if (!command.endsWith('&')) command += ';';
             return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
           })();
@@ -232,7 +238,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       let isBinaryStream = false;
 
       const { result: resultPromise } = ShellExecutionService.execute(
-        commandToExecute,
+        finalCommandToExecute,
         cwd,
         (event: ShellOutputEvent) => {
           if (!updateOutput) {
