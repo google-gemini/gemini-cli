@@ -169,17 +169,26 @@ export class WebSearchTool extends BaseTool<
 
           // Use TextEncoder/TextDecoder since segment indices are UTF-8 byte positions
           const encoder = new TextEncoder();
-          let responseBytes = encoder.encode(modifiedResponseText);
+          const responseBytes = encoder.encode(modifiedResponseText);
+          const parts: Uint8Array[] = [];
+          let lastIndex = responseBytes.length;
           for (const ins of insertions) {
-            const pos = Math.min(ins.index, responseBytes.length);
-            const marker = encoder.encode(ins.marker);
-            const buffer = new Uint8Array(responseBytes.length + marker.length);
-            buffer.set(responseBytes.subarray(0, pos), 0);
-            buffer.set(marker, pos);
-            buffer.set(responseBytes.subarray(pos), pos + marker.length);
-            responseBytes = buffer;
+            const pos = Math.min(ins.index, lastIndex);
+            parts.unshift(responseBytes.subarray(pos, lastIndex));
+            parts.unshift(encoder.encode(ins.marker));
+            lastIndex = pos;
           }
-          modifiedResponseText = new TextDecoder().decode(responseBytes);
+          parts.unshift(responseBytes.subarray(0, lastIndex));
+
+          // Concatenate all parts into a single buffer
+          const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
+          const finalBytes = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const part of parts) {
+            finalBytes.set(part, offset);
+            offset += part.length;
+          }
+          modifiedResponseText = new TextDecoder().decode(finalBytes);
         }
 
         if (sourceListFormatted.length > 0) {
