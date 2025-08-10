@@ -50,6 +50,7 @@ export const useSlashCommandProcessor = (
   toggleCorgiMode: () => void,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
+  openSettingsDialog: () => void,
   toggleVimEnabled: () => Promise<boolean>,
   setIsProcessing: (isProcessing: boolean) => void,
   setGeminiMdFileCount: (count: number) => void,
@@ -495,6 +496,11 @@ export const useSlashCommandProcessor = (
                     case 'privacy':
                       openPrivacyNotice();
                       return { type: 'handled' };
+                    case 'settings':
+                      openSettingsDialog();
+                      return { type: 'handled' };
+                    case 'help':
+                      return { type: 'handled' };
                     default: {
                       const unhandled: never = result.dialog;
                       throw new Error(
@@ -648,6 +654,7 @@ export const useSlashCommandProcessor = (
       openPrivacyNotice,
       openEditorDialog,
       setQuittingMessages,
+      openSettingsDialog,
       setShellConfirmationRequest,
       setSessionShellAllowlist,
       setIsProcessing,
