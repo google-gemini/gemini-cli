@@ -23,6 +23,10 @@ import {
   FileDiscoveryService,
   TelemetryTarget,
   FileFilteringOptions,
+  ShellTool,
+  EditTool,
+  WriteFileTool,
+  MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -66,7 +70,6 @@ export interface CliArgs {
   ideModeFeature: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
-  loadMemoryFromIncludeDirectories: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -215,12 +218,6 @@ export async function parseArguments(): Promise<CliArgs> {
             // Handle comma-separated values
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
         })
-        .option('load-memory-from-include-directories', {
-          type: 'boolean',
-          description:
-            'If true, when refreshing memory, GEMINI.md files should be loaded from all directories that are added. If false, GEMINI.md files should only be loaded from the primary working directory.',
-          default: false,
-        })
         .check((argv) => {
           if (argv.prompt && argv.promptInteractive) {
             throw new Error(
@@ -313,6 +310,10 @@ export async function loadCliConfig(
   const ideModeFeature =
     argv.ideModeFeature ?? settings.ideModeFeature ?? false;
 
+  const folderTrustFeature = settings.folderTrustFeature ?? false;
+  const folderTrustSetting = settings.folderTrust ?? false;
+  const folderTrust = folderTrustFeature && folderTrustSetting;
+
   const allExtensions = annotateActiveExtensions(
     extensions,
     argv.extensions || [],
@@ -361,17 +362,31 @@ export async function loadCliConfig(
   );
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
-  const excludeTools = mergeExcludeTools(settings, activeExtensions);
+  const question = argv.promptInteractive || argv.prompt || '';
+  const approvalMode =
+    argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
+  const interactive =
+    !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
+  // In non-interactive and non-yolo mode, exclude interactive built in tools.
+  const extraExcludes =
+    !interactive && approvalMode !== ApprovalMode.YOLO
+      ? [ShellTool.Name, EditTool.Name, WriteFileTool.Name]
+      : undefined;
+
+  const excludeTools = mergeExcludeTools(
+    settings,
+    activeExtensions,
+    extraExcludes,
+  );
   const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
 
   if (!argv.allowedMcpServerNames) {
     if (settings.allowMCPServers) {
-      const allowedNames = new Set(settings.allowMCPServers.filter(Boolean));
-      if (allowedNames.size > 0) {
-        mcpServers = Object.fromEntries(
-          Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
-        );
-      }
+      mcpServers = allowedMcpServers(
+        mcpServers,
+        settings.allowMCPServers,
+        blockedMcpServers,
+      );
     }
 
     if (settings.excludeMCPServers) {
@@ -385,29 +400,11 @@ export async function loadCliConfig(
   }
 
   if (argv.allowedMcpServerNames) {
-    const allowedNames = new Set(argv.allowedMcpServerNames.filter(Boolean));
-    if (allowedNames.size > 0) {
-      mcpServers = Object.fromEntries(
-        Object.entries(mcpServers).filter(([key, server]) => {
-          const isAllowed = allowedNames.has(key);
-          if (!isAllowed) {
-            blockedMcpServers.push({
-              name: key,
-              extensionName: server.extensionName || '',
-            });
-          }
-          return isAllowed;
-        }),
-      );
-    } else {
-      blockedMcpServers.push(
-        ...Object.entries(mcpServers).map(([key, server]) => ({
-          name: key,
-          extensionName: server.extensionName || '',
-        })),
-      );
-      mcpServers = {};
-    }
+    mcpServers = allowedMcpServers(
+      mcpServers,
+      argv.allowedMcpServerNames,
+      blockedMcpServers,
+    );
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
@@ -419,11 +416,9 @@ export async function loadCliConfig(
     targetDir: process.cwd(),
     includeDirectories,
     loadMemoryFromIncludeDirectories:
-      argv.loadMemoryFromIncludeDirectories ||
-      settings.loadMemoryFromIncludeDirectories ||
-      false,
+      settings.loadMemoryFromIncludeDirectories || false,
     debugMode,
-    question: argv.promptInteractive || argv.prompt || '',
+    question,
     fullContext: argv.allFiles || argv.all_files || false,
     coreTools: settings.coreTools || undefined,
     excludeTools,
@@ -433,7 +428,7 @@ export async function loadCliConfig(
     mcpServers,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
-    approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
+    approvalMode,
     showMemoryUsage:
       argv.showMemoryUsage ||
       argv.show_memory_usage ||
@@ -480,7 +475,42 @@ export async function loadCliConfig(
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
     ideModeFeature,
+    chatCompression: settings.chatCompression,
+    folderTrustFeature,
+    folderTrust,
+    interactive,
   });
+}
+
+function allowedMcpServers(
+  mcpServers: { [x: string]: MCPServerConfig },
+  allowMCPServers: string[],
+  blockedMcpServers: Array<{ name: string; extensionName: string }>,
+) {
+  const allowedNames = new Set(allowMCPServers.filter(Boolean));
+  if (allowedNames.size > 0) {
+    mcpServers = Object.fromEntries(
+      Object.entries(mcpServers).filter(([key, server]) => {
+        const isAllowed = allowedNames.has(key);
+        if (!isAllowed) {
+          blockedMcpServers.push({
+            name: key,
+            extensionName: server.extensionName || '',
+          });
+        }
+        return isAllowed;
+      }),
+    );
+  } else {
+    blockedMcpServers.push(
+      ...Object.entries(mcpServers).map(([key, server]) => ({
+        name: key,
+        extensionName: server.extensionName || '',
+      })),
+    );
+    mcpServers = {};
+  }
+  return mcpServers;
 }
 
 function mergeMcpServers(settings: Settings, extensions: Extension[]) {
@@ -507,8 +537,12 @@ function mergeMcpServers(settings: Settings, extensions: Extension[]) {
 function mergeExcludeTools(
   settings: Settings,
   extensions: Extension[],
+  extraExcludes?: string[] | undefined,
 ): string[] {
-  const allExcludeTools = new Set(settings.excludeTools || []);
+  const allExcludeTools = new Set([
+    ...(settings.excludeTools || []),
+    ...(extraExcludes || []),
+  ]);
   for (const extension of extensions) {
     for (const tool of extension.config.excludeTools || []) {
       allExcludeTools.add(tool);
