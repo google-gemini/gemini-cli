@@ -43,7 +43,8 @@ export async function runNonInteractive(
 
     const geminiClient = config.getGeminiClient();
     const toolRegistry: ToolRegistry = await config.getToolRegistry();
-
+    
+    // TODO(sethtroisi)
     const abortController = new AbortController();
     let currentMessages: Content[] =
       initialHistory.length > 0

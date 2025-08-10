@@ -333,7 +333,7 @@ export async function main() {
     return runAcpPeer(config, settings);
   }
 
-  let input: string | undefined = config.getQuestion();
+  let input: string = config.getQuestion() || '';
   const startupWarnings = [
     ...(await getStartupWarnings()),
     ...(await getUserStartupWarnings(workspaceRoot)),
@@ -341,7 +341,8 @@ export async function main() {
 
   let initialHistory: Content[] = [];
 
-  if (input?.startsWith('/chat resume-auto ')) {
+  // TODO(sethtroisi): refactor to chat processor.
+  if (input.startsWith('/chat resume-auto ')) {
     const sessionId = input.substring('/chat resume-auto '.length).trim();
     if (sessionId) {
       const loadedHistory = await loadSession(sessionId);
@@ -352,13 +353,13 @@ export async function main() {
         input = '';
       } else {
         console.error(`Failed to load session ${sessionId}.`);
-        process.exit(1);
+        input = '';
       }
     } else {
       console.error('Please provide a session ID to resume.');
-      process.exit(1);
+      input = '';
     }
-  } else if (input?.startsWith('/chat list-auto')) {
+  } else if (input.startsWith('/chat list-auto')) {
     const sessions = await listSessions();
     if (sessions.length === 0) {
       console.log('No automatically saved sessions found.');
@@ -411,7 +412,7 @@ export async function main() {
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
   if (!process.stdin.isTTY) {
-    input = (input || '') + (await readStdin());
+    input += await readStdin();
   }
   if (!input && initialHistory.length === 0) {
     console.error('No input provided via stdin.');
@@ -422,10 +423,10 @@ export async function main() {
   logUserPrompt(config, {
     'event.name': 'user_prompt',
     'event.timestamp': new Date().toISOString(),
-    prompt: input || '',
+    prompt: input,
     prompt_id,
     auth_type: config.getContentGeneratorConfig()?.authType,
-    prompt_length: input?.length || 0,
+    prompt_length: input.length,
   });
 
   const nonInteractiveConfig = await validateNonInteractiveAuth(
@@ -437,7 +438,7 @@ export async function main() {
   try {
     lastSessionHistory = await runNonInteractive(
       nonInteractiveConfig,
-      input || '',
+      input,
       initialHistory,
       prompt_id,
     );
