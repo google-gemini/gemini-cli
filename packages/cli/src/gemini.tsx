@@ -50,6 +50,11 @@ import path from 'path';
 
 let lastSessionHistory: Content[] = [];
 
+// Function to update session history from interactive mode
+export function updateSessionHistory(history: Content[]) {
+  lastSessionHistory = history;
+}
+
 // Synchronous session save for immediate exits
 function saveSessionSync(history: Content[]) {
   try {
@@ -359,8 +364,26 @@ export async function main() {
   }
   // TODO(sethtroisi): refactor to chat processor.
   else if (input.startsWith('/chat resume-auto ')) {
-    const sessionId = input.substring('/chat resume-auto '.length).trim();
-    if (sessionId) {
+    const inputId = input.substring('/chat resume-auto '.length).trim();
+    if (inputId) {
+      // Check if input is a number (short ID)
+      const shortId = parseInt(inputId, 10);
+      let sessionId = inputId;
+      
+      if (!isNaN(shortId) && shortId > 0) {
+        // Input is a number, look up the full session ID
+        const sessions = await listSessions();
+        const targetSession = sessions.find(s => s.shortId === shortId);
+        
+        if (!targetSession) {
+          console.error(`No session found with number: ${shortId}. Use /chat list-auto to see available sessions.`);
+          input = '';
+          return;
+        }
+        
+        sessionId = targetSession.fullId;
+      }
+
       const loadedHistory = await loadSession(sessionId);
       if (loadedHistory) {
         initialHistory = loadedHistory;
@@ -372,7 +395,7 @@ export async function main() {
         input = '';
       }
     } else {
-      console.error('Please provide a session ID to resume.');
+      console.error('Please provide a session ID or number to resume.');
       input = '';
     }
   } else if (input.startsWith('/chat list-auto')) {
@@ -458,6 +481,11 @@ export async function main() {
       initialHistory,
       prompt_id,
     );
+    
+    // Save session before exiting non-interactive mode
+    if (lastSessionHistory.length > 0) {
+      await saveSession(lastSessionHistory);
+    }
   } catch (error) {
     console.error('Error in non-interactive mode:', error);
     process.exit(1);

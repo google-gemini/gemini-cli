@@ -17,6 +17,7 @@ import {
 } from './types.js';
 import path from 'path';
 import { HistoryItemWithoutId, MessageType } from '../types.js';
+import { listSessions, loadSession } from '../../utils/session.js';
 
 interface ChatDetail {
   name: string;
@@ -270,9 +271,126 @@ const deleteCommand: SlashCommand = {
   },
 };
 
+const listAutoCommand: SlashCommand = {
+  name: 'list-auto',
+  description: 'List automatically saved sessions',
+  kind: CommandKind.BUILT_IN,
+  action: async (): Promise<MessageActionReturn> => {
+    const sessions = await listSessions();
+    if (sessions.length === 0) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: 'No automatically saved sessions found.',
+      };
+    }
+
+    let message = 'Automatically saved sessions:\n\n';
+    for (const session of sessions) {
+      message += `  ${session.shortId} - ${session.fullId} - ${session.timestamp}\n`;
+    }
+    
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: message,
+    };
+  },
+};
+
+const resumeAutoCommand: SlashCommand = {
+  name: 'resume-auto',
+  description: 'Resume an automatically saved session. Usage: /chat resume-auto <number-or-session-id>',
+  kind: CommandKind.BUILT_IN,
+  action: async (context, args): Promise<SlashCommandActionReturn> => {
+    const input = args.trim();
+    if (!input) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing session ID. Usage: /chat resume-auto <session-id-or-number>',
+      };
+    }
+
+    // Check if input is a number (short ID)
+    const shortId = parseInt(input, 10);
+    let sessionId = input;
+    
+    if (!isNaN(shortId) && shortId > 0) {
+      // Input is a number, look up the full session ID
+      const sessions = await listSessions();
+      const targetSession = sessions.find(s => s.shortId === shortId);
+      
+      if (!targetSession) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `No session found with number: ${shortId}. Use /chat list-auto to see available sessions.`,
+        };
+      }
+      
+      sessionId = targetSession.fullId;
+    }
+
+    const conversation = await loadSession(sessionId);
+    
+    if (!conversation || conversation.length === 0) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `No saved session found with ID: ${sessionId}.`,
+      };
+    }
+
+    const rolemap: { [key: string]: MessageType } = {
+      user: MessageType.USER,
+      model: MessageType.GEMINI,
+    };
+
+    const uiHistory: HistoryItemWithoutId[] = [];
+    let hasSystemPrompt = false;
+    let i = 0;
+
+    for (const item of conversation) {
+      i += 1;
+      const text =
+        item.parts
+          ?.filter((m) => !!m.text)
+          .map((m) => m.text)
+          .join('') || '';
+      if (!text) {
+        continue;
+      }
+      if (i === 1 && text.match(/context for our chat/)) {
+        hasSystemPrompt = true;
+      }
+      if (i > 2 || !hasSystemPrompt) {
+        uiHistory.push({
+          type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
+          text,
+        } as HistoryItemWithoutId);
+      }
+    }
+    
+    return {
+      type: 'load_history',
+      history: uiHistory,
+      clientHistory: conversation,
+    };
+  },
+  completion: async () => {
+    const sessions = await listSessions();
+    // Return both short IDs and full IDs for completion
+    return [
+      ...sessions.map((session) => session.shortId.toString()),
+      ...sessions.map((session) => session.fullId),
+    ];
+  },
+};
+
 export const chatCommand: SlashCommand = {
   name: 'chat',
   description: 'Manage conversation history.',
   kind: CommandKind.BUILT_IN,
-  subCommands: [listCommand, saveCommand, resumeCommand, deleteCommand],
+  subCommands: [listCommand, saveCommand, resumeCommand, deleteCommand, listAutoCommand, resumeAutoCommand],
 };

@@ -65,8 +65,25 @@ export async function runNonInteractive(
       }
       return currentMessages;
     } else if (input.startsWith('/chat resume-auto ')) {
-      const sessionId = input.substring('/chat resume-auto '.length).trim();
-      if (sessionId) {
+      const inputId = input.substring('/chat resume-auto '.length).trim();
+      if (inputId) {
+        // Check if input is a number (short ID)
+        const shortId = parseInt(inputId, 10);
+        let sessionId = inputId;
+        
+        if (!isNaN(shortId) && shortId > 0) {
+          // Input is a number, look up the full session ID
+          const sessions = await listSessions();
+          const targetSession = sessions.find(s => s.shortId === shortId);
+          
+          if (!targetSession) {
+            process.stdout.write(`No session found with number: ${shortId}. Use /chat list-auto to see available sessions.\n`);
+            return currentMessages;
+          }
+          
+          sessionId = targetSession.fullId;
+        }
+
         const loadedHistory = await loadSession(sessionId);
         if (loadedHistory) {
           process.stdout.write(`Session ${sessionId} loaded successfully.\n`);
@@ -75,7 +92,7 @@ export async function runNonInteractive(
           process.stdout.write(`Failed to load session ${sessionId}.\n`);
         }
       } else {
-        process.stdout.write('Please provide a session ID to resume.\n');
+        process.stdout.write('Please provide a session ID or number to resume.\n');
       }
       return currentMessages;
     }

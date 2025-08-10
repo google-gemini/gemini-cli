@@ -16,6 +16,8 @@ import {
 } from 'ink';
 import { StreamingState, type HistoryItem, MessageType } from './types.js';
 import { Content } from '@google/genai';
+import { saveSession } from '../utils/session.js';
+import { updateSessionHistory } from '../gemini.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
@@ -800,6 +802,28 @@ const App = ({ config, settings, startupWarnings = [], version, initialHistory =
       refreshStatic();
     }
   }, [streamingState, refreshStatic, staticNeedsRefresh]);
+
+  // Auto-save session when conversation finishes
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle) {
+      const autoSaveSession = async () => {
+        try {
+          const chat = await config?.getGeminiClient()?.getChat();
+          const chatHistory = chat?.getHistory();
+          if (chatHistory && chatHistory.length > 0) {
+            // Update global session history for exit handlers
+            updateSessionHistory(chatHistory);
+            // Save the session
+            await saveSession(chatHistory);
+          }
+        } catch (error) {
+          console.error('Failed to auto-save session:', error);
+        }
+      };
+      
+      autoSaveSession();
+    }
+  }, [streamingState, config]);
 
   const filteredConsoleMessages = useMemo(() => {
     if (config.getDebugMode()) {

@@ -18,6 +18,8 @@ import {
 } from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
 
+import { getLatestSession, loadSession } from './utils/session.js';
+
 // Custom error to identify mock process.exit calls
 class MockProcessExitError extends Error {
   constructor(readonly code?: string | number | null | undefined) {
@@ -73,6 +75,11 @@ vi.mock('./utils/events.js', async (importOriginal) => {
 vi.mock('./utils/sandbox.js', () => ({
   sandbox_command: vi.fn(() => ''), // Default to no sandbox command
   start_sandbox: vi.fn(() => Promise.resolve()), // Mock as an async function that resolves
+}));
+
+vi.mock('./utils/session.js', () => ({
+  getLatestSession: vi.fn(),
+  loadSession: vi.fn(),
 }));
 
 describe('gemini.tsx main function', () => {
@@ -213,6 +220,35 @@ describe('gemini.tsx main function', () => {
 
     // Avoid the process.exit error from being thrown.
     processExitSpy.mockRestore();
+  });
+
+  describe('--resume-last flag', () => {
+    it('should load the latest session when the flag is provided', async () => {
+      const getLatestSessionMock = vi.mocked(getLatestSession);
+      const loadSessionMock = vi.mocked(loadSession);
+
+      // Simulate having a previous session
+      const latestSessionId = 'session-latest';
+      getLatestSessionMock.mockResolvedValue(latestSessionId);
+      loadSessionMock.mockResolvedValue([]); // Mock loading the session data
+
+      // Mock argv to include the --resume-last flag
+      const originalArgv = process.argv;
+      process.argv = ['node', 'gemini', '--resume-last'];
+
+      try {
+        await main();
+      } catch (error) {
+        // We expect it to throw as it will try to render the UI
+      }
+
+      // Verify that the session functions were called
+      expect(getLatestSessionMock).toHaveBeenCalled();
+      expect(loadSessionMock).toHaveBeenCalledWith(latestSessionId);
+
+      // Restore original argv
+      process.argv = originalArgv;
+    });
   });
 });
 
