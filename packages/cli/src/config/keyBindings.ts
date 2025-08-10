@@ -32,6 +32,8 @@ export enum Command {
 
   // Auto-completion
   ACCEPT_SUGGESTION = 'acceptSuggestion',
+  COMPLETION_UP = 'completionUp',
+  COMPLETION_DOWN = 'completionDown',
 
   // Text input
   SUBMIT = 'submit',
@@ -121,6 +123,9 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Auto-completion
   // Original: key.name === 'tab' || (key.name === 'return' && !key.ctrl)
   [Command.ACCEPT_SUGGESTION]: [{ key: 'tab' }, { key: 'return', ctrl: false }],
+  // Completion navigation (arrow or Ctrl+P/N)
+  [Command.COMPLETION_UP]: [{ key: 'up' }, { key: 'p', ctrl: true }],
+  [Command.COMPLETION_DOWN]: [{ key: 'down' }, { key: 'n', ctrl: true }],
 
   // Text input
   // Original: key.name === 'return' && !key.ctrl && !key.meta && !key.paste
@@ -157,15 +162,9 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Original: key.ctrl && key.name === 'e'
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'e', ctrl: true }],
   // Original: key.ctrl && (key.name === 'c' || key.name === 'C')
-  [Command.QUIT]: [
-    { key: 'c', ctrl: true },
-    { key: 'C', ctrl: true },
-  ],
+  [Command.QUIT]: [{ key: 'c', ctrl: true }],
   // Original: key.ctrl && (key.name === 'd' || key.name === 'D')
-  [Command.EXIT]: [
-    { key: 'd', ctrl: true },
-    { key: 'D', ctrl: true },
-  ],
+  [Command.EXIT]: [{ key: 'd', ctrl: true }],
   // Original: key.ctrl && key.name === 's'
   [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],
 
