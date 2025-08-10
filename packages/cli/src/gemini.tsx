@@ -28,7 +28,7 @@ import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions } from './config/extension.js';
 import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
-import { saveSession, loadSession, listSessions } from './utils/session.js';
+import { saveSession, loadSession, listSessions, getLatestSession } from './utils/session.js';
 import {
   Config,
   sessionId,
@@ -341,8 +341,24 @@ export async function main() {
 
   let initialHistory: Content[] = [];
 
+  // Handle --resume-last flag
+  if (argv.resumeLast) {
+    const latestSessionId = await getLatestSession();
+    if (latestSessionId) {
+      const loadedHistory = await loadSession(latestSessionId);
+      if (loadedHistory) {
+        initialHistory = loadedHistory;
+        console.log(`Resumed latest session: ${latestSessionId}`);
+        input = '';
+      } else {
+        console.error(`Failed to load latest session ${latestSessionId}.`);
+      }
+    } else {
+      console.error('No automatically saved sessions found to resume.');
+    }
+  }
   // TODO(sethtroisi): refactor to chat processor.
-  if (input.startsWith('/chat resume-auto ')) {
+  else if (input.startsWith('/chat resume-auto ')) {
     const sessionId = input.substring('/chat resume-auto '.length).trim();
     if (sessionId) {
       const loadedHistory = await loadSession(sessionId);

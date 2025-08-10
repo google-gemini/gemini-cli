@@ -73,3 +73,8 @@ export async function listSessions(): Promise<
     return [];
   }
 }
+
+export async function getLatestSession(): Promise<string | null> {
+  const sessions = await listSessions();
+  return sessions.length > 0 ? sessions[0].fullId : null;
+}
