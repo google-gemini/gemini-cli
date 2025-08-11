@@ -103,7 +103,7 @@ export const SETTINGS_SCHEMA = {
     requiresRestart: true,
     default: true,
     description: 'Enable collection of usage statistics',
-    showInDialog: true,
+    showInDialog: false,
   },
   autoConfigureMaxOldSpaceSize: {
     type: 'boolean',
