@@ -30,7 +30,9 @@ describe('setupGithubCommand', async () => {
 
   beforeEach(async () => {
     vi.resetAllMocks();
-    scratchDir = await fs.mkdtemp(path.join(os.tmpdir(), ''));
+    scratchDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'setup-github-command-'),
+    );
   });
 
   afterEach(async () => {
