@@ -17,7 +17,7 @@ import {
   ToolCallConfirmationDetails,
   Icon,
 } from './tools.js';
-import { Type } from '@google/genai';
+import { ToolErrorType } from './tool-error.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
@@ -88,21 +88,24 @@ export class WriteFileTool
           file_path: {
             description:
               "The absolute path to the file to write to (e.g., '/home/user/project/file.txt'). Relative paths are not supported.",
-            type: Type.STRING,
+            type: 'string',
           },
           content: {
             description: 'The content to write to the file.',
-            type: Type.STRING,
+            type: 'string',
           },
         },
         required: ['file_path', 'content'],
-        type: Type.OBJECT,
+        type: 'object',
       },
     );
   }
 
   validateToolParams(params: WriteFileToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
     if (errors) {
       return errors;
     }
@@ -230,8 +233,12 @@ export class WriteFileTool
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
-        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: `Error: ${validationError}`,
+        llmContent: `Could not write file due to invalid parameters: ${validationError}`,
+        returnDisplay: validationError,
+        error: {
+          message: validationError,
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
       };
     }
 
@@ -243,10 +250,16 @@ export class WriteFileTool
 
     if (correctedContentResult.error) {
       const errDetails = correctedContentResult.error;
-      const errorMsg = `Error checking existing file: ${errDetails.message}`;
+      const errorMsg = errDetails.code
+        ? `Error checking existing file '${params.file_path}': ${errDetails.message} (${errDetails.code})`
+        : `Error checking existing file: ${errDetails.message}`;
       return {
-        llmContent: `Error checking existing file ${params.file_path}: ${errDetails.message}`,
+        llmContent: errorMsg,
         returnDisplay: errorMsg,
+        error: {
+          message: errorMsg,
+          type: ToolErrorType.FILE_WRITE_FAILURE,
+        },
       };
     }
 
@@ -344,10 +357,43 @@ export class WriteFileTool
         returnDisplay: displayResult,
       };
     } catch (error) {
-      const errorMsg = `Error writing to file: ${error instanceof Error ? error.message : String(error)}`;
+      // Capture detailed error information for debugging
+      let errorMsg: string;
+      let errorType = ToolErrorType.FILE_WRITE_FAILURE;
+
+      if (isNodeError(error)) {
+        // Handle specific Node.js errors with their error codes
+        errorMsg = `Error writing to file '${params.file_path}': ${error.message} (${error.code})`;
+
+        // Log specific error types for better debugging
+        if (error.code === 'EACCES') {
+          errorMsg = `Permission denied writing to file: ${params.file_path} (${error.code})`;
+          errorType = ToolErrorType.PERMISSION_DENIED;
+        } else if (error.code === 'ENOSPC') {
+          errorMsg = `No space left on device: ${params.file_path} (${error.code})`;
+          errorType = ToolErrorType.NO_SPACE_LEFT;
+        } else if (error.code === 'EISDIR') {
+          errorMsg = `Target is a directory, not a file: ${params.file_path} (${error.code})`;
+          errorType = ToolErrorType.TARGET_IS_DIRECTORY;
+        }
+
+        // Include stack trace in debug mode for better troubleshooting
+        if (this.config.getDebugMode() && error.stack) {
+          console.error('Write file error stack:', error.stack);
+        }
+      } else if (error instanceof Error) {
+        errorMsg = `Error writing to file: ${error.message}`;
+      } else {
+        errorMsg = `Error writing to file: ${String(error)}`;
+      }
+
       return {
-        llmContent: `Error writing to file ${params.file_path}: ${errorMsg}`,
-        returnDisplay: `Error: ${errorMsg}`,
+        llmContent: errorMsg,
+        returnDisplay: errorMsg,
+        error: {
+          message: errorMsg,
+          type: errorType,
+        },
       };
     }
   }

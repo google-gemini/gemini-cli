@@ -7,6 +7,8 @@
 import { render } from 'ink-testing-library';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MarkdownDisplay } from './MarkdownDisplay.js';
+import { LoadedSettings } from '../../config/settings.js';
+import { SettingsContext } from '../contexts/SettingsContext.js';
 
 describe('<MarkdownDisplay />', () => {
   const baseProps = {
@@ -15,19 +17,32 @@ describe('<MarkdownDisplay />', () => {
     availableTerminalHeight: 40,
   };
 
+  const mockSettings = new LoadedSettings(
+    { path: '', settings: {} },
+    { path: '', settings: {} },
+    { path: '', settings: {} },
+    [],
+  );
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('renders nothing for empty text', () => {
-    const { lastFrame } = render(<MarkdownDisplay {...baseProps} text="" />);
+    const { lastFrame } = render(
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text="" />
+      </SettingsContext.Provider>,
+    );
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders a simple paragraph', () => {
     const text = 'Hello, world.';
     const { lastFrame } = render(
-      <MarkdownDisplay {...baseProps} text={text} />,
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -40,7 +55,9 @@ describe('<MarkdownDisplay />', () => {
 #### Header 4
 `;
     const { lastFrame } = render(
-      <MarkdownDisplay {...baseProps} text={text} />,
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -48,7 +65,9 @@ describe('<MarkdownDisplay />', () => {
   it('renders a fenced code block with a language', () => {
     const text = '```javascript\nconst x = 1;\nconsole.log(x);\n```';
     const { lastFrame } = render(
-      <MarkdownDisplay {...baseProps} text={text} />,
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -56,7 +75,9 @@ describe('<MarkdownDisplay />', () => {
   it('renders a fenced code block without a language', () => {
     const text = '```\nplain text\n```';
     const { lastFrame } = render(
-      <MarkdownDisplay {...baseProps} text={text} />,
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -64,7 +85,9 @@ describe('<MarkdownDisplay />', () => {
   it('handles unclosed (pending) code blocks', () => {
     const text = '```typescript\nlet y = 2;';
     const { lastFrame } = render(
-      <MarkdownDisplay {...baseProps} text={text} isPending={true} />,
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} isPending={true} />
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -76,7 +99,9 @@ describe('<MarkdownDisplay />', () => {
 + item C
 `;
     const { lastFrame } = render(
-      <MarkdownDisplay {...baseProps} text={text} />,
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -88,7 +113,9 @@ describe('<MarkdownDisplay />', () => {
     * Level 3
 `;
     const { lastFrame } = render(
-      <MarkdownDisplay {...baseProps} text={text} />,
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -99,7 +126,9 @@ describe('<MarkdownDisplay />', () => {
 2. Second item
 `;
     const { lastFrame } = render(
-      <MarkdownDisplay {...baseProps} text={text} />,
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -113,7 +142,9 @@ World
 Test
 `;
     const { lastFrame } = render(
-      <MarkdownDisplay {...baseProps} text={text} />,
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -126,7 +157,9 @@ Test
 | Cell 3   | Cell 4   |
 `;
     const { lastFrame } = render(
-      <MarkdownDisplay {...baseProps} text={text} />,
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -138,7 +171,9 @@ Some text before.
 |---|
 | 1 | 2 |`;
     const { lastFrame } = render(
-      <MarkdownDisplay {...baseProps} text={text} />,
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -148,7 +183,9 @@ Some text before.
 
 Paragraph 2.`;
     const { lastFrame } = render(
-      <MarkdownDisplay {...baseProps} text={text} />,
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -169,8 +206,39 @@ some code
 Another paragraph.
 `;
     const { lastFrame } = render(
-      <MarkdownDisplay {...baseProps} text={text} />,
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('hides line numbers in code blocks when showLineNumbers is false', () => {
+    const text = '```javascript\nconst x = 1;\n```';
+    const settings = new LoadedSettings(
+      { path: '', settings: {} },
+      { path: '', settings: { showLineNumbers: false } },
+      { path: '', settings: {} },
+      [],
+    );
+
+    const { lastFrame } = render(
+      <SettingsContext.Provider value={settings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+    expect(lastFrame()).not.toContain(' 1 ');
+  });
+
+  it('shows line numbers in code blocks by default', () => {
+    const text = '```javascript\nconst x = 1;\n```';
+    const { lastFrame } = render(
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...baseProps} text={text} />
+      </SettingsContext.Provider>,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+    expect(lastFrame()).toContain(' 1 ');
   });
 });
