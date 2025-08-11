@@ -34,6 +34,9 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
+  logIdeConnection,
+  IdeConnectionEvent,
+  IdeConnectionType,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -187,6 +190,11 @@ export async function main() {
   setMaxSizedBoxDebugging(config.getDebugMode());
 
   await config.initialize();
+
+  if (config.getIdeMode() && config.getIdeModeFeature()) {
+    await config.getIdeClient().connect();
+    logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
+  }
 
   // Load custom themes from settings
   themeManager.loadCustomThemes(settings.merged.customThemes);
