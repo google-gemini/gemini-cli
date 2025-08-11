@@ -1,4 +1,4 @@
-/**
+  /**
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -106,6 +106,12 @@ describe('isCommandAllowed', () => {
   describe('command substitution', () => {
     it('should block command substitution using `$(...)`', () => {
       const result = isCommandAllowed('echo $(rm -rf /)', config);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('Command substitution');
+    });
+
+    it('should block command substitution using `>(...)`', () => {
+      const result = isCommandAllowed('cat >(echo hi)', config);
       expect(result.allowed).toBe(false);
       expect(result.reason).toContain('Command substitution');
     });
