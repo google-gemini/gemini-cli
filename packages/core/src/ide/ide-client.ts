@@ -215,15 +215,18 @@ export class IdeClient {
     // disconnected, so that the first detail message is preserved.
     if (!isAlreadyDisconnected) {
       this.state = { status, details };
-      if (details && logToConsole) {
-        logger.error(details);
+      if (details) {
+        if (logToConsole) {
+          logger.error(details);
+        } else {
+          // We only want to log disconnect messages to debug
+          // if they are not already being logged to the console.
+          logger.debug(details);
+        }
       }
     }
 
     if (status === IDEConnectionStatus.Disconnected) {
-      if (details && !logToConsole) {
-        logger.debug(details);
-      }
       ideContext.clearIdeContext();
     }
   }
