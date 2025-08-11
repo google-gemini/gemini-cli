@@ -667,7 +667,7 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   describe('sendMessageStream', () => {
-    it('should include IDE context when ideModeFeature is enabled', async () => {
+    it('should include editor context when ideModeFeature is enabled', async () => {
       // Arrange
       vi.mocked(ideContext.getIdeContext).mockReturnValue({
         workspaceState: {
@@ -725,7 +725,7 @@ describe('Gemini Client (client.ts)', () => {
       // Assert
       expect(ideContext.getIdeContext).toHaveBeenCalled();
       const expectedContext = `
-Here is the user's IDE context as a JSON object. This is for your information only.
+Here is the user's editor context as a JSON object. This is for your information only.
 \`\`\`json
 ${JSON.stringify(
   {
@@ -733,7 +733,7 @@ ${JSON.stringify(
       path: '/path/to/active/file.ts',
       cursor: {
         line: 5,
-        column: 11,
+        character: 10,
       },
       selectedText: 'hello',
     },
@@ -848,7 +848,7 @@ ${JSON.stringify(
       // Assert
       expect(ideContext.getIdeContext).toHaveBeenCalled();
       const expectedContext = `
-Here is the user's IDE context as a JSON object. This is for your information only.
+Here is the user's editor context as a JSON object. This is for your information only.
 \`\`\`json
 ${JSON.stringify(
   {
@@ -856,7 +856,7 @@ ${JSON.stringify(
       path: '/path/to/active/file.ts',
       cursor: {
         line: 5,
-        column: 11,
+        character: 10,
       },
       selectedText: 'hello',
     },
@@ -924,7 +924,7 @@ ${JSON.stringify(
       // Assert
       expect(ideContext.getIdeContext).toHaveBeenCalled();
       const expectedContext = `
-Here is the user's IDE context as a JSON object. This is for your information only.
+Here is the user's editor context as a JSON object. This is for your information only.
 \`\`\`json
 ${JSON.stringify(
   {
@@ -1218,7 +1218,7 @@ ${JSON.stringify(
       );
     });
 
-    describe('IDE context delta', () => {
+    describe('Editor context delta', () => {
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Hello' };
       })();
@@ -1398,7 +1398,7 @@ ${JSON.stringify(
                 parts: expect.arrayContaining([
                   expect.objectContaining({
                     text: expect.stringContaining(
-                      "Here is a summary of changes in the user's IDE context",
+                      "Here is a summary of changes in the user's editor context",
                     ),
                   }),
                 ]),
@@ -1410,7 +1410,7 @@ ${JSON.stringify(
         },
       );
 
-      it('sends full context when history is cleared, even if IDE state is unchanged', async () => {
+      it('sends full context when history is cleared, even if editor state is unchanged', async () => {
         const activeFile = {
           path: '/path/to/active/file.ts',
           cursor: { line: 5, character: 10 },
@@ -1461,7 +1461,9 @@ ${JSON.stringify(
           expect.objectContaining({
             parts: expect.arrayContaining([
               expect.objectContaining({
-                text: expect.stringContaining("Here is the user's IDE context"),
+                text: expect.stringContaining(
+                  "Here is the user's editor context",
+                ),
               }),
             ]),
           }),
