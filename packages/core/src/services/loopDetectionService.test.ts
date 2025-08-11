@@ -217,7 +217,9 @@ describe('LoopDetectionService', () => {
 
       // Continue adding repetitive content inside the code block - should not trigger loop
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
-        const isLoopInside = service.addAndCheck(createContentEvent(repeatedContent));
+        const isLoopInside = service.addAndCheck(
+          createContentEvent(repeatedContent),
+        );
         expect(isLoopInside).toBe(false);
       }
 
@@ -226,7 +228,7 @@ describe('LoopDetectionService', () => {
 
     it('should skip loop detection when already inside a code block (this.inCodeBlock)', () => {
       service.reset('');
-      
+
       // Start with content that puts us inside a code block
       service.addAndCheck(createContentEvent('Here is some code:\n```\n'));
 
@@ -253,7 +255,9 @@ describe('LoopDetectionService', () => {
 
       // Inside code block - should not track loops
       for (let i = 0; i < 5; i++) {
-        const insideResult = service.addAndCheck(createContentEvent(repeatedContent));
+        const insideResult = service.addAndCheck(
+          createContentEvent(repeatedContent),
+        );
         expect(insideResult).toBe(false);
       }
 
@@ -262,7 +266,9 @@ describe('LoopDetectionService', () => {
       expect(exitResult).toBe(false);
 
       // Enter code block again (3rd fence) - should stop tracking again
-      const reenterResult = service.addAndCheck(createContentEvent('```python\n'));
+      const reenterResult = service.addAndCheck(
+        createContentEvent('```python\n'),
+      );
       expect(reenterResult).toBe(false);
 
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
