@@ -24,6 +24,7 @@ import {
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
+import { getLanguageFromFilePath } from '../utils/language-detection.js';
 import {
   isModifiableDeclarativeTool,
   ModifyContext,
@@ -887,7 +888,18 @@ export class CoreToolScheduler {
       this.toolCalls = [];
 
       for (const call of completedCalls) {
-        logToolCall(this.config, new ToolCallEvent(call));
+        const event = new ToolCallEvent(call);
+        if (
+          (event.function_name === 'replace' ||
+            event.function_name === 'write_file') &&
+          event.function_args &&
+          typeof event.function_args.file_path === 'string'
+        ) {
+          event.programming_language = getLanguageFromFilePath(
+            event.function_args.file_path,
+          );
+        }
+        logToolCall(this.config, event);
       }
 
       if (this.onAllToolCallsComplete) {

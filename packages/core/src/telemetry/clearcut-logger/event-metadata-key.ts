@@ -209,6 +209,9 @@ export enum EventMetadataKey {
 
   // Logs user removed lines in edit/write tool response.
   GEMINI_CLI_USER_REMOVED_LINES = 50,
+
+  // Logs the programming language of the project.
+  GEMINI_CLI_PROGRAMMING_LANGUAGE = 51,
 }
 
 export function getEventMetadataKey(

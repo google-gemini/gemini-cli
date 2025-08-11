@@ -109,6 +109,7 @@ export function logUserPrompt(config: Config, event: UserPromptEvent): void {
 }
 
 export function logToolCall(config: Config, event: ToolCallEvent): void {
+  console.log('[TESTING] Intercepted ToolCallEvent:', event);
   const uiEvent = {
     ...event,
     'event.name': EVENT_TOOL_CALL,

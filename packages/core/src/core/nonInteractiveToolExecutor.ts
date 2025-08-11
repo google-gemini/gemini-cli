@@ -15,6 +15,7 @@ import {
 } from '../index.js';
 import { Config } from '../config/config.js';
 import { convertToFunctionResponse } from './coreToolScheduler.js';
+import { getLanguageFromFilePath } from '../utils/language-detection.js';
 import { ToolCallDecision } from '../telemetry/tool-call-decision.js';
 
 /**
@@ -131,6 +132,9 @@ export async function executeToolCall(
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
     const durationMs = Date.now() - startTime;
+    const programming_language = getLanguageFromFilePath(
+      toolCallRequest.args.file_path as string,
+    );
     logToolCall(config, {
       'event.name': 'tool_call',
       'event.timestamp': new Date().toISOString(),
@@ -141,6 +145,7 @@ export async function executeToolCall(
       error: error.message,
       error_type: ToolErrorType.UNHANDLED_EXCEPTION,
       prompt_id: toolCallRequest.prompt_id,
+      programming_language,
     });
     return {
       callId: toolCallRequest.callId,

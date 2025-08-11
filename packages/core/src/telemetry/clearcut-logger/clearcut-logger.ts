@@ -476,6 +476,13 @@ export class ClearcutLogger {
       },
     ];
 
+    if (event.programming_language) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROGRAMMING_LANGUAGE,
+        value: event.programming_language,
+      });
+    }
+
     if (event.metadata) {
       const metadataMapping: { [key: string]: EventMetadataKey } = {
         ai_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
