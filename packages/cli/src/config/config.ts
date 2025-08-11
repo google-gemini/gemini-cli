@@ -57,6 +57,7 @@ export interface CliArgs {
   showMemoryUsage: boolean | undefined;
   show_memory_usage: boolean | undefined;
   yolo: boolean | undefined;
+  acceptAll: boolean | undefined;
   approvalMode: string | undefined;
   telemetry: boolean | undefined;
   checkpointing: boolean | undefined;
