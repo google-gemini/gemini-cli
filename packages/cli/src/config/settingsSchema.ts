@@ -485,6 +485,26 @@ export const SETTINGS_SCHEMA = {
     description: 'Setting to track whether Folder trust is enabled.',
     showInDialog: true,
   },
+  extensions: {
+    type: 'object',
+    label: 'Extensions',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: {},
+    description: 'Extension settings.',
+    showInDialog: false,
+    properties: {
+      disabled: {
+        type: 'array',
+        label: 'Disabled Extensions',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: [] as string[],
+        description: 'A list of extension names to disable.',
+        showInDialog: false,
+      },
+    },
+  },
   chatCompression: {
     type: 'object',
     label: 'Chat Compression',

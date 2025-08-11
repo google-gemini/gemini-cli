@@ -314,9 +314,25 @@ export async function loadCliConfig(
   const folderTrustSetting = settings.folderTrust ?? false;
   const folderTrust = folderTrustFeature && folderTrustSetting;
 
+  let enabledExtensions: string[];
+  if (argv.extensions) {
+    // If the CLI flag is used, it takes precedence.
+    enabledExtensions = argv.extensions;
+  } else {
+    // Otherwise, use the settings to determine the enabled list.
+    const allAvailableNames = extensions.map((ext) => ext.config.name);
+    const disabledFromSettings = settings.extensions?.disabled || [];
+    const disabledNamesSet = new Set(
+      disabledFromSettings.map((name) => name.toLowerCase()),
+    );
+    enabledExtensions = allAvailableNames.filter(
+      (name) => !disabledNamesSet.has(name.toLowerCase()),
+    );
+  }
+
   const allExtensions = annotateActiveExtensions(
     extensions,
-    argv.extensions || [],
+    enabledExtensions || [],
   );
 
   const activeExtensions = extensions.filter(

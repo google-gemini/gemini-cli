@@ -946,6 +946,40 @@ describe('loadCliConfig extensions', () => {
     );
     expect(config.getExtensionContextFilePaths()).toEqual(['/path/to/ext1.md']);
   });
+
+  it('should disable extensions from settings if --extensions flag is not used', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      extensions: {
+        disabled: ['ext2'],
+      },
+    };
+    const config = await loadCliConfig(
+      settings,
+      mockExtensions,
+      'test-session',
+      argv,
+    );
+    expect(config.getExtensionContextFilePaths()).toEqual(['/path/to/ext1.md']);
+  });
+
+  it('should prioritize --extensions flag over settings.extensions.disabled', async () => {
+    process.argv = ['node', 'script.js', '--extensions', 'ext2'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      extensions: {
+        disabled: ['ext1'],
+      },
+    };
+    const config = await loadCliConfig(
+      settings,
+      mockExtensions,
+      'test-session',
+      argv,
+    );
+    expect(config.getExtensionContextFilePaths()).toEqual(['/path/to/ext2.md']);
+  });
 });
 
 describe('loadCliConfig model selection', () => {
