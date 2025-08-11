@@ -28,7 +28,7 @@ import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions } from './config/extension.js';
 import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
-import { saveSession, loadSession, listSessions, getLatestSession } from './utils/session.js';
+import { saveSession, loadSession, listSessions, getLatestSession, findSession } from './utils/session.js';
 import {
   Config,
   sessionId,
@@ -366,38 +366,24 @@ export async function main() {
   else if (input.startsWith('/chat resume-auto ')) {
     const inputId = input.substring('/chat resume-auto '.length).trim();
     if (inputId) {
-      // Check if input is a number (short ID)
-      const shortId = parseInt(inputId, 10);
-      let sessionId = inputId;
+      const sessionId = await findSession(inputId);
       
-      if (!isNaN(shortId) && shortId > 0) {
-        // Input is a number, look up the full session ID
-        const sessions = await listSessions();
-        const targetSession = sessions.find(s => s.shortId === shortId);
-        
-        if (!targetSession) {
-          console.error(`No session found with number: ${shortId}. Use /chat list-auto to see available sessions.`);
-          input = '';
-          return;
-        }
-        
-        sessionId = targetSession.fullId;
-      }
-
-      const loadedHistory = await loadSession(sessionId);
-      if (loadedHistory) {
-        initialHistory = loadedHistory;
-        console.log(`Session ${sessionId} loaded successfully.`);
-        // Clear the input so it doesn't get processed as a new prompt
-        input = '';
+      if (!sessionId) {
+        console.error(`No session found with input: ${inputId}. Use /chat list-auto to see available sessions.`);
       } else {
-        console.error(`Failed to load session ${sessionId}.`);
-        input = '';
+        const loadedHistory = await loadSession(sessionId);
+        if (loadedHistory) {
+          initialHistory = loadedHistory;
+          console.log(`Session ${sessionId} loaded successfully.`);
+        } else {
+          console.error(`Failed to load session ${sessionId}.`);
+        }
       }
     } else {
       console.error('Please provide a session ID or number to resume.');
-      input = '';
     }
+    // Clear the input so it doesn't get processed as a new prompt
+    input = '';
   } else if (input.startsWith('/chat list-auto')) {
     const sessions = await listSessions();
     if (sessions.length === 0) {
@@ -407,7 +393,7 @@ export async function main() {
       sessions.forEach(
         (session: { shortId: number; fullId: string; timestamp: string }) => {
           console.log(
-            `  ${session.shortId} - ${session.fullId} - ${session.timestamp}`,
+            `  ${session.timestamp} - ${session.fullId} - ${session.shortId} `,
           );
         },
       );

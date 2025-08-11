@@ -78,3 +78,29 @@ export async function getLatestSession(): Promise<string | null> {
   const sessions = await listSessions();
   return sessions.length > 0 ? sessions[0].fullId : null;
 }
+
+/**
+ * Finds a session by input (either short ID number or full session ID)
+ * @param input - Either a short ID number (e.g., "1", "2") or full session ID
+ * @returns The full session ID if found, null if not found
+ */
+export async function findSession(input: string): Promise<string | null> {
+  if (!input.trim()) {
+    return null;
+  }
+
+  const trimmedInput = input.trim();
+  
+  // Check if input is a number (short ID)
+  const shortId = parseInt(trimmedInput, 10);
+  
+  if (!isNaN(shortId) && shortId > 0) {
+    // Input is a number, look up the full session ID
+    const sessions = await listSessions();
+    const targetSession = sessions.find(s => s.shortId === shortId);
+    return targetSession ? targetSession.fullId : null;
+  }
+  
+  // Input is already a full session ID, return as-is
+  return trimmedInput;
+}

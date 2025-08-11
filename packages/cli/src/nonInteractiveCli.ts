@@ -15,7 +15,7 @@ import {
   ToolErrorType,
 } from '@google/gemini-cli-core';
 import { Content, Part, FunctionCall } from '@google/genai';
-import { listSessions, loadSession } from './utils/session.js';
+import { listSessions, loadSession, findSession } from './utils/session.js';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -59,7 +59,7 @@ export async function runNonInteractive(
         process.stdout.write('Automatically saved sessions:\n');
         sessions.forEach((session) => {
           process.stdout.write(
-            `  ${session.shortId} - ${session.fullId} - ${session.timestamp}\n`,
+            `  ${session.timestamp} - ${session.fullId} - ${session.shortId}\n`,
           );
         });
       }
@@ -67,21 +67,11 @@ export async function runNonInteractive(
     } else if (input.startsWith('/chat resume-auto ')) {
       const inputId = input.substring('/chat resume-auto '.length).trim();
       if (inputId) {
-        // Check if input is a number (short ID)
-        const shortId = parseInt(inputId, 10);
-        let sessionId = inputId;
+        const sessionId = await findSession(inputId);
         
-        if (!isNaN(shortId) && shortId > 0) {
-          // Input is a number, look up the full session ID
-          const sessions = await listSessions();
-          const targetSession = sessions.find(s => s.shortId === shortId);
-          
-          if (!targetSession) {
-            process.stdout.write(`No session found with number: ${shortId}. Use /chat list-auto to see available sessions.\n`);
-            return currentMessages;
-          }
-          
-          sessionId = targetSession.fullId;
+        if (!sessionId) {
+          process.stdout.write(`No session found with input: ${inputId}. Use /chat list-auto to see available sessions.\n`);
+          return currentMessages;
         }
 
         const loadedHistory = await loadSession(sessionId);

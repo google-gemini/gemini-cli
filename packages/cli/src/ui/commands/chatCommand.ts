@@ -17,7 +17,7 @@ import {
 } from './types.js';
 import path from 'path';
 import { HistoryItemWithoutId, MessageType } from '../types.js';
-import { listSessions, loadSession } from '../../utils/session.js';
+import { listSessions, loadSession, findSession } from '../../utils/session.js';
 
 interface ChatDetail {
   name: string;
@@ -287,7 +287,7 @@ const listAutoCommand: SlashCommand = {
 
     let message = 'Automatically saved sessions:\n\n';
     for (const session of sessions) {
-      message += `  ${session.shortId} - ${session.fullId} - ${session.timestamp}\n`;
+      message += `  ${session.timestamp} - ${session.fullId} - ${session.shortId}\n`;
     }
     
     return {
@@ -312,24 +312,14 @@ const resumeAutoCommand: SlashCommand = {
       };
     }
 
-    // Check if input is a number (short ID)
-    const shortId = parseInt(input, 10);
-    let sessionId = input;
+    const sessionId = await findSession(input);
     
-    if (!isNaN(shortId) && shortId > 0) {
-      // Input is a number, look up the full session ID
-      const sessions = await listSessions();
-      const targetSession = sessions.find(s => s.shortId === shortId);
-      
-      if (!targetSession) {
-        return {
-          type: 'message',
-          messageType: 'error',
-          content: `No session found with number: ${shortId}. Use /chat list-auto to see available sessions.`,
-        };
-      }
-      
-      sessionId = targetSession.fullId;
+    if (!sessionId) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `No session found with input: ${input}. Use /chat list-auto to see available sessions.`,
+      };
     }
 
     const conversation = await loadSession(sessionId);
