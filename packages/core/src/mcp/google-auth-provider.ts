@@ -14,6 +14,8 @@ import {
 import { GoogleAuth } from 'google-auth-library';
 import { MCPServerConfig } from '../config/config.js';
 
+const ALLOWED_HOSTS = [/^.+\.googleapis\.com$/, /^(.*\.)?luci\.app$/];
+
 export class GoogleCredentialProvider implements OAuthClientProvider {
   private readonly auth: GoogleAuth;
 
@@ -29,6 +31,20 @@ export class GoogleCredentialProvider implements OAuthClientProvider {
   private _clientInformation?: OAuthClientInformationFull;
 
   constructor(private readonly config?: MCPServerConfig) {
+    const url = this.config?.url || this.config?.httpUrl;
+    if (!url) {
+      throw new Error(
+        'URL must be provided in the config for Google Credentials provider',
+      );
+    }
+
+    const hostname = new URL(url).hostname;
+    if (!ALLOWED_HOSTS.some((pattern) => pattern.test(hostname))) {
+      throw new Error(
+        `Host "${hostname}" is not an allowed host for Google Credential provider.`,
+      );
+    }
+
     const scopes = this.config?.oauth?.scopes;
     if (!scopes || scopes.length === 0) {
       throw new Error(

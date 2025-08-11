@@ -568,7 +568,7 @@ describe('mcp-client', () => {
         const transport = await createTransport(
           'test-server',
           {
-            httpUrl: 'http://test-server',
+            httpUrl: 'http://test.googleapis.com',
             authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
             oauth: {
               scopes: ['scope1'],
@@ -587,7 +587,7 @@ describe('mcp-client', () => {
         const transport = await createTransport(
           'test-server',
           {
-            url: 'http://test-server',
+            url: 'http://test.googleapis.com',
             authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
             oauth: {
               scopes: ['scope1'],
@@ -615,7 +615,7 @@ describe('mcp-client', () => {
             false,
           ),
         ).rejects.toThrow(
-          'No URL configured for Google Credentials MCP server',
+          'URL must be provided in the config for Google Credentials provider',
         );
       });
     });
