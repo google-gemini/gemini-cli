@@ -29,6 +29,7 @@ import {
   MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
+import { loadPortableConfig } from './portable.js';
 
 import { Extension, annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
@@ -70,6 +71,7 @@ export interface CliArgs {
   ideModeFeature: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
+  portableConfig: string | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -218,6 +220,10 @@ export async function parseArguments(): Promise<CliArgs> {
             // Handle comma-separated values
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
         })
+        .option('portable-config', {
+          type: 'string',
+          description: 'Load configuration from a single YAML file.',
+        })
         .check((argv) => {
           if (argv.prompt && argv.promptInteractive) {
             throw new Error(
@@ -298,6 +304,22 @@ export async function loadCliConfig(
   sessionId: string,
   argv: CliArgs,
 ): Promise<Config> {
+  if (argv.portableConfig) {
+    const portableConfig = loadPortableConfig(argv.portableConfig);
+    if (portableConfig.env) {
+      for (const [key, value] of Object.entries(portableConfig.env)) {
+        process.env[key] = value;
+      }
+    }
+    if (portableConfig.cli) {
+      for (const [key, value] of Object.entries(portableConfig.cli)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (argv as any)[key] = value;
+      }
+    }
+    settings = portableConfig.settings || {};
+  }
+
   const debugMode =
     argv.debug ||
     [process.env.DEBUG, process.env.DEBUG_MODE].some(
@@ -349,17 +371,42 @@ export async function loadCliConfig(
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
 
-  // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
-  const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
-    process.cwd(),
-    settings.loadMemoryFromIncludeDirectories ? includeDirectories : [],
-    debugMode,
-    fileService,
-    settings,
-    extensionContextFilePaths,
-    memoryImportFormat,
-    fileFiltering,
-  );
+  let memoryContent = '';
+  let fileCount = 0;
+
+  if (argv.portableConfig) {
+    const portableConfig = loadPortableConfig(argv.portableConfig);
+    if (portableConfig.context?.geminiMd) {
+      memoryContent = portableConfig.context.geminiMd;
+      fileCount = 1;
+    }
+    if (portableConfig.env) {
+      for (const [key, value] of Object.entries(portableConfig.env)) {
+        process.env[key] = value;
+      }
+    }
+    if (portableConfig.cli) {
+      for (const [key, value] of Object.entries(portableConfig.cli)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (argv as any)[key] = value;
+      }
+    }
+    settings = portableConfig.settings || {};
+  } else {
+    // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
+    const result = await loadHierarchicalGeminiMemory(
+      process.cwd(),
+      settings.loadMemoryFromIncludeDirectories ? includeDirectories : [],
+      debugMode,
+      fileService,
+      settings,
+      extensionContextFilePaths,
+      memoryImportFormat,
+      fileFiltering,
+    );
+    memoryContent = result.memoryContent;
+    fileCount = result.fileCount;
+  }
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
   const question = argv.promptInteractive || argv.prompt || '';
@@ -479,6 +526,7 @@ export async function loadCliConfig(
     folderTrustFeature,
     folderTrust,
     interactive,
+    settings,
   });
 }
 

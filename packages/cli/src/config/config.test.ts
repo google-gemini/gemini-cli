@@ -14,6 +14,7 @@ import { Settings } from './settings.js';
 import { Extension } from './extension.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 
+vi.mock('fs');
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
   return {
