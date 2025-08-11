@@ -199,8 +199,6 @@ When `{{args}}` is used inside a shell injection block (`!{...}`), the arguments
 **Example (`/grep-code.toml`):**
 
 ```toml
-# Invoked via: /grep-code "It's complicated"
-
 prompt = """
 Please summarize the findings for the pattern `{{args}}`.
 
@@ -209,12 +207,12 @@ Search Results:
 """
 ```
 
-When you run `/grep-code "It's complicated"`:
+When you run `/grep-code It's complicated`:
 
 1. The CLI sees `{{args}}` used both outside and inside `!{...}`.
-2. Outside: The first `{{args}}` is replaced raw with `"It's complicated"`.
-3. Inside: The second `{{args}}` is replaced with the escaped version (e.g., on Linux: `'It'\''s complicated'`).
-4. The command executed is `grep -r 'It'\''s complicated' .`.
+2. Outside: The first `{{args}}` is replaced raw with `It's complicated`.
+3. Inside: The second `{{args}}` is replaced with the escaped version (e.g., on Linux: `"It's complicated"`).
+4. The command executed is `grep -r "It's complicated" .`.
 5. The CLI prompts you to confirm this exact, secure command before execution.
 6. The final prompt is sent.
 
@@ -268,9 +266,8 @@ When a custom command attempts to execute a shell command, Gemini CLI will now p
 **How It Works:**
 
 1.  **Inject Commands:** Use the `!{...}` syntax.
-2.  **Argument Substitution:** If `{{args}}` is present inside the block, it is automatically shell-escaped (see Context-Aware Injection above).
-3.  **Robust Parsing:** The parser correctly handles complex shell commands that include nested braces, such as `awk` scripts or JSON payloads.
-    - Example: `!{ls -l | awk '{print $1}'}` works as expected.
+2.  **Argument Substitution:** If `{{args}}` is present inside the block, it is automatically shell-escaped (see [Context-Aware Injection](#1-context-aware-injection-with-args) above).
+3.  **Robust Parsing:** The parser correctly handles complex shell commands that include nested braces, such as JSON payloads.
 4.  **Security Check and Confirmation:** The CLI performs a security check on the final, resolved command (after arguments are escaped and substituted). A dialog will appear showing the exact command(s) to be executed.
 5.  **Execution and Error Reporting:** The command is executed. If the command fails, the output injected into the prompt will include the error messages (stderr) followed by a status line, e.g., `[Shell command exited with code 1]`. This helps the model understand the context of the failure.
 
@@ -290,7 +287,7 @@ Please generate a Conventional Commit message based on the following git diff:
 
 ```diff
 !{git diff --staged}
-````
+```
 
 """
 
@@ -311,7 +308,7 @@ First, ensure the user commands directory exists, then create a `refactor` subdi
 ```bash
 mkdir -p ~/.gemini/commands/refactor
 touch ~/.gemini/commands/refactor/pure.toml
-````
+```
 
 **2. Add the content to the file:**
 
