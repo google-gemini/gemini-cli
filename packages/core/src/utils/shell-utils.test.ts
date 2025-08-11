@@ -302,9 +302,14 @@ describe('stripShellWrapper', () => {
 });
 
 describe('escapeShellArg', () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
   describe('POSIX (Linux/macOS)', () => {
     beforeEach(() => {
-      // Ensure platform is POSIX-like
       mockPlatform.mockReturnValue('linux');
     });
 
@@ -322,48 +327,63 @@ describe('escapeShellArg', () => {
     });
   });
 
-  describe('Windows (cmd.exe)', () => {
+  describe('Windows', () => {
     beforeEach(() => {
-      // Ensure platform is Windows
       mockPlatform.mockReturnValue('win32');
     });
 
-    it('should wrap simple arguments in double quotes', () => {
-      const result = escapeShellArg('search term');
-      expect(result).toBe('"search term"');
+    describe('when shell is cmd.exe', () => {
+      beforeEach(() => {
+        process.env.ComSpec = 'C:\\Windows\\System32\\cmd.exe';
+      });
+
+      it('should wrap simple arguments in double quotes', () => {
+        const result = escapeShellArg('search term');
+        expect(result).toBe('"search term"');
+      });
+
+      it('should escape internal double quotes by doubling them', () => {
+        const result = escapeShellArg('He said "Hello"');
+        expect(result).toBe('"He said ""Hello"""');
+      });
+
+      it('should handle empty strings', () => {
+        const result = escapeShellArg('');
+        expect(result).toBe('');
+      });
     });
 
-    it('should escape internal double quotes by doubling them', () => {
-      const result = escapeShellArg('He said "Hello"');
-      // cmd.exe escaping doubles the internal quotes when wrapped.
-      expect(result).toBe('"He said ""Hello"""');
-    });
+    describe('when shell is PowerShell', () => {
+      beforeEach(() => {
+        process.env.ComSpec =
+          'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+      });
 
-    it('should handle special characters (by quoting)', () => {
-      const result = escapeShellArg('foo&bar|baz');
-      // The implemented escaping just wraps it in quotes.
-      expect(result).toBe('"foo&bar|baz"');
-    });
+      it('should wrap simple arguments in single quotes', () => {
+        const result = escapeShellArg('search term');
+        expect(result).toBe("'search term'");
+      });
 
-    it('should handle empty strings', () => {
-      const result = escapeShellArg('');
-      expect(result).toBe('');
-    });
+      it('should escape internal single quotes by doubling them', () => {
+        const result = escapeShellArg("It's a test");
+        expect(result).toBe("'It''s a test'");
+      });
 
-    it('should not use shell-quote on Windows', () => {
-      escapeShellArg('test');
-      expect(mockQuote).not.toHaveBeenCalled();
+      it('should handle double quotes without escaping them', () => {
+        const result = escapeShellArg('He said "Hello"');
+        expect(result).toBe('\'He said "Hello"\'');
+      });
+
+      it('should handle empty strings', () => {
+        const result = escapeShellArg('');
+        expect(result).toBe('');
+      });
     });
   });
 });
 
 describe('getShellConfiguration', () => {
-  const originalEnv = process.env;
-
-  beforeEach(() => {
-    vi.resetModules();
-    process.env = { ...originalEnv };
-  });
+  const originalEnv = { ...process.env };
 
   afterEach(() => {
     process.env = originalEnv;
@@ -383,22 +403,48 @@ describe('getShellConfiguration', () => {
     expect(config.argsPrefix).toEqual(['-c']);
   });
 
-  it('should return cmd.exe configuration on Windows (fallback)', () => {
-    mockPlatform.mockReturnValue('win32');
-    // Ensure ComSpec is not set for this test to test the fallback
-    delete process.env.ComSpec;
-    const config = getShellConfiguration();
-    expect(config.executable).toBe('cmd.exe');
-    expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
-  });
+  describe('on Windows', () => {
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+    });
 
-  it('should respect ComSpec environment variable on Windows', () => {
-    mockPlatform.mockReturnValue('win32');
-    const customShell = 'C:\\Windows\\System32\\powershell.exe';
-    process.env.ComSpec = customShell;
-    const config = getShellConfiguration();
-    expect(config.executable).toBe(customShell);
-    // Note: We still use cmd.exe style arguments as the primary interface.
-    expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+    it('should return cmd.exe configuration by default', () => {
+      delete process.env.ComSpec;
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('cmd.exe');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+    });
+
+    it('should respect ComSpec for cmd.exe', () => {
+      const cmdPath = 'C:\\WINDOWS\\system32\\cmd.exe';
+      process.env.ComSpec = cmdPath;
+      const config = getShellConfiguration();
+      expect(config.executable).toBe(cmdPath);
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+    });
+
+    it('should return PowerShell configuration if ComSpec points to powershell.exe', () => {
+      const psPath =
+        'C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+      process.env.ComSpec = psPath;
+      const config = getShellConfiguration();
+      expect(config.executable).toBe(psPath);
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+    });
+
+    it('should return PowerShell configuration if ComSpec points to pwsh.exe', () => {
+      const pwshPath = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe';
+      process.env.ComSpec = pwshPath;
+      const config = getShellConfiguration();
+      expect(config.executable).toBe(pwshPath);
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+    });
+
+    it('should be case-insensitive when checking ComSpec', () => {
+      process.env.ComSpec = 'C:\\Path\\To\\POWERSHELL.EXE';
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('C:\\Path\\To\\POWERSHELL.EXE');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+    });
   });
 });

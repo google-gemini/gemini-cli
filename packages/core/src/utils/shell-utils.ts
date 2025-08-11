@@ -30,12 +30,25 @@ export interface ShellConfiguration {
  */
 export function getShellConfiguration(): ShellConfiguration {
   if (os.platform() === 'win32') {
-    const executable = process.env.ComSpec || 'cmd.exe';
+    const comSpec = process.env.ComSpec || 'cmd.exe';
+    const executable = comSpec.toLowerCase();
+
+    if (
+      executable.endsWith('powershell.exe') ||
+      executable.endsWith('pwsh.exe')
+    ) {
+      // For PowerShell, the arguments are different.
+      // -NoProfile: Speeds up startup.
+      // -Command: Executes the following command.
+      return { executable: comSpec, argsPrefix: ['-NoProfile', '-Command'] };
+    }
+
+    // Default to cmd.exe for anything else on Windows.
     // Flags for CMD:
     // /d: Skip execution of AutoRun commands.
     // /s: Modifies the treatment of the command string (important for quoting).
     // /c: Carries out the command specified by the string and then terminates.
-    return { executable, argsPrefix: ['/d', '/s', '/c'] };
+    return { executable: comSpec, argsPrefix: ['/d', '/s', '/c'] };
   }
 
   // Unix-like systems (Linux, macOS)
@@ -60,8 +73,17 @@ export function escapeShellArg(arg: string): string {
   }
 
   if (os.platform() === 'win32') {
-    // Simple Windows escaping for cmd.exe: wrap in double quotes and escape inner double quotes.
-    return `"${arg.replace(/"/g, '""')}"`;
+    const comSpec = (process.env.ComSpec || 'cmd.exe').toLowerCase();
+    const isPowerShell =
+      comSpec.endsWith('powershell.exe') || comSpec.endsWith('pwsh.exe');
+
+    if (isPowerShell) {
+      // For PowerShell, wrap in single quotes and escape internal single quotes by doubling them.
+      return `'${arg.replace(/'/g, "''")}'`;
+    } else {
+      // Simple Windows escaping for cmd.exe: wrap in double quotes and escape inner double quotes.
+      return `"${arg.replace(/"/g, '""')}"`;
+    }
   } else {
     // POSIX shell escaping using shell-quote.
     return quote([arg]);
