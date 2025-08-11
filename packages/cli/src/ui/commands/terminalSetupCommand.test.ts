@@ -19,7 +19,7 @@ describe('terminalSetupCommand', () => {
   it('should have correct metadata', () => {
     expect(terminalSetupCommand.name).toBe('terminal-setup');
     expect(terminalSetupCommand.description).toContain('multiline input');
-    expect(terminalSetupCommand.kind).toBe('builtin');
+    expect(terminalSetupCommand.kind).toBe('built-in');
   });
 
   it('should return success message when terminal setup succeeds', async () => {
