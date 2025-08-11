@@ -11,7 +11,7 @@
     "directory": "packages/vscode-ide-companion"
   },
   "engines": {
-    "vscode": "^1.101.0"
+    "vscode": "^1.99.0"
   },
   "license": "LICENSE",
   "preview": true,
@@ -39,12 +39,12 @@
     "commands": [
       {
         "command": "gemini.diff.accept",
-        "title": "Gemini CLI: Accept Current Diff",
+        "title": "Gemini CLI: Accept Diff",
         "icon": "$(check)"
       },
       {
         "command": "gemini.diff.cancel",
-        "title": "Cancel",
+        "title": "Gemini CLI: Close Diff Editor",
         "icon": "$(close)"
       },
       {
@@ -113,7 +113,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "20.x",
-    "@types/vscode": "^1.101.0",
+    "@types/vscode": "^1.99.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
     "esbuild": "^0.25.3",

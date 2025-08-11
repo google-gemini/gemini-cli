@@ -21,7 +21,6 @@ import {
   sanitizeParameters,
 } from './tool-registry.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { BaseTool, Icon, ToolResult } from './tools.js';
 import {
   FunctionDeclaration,
   CallableTool,
@@ -32,6 +31,7 @@ import {
 import { spawn } from 'node:child_process';
 
 import fs from 'node:fs';
+import { MockTool } from '../test-utils/tools.js';
 
 vi.mock('node:fs');
 
@@ -106,28 +106,6 @@ const createMockCallableTool = (
   tool: vi.fn().mockResolvedValue({ functionDeclarations: toolDeclarations }),
   callTool: vi.fn(),
 });
-
-class MockTool extends BaseTool<{ param: string }, ToolResult> {
-  constructor(
-    name = 'mock-tool',
-    displayName = 'A mock tool',
-    description = 'A mock tool description',
-  ) {
-    super(name, displayName, description, Icon.Hammer, {
-      type: Type.OBJECT,
-      properties: {
-        param: { type: Type.STRING },
-      },
-      required: ['param'],
-    });
-  }
-  async execute(params: { param: string }): Promise<ToolResult> {
-    return {
-      llmContent: `Executed with ${params.param}`,
-      returnDisplay: `Executed with ${params.param}`,
-    };
-  }
-}
 
 const baseConfigParams: ConfigParameters = {
   cwd: '/tmp',
@@ -358,6 +336,7 @@ describe('ToolRegistry', () => {
         toolRegistry,
         config.getPromptRegistry(),
         false,
+        expect.any(Object),
       );
     });
 
@@ -381,6 +360,7 @@ describe('ToolRegistry', () => {
         toolRegistry,
         config.getPromptRegistry(),
         false,
+        expect.any(Object),
       );
     });
   });
