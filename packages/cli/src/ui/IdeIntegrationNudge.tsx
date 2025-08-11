@@ -42,13 +42,6 @@ export function IdeIntegrationNudge({
     },
   ];
 
-  const question = ideName
-    ? `Do you want to connect your ${ideName} editor to Gemini CLI?`
-    : 'Do you want to connect your editor to Gemini CLI?';
-  const description = ideName
-    ? `If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in ${ideName}.`
-    : "If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in your editor.";
-
   return (
     <Box
       flexDirection="column"
@@ -61,9 +54,9 @@ export function IdeIntegrationNudge({
       <Box marginBottom={1} flexDirection="column">
         <Text>
           <Text color="yellow">{'> '}</Text>
-          {question}
+          {`Do you want to connect your ${ideName ?? 'your'} editor to Gemini CLI?`}
         </Text>
-        <Text dimColor>{description}</Text>
+        <Text dimColor>{`If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in ${ideName ?? 'your editor'}.`}</Text>
       </Box>
       <RadioButtonSelect
         items={OPTIONS}

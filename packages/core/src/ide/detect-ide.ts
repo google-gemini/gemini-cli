@@ -42,6 +42,10 @@ export function getIdeDisplayName(ide: DetectedIde): string {
 }
 
 export function detectIde(): DetectedIde | undefined {
+  // Only VSCode-based integrations are currently supported. 
+  if (process.env.TERM_PROGRAM !== 'vscode') {
+    return undefined;
+  }
   if (process.env.CURSOR_TRACE_ID) {
     return DetectedIde.Cursor;
   }
@@ -57,8 +61,5 @@ export function detectIde(): DetectedIde | undefined {
   if (process.env.FIREBASE_DEPLOY_AGENT) {
     return DetectedIde.FirebaseStudio;
   }
-  if (process.env.TERM_PROGRAM === 'vscode') {
-    return DetectedIde.VSCode;
-  }
-  return undefined;
+  return DetectedIde.VSCode;
 }
