@@ -11,12 +11,8 @@ import {
   EVENT_TOOL_CALL,
 } from './constants.js';
 
-import {
-  ApiErrorEvent,
-  ApiResponseEvent,
-  ToolCallEvent,
-  ToolCallDecision,
-} from './types.js';
+import { ToolCallDecision } from './tool-call-decision.js';
+import { ApiErrorEvent, ApiResponseEvent, ToolCallEvent } from './types.js';
 
 export type UiEvent =
   | (ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE })
@@ -32,6 +28,7 @@ export interface ToolCallStats {
     [ToolCallDecision.ACCEPT]: number;
     [ToolCallDecision.REJECT]: number;
     [ToolCallDecision.MODIFY]: number;
+    [ToolCallDecision.AUTO_ACCEPT]: number;
   };
 }
 
@@ -62,6 +59,7 @@ export interface SessionMetrics {
       [ToolCallDecision.ACCEPT]: number;
       [ToolCallDecision.REJECT]: number;
       [ToolCallDecision.MODIFY]: number;
+      [ToolCallDecision.AUTO_ACCEPT]: number;
     };
     byName: Record<string, ToolCallStats>;
   };
@@ -94,6 +92,7 @@ const createInitialMetrics = (): SessionMetrics => ({
       [ToolCallDecision.ACCEPT]: 0,
       [ToolCallDecision.REJECT]: 0,
       [ToolCallDecision.MODIFY]: 0,
+      [ToolCallDecision.AUTO_ACCEPT]: 0,
     },
     byName: {},
   },
@@ -192,6 +191,7 @@ export class UiTelemetryService extends EventEmitter {
           [ToolCallDecision.ACCEPT]: 0,
           [ToolCallDecision.REJECT]: 0,
           [ToolCallDecision.MODIFY]: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
         },
       };
     }

@@ -290,6 +290,30 @@ describe('FileSearch', () => {
     expect(results).toEqual(['src/file1.js', 'src/file2.js']); // Assuming alphabetical sort
   });
 
+  it('should use fzf for fuzzy matching when pattern does not contain wildcards', async () => {
+    tmpDir = await createTmpDir({
+      src: {
+        'main.js': '',
+        'util.ts': '',
+        'style.css': '',
+      },
+    });
+
+    const fileSearch = new FileSearch({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: false,
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+    });
+
+    await fileSearch.initialize();
+    const results = await fileSearch.search('sst');
+
+    expect(results).toEqual(['src/style.css']);
+  });
+
   it('should return empty array when no matches are found', async () => {
     tmpDir = await createTmpDir({
       src: ['file1.js'],
@@ -445,6 +469,46 @@ describe('FileSearch', () => {
       await fs2.initialize();
 
       expect(crawlSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should miss the cache when maxDepth changes', async () => {
+      tmpDir = await createTmpDir({ 'file1.js': '' });
+      const getOptions = (maxDepth?: number) => ({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: false,
+        ignoreDirs: [],
+        cache: true,
+        cacheTtl: 10000,
+        maxDepth,
+      });
+
+      // 1. First search with maxDepth: 1, should trigger a crawl.
+      const fs1 = new FileSearch(getOptions(1));
+      const crawlSpy1 = vi.spyOn(
+        fs1 as FileSearchWithPrivateMethods,
+        'performCrawl',
+      );
+      await fs1.initialize();
+      expect(crawlSpy1).toHaveBeenCalledTimes(1);
+
+      // 2. Second search with maxDepth: 2, should be a cache miss and trigger a crawl.
+      const fs2 = new FileSearch(getOptions(2));
+      const crawlSpy2 = vi.spyOn(
+        fs2 as FileSearchWithPrivateMethods,
+        'performCrawl',
+      );
+      await fs2.initialize();
+      expect(crawlSpy2).toHaveBeenCalledTimes(1);
+
+      // 3. Third search with maxDepth: 1 again, should be a cache hit.
+      const fs3 = new FileSearch(getOptions(1));
+      const crawlSpy3 = vi.spyOn(
+        fs3 as FileSearchWithPrivateMethods,
+        'performCrawl',
+      );
+      await fs3.initialize();
+      expect(crawlSpy3).not.toHaveBeenCalled();
     });
   });
 
@@ -638,5 +702,110 @@ describe('FileSearch', () => {
 
     // 3. Assert that the maxResults limit was respected, even with a cache hit.
     expect(limitedResults).toEqual(['file1.js', 'file2.js']);
+  });
+
+  describe('with maxDepth', () => {
+    beforeEach(async () => {
+      tmpDir = await createTmpDir({
+        'file-root.txt': '',
+        level1: {
+          'file-level1.txt': '',
+          level2: {
+            'file-level2.txt': '',
+            level3: {
+              'file-level3.txt': '',
+            },
+          },
+        },
+      });
+    });
+
+    it('should only search top-level files when maxDepth is 0', async () => {
+      const fileSearch = new FileSearch({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: false,
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        maxDepth: 0,
+      });
+
+      await fileSearch.initialize();
+      const results = await fileSearch.search('');
+
+      expect(results).toEqual(['level1/', 'file-root.txt']);
+    });
+
+    it('should search one level deep when maxDepth is 1', async () => {
+      const fileSearch = new FileSearch({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: false,
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        maxDepth: 1,
+      });
+
+      await fileSearch.initialize();
+      const results = await fileSearch.search('');
+
+      expect(results).toEqual([
+        'level1/',
+        'level1/level2/',
+        'file-root.txt',
+        'level1/file-level1.txt',
+      ]);
+    });
+
+    it('should search two levels deep when maxDepth is 2', async () => {
+      const fileSearch = new FileSearch({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: false,
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        maxDepth: 2,
+      });
+
+      await fileSearch.initialize();
+      const results = await fileSearch.search('');
+
+      expect(results).toEqual([
+        'level1/',
+        'level1/level2/',
+        'level1/level2/level3/',
+        'file-root.txt',
+        'level1/file-level1.txt',
+        'level1/level2/file-level2.txt',
+      ]);
+    });
+
+    it('should perform a full recursive search when maxDepth is undefined', async () => {
+      const fileSearch = new FileSearch({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: false,
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        maxDepth: undefined, // Explicitly undefined
+      });
+
+      await fileSearch.initialize();
+      const results = await fileSearch.search('');
+
+      expect(results).toEqual([
+        'level1/',
+        'level1/level2/',
+        'level1/level2/level3/',
+        'file-root.txt',
+        'level1/file-level1.txt',
+        'level1/level2/file-level2.txt',
+        'level1/level2/level3/file-level3.txt',
+      ]);
+    });
   });
 });

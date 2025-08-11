@@ -50,6 +50,7 @@ describe('useAtCompletion', () => {
         respectGitIgnore: true,
         respectGeminiIgnore: true,
       })),
+      getEnableRecursiveFileSearch: () => true,
     } as unknown as Config;
     vi.clearAllMocks();
   });
@@ -113,8 +114,8 @@ describe('useAtCompletion', () => {
       expect(result.current.suggestions.map((s) => s.value)).toEqual([
         'src/',
         'src/components/',
-        'src/components/Button.tsx',
         'src/index.js',
+        'src/components/Button.tsx',
       ]);
     });
 
@@ -156,7 +157,7 @@ describe('useAtCompletion', () => {
       });
     });
 
-    it('should NOT show a loading indicator for subsequent searches that complete under 100ms', async () => {
+    it('should NOT show a loading indicator for subsequent searches that complete under 200ms', async () => {
       const structure: FileSystemStructure = { 'a.txt': '', 'b.txt': '' };
       testRootDir = await createTmpDir(structure);
 
@@ -185,7 +186,7 @@ describe('useAtCompletion', () => {
       expect(result.current.isLoadingSuggestions).toBe(false);
     });
 
-    it('should show a loading indicator and clear old suggestions for subsequent searches that take longer than 100ms', async () => {
+    it('should show a loading indicator and clear old suggestions for subsequent searches that take longer than 200ms', async () => {
       const structure: FileSystemStructure = { 'a.txt': '', 'b.txt': '' };
       testRootDir = await createTmpDir(structure);
 
@@ -193,7 +194,7 @@ describe('useAtCompletion', () => {
       const originalSearch = FileSearch.prototype.search;
       vi.spyOn(FileSearch.prototype, 'search').mockImplementation(
         async function (...args) {
-          await new Promise((resolve) => setTimeout(resolve, 200));
+          await new Promise((resolve) => setTimeout(resolve, 300));
           return originalSearch.apply(this, args);
         },
       );
@@ -430,6 +431,43 @@ describe('useAtCompletion', () => {
 
       await cleanupTmpDir(rootDir1);
       await cleanupTmpDir(rootDir2);
+    });
+
+    it('should perform a non-recursive search when enableRecursiveFileSearch is false', async () => {
+      const structure: FileSystemStructure = {
+        'file.txt': '',
+        src: {
+          'index.js': '',
+        },
+      };
+      testRootDir = await createTmpDir(structure);
+
+      const nonRecursiveConfig = {
+        getEnableRecursiveFileSearch: () => false,
+        getFileFilteringOptions: vi.fn(() => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        })),
+      } as unknown as Config;
+
+      const { result } = renderHook(() =>
+        useTestHarnessForAtCompletion(
+          true,
+          '',
+          nonRecursiveConfig,
+          testRootDir,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      // Should only contain top-level items
+      expect(result.current.suggestions.map((s) => s.value)).toEqual([
+        'src/',
+        'file.txt',
+      ]);
     });
   });
 });

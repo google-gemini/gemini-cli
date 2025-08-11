@@ -11,6 +11,7 @@ import picomatch from 'picomatch';
 import { Ignore } from './ignore.js';
 import { ResultCache } from './result-cache.js';
 import * as cache from './crawlCache.js';
+import { AsyncFzf, FzfResultItem } from 'fzf';
 
 export type FileSearchOptions = {
   projectRoot: string;
@@ -19,6 +20,7 @@ export type FileSearchOptions = {
   useGeminiignore: boolean;
   cache: boolean;
   cacheTtl: number;
+  maxDepth?: number;
 };
 
 export class AbortError extends Error {
@@ -91,6 +93,7 @@ export class FileSearch {
   private readonly ignore: Ignore = new Ignore();
   private resultCache: ResultCache | undefined;
   private allFiles: string[] = [];
+  private fzf: AsyncFzf<string[]> | undefined;
 
   /**
    * Constructs a new `FileSearch` instance.
@@ -122,22 +125,38 @@ export class FileSearch {
     pattern: string,
     options: SearchOptions = {},
   ): Promise<string[]> {
-    if (!this.resultCache) {
+    if (!this.resultCache || !this.fzf) {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
 
     pattern = pattern || '*';
 
+    let filteredCandidates;
     const { files: candidates, isExactMatch } =
       await this.resultCache!.get(pattern);
 
-    let filteredCandidates;
     if (isExactMatch) {
+      // Use the cached result.
       filteredCandidates = candidates;
     } else {
-      // Apply the user's picomatch pattern filter
-      filteredCandidates = await filter(candidates, pattern, options.signal);
-      this.resultCache!.set(pattern, filteredCandidates);
+      let shouldCache = true;
+      if (pattern.includes('*')) {
+        filteredCandidates = await filter(candidates, pattern, options.signal);
+      } else {
+        filteredCandidates = await this.fzf
+          .find(pattern)
+          .then((results: Array<FzfResultItem<string>>) =>
+            results.map((entry: FzfResultItem<string>) => entry.item),
+          )
+          .catch(() => {
+            shouldCache = false;
+            return [];
+          });
+      }
+
+      if (shouldCache) {
+        this.resultCache!.set(pattern, filteredCandidates);
+      }
     }
 
     // Trade-off: We apply a two-stage filtering process.
@@ -215,6 +234,7 @@ export class FileSearch {
       const cacheKey = cache.getCacheKey(
         this.absoluteDir,
         this.ignore.getFingerprint(),
+        this.options.maxDepth,
       );
       const cachedResults = cache.read(cacheKey);
 
@@ -230,6 +250,7 @@ export class FileSearch {
       const cacheKey = cache.getCacheKey(
         this.absoluteDir,
         this.ignore.getFingerprint(),
+        this.options.maxDepth,
       );
       cache.write(cacheKey, this.allFiles, this.options.cacheTtl * 1000);
     }
@@ -257,6 +278,10 @@ export class FileSearch {
         return dirFilter(`${relativePath}/`);
       });
 
+    if (this.options.maxDepth !== undefined) {
+      api.withMaxDepth(this.options.maxDepth);
+    }
+
     return api.crawl(this.absoluteDir).withPromise();
   }
 
@@ -265,5 +290,11 @@ export class FileSearch {
    */
   private buildResultCache(): void {
     this.resultCache = new ResultCache(this.allFiles, this.absoluteDir);
+    // The v1 algorithm is much faster since it only looks at the first
+    // occurence of the pattern. We use it for search spaces that have >20k
+    // files, because the v2 algorithm is just too slow in those cases.
+    this.fzf = new AsyncFzf(this.allFiles, {
+      fuzzy: this.allFiles.length > 20000 ? 'v1' : 'v2',
+    });
   }
 }
