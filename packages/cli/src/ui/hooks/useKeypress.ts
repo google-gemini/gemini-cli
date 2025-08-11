@@ -8,6 +8,16 @@ import { useEffect, useRef } from 'react';
 import { useStdin } from 'ink';
 import readline from 'readline';
 import { PassThrough } from 'stream';
+import {
+  KITTY_CTRL_C,
+  BACKSLASH_ENTER_DETECTION_WINDOW_MS,
+  MAX_KITTY_SEQUENCE_LENGTH,
+} from '../utils/platformConstants.js';
+import {
+  KittySequenceOverflowEvent,
+  logKittySequenceOverflow,
+  Config,
+} from '@google/gemini-cli-core';
 
 export interface Key {
   name: string;
@@ -16,6 +26,7 @@ export interface Key {
   shift: boolean;
   paste: boolean;
   sequence: string;
+  kittyProtocol?: boolean;
 }
 
 /**
@@ -30,10 +41,16 @@ export interface Key {
  * @param onKeypress - The callback function to execute on each keypress.
  * @param options - Options to control the hook's behavior.
  * @param options.isActive - Whether the hook should be actively listening for input.
+ * @param options.kittyProtocolEnabled - Whether Kitty keyboard protocol is enabled.
+ * @param options.config - Optional config for telemetry logging.
  */
 export function useKeypress(
   onKeypress: (key: Key) => void,
-  { isActive }: { isActive: boolean },
+  {
+    isActive,
+    kittyProtocolEnabled = false,
+    config,
+  }: { isActive: boolean; kittyProtocolEnabled?: boolean; config?: Config },
 ) {
   const { stdin, setRawMode } = useStdin();
   const onKeypressRef = useRef(onKeypress);
@@ -64,8 +81,173 @@ export function useKeypress(
 
     let isPaste = false;
     let pasteBuffer = Buffer.alloc(0);
+    let kittySequenceBuffer = '';
+    let backslashTimeout: NodeJS.Timeout | null = null;
+    let waitingForEnterAfterBackslash = false;
+    const ESC = '\u001B';
+
+    // Parse Kitty protocol sequences
+    const parseKittySequence = (sequence: string): Key | null => {
+      // Match CSI <number> ; <modifiers> u or ~
+      // Format: ESC [ <keycode> ; <modifiers> u/~
+      const kittyPattern = new RegExp(`^${ESC}\\[(\\d+)(;(\\d+))?([u~])$`);
+      const match = sequence.match(kittyPattern);
+      if (!match) return null;
+
+      const keyCode = parseInt(match[1], 10);
+      const modifiers = match[3] ? parseInt(match[3], 10) : 1;
+
+      // Decode modifiers (subtract 1 as per Kitty protocol spec)
+      const modifierBits = modifiers - 1;
+      const shift = (modifierBits & 1) === 1;
+      const alt = (modifierBits & 2) === 2;
+      const ctrl = (modifierBits & 4) === 4;
+
+      // Handle Enter key (code 13)
+      if (keyCode === 13) {
+        return {
+          name: 'return',
+          ctrl,
+          meta: alt,
+          shift,
+          paste: false,
+          sequence,
+          kittyProtocol: true,
+        };
+      }
+
+      // Handle Ctrl+letter combinations (a-z)
+      // ASCII codes: a=97, b=98, c=99, ..., z=122
+      if (keyCode >= 97 && keyCode <= 122 && ctrl) {
+        const letter = String.fromCharCode(keyCode);
+        return {
+          name: letter,
+          ctrl: true,
+          meta: alt,
+          shift,
+          paste: false,
+          sequence,
+          kittyProtocol: true,
+        };
+      }
+
+      // Handle other keys as needed
+      return null;
+    };
 
     const handleKeypress = (_: unknown, key: Key) => {
+      // Handle VS Code's backslash+return pattern (Shift+Enter)
+      if (key.name === 'return' && waitingForEnterAfterBackslash) {
+        // Cancel the timeout since we got the Enter
+        if (backslashTimeout) {
+          clearTimeout(backslashTimeout);
+          backslashTimeout = null;
+        }
+        waitingForEnterAfterBackslash = false;
+
+        // Convert to Shift+Enter
+        onKeypressRef.current({
+          ...key,
+          shift: true,
+          sequence: '\\\r', // VS Code's Shift+Enter representation
+        });
+        return;
+      }
+
+      // Handle backslash - hold it to see if Enter follows
+      if (key.sequence === '\\' && !key.name) {
+        // Don't pass through the backslash yet - wait to see if Enter follows
+        waitingForEnterAfterBackslash = true;
+
+        // Set up a timeout to pass through the backslash if no Enter follows
+        backslashTimeout = setTimeout(() => {
+          waitingForEnterAfterBackslash = false;
+          backslashTimeout = null;
+          // Pass through the backslash since no Enter followed
+          onKeypressRef.current(key);
+        }, BACKSLASH_ENTER_DETECTION_WINDOW_MS);
+
+        return;
+      }
+
+      // If we're waiting for Enter after backslash but got something else,
+      // pass through the backslash first, then the new key
+      if (waitingForEnterAfterBackslash && key.name !== 'return') {
+        if (backslashTimeout) {
+          clearTimeout(backslashTimeout);
+          backslashTimeout = null;
+        }
+        waitingForEnterAfterBackslash = false;
+
+        // Pass through the backslash that was held
+        onKeypressRef.current({
+          name: '',
+          sequence: '\\',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+        });
+
+        // Then continue processing the current key normally
+      }
+
+      // Always pass through Ctrl+C immediately, regardless of protocol state
+      // Check both standard format and Kitty protocol sequence
+      if (
+        (key.ctrl && key.name === 'c') ||
+        key.sequence === `${ESC}${KITTY_CTRL_C}`
+      ) {
+        kittySequenceBuffer = '';
+        // If it's the Kitty sequence, create a proper key object
+        if (key.sequence === `${ESC}${KITTY_CTRL_C}`) {
+          onKeypressRef.current({
+            name: 'c',
+            ctrl: true,
+            meta: false,
+            shift: false,
+            paste: false,
+            sequence: key.sequence,
+            kittyProtocol: true,
+          });
+        } else {
+          onKeypressRef.current(key);
+        }
+        return;
+      }
+
+      // If Kitty protocol is enabled, handle CSI sequences
+      if (kittyProtocolEnabled) {
+        // If we have a buffer or this starts a CSI sequence
+        if (kittySequenceBuffer || key.sequence.startsWith(`${ESC}[`)) {
+          kittySequenceBuffer += key.sequence;
+
+          // Try to parse the buffer as a Kitty sequence
+          const kittyKey = parseKittySequence(kittySequenceBuffer);
+          if (kittyKey) {
+            kittySequenceBuffer = '';
+            onKeypressRef.current(kittyKey);
+            return;
+          }
+
+          // If buffer doesn't match expected pattern and is getting long, flush it
+          if (kittySequenceBuffer.length > MAX_KITTY_SEQUENCE_LENGTH) {
+            // Log telemetry for buffer overflow
+            if (config) {
+              const event = new KittySequenceOverflowEvent(
+                kittySequenceBuffer.length,
+                kittySequenceBuffer,
+              );
+              logKittySequenceOverflow(config, event);
+            }
+            // Not a Kitty sequence, treat as regular key
+            kittySequenceBuffer = '';
+          } else {
+            // Wait for more characters
+            return;
+          }
+        }
+      }
       if (key.name === 'paste-start') {
         isPaste = true;
       } else if (key.name === 'paste-end') {
@@ -84,7 +266,7 @@ export function useKeypress(
           pasteBuffer = Buffer.concat([pasteBuffer, Buffer.from(key.sequence)]);
         } else {
           // Handle special keys
-          if (key.name === 'return' && key.sequence === '\x1B\r') {
+          if (key.name === 'return' && key.sequence === `${ESC}\r`) {
             key.meta = true;
           }
           onKeypressRef.current({ ...key, paste: isPaste });
@@ -93,8 +275,8 @@ export function useKeypress(
     };
 
     const handleRawKeypress = (data: Buffer) => {
-      const PASTE_MODE_PREFIX = Buffer.from('\x1B[200~');
-      const PASTE_MODE_SUFFIX = Buffer.from('\x1B[201~');
+      const PASTE_MODE_PREFIX = Buffer.from(`${ESC}[200~`);
+      const PASTE_MODE_SUFFIX = Buffer.from(`${ESC}[201~`);
 
       let pos = 0;
       while (pos < data.length) {
@@ -170,6 +352,12 @@ export function useKeypress(
       rl.close();
       setRawMode(false);
 
+      // Clean up any pending backslash timeout
+      if (backslashTimeout) {
+        clearTimeout(backslashTimeout);
+        backslashTimeout = null;
+      }
+
       // If we are in the middle of a paste, send what we have.
       if (isPaste) {
         onKeypressRef.current({
@@ -183,5 +371,5 @@ export function useKeypress(
         pasteBuffer = Buffer.alloc(0);
       }
     };
-  }, [isActive, stdin, setRawMode]);
+  }, [isActive, stdin, setRawMode, kittyProtocolEnabled, config]);
 }
