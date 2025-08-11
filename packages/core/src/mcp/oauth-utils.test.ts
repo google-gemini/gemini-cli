@@ -154,20 +154,6 @@ describe('OAuthUtils', () => {
     });
   });
 
-  describe('extractBaseUrl', () => {
-    it('should extract base URL from MCP server URL', () => {
-      const result = OAuthUtils.extractBaseUrl('https://example.com/mcp/v1');
-      expect(result).toBe('https://example.com');
-    });
-
-    it('should handle URLs with ports', () => {
-      const result = OAuthUtils.extractBaseUrl(
-        'https://example.com:8080/mcp/v1',
-      );
-      expect(result).toBe('https://example.com:8080');
-    });
-  });
-
   describe('isSSEEndpoint', () => {
     it('should return true for SSE endpoints', () => {
       expect(OAuthUtils.isSSEEndpoint('https://example.com/sse')).toBe(true);
