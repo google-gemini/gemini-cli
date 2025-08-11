@@ -23,7 +23,6 @@ import {
   ShellProcessor,
 } from './prompt-processors/shellProcessor.js';
 import { DefaultArgumentProcessor } from './prompt-processors/argumentProcessor.js';
-
 import { CommandContext } from '../ui/commands/types.js';
 
 const mockShellProcess = vi.hoisted(() => vi.fn());
