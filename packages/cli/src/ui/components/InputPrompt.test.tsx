@@ -5,6 +5,7 @@
  */
 
 import { render } from 'ink-testing-library';
+import { waitFor } from '@testing-library/react';
 import { InputPrompt, InputPromptProps } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 import { Config } from '@google/gemini-cli-core';
@@ -1190,6 +1191,106 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('enhanced input UX - double ESC clear functionality', () => {
+    it('should clear buffer on second ESC press', async () => {
+      const onEscapePromptChange = vi.fn();
+      props.onEscapePromptChange = onEscapePromptChange;
+      props.buffer.setText('text to clear');
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x1B');
+      await wait();
+
+      stdin.write('\x1B');
+      await wait();
+
+      expect(props.buffer.setText).toHaveBeenCalledWith('');
+      expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should reset escape state on any non-ESC key', async () => {
+      const onEscapePromptChange = vi.fn();
+      props.onEscapePromptChange = onEscapePromptChange;
+      props.buffer.setText('some text');
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x1B');
+      await wait();
+
+      expect(onEscapePromptChange).toHaveBeenCalledWith(true);
+
+      stdin.write('a');
+      await wait();
+
+      expect(onEscapePromptChange).toHaveBeenCalledWith(false);
+      unmount();
+    });
+
+    it('should handle ESC in shell mode by disabling shell mode', async () => {
+      props.shellModeActive = true;
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x1B');
+      await wait();
+
+      expect(props.setShellModeActive).toHaveBeenCalledWith(false);
+      unmount();
+    });
+
+    it('should handle ESC when completion suggestions are showing', async () => {
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: true,
+        suggestions: [{ label: 'suggestion', value: 'suggestion' }],
+      });
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x1B');
+      await wait();
+
+      expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should not call onEscapePromptChange when not provided', async () => {
+      props.onEscapePromptChange = undefined;
+      props.buffer.setText('some text');
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x1B');
+      await wait();
+
+      unmount();
+    });
+
+    it('should not interfere with existing keyboard shortcuts', async () => {
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x0C');
+      await wait();
+
+      expect(props.onClearScreen).toHaveBeenCalled();
+
+      stdin.write('\x01');
+      await wait();
+
+      expect(props.buffer.move).toHaveBeenCalledWith('home');
+      unmount();
+    });
+  });
+
   describe('reverse search', () => {
     beforeEach(async () => {
       props.shellModeActive = true;
@@ -1226,11 +1327,12 @@ describe('InputPrompt', () => {
       stdin.write('\x12');
       await wait();
       stdin.write('\x1B');
-      await wait();
 
-      const frame = stdout.lastFrame();
-      expect(frame).not.toContain('(r:)');
-      expect(frame).not.toContain('echo hello');
+      await waitFor(() => {
+        expect(stdout.lastFrame()).not.toContain('(r:)');
+      });
+
+      expect(stdout.lastFrame()).not.toContain('echo hello');
 
       unmount();
     });
@@ -1240,9 +1342,11 @@ describe('InputPrompt', () => {
       stdin.write('\x12');
       await wait();
       stdin.write('\t');
-      await wait();
 
-      expect(stdout.lastFrame()).not.toContain('(r:)');
+      await waitFor(() => {
+        expect(stdout.lastFrame()).not.toContain('(r:)');
+      });
+
       expect(props.buffer.setText).toHaveBeenCalledWith('echo hello');
       unmount();
     });
@@ -1253,9 +1357,11 @@ describe('InputPrompt', () => {
       await wait();
       expect(stdout.lastFrame()).toContain('(r:)');
       stdin.write('\r');
-      await wait();
 
-      expect(stdout.lastFrame()).not.toContain('(r:)');
+      await waitFor(() => {
+        expect(stdout.lastFrame()).not.toContain('(r:)');
+      });
+
       expect(props.onSubmit).toHaveBeenCalledWith('echo hello');
       unmount();
     });
@@ -1268,9 +1374,10 @@ describe('InputPrompt', () => {
       await wait();
       expect(stdout.lastFrame()).toContain('(r:)');
       stdin.write('\x1B');
-      await wait();
 
-      expect(stdout.lastFrame()).not.toContain('(r:)');
+      await waitFor(() => {
+        expect(stdout.lastFrame()).not.toContain('(r:)');
+      });
       expect(props.buffer.text).toBe('initial text');
       expect(props.buffer.cursor).toEqual([0, 3]);
 

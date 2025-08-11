@@ -83,6 +83,36 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
 
 async function getGeminiMdFilePathsInternal(
   currentWorkingDirectory: string,
+  includeDirectoriesToReadGemini: readonly string[],
+  userHomePath: string,
+  debugMode: boolean,
+  fileService: FileDiscoveryService,
+  extensionContextFilePaths: string[] = [],
+  fileFilteringOptions: FileFilteringOptions,
+  maxDirs: number,
+): Promise<string[]> {
+  const dirs = new Set<string>([
+    ...includeDirectoriesToReadGemini,
+    currentWorkingDirectory,
+  ]);
+  const paths = [];
+  for (const dir of dirs) {
+    const pathsByDir = await getGeminiMdFilePathsInternalForEachDir(
+      dir,
+      userHomePath,
+      debugMode,
+      fileService,
+      extensionContextFilePaths,
+      fileFilteringOptions,
+      maxDirs,
+    );
+    paths.push(...pathsByDir);
+  }
+  return Array.from(new Set<string>(paths));
+}
+
+async function getGeminiMdFilePathsInternalForEachDir(
+  dir: string,
   userHomePath: string,
   debugMode: boolean,
   fileService: FileDiscoveryService,
@@ -115,8 +145,8 @@ async function getGeminiMdFilePathsInternal(
 
     // FIX: Only perform the workspace search (upward and downward scans)
     // if a valid currentWorkingDirectory is provided.
-    if (currentWorkingDirectory) {
-      const resolvedCwd = path.resolve(currentWorkingDirectory);
+    if (dir) {
+      const resolvedCwd = path.resolve(dir);
       if (debugMode)
         logger.debug(
           `Searching for ${geminiMdFilename} starting from CWD: ${resolvedCwd}`,
@@ -257,6 +287,7 @@ function concatenateInstructions(
  */
 export async function loadServerHierarchicalMemory(
   currentWorkingDirectory: string,
+  includeDirectoriesToReadGemini: readonly string[],
   debugMode: boolean,
   fileService: FileDiscoveryService,
   extensionContextFilePaths: string[] = [],
@@ -274,6 +305,7 @@ export async function loadServerHierarchicalMemory(
   const userHomePath = homedir();
   const filePaths = await getGeminiMdFilePathsInternal(
     currentWorkingDirectory,
+    includeDirectoriesToReadGemini,
     userHomePath,
     debugMode,
     fileService,
@@ -282,7 +314,8 @@ export async function loadServerHierarchicalMemory(
     maxDirs,
   );
   if (filePaths.length === 0) {
-    if (debugMode) logger.debug('No GEMINI.md files found in hierarchy.');
+    if (debugMode)
+      logger.debug('No GEMINI.md files found in hierarchy of the workspace.');
     return { memoryContent: '', fileCount: 0 };
   }
   const contentsWithPaths = await readGeminiMdFiles(
@@ -303,5 +336,8 @@ export async function loadServerHierarchicalMemory(
     logger.debug(
       `Combined instructions (snippet): ${combinedInstructions.substring(0, 500)}...`,
     );
-  return { memoryContent: combinedInstructions, fileCount: filePaths.length };
+  return {
+    memoryContent: combinedInstructions,
+    fileCount: contentsWithPaths.length,
+  };
 }

@@ -21,7 +21,6 @@ import {
   sanitizeParameters,
 } from './tool-registry.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { BaseTool, Icon, ToolResult } from './tools.js';
 import {
   FunctionDeclaration,
   CallableTool,
@@ -30,8 +29,9 @@ import {
   Schema,
 } from '@google/genai';
 import { spawn } from 'node:child_process';
-import { IdeClient } from '../ide/ide-client.js';
+
 import fs from 'node:fs';
+import { MockTool } from '../test-utils/tools.js';
 
 vi.mock('node:fs');
 
@@ -107,28 +107,6 @@ const createMockCallableTool = (
   callTool: vi.fn(),
 });
 
-class MockTool extends BaseTool<{ param: string }, ToolResult> {
-  constructor(
-    name = 'mock-tool',
-    displayName = 'A mock tool',
-    description = 'A mock tool description',
-  ) {
-    super(name, displayName, description, Icon.Hammer, {
-      type: Type.OBJECT,
-      properties: {
-        param: { type: Type.STRING },
-      },
-      required: ['param'],
-    });
-  }
-  async execute(params: { param: string }): Promise<ToolResult> {
-    return {
-      llmContent: `Executed with ${params.param}`,
-      returnDisplay: `Executed with ${params.param}`,
-    };
-  }
-}
-
 const baseConfigParams: ConfigParameters = {
   cwd: '/tmp',
   model: 'test-model',
@@ -140,7 +118,6 @@ const baseConfigParams: ConfigParameters = {
   geminiMdFileCount: 0,
   approvalMode: ApprovalMode.DEFAULT,
   sessionId: 'test-session-id',
-  ideClient: IdeClient.getInstance(false),
 };
 
 describe('ToolRegistry', () => {
@@ -172,6 +149,10 @@ describe('ToolRegistry', () => {
     );
     vi.spyOn(config, 'getMcpServers');
     vi.spyOn(config, 'getMcpServerCommand');
+    vi.spyOn(config, 'getPromptRegistry').mockReturnValue({
+      clear: vi.fn(),
+      removePromptsByServer: vi.fn(),
+    } as any);
     mockDiscoverMcpTools.mockReset().mockResolvedValue(undefined);
   });
 
@@ -353,8 +334,9 @@ describe('ToolRegistry', () => {
         mcpServerConfigVal,
         undefined,
         toolRegistry,
-        undefined,
+        config.getPromptRegistry(),
         false,
+        expect.any(Object),
       );
     });
 
@@ -376,8 +358,9 @@ describe('ToolRegistry', () => {
         mcpServerConfigVal,
         undefined,
         toolRegistry,
-        undefined,
+        config.getPromptRegistry(),
         false,
+        expect.any(Object),
       );
     });
   });
