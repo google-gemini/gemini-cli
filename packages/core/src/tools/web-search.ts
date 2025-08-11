@@ -100,6 +100,28 @@ export class WebSearchTool extends BaseTool<
     return null;
   }
 
+  /**
+   * Converts a UTF-8 byte index to a character index.
+   * This is needed because the Grounding API returns byte positions,
+   * but JavaScript string operations work with character positions.
+   * 
+   * @param text The text string
+   * @param byteIndex The byte index to convert
+   * @returns The corresponding character index
+   */
+  private byteIndexToCharIndex(text: string, byteIndex: number): number {
+    const bytes = Buffer.from(text, 'utf8');
+    if (byteIndex >= bytes.length) {
+      return text.length;
+    }
+    if (byteIndex <= 0) {
+      return 0;
+    }
+    
+    const truncatedBytes = bytes.subarray(0, byteIndex);
+    return truncatedBytes.toString('utf8').length;
+  }
+
   getDescription(params: WebSearchToolParams): string {
     return `Searching the web for: "${params.query}"`;
   }
@@ -157,8 +179,13 @@ export class WebSearchTool extends BaseTool<
               const citationMarker = support.groundingChunkIndices
                 .map((chunkIndex: number) => `[${chunkIndex + 1}]`)
                 .join('');
+              // Convert byte index to character index
+              const charIndex = this.byteIndexToCharIndex(
+                modifiedResponseText,
+                support.segment.endIndex,
+              );
               insertions.push({
-                index: support.segment.endIndex,
+                index: charIndex,
                 marker: citationMarker,
               });
             }
