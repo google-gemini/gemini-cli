@@ -99,7 +99,9 @@ export class LoggingContentGenerator implements ContentGenerator {
         prompt_id,
         this.config.getContentGeneratorConfig()?.authType,
         errorType,
-        isStructuredError(error) ? (error as StructuredError).status : undefined,
+        isStructuredError(error)
+          ? (error as StructuredError).status
+          : undefined,
       ),
     );
   }
