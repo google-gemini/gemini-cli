@@ -65,10 +65,10 @@ function formatFileList(openFiles: File[]): string {
       const isDuplicate = (basenameCounts.get(basename) || 0) > 1;
       const parentDir = path.basename(path.dirname(file.path));
       const displayName = isDuplicate
-        ? `${basename} (/${parentDir})`
+        ? `${basename} (/${parentDir})` 
         : basename;
 
-      return `  - ${displayName}${file.isActive ? ' (active)' : ''}`;
+      return `  - ${displayName}${file.isActive ? ' (active)' : ''}`; 
     })
     .join('\n');
 
@@ -131,7 +131,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
           messageType: 'error',
           content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: ${Object.values(
             DetectedIde,
-          ).map((ide) => getIdeDisplayName(ide))}
+          ).map((ide) => getIdeDisplayName(ide))
             .join(', ')}`,
         }) as const,
     };
@@ -169,7 +169,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         context.ui.addItem(
           {
             type: 'error',
-            text: `No installer is available for ${ideClient.getDetectedIdeDisplayName()}. Please install the IDE companion manually from its marketplace.`,
+            text: `No installer is available for ${ideClient.getDetectedIdeDisplayName()}. Please install the IDE companion manually from its marketplace.`, 
           },
           Date.now(),
         );
