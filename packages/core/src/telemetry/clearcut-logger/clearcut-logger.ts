@@ -150,13 +150,27 @@ export class ClearcutLogger {
     }
   }
 
+  addDefaultFields(data: EventValue[]): void {
+    const totalAccounts = getLifetimeGoogleAccounts();
+    const surface = determineSurface();
+    const defaultLogMetadata = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
+        value: totalAccounts.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
+    ];
+    data.push(...defaultLogMetadata);
+  }
+
   createLogEvent(name: string, data: EventValue[]): LogEvent {
     const email = getCachedGoogleAccount();
-    const totalAccounts = getLifetimeGoogleAccounts();
-    data.push({
-      gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
-      value: totalAccounts.toString(),
-    });
+
+    // Add default fields that should exist for all logs
+    this.addDefaultFields(data);
 
     const logEvent: LogEvent = {
       console_type: 'GEMINI_CLI',
@@ -340,8 +354,6 @@ export class ClearcutLogger {
   }
 
   logStartSessionEvent(event: StartSessionEvent): void {
-    const surface = determineSurface();
-
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
@@ -406,10 +418,6 @@ export class ClearcutLogger {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_TELEMETRY_LOG_USER_PROMPTS_ENABLED,
         value: event.telemetry_log_user_prompts_enabled.toString(),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-        value: surface,
       },
     ];
 
