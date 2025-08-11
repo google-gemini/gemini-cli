@@ -7,7 +7,7 @@
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
-import { loadCliConfig, parseArguments, CliArgs } from './config/config.js';
+import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
 import v8 from 'node:v8';
@@ -43,6 +43,7 @@ import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { getTriggeredAccelosCommand, executeAccelosCommand } from './config/accelosCommands.js';
+import process from 'node:process';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -152,7 +153,6 @@ export async function main() {
   // Check if an accelos command was triggered
   if (argv.accelosCommands && argv.accelosCommands.length > 0) {
     const triggeredCommand = getTriggeredAccelosCommand(argv, argv.accelosCommands);
-    
     if (triggeredCommand) {
       try {
         await executeAccelosCommand(triggeredCommand);
@@ -289,6 +289,7 @@ export async function main() {
 
   const shouldBeInteractive =
     !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0 && !argv.prompt && !argv.accelosPrompt);
+
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {
     const version = await getCliVersion();
