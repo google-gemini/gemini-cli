@@ -60,7 +60,6 @@
   },
   "devDependencies": {
     "@babel/runtime": "^7.27.6",
-    "@google/gemini-cli-test-utils": "file:../test-utils",
     "@testing-library/react": "^16.3.0",
     "@types/command-exists": "^1.2.3",
     "@types/diff": "^7.0.2",
@@ -76,7 +75,8 @@
     "pretty-format": "^30.0.2",
     "react-dom": "^19.1.0",
     "typescript": "^5.3.3",
-    "vitest": "^3.1.1"
+    "vitest": "^3.1.1",
+    "@google/gemini-cli-test-utils": "file:../test-utils"
   },
   "engines": {
     "node": ">=20"
