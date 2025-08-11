@@ -304,6 +304,9 @@ export async function loadCliConfig(
   sessionId: string,
   argv: CliArgs,
 ): Promise<Config> {
+  let memoryContent = '';
+  let fileCount = 0;
+
   if (argv.portableConfig) {
     const portableConfig = loadPortableConfig(argv.portableConfig);
     if (portableConfig.env) {
@@ -318,6 +321,10 @@ export async function loadCliConfig(
       }
     }
     settings = portableConfig.settings || {};
+    if (portableConfig.context?.geminiMd) {
+      memoryContent = portableConfig.context.geminiMd;
+      fileCount = 1;
+    }
   }
 
   const debugMode =
@@ -371,28 +378,7 @@ export async function loadCliConfig(
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
 
-  let memoryContent = '';
-  let fileCount = 0;
-
-  if (argv.portableConfig) {
-    const portableConfig = loadPortableConfig(argv.portableConfig);
-    if (portableConfig.context?.geminiMd) {
-      memoryContent = portableConfig.context.geminiMd;
-      fileCount = 1;
-    }
-    if (portableConfig.env) {
-      for (const [key, value] of Object.entries(portableConfig.env)) {
-        process.env[key] = value;
-      }
-    }
-    if (portableConfig.cli) {
-      for (const [key, value] of Object.entries(portableConfig.cli)) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (argv as any)[key] = value;
-      }
-    }
-    settings = portableConfig.settings || {};
-  } else {
+  if (!argv.portableConfig) {
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadHierarchicalGeminiMemory(
       process.cwd(),
