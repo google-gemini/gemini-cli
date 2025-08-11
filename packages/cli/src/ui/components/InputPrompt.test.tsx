@@ -1191,6 +1191,106 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('enhanced input UX - double ESC clear functionality', () => {
+    it('should clear buffer on second ESC press', async () => {
+      const onEscapePromptChange = vi.fn();
+      props.onEscapePromptChange = onEscapePromptChange;
+      props.buffer.setText('text to clear');
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x1B');
+      await wait();
+
+      stdin.write('\x1B');
+      await wait();
+
+      expect(props.buffer.setText).toHaveBeenCalledWith('');
+      expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should reset escape state on any non-ESC key', async () => {
+      const onEscapePromptChange = vi.fn();
+      props.onEscapePromptChange = onEscapePromptChange;
+      props.buffer.setText('some text');
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x1B');
+      await wait();
+
+      expect(onEscapePromptChange).toHaveBeenCalledWith(true);
+
+      stdin.write('a');
+      await wait();
+
+      expect(onEscapePromptChange).toHaveBeenCalledWith(false);
+      unmount();
+    });
+
+    it('should handle ESC in shell mode by disabling shell mode', async () => {
+      props.shellModeActive = true;
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x1B');
+      await wait();
+
+      expect(props.setShellModeActive).toHaveBeenCalledWith(false);
+      unmount();
+    });
+
+    it('should handle ESC when completion suggestions are showing', async () => {
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: true,
+        suggestions: [{ label: 'suggestion', value: 'suggestion' }],
+      });
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x1B');
+      await wait();
+
+      expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should not call onEscapePromptChange when not provided', async () => {
+      props.onEscapePromptChange = undefined;
+      props.buffer.setText('some text');
+
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x1B');
+      await wait();
+
+      unmount();
+    });
+
+    it('should not interfere with existing keyboard shortcuts', async () => {
+      const { stdin, unmount } = render(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x0C');
+      await wait();
+
+      expect(props.onClearScreen).toHaveBeenCalled();
+
+      stdin.write('\x01');
+      await wait();
+
+      expect(props.buffer.move).toHaveBeenCalledWith('home');
+      unmount();
+    });
+  });
+
   describe('reverse search', () => {
     beforeEach(async () => {
       props.shellModeActive = true;

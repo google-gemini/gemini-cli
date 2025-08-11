@@ -178,6 +178,7 @@ export class ToolRegistry {
       this,
       this.config.getPromptRegistry(),
       this.config.getDebugMode(),
+      this.config.getWorkspaceContext(),
     );
   }
 
@@ -199,6 +200,7 @@ export class ToolRegistry {
       this,
       this.config.getPromptRegistry(),
       this.config.getDebugMode(),
+      this.config.getWorkspaceContext(),
     );
   }
 
@@ -225,6 +227,7 @@ export class ToolRegistry {
         this,
         this.config.getPromptRegistry(),
         this.config.getDebugMode(),
+        this.config.getWorkspaceContext(),
       );
     }
   }
@@ -362,6 +365,22 @@ export class ToolRegistry {
     this.tools.forEach((tool) => {
       declarations.push(tool.schema);
     });
+    return declarations;
+  }
+
+  /**
+   * Retrieves a filtered list of tool schemas based on a list of tool names.
+   * @param toolNames - An array of tool names to include.
+   * @returns An array of FunctionDeclarations for the specified tools.
+   */
+  getFunctionDeclarationsFiltered(toolNames: string[]): FunctionDeclaration[] {
+    const declarations: FunctionDeclaration[] = [];
+    for (const name of toolNames) {
+      const tool = this.tools.get(name);
+      if (tool) {
+        declarations.push(tool.schema);
+      }
+    }
     return declarations;
   }
 
