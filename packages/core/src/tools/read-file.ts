@@ -16,7 +16,7 @@ import {
   ToolResult,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import { PartUnion, Type } from '@google/genai';
+import { PartUnion } from '@google/genai';
 import {
   processSingleFileContent,
   getSpecificMimeType,
@@ -179,27 +179,30 @@ export class ReadFileTool extends BaseDeclarativeTool<
           absolute_path: {
             description:
               "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
-            type: Type.STRING,
+            type: 'string',
           },
           offset: {
             description:
               "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
-            type: Type.NUMBER,
+            type: 'number',
           },
           limit: {
             description:
               "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
-            type: Type.NUMBER,
+            type: 'number',
           },
         },
         required: ['absolute_path'],
-        type: Type.OBJECT,
+        type: 'object',
       },
     );
   }
 
   protected validateToolParams(params: ReadFileToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
     if (errors) {
       return errors;
     }

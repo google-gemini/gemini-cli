@@ -12,7 +12,6 @@ import {
   ToolConfirmationOutcome,
   Icon,
 } from './tools.js';
-import { Type } from '@google/genai';
 import { getErrorMessage } from '../utils/errors.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
@@ -77,11 +76,11 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
           prompt: {
             description:
               'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). Must contain as least one URL starting with http:// or https://.',
-            type: Type.STRING,
+            type: 'string',
           },
         },
         required: ['prompt'],
-        type: Type.OBJECT,
+        type: 'object',
       },
     );
     const proxy = config.getProxy();
@@ -156,7 +155,10 @@ ${textContent}
   }
 
   validateParams(params: WebFetchToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
     if (errors) {
       return errors;
     }

@@ -18,7 +18,6 @@ import {
   Icon,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
@@ -64,19 +63,19 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       Process Group PGID: Process group started or \`(none)\``,
       Icon.Terminal,
       {
-        type: Type.OBJECT,
+        type: 'object',
         properties: {
           command: {
-            type: Type.STRING,
+            type: 'string',
             description: 'Exact bash command to execute as `bash -c <command>`',
           },
           description: {
-            type: Type.STRING,
+            type: 'string',
             description:
               'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
           },
           directory: {
-            type: Type.STRING,
+            type: 'string',
             description:
               '(OPTIONAL) Directory to run the command in, if not the project root directory. Must be relative to the project root directory and must already exist.',
           },
@@ -113,7 +112,10 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       }
       return commandCheck.reason;
     }
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
     if (errors) {
       return errors;
     }
