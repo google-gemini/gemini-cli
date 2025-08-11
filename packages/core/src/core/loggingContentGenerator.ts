@@ -29,8 +29,7 @@ import { ContentGenerator } from './contentGenerator.js';
 import { toContents } from '../code_assist/converter.js';
 
 interface StructuredError {
-  message: string;
-  status?: number;
+  status: number;
 }
 
 export function isStructuredError(error: unknown): error is StructuredError {
