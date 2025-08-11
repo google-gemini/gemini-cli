@@ -54,6 +54,91 @@ export function isWithinRoot(
 }
 
 /**
+ * Detects the Unicode Byte Order Mark (BOM) in a buffer.
+ * @param buffer The buffer to check for BOM.
+ * @returns Object with BOM information: { hasBOM: boolean, encoding?: string, bomLength?: number }
+ */
+function detectBOM(buffer: Buffer): { hasBOM: boolean; encoding?: string; bomLength?: number } {
+  if (buffer.length >= 4) {
+    // UTF-32 LE: FF FE 00 00
+    if (buffer[0] === 0xFF && buffer[1] === 0xFE && buffer[2] === 0x00 && buffer[3] === 0x00) {
+      return { hasBOM: true, encoding: 'utf32le', bomLength: 4 };
+    }
+    // UTF-32 BE: 00 00 FE FF
+    if (buffer[0] === 0x00 && buffer[1] === 0x00 && buffer[2] === 0xFE && buffer[3] === 0xFF) {
+      return { hasBOM: true, encoding: 'utf32be', bomLength: 4 };
+    }
+  }
+  
+  if (buffer.length >= 3) {
+    // UTF-8: EF BB BF
+    if (buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
+      return { hasBOM: true, encoding: 'utf8', bomLength: 3 };
+    }
+  }
+  
+  if (buffer.length >= 2) {
+    // UTF-16 LE: FF FE
+    if (buffer[0] === 0xFF && buffer[1] === 0xFE) {
+      return { hasBOM: true, encoding: 'utf16le', bomLength: 2 };
+    }
+    // UTF-16 BE: FE FF
+    if (buffer[0] === 0xFE && buffer[1] === 0xFF) {
+      return { hasBOM: true, encoding: 'utf16be', bomLength: 2 };
+    }
+  }
+  
+  return { hasBOM: false };
+}
+
+/**
+ * Reads a file with proper encoding detection based on BOM.
+ * Falls back to UTF-8 if no BOM is detected.
+ * @param filePath Path to the file.
+ * @returns Promise that resolves to the file content as a string.
+ */
+export async function readFileWithEncoding(filePath: string): Promise<string> {
+  const buffer = await fs.promises.readFile(filePath);
+  const bomInfo = detectBOM(buffer);
+  
+  if (bomInfo.hasBOM && bomInfo.encoding && bomInfo.bomLength) {
+    // Remove BOM and decode with detected encoding
+    const contentBuffer = buffer.subarray(bomInfo.bomLength);
+    
+    // Handle special encodings that Node.js doesn't support directly
+    if (bomInfo.encoding === 'utf32le' || bomInfo.encoding === 'utf32be') {
+      // For UTF-32, we'll try to decode as utf16le as a fallback
+      try {
+        return contentBuffer.toString('utf16le');
+      } catch {
+        return contentBuffer.toString('utf8');
+      }
+    }
+    
+    if (bomInfo.encoding === 'utf16be') {
+      // For UTF-16 BE, we need to swap bytes to make it LE
+      try {
+        const swappedBuffer = Buffer.from(contentBuffer);
+        // Swap every pair of bytes
+        for (let i = 0; i < swappedBuffer.length - 1; i += 2) {
+          const temp = swappedBuffer[i];
+          swappedBuffer[i] = swappedBuffer[i + 1];
+          swappedBuffer[i + 1] = temp;
+        }
+        return swappedBuffer.toString('utf16le');
+      } catch {
+        return contentBuffer.toString('utf8');
+      }
+    }
+    
+    return contentBuffer.toString(bomInfo.encoding as BufferEncoding);
+  }
+  
+  // No BOM detected, assume UTF-8
+  return buffer.toString('utf8');
+}
+
+/**
  * Determines if a file is likely binary based on content sampling.
  * @param filePath Path to the file.
  * @returns Promise that resolves to true if the file appears to be binary.
@@ -76,6 +161,12 @@ export async function isBinaryFile(filePath: string): Promise<boolean> {
     const bytesRead = result.bytesRead;
 
     if (bytesRead === 0) return false;
+
+    // Check for Unicode BOM first - if found, this is a text file
+    const bomInfo = detectBOM(buffer);
+    if (bomInfo.hasBOM) {
+      return false; // Files with BOM are text files, not binary
+    }
 
     let nonPrintableCount = 0;
     for (let i = 0; i < bytesRead; i++) {
@@ -279,14 +370,14 @@ export async function processSingleFileContent(
             returnDisplay: `Skipped large SVG file (>1MB): ${relativePathForDisplay}`,
           };
         }
-        const content = await fs.promises.readFile(filePath, 'utf8');
+        const content = await readFileWithEncoding(filePath);
         return {
           llmContent: content,
           returnDisplay: `Read SVG as text: ${relativePathForDisplay}`,
         };
       }
       case 'text': {
-        const content = await fs.promises.readFile(filePath, 'utf8');
+        const content = await readFileWithEncoding(filePath);
         const lines = content.split('\n');
         const originalLineCount = lines.length;
 
