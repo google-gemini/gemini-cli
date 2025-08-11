@@ -89,7 +89,7 @@ export class IdeClient {
         )
           .map((ide) => getIdeDisplayName(ide))
           .join(', ')}`,
-        true,
+        false,
       );
       return;
     }
