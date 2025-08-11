@@ -238,7 +238,7 @@ describe('gemini.tsx main function', () => {
 
       try {
         await main();
-      } catch (error) {
+      } catch (_error) {
         // We expect it to throw as it will try to render the UI
       }
 
