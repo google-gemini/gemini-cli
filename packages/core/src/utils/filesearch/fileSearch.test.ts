@@ -290,6 +290,30 @@ describe('FileSearch', () => {
     expect(results).toEqual(['src/file1.js', 'src/file2.js']); // Assuming alphabetical sort
   });
 
+  it('should use fzf for fuzzy matching when pattern does not contain wildcards', async () => {
+    tmpDir = await createTmpDir({
+      src: {
+        'main.js': '',
+        'util.ts': '',
+        'style.css': '',
+      },
+    });
+
+    const fileSearch = new FileSearch({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: false,
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+    });
+
+    await fileSearch.initialize();
+    const results = await fileSearch.search('sst');
+
+    expect(results).toEqual(['src/style.css']);
+  });
+
   it('should return empty array when no matches are found', async () => {
     tmpDir = await createTmpDir({
       src: ['file1.js'],
