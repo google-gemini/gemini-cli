@@ -26,10 +26,33 @@ export interface ExtensionConfig {
   excludeTools?: string[];
 }
 
+function getSystemExtensionsPath(): string {
+  if (process.env.GEMINI_CLI_SYSTEM_EXTENSIONS_PATH) {
+    return process.env.GEMINI_CLI_SYSTEM_EXTENSIONS_PATH;
+  }
+  if (os.platform() === 'darwin') {
+    return path.join(
+      '/Library',
+      'Application Support',
+      'GeminiCli',
+      'extensions',
+    );
+  } else if (os.platform() === 'win32') {
+    return path.join(
+      process.env.PROGRAMDATA || 'C:\\ProgramData',
+      'gemini-cli',
+      'extensions',
+    );
+  } else {
+    return '/usr/share/gemini-cli/extensions';
+  }
+}
+
 export function loadExtensions(workspaceDir: string): Extension[] {
   const allExtensions = [
-    ...loadExtensionsFromDir(workspaceDir),
-    ...loadExtensionsFromDir(os.homedir()),
+    ...loadExtensionsFromBaseDir(workspaceDir),
+    ...loadExtensionsFromBaseDir(os.homedir()),
+    ...loadExtensionsFromDir(getSystemExtensionsPath()),
   ];
 
   const uniqueExtensions = new Map<string, Extension>();
@@ -42,8 +65,12 @@ export function loadExtensions(workspaceDir: string): Extension[] {
   return Array.from(uniqueExtensions.values());
 }
 
-function loadExtensionsFromDir(dir: string): Extension[] {
-  const extensionsDir = path.join(dir, EXTENSIONS_DIRECTORY_NAME);
+function loadExtensionsFromBaseDir(baseDir: string): Extension[] {
+  const extensionsDir = path.join(baseDir, EXTENSIONS_DIRECTORY_NAME);
+  return loadExtensionsFromDir(extensionsDir);
+}
+
+function loadExtensionsFromDir(extensionsDir: string): Extension[] {
   if (!fs.existsSync(extensionsDir)) {
     return [];
   }
