@@ -28,12 +28,14 @@ import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions } from './config/extension.js';
 import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
+import { saveSession, loadSession, listSessions, getLatestSession, findSession } from './utils/session.js';
 import {
   Config,
   sessionId,
   logUserPrompt,
   AuthType,
   getOauthClient,
+  getProjectTempDir,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -42,6 +44,97 @@ import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
+import { Content } from '@google/genai';
+import fs from 'fs';
+import path from 'path';
+
+let lastSessionHistory: Content[] = [];
+
+// Function to update session history from interactive mode
+export function updateSessionHistory(history: Content[]) {
+  lastSessionHistory = history;
+}
+
+// Synchronous session save for immediate exits
+function saveSessionSync(history: Content[]) {
+  try {
+    const tempDir = getProjectTempDir(process.cwd());
+    const sessionsDir = path.join(tempDir, 'sessions');
+    fs.mkdirSync(sessionsDir, { recursive: true });
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `session-${timestamp}.json`;
+    const filePath = path.join(sessionsDir, fileName);
+
+    fs.writeFileSync(filePath, JSON.stringify(history, null, 2));
+    console.log(`Session saved to ${filePath}`);
+  } catch (error) {
+    console.error('Failed to save session on exit:', error);
+  }
+}
+
+// Track if we're already in the exit process to avoid double-saving
+let isExiting = false;
+
+// Handle graceful shutdown with async operations
+process.on('beforeExit', async () => {
+  if (!isExiting && lastSessionHistory.length > 0) {
+    isExiting = true;
+    try {
+      await saveSession(lastSessionHistory);
+    } catch (error) {
+      console.error('Failed to save session on beforeExit:', error);
+      // Fallback to sync save if async fails
+      saveSessionSync(lastSessionHistory);
+    }
+  }
+});
+
+// Handle various exit signals
+function handleExitSignal(signal: string) {
+  return () => {
+    if (!isExiting && lastSessionHistory.length > 0) {
+      isExiting = true;
+      console.log(`\nReceived ${signal}, saving session...`);
+      saveSessionSync(lastSessionHistory);
+    }
+    process.exit(0);
+  };
+}
+
+// Handle SIGINT (Ctrl+C)
+process.on('SIGINT', handleExitSignal('SIGINT'));
+
+// Handle SIGTERM (termination)
+process.on('SIGTERM', handleExitSignal('SIGTERM'));
+
+// Handle SIGHUP (hang up)
+process.on('SIGHUP', handleExitSignal('SIGHUP'));
+
+// Handle SIGQUIT (quit)
+process.on('SIGQUIT', handleExitSignal('SIGQUIT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  if (!isExiting && lastSessionHistory.length > 0) {
+    isExiting = true;
+    console.log('Saving session before crash...');
+    saveSessionSync(lastSessionHistory);
+  }
+  process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  if (!isExiting && lastSessionHistory.length > 0) {
+    isExiting = true;
+    console.log('Saving session before crash...');
+    saveSessionSync(lastSessionHistory);
+  }
+  process.exit(1);
+});
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -233,7 +326,6 @@ export async function main() {
       }
     }
   }
-
   if (
     settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
     config.isBrowserLaunchSuppressed()
@@ -246,11 +338,68 @@ export async function main() {
     return runAcpPeer(config, settings);
   }
 
-  let input = config.getQuestion();
+  let input: string = config.getQuestion() || '';
   const startupWarnings = [
     ...(await getStartupWarnings()),
     ...(await getUserStartupWarnings(workspaceRoot)),
   ];
+
+  let initialHistory: Content[] = [];
+
+  // Handle --resume-last flag
+  if (argv.resumeLast) {
+    const latestSessionId = await getLatestSession();
+    if (latestSessionId) {
+      const loadedHistory = await loadSession(latestSessionId);
+      if (loadedHistory) {
+        initialHistory = loadedHistory;
+        console.log(`Resumed latest session: ${latestSessionId}`);
+        input = '';
+      } else {
+        console.error(`Failed to load latest session ${latestSessionId}.`);
+      }
+    } else {
+      console.error('No automatically saved sessions found to resume.');
+    }
+  }
+  // TODO(sethtroisi): refactor to chat processor.
+  else if (input.startsWith('/chat resume-auto ')) {
+    const inputId = input.substring('/chat resume-auto '.length).trim();
+    if (inputId) {
+      const sessionId = await findSession(inputId);
+      
+      if (!sessionId) {
+        console.error(`No session found with input: ${inputId}. Use /chat list-auto to see available sessions.`);
+      } else {
+        const loadedHistory = await loadSession(sessionId);
+        if (loadedHistory) {
+          initialHistory = loadedHistory;
+          console.log(`Session ${sessionId} loaded successfully.`);
+        } else {
+          console.error(`Failed to load session ${sessionId}.`);
+        }
+      }
+    } else {
+      console.error('Please provide a session ID or number to resume.');
+    }
+    // Clear the input so it doesn't get processed as a new prompt
+    input = '';
+  } else if (input.startsWith('/chat list-auto')) {
+    const sessions = await listSessions();
+    if (sessions.length === 0) {
+      console.log('No automatically saved sessions found.');
+    } else {
+      console.log('Automatically saved sessions:');
+      sessions.forEach(
+        (session: { shortId: number; fullId: string; timestamp: string }) => {
+          console.log(
+            `  ${session.timestamp} - ${session.fullId} - ${session.shortId} `,
+          );
+        },
+      );
+    }
+    process.exit(0);
+  }
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {
@@ -264,6 +413,7 @@ export async function main() {
             settings={settings}
             startupWarnings={startupWarnings}
             version={version}
+            initialHistory={initialHistory}
           />
         </SettingsContext.Provider>
       </React.StrictMode>,
@@ -286,10 +436,10 @@ export async function main() {
   }
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
-  if (!process.stdin.isTTY && !input) {
+  if (!process.stdin.isTTY) {
     input += await readStdin();
   }
-  if (!input) {
+  if (!input && initialHistory.length === 0) {
     console.error('No input provided via stdin.');
     process.exit(1);
   }
@@ -310,7 +460,22 @@ export async function main() {
     config,
   );
 
-  await runNonInteractive(nonInteractiveConfig, input, prompt_id);
+  try {
+    lastSessionHistory = await runNonInteractive(
+      nonInteractiveConfig,
+      input,
+      initialHistory,
+      prompt_id,
+    );
+    
+    // Save session before exiting non-interactive mode
+    if (lastSessionHistory.length > 0) {
+      await saveSession(lastSessionHistory);
+    }
+  } catch (error) {
+    console.error('Error in non-interactive mode:', error);
+    process.exit(1);
+  }
   process.exit(0);
 }
 

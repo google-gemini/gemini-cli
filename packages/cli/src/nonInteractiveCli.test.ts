@@ -95,7 +95,7 @@ describe('runNonInteractive', () => {
       createStreamFromEvents(events),
     );
 
-    await runNonInteractive(mockConfig, 'Test input', 'prompt-id-1');
+    await runNonInteractive(mockConfig, 'Test input', [], 'prompt-id-1');
 
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledWith(
       [{ text: 'Test input' }],
@@ -131,7 +131,7 @@ describe('runNonInteractive', () => {
       .mockReturnValueOnce(createStreamFromEvents(firstCallEvents))
       .mockReturnValueOnce(createStreamFromEvents(secondCallEvents));
 
-    await runNonInteractive(mockConfig, 'Use a tool', 'prompt-id-2');
+    await runNonInteractive(mockConfig, 'Use a tool', [], 'prompt-id-2');
 
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(2);
     expect(mockCoreExecuteToolCall).toHaveBeenCalledWith(
@@ -169,7 +169,7 @@ describe('runNonInteractive', () => {
       createStreamFromEvents([toolCallEvent]),
     );
 
-    await runNonInteractive(mockConfig, 'Trigger tool error', 'prompt-id-3');
+    await runNonInteractive(mockConfig, 'Trigger tool error', [], 'prompt-id-3');
 
     expect(mockCoreExecuteToolCall).toHaveBeenCalled();
     expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -184,7 +184,7 @@ describe('runNonInteractive', () => {
       throw apiError;
     });
 
-    await runNonInteractive(mockConfig, 'Initial fail', 'prompt-id-4');
+    await runNonInteractive(mockConfig, 'Initial fail', [], 'prompt-id-4');
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       '[API Error: API connection failed]',
@@ -221,6 +221,7 @@ describe('runNonInteractive', () => {
     await runNonInteractive(
       mockConfig,
       'Trigger tool not found',
+      [],
       'prompt-id-5',
     );
 
@@ -237,7 +238,7 @@ describe('runNonInteractive', () => {
 
   it('should exit when max session turns are exceeded', async () => {
     vi.mocked(mockConfig.getMaxSessionTurns).mockReturnValue(0);
-    await runNonInteractive(mockConfig, 'Trigger loop', 'prompt-id-6');
+    await runNonInteractive(mockConfig, 'Trigger loop', [], 'prompt-id-6');
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       '\n Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
     );

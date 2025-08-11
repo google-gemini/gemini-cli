@@ -52,6 +52,7 @@ export interface CliArgs {
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
+  resumeLast: boolean | undefined;
   allFiles: boolean | undefined;
   all_files: boolean | undefined;
   showMemoryUsage: boolean | undefined;
@@ -96,6 +97,11 @@ export async function parseArguments(): Promise<CliArgs> {
           type: 'string',
           description:
             'Execute the provided prompt and continue in interactive mode',
+        })
+        .option('resume-last', {
+          alias: 'r',
+          type: 'boolean',
+          description: 'Resume the most recent automatically saved session',
         })
         .option('sandbox', {
           alias: 's',
@@ -222,6 +228,11 @@ export async function parseArguments(): Promise<CliArgs> {
           if (argv.prompt && argv.promptInteractive) {
             throw new Error(
               'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
+            );
+          }
+          if (argv.resumeLast && (argv.prompt || argv.promptInteractive)) {
+            throw new Error(
+              'Cannot use --resume-last (-r) with --prompt (-p) or --prompt-interactive (-i)',
             );
           }
           return true;

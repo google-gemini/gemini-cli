@@ -15,6 +15,9 @@ import {
   useStdout,
 } from 'ink';
 import { StreamingState, type HistoryItem, MessageType } from './types.js';
+import { Content } from '@google/genai';
+import { saveSession } from '../utils/session.js';
+import { updateSessionHistory } from '../gemini.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
@@ -105,6 +108,7 @@ interface AppProps {
   config: Config;
   settings: LoadedSettings;
   startupWarnings?: string[];
+  initialHistory?: Content[];
   version: string;
 }
 
@@ -116,14 +120,13 @@ export const AppWrapper = (props: AppProps) => (
   </SessionStatsProvider>
 );
 
-const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
+const App = ({ config, settings, startupWarnings = [], version, initialHistory = [] }: AppProps) => {
   const isFocused = useFocus();
   useBracketedPaste();
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
   const { stdout } = useStdout();
   const nightly = version.includes('nightly');
-  const { history, addItem, clearItems, loadHistory } = useHistory();
-
+  
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
   const currentIDE = config.getIdeClient().getCurrentIde();
   useEffect(() => {
@@ -136,11 +139,25 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     !settings.merged.hasSeenIdeIntegrationNudge &&
     !idePromptAnswered;
 
+  const convertedInitialHistory: HistoryItem[] = useMemo(
+    () =>
+      initialHistory.map((content, index) => ({
+        id: index, // Simple ID for now, will be replaced by useHistory
+        type: content.role === 'user' ? MessageType.USER : MessageType.GEMINI,
+        text: content.parts?.map((part) => part.text).join('') || '',
+        timestamp: Date.now(),
+      })),
+    [initialHistory],
+  );
+
+  const { history, addItem, clearItems, loadHistory } = useHistory(
+    convertedInitialHistory,
+  );
+
   useEffect(() => {
     const cleanup = setUpdateHandler(addItem, setUpdateInfo);
     return cleanup;
   }, [addItem]);
-
   const {
     consoleMessages,
     handleNewMessage,
@@ -785,6 +802,28 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       refreshStatic();
     }
   }, [streamingState, refreshStatic, staticNeedsRefresh]);
+
+  // Auto-save session when conversation finishes
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle) {
+      const autoSaveSession = async () => {
+        try {
+          const chat = await config?.getGeminiClient()?.getChat();
+          const chatHistory = chat?.getHistory();
+          if (chatHistory && chatHistory.length > 0) {
+            // Update global session history for exit handlers
+            updateSessionHistory(chatHistory);
+            // Save the session
+            await saveSession(chatHistory);
+          }
+        } catch (error) {
+          console.error('Failed to auto-save session:', error);
+        }
+      };
+      
+      autoSaveSession();
+    }
+  }, [streamingState, config]);
 
   const filteredConsoleMessages = useMemo(() => {
     if (config.getDebugMode()) {
