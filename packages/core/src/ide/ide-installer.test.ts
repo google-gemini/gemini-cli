@@ -70,13 +70,9 @@ describe('ide-installer', () => {
 
   describe('OpenVSXInstaller', () => {
     let installer: IdeInstaller;
-    let execSyncSpy: vi.SpyInstance;
 
     beforeEach(() => {
       installer = getIdeInstaller(DetectedIde.VSCodium)!;
-      execSyncSpy = vi
-        .spyOn(child_process, 'execSync')
-        .mockImplementation(() => '');
     });
 
     afterEach(() => {
@@ -84,16 +80,15 @@ describe('ide-installer', () => {
     });
 
     describe('install', () => {
-      it('should call execSync with the correct command', async () => {
-        await installer.install();
+      it('should call execSync with the correct command and return success', async () => {
+        const execSyncSpy = vi
+          .spyOn(child_process, 'execSync')
+          .mockImplementation(() => '');
+        const result = await installer.install();
         expect(execSyncSpy).toHaveBeenCalledWith(
           'npx ovsx get google.gemini-cli-vscode-ide-companion',
           { stdio: 'pipe' },
         );
-      });
-
-      it('should return a success message on successful installation', async () => {
-        const result = await installer.install();
         expect(result.success).toBe(true);
         expect(result.message).toContain(
           'VS Code companion extension was installed successfully from OpenVSX',
@@ -101,7 +96,7 @@ describe('ide-installer', () => {
       });
 
       it('should return a failure message on failed installation', async () => {
-        execSyncSpy.mockImplementation(() => {
+        vi.spyOn(child_process, 'execSync').mockImplementation(() => {
           throw new Error('Command failed');
         });
         const result = await installer.install();

@@ -56,7 +56,9 @@ export function IdeIntegrationNudge({
           <Text color="yellow">{'> '}</Text>
           {`Do you want to connect your ${ideName ?? 'your'} editor to Gemini CLI?`}
         </Text>
-        <Text dimColor>{`If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in ${ideName ?? 'your editor'}.`}</Text>
+        <Text
+          dimColor
+        >{`If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in ${ideName ?? 'your editor'}.`}</Text>
       </Box>
       <RadioButtonSelect
         items={OPTIONS}

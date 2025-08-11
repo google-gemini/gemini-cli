@@ -42,7 +42,7 @@ export function getIdeDisplayName(ide: DetectedIde): string {
 }
 
 export function detectIde(): DetectedIde | undefined {
-  // Only VSCode-based integrations are currently supported. 
+  // Only VSCode-based integrations are currently supported.
   if (process.env.TERM_PROGRAM !== 'vscode') {
     return undefined;
   }
