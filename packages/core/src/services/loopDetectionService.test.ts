@@ -200,6 +200,80 @@ describe('LoopDetectionService', () => {
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
 
+    it('should not detect loops when content transitions into a code block', () => {
+      service.reset('');
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      // Add some repetitive content outside of code block
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 2; i++) {
+        service.addAndCheck(createContentEvent(repeatedContent));
+      }
+
+      // Now transition into a code block - this should prevent loop detection
+      // even though we were already close to the threshold
+      const codeBlockStart = '```javascript\n';
+      const isLoop = service.addAndCheck(createContentEvent(codeBlockStart));
+      expect(isLoop).toBe(false);
+
+      // Continue adding repetitive content inside the code block - should not trigger loop
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
+        const isLoopInside = service.addAndCheck(
+          createContentEvent(repeatedContent),
+        );
+        expect(isLoopInside).toBe(false);
+      }
+
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should skip loop detection when already inside a code block (this.inCodeBlock)', () => {
+      service.reset('');
+
+      // Start with content that puts us inside a code block
+      service.addAndCheck(createContentEvent('Here is some code:\n```\n'));
+
+      // Verify we are now inside a code block and any content should be ignored for loop detection
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 5; i++) {
+        const isLoop = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(isLoop).toBe(false);
+      }
+
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should correctly track inCodeBlock state with multiple fence transitions', () => {
+      service.reset('');
+      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      // Outside code block - should track content
+      service.addAndCheck(createContentEvent('Normal text '));
+
+      // Enter code block (1 fence) - should stop tracking
+      const enterResult = service.addAndCheck(createContentEvent('```\n'));
+      expect(enterResult).toBe(false);
+
+      // Inside code block - should not track loops
+      for (let i = 0; i < 5; i++) {
+        const insideResult = service.addAndCheck(
+          createContentEvent(repeatedContent),
+        );
+        expect(insideResult).toBe(false);
+      }
+
+      // Exit code block (2nd fence) - should reset tracking but still return false
+      const exitResult = service.addAndCheck(createContentEvent('```\n'));
+      expect(exitResult).toBe(false);
+
+      // Enter code block again (3rd fence) - should stop tracking again
+      const reenterResult = service.addAndCheck(
+        createContentEvent('```python\n'),
+      );
+      expect(reenterResult).toBe(false);
+
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
     it('should detect a loop when repetitive content is outside a code block', () => {
       service.reset('');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
