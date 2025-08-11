@@ -20,6 +20,7 @@ import {
   ListPromptsResultSchema,
   GetPromptResult,
   GetPromptResultSchema,
+  ListRootsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
 import { AuthProviderType, MCPServerConfig } from '../config/config.js';
@@ -33,6 +34,9 @@ import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { basename } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -306,6 +310,7 @@ export async function discoverMcpTools(
   toolRegistry: ToolRegistry,
   promptRegistry: PromptRegistry,
   debugMode: boolean,
+  workspaceContext: WorkspaceContext,
 ): Promise<void> {
   mcpDiscoveryState = MCPDiscoveryState.IN_PROGRESS;
   try {
@@ -319,6 +324,7 @@ export async function discoverMcpTools(
           toolRegistry,
           promptRegistry,
           debugMode,
+          workspaceContext,
         ),
     );
     await Promise.all(discoveryPromises);
@@ -363,6 +369,7 @@ export async function connectAndDiscover(
   toolRegistry: ToolRegistry,
   promptRegistry: PromptRegistry,
   debugMode: boolean,
+  workspaceContext: WorkspaceContext,
 ): Promise<void> {
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
@@ -372,6 +379,7 @@ export async function connectAndDiscover(
       mcpServerName,
       mcpServerConfig,
       debugMode,
+      workspaceContext,
     );
 
     mcpClient.onerror = (error) => {
@@ -417,6 +425,65 @@ export async function connectAndDiscover(
 }
 
 /**
+ * Recursively validates that a JSON schema and all its nested properties and
+ * items have a `type` defined.
+ *
+ * @param schema The JSON schema to validate.
+ * @returns `true` if the schema is valid, `false` otherwise.
+ *
+ * @visiblefortesting
+ */
+export function hasValidTypes(schema: unknown): boolean {
+  if (typeof schema !== 'object' || schema === null) {
+    // Not a schema object we can validate, or not a schema at all.
+    // Treat as valid as it has no properties to be invalid.
+    return true;
+  }
+
+  const s = schema as Record<string, unknown>;
+
+  if (!s.type) {
+    // These keywords contain an array of schemas that should be validated.
+    //
+    // If no top level type was given, then they must each have a type.
+    let hasSubSchema = false;
+    const schemaArrayKeywords = ['anyOf', 'allOf', 'oneOf'];
+    for (const keyword of schemaArrayKeywords) {
+      const subSchemas = s[keyword];
+      if (Array.isArray(subSchemas)) {
+        hasSubSchema = true;
+        for (const subSchema of subSchemas) {
+          if (!hasValidTypes(subSchema)) {
+            return false;
+          }
+        }
+      }
+    }
+
+    // If the node itself is missing a type and had no subschemas, then it isn't valid.
+    if (!hasSubSchema) return false;
+  }
+
+  if (s.type === 'object' && s.properties) {
+    if (typeof s.properties === 'object' && s.properties !== null) {
+      for (const prop of Object.values(s.properties)) {
+        if (!hasValidTypes(prop)) {
+          return false;
+        }
+      }
+    }
+  }
+
+  if (s.type === 'array' && s.items) {
+    if (!hasValidTypes(s.items)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Discovers and sanitizes tools from a connected MCP client.
  * It retrieves function declarations from the client, filters out disabled tools,
  * generates valid names for them, and wraps them in `DiscoveredMCPTool` instances.
@@ -445,6 +512,15 @@ export async function discoverTools(
     for (const funcDecl of tool.functionDeclarations) {
       try {
         if (!isEnabled(funcDecl, mcpServerName, mcpServerConfig)) {
+          continue;
+        }
+
+        if (!hasValidTypes(funcDecl.parametersJsonSchema)) {
+          console.warn(
+            `Skipping tool '${funcDecl.name}' from MCP server '${mcpServerName}' ` +
+              `because it has missing types in its parameter schema. Please file an ` +
+              `issue with the owner of the MCP server.`,
+          );
           continue;
         }
 
@@ -587,10 +663,28 @@ export async function connectToMcpServer(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
+  workspaceContext: WorkspaceContext,
 ): Promise<Client> {
   const mcpClient = new Client({
     name: 'gemini-cli-mcp-client',
     version: '0.0.1',
+  });
+
+  mcpClient.registerCapabilities({
+    roots: {},
+  });
+
+  mcpClient.setRequestHandler(ListRootsRequestSchema, async () => {
+    const roots = [];
+    for (const dir of workspaceContext.getDirectories()) {
+      roots.push({
+        uri: pathToFileURL(dir).toString(),
+        name: basename(dir),
+      });
+    }
+    return {
+      roots,
+    };
   });
 
   // patch Client.callTool to use request timeout as genai McpCallTool.callTool does not do it

@@ -20,6 +20,7 @@ import {
   populateMcpServerCommand,
 } from './mcp-client.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 /**
  * Manages the lifecycle of multiple MCP clients, including local child processes.
@@ -34,6 +35,7 @@ export class McpClientManager {
   private toolRegistry: ToolRegistry;
   private promptRegistry: PromptRegistry;
   private debugMode: boolean;
+  private workspaceContext: WorkspaceContext;
   private discoveryState: MCPDiscoveryState = MCPDiscoveryState.NOT_STARTED;
 
   constructor(
@@ -42,12 +44,14 @@ export class McpClientManager {
     toolRegistry: ToolRegistry,
     promptRegistry: PromptRegistry,
     debugMode: boolean,
+    workspaceContext: WorkspaceContext,
   ) {
     this.mcpServers = mcpServers;
     this.mcpServerCommand = mcpServerCommand;
     this.toolRegistry = toolRegistry;
     this.promptRegistry = promptRegistry;
     this.debugMode = debugMode;
+    this.workspaceContext = workspaceContext;
   }
 
   /**
@@ -184,7 +188,12 @@ export class McpClientManager {
     } else {
       // Create a new transport for remote or dynamically started servers
       // This is a bit of a hack to get the transport
-      const tempClient = await connectToMcpServer(name, config, this.debugMode);
+      const tempClient = await connectToMcpServer(
+        name,
+        config,
+        this.debugMode,
+        this.workspaceContext,
+      );
       if (!tempClient.transport) {
         throw new Error(`Failed to create transport for server '${name}'`);
       }
