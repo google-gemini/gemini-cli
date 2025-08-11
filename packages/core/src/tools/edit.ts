@@ -30,6 +30,120 @@ import { ReadFileTool } from './read-file.js';
 import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
 import { IDEConnectionStatus } from '../ide/ide-client.js';
 
+/**
+ * Determines if a string needs precise matching to avoid partial replacements.
+ * This is important for cases like distinguishing between $ and $$ symbols.
+ */
+function needsPreciseMatching(
+  oldString: string,
+  currentContent: string,
+): boolean {
+  // Check if oldString contains special characters that could be part of larger symbols
+  const specialChars = /[$$\\^.*+?{}[\]|()-]/;
+
+  if (!specialChars.test(oldString)) {
+    return false;
+  }
+
+  // For single character special symbols like $, check if there are multi-character versions
+  if (oldString.length === 1 && specialChars.test(oldString)) {
+    const doubleSymbol = oldString + oldString;
+    return currentContent.includes(doubleSymbol);
+  }
+
+  return false;
+}
+
+/**
+ * Performs precise string replacement using regex patterns to avoid partial matches.
+ */
+function preciseReplace(
+  content: string,
+  oldString: string,
+  newString: string,
+): string {
+  // For special characters, we need to be careful about partial matches
+  if (/[$$\\^.*+?{}[\]|()-]/.test(oldString)) {
+    // For single characters, avoid matching when they're part of longer sequences
+    if (oldString.length === 1) {
+      let result = '';
+      let i = 0;
+      while (i < content.length) {
+        if (content[i] === oldString) {
+          // Check if this is part of a sequence (like $$ in $$)
+          const prevChar = i > 0 ? content[i - 1] : '';
+          const nextChar = i < content.length - 1 ? content[i + 1] : '';
+
+          // Only replace if it's not part of a repeated sequence
+          if (prevChar !== oldString && nextChar !== oldString) {
+            result += newString;
+          } else {
+            result += oldString;
+          }
+        } else {
+          result += content[i];
+        }
+        i++;
+      }
+      return result;
+    }
+
+    // For multi-character strings with special chars, manually find and replace exact matches
+    let result = content;
+    let searchIndex = 0;
+
+    while (true) {
+      const index = result.indexOf(oldString, searchIndex);
+      if (index === -1) break;
+
+      // Check if this match should be replaced
+      let shouldReplace = true;
+
+      // For repeated character patterns like $$, check if it's part of a longer sequence
+      if (oldString === oldString[0].repeat(oldString.length)) {
+        const char = oldString[0];
+        const before = index > 0 ? result[index - 1] : '';
+        const after =
+          index + oldString.length < result.length
+            ? result[index + oldString.length]
+            : '';
+
+        // Don't replace if it's part of a longer sequence of the same character
+        if (before === char || after === char) {
+          shouldReplace = false;
+        }
+      }
+
+      if (shouldReplace) {
+        result =
+          result.substring(0, index) +
+          newString +
+          result.substring(index + oldString.length);
+        searchIndex = index + newString.length;
+      } else {
+        searchIndex = index + 1;
+      }
+    }
+
+    return result;
+  }
+
+  // For regular strings, escape and use direct replacement
+  const escapedOldString = oldString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // Use word boundaries if appropriate for alphanumeric strings
+  const needsWordBoundary =
+    /^[a-zA-Z0-9_]/.test(oldString) && /[a-zA-Z0-9_]$/.test(oldString);
+  if (needsWordBoundary) {
+    const pattern = new RegExp(`\\b${escapedOldString}\\b`, 'g');
+    return content.replace(pattern, newString);
+  }
+
+  // Default to exact string matching
+  const pattern = new RegExp(escapedOldString, 'g');
+  return content.replace(pattern, newString);
+}
+
 export function applyReplacement(
   currentContent: string | null,
   oldString: string,
@@ -47,6 +161,12 @@ export function applyReplacement(
   if (oldString === '' && !isNewFile) {
     return currentContent;
   }
+
+  // Use precise matching for special characters to avoid partial replacements
+  if (needsPreciseMatching(oldString, currentContent)) {
+    return preciseReplace(currentContent, oldString, newString);
+  }
+
   return currentContent.replaceAll(oldString, newString);
 }
 

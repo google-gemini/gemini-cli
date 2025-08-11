@@ -180,6 +180,35 @@ describe('EditTool', () => {
         'hello world',
       );
     });
+
+    // Test case for Issue #5973: gemini-cli does not distinguish between $$ and $ when editing files
+    it('should NOT replace $$ when trying to replace $ (Issue #5973)', () => {
+      const content =
+        'const element = $(".item"); const elements = $$(".items");';
+      // This should only replace the single $ function call, not the $$ function call
+      const result = applyReplacement(content, '$', 'jQuery', false);
+
+      // The problem: this currently fails because replaceAll replaces both $ and $$
+      // Expected: only $ should be replaced, $$ should remain unchanged
+      expect(result).toBe(
+        'const element = jQuery(".item"); const elements = $$(".items");',
+      );
+    });
+
+    it('should handle multiple special character combinations correctly', () => {
+      const content = 'let a = $; let b = $$; let c = $$$;';
+
+      // Test replacing $ - should not affect $$ or $$$
+      expect(applyReplacement(content, '$', 'X', false)).toBe(
+        'let a = X; let b = $$; let c = $$$;',
+      );
+
+      // Test replacing $$ - should not affect single $ or $$$
+      const content2 = 'let a = $; let b = $$; let c = $$$;';
+      expect(applyReplacement(content2, '$$', 'Y', false)).toBe(
+        'let a = $; let b = Y; let c = Y$;',
+      );
+    });
   });
 
   describe('validateToolParams', () => {
