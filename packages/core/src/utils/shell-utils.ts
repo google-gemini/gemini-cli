@@ -160,13 +160,8 @@ export function detectCommandSubstitution(command: string): boolean {
         return true;
       }
 
-      // >(...) process substitution - works unquoted only (not in double quotes)
-      if (char === '>' && nextChar === '(' && !inDoubleQuotes && !inBackticks) {
-        return true;
-      }
-
-      // <(...) process substitution - works unquoted only (not in double quotes)
-      if (char === '<' && nextChar === '(' && !inDoubleQuotes && !inBackticks) {
+      // >(...), <(...) process substitution - works unquoted only (not in double quotes)
+      if (['>', '<'].includes(char) && nextChar === '(' && !inDoubleQuotes && !inBackticks) {
         return true;
       }
 
