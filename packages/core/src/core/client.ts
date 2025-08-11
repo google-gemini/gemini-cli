@@ -167,6 +167,7 @@ export class GeminiClient {
 
   setHistory(history: Content[]) {
     this.getChat().setHistory(history);
+    this.forceFullIdeContext = true;
   }
 
   async setTools(): Promise<void> {
@@ -267,7 +268,7 @@ export class GeminiClient {
           cursor: activeFile.cursor
             ? {
                 line: activeFile.cursor.line,
-                column: activeFile.cursor.character + 1,
+                character: activeFile.cursor.character,
               }
             : undefined,
           selectedText: activeFile.selectedText || undefined,
@@ -284,7 +285,7 @@ export class GeminiClient {
 
       const jsonString = JSON.stringify(contextData, null, 2);
       const contextParts = [
-        "Here is the user's IDE context as a JSON object. This is for your information only.",
+        "Here is the user's editor context as a JSON object. This is for your information only.",
         '```json',
         jsonString,
         '```',
@@ -348,7 +349,7 @@ export class GeminiClient {
             cursor: currentActiveFile.cursor
               ? {
                   line: currentActiveFile.cursor.line,
-                  column: currentActiveFile.cursor.character + 1,
+                  character: currentActiveFile.cursor.character,
                 }
               : undefined,
             selectedText: currentActiveFile.selectedText || undefined,
@@ -366,7 +367,7 @@ export class GeminiClient {
               path: currentActiveFile.path,
               cursor: {
                 line: currentCursor.line,
-                column: currentCursor.character + 1,
+                character: currentCursor.character,
               },
             };
           }
@@ -394,7 +395,7 @@ export class GeminiClient {
       delta.changes = changes;
       const jsonString = JSON.stringify(delta, null, 2);
       const contextParts = [
-        "Here is a summary of changes in the user's IDE context, in JSON format. This is for your information only.",
+        "Here is a summary of changes in the user's editor context, in JSON format. This is for your information only.",
         '```json',
         jsonString,
         '```',
