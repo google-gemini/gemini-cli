@@ -1,6 +1,6 @@
 # Gemini CLI Companion
 
-The Gemini CLI Companion extension seamlessly integrates [Gemini CLI](https://github.com/google-gemini/gemini-cli) into your IDE environment.
+The Gemini CLI Companion extension seamlessly integrates [Gemini CLI](https://github.com/google-gemini/gemini-cli) into your IDE.
 
 # Features
 
