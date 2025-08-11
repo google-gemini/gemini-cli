@@ -18,6 +18,11 @@ import {
   logKittySequenceOverflow,
   Config,
 } from '@google/gemini-cli-core';
+import { FOCUS_IN, FOCUS_OUT } from './useFocus.js';
+
+const ESC = '\u001B';
+export const PASTE_MODE_PREFIX = `${ESC}[200~`;
+export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
 
 export interface Key {
   name: string;
@@ -84,7 +89,6 @@ export function useKeypress(
     let kittySequenceBuffer = '';
     let backslashTimeout: NodeJS.Timeout | null = null;
     let waitingForEnterAfterBackslash = false;
-    const ESC = '\u001B';
 
     // Parse Kitty protocol sequences
     const parseKittySequence = (sequence: string): Key | null => {
@@ -102,6 +106,19 @@ export function useKeypress(
       const shift = (modifierBits & 1) === 1;
       const alt = (modifierBits & 2) === 2;
       const ctrl = (modifierBits & 4) === 4;
+
+      // Handle Escape key (code 27)
+      if (keyCode === 27) {
+        return {
+          name: 'escape',
+          ctrl,
+          meta: alt,
+          shift,
+          paste: false,
+          sequence,
+          kittyProtocol: true,
+        };
+      }
 
       // Handle Enter key (code 13)
       if (keyCode === 13) {
@@ -192,6 +209,13 @@ export function useKeypress(
         // Then continue processing the current key normally
       }
 
+      // If readline has already identified an arrow key, pass it through
+      // immediately, bypassing the Kitty protocol sequence buffering.
+      if (['up', 'down', 'left', 'right'].includes(key.name)) {
+        onKeypressRef.current(key);
+        return;
+      }
+
       // Always pass through Ctrl+C immediately, regardless of protocol state
       // Check both standard format and Kitty protocol sequence
       if (
@@ -219,7 +243,14 @@ export function useKeypress(
       // If Kitty protocol is enabled, handle CSI sequences
       if (kittyProtocolEnabled) {
         // If we have a buffer or this starts a CSI sequence
-        if (kittySequenceBuffer || key.sequence.startsWith(`${ESC}[`)) {
+        if (
+          kittySequenceBuffer ||
+          (key.sequence.startsWith(`${ESC}[`) &&
+            !key.sequence.startsWith(PASTE_MODE_PREFIX) &&
+            !key.sequence.startsWith(PASTE_MODE_SUFFIX) &&
+            !key.sequence.startsWith(FOCUS_IN) &&
+            !key.sequence.startsWith(FOCUS_OUT))
+        ) {
           kittySequenceBuffer += key.sequence;
 
           // Try to parse the buffer as a Kitty sequence
@@ -228,6 +259,17 @@ export function useKeypress(
             kittySequenceBuffer = '';
             onKeypressRef.current(kittyKey);
             return;
+          }
+
+          if (config?.getDebugMode()) {
+            const codes = Array.from(kittySequenceBuffer).map((ch) =>
+              ch.charCodeAt(0),
+            );
+            // Unless the user is sshing over a slow connection, this likely
+            // indicates this is not a kitty sequence but we have incorrectly
+            // interpreted it as such. See the examples above for sequences
+            // such as FOCUS_IN that are not Kitty sequences.
+            console.warn('Kitty sequence buffer has char codes:', codes);
           }
 
           // If buffer doesn't match expected pattern and is getting long, flush it
@@ -275,13 +317,13 @@ export function useKeypress(
     };
 
     const handleRawKeypress = (data: Buffer) => {
-      const PASTE_MODE_PREFIX = Buffer.from(`${ESC}[200~`);
-      const PASTE_MODE_SUFFIX = Buffer.from(`${ESC}[201~`);
+      const pasteModePrefixBuffer = Buffer.from(PASTE_MODE_PREFIX);
+      const pasteModeSuffixBuffer = Buffer.from(PASTE_MODE_SUFFIX);
 
       let pos = 0;
       while (pos < data.length) {
-        const prefixPos = data.indexOf(PASTE_MODE_PREFIX, pos);
-        const suffixPos = data.indexOf(PASTE_MODE_SUFFIX, pos);
+        const prefixPos = data.indexOf(pasteModePrefixBuffer, pos);
+        const suffixPos = data.indexOf(pasteModeSuffixBuffer, pos);
 
         // Determine which marker comes first, if any.
         const isPrefixNext =
@@ -297,7 +339,7 @@ export function useKeypress(
         } else if (isSuffixNext) {
           nextMarkerPos = suffixPos;
         }
-        markerLength = PASTE_MODE_SUFFIX.length;
+        markerLength = pasteModeSuffixBuffer.length;
 
         if (nextMarkerPos === -1) {
           keypressStream.write(data.slice(pos));
