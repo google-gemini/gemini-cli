@@ -28,6 +28,7 @@ vi.mock('node:process', () => {
   const mockProcess = {
     exit: mockProcessExit,
     platform: 'test-platform',
+    cwd: vi.fn(() => '/mock/cwd'),
   };
   return {
     ...mockProcess,
