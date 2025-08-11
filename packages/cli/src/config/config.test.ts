@@ -1082,6 +1082,7 @@ describe('loadCliConfig approvalMode', () => {
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.AUTO_EDIT);
   });
 
+
   it('should throw error for invalid approval mode value', async () => {
     process.argv = ['node', 'script.js', '--approval-mode', 'invalid'];
     

@@ -225,19 +225,6 @@ export async function parseArguments(): Promise<CliArgs> {
           description: 'Automatically accept all file edits (equivalent to shift+tab)',
           default: false,
         })
-        .check((argv) => {
-          if (argv.prompt && argv.promptInteractive) {
-            throw new Error(
-              'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
-            );
-          }
-          return true;
-        })
-        .option('accept-all', {
-          type: 'boolean',
-          description: 'Automatically accept all file edits (equivalent to shift+tab)',
-          default: false,
-        })
         .option('approval-mode', {
           type: 'string',
           choices: ['default', 'auto_edit', 'yolo'],
