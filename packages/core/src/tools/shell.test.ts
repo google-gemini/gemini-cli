@@ -25,6 +25,7 @@ vi.mock('../utils/summarizer.js');
 
 import { isCommandAllowed } from '../utils/shell-utils.js';
 import { ShellTool } from './shell.js';
+import { ToolErrorType } from './tool-error.js';
 import { type Config } from '../config/config.js';
 import {
   type ShellExecutionResult,
@@ -201,6 +202,42 @@ describe('ShellTool', () => {
       // The final llmContent should contain the user's command, not the wrapper
       expect(result.llmContent).toContain('Error: wrapped command failed');
       expect(result.llmContent).not.toContain('pgrep');
+    });
+
+    it('should return error with error property for invalid parameters', async () => {
+      const result = await shellTool.execute(
+        { command: '' }, // Empty command is invalid
+        mockAbortSignal,
+      );
+
+      expect(result.llmContent).toContain(
+        'Could not execute command due to invalid parameters:',
+      );
+      expect(result.returnDisplay).toBe('Command cannot be empty.');
+      expect(result.error).toEqual({
+        message: 'Command cannot be empty.',
+        type: ToolErrorType.INVALID_TOOL_PARAMS,
+      });
+    });
+
+    it('should return error with error property for invalid directory', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      const result = await shellTool.execute(
+        { command: 'ls', directory: 'nonexistent' },
+        mockAbortSignal,
+      );
+
+      expect(result.llmContent).toContain(
+        'Could not execute command due to invalid parameters:',
+      );
+      expect(result.returnDisplay).toBe(
+        "Directory 'nonexistent' is not a registered workspace directory.",
+      );
+      expect(result.error).toEqual({
+        message:
+          "Directory 'nonexistent' is not a registered workspace directory.",
+        type: ToolErrorType.INVALID_TOOL_PARAMS,
+      });
     });
 
     it('should summarize output when configured', async () => {
