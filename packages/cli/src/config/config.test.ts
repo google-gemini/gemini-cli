@@ -1034,12 +1034,12 @@ describe('Approval mode tool exclusion logic', () => {
 
   it('should throw an error for invalid approval mode values in loadCliConfig', async () => {
     // Create a mock argv with an invalid approval mode that bypasses argument parsing validation
-    const invalidArgv = {
+    const invalidArgv: Partial<CliArgs> & { approvalMode: string } = {
       approvalMode: 'invalid_mode',
       promptInteractive: '',
       prompt: '',
       yolo: false,
-    } as any;
+    };
 
     const settings: Settings = {};
     const extensions: Extension[] = [];

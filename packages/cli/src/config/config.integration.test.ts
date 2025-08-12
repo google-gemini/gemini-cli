@@ -263,7 +263,7 @@ describe('Configuration Integration Tests', () => {
   });
 
   describe('Approval Mode Integration Tests', () => {
-    let parseArguments: any;
+    let parseArguments: typeof import('./config').parseArguments;
 
     beforeEach(async () => {
       // Import the argument parsing function for integration testing

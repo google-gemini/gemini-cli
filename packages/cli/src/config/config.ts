@@ -408,7 +408,12 @@ export async function loadCliConfig(
         // In auto-edit non-interactive mode, only tools that still require a prompt are excluded.
         extraExcludes.push(ShellTool.Name);
         break;
-      // No extra excludes for YOLO mode.
+      case ApprovalMode.YOLO:
+        // No extra excludes for YOLO mode.
+        break;
+      default:
+        // This should never happen due to validation earlier, but satisfies the linter
+        break;
     }
   }
 
