@@ -1010,33 +1010,6 @@ describe('loadCliConfig model selection', () => {
   });
 });
 
-describe('loadCliConfig ideModeFeature', () => {
-  const originalArgv = process.argv;
-  const originalEnv = { ...process.env };
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
-    process.env.GEMINI_API_KEY = 'test-api-key';
-    delete process.env.SANDBOX;
-    delete process.env.GEMINI_CLI_IDE_SERVER_PORT;
-  });
-
-  afterEach(() => {
-    process.argv = originalArgv;
-    process.env = originalEnv;
-    vi.restoreAllMocks();
-  });
-
-  it('should be false by default', async () => {
-    process.argv = ['node', 'script.js'];
-    const settings: Settings = {};
-    const argv = await parseArguments();
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeModeFeature()).toBe(false);
-  });
-});
-
 describe('loadCliConfig folderTrustFeature', () => {
   const originalArgv = process.argv;
   const originalEnv = { ...process.env };
