@@ -41,7 +41,7 @@ async function main() {
     sourcesContent: false,
     platform: 'node',
     outfile: 'dist/extension.cjs',
-    external: ['vscode', 'node-pty'],
+    external: ['vscode'],
     logLevel: 'silent',
     plugins: [
       /* add to the end of plugins array */

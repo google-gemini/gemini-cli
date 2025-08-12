@@ -6,7 +6,7 @@
 
 import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 const mockPtySpawn = vi.hoisted(() => vi.fn());
-vi.mock('node-pty', () => ({
+vi.mock('@lydell/node-pty', () => ({
   spawn: mockPtySpawn,
 }));
 

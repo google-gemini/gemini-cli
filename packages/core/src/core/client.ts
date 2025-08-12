@@ -7,7 +7,6 @@
 import {
   EmbedContentParameters,
   GenerateContentConfig,
-  SchemaUnion,
   PartListUnion,
   Content,
   Tool,
@@ -445,7 +444,7 @@ export class GeminiClient {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
 
-    if (this.config.getIdeModeFeature() && this.config.getIdeMode()) {
+    if (this.config.getIdeMode()) {
       const { contextParts, newIdeContext } = this.getIdeContextParts(
         this.forceFullIdeContext || this.getHistory().length === 0,
       );
@@ -515,7 +514,7 @@ export class GeminiClient {
 
   async generateJson(
     contents: Content[],
-    schema: SchemaUnion,
+    schema: Record<string, unknown>,
     abortSignal: AbortSignal,
     model?: string,
     config: GenerateContentConfig = {},
@@ -539,7 +538,7 @@ export class GeminiClient {
             config: {
               ...requestConfig,
               systemInstruction,
-              responseSchema: schema,
+              responseJsonSchema: schema,
               responseMimeType: 'application/json',
             },
             contents,

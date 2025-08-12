@@ -21,10 +21,14 @@ esbuild
     outfile: 'bundle/gemini.js',
     platform: 'node',
     format: 'esm',
-    external: ['node-pty', '@xterm/headless'],
-    loader: {
-      '.node': 'file',
-    },
+    external: [
+      '@lydell/node-pty',
+      '@lydell/node-pty-darwin-arm64',
+      '@lydell/node-pty-darwin-x64',
+      '@lydell/node-pty-linux-x64',
+      '@lydell/node-pty-win32-arm64',
+      '@lydell/node-pty-win32-x64',
+    ],
     alias: {
       'is-in-ci': path.resolve(
         __dirname,

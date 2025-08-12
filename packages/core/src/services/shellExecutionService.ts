@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as pty from 'node-pty';
+import * as pty from '@lydell/node-pty';
 import { TextDecoder } from 'util';
 import os from 'os';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
@@ -147,6 +147,11 @@ export class ShellExecutionService {
       let sniffedBytes = 0;
 
       const handleOutput = (data: Buffer) => {
+        // NOTE: The migration from `child_process` to `node-pty` means we
+        // no longer have separate `stdout` and `stderr` streams. The `data`
+        // buffer contains the merged output. If a drop in LLM quality is
+        // observed after this change, we may need to revisit this and
+        // explore ways to re-introduce that distinction.
         processingChain = processingChain.then(
           () =>
             new Promise<void>((resolve) => {
@@ -223,7 +228,7 @@ export class ShellExecutionService {
 
       const abortHandler = async () => {
         if (ptyProcess.pid && !exited) {
-          ptyProcess.kill();
+          ptyProcess.kill('SIGHUP');
         }
       };
 

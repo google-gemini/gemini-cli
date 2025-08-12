@@ -5,6 +5,7 @@
  */
 
 import { render } from 'ink-testing-library';
+import { waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import { FolderTrustDialog, FolderTrustChoice } from './FolderTrustDialog.js';
 
@@ -18,12 +19,14 @@ describe('FolderTrustDialog', () => {
     );
   });
 
-  it('should call onSelect with DO_NOT_TRUST when escape is pressed', () => {
+  it('should call onSelect with DO_NOT_TRUST when escape is pressed', async () => {
     const onSelect = vi.fn();
     const { stdin } = render(<FolderTrustDialog onSelect={onSelect} />);
 
-    stdin.write('\u001B'); // Simulate escape key
+    stdin.write('\x1b');
 
-    expect(onSelect).toHaveBeenCalledWith(FolderTrustChoice.DO_NOT_TRUST);
+    await waitFor(() => {
+      expect(onSelect).toHaveBeenCalledWith(FolderTrustChoice.DO_NOT_TRUST);
+    });
   });
 });
