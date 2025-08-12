@@ -7,6 +7,7 @@
 import {
   FileDiff,
   logToolCall,
+  ToolCallEvent,
   ToolCallRequestInfo,
   ToolCallResponseInfo,
   ToolErrorType,
@@ -17,6 +18,17 @@ import { Config } from '../config/config.js';
 import { convertToFunctionResponse } from './coreToolScheduler.js';
 import { getLanguageFromFilePath } from '../utils/language-detection.js';
 import { ToolCallDecision } from '../telemetry/tool-call-decision.js';
+
+function addProgrammingLanguageAndLog(config: Config, event: ToolCallEvent) {
+  // Logging programming_language for replace, write_file, and read_file function calls.
+  if (event.function_args) {
+    const filePath = event.function_args.file_path || event.function_args.absolute_path;
+    if (typeof filePath === 'string') {
+      event.programming_language = getLanguageFromFilePath(filePath);
+    }
+  }
+  logToolCall(config, event);
+}
 
 /**
  * Executes a single tool call non-interactively.
@@ -36,7 +48,7 @@ export async function executeToolCall(
       `Tool "${toolCallRequest.name}" not found in registry.`,
     );
     const durationMs = Date.now() - startTime;
-    logToolCall(config, {
+    addProgrammingLanguageAndLog(config, {
       'event.name': 'tool_call',
       'event.timestamp': new Date().toISOString(),
       function_name: toolCallRequest.name,
@@ -96,7 +108,7 @@ export async function executeToolCall(
       }
     }
     const durationMs = Date.now() - startTime;
-    logToolCall(config, {
+    const event: ToolCallEvent = {
       'event.name': 'tool_call',
       'event.timestamp': new Date().toISOString(),
       function_name: toolCallRequest.name,
@@ -110,7 +122,9 @@ export async function executeToolCall(
       prompt_id: toolCallRequest.prompt_id,
       metadata,
       decision: ToolCallDecision.AUTO_ACCEPT,
-    });
+    };
+
+    addProgrammingLanguageAndLog(config, event);
 
     const response = convertToFunctionResponse(
       toolCallRequest.name,
@@ -132,10 +146,7 @@ export async function executeToolCall(
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
     const durationMs = Date.now() - startTime;
-    const programming_language = getLanguageFromFilePath(
-      toolCallRequest.args.file_path as string,
-    );
-    logToolCall(config, {
+    const event: ToolCallEvent = {
       'event.name': 'tool_call',
       'event.timestamp': new Date().toISOString(),
       function_name: toolCallRequest.name,
@@ -145,8 +156,9 @@ export async function executeToolCall(
       error: error.message,
       error_type: ToolErrorType.UNHANDLED_EXCEPTION,
       prompt_id: toolCallRequest.prompt_id,
-      programming_language,
-    });
+    };
+
+    addProgrammingLanguageAndLog(config, event);
     return {
       callId: toolCallRequest.callId,
       responseParts: [

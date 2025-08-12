@@ -889,15 +889,12 @@ export class CoreToolScheduler {
 
       for (const call of completedCalls) {
         const event = new ToolCallEvent(call);
-        if (
-          (event.function_name === 'replace' ||
-            event.function_name === 'write_file') &&
-          event.function_args &&
-          typeof event.function_args.file_path === 'string'
-        ) {
-          event.programming_language = getLanguageFromFilePath(
-            event.function_args.file_path,
-          );
+        // Logging programming_language for replace, write_file, and read_file function calls.
+        if (event.function_args) {
+          const filePath = event.function_args.file_path || event.function_args.absolute_path;
+          if (typeof filePath === 'string') {
+            event.programming_language = getLanguageFromFilePath(filePath);
+          }
         }
         logToolCall(this.config, event);
       }
