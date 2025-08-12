@@ -35,6 +35,8 @@ import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
 
+import { isCurrentDirectoryTrusted } from './trustedFolders.js';
+
 // Simple console logger for now - replace with actual logger if available
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -453,6 +455,7 @@ export async function loadCliConfig(
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
+  const trustedFolder = isCurrentDirectoryTrusted();
 
   return new Config({
     sessionId,
@@ -523,6 +526,7 @@ export async function loadCliConfig(
     folderTrustFeature,
     folderTrust,
     interactive,
+    trustedFolder,
   });
 }
 
