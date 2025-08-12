@@ -30,6 +30,11 @@ import {
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
 import * as Diff from 'diff';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+
+const TRUNCATION_THRESHOLD = 100000; // 100kb
+const TRUNCATION_LINES = 100;
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -205,6 +210,50 @@ export function convertToFunctionResponse(
     toolName,
     'Tool execution succeeded.',
   );
+}
+
+export async function truncateAndSaveToFile(
+  content: string,
+  callId: string,
+  projectTempDir: string,
+  contentType: 'output' | 'error' = 'output',
+): Promise<string> {
+  if (content.length <= TRUNCATION_THRESHOLD) {
+    return content;
+  }
+
+  try {
+    const tempFilePath = path.join(
+      projectTempDir,
+      `${callId}_${Date.now()}.txt`,
+    );
+    await fs.writeFile(tempFilePath, content);
+
+    const lines = content.split('\n');
+    const truncatedContent = lines.slice(-TRUNCATION_LINES).join('\n');
+    const contentLabel = contentType === 'error' ? 'error message' : 'output';
+    const linesLabel = contentType === 'error' ? 'error message' : 'output';
+
+    return `Tool ${contentLabel} was too large and has been truncated.
+The full ${contentLabel} has been saved to: ${tempFilePath}
+
+To read the complete ${contentLabel}, use the Read tool with the file path above. For large files, you can use the offset and limit parameters to read specific sections:
+- Read tool with offset=0, limit=100 to see the first 100 lines
+- Read tool with offset=N to skip N lines from the beginning
+- Read tool with limit=M to read only M lines at a time
+This allows you to efficiently examine different parts of the ${contentLabel} without loading the entire file.
+
+Last ${TRUNCATION_LINES} lines of ${linesLabel}:
+...
+${truncatedContent}`;
+  } catch (_error) {
+    const lines = content.split('\n');
+    const contentLabel = contentType === 'error' ? 'error message' : 'output';
+    return (
+      lines.slice(-TRUNCATION_LINES).join('\n') +
+      `\n\n[Note: Could not save full ${contentLabel} to file]`
+    );
+  }
 }
 
 const createErrorResponse = (
@@ -832,11 +881,23 @@ export class CoreToolScheduler {
               return;
             }
 
+            const projectTempDir = this.config.getProjectTempDir();
+            await fs.mkdir(projectTempDir, { recursive: true });
+
             if (toolResult.error === undefined) {
+              let llmContent = toolResult.llmContent;
+              if (typeof llmContent === 'string') {
+                llmContent = await truncateAndSaveToFile(
+                  llmContent,
+                  callId,
+                  projectTempDir,
+                );
+              }
+
               const response = convertToFunctionResponse(
                 toolName,
                 callId,
-                toolResult.llmContent,
+                llmContent,
               );
               const successResponse: ToolCallResponseInfo = {
                 callId,
@@ -848,7 +909,13 @@ export class CoreToolScheduler {
               this.setStatusInternal(callId, 'success', successResponse);
             } else {
               // It is a failure
-              const error = new Error(toolResult.error.message);
+              const truncatedErrorMessage = await truncateAndSaveToFile(
+                toolResult.error.message,
+                callId,
+                projectTempDir,
+                'error',
+              );
+              const error = new Error(truncatedErrorMessage);
               const errorResponse = createErrorResponse(
                 scheduledCall.request,
                 error,

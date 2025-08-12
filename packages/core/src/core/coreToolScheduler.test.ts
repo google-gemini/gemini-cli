@@ -5,13 +5,17 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   CoreToolScheduler,
   ToolCall,
   ValidatingToolCall,
   convertToFunctionResponse,
+  truncateAndSaveToFile,
 } from './coreToolScheduler.js';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
 import {
   BaseTool,
   ToolCallConfirmationDetails,
@@ -782,5 +786,129 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Ensure completion callbacks were called twice.
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('truncateAndSaveToFile', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'truncate-test-'));
+  });
+
+  afterEach(async () => {
+    try {
+      await fs.rm(tempDir, { recursive: true });
+    } catch (_error) {
+      // Ignore cleanup errors
+    }
+  });
+
+  it('should return content as-is if under threshold', async () => {
+    const content = 'short content';
+    const result = await truncateAndSaveToFile(content, 'test-call', tempDir);
+    expect(result).toBe(content);
+  });
+
+  it('should truncate and save large output content to file', async () => {
+    const largeContent = 'x'.repeat(200000); // 200kb
+    const result = await truncateAndSaveToFile(
+      largeContent,
+      'test-call',
+      tempDir,
+      'output',
+    );
+
+    expect(result).toContain(
+      'Tool output was too large and has been truncated',
+    );
+    expect(result).toContain('The full output has been saved to:');
+    expect(result).toContain('Last 100 lines of output:');
+    expect(result).toContain('test-call');
+
+    // Check that file was created
+    const files = await fs.readdir(tempDir);
+    expect(files).toHaveLength(1);
+    expect(files[0]).toContain('test-call');
+
+    // Verify file content
+    const savedContent = await fs.readFile(
+      path.join(tempDir, files[0]),
+      'utf-8',
+    );
+    expect(savedContent).toBe(largeContent);
+  });
+
+  it('should truncate and save large error content with proper messaging', async () => {
+    const largeError = 'error: '.repeat(50000); // Large error message
+    const result = await truncateAndSaveToFile(
+      largeError,
+      'error-call',
+      tempDir,
+      'error',
+    );
+
+    expect(result).toContain(
+      'Tool error message was too large and has been truncated',
+    );
+    expect(result).toContain('The full error message has been saved to:');
+    expect(result).toContain('Last 100 lines of error message:');
+
+    // Check that file was created
+    const files = await fs.readdir(tempDir);
+    expect(files).toHaveLength(1);
+    expect(files[0]).toContain('error-call');
+  });
+
+  it('should handle file write failures gracefully', async () => {
+    const largeContent = 'x'.repeat(200000);
+    const invalidDir = '/invalid/path/that/does/not/exist';
+
+    const result = await truncateAndSaveToFile(
+      largeContent,
+      'test-call',
+      invalidDir,
+    );
+
+    expect(result).not.toContain('The full output has been saved to:');
+    expect(result).toContain('[Note: Could not save full output to file]');
+    expect(result.length).toBeLessThan(largeContent.length);
+  });
+
+  it('should handle multiline content correctly', async () => {
+    const lines = Array.from({ length: 200 }, (_, i) => `Line ${i + 1}`);
+    const multilineContent = lines.join('\\n');
+
+    const result = await truncateAndSaveToFile(
+      multilineContent,
+      'multiline-call',
+      tempDir,
+    );
+
+    expect(result).toContain(
+      'Tool output was too large and has been truncated',
+    );
+    expect(result).toContain('Last 100 lines of output:');
+
+    // Should contain the last 100 lines
+    const outputSection = result.split('Last 100 lines of output:\\n...\\n')[1];
+    expect(outputSection).toContain('Line 200');
+    expect(outputSection).toContain('Line 101');
+    expect(outputSection).not.toContain('Line 100');
+  });
+
+  it('should create unique filenames with timestamps', async () => {
+    const largeContent = 'x'.repeat(200000);
+
+    // Create two files quickly
+    const result1 = truncateAndSaveToFile(largeContent, 'call-1', tempDir);
+    const result2 = truncateAndSaveToFile(largeContent, 'call-2', tempDir);
+
+    await Promise.all([result1, result2]);
+
+    const files = await fs.readdir(tempDir);
+    expect(files).toHaveLength(2);
+    expect(files[0]).not.toBe(files[1]); // Should have different names
+    expect(files.every((f) => f.includes('.txt'))).toBe(true);
   });
 });
