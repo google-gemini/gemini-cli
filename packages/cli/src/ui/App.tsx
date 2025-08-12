@@ -603,13 +603,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     if (streamingState === StreamingState.Idle && messageQueue.length > 0) {
       // Combine all messages with double newlines for clarity
       const combinedMessage = messageQueue.join('\n\n');
-      // Small delay to ensure UI updates and prevent race conditions
-      const timeoutId = setTimeout(() => {
-        // Clear the queue after scheduling the submission
-        setMessageQueue([]);
-        submitQuery(combinedMessage);
-      }, 100);
-      return () => clearTimeout(timeoutId);
+      // Clear the queue and submit
+      setMessageQueue([]);
+      submitQuery(combinedMessage);
     }
   }, [streamingState, messageQueue, submitQuery]);
 
