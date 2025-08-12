@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { TextBuffer, logicalPosToOffset } from './shared/text-buffer.js';
@@ -17,6 +17,7 @@ import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
 import {
@@ -40,6 +41,7 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
 }
 
@@ -57,9 +59,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  onEscapePromptChange,
   vimHandleInput,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const [escPressCount, setEscPressCount] = useState(0);
+  const [showEscapePrompt, setShowEscapePrompt] = useState(false);
+  const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -96,6 +102,32 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const resetCompletionState = completion.resetCompletionState;
   const resetReverseSearchCompletionState =
     reverseSearchCompletion.resetCompletionState;
+
+  const resetEscapeState = useCallback(() => {
+    if (escapeTimerRef.current) {
+      clearTimeout(escapeTimerRef.current);
+      escapeTimerRef.current = null;
+    }
+    setEscPressCount(0);
+    setShowEscapePrompt(false);
+  }, []);
+
+  // Notify parent component about escape prompt state changes
+  useEffect(() => {
+    if (onEscapePromptChange) {
+      onEscapePromptChange(showEscapePrompt);
+    }
+  }, [showEscapePrompt, onEscapePromptChange]);
+
+  // Clear escape prompt timer on unmount
+  useEffect(
+    () => () => {
+      if (escapeTimerRef.current) {
+        clearTimeout(escapeTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
@@ -211,6 +243,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Reset ESC count and hide prompt on any non-ESC key
+      if (key.name !== 'escape') {
+        if (escPressCount > 0 || showEscapePrompt) {
+          resetEscapeState();
+        }
+      }
+
       if (
         key.sequence === '!' &&
         buffer.text === '' &&
@@ -221,7 +260,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      if (key.name === 'escape') {
+      if (keyMatchers[Command.ESCAPE](key)) {
         if (reverseSearchActive) {
           setReverseSearchActive(false);
           reverseSearchCompletion.resetCompletionState();
@@ -234,26 +273,48 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           buffer.moveToOffset(offset);
           return;
         }
-
         if (shellModeActive) {
           setShellModeActive(false);
+          resetEscapeState();
           return;
         }
 
         if (completion.showSuggestions) {
           completion.resetCompletionState();
+          resetEscapeState();
           return;
         }
+
+        // Handle double ESC for clearing input
+        if (escPressCount === 0) {
+          if (buffer.text === '') {
+            return;
+          }
+          setEscPressCount(1);
+          setShowEscapePrompt(true);
+          if (escapeTimerRef.current) {
+            clearTimeout(escapeTimerRef.current);
+          }
+          escapeTimerRef.current = setTimeout(() => {
+            resetEscapeState();
+          }, 500);
+        } else {
+          // clear input and immediately reset state
+          buffer.setText('');
+          resetCompletionState();
+          resetEscapeState();
+        }
+        return;
       }
 
-      if (shellModeActive && key.ctrl && key.name === 'r') {
+      if (shellModeActive && keyMatchers[Command.REVERSE_SEARCH](key)) {
         setReverseSearchActive(true);
         setTextBeforeReverseSearch(buffer.text);
         setCursorPosition(buffer.cursor);
         return;
       }
 
-      if (key.ctrl && key.name === 'l') {
+      if (keyMatchers[Command.CLEAR_SCREEN](key)) {
         onClearScreen();
         return;
       }
@@ -268,15 +329,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         } = reverseSearchCompletion;
 
         if (showSuggestions) {
-          if (key.name === 'up') {
+          if (keyMatchers[Command.NAVIGATION_UP](key)) {
             navigateUp();
             return;
           }
-          if (key.name === 'down') {
+          if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
             navigateDown();
             return;
           }
-          if (key.name === 'tab') {
+          if (keyMatchers[Command.ACCEPT_SUGGESTION_REVERSE_SEARCH](key)) {
             reverseSearchCompletion.handleAutocomplete(activeSuggestionIndex);
             reverseSearchCompletion.resetCompletionState();
             setReverseSearchActive(false);
@@ -284,7 +345,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
         }
 
-        if (key.name === 'return' && !key.ctrl) {
+        if (keyMatchers[Command.SUBMIT_REVERSE_SEARCH](key)) {
           const textToSubmit =
             showSuggestions && activeSuggestionIndex > -1
               ? suggestions[activeSuggestionIndex].value
@@ -296,30 +357,33 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         // Prevent up/down from falling through to regular history navigation
-        if (key.name === 'up' || key.name === 'down') {
+        if (
+          keyMatchers[Command.NAVIGATION_UP](key) ||
+          keyMatchers[Command.NAVIGATION_DOWN](key)
+        ) {
           return;
         }
       }
 
       // If the command is a perfect match, pressing enter should execute it.
-      if (completion.isPerfectMatch && key.name === 'return') {
+      if (completion.isPerfectMatch && keyMatchers[Command.RETURN](key)) {
         handleSubmitAndClear(buffer.text);
         return;
       }
 
       if (completion.showSuggestions) {
         if (completion.suggestions.length > 1) {
-          if (key.name === 'up' || (key.ctrl && key.name === 'p')) {
+          if (keyMatchers[Command.COMPLETION_UP](key)) {
             completion.navigateUp();
             return;
           }
-          if (key.name === 'down' || (key.ctrl && key.name === 'n')) {
+          if (keyMatchers[Command.COMPLETION_DOWN](key)) {
             completion.navigateDown();
             return;
           }
         }
 
-        if (key.name === 'tab' || (key.name === 'return' && !key.ctrl)) {
+        if (keyMatchers[Command.ACCEPT_SUGGESTION](key)) {
           if (completion.suggestions.length > 0) {
             const targetIndex =
               completion.activeSuggestionIndex === -1
@@ -334,17 +398,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (!shellModeActive) {
-        if (key.ctrl && key.name === 'p') {
+        if (keyMatchers[Command.HISTORY_UP](key)) {
           inputHistory.navigateUp();
           return;
         }
-        if (key.ctrl && key.name === 'n') {
+        if (keyMatchers[Command.HISTORY_DOWN](key)) {
           inputHistory.navigateDown();
           return;
         }
         // Handle arrow-up/down for history on single-line or at edges
         if (
-          key.name === 'up' &&
+          keyMatchers[Command.NAVIGATION_UP](key) &&
           (buffer.allVisualLines.length === 1 ||
             (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
         ) {
@@ -352,7 +416,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
         if (
-          key.name === 'down' &&
+          keyMatchers[Command.NAVIGATION_DOWN](key) &&
           (buffer.allVisualLines.length === 1 ||
             buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
         ) {
@@ -360,18 +424,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
       } else {
-        if (key.name === 'up') {
+        // Shell History Navigation
+        if (keyMatchers[Command.NAVIGATION_UP](key)) {
           const prevCommand = shellHistory.getPreviousCommand();
           if (prevCommand !== null) buffer.setText(prevCommand);
           return;
         }
-        if (key.name === 'down') {
+        if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
           const nextCommand = shellHistory.getNextCommand();
           if (nextCommand !== null) buffer.setText(nextCommand);
           return;
         }
       }
-      if (key.name === 'return' && !key.ctrl && !key.meta && !key.paste) {
+
+      if (keyMatchers[Command.SUBMIT](key)) {
         if (buffer.text.trim()) {
           const [row, col] = buffer.cursor;
           const line = buffer.lines[row];
@@ -387,50 +453,48 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Newline insertion
-      if (key.name === 'return' && (key.ctrl || key.meta || key.paste)) {
+      if (keyMatchers[Command.NEWLINE](key)) {
         buffer.newline();
         return;
       }
 
       // Ctrl+A (Home) / Ctrl+E (End)
-      if (key.ctrl && key.name === 'a') {
+      if (keyMatchers[Command.HOME](key)) {
         buffer.move('home');
         return;
       }
-      if (key.ctrl && key.name === 'e') {
+      if (keyMatchers[Command.END](key)) {
         buffer.move('end');
         buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
       // Ctrl+C (Clear input)
-      if (key.ctrl && key.name === 'c') {
+      if (keyMatchers[Command.CLEAR_INPUT](key)) {
         if (buffer.text.length > 0) {
           buffer.setText('');
           resetCompletionState();
-          return;
         }
         return;
       }
 
       // Kill line commands
-      if (key.ctrl && key.name === 'k') {
+      if (keyMatchers[Command.KILL_LINE_RIGHT](key)) {
         buffer.killLineRight();
         return;
       }
-      if (key.ctrl && key.name === 'u') {
+      if (keyMatchers[Command.KILL_LINE_LEFT](key)) {
         buffer.killLineLeft();
         return;
       }
 
       // External editor
-      const isCtrlX = key.ctrl && (key.name === 'x' || key.sequence === '\x18');
-      if (isCtrlX) {
+      if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
         buffer.openInExternalEditor();
         return;
       }
 
       // Ctrl+V for clipboard image paste
-      if (key.ctrl && key.name === 'v') {
+      if (keyMatchers[Command.PASTE_CLIPBOARD_IMAGE](key)) {
         handleClipboardImage();
         return;
       }
@@ -451,6 +515,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchCompletion,
       handleClipboardImage,
       resetCompletionState,
+      escPressCount,
+      showEscapePrompt,
+      resetEscapeState,
       vimHandleInput,
       reverseSearchActive,
       textBeforeReverseSearch,
@@ -469,15 +536,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     <>
       <Box
         borderStyle="round"
-        borderColor={shellModeActive ? Colors.AccentYellow : Colors.AccentBlue}
+        borderColor={
+          shellModeActive ? theme.status.warning : theme.border.focused
+        }
         paddingX={1}
       >
         <Text
-          color={shellModeActive ? Colors.AccentYellow : Colors.AccentPurple}
+          color={shellModeActive ? theme.status.warning : theme.text.accent}
         >
           {shellModeActive ? (
             reverseSearchActive ? (
-              <Text color={Colors.AccentCyan}>(r:) </Text>
+              <Text color={theme.text.link}>(r:) </Text>
             ) : (
               '! '
             )
@@ -490,10 +559,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             focus ? (
               <Text>
                 {chalk.inverse(placeholder.slice(0, 1))}
-                <Text color={Colors.Gray}>{placeholder.slice(1)}</Text>
+                <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
               </Text>
             ) : (
-              <Text color={Colors.Gray}>{placeholder}</Text>
+              <Text color={theme.text.secondary}>{placeholder}</Text>
             )
           ) : (
             linesToRender.map((lineText, visualIdxInRenderedSet) => {
@@ -536,7 +605,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         </Box>
       </Box>
       {completion.showSuggestions && (
-        <Box>
+        <Box paddingRight={2}>
           <SuggestionsDisplay
             suggestions={completion.suggestions}
             activeIndex={completion.activeSuggestionIndex}
@@ -548,7 +617,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         </Box>
       )}
       {reverseSearchActive && (
-        <Box>
+        <Box paddingRight={2}>
           <SuggestionsDisplay
             suggestions={reverseSearchCompletion.suggestions}
             activeIndex={reverseSearchCompletion.activeSuggestionIndex}

@@ -18,6 +18,7 @@ import {
   ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
+import { runExitCleanup } from '../../utils/cleanup.js';
 import {
   Message,
   MessageType,
@@ -49,6 +50,7 @@ export const useSlashCommandProcessor = (
   toggleCorgiMode: () => void,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
+  openSettingsDialog: () => void,
   toggleVimEnabled: () => Promise<boolean>,
   setIsProcessing: (isProcessing: boolean) => void,
   setGeminiMdFileCount: (count: number) => void,
@@ -63,6 +65,11 @@ export const useSlashCommandProcessor = (
         approvedCommands?: string[],
       ) => void;
     }>(null);
+  const [confirmationRequest, setConfirmationRequest] = useState<null | {
+    prompt: React.ReactNode;
+    onConfirm: (confirmed: boolean) => void;
+  }>(null);
+
   const [sessionShellAllowlist, setSessionShellAllowlist] = useState(
     new Set<string>(),
   );
@@ -219,6 +226,7 @@ export const useSlashCommandProcessor = (
     async (
       rawQuery: PartListUnion,
       oneTimeShellAllowlist?: Set<string>,
+      overwriteConfirmed?: boolean,
     ): Promise<SlashCommandProcessorResult | false> => {
       setIsProcessing(true);
       try {
@@ -298,6 +306,7 @@ export const useSlashCommandProcessor = (
                 name: commandToExecute.name,
                 args,
               },
+              overwriteConfirmed,
             };
 
             // If a one-time list is provided for a "Proceed" action, temporarily
@@ -351,6 +360,11 @@ export const useSlashCommandProcessor = (
                     case 'privacy':
                       openPrivacyNotice();
                       return { type: 'handled' };
+                    case 'settings':
+                      openSettingsDialog();
+                      return { type: 'handled' };
+                    case 'help':
+                      return { type: 'handled' };
                     default: {
                       const unhandled: never = result.dialog;
                       throw new Error(
@@ -370,7 +384,8 @@ export const useSlashCommandProcessor = (
                 }
                 case 'quit':
                   setQuittingMessages(result.messages);
-                  setTimeout(() => {
+                  setTimeout(async () => {
+                    await runExitCleanup();
                     process.exit(0);
                   }, 100);
                   return { type: 'handled' };
@@ -418,6 +433,36 @@ export const useSlashCommandProcessor = (
                     result.originalInvocation.raw,
                     // Pass the approved commands as a one-time grant for this execution.
                     new Set(approvedCommands),
+                  );
+                }
+                case 'confirm_action': {
+                  const { confirmed } = await new Promise<{
+                    confirmed: boolean;
+                  }>((resolve) => {
+                    setConfirmationRequest({
+                      prompt: result.prompt,
+                      onConfirm: (resolvedConfirmed) => {
+                        setConfirmationRequest(null);
+                        resolve({ confirmed: resolvedConfirmed });
+                      },
+                    });
+                  });
+
+                  if (!confirmed) {
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: 'Operation cancelled.',
+                      },
+                      Date.now(),
+                    );
+                    return { type: 'handled' };
+                  }
+
+                  return await handleSlashCommand(
+                    result.originalInvocation.raw,
+                    undefined,
+                    true,
                   );
                 }
                 default: {
@@ -473,9 +518,11 @@ export const useSlashCommandProcessor = (
       openPrivacyNotice,
       openEditorDialog,
       setQuittingMessages,
+      openSettingsDialog,
       setShellConfirmationRequest,
       setSessionShellAllowlist,
       setIsProcessing,
+      setConfirmationRequest,
     ],
   );
 
@@ -485,5 +532,6 @@ export const useSlashCommandProcessor = (
     pendingHistoryItems,
     commandContext,
     shellConfirmationRequest,
+    confirmationRequest,
   };
 };

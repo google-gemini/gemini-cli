@@ -13,8 +13,6 @@ import {
   Text,
   useStdin,
   useStdout,
-  useInput,
-  type Key as InkKeyType,
 } from 'ink';
 import { StreamingState, type HistoryItem, MessageType } from './types.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
@@ -22,6 +20,7 @@ import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './hooks/useAuthCommand.js';
+import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
@@ -36,7 +35,9 @@ import { ThemeDialog } from './components/ThemeDialog.js';
 import { AuthDialog } from './components/AuthDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
+import { FolderTrustDialog } from './components/FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
+import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
 import { Colors } from './colors.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { LoadedSettings, SettingScope } from '../config/settings.js';
@@ -46,7 +47,6 @@ import { registerCleanup } from '../utils/cleanup.js';
 import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
-import { IDEContextDetailDisplay } from './components/IDEContextDetailDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
 import {
@@ -79,6 +79,8 @@ import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useVimMode, VimModeProvider } from './contexts/VimModeContext.js';
 import { useVim } from './hooks/vim.js';
+import { useKeypress, Key } from './hooks/useKeypress.js';
+import { keyMatchers, Command } from './keyMatchers.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
 import {
@@ -91,8 +93,11 @@ import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
+import { useSettingsCommand } from './hooks/useSettingsCommand.js';
+import { SettingsDialog } from './components/SettingsDialog.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
+import { isNarrowWidth } from './utils/isNarrowWidth.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -121,8 +126,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
   const currentIDE = config.getIdeClient().getCurrentIde();
+  useEffect(() => {
+    registerCleanup(() => config.getIdeClient().disconnect());
+  }, [config]);
   const shouldShowIdePrompt =
-    config.getIdeModeFeature() &&
     currentIDE &&
     !config.getIdeMode() &&
     !settings.merged.hasSeenIdeIntegrationNudge &&
@@ -168,8 +175,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
   const [showToolDescriptions, setShowToolDescriptions] =
     useState<boolean>(false);
-  const [showIDEContextDetail, setShowIDEContextDetail] =
-    useState<boolean>(false);
+
   const [ctrlCPressedOnce, setCtrlCPressedOnce] = useState(false);
   const [quittingMessages, setQuittingMessages] = useState<
     HistoryItem[] | null
@@ -185,6 +191,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [ideContextState, setIdeContextState] = useState<
     IdeContext | undefined
   >();
+  const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   useEffect(() => {
@@ -219,6 +226,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const openPrivacyNotice = useCallback(() => {
     setShowPrivacyNotice(true);
   }, []);
+
+  const handleEscapePromptChange = useCallback((showPrompt: boolean) => {
+    setShowEscapePrompt(showPrompt);
+  }, []);
+
   const initialPromptSubmitted = useRef(false);
 
   const errorCount = useMemo(
@@ -235,6 +247,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     handleThemeSelect,
     handleThemeHighlight,
   } = useThemeCommand(settings, setThemeError, addItem);
+
+  const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
+    useSettingsCommand();
+
+  const { isFolderTrustDialogOpen, handleFolderTrustSelect } =
+    useFolderTrust(settings);
 
   const {
     isAuthDialogOpen,
@@ -433,6 +451,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   // Terminal and UI setup
   const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
+  const isNarrow = isNarrowWidth(terminalWidth);
   const { stdin, setRawMode } = useStdin();
   const isInitialMount = useRef(true);
 
@@ -441,7 +460,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     20,
     Math.floor(terminalWidth * widthFraction) - 3,
   );
-  const suggestionsWidth = Math.max(60, Math.floor(terminalWidth * 0.8));
+  const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 0.8));
 
   // Utility callbacks
   const isValidPath = useCallback((filePath: string): boolean => {
@@ -480,6 +499,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     pendingHistoryItems: pendingSlashCommandHistoryItems,
     commandContext,
     shellConfirmationRequest,
+    confirmationRequest,
   } = useSlashCommandProcessor(
     config,
     settings,
@@ -494,6 +514,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     toggleCorgiMode,
     setQuittingMessages,
     openPrivacyNotice,
+    openSettingsDialog,
     toggleVimEnabled,
     setIsProcessing,
     setGeminiMdFileCount,
@@ -523,6 +544,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     initError,
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
+    cancelOngoingRequest,
   } = useGeminiStream(
     config.getGeminiClient(),
     history,
@@ -553,14 +575,18 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const handleIdePromptComplete = useCallback(
     (result: IdeIntegrationNudgeResult) => {
-      if (result === 'yes') {
-        handleSlashCommand('/ide install');
+      if (result.userSelection === 'yes') {
+        if (result.isExtensionPreInstalled) {
+          handleSlashCommand('/ide enable');
+        } else {
+          handleSlashCommand('/ide install');
+        }
         settings.setValue(
           SettingScope.User,
           'hasSeenIdeIntegrationNudge',
           true,
         );
-      } else if (result === 'dismiss') {
+      } else if (result.userSelection === 'dismiss') {
         settings.setValue(
           SettingScope.User,
           'hasSeenIdeIntegrationNudge',
@@ -603,50 +629,75 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     [handleSlashCommand],
   );
 
-  useInput((input: string, key: InkKeyType) => {
-    let enteringConstrainHeightMode = false;
-    if (!constrainHeight) {
-      // Automatically re-enter constrain height mode if the user types
-      // anything. When constrainHeight==false, the user will experience
-      // significant flickering so it is best to disable it immediately when
-      // the user starts interacting with the app.
-      enteringConstrainHeightMode = true;
-      setConstrainHeight(true);
-    }
+  const handleGlobalKeypress = useCallback(
+    (key: Key) => {
+      let enteringConstrainHeightMode = false;
+      if (!constrainHeight) {
+        enteringConstrainHeightMode = true;
+        setConstrainHeight(true);
+      }
 
-    if (key.ctrl && input === 'o') {
-      setShowErrorDetails((prev) => !prev);
-    } else if (key.ctrl && input === 't') {
-      const newValue = !showToolDescriptions;
-      setShowToolDescriptions(newValue);
+      if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
+        setShowErrorDetails((prev) => !prev);
+      } else if (keyMatchers[Command.TOGGLE_TOOL_DESCRIPTIONS](key)) {
+        const newValue = !showToolDescriptions;
+        setShowToolDescriptions(newValue);
 
-      const mcpServers = config.getMcpServers();
-      if (Object.keys(mcpServers || {}).length > 0) {
-        handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
+        const mcpServers = config.getMcpServers();
+        if (Object.keys(mcpServers || {}).length > 0) {
+          handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
+        }
+      } else if (
+        keyMatchers[Command.TOGGLE_IDE_CONTEXT_DETAIL](key) &&
+        config.getIdeMode() &&
+        ideContextState
+      ) {
+        // Show IDE status when in IDE mode and context is available.
+        handleSlashCommand('/ide status');
+      } else if (keyMatchers[Command.QUIT](key)) {
+        // When authenticating, let AuthInProgress component handle Ctrl+C.
+        if (isAuthenticating) {
+          return;
+        }
+        if (!ctrlCPressedOnce) {
+          cancelOngoingRequest?.();
+        }
+        handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+      } else if (keyMatchers[Command.EXIT](key)) {
+        if (buffer.text.length > 0) {
+          return;
+        }
+        handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
+      } else if (
+        keyMatchers[Command.SHOW_MORE_LINES](key) &&
+        !enteringConstrainHeightMode
+      ) {
+        setConstrainHeight(false);
       }
-    } else if (
-      key.ctrl &&
-      input === 'e' &&
-      config.getIdeMode() &&
-      ideContextState
-    ) {
-      setShowIDEContextDetail((prev) => !prev);
-    } else if (key.ctrl && (input === 'c' || input === 'C')) {
-      if (isAuthenticating) {
-        // Let AuthInProgress component handle the input.
-        return;
-      }
-      handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
-    } else if (key.ctrl && (input === 'd' || input === 'D')) {
-      if (buffer.text.length > 0) {
-        // Do nothing if there is text in the input.
-        return;
-      }
-      handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
-    } else if (key.ctrl && input === 's' && !enteringConstrainHeightMode) {
-      setConstrainHeight(false);
-    }
-  });
+    },
+    [
+      constrainHeight,
+      setConstrainHeight,
+      setShowErrorDetails,
+      showToolDescriptions,
+      setShowToolDescriptions,
+      config,
+      ideContextState,
+      handleExit,
+      ctrlCPressedOnce,
+      setCtrlCPressedOnce,
+      ctrlCTimerRef,
+      buffer.text.length,
+      ctrlDPressedOnce,
+      setCtrlDPressedOnce,
+      ctrlDTimerRef,
+      handleSlashCommand,
+      isAuthenticating,
+      cancelOngoingRequest,
+    ],
+  );
+
+  useKeypress(handleGlobalKeypress, { isActive: true });
 
   useEffect(() => {
     if (config) {
@@ -835,11 +886,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           items={[
             <Box flexDirection="column" key="header">
               {!settings.merged.hideBanner && (
-                <Header
-                  terminalWidth={terminalWidth}
-                  version={version}
-                  nightly={nightly}
-                />
+                <Header version={version} nightly={nightly} />
               )}
               {!settings.merged.hideTips && <Tips config={config} />}
             </Box>,
@@ -898,14 +945,30 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             </Box>
           )}
 
-          {shouldShowIdePrompt ? (
+          {shouldShowIdePrompt && currentIDE ? (
             <IdeIntegrationNudge
-              question="Do you want to connect your VS Code editor to Gemini CLI?"
-              description="If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in VS Code."
+              ide={currentIDE}
               onComplete={handleIdePromptComplete}
             />
+          ) : isFolderTrustDialogOpen ? (
+            <FolderTrustDialog onSelect={handleFolderTrustSelect} />
           ) : shellConfirmationRequest ? (
             <ShellConfirmationDialog request={shellConfirmationRequest} />
+          ) : confirmationRequest ? (
+            <Box flexDirection="column">
+              {confirmationRequest.prompt}
+              <Box paddingY={1}>
+                <RadioButtonSelect
+                  items={[
+                    { label: 'Yes', value: true },
+                    { label: 'No', value: false },
+                  ]}
+                  onSelect={(value: boolean) => {
+                    confirmationRequest.onConfirm(value);
+                  }}
+                />
+              </Box>
+            </Box>
           ) : isThemeDialogOpen ? (
             <Box flexDirection="column">
               {themeError && (
@@ -923,6 +986,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     : undefined
                 }
                 terminalWidth={mainAreaWidth}
+              />
+            </Box>
+          ) : isSettingsDialogOpen ? (
+            <Box flexDirection="column">
+              <SettingsDialog
+                settings={settings}
+                onSelect={() => closeSettingsDialog()}
+                onRestartRequest={() => process.exit(0)}
               />
             </Box>
           ) : isAuthenticating ? (
@@ -994,9 +1065,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
               <Box
                 marginTop={1}
-                display="flex"
                 justifyContent="space-between"
                 width="100%"
+                flexDirection={isNarrow ? 'column' : 'row'}
+                alignItems={isNarrow ? 'flex-start' : 'center'}
               >
                 <Box>
                   {process.env.GEMINI_SYSTEM_MD && (
@@ -1010,6 +1082,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     <Text color={Colors.AccentYellow}>
                       Press Ctrl+D again to exit.
                     </Text>
+                  ) : showEscapePrompt ? (
+                    <Text color={Colors.Gray}>Press Esc again to clear.</Text>
                   ) : (
                     <ContextSummaryDisplay
                       ideContext={ideContextState}
@@ -1021,7 +1095,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     />
                   )}
                 </Box>
-                <Box>
+                <Box paddingTop={isNarrow ? 1 : 0}>
                   {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
                     !shellModeActive && (
                       <AutoAcceptIndicator
@@ -1031,14 +1105,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   {shellModeActive && <ShellModeIndicator />}
                 </Box>
               </Box>
-              {showIDEContextDetail && (
-                <IDEContextDetailDisplay
-                  ideContext={ideContextState}
-                  detectedIdeDisplay={config
-                    .getIdeClient()
-                    .getDetectedIdeDisplayName()}
-                />
-              )}
+
               {showErrorDetails && (
                 <OverflowProvider>
                   <Box flexDirection="column">
@@ -1067,6 +1134,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   commandContext={commandContext}
                   shellModeActive={shellModeActive}
                   setShellModeActive={setShellModeActive}
+                  onEscapePromptChange={handleEscapePromptChange}
                   focus={isFocused}
                   vimHandleInput={vimHandleInput}
                   placeholder={placeholder}
@@ -1117,7 +1185,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             errorCount={errorCount}
             showErrorDetails={showErrorDetails}
             showMemoryUsage={
-              config.getDebugMode() || config.getShowMemoryUsage()
+              config.getDebugMode() || settings.merged.showMemoryUsage || false
             }
             promptTokenCount={sessionStats.lastPromptTokenCount}
             nightly={nightly}

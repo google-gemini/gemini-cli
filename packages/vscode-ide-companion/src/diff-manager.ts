@@ -54,11 +54,25 @@ export class DiffManager {
     new vscode.EventEmitter<JSONRPCNotification>();
   readonly onDidChange = this.onDidChangeEmitter.event;
   private diffDocuments = new Map<string, DiffInfo>();
+  private readonly subscriptions: vscode.Disposable[] = [];
 
   constructor(
-    private readonly logger: vscode.OutputChannel,
+    private readonly log: (message: string) => void,
     private readonly diffContentProvider: DiffContentProvider,
-  ) {}
+  ) {
+    this.subscriptions.push(
+      vscode.window.onDidChangeActiveTextEditor((editor) => {
+        this.onActiveEditorChange(editor);
+      }),
+    );
+    this.onActiveEditorChange(vscode.window.activeTextEditor);
+  }
+
+  dispose() {
+    for (const subscription of this.subscriptions) {
+      subscription.dispose();
+    }
+  }
 
   /**
    * Creates and shows a new diff view.
@@ -151,9 +165,7 @@ export class DiffManager {
   async acceptDiff(rightDocUri: vscode.Uri) {
     const diffInfo = this.diffDocuments.get(rightDocUri.toString());
     if (!diffInfo) {
-      this.logger.appendLine(
-        `No diff info found for ${rightDocUri.toString()}`,
-      );
+      this.log(`No diff info found for ${rightDocUri.toString()}`);
       return;
     }
 
@@ -179,9 +191,7 @@ export class DiffManager {
   async cancelDiff(rightDocUri: vscode.Uri) {
     const diffInfo = this.diffDocuments.get(rightDocUri.toString());
     if (!diffInfo) {
-      this.logger.appendLine(
-        `No diff info found for ${rightDocUri.toString()}`,
-      );
+      this.log(`No diff info found for ${rightDocUri.toString()}`);
       // Even if we don't have diff info, we should still close the editor.
       await this.closeDiffEditor(rightDocUri);
       return;
@@ -200,6 +210,26 @@ export class DiffManager {
           content: modifiedContent,
         },
       }),
+    );
+  }
+
+  private async onActiveEditorChange(editor: vscode.TextEditor | undefined) {
+    let isVisible = false;
+    if (editor) {
+      isVisible = this.diffDocuments.has(editor.document.uri.toString());
+      if (!isVisible) {
+        for (const document of this.diffDocuments.values()) {
+          if (document.originalFilePath === editor.document.uri.fsPath) {
+            isVisible = true;
+            break;
+          }
+        }
+      }
+    }
+    await vscode.commands.executeCommand(
+      'setContext',
+      'gemini.diff.isVisible',
+      isVisible,
     );
   }
 

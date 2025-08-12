@@ -28,6 +28,7 @@ import { checkForUpdates, UpdateObject } from './utils/updateCheck.js';
 import { EventEmitter } from 'events';
 import { updateEventEmitter } from '../utils/updateEventEmitter.js';
 import * as auth from '../config/auth.js';
+import * as useTerminalSize from './hooks/useTerminalSize.js';
 
 // Define a more complete mock server config based on actual Config
 interface MockServerConfig {
@@ -154,13 +155,13 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         setFlashFallbackHandler: vi.fn(),
         getSessionId: vi.fn(() => 'test-session-id'),
         getUserTier: vi.fn().mockResolvedValue(undefined),
-        getIdeModeFeature: vi.fn(() => false),
-        getIdeMode: vi.fn(() => false),
+        getIdeMode: vi.fn(() => true),
         getWorkspaceContext: vi.fn(() => ({
           getDirectories: vi.fn(() => []),
         })),
         getIdeClient: vi.fn(() => ({
           getCurrentIde: vi.fn(() => 'vscode'),
+          getDetectedIdeDisplayName: vi.fn(() => 'VSCode'),
         })),
       };
     });
@@ -199,6 +200,13 @@ vi.mock('./hooks/useAuthCommand', () => ({
     handleAuthHighlight: vi.fn(),
     isAuthenticating: false,
     cancelAuthentication: vi.fn(),
+  })),
+}));
+
+vi.mock('./hooks/useFolderTrust', () => ({
+  useFolderTrust: vi.fn(() => ({
+    isFolderTrustDialogOpen: false,
+    handleFolderTrustSelect: vi.fn(),
   })),
 }));
 
@@ -243,6 +251,10 @@ vi.mock('../config/auth.js', () => ({
   validateAuthMethod: vi.fn(),
 }));
 
+vi.mock('../hooks/useTerminalSize.js', () => ({
+  useTerminalSize: vi.fn(),
+}));
+
 const mockedCheckForUpdates = vi.mocked(checkForUpdates);
 const { isGitRepository: mockedIsGitRepository } = vi.mocked(
   await import('@google/gemini-cli-core'),
@@ -284,6 +296,11 @@ describe('App UI', () => {
   };
 
   beforeEach(() => {
+    vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
+      columns: 120,
+      rows: 24,
+    });
+
     const ServerConfigMocked = vi.mocked(ServerConfig, true);
     mockConfig = new ServerConfigMocked({
       embeddingModel: 'test-embedding-model',
@@ -1060,6 +1077,46 @@ describe('App UI', () => {
       currentUnmount = unmount;
 
       expect(validateAuthMethodSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when in a narrow terminal', () => {
+    it('should render with a column layout', () => {
+      vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
+        columns: 60,
+        rows: 24,
+      });
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      expect(lastFrame()).toMatchSnapshot();
+    });
+  });
+
+  describe('FolderTrustDialog', () => {
+    it('should display the folder trust dialog when isFolderTrustDialogOpen is true', async () => {
+      const { useFolderTrust } = await import('./hooks/useFolderTrust.js');
+      vi.mocked(useFolderTrust).mockReturnValue({
+        isFolderTrustDialogOpen: true,
+        handleFolderTrustSelect: vi.fn(),
+      });
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      await Promise.resolve();
+      expect(lastFrame()).toContain('Do you trust this folder?');
     });
   });
 });
