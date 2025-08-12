@@ -223,10 +223,7 @@ export async function truncateAndSaveToFile(
   }
 
   try {
-    const tempFilePath = path.join(
-      projectTempDir,
-      `${callId}_${Date.now()}.txt`,
-    );
+    const tempFilePath = path.join(projectTempDir, `${callId}.txt`);
     await fs.writeFile(tempFilePath, content);
 
     const lines = content.split('\n');
@@ -249,10 +246,25 @@ ${truncatedContent}`;
   } catch (_error) {
     const lines = content.split('\n');
     const contentLabel = contentType === 'error' ? 'error message' : 'output';
-    return (
-      lines.slice(-TRUNCATION_LINES).join('\n') +
-      `\n\n[Note: Could not save full ${contentLabel} to file]`
-    );
+    // If we have many lines, take the last TRUNCATION_LINES
+    if (lines.length > TRUNCATION_LINES) {
+      return (
+        lines.slice(-TRUNCATION_LINES).join('\n') +
+        `\n\n[Note: Could not save full ${contentLabel} to file]`
+      );
+    }
+
+    // If it's just one very long line, truncate by characters
+    const maxChars = TRUNCATION_LINES * 80; // Approximate 80 chars per line
+    if (content.length > maxChars) {
+      return (
+        content.slice(-maxChars) +
+        `\n\n[Note: Could not save full ${contentLabel} to file]`
+      );
+    }
+
+    // Content is small enough, return as-is with note
+    return content + `\n\n[Note: Could not save full ${contentLabel} to file]`;
   }
 }
 
@@ -881,12 +893,14 @@ export class CoreToolScheduler {
               return;
             }
 
-            const projectTempDir = this.config.getProjectTempDir();
-            await fs.mkdir(projectTempDir, { recursive: true });
-
             if (toolResult.error === undefined) {
               let llmContent = toolResult.llmContent;
-              if (typeof llmContent === 'string') {
+              if (
+                typeof llmContent === 'string' &&
+                llmContent.length > TRUNCATION_THRESHOLD
+              ) {
+                const projectTempDir = this.config.getProjectTempDir();
+                await fs.mkdir(projectTempDir, { recursive: true });
                 llmContent = await truncateAndSaveToFile(
                   llmContent,
                   callId,
@@ -909,13 +923,18 @@ export class CoreToolScheduler {
               this.setStatusInternal(callId, 'success', successResponse);
             } else {
               // It is a failure
-              const truncatedErrorMessage = await truncateAndSaveToFile(
-                toolResult.error.message,
-                callId,
-                projectTempDir,
-                'error',
-              );
-              const error = new Error(truncatedErrorMessage);
+              let errorMessage = toolResult.error.message;
+              if (errorMessage.length > TRUNCATION_THRESHOLD) {
+                const projectTempDir = this.config.getProjectTempDir();
+                await fs.mkdir(projectTempDir, { recursive: true });
+                errorMessage = await truncateAndSaveToFile(
+                  errorMessage,
+                  callId,
+                  projectTempDir,
+                  'error',
+                );
+              }
+              const error = new Error(errorMessage);
               const errorResponse = createErrorResponse(
                 scheduledCall.request,
                 error,

@@ -102,6 +102,7 @@ describe('CoreToolScheduler', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getProjectTempDir: () => '/tmp/test',
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -173,6 +174,7 @@ describe('CoreToolScheduler with payload', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getProjectTempDir: () => '/tmp/test',
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -450,6 +452,7 @@ describe('CoreToolScheduler edit cancellation', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getProjectTempDir: () => '/tmp/test',
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -872,12 +875,15 @@ describe('truncateAndSaveToFile', () => {
 
     expect(result).not.toContain('The full output has been saved to:');
     expect(result).toContain('[Note: Could not save full output to file]');
-    expect(result.length).toBeLessThan(largeContent.length);
+    // Should be truncated to approximately 100 * 80 = 8000 chars plus note
+    expect(result.length).toBeLessThan(10000);
   });
 
   it('should handle multiline content correctly', async () => {
-    const lines = Array.from({ length: 200 }, (_, i) => `Line ${i + 1}`);
-    const multilineContent = lines.join('\\n');
+    const lines = Array.from({ length: 2000 }, (_, i) =>
+      `Line ${i + 1}`.repeat(100),
+    );
+    const multilineContent = lines.join('\n');
 
     const result = await truncateAndSaveToFile(
       multilineContent,
@@ -891,16 +897,14 @@ describe('truncateAndSaveToFile', () => {
     expect(result).toContain('Last 100 lines of output:');
 
     // Should contain the last 100 lines
-    const outputSection = result.split('Last 100 lines of output:\\n...\\n')[1];
-    expect(outputSection).toContain('Line 200');
-    expect(outputSection).toContain('Line 101');
-    expect(outputSection).not.toContain('Line 100');
+    expect(result).toContain('Line 2000');
+    expect(result).toContain('Line 1901');
   });
 
-  it('should create unique filenames with timestamps', async () => {
+  it('should create unique filenames based on callId', async () => {
     const largeContent = 'x'.repeat(200000);
 
-    // Create two files quickly
+    // Create two files with different call IDs
     const result1 = truncateAndSaveToFile(largeContent, 'call-1', tempDir);
     const result2 = truncateAndSaveToFile(largeContent, 'call-2', tempDir);
 
@@ -908,7 +912,7 @@ describe('truncateAndSaveToFile', () => {
 
     const files = await fs.readdir(tempDir);
     expect(files).toHaveLength(2);
-    expect(files[0]).not.toBe(files[1]); // Should have different names
-    expect(files.every((f) => f.includes('.txt'))).toBe(true);
+    expect(files).toContain('call-1.txt');
+    expect(files).toContain('call-2.txt');
   });
 });
