@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   detectIde,
   DetectedIde,
@@ -249,7 +250,11 @@ export class IdeClient {
       );
       return false;
     }
-    if (getRealPath(ideWorkspacePath) !== getRealPath(process.cwd())) {
+
+    const idePath = getRealPath(ideWorkspacePath).toLocaleLowerCase();
+    const cwd = getRealPath(process.cwd()).toLocaleLowerCase();
+    const rel = path.relative(idePath, cwd);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `Directory mismatch. Gemini CLI is running in a different location than the open workspace in ${this.currentIdeDisplayName}. Please run the CLI from the same directory as your project's root folder.`,
@@ -360,9 +365,6 @@ export class IdeClient {
 
 function getIdeServerHost() {
   const isInContainer =
-    fs.existsSync('/.dockerenv') ||
-    fs.existsSync('/run/.containerenv') ||
-    !!process.env.SANDBOX ||
-    !!process.env.container;
+    fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
   return isInContainer ? 'host.docker.internal' : 'localhost';
 }
