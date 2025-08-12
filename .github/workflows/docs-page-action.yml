@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  manual-release-only-job:
+  build:
     # This 'if' condition is the key. It ensures the job only runs if the
     # tag name does NOT contain the substring 'nightly'.
       if: "contains(github.ref_name, 'nightly') == false"
