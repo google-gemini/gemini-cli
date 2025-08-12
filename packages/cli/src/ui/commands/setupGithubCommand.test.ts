@@ -12,6 +12,7 @@ import { vi, describe, expect, it, afterEach, beforeEach } from 'vitest';
 import * as gitUtils from '../../utils/gitUtils.js';
 import { setupGithubCommand } from './setupGithubCommand.js';
 import { CommandContext, ToolActionReturn } from './types.js';
+import * as commandUtils from '../utils/commandUtils.js';
 
 vi.mock('child_process');
 
@@ -23,6 +24,10 @@ vi.mock('../../utils/gitUtils.js', () => ({
   getGitRepoRoot: vi.fn(),
   getLatestGitHubRelease: vi.fn(),
   getGitHubRepoInfo: vi.fn(),
+}));
+
+vi.mock('../utils/commandUtils.js', () => ({
+  getUrlOpenCommand: vi.fn(),
 }));
 
 describe('setupGithubCommand', async () => {
@@ -67,6 +72,9 @@ describe('setupGithubCommand', async () => {
       owner: fakeRepoOwner,
       repo: fakeRepoName,
     });
+    vi.mocked(commandUtils.getUrlOpenCommand).mockReturnValueOnce(
+      'fakeOpenCommand',
+    );
 
     const result = (await setupGithubCommand.action?.(
       {} as CommandContext,
@@ -77,7 +85,7 @@ describe('setupGithubCommand', async () => {
 
     const expectedSubstrings = [
       `set -eEuo pipefail`,
-      `open "https://github.com/google-github-actions/run-gemini-cli`,
+      `fakeOpenCommand "https://github.com/google-github-actions/run-gemini-cli`,
     ];
 
     for (const substring of expectedSubstrings) {
