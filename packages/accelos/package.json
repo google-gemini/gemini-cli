@@ -1,0 +1,45 @@
+{
+  "name": "@google/gemini-cli-accelos",
+  "version": "0.1.0",
+  "description": "Accelos AI Agent using Mastra framework",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "node ../../scripts/build_package.js",
+    "start": "node dist/index.js",
+    "debug": "node --inspect-brk dist/index.js",
+    "dev": "mastra dev",
+    "dev:server": "tsx src/server.ts",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:ci": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@ai-sdk/anthropic": "^1.2.0",
+    "@ai-sdk/google": "^2.0.5",
+    "@ai-sdk/openai": "^1.2.0",
+    "@google/genai": "1.9.0",
+    "@mastra/core": "^0.13.2",
+    "ai": "^4.0.53",
+    "dotenv": "^17.1.0",
+    "mastra": "^0.10.21",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3",
+    "vitest": "^3.1.1"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

@@ -1,0 +1,3 @@
+const bundler = {};
+
+export { bundler };

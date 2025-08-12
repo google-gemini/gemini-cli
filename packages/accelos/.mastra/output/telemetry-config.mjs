@@ -1,0 +1,3 @@
+const telemetry = {};
+
+export { telemetry };

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/mastra.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mastra Playground</title>
+    <script>
+      function connectSSE() {
+        const events = new EventSource('/refresh-events');
+
+        events.onmessage = event => {
+          if (event.data === 'refresh') {
+            window.location.reload();
+          }
+        };
+
+        events.onerror = () => {
+          events.close();
+          setTimeout(connectSSE, 1000);
+        };
+
+        window.addEventListener('beforeunload', () => {
+          events.close();
+        });
+      }
+
+      connectSSE();
+    </script>
+    <script type="module" crossorigin src="/assets/index-c7ceEoBf.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/style-18US00uZ.css">
+  </head>
+
+  <body>
+    <script>
+      window.MASTRA_TELEMETRY_DISABLED = '%%MASTRA_TELEMETRY_DISABLED%%';
+      window.MASTRA_SERVER_URL = '%%MASTRA_SERVER_URL%%';
+    </script>
+    <div id="root" class="dark"></div>
+  </body>
+</html>

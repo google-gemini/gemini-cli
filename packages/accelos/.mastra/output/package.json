@@ -1,0 +1,26 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node --import=./instrumentation.mjs --import=@opentelemetry/instrumentation/hook.mjs ./index.mjs"
+  },
+  "author": "Mastra",
+  "license": "ISC",
+  "dependencies": {
+    "@opentelemetry/core": "^2.0.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.59.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "^0.201.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.201.0",
+    "@opentelemetry/resources": "^2.0.1",
+    "@opentelemetry/sdk-node": "^0.201.0",
+    "@opentelemetry/sdk-trace-base": "^2.0.1",
+    "@opentelemetry/semantic-conventions": "^1.33.0",
+    "@opentelemetry/instrumentation": "^0.202.0"
+  },
+  "pnpm": {
+    "neverBuiltDependencies": []
+  }
+}
