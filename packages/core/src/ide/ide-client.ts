@@ -6,11 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import {
-  detectIde,
-  DetectedIde,
-  getIdeDisplayName,
-} from '../ide/detect-ide.js';
+import { detectIde, DetectedIde, getIdeInfo } from '../ide/detect-ide.js';
 import {
   ideContext,
   IdeContextNotificationSchema,
@@ -68,7 +64,7 @@ export class IdeClient {
   private constructor() {
     this.currentIde = detectIde();
     if (this.currentIde) {
-      this.currentIdeDisplayName = getIdeDisplayName(this.currentIde);
+      this.currentIdeDisplayName = getIdeInfo(this.currentIde).displayName;
     }
   }
 
@@ -86,7 +82,7 @@ export class IdeClient {
         `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: ${Object.values(
           DetectedIde,
         )
-          .map((ide) => getIdeDisplayName(ide))
+          .map((ide) => getIdeInfo(ide).displayName)
           .join(', ')}`,
         false,
       );

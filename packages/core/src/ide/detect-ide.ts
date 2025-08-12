@@ -6,33 +6,43 @@
 
 export enum DetectedIde {
   VSCode = 'vscode',
-  VSCodium = 'vscodium',
   Cursor = 'cursor',
   CloudShell = 'cloudshell',
   Codespaces = 'codespaces',
-  Windsurf = 'windsurf',
   FirebaseStudio = 'firebasestudio',
   Trae = 'trae',
 }
 
-export function getIdeDisplayName(ide: DetectedIde): string {
+export interface IdeInfo {
+  displayName: string;
+}
+
+export function getIdeInfo(ide: DetectedIde): IdeInfo {
   switch (ide) {
     case DetectedIde.VSCode:
-      return 'VS Code';
-    case DetectedIde.VSCodium:
-      return 'VSCodium';
+      return {
+        displayName: 'VS Code',
+      };
     case DetectedIde.Cursor:
-      return 'Cursor';
+      return {
+        displayName: 'Cursor',
+      };
     case DetectedIde.CloudShell:
-      return 'Cloud Shell';
+      return {
+        displayName: 'Cloud Shell',
+      };
     case DetectedIde.Codespaces:
-      return 'GitHub Codespaces';
-    case DetectedIde.Windsurf:
-      return 'Windsurf';
+      return {
+        displayName: 'GitHub Codespaces',
+      };
     case DetectedIde.FirebaseStudio:
-      return 'Firebase Studio';
+      return {
+        displayName: 'Firebase Studio',
+      };
     case DetectedIde.Trae:
-      return 'Trae';
+      return {
+        displayName: 'Trae',
+      };
     default: {
       // This ensures that if a new IDE is added to the enum, we get a compile-time error.
       const exhaustiveCheck: never = ide;

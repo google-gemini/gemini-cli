@@ -8,7 +8,7 @@ import {
   Config,
   DetectedIde,
   IDEConnectionStatus,
-  getIdeDisplayName,
+  getIdeInfo,
   getIdeInstaller,
   IdeClient,
   type File,
@@ -132,7 +132,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
           content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: ${Object.values(
             DetectedIde,
           )
-            .map((ide) => getIdeDisplayName(ide))
+            .map((ide) => getIdeInfo(ide).displayName)
             .join(', ')}`,
         }) as const,
     };
