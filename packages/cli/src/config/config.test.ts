@@ -156,6 +156,99 @@ describe('parseArguments', () => {
     expect(argv.promptInteractive).toBe('interactive prompt');
     expect(argv.prompt).toBeUndefined();
   });
+
+  it('should throw an error when both --yolo and --approval-mode are used together', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--yolo',
+      '--approval-mode',
+      'default',
+    ];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments()).rejects.toThrow('process.exit called');
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
+      ),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should throw an error when using short flags -y and --approval-mode together', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '-y',
+      '--approval-mode',
+      'yolo',
+    ];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments()).rejects.toThrow('process.exit called');
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
+      ),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should allow --approval-mode without --yolo', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
+    const argv = await parseArguments();
+    expect(argv.approvalMode).toBe('auto_edit');
+    expect(argv.yolo).toBe(false);
+  });
+
+  it('should allow --yolo without --approval-mode', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments();
+    expect(argv.yolo).toBe(true);
+    expect(argv.approvalMode).toBeUndefined();
+  });
+
+  it('should reject invalid --approval-mode values', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'invalid'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments()).rejects.toThrow('process.exit called');
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid values:'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
 });
 
 describe('loadCliConfig', () => {
@@ -1352,5 +1445,82 @@ describe('loadCliConfig interactive', () => {
     const argv = await parseArguments();
     const config = await loadCliConfig({}, [], 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
+  });
+});
+
+describe('loadCliConfig approval mode', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('should default to DEFAULT approval mode when no flags are set', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+  });
+
+  it('should set YOLO approval mode when --yolo flag is used', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+  });
+
+  it('should set YOLO approval mode when -y flag is used', async () => {
+    process.argv = ['node', 'script.js', '-y'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+  });
+
+  it('should set DEFAULT approval mode when --approval-mode=default', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'default'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+  });
+
+  it('should set AUTO_EDIT approval mode when --approval-mode=auto_edit', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.AUTO_EDIT);
+  });
+
+  it('should set YOLO approval mode when --approval-mode=yolo', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'yolo'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+  });
+
+  it('should prioritize --approval-mode over --yolo when both would be valid (but validation prevents this)', async () => {
+    // Note: This test documents the intended behavior, but in practice the validation
+    // prevents both flags from being used together
+    process.argv = ['node', 'script.js', '--approval-mode', 'default'];
+    const argv = await parseArguments();
+    // Manually set yolo to true to simulate what would happen if validation didn't prevent it
+    argv.yolo = true;
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+  });
+
+  it('should fall back to --yolo behavior when --approval-mode is not set', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
   });
 });
