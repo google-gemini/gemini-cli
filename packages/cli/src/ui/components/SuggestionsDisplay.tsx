@@ -72,32 +72,30 @@ export function SuggestionsDisplay({
         return (
           <Box key={`${suggestion.value}-${originalIndex}`} width={width}>
             <Box flexDirection="row">
-              {userInput.startsWith('/') ? (
-                // Dynamic column width for better command/description separation
-                <>
-                  <Box flexShrink={0} paddingRight={2}>
-                    {labelElement}
-                  </Box>
-                  {suggestion.description ? (
-                    <Box flexGrow={1}>
-                      <Text color={textColor} wrap="truncate">
-                        {suggestion.description}
-                      </Text>
-                    </Box>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  {labelElement}
-                  {suggestion.description ? (
-                    <Box flexGrow={1} paddingLeft={1}>
-                      <Text color={textColor} wrap="truncate">
-                        {suggestion.description}
-                      </Text>
-                    </Box>
-                  ) : null}
-                </>
-              )}
+              {(() => {
+                const isSlashCommand = userInput.startsWith('/');
+                return (
+                  <>
+                    {isSlashCommand ? (
+                      <Box flexShrink={0} paddingRight={2}>
+                        {labelElement}
+                      </Box>
+                    ) : (
+                      labelElement
+                    )}
+                    {suggestion.description && (
+                      <Box
+                        flexGrow={1}
+                        paddingLeft={isSlashCommand ? undefined : 1}
+                      >
+                        <Text color={textColor} wrap="truncate">
+                          {suggestion.description}
+                        </Text>
+                      </Box>
+                    )}
+                  </>
+                );
+              })()}
             </Box>
           </Box>
         );
