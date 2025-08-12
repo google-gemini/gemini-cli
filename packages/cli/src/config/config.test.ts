@@ -156,6 +156,25 @@ describe('parseArguments', () => {
     expect(argv.promptInteractive).toBe('interactive prompt');
     expect(argv.prompt).toBeUndefined();
   });
+
+  it('should convert positional query argument to promptInteractive', async () => {
+    process.argv = ['node', 'script.js', '@path ./file.md'];
+    const argv = await parseArguments();
+    expect(argv.query).toBe('@path ./file.md');
+    expect(argv.promptInteractive).toBe('@path ./file.md');
+    expect(argv.prompt).toBeUndefined();
+  });
+
+  it('maps unquoted positional @path + arg to promptInteractive', async () => {
+    // Simulate: gemini @path ./file.md
+    process.argv = ['node', 'script.js', '@path', './file.md'];
+    const argv = await parseArguments();
+    // After normalization, query is a single string
+    expect(argv.query).toBe('@path ./file.md');
+    // And it's mapped to interactive prompt when no -p/-i flags are set
+    expect(argv.promptInteractive).toBe('@path ./file.md');
+    expect(argv.prompt).toBeUndefined();
+  });
 });
 
 describe('loadCliConfig', () => {

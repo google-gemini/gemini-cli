@@ -46,6 +46,7 @@ const logger = {
 };
 
 export interface CliArgs {
+  query: string | undefined;
   model: string | undefined;
   sandbox: boolean | string | undefined;
   sandboxImage: string | undefined;
@@ -77,8 +78,13 @@ export async function parseArguments(): Promise<CliArgs> {
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
     )
-    .command('$0', 'Launch Gemini CLI', (yargsInstance) =>
+    .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
+        .positional('query', {
+          type: 'string',
+          description:
+            'Query to execute in interactive mode (e.g., @path ./file.md)',
+        })
         .option('model', {
           alias: 'm',
           type: 'string',
@@ -240,6 +246,21 @@ export async function parseArguments(): Promise<CliArgs> {
     // MCP commands handle their own execution and process exit
     process.exit(0);
   }
+
+  // Normalize variadic positional to a single string
+  // Supports both:
+  //   gemini "@path ./file.md"        (quoted single token)
+  //   gemini @path ./file.md          (unquoted two tokens)
+  const q = Array.isArray((result as Record<string, unknown>).query)
+    ? ((result as Record<string, unknown>).query as string[]).join(' ')
+    : ((result as Record<string, unknown>).query as string);
+
+  // Map to interactive prompt only if no explicit prompt flags are set
+  if (q && !result.prompt && !result.promptInteractive) {
+    result.promptInteractive = q;
+  }
+  // Keep CliArgs.query as a string for downstream typing
+  (result as Record<string, unknown>).query = q || undefined;
 
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
