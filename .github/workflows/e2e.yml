@@ -71,3 +71,24 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: npm run test:e2e
+
+  e2e-test-native-binary:
+    name: E2E Native Binary Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+      - uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2
+        with:
+          bun-version: '1.2.20'
+      - run: npm ci
+      - run: npm run bundle
+      - run: npm run build:binaries
+      - name: Smoke test native binary
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_BINARY: ${{ github.workspace }}/bundle/binaries/gemini-cli-linux-x64
+        run: npm run test:integration:sandbox:none -- list_directory

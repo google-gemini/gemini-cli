@@ -74,6 +74,11 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2
+        with:
+          bun-version: '1.2.20'
+
       - name: Install Dependencies
         run: npm ci
 
@@ -129,6 +134,9 @@ jobs:
           npm run build:packages
           npm run prepare:package
 
+      - name: Build Native Binaries
+        run: npm run build:binaries
+
       - name: Configure npm for publishing
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -158,6 +166,7 @@ jobs:
         run: |
           gh release create ${{ steps.version.outputs.RELEASE_TAG }} \
             bundle/gemini.js \
+            bundle/binaries/* \
             --target "$RELEASE_BRANCH" \
             --title "Release ${{ steps.version.outputs.RELEASE_TAG }}" \
             --generate-notes

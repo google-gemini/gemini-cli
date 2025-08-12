@@ -103,7 +103,14 @@ export function validateModelOutput(
 
 export class TestRig {
   constructor() {
-    this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
+    // Support testing native binaries via GEMINI_BINARY env variable
+    if (env.GEMINI_BINARY) {
+      this.binaryPath = env.GEMINI_BINARY;
+      this.isNativeBinary = true;
+    } else {
+      this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
+      this.isNativeBinary = false;
+    }
     this.testDir = null;
   }
 
@@ -162,7 +169,9 @@ export class TestRig {
   }
 
   run(promptOrOptions, ...args) {
-    let command = `node ${this.bundlePath} --yolo`;
+    let command = this.isNativeBinary
+      ? `${this.binaryPath} --yolo`
+      : `node ${this.bundlePath} --yolo`;
     const execOptions = {
       cwd: this.testDir,
       encoding: 'utf-8',
@@ -185,9 +194,9 @@ export class TestRig {
     command += ` ${args.join(' ')}`;
 
     const commandArgs = parse(command);
-    const node = commandArgs.shift();
+    const executable = commandArgs.shift();
 
-    const child = spawn(node, commandArgs, {
+    const child = spawn(executable, commandArgs, {
       cwd: this.testDir,
       stdio: 'pipe',
     });
