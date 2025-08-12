@@ -545,6 +545,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     initError,
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
+    cancelOngoingRequest,
   } = useGeminiStream(
     config.getGeminiClient(),
     history,
@@ -655,6 +656,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         if (isAuthenticating) {
           return;
         }
+        if (!ctrlCPressedOnce) {
+          cancelOngoingRequest?.();
+        }
         handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
       } else if (keyMatchers[Command.EXIT](key)) {
         if (buffer.text.length > 0) {
@@ -686,6 +690,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       ctrlDTimerRef,
       handleSlashCommand,
       isAuthenticating,
+      cancelOngoingRequest,
     ],
   );
 
@@ -939,8 +944,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
           {shouldShowIdePrompt ? (
             <IdeIntegrationNudge
-              question="Do you want to connect your VS Code editor to Gemini CLI?"
-              description="If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in VS Code."
+              ideName={config.getIdeClient().getDetectedIdeDisplayName()}
               onComplete={handleIdePromptComplete}
             />
           ) : isFolderTrustDialogOpen ? (
