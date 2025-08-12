@@ -89,7 +89,10 @@ export class WebSearchTool extends BaseTool<
    * @returns An error message string if validation fails, null if valid
    */
   validateParams(params: WebSearchToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
     if (errors) {
       return errors;
     }

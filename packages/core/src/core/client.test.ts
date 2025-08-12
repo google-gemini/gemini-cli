@@ -201,11 +201,13 @@ describe('Gemini Client (client.ts)', () => {
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
       getIdeModeFeature: vi.fn().mockReturnValue(false),
       getIdeMode: vi.fn().mockReturnValue(true),
+      getDebugMode: vi.fn().mockReturnValue(false),
       getWorkspaceContext: vi.fn().mockReturnValue({
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getGeminiClient: vi.fn(),
       setFallbackMode: vi.fn(),
+      getChatCompression: vi.fn().mockReturnValue(undefined),
     };
     const MockedConfig = vi.mocked(Config, true);
     MockedConfig.mockImplementation(
@@ -394,7 +396,7 @@ describe('Gemini Client (client.ts)', () => {
             systemInstruction: getCoreSystemPrompt(''),
             temperature: 0,
             topP: 1,
-            responseSchema: schema,
+            responseJsonSchema: schema,
             responseMimeType: 'application/json',
           },
           contents,
@@ -433,7 +435,7 @@ describe('Gemini Client (client.ts)', () => {
             temperature: 0.9,
             topP: 1, // from default
             topK: 20,
-            responseSchema: schema,
+            responseJsonSchema: schema,
             responseMimeType: 'application/json',
           },
           contents,
@@ -448,8 +450,7 @@ describe('Gemini Client (client.ts)', () => {
       const mockChat = {
         addHistory: vi.fn(),
       };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      client['chat'] = mockChat as any;
+      client['chat'] = mockChat as unknown as GeminiChat;
 
       const newContent = {
         role: 'user',
@@ -531,14 +532,19 @@ describe('Gemini Client (client.ts)', () => {
       expect(newChat).toBe(initialChat);
     });
 
-    it('should trigger summarization if token count is at threshold', async () => {
+    it('should trigger summarization if token count is at threshold with contextPercentageThreshold setting', async () => {
       const MOCKED_TOKEN_LIMIT = 1000;
+      const MOCKED_CONTEXT_PERCENTAGE_THRESHOLD = 0.5;
       vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+      vi.spyOn(client['config'], 'getChatCompression').mockReturnValue({
+        contextPercentageThreshold: MOCKED_CONTEXT_PERCENTAGE_THRESHOLD,
+      });
       mockGetHistory.mockReturnValue([
         { role: 'user', parts: [{ text: '...history...' }] },
       ]);
 
-      const originalTokenCount = 1000 * 0.7;
+      const originalTokenCount =
+        MOCKED_TOKEN_LIMIT * MOCKED_CONTEXT_PERCENTAGE_THRESHOLD;
       const newTokenCount = 100;
 
       mockCountTokens
@@ -661,7 +667,7 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   describe('sendMessageStream', () => {
-    it('should include IDE context when ideModeFeature is enabled', async () => {
+    it('should include editor context when ideModeFeature is enabled', async () => {
       // Arrange
       vi.mocked(ideContext.getIdeContext).mockReturnValue({
         workspaceState: {
@@ -719,21 +725,30 @@ describe('Gemini Client (client.ts)', () => {
       // Assert
       expect(ideContext.getIdeContext).toHaveBeenCalled();
       const expectedContext = `
-This is the file that the user is looking at:
-- Path: /path/to/active/file.ts
-This is the cursor position in the file:
-- Cursor Position: Line 5, Character 10
-This is the selected text in the file:
-- hello
-Here are some other files the user has open, with the most recent at the top:
-- /path/to/recent/file1.ts
-- /path/to/recent/file2.ts
+Here is the user's editor context as a JSON object. This is for your information only.
+\`\`\`json
+${JSON.stringify(
+  {
+    activeFile: {
+      path: '/path/to/active/file.ts',
+      cursor: {
+        line: 5,
+        character: 10,
+      },
+      selectedText: 'hello',
+    },
+    otherOpenFiles: ['/path/to/recent/file1.ts', '/path/to/recent/file2.ts'],
+  },
+  null,
+  2,
+)}
+\`\`\`
       `.trim();
-      const expectedRequest = [{ text: expectedContext }, ...initialRequest];
-      expect(mockTurnRunFn).toHaveBeenCalledWith(
-        expectedRequest,
-        expect.any(Object),
-      );
+      const expectedRequest = [{ text: expectedContext }];
+      expect(mockChat.addHistory).toHaveBeenCalledWith({
+        role: 'user',
+        parts: expectedRequest,
+      });
     });
 
     it('should not add context if ideModeFeature is enabled but no open files', async () => {
@@ -833,18 +848,29 @@ Here are some other files the user has open, with the most recent at the top:
       // Assert
       expect(ideContext.getIdeContext).toHaveBeenCalled();
       const expectedContext = `
-This is the file that the user is looking at:
-- Path: /path/to/active/file.ts
-This is the cursor position in the file:
-- Cursor Position: Line 5, Character 10
-This is the selected text in the file:
-- hello
+Here is the user's editor context as a JSON object. This is for your information only.
+\`\`\`json
+${JSON.stringify(
+  {
+    activeFile: {
+      path: '/path/to/active/file.ts',
+      cursor: {
+        line: 5,
+        character: 10,
+      },
+      selectedText: 'hello',
+    },
+  },
+  null,
+  2,
+)}
+\`\`\`
       `.trim();
-      const expectedRequest = [{ text: expectedContext }, ...initialRequest];
-      expect(mockTurnRunFn).toHaveBeenCalledWith(
-        expectedRequest,
-        expect.any(Object),
-      );
+      const expectedRequest = [{ text: expectedContext }];
+      expect(mockChat.addHistory).toHaveBeenCalledWith({
+        role: 'user',
+        parts: expectedRequest,
+      });
     });
 
     it('should add context if ideModeFeature is enabled and there are open files but no active file', async () => {
@@ -898,15 +924,22 @@ This is the selected text in the file:
       // Assert
       expect(ideContext.getIdeContext).toHaveBeenCalled();
       const expectedContext = `
-Here are some files the user has open, with the most recent at the top:
-- /path/to/recent/file1.ts
-- /path/to/recent/file2.ts
+Here is the user's editor context as a JSON object. This is for your information only.
+\`\`\`json
+${JSON.stringify(
+  {
+    otherOpenFiles: ['/path/to/recent/file1.ts', '/path/to/recent/file2.ts'],
+  },
+  null,
+  2,
+)}
+\`\`\`
       `.trim();
-      const expectedRequest = [{ text: expectedContext }, ...initialRequest];
-      expect(mockTurnRunFn).toHaveBeenCalledWith(
-        expectedRequest,
-        expect.any(Object),
-      );
+      const expectedRequest = [{ text: expectedContext }];
+      expect(mockChat.addHistory).toHaveBeenCalledWith({
+        role: 'user',
+        parts: expectedRequest,
+      });
     });
 
     it('should return the turn instance after the stream is complete', async () => {
@@ -1183,6 +1216,268 @@ Here are some files the user has open, with the most recent at the top:
         `Infinite loop protection working: checkNextSpeaker called ${callCount} times, ` +
           `${eventCount} events generated (properly bounded by MAX_TURNS)`,
       );
+    });
+
+    describe('Editor context delta', () => {
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+
+      beforeEach(() => {
+        client['forceFullIdeContext'] = false; // Reset before each delta test
+        vi.spyOn(client, 'tryCompressChat').mockResolvedValue(null);
+        vi.spyOn(client['config'], 'getIdeModeFeature').mockReturnValue(true);
+        mockTurnRunFn.mockReturnValue(mockStream);
+
+        const mockChat: Partial<GeminiChat> = {
+          addHistory: vi.fn(),
+          setHistory: vi.fn(),
+          sendMessage: vi.fn().mockResolvedValue({ text: 'summary' }),
+          // Assume history is not empty for delta checks
+          getHistory: vi
+            .fn()
+            .mockReturnValue([
+              { role: 'user', parts: [{ text: 'previous message' }] },
+            ]),
+        };
+        client['chat'] = mockChat as GeminiChat;
+
+        const mockGenerator: Partial<ContentGenerator> = {
+          countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+          generateContent: mockGenerateContentFn,
+        };
+        client['contentGenerator'] = mockGenerator as ContentGenerator;
+      });
+
+      const testCases = [
+        {
+          description: 'sends delta when active file changes',
+          previousActiveFile: {
+            path: '/path/to/old/file.ts',
+            cursor: { line: 5, character: 10 },
+            selectedText: 'hello',
+          },
+          currentActiveFile: {
+            path: '/path/to/active/file.ts',
+            cursor: { line: 5, character: 10 },
+            selectedText: 'hello',
+          },
+          shouldSendContext: true,
+        },
+        {
+          description: 'sends delta when cursor line changes',
+          previousActiveFile: {
+            path: '/path/to/active/file.ts',
+            cursor: { line: 1, character: 10 },
+            selectedText: 'hello',
+          },
+          currentActiveFile: {
+            path: '/path/to/active/file.ts',
+            cursor: { line: 5, character: 10 },
+            selectedText: 'hello',
+          },
+          shouldSendContext: true,
+        },
+        {
+          description: 'sends delta when cursor character changes',
+          previousActiveFile: {
+            path: '/path/to/active/file.ts',
+            cursor: { line: 5, character: 1 },
+            selectedText: 'hello',
+          },
+          currentActiveFile: {
+            path: '/path/to/active/file.ts',
+            cursor: { line: 5, character: 10 },
+            selectedText: 'hello',
+          },
+          shouldSendContext: true,
+        },
+        {
+          description: 'sends delta when selected text changes',
+          previousActiveFile: {
+            path: '/path/to/active/file.ts',
+            cursor: { line: 5, character: 10 },
+            selectedText: 'world',
+          },
+          currentActiveFile: {
+            path: '/path/to/active/file.ts',
+            cursor: { line: 5, character: 10 },
+            selectedText: 'hello',
+          },
+          shouldSendContext: true,
+        },
+        {
+          description: 'sends delta when selected text is added',
+          previousActiveFile: {
+            path: '/path/to/active/file.ts',
+            cursor: { line: 5, character: 10 },
+          },
+          currentActiveFile: {
+            path: '/path/to/active/file.ts',
+            cursor: { line: 5, character: 10 },
+            selectedText: 'hello',
+          },
+          shouldSendContext: true,
+        },
+        {
+          description: 'sends delta when selected text is removed',
+          previousActiveFile: {
+            path: '/path/to/active/file.ts',
+            cursor: { line: 5, character: 10 },
+            selectedText: 'hello',
+          },
+          currentActiveFile: {
+            path: '/path/to/active/file.ts',
+            cursor: { line: 5, character: 10 },
+          },
+          shouldSendContext: true,
+        },
+        {
+          description: 'does not send context when nothing changes',
+          previousActiveFile: {
+            path: '/path/to/active/file.ts',
+            cursor: { line: 5, character: 10 },
+            selectedText: 'hello',
+          },
+          currentActiveFile: {
+            path: '/path/to/active/file.ts',
+            cursor: { line: 5, character: 10 },
+            selectedText: 'hello',
+          },
+          shouldSendContext: false,
+        },
+      ];
+
+      it.each(testCases)(
+        '$description',
+        async ({
+          previousActiveFile,
+          currentActiveFile,
+          shouldSendContext,
+        }) => {
+          // Setup previous context
+          client['lastSentIdeContext'] = {
+            workspaceState: {
+              openFiles: [
+                {
+                  path: previousActiveFile.path,
+                  cursor: previousActiveFile.cursor,
+                  selectedText: previousActiveFile.selectedText,
+                  isActive: true,
+                  timestamp: Date.now() - 1000,
+                },
+              ],
+            },
+          };
+
+          // Setup current context
+          vi.mocked(ideContext.getIdeContext).mockReturnValue({
+            workspaceState: {
+              openFiles: [
+                { ...currentActiveFile, isActive: true, timestamp: Date.now() },
+              ],
+            },
+          });
+
+          const stream = client.sendMessageStream(
+            [{ text: 'Hi' }],
+            new AbortController().signal,
+            'prompt-id-delta',
+          );
+          for await (const _ of stream) {
+            // consume stream
+          }
+
+          const mockChat = client['chat'] as unknown as {
+            addHistory: (typeof vi)['fn'];
+          };
+
+          if (shouldSendContext) {
+            expect(mockChat.addHistory).toHaveBeenCalledWith(
+              expect.objectContaining({
+                parts: expect.arrayContaining([
+                  expect.objectContaining({
+                    text: expect.stringContaining(
+                      "Here is a summary of changes in the user's editor context",
+                    ),
+                  }),
+                ]),
+              }),
+            );
+          } else {
+            expect(mockChat.addHistory).not.toHaveBeenCalled();
+          }
+        },
+      );
+
+      it('sends full context when history is cleared, even if editor state is unchanged', async () => {
+        const activeFile = {
+          path: '/path/to/active/file.ts',
+          cursor: { line: 5, character: 10 },
+          selectedText: 'hello',
+        };
+
+        // Setup previous context
+        client['lastSentIdeContext'] = {
+          workspaceState: {
+            openFiles: [
+              {
+                path: activeFile.path,
+                cursor: activeFile.cursor,
+                selectedText: activeFile.selectedText,
+                isActive: true,
+                timestamp: Date.now() - 1000,
+              },
+            ],
+          },
+        };
+
+        // Setup current context (same as previous)
+        vi.mocked(ideContext.getIdeContext).mockReturnValue({
+          workspaceState: {
+            openFiles: [
+              { ...activeFile, isActive: true, timestamp: Date.now() },
+            ],
+          },
+        });
+
+        // Make history empty
+        const mockChat = client['chat'] as unknown as {
+          getHistory: ReturnType<(typeof vi)['fn']>;
+          addHistory: ReturnType<(typeof vi)['fn']>;
+        };
+        mockChat.getHistory.mockReturnValue([]);
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-history-cleared',
+        );
+        for await (const _ of stream) {
+          // consume stream
+        }
+
+        expect(mockChat.addHistory).toHaveBeenCalledWith(
+          expect.objectContaining({
+            parts: expect.arrayContaining([
+              expect.objectContaining({
+                text: expect.stringContaining(
+                  "Here is the user's editor context",
+                ),
+              }),
+            ]),
+          }),
+        );
+
+        // Also verify it's the full context, not a delta.
+        const call = mockChat.addHistory.mock.calls[0][0];
+        const contextText = call.parts[0].text;
+        const contextJson = JSON.parse(
+          contextText.match(/```json\n(.*)\n```/s)![1],
+        );
+        expect(contextJson).toHaveProperty('activeFile');
+        expect(contextJson.activeFile.path).toBe('/path/to/active/file.ts');
+      });
     });
   });
 
