@@ -552,14 +552,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const handleUserCancel = useCallback(() => {
     const lastUserMessage = userMessages.at(-1);
     let textToSet = lastUserMessage || '';
-    
+
     // Append queued messages if any exist
     if (messageQueue.length > 0) {
       const queuedText = messageQueue.join('\n\n');
       textToSet = textToSet ? `${textToSet}\n\n${queuedText}` : queuedText;
       setMessageQueue([]);
     }
-    
+
     if (textToSet) {
       buffer.setText(textToSet);
     }
@@ -590,16 +590,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   );
 
   // Input handling - queue messages for processing
-  const handleFinalSubmit = useCallback(
-    (submittedValue: string) => {
-      const trimmedValue = submittedValue.trim();
-      if (trimmedValue.length > 0) {
-        // queue for handling
-        setMessageQueue((prev) => [...prev, trimmedValue]);
-      }
-    },
-    [],
-  );
+  const handleFinalSubmit = useCallback((submittedValue: string) => {
+    const trimmedValue = submittedValue.trim();
+    if (trimmedValue.length > 0) {
+      // queue for handling
+      setMessageQueue((prev) => [...prev, trimmedValue]);
+    }
+  }, []);
 
   // Process queued messages when idle
   useEffect(() => {
@@ -615,7 +612,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       return () => clearTimeout(timeoutId);
     }
   }, [streamingState, messageQueue, submitQuery]);
-
 
   const handleIdePromptComplete = useCallback(
     (result: IdeIntegrationNudgeResult) => {
