@@ -252,11 +252,13 @@ export class ClearcutLogger {
     let result: LogResponse = {};
 
     try {
+      const headers = new Headers()
+        headers.append('Content-Type', 'application/json')
       const response = await fetch(CLEARCUT_URL, {
         agent: this.getProxyAgent(),
         method: 'POST',
         body: safeJsonStringify(request),
-        headers: new Headers().append('Content-Type', 'application/json'),
+        headers,
       });
 
       const responseBody = await response.text();
