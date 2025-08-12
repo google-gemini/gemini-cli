@@ -47,7 +47,7 @@ export function IdeIntegrationNudge({
   ];
 
   const installText = isExtensionInstalledByDefault
-    ? `If you select Yes, we'll enable an extension that allows the CLI to access your open files and display diffs directly in ${
+    ? `If you select Yes, the CLI will have access to access your open files and display diffs directly in ${
         ideName ?? 'your editor'
       }.`
     : `If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in ${
@@ -66,7 +66,7 @@ export function IdeIntegrationNudge({
       <Box marginBottom={1} flexDirection="column">
         <Text>
           <Text color="yellow">{'> '}</Text>
-          {`Do you want to connect your ${ideName ?? 'your'} editor to Gemini CLI?`}
+          {`Do you want to connect ${ideName ?? 'your'} editor to Gemini CLI?`}
         </Text>
         <Text dimColor>{installText}</Text>
       </Box>
