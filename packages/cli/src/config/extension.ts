@@ -38,11 +38,10 @@ function getSystemExtensionsPath(): string {
       'extensions',
     );
   } else if (os.platform() === 'win32') {
-    return path.join(
-      process.env.PROGRAMDATA || 'C:\\ProgramData',
-      'gemini-cli',
-      'extensions',
-    );
+    if (process.env.PROGRAMDATA) {
+      return path.join(process.env.PROGRAMDATA, 'gemini-cli', 'extensions');
+    }
+    return '';
   } else {
     return '/usr/share/gemini-cli/extensions';
   }

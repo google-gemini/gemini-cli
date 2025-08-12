@@ -31,7 +31,10 @@ export function getSystemSettingsPath(): string {
   if (platform() === 'darwin') {
     return '/Library/Application Support/GeminiCli/settings.json';
   } else if (platform() === 'win32') {
-    return 'C:\\ProgramData\\gemini-cli\\settings.json';
+    if (process.env.PROGRAMDATA) {
+      return path.join(process.env.PROGRAMDATA, 'gemini-cli', 'settings.json');
+    }
+    return '';
   } else {
     return '/etc/gemini-cli/settings.json';
   }
