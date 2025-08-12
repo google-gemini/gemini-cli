@@ -13,6 +13,7 @@ import {
   getDecisionFromOutcome,
   ToolCallDecision,
 } from './tool-call-decision.js';
+export { ToolCallDecision };
 
 export class StartSessionEvent {
   'event.name': 'cli_config';
