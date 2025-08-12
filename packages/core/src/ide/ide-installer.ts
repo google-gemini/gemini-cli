@@ -6,15 +6,12 @@
 
 import * as child_process from 'child_process';
 import * as process from 'process';
-import { glob } from 'glob';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { fileURLToPath } from 'url';
 import { DetectedIde } from './detect-ide.js';
 
 const VSCODE_COMMAND = process.platform === 'win32' ? 'code.cmd' : 'code';
-const VSCODE_COMPANION_EXTENSION_FOLDER = 'vscode-ide-companion';
 
 export interface IdeInstaller {
   install(): Promise<InstallResult>;
