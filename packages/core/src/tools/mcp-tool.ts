@@ -12,13 +12,7 @@ import {
   ToolMcpConfirmationDetails,
   Icon,
 } from './tools.js';
-import {
-  CallableTool,
-  Part,
-  FunctionCall,
-  FunctionDeclaration,
-  Type,
-} from '@google/genai';
+import { CallableTool, Part, FunctionCall } from '@google/genai';
 
 type ToolParams = Record<string, unknown>;
 
@@ -64,7 +58,7 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
     readonly serverName: string,
     readonly serverToolName: string,
     description: string,
-    readonly parameterSchemaJson: unknown,
+    readonly parameterSchema: unknown,
     readonly timeout?: number,
     readonly trust?: boolean,
     nameOverride?: string,
@@ -74,7 +68,7 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
       `${serverToolName} (${serverName} MCP Server)`,
       description,
       Icon.Hammer,
-      { type: Type.OBJECT }, // this is a dummy Schema for MCP, will be not be used to construct the FunctionDeclaration
+      parameterSchema,
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
@@ -86,23 +80,11 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
       this.serverName,
       this.serverToolName,
       this.description,
-      this.parameterSchemaJson,
+      this.parameterSchema,
       this.timeout,
       this.trust,
       `${this.serverName}__${this.serverToolName}`,
     );
-  }
-
-  /**
-   * Overrides the base schema to use parametersJsonSchema when building
-   * FunctionDeclaration
-   */
-  override get schema(): FunctionDeclaration {
-    return {
-      name: this.name,
-      description: this.description,
-      parametersJsonSchema: this.parameterSchemaJson,
-    };
   }
 
   async shouldConfirmExecute(
