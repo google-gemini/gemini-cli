@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Mock } from 'vitest';
 import { Config, ConfigParameters, SandboxConfig } from './config.js';
 import * as path from 'path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
@@ -18,6 +19,7 @@ import {
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
+import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -119,11 +121,16 @@ describe('Server Config (config.ts)', () => {
     telemetry: TELEMETRY_SETTINGS,
     sessionId: SESSION_ID,
     model: MODEL,
+    usageStatisticsEnabled: false,
   };
 
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
+    vi.spyOn(
+      ClearcutLogger.prototype,
+      'logStartSessionEvent',
+    ).mockImplementation(() => undefined);
   });
 
   describe('initialize', () => {
@@ -370,6 +377,39 @@ describe('Server Config (config.ts)', () => {
     const config = new Config(baseParams);
     const fileService = config.getFileService();
     expect(fileService).toBeDefined();
+  });
+
+  describe('Usage Statistics', () => {
+    it('defaults usage statistics to enabled if not specified', () => {
+      const config = new Config({
+        ...baseParams,
+        usageStatisticsEnabled: undefined,
+      });
+
+      expect(config.getUsageStatisticsEnabled()).toBe(true);
+    });
+
+    it.each([{ enabled: true }, { enabled: false }])(
+      'sets usage statistics based on the provided value (enabled: $enabled)',
+      ({ enabled }) => {
+        const config = new Config({
+          ...baseParams,
+          usageStatisticsEnabled: enabled,
+        });
+        expect(config.getUsageStatisticsEnabled()).toBe(enabled);
+      },
+    );
+
+    it('logs the session start event', () => {
+      new Config({
+        ...baseParams,
+        usageStatisticsEnabled: true,
+      });
+
+      expect(
+        ClearcutLogger.prototype.logStartSessionEvent,
+      ).toHaveBeenCalledOnce();
+    });
   });
 
   describe('Telemetry Settings', () => {
