@@ -73,20 +73,31 @@ export function SuggestionsDisplay({
           <Box key={`${suggestion.value}-${originalIndex}`} width={width}>
             <Box flexDirection="row">
               {userInput.startsWith('/') ? (
-                // only use box model for (/) command mode
-                <Box width={20} flexShrink={0}>
-                  {labelElement}
-                </Box>
+                // Dynamic column width for better command/description separation
+                <>
+                  <Box flexShrink={0} paddingRight={2}>
+                    {labelElement}
+                  </Box>
+                  {suggestion.description ? (
+                    <Box flexGrow={1}>
+                      <Text color={textColor} wrap="truncate">
+                        {suggestion.description}
+                      </Text>
+                    </Box>
+                  ) : null}
+                </>
               ) : (
-                labelElement
+                <>
+                  {labelElement}
+                  {suggestion.description ? (
+                    <Box flexGrow={1} paddingLeft={1}>
+                      <Text color={textColor} wrap="truncate">
+                        {suggestion.description}
+                      </Text>
+                    </Box>
+                  ) : null}
+                </>
               )}
-              {suggestion.description ? (
-                <Box flexGrow={1}>
-                  <Text color={textColor} wrap="truncate">
-                    {suggestion.description}
-                  </Text>
-                </Box>
-              ) : null}
             </Box>
           </Box>
         );
