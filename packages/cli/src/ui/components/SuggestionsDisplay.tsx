@@ -7,11 +7,13 @@
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { PrepareLabel } from './PrepareLabel.js';
+import { CommandKind } from '../commands/types.js';
 export interface Suggestion {
   label: string;
   value: string;
   description?: string;
   matchedIndex?: number;
+  commandKind?: CommandKind;
 }
 interface SuggestionsDisplayProps {
   suggestions: Suggestion[];
@@ -79,6 +81,9 @@ export function SuggestionsDisplay({
                     {isSlashCommand ? (
                       <Box flexShrink={0} paddingRight={2}>
                         {labelElement}
+                        {suggestion.commandKind === CommandKind.MCP_PROMPT && (
+                          <Text color={Colors.Gray}> [MCP]</Text>
+                        )}
                       </Box>
                     ) : (
                       labelElement
