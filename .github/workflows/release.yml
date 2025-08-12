@@ -126,7 +126,7 @@ jobs:
 
       - name: Build and Prepare Packages
         run: |
-          npm run build:packages
+          npm run bundle
           npm run prepare:package
 
       - name: Configure npm for publishing
