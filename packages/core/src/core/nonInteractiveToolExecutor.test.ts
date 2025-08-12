@@ -11,9 +11,18 @@ import {
   ToolCallRequestInfo,
   ToolResult,
   Config,
+  logToolCall,
 } from '../index.js';
 import { Part } from '@google/genai';
 import { MockTool } from '../test-utils/tools.js';
+
+vi.mock('../index.js', async () => {
+  const actual = await vi.importActual('../index.js');
+  return {
+    ...actual,
+    logToolCall: vi.fn(),
+  };
+});
 
 const mockConfig = {
   getSessionId: () => 'test-session-id',
@@ -27,6 +36,7 @@ describe('executeToolCall', () => {
   let abortController: AbortController;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     mockTool = new MockTool();
 
     mockToolRegistry = {
@@ -229,5 +239,88 @@ describe('executeToolCall', () => {
       },
       imageDataPart,
     ]);
+  });
+});
+
+describe('executeToolCall with programming_language logging', () => {
+  let mockToolRegistry: ToolRegistry;
+  let mockTool: MockTool;
+  let abortController: AbortController;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockTool = new MockTool();
+    mockToolRegistry = {
+      getTool: vi.fn().mockReturnValue(mockTool),
+    } as unknown as ToolRegistry;
+    abortController = new AbortController();
+  });
+
+  it('should log programming_language for write_file', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call-write',
+      name: 'write_file',
+      args: { file_path: 'test.ts', content: '' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-write',
+    };
+    vi.spyOn(mockTool, 'buildAndExecute').mockResolvedValue({ llmContent: '', returnDisplay: '' });
+
+    await executeToolCall(mockConfig, request, mockToolRegistry, abortController.signal);
+
+    expect(logToolCall).toHaveBeenCalled();
+    const loggedEvent = (logToolCall as any).mock.calls[0][1];
+    expect(loggedEvent).toHaveProperty('programming_language', 'TypeScript');
+  });
+
+  it('should log programming_language for read_file', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call-read',
+      name: 'read_file',
+      args: { absolute_path: 'test.py' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-read',
+    };
+    vi.spyOn(mockTool, 'buildAndExecute').mockResolvedValue({ llmContent: '', returnDisplay: '' });
+
+    await executeToolCall(mockConfig, request, mockToolRegistry, abortController.signal);
+
+    expect(logToolCall).toHaveBeenCalled();
+    const loggedEvent = (logToolCall as any).mock.calls[0][1];
+    expect(loggedEvent).toHaveProperty('programming_language', 'Python');
+  });
+
+  it('should not log programming_language for other tools', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call-glob',
+      name: 'glob',
+      args: { pattern: '**/*' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-glob',
+    };
+    vi.spyOn(mockTool, 'buildAndExecute').mockResolvedValue({ llmContent: '', returnDisplay: '' });
+
+    await executeToolCall(mockConfig, request, mockToolRegistry, abortController.signal);
+
+    expect(logToolCall).toHaveBeenCalled();
+    const loggedEvent = (logToolCall as any).mock.calls[0][1];
+    expect(loggedEvent).not.toHaveProperty('programming_language');
+  });
+
+  it('should log programming_language on execution failure', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call-fail',
+      name: 'write_file',
+      args: { file_path: 'test.java', content: '' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-fail',
+    };
+    vi.spyOn(mockTool, 'buildAndExecute').mockRejectedValue(new Error('Failed'));
+
+    await executeToolCall(mockConfig, request, mockToolRegistry, abortController.signal);
+
+    expect(logToolCall).toHaveBeenCalled();
+    const loggedEvent = (logToolCall as any).mock.calls[0][1];
+    expect(loggedEvent).toHaveProperty('programming_language', 'Java');
   });
 });
