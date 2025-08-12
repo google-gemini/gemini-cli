@@ -7,7 +7,6 @@
 import fs from 'fs';
 import path from 'path';
 import { BaseTool, Icon, ToolResult } from './tools.js';
-import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
@@ -82,35 +81,35 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
           path: {
             description:
               'The absolute path to the directory to list (must be absolute, not relative)',
-            type: Type.STRING,
+            type: 'string',
           },
           ignore: {
             description: 'List of glob patterns to ignore',
             items: {
-              type: Type.STRING,
+              type: 'string',
             },
-            type: Type.ARRAY,
+            type: 'array',
           },
           file_filtering_options: {
             description:
               'Optional: Whether to respect ignore patterns from .gitignore or .geminiignore',
-            type: Type.OBJECT,
+            type: 'object',
             properties: {
               respect_git_ignore: {
                 description:
                   'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
-                type: Type.BOOLEAN,
+                type: 'boolean',
               },
               respect_gemini_ignore: {
                 description:
                   'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
-                type: Type.BOOLEAN,
+                type: 'boolean',
               },
             },
           },
         },
         required: ['path'],
-        type: Type.OBJECT,
+        type: 'object',
       },
     );
   }
@@ -121,7 +120,10 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
    * @returns An error message string if invalid, null otherwise
    */
   validateToolParams(params: LSToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
     if (errors) {
       return errors;
     }
