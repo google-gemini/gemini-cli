@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useGeminiStream, mergePartListUnions } from './useGeminiStream.js';
-import { useInput } from 'ink';
+import { useKeypress } from './useKeypress.js';
 import {
   useReactToolScheduler,
   TrackedToolCall,
@@ -71,10 +71,9 @@ vi.mock('./useReactToolScheduler.js', async (importOriginal) => {
   };
 });
 
-vi.mock('ink', async (importOriginal) => {
-  const actualInkModule = (await importOriginal()) as any;
-  return { ...(actualInkModule || {}), useInput: vi.fn() };
-});
+vi.mock('./useKeypress.js', () => ({
+  useKeypress: vi.fn(),
+}));
 
 vi.mock('./shellCommandProcessor.js', () => ({
   useShellCommandProcessor: vi.fn().mockReturnValue({
@@ -899,19 +898,23 @@ describe('useGeminiStream', () => {
   });
 
   describe('User Cancellation', () => {
-    let useInputCallback: (input: string, key: any) => void;
-    const mockUseInput = useInput as Mock;
+    let keypressCallback: (key: any) => void;
+    const mockUseKeypress = useKeypress as Mock;
 
     beforeEach(() => {
-      // Capture the callback passed to useInput
-      mockUseInput.mockImplementation((callback) => {
-        useInputCallback = callback;
+      // Capture the callback passed to useKeypress
+      mockUseKeypress.mockImplementation((callback, options) => {
+        if (options.isActive) {
+          keypressCallback = callback;
+        } else {
+          keypressCallback = () => {};
+        }
       });
     });
 
     const simulateEscapeKeyPress = () => {
       act(() => {
-        useInputCallback('', { escape: true });
+        keypressCallback({ name: 'escape' });
       });
     };
 
