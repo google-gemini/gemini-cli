@@ -99,6 +99,10 @@ Slash commands provide meta-level control over the CLI itself.
 - [**`/theme`**](./themes.md)
   - **Description:** Open a dialog that lets you change the visual theme of Gemini CLI.
 
+- **`/install`**
+  - **Description:** Install VS Code themes from marketplace URLs.
+  - **Usage:** `/install <marketplace-url>`
+
 - **`/auth`**
   - **Description:** Open a dialog that lets you change the authentication method.
 
