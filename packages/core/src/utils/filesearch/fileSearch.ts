@@ -197,7 +197,6 @@ class DirectoryFileSearch implements FileSearch {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
     pattern = pattern || '*';
-    console.log('searching for ', pattern);
 
     const dir = pattern.endsWith('/') ? pattern : path.dirname(pattern);
     const results = await crawl({
