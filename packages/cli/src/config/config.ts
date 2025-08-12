@@ -368,7 +368,7 @@ export async function loadCliConfig(
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
   const question = argv.promptInteractive || argv.prompt || '';
-  
+
   // Determine approval mode with backward compatibility
   let approvalMode: ApprovalMode;
   if (argv.approvalMode) {
@@ -384,13 +384,16 @@ export async function loadCliConfig(
         approvalMode = ApprovalMode.DEFAULT;
         break;
       default:
-        throw new Error(`Invalid approval mode: ${argv.approvalMode}. Valid values are: yolo, auto_edit, default`);
+        throw new Error(
+          `Invalid approval mode: ${argv.approvalMode}. Valid values are: yolo, auto_edit, default`,
+        );
     }
   } else {
     // Fallback to legacy --yolo flag behavior
-    approvalMode = argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
+    approvalMode =
+      argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
   }
-  
+
   const interactive =
     !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
   // In non-interactive mode, exclude tools that require a prompt.
@@ -399,11 +402,7 @@ export async function loadCliConfig(
     switch (approvalMode) {
       case ApprovalMode.DEFAULT:
         // In default non-interactive mode, all tools that require approval are excluded.
-        extraExcludes.push(
-          ShellTool.Name,
-          EditTool.Name,
-          WriteFileTool.Name,
-        );
+        extraExcludes.push(ShellTool.Name, EditTool.Name, WriteFileTool.Name);
         break;
       case ApprovalMode.AUTO_EDIT:
         // In auto-edit non-interactive mode, only tools that still require a prompt are excluded.

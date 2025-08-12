@@ -187,13 +187,7 @@ describe('parseArguments', () => {
   });
 
   it('should throw an error when using short flags -y and --approval-mode together', async () => {
-    process.argv = [
-      'node',
-      'script.js',
-      '-y',
-      '--approval-mode',
-      'yolo',
-    ];
+    process.argv = ['node', 'script.js', '-y', '--approval-mode', 'yolo'];
 
     const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
@@ -855,11 +849,11 @@ describe('mergeExcludeTools', () => {
 
 describe('Approval mode tool exclusion logic', () => {
   const originalIsTTY = process.stdin.isTTY;
-  
+
   beforeEach(() => {
     process.stdin.isTTY = false; // Ensure non-interactive mode
   });
-  
+
   afterEach(() => {
     process.stdin.isTTY = originalIsTTY;
   });
@@ -869,14 +863,14 @@ describe('Approval mode tool exclusion logic', () => {
     const argv = await parseArguments();
     const settings: Settings = {};
     const extensions: Extension[] = [];
-    
+
     const config = await loadCliConfig(
       settings,
       extensions,
       'test-session',
       argv,
     );
-    
+
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).toContain(ShellTool.Name);
     expect(excludedTools).toContain(EditTool.Name);
@@ -884,18 +878,25 @@ describe('Approval mode tool exclusion logic', () => {
   });
 
   it('should exclude all interactive tools in non-interactive mode with explicit default approval mode', async () => {
-    process.argv = ['node', 'script.js', '--approval-mode', 'default', '-p', 'test'];
+    process.argv = [
+      'node',
+      'script.js',
+      '--approval-mode',
+      'default',
+      '-p',
+      'test',
+    ];
     const argv = await parseArguments();
     const settings: Settings = {};
     const extensions: Extension[] = [];
-    
+
     const config = await loadCliConfig(
       settings,
       extensions,
       'test-session',
       argv,
     );
-    
+
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).toContain(ShellTool.Name);
     expect(excludedTools).toContain(EditTool.Name);
@@ -903,18 +904,25 @@ describe('Approval mode tool exclusion logic', () => {
   });
 
   it('should exclude only shell tools in non-interactive mode with auto_edit approval mode', async () => {
-    process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit', '-p', 'test'];
+    process.argv = [
+      'node',
+      'script.js',
+      '--approval-mode',
+      'auto_edit',
+      '-p',
+      'test',
+    ];
     const argv = await parseArguments();
     const settings: Settings = {};
     const extensions: Extension[] = [];
-    
+
     const config = await loadCliConfig(
       settings,
       extensions,
       'test-session',
       argv,
     );
-    
+
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).toContain(ShellTool.Name);
     expect(excludedTools).not.toContain(EditTool.Name);
@@ -922,18 +930,25 @@ describe('Approval mode tool exclusion logic', () => {
   });
 
   it('should exclude no interactive tools in non-interactive mode with yolo approval mode', async () => {
-    process.argv = ['node', 'script.js', '--approval-mode', 'yolo', '-p', 'test'];
+    process.argv = [
+      'node',
+      'script.js',
+      '--approval-mode',
+      'yolo',
+      '-p',
+      'test',
+    ];
     const argv = await parseArguments();
     const settings: Settings = {};
     const extensions: Extension[] = [];
-    
+
     const config = await loadCliConfig(
       settings,
       extensions,
       'test-session',
       argv,
     );
-    
+
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).not.toContain(ShellTool.Name);
     expect(excludedTools).not.toContain(EditTool.Name);
@@ -945,14 +960,14 @@ describe('Approval mode tool exclusion logic', () => {
     const argv = await parseArguments();
     const settings: Settings = {};
     const extensions: Extension[] = [];
-    
+
     const config = await loadCliConfig(
       settings,
       extensions,
       'test-session',
       argv,
     );
-    
+
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).not.toContain(ShellTool.Name);
     expect(excludedTools).not.toContain(EditTool.Name);
@@ -961,7 +976,7 @@ describe('Approval mode tool exclusion logic', () => {
 
   it('should not exclude interactive tools in interactive mode regardless of approval mode', async () => {
     process.stdin.isTTY = true; // Interactive mode
-    
+
     const testCases = [
       { args: ['node', 'script.js'] }, // default
       { args: ['node', 'script.js', '--approval-mode', 'default'] },
@@ -975,14 +990,14 @@ describe('Approval mode tool exclusion logic', () => {
       const argv = await parseArguments();
       const settings: Settings = {};
       const extensions: Extension[] = [];
-      
+
       const config = await loadCliConfig(
         settings,
         extensions,
         'test-session',
         argv,
       );
-      
+
       const excludedTools = config.getExcludeTools();
       expect(excludedTools).not.toContain(ShellTool.Name);
       expect(excludedTools).not.toContain(EditTool.Name);
@@ -991,18 +1006,25 @@ describe('Approval mode tool exclusion logic', () => {
   });
 
   it('should merge approval mode exclusions with settings exclusions in auto_edit mode', async () => {
-    process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit', '-p', 'test'];
+    process.argv = [
+      'node',
+      'script.js',
+      '--approval-mode',
+      'auto_edit',
+      '-p',
+      'test',
+    ];
     const argv = await parseArguments();
     const settings: Settings = { excludeTools: ['custom_tool'] };
     const extensions: Extension[] = [];
-    
+
     const config = await loadCliConfig(
       settings,
       extensions,
       'test-session',
       argv,
     );
-    
+
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).toContain('custom_tool'); // From settings
     expect(excludedTools).toContain(ShellTool.Name); // From approval mode
@@ -1018,13 +1040,15 @@ describe('Approval mode tool exclusion logic', () => {
       prompt: '',
       yolo: false,
     } as any;
-    
+
     const settings: Settings = {};
     const extensions: Extension[] = [];
-    
-    await expect(loadCliConfig(settings, extensions, 'test-session', invalidArgv))
-      .rejects
-      .toThrow('Invalid approval mode: invalid_mode. Valid values are: yolo, auto_edit, default');
+
+    await expect(
+      loadCliConfig(settings, extensions, 'test-session', invalidArgv),
+    ).rejects.toThrow(
+      'Invalid approval mode: invalid_mode. Valid values are: yolo, auto_edit, default',
+    );
   });
 });
 
