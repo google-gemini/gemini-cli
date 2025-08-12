@@ -57,6 +57,7 @@ export interface CliArgs {
   showMemoryUsage: boolean | undefined;
   show_memory_usage: boolean | undefined;
   yolo: boolean | undefined;
+  approvalMode: string | undefined;
   telemetry: boolean | undefined;
   checkpointing: boolean | undefined;
   telemetryTarget: string | undefined;
@@ -147,6 +148,12 @@ export async function parseArguments(): Promise<CliArgs> {
             'Automatically accept all actions (aka YOLO mode, see https://www.youtube.com/watch?v=xvFZjo5PgG0 for more details)?',
           default: false,
         })
+        .option('approval-mode', {
+          type: 'string',
+          choices: ['default', 'auto_edit', 'yolo'],
+          description:
+            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools)',
+        })
         .option('telemetry', {
           type: 'boolean',
           description:
@@ -217,6 +224,11 @@ export async function parseArguments(): Promise<CliArgs> {
           if (argv.prompt && argv.promptInteractive) {
             throw new Error(
               'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
+            );
+          }
+          if (argv.yolo && argv.approvalMode) {
+            throw new Error(
+              'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
             );
           }
           return true;
@@ -356,20 +368,59 @@ export async function loadCliConfig(
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
   const question = argv.promptInteractive || argv.prompt || '';
-  const approvalMode =
-    argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
+
+  // Determine approval mode with backward compatibility
+  let approvalMode: ApprovalMode;
+  if (argv.approvalMode) {
+    // New --approval-mode flag takes precedence
+    switch (argv.approvalMode) {
+      case 'yolo':
+        approvalMode = ApprovalMode.YOLO;
+        break;
+      case 'auto_edit':
+        approvalMode = ApprovalMode.AUTO_EDIT;
+        break;
+      case 'default':
+        approvalMode = ApprovalMode.DEFAULT;
+        break;
+      default:
+        throw new Error(
+          `Invalid approval mode: ${argv.approvalMode}. Valid values are: yolo, auto_edit, default`,
+        );
+    }
+  } else {
+    // Fallback to legacy --yolo flag behavior
+    approvalMode =
+      argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
+  }
+
   const interactive =
     !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
-  // In non-interactive and non-yolo mode, exclude interactive built in tools.
-  const extraExcludes =
-    !interactive && approvalMode !== ApprovalMode.YOLO
-      ? [ShellTool.Name, EditTool.Name, WriteFileTool.Name]
-      : undefined;
+  // In non-interactive mode, exclude tools that require a prompt.
+  const extraExcludes: string[] = [];
+  if (!interactive) {
+    switch (approvalMode) {
+      case ApprovalMode.DEFAULT:
+        // In default non-interactive mode, all tools that require approval are excluded.
+        extraExcludes.push(ShellTool.Name, EditTool.Name, WriteFileTool.Name);
+        break;
+      case ApprovalMode.AUTO_EDIT:
+        // In auto-edit non-interactive mode, only tools that still require a prompt are excluded.
+        extraExcludes.push(ShellTool.Name);
+        break;
+      case ApprovalMode.YOLO:
+        // No extra excludes for YOLO mode.
+        break;
+      default:
+        // This should never happen due to validation earlier, but satisfies the linter
+        break;
+    }
+  }
 
   const excludeTools = mergeExcludeTools(
     settings,
     activeExtensions,
-    extraExcludes,
+    extraExcludes.length > 0 ? extraExcludes : undefined,
   );
   const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
 
