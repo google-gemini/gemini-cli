@@ -45,7 +45,7 @@ export const ToolConfirmationMessage: React.FC<
   const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
     if (confirmationDetails.type === 'edit') {
       const ideClient = config?.getIdeClient();
-      if (config?.getIdeMode() && config?.getIdeModeFeature()) {
+      if (config?.getIdeMode()) {
         const cliOutcome =
           outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
         await ideClient?.resolveDiffFromCli(
@@ -136,7 +136,7 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedAlways,
       },
     );
-    if (config?.getIdeMode() && config?.getIdeModeFeature()) {
+    if (config?.getIdeMode()) {
       options.push({
         label: 'No (esc)',
         value: ToolConfirmationOutcome.Cancel,
