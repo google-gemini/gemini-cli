@@ -5,7 +5,6 @@
  */
 
 import { HttpsProxyAgent } from 'https-proxy-agent';
-import fetch, { Headers } from 'node-fetch';
 import {
   StartSessionEvent,
   EndSessionEvent,
@@ -252,13 +251,12 @@ export class ClearcutLogger {
     let result: LogResponse = {};
 
     try {
-      const headers = new Headers();
-      headers.append('Content-Type', 'application/json');
       const response = await fetch(CLEARCUT_URL, {
-        agent: this.getProxyAgent(),
         method: 'POST',
         body: safeJsonStringify(request),
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       const responseBody = await response.text();
