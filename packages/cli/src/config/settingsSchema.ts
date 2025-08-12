@@ -395,15 +395,7 @@ export const SETTINGS_SCHEMA = {
     description: 'Settings for summarizing tool output.',
     showInDialog: false,
   },
-  ideModeFeature: {
-    type: 'boolean',
-    label: 'IDE Mode Feature Flag',
-    category: 'Advanced',
-    requiresRestart: true,
-    default: undefined as boolean | undefined,
-    description: 'Internal feature flag for IDE mode.',
-    showInDialog: false,
-  },
+
   dnsResolutionOrder: {
     type: 'string',
     label: 'DNS Resolution Order',

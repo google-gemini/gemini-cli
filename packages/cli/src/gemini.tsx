@@ -191,7 +191,7 @@ export async function main() {
 
   await config.initialize();
 
-  if (config.getIdeMode() && config.getIdeModeFeature()) {
+  if (config.getIdeMode()) {
     await config.getIdeClient().connect();
     logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
   }

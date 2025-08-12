@@ -6,15 +6,12 @@
 
 import * as child_process from 'child_process';
 import * as process from 'process';
-import { glob } from 'glob';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { fileURLToPath } from 'url';
 import { DetectedIde } from './detect-ide.js';
 
 const VSCODE_COMMAND = process.platform === 'win32' ? 'code.cmd' : 'code';
-const VSCODE_COMPANION_EXTENSION_FOLDER = 'vscode-ide-companion';
 
 export interface IdeInstaller {
   install(): Promise<InstallResult>;
@@ -103,34 +100,7 @@ class VsCodeInstaller implements IdeInstaller {
       };
     }
 
-    const bundleDir = path.dirname(fileURLToPath(import.meta.url));
-    // The VSIX file is copied to the bundle directory as part of the build.
-    let vsixFiles = glob.sync(path.join(bundleDir, '*.vsix'));
-    if (vsixFiles.length === 0) {
-      // If the VSIX file is not in the bundle, it might be a dev
-      // environment running with `npm start`. Look for it in the original
-      // package location, relative to the bundle dir.
-      const devPath = path.join(
-        bundleDir, // .../packages/core/dist/src/ide
-        '..', // .../packages/core/dist/src
-        '..', // .../packages/core/dist
-        '..', // .../packages/core
-        '..', // .../packages
-        VSCODE_COMPANION_EXTENSION_FOLDER,
-        '*.vsix',
-      );
-      vsixFiles = glob.sync(devPath);
-    }
-    if (vsixFiles.length === 0) {
-      return {
-        success: false,
-        message:
-          'Could not find the required VS Code companion extension. Please file a bug via /bug.',
-      };
-    }
-
-    const vsixPath = vsixFiles[0];
-    const command = `"${commandPath}" --install-extension "${vsixPath}" --force`;
+    const command = `"${commandPath}" --install-extension google.gemini-cli-vscode-ide-companion --force`;
     try {
       child_process.execSync(command, { stdio: 'pipe' });
       return {

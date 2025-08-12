@@ -37,12 +37,4 @@ for (const file of sbFiles) {
   copyFileSync(join(root, file), join(bundleDir, basename(file)));
 }
 
-// Find and copy all .vsix files from packages to the root of the bundle directory
-const vsixFiles = glob.sync('packages/vscode-ide-companion/*.vsix', {
-  cwd: root,
-});
-for (const file of vsixFiles) {
-  copyFileSync(join(root, file), join(bundleDir, basename(file)));
-}
-
 console.log('Assets copied to bundle/');
