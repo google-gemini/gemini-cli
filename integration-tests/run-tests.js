@@ -52,13 +52,13 @@ async function main() {
 
   const testPatterns =
     args.length > 0
-      ? args.map((arg) => `integration-tests/${arg}.test.js`)
-      : ['integration-tests/*.test.js'];
+      ? args.map((arg) => `integration-tests/${arg}.test.ts`)
+      : ['integration-tests/*.test.ts'];
   const testFiles = glob.sync(testPatterns, { cwd: rootDir, absolute: true });
 
   for (const testFile of testFiles) {
     const testFileName = basename(testFile);
-    console.log(`\tFound test file: ${testFileName}`);
+    console.log(`	Found test file: ${testFileName}`);
   }
 
   const MAX_RETRIES = 3;
@@ -92,7 +92,7 @@ async function main() {
       }
       nodeArgs.push(testFile);
 
-      const child = spawn('node', nodeArgs, {
+      const child = spawn('npx', ['tsx', ...nodeArgs], {
         stdio: 'pipe',
         env: {
           ...process.env,

@@ -14,7 +14,7 @@ import { fileExists } from '../scripts/telemetry_utils.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-function sanitizeTestName(name) {
+function sanitizeTestName(name: string) {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '-')
@@ -22,7 +22,11 @@ function sanitizeTestName(name) {
 }
 
 // Helper to create detailed error messages
-export function createToolCallErrorMessage(expectedTools, foundTools, result) {
+export function createToolCallErrorMessage(
+  expectedTools: string | string[],
+  foundTools: string[],
+  result: string,
+) {
   const expectedStr = Array.isArray(expectedTools)
     ? expectedTools.join(' or ')
     : expectedTools;
@@ -34,7 +38,11 @@ export function createToolCallErrorMessage(expectedTools, foundTools, result) {
 }
 
 // Helper to print debug information when tests fail
-export function printDebugInfo(rig, result, context = {}) {
+export function printDebugInfo(
+  rig: TestRig,
+  result: string,
+  context: Record<string, unknown> = {},
+) {
   console.error('Test failed - Debug info:');
   console.error('Result length:', result.length);
   console.error('Result (first 500 chars):', result.substring(0, 500));
@@ -60,8 +68,8 @@ export function printDebugInfo(rig, result, context = {}) {
 
 // Helper to validate model output and warn about unexpected content
 export function validateModelOutput(
-  result,
-  expectedContent = null,
+  result: string,
+  expectedContent: string | (string | RegExp)[] | null = null,
   testName = '',
 ) {
   // First, check if there's any output at all (this should fail the test if missing)
@@ -102,6 +110,11 @@ export function validateModelOutput(
 }
 
 export class TestRig {
+  bundlePath: string;
+  testDir: string | null;
+  testName?: string;
+  _lastRunStdout?: string;
+
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
     this.testDir = null;
@@ -114,10 +127,13 @@ export class TestRig {
     return 15000; // 15s locally
   }
 
-  setup(testName, options = {}) {
+  setup(
+    testName: string,
+    options: { settings?: Record<string, unknown> } = {},
+  ) {
     this.testName = testName;
     const sanitizedName = sanitizeTestName(testName);
-    this.testDir = join(env.INTEGRATION_TEST_FILE_DIR, sanitizedName);
+    this.testDir = join(env.INTEGRATION_TEST_FILE_DIR!, sanitizedName);
     mkdirSync(this.testDir, { recursive: true });
 
     // Create a settings file to point the CLI to the local collector
@@ -146,25 +162,32 @@ export class TestRig {
     );
   }
 
-  createFile(fileName, content) {
-    const filePath = join(this.testDir, fileName);
+  createFile(fileName: string, content: string) {
+    const filePath = join(this.testDir!, fileName);
     writeFileSync(filePath, content);
     return filePath;
   }
 
-  mkdir(dir) {
-    mkdirSync(join(this.testDir, dir), { recursive: true });
+  mkdir(dir: string) {
+    mkdirSync(join(this.testDir!, dir), { recursive: true });
   }
 
   sync() {
     // ensure file system is done before spawning
-    execSync('sync', { cwd: this.testDir });
+    execSync('sync', { cwd: this.testDir! });
   }
 
-  run(promptOrOptions, ...args) {
+  run(
+    promptOrOptions: string | { prompt?: string; stdin?: string },
+    ...args: string[]
+  ): Promise<string> {
     let command = `node ${this.bundlePath} --yolo`;
-    const execOptions = {
-      cwd: this.testDir,
+    const execOptions: {
+      cwd: string;
+      encoding: 'utf-8';
+      input?: string;
+    } = {
+      cwd: this.testDir!,
       encoding: 'utf-8',
     };
 
@@ -185,10 +208,10 @@ export class TestRig {
     command += ` ${args.join(' ')}`;
 
     const commandArgs = parse(command);
-    const node = commandArgs.shift();
+    const node = commandArgs.shift() as string;
 
-    const child = spawn(node, commandArgs, {
-      cwd: this.testDir,
+    const child = spawn(node, commandArgs as string[], {
+      cwd: this.testDir!,
       stdio: 'pipe',
     });
 
@@ -197,26 +220,26 @@ export class TestRig {
 
     // Handle stdin if provided
     if (execOptions.input) {
-      child.stdin.write(execOptions.input);
-      child.stdin.end();
+      child.stdin!.write(execOptions.input);
+      child.stdin!.end();
     }
 
-    child.stdout.on('data', (data) => {
+    child.stdout!.on('data', (data: Buffer) => {
       stdout += data;
       if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
         process.stdout.write(data);
       }
     });
 
-    child.stderr.on('data', (data) => {
+    child.stderr!.on('data', (data: Buffer) => {
       stderr += data;
       if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
         process.stderr.write(data);
       }
     });
 
-    const promise = new Promise((resolve, reject) => {
-      child.on('close', (code) => {
+    const promise = new Promise<string>((resolve, reject) => {
+      child.on('close', (code: number) => {
         if (code === 0) {
           // Store the raw stdout for Podman telemetry parsing
           this._lastRunStdout = stdout;
@@ -273,13 +296,13 @@ export class TestRig {
     return promise;
   }
 
-  readFile(fileName) {
-    const content = readFileSync(join(this.testDir, fileName), 'utf-8');
+  readFile(fileName: string) {
+    const content = readFileSync(join(this.testDir!, fileName), 'utf-8');
     if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
-      const testId = `${env.TEST_FILE_NAME.replace(
+      const testId = `${env.TEST_FILE_NAME!.replace(
         '.test.js',
         '',
-      )}:${this.testName.replace(/ /g, '-')}`;
+      )}:${this.testName!.replace(/ /g, '-')}`;
       console.log(`--- FILE: ${testId}/${fileName} ---`);
       console.log(content);
       console.log(`--- END FILE: ${testId}/${fileName} ---`);
@@ -295,7 +318,7 @@ export class TestRig {
       } catch (error) {
         // Ignore cleanup errors
         if (env.VERBOSE === 'true') {
-          console.warn('Cleanup warning:', error.message);
+          console.warn('Cleanup warning:', (error as Error).message);
         }
       }
     }
@@ -305,7 +328,7 @@ export class TestRig {
     // In sandbox mode, telemetry is written to a relative path in the test directory
     const logFilePath =
       env.GEMINI_SANDBOX && env.GEMINI_SANDBOX !== 'false'
-        ? join(this.testDir, 'telemetry.log')
+        ? join(this.testDir!, 'telemetry.log')
         : env.TELEMETRY_LOG_FILE;
 
     if (!logFilePath) return;
@@ -318,7 +341,7 @@ export class TestRig {
           const content = readFileSync(logFilePath, 'utf-8');
           // Check if file has meaningful content (at least one complete JSON object)
           return content.includes('"event.name"');
-        } catch (_e) {
+        } catch {
           return false;
         }
       },
@@ -327,7 +350,7 @@ export class TestRig {
     );
   }
 
-  async waitForToolCall(toolName, timeout) {
+  async waitForToolCall(toolName: string, timeout?: number) {
     // Use environment-specific timeout
     if (!timeout) {
       timeout = this.getDefaultTimeout();
@@ -346,7 +369,7 @@ export class TestRig {
     );
   }
 
-  async waitForAnyToolCall(toolNames, timeout) {
+  async waitForAnyToolCall(toolNames: string[], timeout?: number) {
     // Use environment-specific timeout
     if (!timeout) {
       timeout = this.getDefaultTimeout();
@@ -367,7 +390,11 @@ export class TestRig {
     );
   }
 
-  async poll(predicate, timeout, interval) {
+  async poll(
+    predicate: () => boolean,
+    timeout: number,
+    interval: number,
+  ): Promise<boolean> {
     const startTime = Date.now();
     let attempts = 0;
     while (Date.now() - startTime < timeout) {
@@ -389,8 +416,16 @@ export class TestRig {
     return false;
   }
 
-  _parseToolLogsFromStdout(stdout) {
-    const logs = [];
+  _parseToolLogsFromStdout(stdout: string) {
+    const logs: {
+      timestamp: number;
+      toolRequest: {
+        name: string;
+        args: string;
+        success: boolean;
+        duration_ms: number;
+      };
+    }[] = [];
 
     // The console output from Podman is JavaScript object notation, not JSON
     // Look for tool call events in the output
@@ -493,7 +528,7 @@ export class TestRig {
                   },
                 });
               }
-            } catch (_e) {
+            } catch {
               // Not valid JSON
             }
             currentObject = '';
@@ -510,7 +545,7 @@ export class TestRig {
     // If not, fall back to parsing from stdout
     if (env.GEMINI_SANDBOX === 'podman') {
       // Try reading from file first
-      const logFilePath = join(this.testDir, 'telemetry.log');
+      const logFilePath = join(this.testDir!, 'telemetry.log');
 
       if (fileExists(logFilePath)) {
         try {
@@ -522,7 +557,7 @@ export class TestRig {
             // File exists but is empty or doesn't have events, parse from stdout
             return this._parseToolLogsFromStdout(this._lastRunStdout);
           }
-        } catch (_e) {
+        } catch {
           // Error reading file, fall back to stdout
           if (this._lastRunStdout) {
             return this._parseToolLogsFromStdout(this._lastRunStdout);
@@ -537,7 +572,7 @@ export class TestRig {
     // In sandbox mode, telemetry is written to a relative path in the test directory
     const logFilePath =
       env.GEMINI_SANDBOX && env.GEMINI_SANDBOX !== 'false'
-        ? join(this.testDir, 'telemetry.log')
+        ? join(this.testDir!, 'telemetry.log')
         : env.TELEMETRY_LOG_FILE;
 
     if (!logFilePath) {
@@ -553,7 +588,7 @@ export class TestRig {
     const content = readFileSync(logFilePath, 'utf-8');
 
     // Split the content into individual JSON objects
-    // They are separated by "}\n{" pattern
+    // They are separated by "}\n{"
     const jsonObjects = content
       .split(/}\s*\n\s*{/)
       .map((obj, index, array) => {
@@ -564,7 +599,14 @@ export class TestRig {
       })
       .filter((obj) => obj);
 
-    const logs = [];
+    const logs: {
+      toolRequest: {
+        name: string;
+        args: string;
+        success: boolean;
+        duration_ms: number;
+      };
+    }[] = [];
 
     for (const jsonStr of jsonObjects) {
       try {
@@ -584,10 +626,13 @@ export class TestRig {
             },
           });
         }
-      } catch (_e) {
+      } catch (e) {
         // Skip objects that aren't valid JSON
         if (env.VERBOSE === 'true') {
-          console.error('Failed to parse telemetry object:', _e.message);
+          console.error(
+            'Failed to parse telemetry object:',
+            (e as Error).message,
+          );
         }
       }
     }

@@ -14,10 +14,7 @@ import { test, describe, before } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { TestRig, validateModelOutput } from './test-helper.js';
 import { join } from 'path';
-import { fileURLToPath } from 'url';
 import { writeFileSync } from 'fs';
-
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // Create a minimal MCP server that doesn't require external dependencies
 // This implements the MCP protocol directly using Node.js built-ins
@@ -185,7 +182,7 @@ describe('simple-mcp-server', () => {
     });
 
     // Create server script in the test directory
-    const testServerPath = join(rig.testDir, 'mcp-server.cjs');
+    const testServerPath = join(rig.testDir!, 'mcp-server.cjs');
     writeFileSync(testServerPath, serverScript);
 
     // Make the script executable (though running with 'node' should work anyway)

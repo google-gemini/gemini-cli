@@ -18,10 +18,13 @@ test('should be able to search the web', async () => {
   } catch (error) {
     // Network errors can occur in CI environments
     if (
-      error.message.includes('network') ||
-      error.message.includes('timeout')
+      error instanceof Error &&
+      (error.message.includes('network') || error.message.includes('timeout'))
     ) {
-      console.warn('Skipping test due to network error:', error.message);
+      console.warn(
+        'Skipping test due to network error:',
+        (error as Error).message,
+      );
       return; // Skip the test
     }
     throw error; // Re-throw if not a network error
