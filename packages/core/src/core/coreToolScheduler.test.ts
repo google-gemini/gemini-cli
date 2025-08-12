@@ -5,7 +5,7 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   CoreToolScheduler,
   ToolCall,
@@ -21,6 +21,8 @@ import {
   Config,
   Icon,
   ApprovalMode,
+  logToolCall,
+  ToolCallEvent,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 
@@ -29,6 +31,14 @@ import {
   ModifyContext,
 } from '../tools/modifiable-tool.js';
 import { MockTool } from '../test-utils/tools.js';
+
+vi.mock('../index.js', async () => {
+  const actual = await vi.importActual('../index.js');
+  return {
+    ...actual,
+    logToolCall: vi.fn(),
+  };
+});
 
 class MockModifiableTool
   extends MockTool
@@ -72,6 +82,10 @@ class MockModifiableTool
 }
 
 describe('CoreToolScheduler', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('should cancel a tool call if the signal is aborted before confirmation', async () => {
     const mockTool = new MockTool();
     mockTool.shouldConfirm = true;
@@ -144,6 +158,10 @@ describe('CoreToolScheduler', () => {
 });
 
 describe('CoreToolScheduler with payload', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('should update args and diff and execute tool when payload is provided', async () => {
     const mockTool = new MockModifiableTool();
     const declarativeTool = mockTool;
@@ -382,6 +400,10 @@ describe('convertToFunctionResponse', () => {
 });
 
 describe('CoreToolScheduler edit cancellation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('should preserve diff when an edit is cancelled', async () => {
     class MockEditTool extends BaseTool<Record<string, unknown>, ToolResult> {
       constructor() {
@@ -506,6 +528,10 @@ describe('CoreToolScheduler edit cancellation', () => {
 });
 
 describe('CoreToolScheduler YOLO mode', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('should execute tool requiring confirmation directly without waiting', async () => {
     // Arrange
     const mockTool = new MockTool();
@@ -594,6 +620,10 @@ describe('CoreToolScheduler YOLO mode', () => {
 });
 
 describe('CoreToolScheduler request queueing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('should queue a request if another is running', async () => {
     let resolveFirstCall: (result: ToolResult) => void;
     const firstCallPromise = new Promise<ToolResult>((resolve) => {
@@ -782,5 +812,118 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Ensure completion callbacks were called twice.
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('CoreToolScheduler programming_language logging', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should log programming_language for relevant tool calls', async () => {
+    const mockTool = new MockTool();
+    mockTool.executeFn.mockResolvedValue({ llmContent: '' });
+    const declarativeTool = mockTool;
+    const toolRegistry = {
+      getTool: () => declarativeTool,
+      getToolByName: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {} as any,
+      registerTool: () => {},
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    };
+
+    const onAllToolCallsComplete = vi.fn();
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.YOLO,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      toolRegistry: Promise.resolve(toolRegistry as any),
+      onAllToolCallsComplete,
+      onToolCallsUpdate: () => {},
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const abortController = new AbortController();
+    const requests = [
+      {
+        callId: '1',
+        name: 'write_file',
+        args: { file_path: 'test.ts', content: '' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+      {
+        callId: '2',
+        name: 'read_file',
+        args: { absolute_path: 'test.py' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+      {
+        callId: '3',
+        name: 'glob',
+        args: { pattern: '**/*' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+      {
+        callId: '4',
+        name: 'replace',
+        args: { file_path: 'test.js', old_string: 'foo', new_string: 'bar' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+    ];
+
+    // Wrap the onAllToolCallsComplete callback in a promise
+    const completionPromise = new Promise<void>((resolve) => {
+      onAllToolCallsComplete.mockImplementation(() => {
+        resolve();
+      });
+    });
+
+    await scheduler.schedule(requests, abortController.signal);
+
+    await completionPromise;
+
+    expect(logToolCall).toHaveBeenCalledTimes(4);
+
+    const loggedEvents = (logToolCall as any).mock.calls.map(
+      (call: [unknown, ToolCallEvent]) => call[1],
+    );
+
+    const writeFileEvent = loggedEvents.find(
+      (e: ToolCallEvent) => e.function_name === 'write_file',
+    );
+    expect(writeFileEvent).toBeDefined();
+    expect(writeFileEvent).toHaveProperty('programming_language', 'TypeScript');
+
+    const readFileEvent = loggedEvents.find(
+      (e: ToolCallEvent) => e.function_name === 'read_file',
+    );
+    expect(readFileEvent).toBeDefined();
+    expect(readFileEvent).toHaveProperty('programming_language', 'Python');
+
+    const replaceEvent = loggedEvents.find(
+      (e: ToolCallEvent) => e.function_name === 'replace',
+    );
+    expect(replaceEvent).toBeDefined();
+    expect(replaceEvent).toHaveProperty('programming_language', 'JavaScript');
+
+    const globEvent = loggedEvents.find((e: ToolCallEvent) => e.function_name === 'glob');
+    expect(globEvent).toBeDefined();
+    expect(globEvent).not.toHaveProperty('undefined');
   });
 });
