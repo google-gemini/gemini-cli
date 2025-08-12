@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
 import {
   ToolRegistry,
@@ -264,12 +264,20 @@ describe('executeToolCall with programming_language logging', () => {
       isClientInitiated: false,
       prompt_id: 'prompt-id-write',
     };
-    vi.spyOn(mockTool, 'buildAndExecute').mockResolvedValue({ llmContent: '', returnDisplay: '' });
+    vi.spyOn(mockTool, 'buildAndExecute').mockResolvedValue({
+      llmContent: '',
+      returnDisplay: '',
+    });
 
-    await executeToolCall(mockConfig, request, mockToolRegistry, abortController.signal);
+    await executeToolCall(
+      mockConfig,
+      request,
+      mockToolRegistry,
+      abortController.signal,
+    );
 
     expect(logToolCall).toHaveBeenCalled();
-    const loggedEvent = (logToolCall as any).mock.calls[0][1];
+    const loggedEvent = (logToolCall as Mock).mock.calls[0][1];
     expect(loggedEvent).toHaveProperty('programming_language', 'TypeScript');
   });
 
@@ -281,12 +289,20 @@ describe('executeToolCall with programming_language logging', () => {
       isClientInitiated: false,
       prompt_id: 'prompt-id-read',
     };
-    vi.spyOn(mockTool, 'buildAndExecute').mockResolvedValue({ llmContent: '', returnDisplay: '' });
+    vi.spyOn(mockTool, 'buildAndExecute').mockResolvedValue({
+      llmContent: '',
+      returnDisplay: '',
+    });
 
-    await executeToolCall(mockConfig, request, mockToolRegistry, abortController.signal);
+    await executeToolCall(
+      mockConfig,
+      request,
+      mockToolRegistry,
+      abortController.signal,
+    );
 
     expect(logToolCall).toHaveBeenCalled();
-    const loggedEvent = (logToolCall as any).mock.calls[0][1];
+    const loggedEvent = (logToolCall as Mock).mock.calls[0][1];
     expect(loggedEvent).toHaveProperty('programming_language', 'Python');
   });
 
@@ -298,12 +314,20 @@ describe('executeToolCall with programming_language logging', () => {
       isClientInitiated: false,
       prompt_id: 'prompt-id-glob',
     };
-    vi.spyOn(mockTool, 'buildAndExecute').mockResolvedValue({ llmContent: '', returnDisplay: '' });
+    vi.spyOn(mockTool, 'buildAndExecute').mockResolvedValue({
+      llmContent: '',
+      returnDisplay: '',
+    });
 
-    await executeToolCall(mockConfig, request, mockToolRegistry, abortController.signal);
+    await executeToolCall(
+      mockConfig,
+      request,
+      mockToolRegistry,
+      abortController.signal,
+    );
 
     expect(logToolCall).toHaveBeenCalled();
-    const loggedEvent = (logToolCall as any).mock.calls[0][1];
+    const loggedEvent = (logToolCall as Mock).mock.calls[0][1];
     expect(loggedEvent).not.toHaveProperty('programming_language');
   });
 
@@ -315,12 +339,19 @@ describe('executeToolCall with programming_language logging', () => {
       isClientInitiated: false,
       prompt_id: 'prompt-id-fail',
     };
-    vi.spyOn(mockTool, 'buildAndExecute').mockRejectedValue(new Error('Failed'));
+    vi.spyOn(mockTool, 'buildAndExecute').mockRejectedValue(
+      new Error('Failed'),
+    );
 
-    await executeToolCall(mockConfig, request, mockToolRegistry, abortController.signal);
+    await executeToolCall(
+      mockConfig,
+      request,
+      mockToolRegistry,
+      abortController.signal,
+    );
 
     expect(logToolCall).toHaveBeenCalled();
-    const loggedEvent = (logToolCall as any).mock.calls[0][1];
+    const loggedEvent = (logToolCall as Mock).mock.calls[0][1];
     expect(loggedEvent).toHaveProperty('programming_language', 'Java');
   });
 });

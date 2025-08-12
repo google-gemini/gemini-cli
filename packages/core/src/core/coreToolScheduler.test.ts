@@ -922,7 +922,9 @@ describe('CoreToolScheduler programming_language logging', () => {
     expect(replaceEvent).toBeDefined();
     expect(replaceEvent).toHaveProperty('programming_language', 'JavaScript');
 
-    const globEvent = loggedEvents.find((e: ToolCallEvent) => e.function_name === 'glob');
+    const globEvent = loggedEvents.find(
+      (e: ToolCallEvent) => e.function_name === 'glob',
+    );
     expect(globEvent).toBeDefined();
     expect(globEvent).not.toHaveProperty('undefined');
   });

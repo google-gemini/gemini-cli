@@ -284,7 +284,8 @@ describe('ClearcutLogger', () => {
       const eventData = createLogEventSpy.mock.calls[0][1];
       const programmingLanguageEntry = eventData.find(
         (entry) =>
-          entry.gemini_cli_key === EventMetadataKey.GEMINI_CLI_PROGRAMMING_LANGUAGE,
+          entry.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_PROGRAMMING_LANGUAGE,
       );
       expect(programmingLanguageEntry).toBeDefined();
       expect(programmingLanguageEntry?.value).toBe('TypeScript');
@@ -309,7 +310,8 @@ describe('ClearcutLogger', () => {
       const eventData = createLogEventSpy.mock.calls[0][1];
       const programmingLanguageEntry = eventData.find(
         (entry) =>
-          entry.gemini_cli_key === EventMetadataKey.GEMINI_CLI_PROGRAMMING_LANGUAGE,
+          entry.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_PROGRAMMING_LANGUAGE,
       );
       expect(programmingLanguageEntry).toBeUndefined();
     });
