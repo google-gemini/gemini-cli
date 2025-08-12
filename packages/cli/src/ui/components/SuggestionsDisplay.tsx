@@ -7,7 +7,6 @@
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { PrepareLabel } from './PrepareLabel.js';
-import { isSlashCommand } from '../utils/commandUtils.js';
 export interface Suggestion {
   label: string;
   value: string;
@@ -53,21 +52,6 @@ export function SuggestionsDisplay({
   );
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
-  const isSlashCommandMode = isSlashCommand(userInput);
-  let commandNameWidth = 0;
-
-  if (isSlashCommandMode) {
-    const maxLabelLength = visibleSuggestions.length
-      ? Math.max(...visibleSuggestions.map((s) => s.label.length))
-      : 0;
-
-    const maxAllowedWidth = Math.floor(width * 0.35);
-    commandNameWidth = Math.max(
-      15,
-      Math.min(maxLabelLength + 2, maxAllowedWidth),
-    );
-  }
-
   return (
     <Box flexDirection="column" paddingX={1} width={width}>
       {scrollOffset > 0 && <Text color={Colors.Foreground}>▲</Text>}
@@ -88,14 +72,15 @@ export function SuggestionsDisplay({
         return (
           <Box key={`${suggestion.value}-${originalIndex}`} width={width}>
             <Box flexDirection="row">
-              {isSlashCommandMode ? (
+              {userInput.startsWith('/') ? (
+                // Dynamic column width for better command/description separation
                 <>
-                  <Box width={commandNameWidth} flexShrink={0}>
+                  <Box flexShrink={0} paddingRight={2}>
                     {labelElement}
                   </Box>
                   {suggestion.description ? (
-                    <Box flexGrow={1} marginLeft={1}>
-                      <Text color={textColor} wrap="wrap">
+                    <Box flexGrow={1}>
+                      <Text color={textColor} wrap="truncate">
                         {suggestion.description}
                       </Text>
                     </Box>
@@ -105,8 +90,8 @@ export function SuggestionsDisplay({
                 <>
                   {labelElement}
                   {suggestion.description ? (
-                    <Box flexGrow={1} marginLeft={1}>
-                      <Text color={textColor} wrap="wrap">
+                    <Box flexGrow={1} paddingLeft={1}>
+                      <Text color={textColor} wrap="truncate">
                         {suggestion.description}
                       </Text>
                     </Box>
