@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Content, SchemaUnion, Type } from '@google/genai';
+import { Content } from '@google/genai';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { GeminiClient } from '../core/client.js';
 import { GeminiChat } from '../core/geminiChat.js';
@@ -16,16 +16,16 @@ const CHECK_PROMPT = `Analyze *only* the content and structure of your immediate
 2.  **Question to User:** If your last response ends with a direct question specifically addressed *to the user*, then the **'user'** should speak next.
 3.  **Waiting for User:** If your last response completed a thought, statement, or task *and* does not meet the criteria for Rule 1 (Model Continues) or Rule 2 (Question to User), it implies a pause expecting user input or reaction. In this case, the **'user'** should speak next.`;
 
-const RESPONSE_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const RESPONSE_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     reasoning: {
-      type: Type.STRING,
+      type: 'string',
       description:
         "Brief explanation justifying the 'next_speaker' choice based *strictly* on the applicable rule and the content/structure of the preceding turn.",
     },
     next_speaker: {
-      type: Type.STRING,
+      type: 'string',
       enum: ['user', 'model'],
       description:
         'Who should speak next based *only* on the preceding turn and the decision rules',

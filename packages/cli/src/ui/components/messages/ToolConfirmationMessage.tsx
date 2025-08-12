@@ -56,9 +56,9 @@ export const ToolConfirmationMessage: React.FC<
     onConfirm(outcome);
   };
 
-  useInput((_, key) => {
+  useInput((input, key) => {
     if (!isFocused) return;
-    if (key.escape) {
+    if (key.escape || (key.ctrl && (input === 'c' || input === 'C'))) {
       handleConfirm(ToolConfirmationOutcome.Cancel);
     }
   });
@@ -134,7 +134,7 @@ export const ToolConfirmationMessage: React.FC<
     );
     if (config?.getIdeMode() && config?.getIdeModeFeature()) {
       options.push({
-        label: 'No',
+        label: 'No (esc)',
         value: ToolConfirmationOutcome.Cancel,
       });
     } else {

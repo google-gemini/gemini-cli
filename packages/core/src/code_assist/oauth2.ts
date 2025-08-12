@@ -366,7 +366,7 @@ async function cacheCredentials(credentials: Credentials) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 
   const credString = JSON.stringify(credentials, null, 2);
-  await fs.writeFile(filePath, credString);
+  await fs.writeFile(filePath, credString, { mode: 0o600 });
 }
 
 function getCachedCredentialPath(): string {
