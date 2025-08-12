@@ -7,27 +7,9 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+import type { CustomTheme } from './theme.js';
 
-/**
- * Custom theme interface for CLI package
- */
-export interface CustomTheme {
-  name: string;
-  type: 'custom';
-  Background: string;
-  Foreground: string;
-  LightBlue: string;
-  AccentBlue: string;
-  AccentPurple: string;
-  AccentCyan: string;
-  AccentGreen: string;
-  AccentYellow: string;
-  AccentRed: string;
-  DiffAdded: string;
-  DiffRemoved: string;
-  Comment: string;
-  Gray: string;
-}
+// Uses shared CustomTheme type from theme.ts
 
 /**
  * Theme file structure with metadata
@@ -55,7 +37,7 @@ export interface CombinedThemes {
 /**
  * Get the themes directory path
  */
-function getThemesDirectory(): string {
+export function getThemesDirectory(): string {
   const homeDir = os.homedir();
   return path.join(homeDir, '.gemini', 'themes');
 }

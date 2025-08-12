@@ -8,6 +8,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
+import { type CombinedThemes, loadFileBasedThemes } from '../themes/theme-loader.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
@@ -49,26 +50,30 @@ export function ThemeDialog({
   const [combinedThemes, setCombinedThemes] = useState<CombinedThemes | null>(null);
   const [_isLoadingThemes, setIsLoadingThemes] = useState(true);
 
-  // Load themes from both sources
+  // Load themes from merged settings plus file-based storage (single catalog)
   useEffect(() => {
     const loadThemes = async () => {
       try {
-        const settingsThemes = selectedScope === SettingScope.User
-          ? settings.user.settings.customThemes || {}
-          : settings.merged.customThemes || {};
-        
-        const combined = await loadCombinedThemes(settingsThemes);
-        setCombinedThemes(combined);
+        const mergedSettingsThemes = settings.merged.customThemes || {};
+        const fileThemes = await loadFileBasedThemes();
+
+        const allThemes = {
+          ...mergedSettingsThemes,
+          ...fileThemes,
+        };
+
+        setCombinedThemes({
+          settingsThemes: mergedSettingsThemes,
+          fileThemes,
+          allThemes,
+        });
       } catch (error) {
         console.warn('Failed to load combined themes:', error);
-        // Fallback to settings-only themes
-        const settingsThemes = selectedScope === SettingScope.User
-          ? settings.user.settings.customThemes || {}
-          : settings.merged.customThemes || {};
+        const mergedSettingsThemes = settings.merged.customThemes || {};
         setCombinedThemes({
-          settingsThemes,
+          settingsThemes: mergedSettingsThemes,
           fileThemes: {},
-          allThemes: settingsThemes
+          allThemes: mergedSettingsThemes,
         });
       } finally {
         setIsLoadingThemes(false);
@@ -76,7 +81,13 @@ export function ThemeDialog({
     };
 
     loadThemes();
-  }, [selectedScope, settings]);
+    // Only reload when the custom theme collections actually change
+  }, [
+    settings.user.settings.customThemes,
+    settings.workspace.settings.customThemes,
+    settings.system.settings.customThemes,
+    settings.merged.customThemes,
+  ]);
 
   // Generate theme items from combined sources
   const customThemes = combinedThemes?.allThemes || {};
@@ -85,7 +96,7 @@ export function ThemeDialog({
     .filter((theme) => theme.type !== 'custom');
   const customThemeNames = Object.keys(customThemes);
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-  
+
   // Generate theme items with source indication
   const themeItems = [
     ...builtInThemes.map((theme) => ({
@@ -95,19 +106,22 @@ export function ThemeDialog({
       themeTypeDisplay: capitalize(theme.type),
     })),
     ...customThemeNames.map((name) => {
-      // Determine source for display
-      const isFromFile = combinedThemes?.fileThemes[name] !== undefined;
-      const isFromSettings = combinedThemes?.settingsThemes[name] !== undefined;
-      
-      let typeDisplay = 'Custom';
-      if (isFromFile && isFromSettings) {
-        typeDisplay = 'Custom (File + Settings)';
-      } else if (isFromFile) {
-        typeDisplay = 'Custom (File)';
-      } else if (isFromSettings) {
-        typeDisplay = 'Custom (Settings)';
-      }
-      
+      // Determine granular source for display
+      const fromFile = combinedThemes?.fileThemes[name] !== undefined;
+      const fromUser = !!settings.user.settings.customThemes?.[name];
+      const fromWorkspace = !!settings.workspace.settings.customThemes?.[name];
+      const fromSystem = !!settings.system.settings.customThemes?.[name];
+
+      const sources: string[] = [];
+      if (fromFile) sources.push('File');
+      if (fromUser) sources.push('User');
+      if (fromWorkspace) sources.push('Workspace');
+      if (fromSystem) sources.push('System');
+
+      const typeDisplay = sources.length > 0
+        ? `Custom (${sources.join(', ')})`
+        : 'Custom';
+
       return {
         label: name,
         value: name,
@@ -162,7 +176,8 @@ export function ThemeDialog({
       setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
     }
     if (key.escape) {
-      onSelect(undefined, selectedScope);
+  // Cancel: restore previously active theme by signaling undefined
+  onSelect(undefined, selectedScope);
     }
   });
 
@@ -184,8 +199,8 @@ export function ThemeDialog({
   const colorizeCodeWidth = Math.max(
     Math.floor(
       (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
-        PREVIEW_PANE_WIDTH_PERCENTAGE *
-        PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+      PREVIEW_PANE_WIDTH_PERCENTAGE *
+      PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
     ),
     1,
   );

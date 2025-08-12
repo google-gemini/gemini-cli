@@ -66,28 +66,32 @@ class ThemeManager {
    * @param customThemesSettings Custom themes from settings.
    */
   async loadCustomThemes(customThemesSettings?: Record<string, CustomTheme>): Promise<void> {
-    this.customThemes.clear();
+    // Fast path: synchronously load themes from settings so immediate callers see results.
+    this.loadCustomThemesSync(customThemesSettings);
 
-    // Load themes from both sources
-    const combinedThemes = await loadCombinedThemes(customThemesSettings || {});
-
-    // Register all combined themes
-    for (const [name, customThemeConfig] of Object.entries(combinedThemes.allThemes)) {
-      const validation = validateCustomTheme(customThemeConfig);
-      if (validation.isValid) {
-        if (validation.warning) {
-          console.warn(`Theme "${name}": ${validation.warning}`);
+    // Async augmentation: include file-based themes and rebuild.
+    try {
+      const combinedThemes = await loadCombinedThemes(customThemesSettings || {});
+      this.customThemes.clear();
+      for (const [name, customThemeConfig] of Object.entries(combinedThemes.allThemes)) {
+        const validation = validateCustomTheme(customThemeConfig);
+        if (validation.isValid) {
+          if (validation.warning) {
+            console.warn(`Theme "${name}": ${validation.warning}`);
+          }
+          const themeWithDefaults: CustomTheme = {
+            ...DEFAULT_THEME.colors,
+            ...customThemeConfig,
+            name: customThemeConfig.name || name,
+            type: 'custom',
+          };
+          this.customThemes.set(name, createCustomTheme(themeWithDefaults));
+        } else {
+          console.error(`Invalid custom theme "${name}": ${validation.error}`);
         }
-        const themeWithDefaults: CustomTheme = {
-          ...DEFAULT_THEME.colors,
-          ...customThemeConfig,
-          name: customThemeConfig.name || name,
-          type: 'custom',
-        };
-        this.customThemes.set(name, createCustomTheme(themeWithDefaults));
-      } else {
-        console.error(`Invalid custom theme "${name}": ${validation.error}`);
       }
+    } catch (error) {
+      console.warn('Failed to include file-based themes; using settings-only.', error);
     }
   }
 

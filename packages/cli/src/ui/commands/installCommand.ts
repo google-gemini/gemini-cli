@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandKind, SlashCommand, SlashCommandActionReturn } from './types.js';
-import { CommandContext } from './types.js';
+import { CommandKind, SlashCommand, SlashCommandActionReturn, CommandContext } from './types.js';
+import { themeInstaller, type Installer } from './installers/themeInstaller.js';
 
 export const installCommand: SlashCommand = {
   name: 'install',
@@ -15,6 +15,9 @@ export const installCommand: SlashCommand = {
     context: CommandContext,
     args: string,
   ): Promise<SlashCommandActionReturn> => {
+  // Registry of available installers. Keep lightweight and local for now.
+  const installers: Installer[] = [themeInstaller];
+
     if (!args.trim()) {
       return {
         type: 'submit_prompt',
@@ -28,7 +31,7 @@ The URL should be from the VS Code marketplace and point to a theme extension.`,
       };
     }
 
-    // Extract URL from args
+    // Extract URL from args (current default flow expects a theme URL)
     const urlMatch = args.match(/(https?:\/\/[^\s]+)/);
     if (!urlMatch) {
       return {
@@ -39,15 +42,17 @@ Example: /install https://marketplace.visualstudio.com/items?itemName=arcticices
       };
     }
 
-    const marketplaceUrl = urlMatch[1];
-    
+    // Delegate to the first matching installer
+    const installer = installers.find((i) => i.matches(args));
+    if (installer) {
+      return installer.run(context, args);
+    }
+
+    // Fallback (shouldn't happen with current theme installer present)
     return {
       type: 'submit_prompt',
-      content: `I'll help you install a VS Code theme from the marketplace URL you provided: ${marketplaceUrl}
-
-Let me download and extract the theme from this VS Code marketplace extension, then create a custom theme configuration for Gemini CLI.
-
-Please wait while I process this request...`,
+      content:
+        `I couldn't find a suitable installer for your input. Please provide a VS Code marketplace URL.`,
     };
   },
 }; 
