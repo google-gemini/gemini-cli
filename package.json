@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.18"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.19"
   },
   "scripts": {
     "start": "node scripts/start.js",
@@ -24,6 +24,7 @@
     "auth": "npm run auth:npm && npm run auth:docker",
     "generate": "node scripts/generate-git-commit-info.js",
     "build": "node scripts/build.js",
+    "build-and-start": "npm run build && npm run start",
     "build:vscode": "node scripts/build_vscode_companion.js",
     "build:all": "npm run build && npm run build:sandbox && npm run build:vscode",
     "build:packages": "npm run build --workspaces",
@@ -79,13 +80,17 @@
     "json": "^11.0.0",
     "lodash": "^4.17.21",
     "memfs": "^4.17.2",
+    "mnemonist": "^0.40.3",
     "mock-fs": "^5.5.0",
+    "msw": "^2.10.4",
     "prettier": "^3.5.3",
     "react-devtools-core": "^4.28.5",
     "tsx": "^4.20.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
-    "yargs": "^17.7.2",
-    "mnemonist": "^0.40.3"
+    "yargs": "^17.7.2"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
   }
 }
