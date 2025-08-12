@@ -244,9 +244,6 @@ vi.mock('./components/Header.js', () => ({
   Header: vi.fn(() => null),
 }));
 
-// Note: InputPrompt is not globally mocked because it causes ESM issues
-// It's only mocked within the Message Queuing tests
-
 vi.mock('./utils/updateCheck.js', () => ({
   checkForUpdates: vi.fn(),
 }));
