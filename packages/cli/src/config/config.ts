@@ -35,7 +35,7 @@ import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
 
-import { isCurrentDirectoryTrusted } from './trustedFolders.js';
+import { isWorkspaceTrusted } from './trustedFolders.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -455,7 +455,7 @@ export async function loadCliConfig(
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
-  const trustedFolder = isCurrentDirectoryTrusted();
+  const trustedFolder = isWorkspaceTrusted();
 
   return new Config({
     sessionId,

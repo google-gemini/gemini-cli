@@ -10,18 +10,13 @@ import { useFolderTrust } from './useFolderTrust.js';
 import { type Config } from '@google/gemini-cli-core';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
-import { loadTrustedFolders, TrustLevel } from '../../config/trustedFolders.js';
+import {
+  LoadedTrustedFolders,
+  TrustLevel,
+} from '../../config/trustedFolders.js';
 import * as process from 'process';
 
-// Mock dependencies
-vi.mock('../../config/trustedFolders.js', () => ({
-  loadTrustedFolders: vi.fn(),
-  TrustLevel: {
-    TRUST_FOLDER: 'trust_folder',
-    TRUST_PARENT: 'trust_parent',
-    DO_NOT_TRUST: 'do_not_trust',
-  },
-}));
+import * as trustedFolders from '../../config/trustedFolders.js';
 
 vi.mock('process', () => ({
   cwd: vi.fn(),
@@ -31,7 +26,8 @@ vi.mock('process', () => ({
 describe('useFolderTrust', () => {
   let mockSettings: LoadedSettings;
   let mockConfig: Config;
-  let mockTrustedFolders: { setValue: vi.Mock };
+  let mockTrustedFolders: LoadedTrustedFolders;
+  let loadTrustedFoldersSpy: vi.SpyInstance;
 
   beforeEach(() => {
     mockSettings = {
@@ -48,9 +44,11 @@ describe('useFolderTrust', () => {
 
     mockTrustedFolders = {
       setValue: vi.fn(),
-    };
+    } as unknown as LoadedTrustedFolders;
 
-    (loadTrustedFolders as vi.Mock).mockReturnValue(mockTrustedFolders);
+    loadTrustedFoldersSpy = vi
+      .spyOn(trustedFolders, 'loadTrustedFolders')
+      .mockReturnValue(mockTrustedFolders);
     (process.cwd as vi.Mock).mockReturnValue('/test/path');
   });
 
@@ -98,9 +96,8 @@ describe('useFolderTrust', () => {
       result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
     });
 
-    expect(loadTrustedFolders).toHaveBeenCalled();
+    expect(loadTrustedFoldersSpy).toHaveBeenCalled();
     expect(mockTrustedFolders.setValue).toHaveBeenCalledWith(
-      SettingScope.User,
       '/test/path',
       TrustLevel.TRUST_FOLDER,
     );
@@ -122,7 +119,6 @@ describe('useFolderTrust', () => {
     });
 
     expect(mockTrustedFolders.setValue).toHaveBeenCalledWith(
-      SettingScope.User,
       '/test/path',
       TrustLevel.TRUST_PARENT,
     );
@@ -139,7 +135,6 @@ describe('useFolderTrust', () => {
     });
 
     expect(mockTrustedFolders.setValue).toHaveBeenCalledWith(
-      SettingScope.User,
       '/test/path',
       TrustLevel.DO_NOT_TRUST,
     );

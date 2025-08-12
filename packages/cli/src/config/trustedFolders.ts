@@ -6,10 +6,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { homedir, platform } from 'os';
-import { getErrorMessage } from '@google/gemini-cli-core';
+import { homedir } from 'os';
+import { getErrorMessage, isWithinRoot } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
-import { SettingScope } from './settings.js';
 
 export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
@@ -18,19 +17,6 @@ export const USER_TRUSTED_FOLDERS_PATH = path.join(
   USER_SETTINGS_DIR,
   TRUSTED_FOLDERS_FILENAME,
 );
-
-export function getSystemTrustedFoldersPath(): string {
-  if (process.env.GEMINI_CLI_SYSTEM_TRUSTED_FOLDERS_PATH) {
-    return process.env.GEMINI_CLI_SYSTEM_TRUSTED_FOLDERS_PATH;
-  }
-  if (platform() === 'darwin') {
-    return `/Library/Application Support/GeminiCli/${TRUSTED_FOLDERS_FILENAME}`;
-  } else if (platform() === 'win32') {
-    return `C:/ProgramData/gemini-cli/${TRUSTED_FOLDERS_FILENAME}`;
-  } else {
-    return `/etc/gemini-cli/${TRUSTED_FOLDERS_FILENAME}`;
-  }
-}
 
 export enum TrustLevel {
   TRUST_FOLDER = 'TRUST_FOLDER',
@@ -55,63 +41,28 @@ export interface TrustedFoldersFile {
 
 export class LoadedTrustedFolders {
   constructor(
-    public system: TrustedFoldersFile,
     public user: TrustedFoldersFile,
     public errors: TrustedFoldersError[],
   ) {}
 
   get rules(): TrustRule[] {
-    const mergedConfig = { ...this.user.config, ...this.system.config };
-    return Object.entries(mergedConfig).map(([path, trustLevel]) => ({
+    return Object.entries(this.user.config).map(([path, trustLevel]) => ({
       path,
       trustLevel,
     }));
   }
 
-  forScope(scope: SettingScope): TrustedFoldersFile {
-    switch (scope) {
-      case SettingScope.User:
-        return this.user;
-      case SettingScope.System:
-        return this.system;
-      default:
-        throw new Error(`Invalid scope: ${scope}`);
-    }
-  }
-
-  setValue(scope: SettingScope, path: string, trustLevel: TrustLevel): void {
-    const fileToUpdate = this.forScope(scope);
-    fileToUpdate.config[path] = trustLevel;
-    saveTrustedFolders(fileToUpdate);
+  setValue(path: string, trustLevel: TrustLevel): void {
+    this.user.config[path] = trustLevel;
+    saveTrustedFolders(this.user);
   }
 }
 
 export function loadTrustedFolders(): LoadedTrustedFolders {
   const errors: TrustedFoldersError[] = [];
-  const systemConfig: Record<string, TrustLevel> = {};
   const userConfig: Record<string, TrustLevel> = {};
 
-  const systemPath = getSystemTrustedFoldersPath();
   const userPath = USER_TRUSTED_FOLDERS_PATH;
-
-  // Load system trusted folders
-  try {
-    if (fs.existsSync(systemPath)) {
-      const content = fs.readFileSync(systemPath, 'utf-8');
-      const parsed = JSON.parse(stripJsonComments(content)) as Record<
-        string,
-        TrustLevel
-      >;
-      if (parsed) {
-        Object.assign(systemConfig, parsed);
-      }
-    }
-  } catch (error: unknown) {
-    errors.push({
-      message: getErrorMessage(error),
-      path: systemPath,
-    });
-  }
 
   // Load user trusted folders
   try {
@@ -133,7 +84,6 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
   }
 
   return new LoadedTrustedFolders(
-    { path: systemPath, config: systemConfig },
     { path: userPath, config: userConfig },
     errors,
   );
@@ -159,7 +109,7 @@ export function saveTrustedFolders(
   }
 }
 
-export function isCurrentDirectoryTrusted(): boolean | undefined {
+export function isWorkspaceTrusted(): boolean | undefined {
   const { rules, errors } = loadTrustedFolders();
 
   if (errors.length > 0) {
@@ -191,24 +141,15 @@ export function isCurrentDirectoryTrusted(): boolean | undefined {
   }
 
   const cwd = process.cwd();
-  const normalizedCwd = path.normalize(cwd);
 
   for (const trustedPath of trustedPaths) {
-    const normalizedTrustedPath = path.normalize(trustedPath);
-    if (normalizedCwd === normalizedTrustedPath) {
-      return true;
-    }
-    const trustedPathWithSep = normalizedTrustedPath.endsWith(path.sep)
-      ? normalizedTrustedPath
-      : `${normalizedTrustedPath}${path.sep}`;
-    if (normalizedCwd.startsWith(trustedPathWithSep)) {
+    if (isWithinRoot(cwd, trustedPath)) {
       return true;
     }
   }
 
   for (const untrustedPath of untrustedPaths) {
-    const normalizedUntrustedPath = path.normalize(untrustedPath);
-    if (normalizedCwd === normalizedUntrustedPath) {
+    if (path.normalize(cwd) === path.normalize(untrustedPath)) {
       return false;
     }
   }

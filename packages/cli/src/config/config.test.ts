@@ -13,10 +13,10 @@ import { loadCliConfig, parseArguments } from './config.js';
 import { Settings } from './settings.js';
 import { Extension } from './extension.js';
 import * as ServerConfig from '@google/gemini-cli-core';
-import { isCurrentDirectoryTrusted } from './trustedFolders.js';
+import { isWorkspaceTrusted } from './trustedFolders.js';
 
 vi.mock('./trustedFolders.js', () => ({
-  isCurrentDirectoryTrusted: vi.fn(),
+  isWorkspaceTrusted: vi.fn(),
 }));
 
 vi.mock('os', async (importOriginal) => {
@@ -1718,8 +1718,8 @@ describe('loadCliConfig trustedFolder', () => {
     vi.restoreAllMocks();
   });
 
-  it('should set trustedFolder to true when isCurrentDirectoryTrusted returns true', async () => {
-    (isCurrentDirectoryTrusted as vi.Mock).mockReturnValue(true);
+  it('should set trustedFolder to true when isWorkspaceTrusted returns true', async () => {
+    (isWorkspaceTrusted as vi.Mock).mockReturnValue(true);
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const settings: Settings = {};
@@ -1727,8 +1727,8 @@ describe('loadCliConfig trustedFolder', () => {
     expect(config.isTrustedFolder()).toBe(true);
   });
 
-  it('should set trustedFolder to false when isCurrentDirectoryTrusted returns false', async () => {
-    (isCurrentDirectoryTrusted as vi.Mock).mockReturnValue(false);
+  it('should set trustedFolder to false when isWorkspaceTrusted returns false', async () => {
+    (isWorkspaceTrusted as vi.Mock).mockReturnValue(false);
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const settings: Settings = {};
@@ -1736,8 +1736,8 @@ describe('loadCliConfig trustedFolder', () => {
     expect(config.isTrustedFolder()).toBe(false);
   });
 
-  it('should set trustedFolder to undefined when isCurrentDirectoryTrusted returns undefined', async () => {
-    (isCurrentDirectoryTrusted as vi.Mock).mockReturnValue(undefined);
+  it('should set trustedFolder to undefined when isWorkspaceTrusted returns undefined', async () => {
+    (isWorkspaceTrusted as vi.Mock).mockReturnValue(undefined);
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const settings: Settings = {};

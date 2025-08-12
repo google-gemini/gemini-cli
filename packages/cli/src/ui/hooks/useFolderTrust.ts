@@ -39,7 +39,7 @@ export const useFolderTrust = (settings: LoadedSettings, config: Config) => {
           return;
       }
 
-      trustedFolders.setValue(SettingScope.User, cwd, trustLevel);
+      trustedFolders.setValue(cwd, trustLevel);
       settings.setValue(SettingScope.User, 'folderTrust', true);
       setIsFolderTrustDialogOpen(false);
     },
