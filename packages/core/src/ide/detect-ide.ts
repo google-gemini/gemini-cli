@@ -15,24 +15,53 @@ export enum DetectedIde {
   Trae = 'trae',
 }
 
-export function getIdeDisplayName(ide: DetectedIde): string {
+export interface IdeInfo {
+  displayName: string;
+  isExtensionInstalledByDefault: boolean;
+}
+
+export function getIdeInfo(ide: DetectedIde): IdeInfo {
   switch (ide) {
     case DetectedIde.VSCode:
-      return 'VS Code';
+      return {
+        displayName: 'VS Code',
+        isExtensionInstalledByDefault: false,
+      };
     case DetectedIde.VSCodium:
-      return 'VSCodium';
+      return {
+        displayName: 'VSCodium',
+        isExtensionInstalledByDefault: false,
+      };
     case DetectedIde.Cursor:
-      return 'Cursor';
+      return {
+        displayName: 'Cursor',
+        isExtensionInstalledByDefault: false,
+      };
     case DetectedIde.CloudShell:
-      return 'Cloud Shell';
+      return {
+        displayName: 'Cloud Shell',
+        isExtensionInstalledByDefault: true,
+      };
     case DetectedIde.Codespaces:
-      return 'GitHub Codespaces';
+      return {
+        displayName: 'GitHub Codespaces',
+        isExtensionInstalledByDefault: false,
+      };
     case DetectedIde.Windsurf:
-      return 'Windsurf';
+      return {
+        displayName: 'Windsurf',
+        isExtensionInstalledByDefault: false,
+      };
     case DetectedIde.FirebaseStudio:
-      return 'Firebase Studio';
+      return {
+        displayName: 'Firebase Studio',
+        isExtensionInstalledByDefault: true,
+      };
     case DetectedIde.Trae:
-      return 'Trae';
+      return {
+        displayName: 'Trae',
+        isExtensionInstalledByDefault: false,
+      };
     default: {
       // This ensures that if a new IDE is added to the enum, we get a compile-time error.
       const exhaustiveCheck: never = ide;

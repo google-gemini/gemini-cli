@@ -942,9 +942,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             </Box>
           )}
 
-          {shouldShowIdePrompt ? (
+          {shouldShowIdePrompt && currentIDE ? (
             <IdeIntegrationNudge
-              ideName={config.getIdeClient().getDetectedIdeDisplayName()}
+              ide={currentIDE}
               onComplete={handleIdePromptComplete}
             />
           ) : isFolderTrustDialogOpen ? (

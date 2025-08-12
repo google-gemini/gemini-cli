@@ -24,15 +24,27 @@ describe('ide-installer', () => {
       expect(installer).toBeInstanceOf(Object);
     });
 
-    it('should return an OpenVSXInstaller for "vscodium"', () => {
+    it('should return a DefaultInstaller for "vscodium"', () => {
       const installer = getIdeInstaller(DetectedIde.VSCodium);
       expect(installer).not.toBeNull();
       expect(installer).toBeInstanceOf(Object);
     });
 
-    it('should return a DefaultIDEInstaller for an unknown IDE', () => {
+    it('should return a DefaultInstaller for an unknown IDE', () => {
       const installer = getIdeInstaller('unknown' as DetectedIde);
-      // Assuming DefaultIDEInstaller is the fallback
+      // Assuming DefaultInstaller is the fallback
+      expect(installer).not.toBeNull();
+      expect(installer).toBeInstanceOf(Object);
+    });
+
+    it('should return a CloudIdeInstaller for "cloudshell"', () => {
+      const installer = getIdeInstaller(DetectedIde.CloudShell);
+      expect(installer).not.toBeNull();
+      expect(installer).toBeInstanceOf(Object);
+    });
+
+    it('should return a CloudIdeInstaller for "firebasestudio"', () => {
+      const installer = getIdeInstaller(DetectedIde.FirebaseStudio);
       expect(installer).not.toBeNull();
       expect(installer).toBeInstanceOf(Object);
     });
@@ -64,46 +76,6 @@ describe('ide-installer', () => {
         const result = await installer.install();
         expect(result.success).toBe(false);
         expect(result.message).toContain('VS Code CLI not found');
-      });
-    });
-  });
-
-  describe('OpenVSXInstaller', () => {
-    let installer: IdeInstaller;
-
-    beforeEach(() => {
-      installer = getIdeInstaller(DetectedIde.VSCodium)!;
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    describe('install', () => {
-      it('should call execSync with the correct command and return success', async () => {
-        const execSyncSpy = vi
-          .spyOn(child_process, 'execSync')
-          .mockImplementation(() => '');
-        const result = await installer.install();
-        expect(execSyncSpy).toHaveBeenCalledWith(
-          'npx ovsx get google.gemini-cli-vscode-ide-companion',
-          { stdio: 'pipe' },
-        );
-        expect(result.success).toBe(true);
-        expect(result.message).toContain(
-          'VS Code companion extension was installed successfully from OpenVSX',
-        );
-      });
-
-      it('should return a failure message on failed installation', async () => {
-        vi.spyOn(child_process, 'execSync').mockImplementation(() => {
-          throw new Error('Command failed');
-        });
-        const result = await installer.install();
-        expect(result.success).toBe(false);
-        expect(result.message).toContain(
-          'Failed to install VS Code companion extension from OpenVSX',
-        );
       });
     });
   });
