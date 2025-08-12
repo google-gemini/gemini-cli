@@ -13,14 +13,12 @@ import {
 export type IdeIntegrationNudgeResult = 'yes' | 'no' | 'dismiss';
 
 interface IdeIntegrationNudgeProps {
-  question: string;
-  description?: string;
+  ideName?: string;
   onComplete: (result: IdeIntegrationNudgeResult) => void;
 }
 
 export function IdeIntegrationNudge({
-  question,
-  description,
+  ideName,
   onComplete,
 }: IdeIntegrationNudgeProps) {
   useInput((_input, key) => {
@@ -56,9 +54,11 @@ export function IdeIntegrationNudge({
       <Box marginBottom={1} flexDirection="column">
         <Text>
           <Text color="yellow">{'> '}</Text>
-          {question}
+          {`Do you want to connect your ${ideName ?? 'your'} editor to Gemini CLI?`}
         </Text>
-        {description && <Text dimColor>{description}</Text>}
+        <Text
+          dimColor
+        >{`If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in ${ideName ?? 'your editor'}.`}</Text>
       </Box>
       <RadioButtonSelect
         items={OPTIONS}
