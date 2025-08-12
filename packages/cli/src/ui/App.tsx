@@ -544,6 +544,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     shellModeActive,
   });
 
+  // Simple message queue for handling input during streaming
+  const [messageQueue, setMessageQueue] = useState<string[]>([]);
+
   const [userMessages, setUserMessages] = useState<string[]>([]);
 
   const handleUserCancel = useCallback(() => {
@@ -577,15 +580,20 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     handleUserCancel,
   );
 
-  // Input handling
+  // Input handling - with message queue support
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
       if (trimmedValue.length > 0) {
-        submitQuery(trimmedValue);
+        // Queue message if streaming is active, otherwise submit directly
+        if (streamingState === StreamingState.Responding) {
+          setMessageQueue((prev) => [...prev, trimmedValue]);
+        } else {
+          submitQuery(trimmedValue);
+        }
       }
     },
-    [submitQuery],
+    [submitQuery, streamingState],
   );
 
   const handleIdePromptComplete = useCallback(
@@ -1083,6 +1091,17 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 }
                 elapsedTime={elapsedTime}
               />
+
+              {/* Display queued messages below loading indicator */}
+              {messageQueue.length > 0 && (
+                <Box flexDirection="column" marginTop={1}>
+                  {messageQueue.map((message, index) => (
+                    <Box key={index} paddingLeft={2}>
+                      <Text dimColor>▸ {message}</Text>
+                    </Box>
+                  ))}
+                </Box>
+              )}
 
               <Box
                 marginTop={1}
