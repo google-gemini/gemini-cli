@@ -36,6 +36,14 @@ jobs:
       - name: Run linter
         run: npm run lint:ci
 
+      - name: Run linter on integration tests
+        run: npx eslint integration-tests --max-warnings 0
+
+      - name: Run formatter on integration tests
+        run: |
+          npx prettier --check integration-tests
+          git diff --exit-code
+
       - name: Build project
         run: npm run build
 
