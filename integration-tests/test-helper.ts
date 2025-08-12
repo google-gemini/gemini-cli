@@ -10,7 +10,7 @@ import { mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { env } from 'process';
-import { fileExists } from '../scripts/telemetry_utils.js';
+import fs from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -297,15 +297,12 @@ export class TestRig {
   }
 
   readFile(fileName: string) {
-    const content = readFileSync(join(this.testDir!, fileName), 'utf-8');
+    const filePath = join(this.testDir!, fileName);
+    const content = readFileSync(filePath, 'utf-8');
     if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
-      const testId = `${env.TEST_FILE_NAME!.replace(
-        '.test.js',
-        '',
-      )}:${this.testName!.replace(/ /g, '-')}`;
-      console.log(`--- FILE: ${testId}/${fileName} ---`);
+      console.log(`--- FILE: ${filePath} ---`);
       console.log(content);
-      console.log(`--- END FILE: ${testId}/${fileName} ---`);
+      console.log(`--- END FILE: ${filePath} ---`);
     }
     return content;
   }
@@ -336,7 +333,7 @@ export class TestRig {
     // Wait for telemetry file to exist and have content
     await this.poll(
       () => {
-        if (!fileExists(logFilePath)) return false;
+        if (!fs.existsSync(logFilePath)) return false;
         try {
           const content = readFileSync(logFilePath, 'utf-8');
           // Check if file has meaningful content (at least one complete JSON object)
@@ -547,7 +544,7 @@ export class TestRig {
       // Try reading from file first
       const logFilePath = join(this.testDir!, 'telemetry.log');
 
-      if (fileExists(logFilePath)) {
+      if (fs.existsSync(logFilePath)) {
         try {
           const content = readFileSync(logFilePath, 'utf-8');
           if (content && content.includes('"event.name"')) {
@@ -581,7 +578,7 @@ export class TestRig {
     }
 
     // Check if file exists, if not return empty array (file might not be created yet)
-    if (!fileExists(logFilePath)) {
+    if (!fs.existsSync(logFilePath)) {
       return [];
     }
 
