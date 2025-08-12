@@ -448,6 +448,64 @@ Arguments passed directly when running the CLI can override other configurations
   - Example: `--include-directories /path/to/project1,/path/to/project2` or `--include-directories /path/to/project1 --include-directories /path/to/project2`
 - **`--version`**:
   - Displays the version of the CLI.
+- **`--portable-config <path_to_yaml>`**:
+  - **Description:** Loads all configuration from a single YAML file. When this flag is used, all `settings.json` files are ignored, and the specified YAML file becomes the single source of truth for all file-based settings. This is ideal for creating a portable, self-contained CLI environment.
+  - **Example:** `gemini --portable-config /path/to/my-config.yaml`
+  - **YAML File Structure:**
+
+    ```yaml
+    # config.yaml
+
+    # Simulates environment variables
+    env:
+      GEMINI_API_KEY: 'your-api-key'
+      GOOGLE_CLOUD_PROJECT: 'your-gcp-project'
+
+    # Simulates command-line arguments
+    cli:
+      model: 'gemini-1.5-pro-latest'
+      debug: true
+      # Corresponds to --yolo
+      auto_approve_tool_calls: true
+
+    # Simulates settings.json content
+    settings:
+      theme: 'GitHub'
+      sandbox: 'docker'
+      telemetry:
+        enabled: false
+      mcpServers:
+        myPythonServer:
+          command: 'python'
+          args: ['mcp_server.py']
+
+    # Simulates instructional context (GEMINI.md, extensions, etc.)
+    context:
+      # Content that would normally be in GEMINI.md
+      geminiMd: |
+        # Project: My Awesome TypeScript Library
+        - Follow the existing coding style.
+        - Ensure all new functions have JSDoc comments.
+
+      # Simulates content from extension docs
+      extensions:
+        - name: 'my-custom-extension'
+          content: |
+            # My Custom Extension
+            - This extension provides tools for database interaction.
+
+      # Simulates .gemini-ignore content
+      ignoreFiles:
+        - 'node_modules/'
+        - 'dist/'
+        - '*.log'
+
+    # Simulates custom commands
+    commands:
+      my_command:
+        description: 'A custom command'
+        prompt: 'This is a custom prompt'
+    ```
 
 ## Context Files (Hierarchical Instructional Context)
 
