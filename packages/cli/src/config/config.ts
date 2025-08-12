@@ -11,6 +11,7 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
+import { extensionsCommand } from '../commands/extensions.js';
 import {
   Config,
   loadServerHierarchicalMemory,
@@ -229,6 +230,7 @@ export async function parseArguments(): Promise<CliArgs> {
     )
     // Register MCP subcommands
     .command(mcpCommand)
+    .command(extensionsCommand)
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -239,9 +241,9 @@ export async function parseArguments(): Promise<CliArgs> {
   yargsInstance.wrap(yargsInstance.terminalWidth());
   const result = await yargsInstance.parse();
 
-  // Handle case where MCP subcommands are executed - they should exit the process
+  // Handle case where MCP and extensions subcommands are executed - they should exit the process
   // and not return to main CLI logic
-  if (result._.length > 0 && result._[0] === 'mcp') {
+  if (result._.length > 0 && (result._[0] === 'mcp' || result._[0] === 'extensions')) {
     // MCP commands handle their own execution and process exit
     process.exit(0);
   }
@@ -536,7 +538,7 @@ function mergeMcpServers(settings: Settings, extensions: Extension[]) {
       ([key, server]) => {
         if (mcpServers[key]) {
           logger.warn(
-            `Skipping extension MCP config for server with key "${key}" as it already exists.`,
+            `Skipping extension MCP config for server with key \"${key}\" as it already exists.`,
           );
           return;
         }
