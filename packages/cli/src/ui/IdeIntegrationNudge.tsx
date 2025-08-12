@@ -4,43 +4,77 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text, useInput } from 'ink';
+import { DetectedIde, getIdeInfo } from '@google/gemini-cli-core';
+import { Box, Text } from 'ink';
 import {
   RadioButtonSelect,
   RadioSelectItem,
 } from './components/shared/RadioButtonSelect.js';
+import { useKeypress } from './hooks/useKeypress.js';
 
-export type IdeIntegrationNudgeResult = 'yes' | 'no' | 'dismiss';
+export type IdeIntegrationNudgeResult = {
+  userSelection: 'yes' | 'no' | 'dismiss';
+  isExtensionPreInstalled: boolean;
+};
 
 interface IdeIntegrationNudgeProps {
-  ideName?: string;
+  ide: DetectedIde;
   onComplete: (result: IdeIntegrationNudgeResult) => void;
 }
 
 export function IdeIntegrationNudge({
-  ideName,
+  ide,
   onComplete,
 }: IdeIntegrationNudgeProps) {
-  useInput((_input, key) => {
-    if (key.escape) {
-      onComplete('no');
-    }
-  });
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape') {
+        onComplete({
+          userSelection: 'no',
+          isExtensionPreInstalled: false,
+        });
+      }
+    },
+    { isActive: true },
+  );
+
+  const { displayName: ideName } = getIdeInfo(ide);
+  // Assume extension is already installed if the env variables are set.
+  const isExtensionPreInstalled =
+    !!process.env.GEMINI_CLI_IDE_SERVER_PORT &&
+    !!process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
 
   const OPTIONS: Array<RadioSelectItem<IdeIntegrationNudgeResult>> = [
     {
       label: 'Yes',
-      value: 'yes',
+      value: {
+        userSelection: 'yes',
+        isExtensionPreInstalled,
+      },
     },
     {
       label: 'No (esc)',
-      value: 'no',
+      value: {
+        userSelection: 'no',
+        isExtensionPreInstalled,
+      },
     },
     {
       label: "No, don't ask again",
-      value: 'dismiss',
+      value: {
+        userSelection: 'dismiss',
+        isExtensionPreInstalled,
+      },
     },
   ];
+
+  const installText = isExtensionPreInstalled
+    ? `If you select Yes, the CLI will have access to your open files and display diffs directly in ${
+        ideName ?? 'your editor'
+      }.`
+    : `If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in ${
+        ideName ?? 'your editor'
+      }.`;
 
   return (
     <Box
@@ -54,11 +88,9 @@ export function IdeIntegrationNudge({
       <Box marginBottom={1} flexDirection="column">
         <Text>
           <Text color="yellow">{'> '}</Text>
-          {`Do you want to connect your ${ideName ?? 'your'} editor to Gemini CLI?`}
+          {`Do you want to connect ${ideName ?? 'your'} editor to Gemini CLI?`}
         </Text>
-        <Text
-          dimColor
-        >{`If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in ${ideName ?? 'your editor'}.`}</Text>
+        <Text dimColor>{installText}</Text>
       </Box>
       <RadioButtonSelect
         items={OPTIONS}
