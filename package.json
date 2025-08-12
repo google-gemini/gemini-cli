@@ -79,13 +79,17 @@
     "json": "^11.0.0",
     "lodash": "^4.17.21",
     "memfs": "^4.17.2",
+    "mnemonist": "^0.40.3",
     "mock-fs": "^5.5.0",
+    "msw": "^2.10.4",
     "prettier": "^3.5.3",
     "react-devtools-core": "^4.28.5",
     "tsx": "^4.20.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
-    "yargs": "^17.7.2",
-    "mnemonist": "^0.40.3"
+    "yargs": "^17.7.2"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
   }
 }
