@@ -388,9 +388,10 @@ export async function loadCliConfig(
         approvalMode = ApprovalMode.AUTO_EDIT;
         break;
       case 'default':
-      default:
         approvalMode = ApprovalMode.DEFAULT;
         break;
+      default:
+        throw new Error(`Invalid approval mode: ${argv.approvalMode}. Valid values are: yolo, auto_edit, default`);
     }
   } else {
     // Fallback to legacy --yolo flag behavior
@@ -399,16 +400,30 @@ export async function loadCliConfig(
   
   const interactive =
     !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
-  // In non-interactive and non-yolo mode, exclude interactive built in tools.
-  const extraExcludes =
-    !interactive && approvalMode !== ApprovalMode.YOLO
-      ? [ShellTool.Name, EditTool.Name, WriteFileTool.Name]
-      : undefined;
+  // In non-interactive mode, exclude tools that require a prompt.
+  const extraExcludes: string[] = [];
+  if (!interactive) {
+    switch (approvalMode) {
+      case ApprovalMode.DEFAULT:
+        // In default non-interactive mode, all tools that require approval are excluded.
+        extraExcludes.push(
+          ShellTool.Name,
+          EditTool.Name,
+          WriteFileTool.Name,
+        );
+        break;
+      case ApprovalMode.AUTO_EDIT:
+        // In auto-edit non-interactive mode, only tools that still require a prompt are excluded.
+        extraExcludes.push(ShellTool.Name);
+        break;
+      // No extra excludes for YOLO mode.
+    }
+  }
 
   const excludeTools = mergeExcludeTools(
     settings,
     activeExtensions,
-    extraExcludes,
+    extraExcludes.length > 0 ? extraExcludes : undefined,
   );
   const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
 
