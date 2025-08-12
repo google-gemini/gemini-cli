@@ -26,21 +26,21 @@ jobs:
   build:
     # This 'if' condition is the key. It ensures the job only runs if the
     # tag name does NOT contain the substring 'nightly'.
-      if: "contains(github.ref_name, 'nightly') == false"
-      # Build job
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v4
-        - name: Setup Pages
-          uses: actions/configure-pages@v5
-        - name: Build with Jekyll
-          uses: actions/jekyll-build-pages@v1
-          with:
-            source: ./
-            destination: ./_site
-        - name: Upload artifact
-          uses: actions/upload-pages-artifact@v3
+    if: "contains(github.ref_name, 'nightly') == false"
+    # Build job
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./
+          destination: ./_site
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
 
   # Deployment job
   deploy:
