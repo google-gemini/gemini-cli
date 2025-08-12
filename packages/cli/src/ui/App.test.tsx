@@ -1185,7 +1185,7 @@ describe('App UI', () => {
         thought: null,
       });
 
-      const { unmount, lastFrame } = render(
+      const { unmount } = render(
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
@@ -1194,16 +1194,13 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      // Get the App instance to access its state (through lastFrame output)
-      const initialOutput = lastFrame();
-      
       // The message should not be sent immediately during streaming
       expect(mockSubmitQuery).not.toHaveBeenCalled();
     });
 
     it('should auto-send queued messages when transitioning from Responding to Idle', async () => {
       const mockSubmitQueryFn = vi.fn();
-      
+
       // Start with Responding state
       vi.mocked(useGeminiStream).mockReturnValue({
         streamingState: StreamingState.Responding,
@@ -1251,7 +1248,7 @@ describe('App UI', () => {
       // This test would require being able to simulate handleFinalSubmit
       // and then checking the rendered output for the queued messages
       // with the ▸ prefix and dimColor styling
-      
+
       vi.mocked(useGeminiStream).mockReturnValue({
         streamingState: StreamingState.Responding,
         submitQuery: mockSubmitQuery,
@@ -1277,7 +1274,7 @@ describe('App UI', () => {
 
     it('should clear message queue after sending', async () => {
       const mockSubmitQueryFn = vi.fn();
-      
+
       // Start with idle to allow message queue to process
       vi.mocked(useGeminiStream).mockReturnValue({
         streamingState: StreamingState.Idle,
@@ -1299,7 +1296,7 @@ describe('App UI', () => {
       // After sending, the queue should be cleared
       // This is handled internally by setMessageQueue([]) in the useEffect
       await vi.advanceTimersByTimeAsync(100);
-      
+
       // Verify the component renders without errors
       expect(lastFrame()).toBeDefined();
     });
@@ -1307,7 +1304,7 @@ describe('App UI', () => {
     it('should handle empty messages by filtering them out', () => {
       // The handleFinalSubmit function trims and checks if length > 0
       // before adding to queue, so empty messages are filtered
-      
+
       vi.mocked(useGeminiStream).mockReturnValue({
         streamingState: StreamingState.Idle,
         submitQuery: mockSubmitQuery,
@@ -1333,9 +1330,9 @@ describe('App UI', () => {
     it('should combine multiple queued messages with double newlines', async () => {
       // This test verifies that when multiple messages are queued,
       // they are combined with '\n\n' as the separator
-      
+
       const mockSubmitQueryFn = vi.fn();
-      
+
       vi.mocked(useGeminiStream).mockReturnValue({
         streamingState: StreamingState.Idle,
         submitQuery: mockSubmitQueryFn,
@@ -1356,7 +1353,7 @@ describe('App UI', () => {
       // The combining logic uses messageQueue.join('\n\n')
       // This is tested by the implementation in the useEffect
       await vi.advanceTimersByTimeAsync(100);
-      
+
       expect(lastFrame()).toBeDefined();
     });
   });
