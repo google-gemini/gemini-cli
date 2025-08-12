@@ -19,6 +19,8 @@ import {
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -94,7 +96,23 @@ vi.mock('../services/gitService.js', () => {
   return { GitService: GitServiceMock };
 });
 
+export const server = setupServer();
+
+// TODO(richieforeman): Consider moving this to test setup globally.
+beforeAll(() => {
+  server.listen({});
+});
+
+afterEach(() => {
+  server.resetHandlers();
+});
+
+afterAll(() => {
+  server.close();
+});
+
 describe('Server Config (config.ts)', () => {
+  const CLEARCUT_URL = 'https://play.googleapis.com/log';
   const MODEL = 'gemini-pro';
   const SANDBOX: SandboxConfig = {
     command: 'docker',
@@ -125,6 +143,7 @@ describe('Server Config (config.ts)', () => {
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
+    server.resetHandlers(http.post(CLEARCUT_URL, () => HttpResponse.text()));
   });
 
   describe('initialize', () => {
