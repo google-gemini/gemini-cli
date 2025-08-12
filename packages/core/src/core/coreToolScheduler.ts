@@ -33,7 +33,7 @@ import * as Diff from 'diff';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
-const TRUNCATION_THRESHOLD = 100000; // 100kb
+const TRUNCATION_THRESHOLD = 1000000; // 1M
 const TRUNCATION_LINES = 100;
 
 export type ValidatingToolCall = {
