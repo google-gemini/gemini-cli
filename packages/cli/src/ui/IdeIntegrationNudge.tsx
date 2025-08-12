@@ -11,7 +11,10 @@ import {
   RadioSelectItem,
 } from './components/shared/RadioButtonSelect.js';
 
-export type IdeIntegrationNudgeResult = 'yes' | 'no' | 'dismiss';
+export type IdeIntegrationNudgeResult = {
+  userSelection: 'yes' | 'no' | 'dismiss';
+  isExtensionPreInstalled: boolean;
+};
 
 interface IdeIntegrationNudgeProps {
   ide: DetectedIde;
@@ -24,7 +27,10 @@ export function IdeIntegrationNudge({
 }: IdeIntegrationNudgeProps) {
   useInput((_input, key) => {
     if (key.escape) {
-      onComplete('no');
+      onComplete({
+        userSelection: 'no',
+        isExtensionPreInstalled: false,
+      });
     }
   });
 
@@ -37,15 +43,24 @@ export function IdeIntegrationNudge({
   const OPTIONS: Array<RadioSelectItem<IdeIntegrationNudgeResult>> = [
     {
       label: 'Yes',
-      value: 'yes',
+      value: {
+        userSelection: 'yes',
+        isExtensionPreInstalled,
+      },
     },
     {
       label: 'No (esc)',
-      value: 'no',
+      value: {
+        userSelection: 'no',
+        isExtensionPreInstalled,
+      },
     },
     {
       label: "No, don't ask again",
-      value: 'dismiss',
+      value: {
+        userSelection: 'dismiss',
+        isExtensionPreInstalled,
+      },
     },
   ];
 

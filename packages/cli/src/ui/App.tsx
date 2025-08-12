@@ -61,7 +61,6 @@ import {
   AuthType,
   type IdeContext,
   ideContext,
-  getIdeInfo,
 } from '@google/gemini-cli-core';
 import {
   IdeIntegrationNudge,
@@ -577,12 +576,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const handleIdePromptComplete = useCallback(
     (result: IdeIntegrationNudgeResult) => {
-      if (result === 'yes') {
-        if (!currentIDE) {
-          return;
-        }
-        const ideInfo = getIdeInfo(currentIDE);
-        if (ideInfo.isExtensionInstalledByDefault) {
+      if (result.userSelection === 'yes') {
+        if (result.isExtensionPreInstalled) {
           handleSlashCommand('/ide enable');
         } else {
           handleSlashCommand('/ide install');
@@ -592,7 +587,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           'hasSeenIdeIntegrationNudge',
           true,
         );
-      } else if (result === 'dismiss') {
+      } else if (result.userSelection === 'dismiss') {
         settings.setValue(
           SettingScope.User,
           'hasSeenIdeIntegrationNudge',
@@ -601,7 +596,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       }
       setIdePromptAnswered(true);
     },
-    [handleSlashCommand, settings, currentIDE],
+    [handleSlashCommand, settings],
   );
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
