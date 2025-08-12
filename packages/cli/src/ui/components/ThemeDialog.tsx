@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
@@ -16,6 +16,7 @@ import {
   getScopeItems,
   getScopeMessageForSetting,
 } from '../../utils/dialogScopeUtils.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
@@ -111,14 +112,17 @@ export function ThemeDialog({
     'theme',
   );
 
-  useInput((input, key) => {
-    if (key.tab) {
-      setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
-    }
-    if (key.escape) {
-      onSelect(undefined, selectedScope);
-    }
-  });
+  useKeypress(
+    (key) => {
+      if (key.name === 'tab') {
+        setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
+      }
+      if (key.name === 'escape') {
+        onSelect(undefined, selectedScope);
+      }
+    },
+    { isActive: true },
+  );
 
   // Generate scope message for theme setting
   const otherScopeModifiedMessage = getScopeMessageForSetting(

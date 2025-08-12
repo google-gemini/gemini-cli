@@ -5,11 +5,12 @@
  */
 
 import { DetectedIde, getIdeInfo } from '@google/gemini-cli-core';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import {
   RadioButtonSelect,
   RadioSelectItem,
 } from './components/shared/RadioButtonSelect.js';
+import { useKeypress } from './hooks/useKeypress.js';
 
 export type IdeIntegrationNudgeResult = {
   userSelection: 'yes' | 'no' | 'dismiss';
@@ -25,14 +26,17 @@ export function IdeIntegrationNudge({
   ide,
   onComplete,
 }: IdeIntegrationNudgeProps) {
-  useInput((_input, key) => {
-    if (key.escape) {
-      onComplete({
-        userSelection: 'no',
-        isExtensionPreInstalled: false,
-      });
-    }
-  });
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape') {
+        onComplete({
+          userSelection: 'no',
+          isExtensionPreInstalled: false,
+        });
+      }
+    },
+    { isActive: true },
+  );
 
   const { displayName: ideName } = getIdeInfo(ide);
   // Assume extension is already installed if the env variables are set.
