@@ -28,8 +28,11 @@ export function IdeIntegrationNudge({
     }
   });
 
-  const { displayName: ideName, isExtensionInstalledByDefault } =
-    getIdeInfo(ide);
+  const { displayName: ideName } = getIdeInfo(ide);
+  // Assume extension is already installed if the env variables are set.
+  const isExtensionPreInstalled =
+    !!process.env.GEMINI_CLI_IDE_SERVER_PORT &&
+    !!process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
 
   const OPTIONS: Array<RadioSelectItem<IdeIntegrationNudgeResult>> = [
     {
@@ -46,7 +49,7 @@ export function IdeIntegrationNudge({
     },
   ];
 
-  const installText = isExtensionInstalledByDefault
+  const installText = isExtensionPreInstalled
     ? `If you select Yes, the CLI will have access to access your open files and display diffs directly in ${
         ideName ?? 'your editor'
       }.`

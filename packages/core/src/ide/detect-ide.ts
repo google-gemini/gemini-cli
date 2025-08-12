@@ -6,18 +6,15 @@
 
 export enum DetectedIde {
   VSCode = 'vscode',
-  VSCodium = 'vscodium',
   Cursor = 'cursor',
   CloudShell = 'cloudshell',
   Codespaces = 'codespaces',
-  Windsurf = 'windsurf',
   FirebaseStudio = 'firebasestudio',
   Trae = 'trae',
 }
 
 export interface IdeInfo {
   displayName: string;
-  isExtensionInstalledByDefault: boolean;
 }
 
 export function getIdeInfo(ide: DetectedIde): IdeInfo {
@@ -25,42 +22,26 @@ export function getIdeInfo(ide: DetectedIde): IdeInfo {
     case DetectedIde.VSCode:
       return {
         displayName: 'VS Code',
-        isExtensionInstalledByDefault: false,
-      };
-    case DetectedIde.VSCodium:
-      return {
-        displayName: 'VSCodium',
-        isExtensionInstalledByDefault: false,
       };
     case DetectedIde.Cursor:
       return {
         displayName: 'Cursor',
-        isExtensionInstalledByDefault: false,
       };
     case DetectedIde.CloudShell:
       return {
         displayName: 'Cloud Shell',
-        isExtensionInstalledByDefault: true,
       };
     case DetectedIde.Codespaces:
       return {
         displayName: 'GitHub Codespaces',
-        isExtensionInstalledByDefault: false,
-      };
-    case DetectedIde.Windsurf:
-      return {
-        displayName: 'Windsurf',
-        isExtensionInstalledByDefault: false,
       };
     case DetectedIde.FirebaseStudio:
       return {
         displayName: 'Firebase Studio',
-        isExtensionInstalledByDefault: true,
       };
     case DetectedIde.Trae:
       return {
         displayName: 'Trae',
-        isExtensionInstalledByDefault: false,
       };
     default: {
       // This ensures that if a new IDE is added to the enum, we get a compile-time error.

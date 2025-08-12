@@ -147,20 +147,11 @@ class VsCodeInstaller implements IdeInstaller {
   }
 }
 
-class DefaultInstaller implements IdeInstaller {
-  async install(): Promise<InstallResult> {
-    return {
-      success: false,
-      message: `Install the Gemini Code Assist Companion Extension manually from the extension marketplace.`,
-    };
-  }
-}
-
 export function getIdeInstaller(ide: DetectedIde): IdeInstaller | null {
   switch (ide) {
     case DetectedIde.VSCode:
       return new VsCodeInstaller();
     default:
-      return new DefaultInstaller();
+      return null;
   }
 }

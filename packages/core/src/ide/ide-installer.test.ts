@@ -23,31 +23,6 @@ describe('ide-installer', () => {
       // A more specific check might be needed if we export the class
       expect(installer).toBeInstanceOf(Object);
     });
-
-    it('should return a DefaultInstaller for "vscodium"', () => {
-      const installer = getIdeInstaller(DetectedIde.VSCodium);
-      expect(installer).not.toBeNull();
-      expect(installer).toBeInstanceOf(Object);
-    });
-
-    it('should return a DefaultInstaller for an unknown IDE', () => {
-      const installer = getIdeInstaller('unknown' as DetectedIde);
-      // Assuming DefaultInstaller is the fallback
-      expect(installer).not.toBeNull();
-      expect(installer).toBeInstanceOf(Object);
-    });
-
-    it('should return a CloudIdeInstaller for "cloudshell"', () => {
-      const installer = getIdeInstaller(DetectedIde.CloudShell);
-      expect(installer).not.toBeNull();
-      expect(installer).toBeInstanceOf(Object);
-    });
-
-    it('should return a CloudIdeInstaller for "firebasestudio"', () => {
-      const installer = getIdeInstaller(DetectedIde.FirebaseStudio);
-      expect(installer).not.toBeNull();
-      expect(installer).toBeInstanceOf(Object);
-    });
   });
 
   describe('VsCodeInstaller', () => {
