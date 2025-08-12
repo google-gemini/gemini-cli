@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Mock } from 'vitest';
 import { Config, ConfigParameters, SandboxConfig } from './config.js';
 import * as path from 'path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
@@ -120,11 +121,13 @@ describe('Server Config (config.ts)', () => {
     telemetry: TELEMETRY_SETTINGS,
     sessionId: SESSION_ID,
     model: MODEL,
+    usageStatisticsEnabled: false,
   };
 
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
+    vi.spyOn(ClearcutLogger.prototype, 'logStartSessionEvent');
   });
 
   describe('initialize', () => {
@@ -375,7 +378,10 @@ describe('Server Config (config.ts)', () => {
 
   describe('Usage Statistics', () => {
     it('defaults usage statistics to enabled if not specified', () => {
-      const config = new Config(baseParams);
+      const config = new Config({
+        ...baseParams,
+        usageStatisticsEnabled: undefined,
+      });
 
       expect(config.getUsageStatisticsEnabled()).toBe(true);
     });
@@ -392,10 +398,9 @@ describe('Server Config (config.ts)', () => {
     );
 
     it('logs the session start event', () => {
-      vi.spyOn(ClearcutLogger.prototype, 'logStartSessionEvent');
-
       new Config({
         ...baseParams,
+        usageStatisticsEnabled: true,
       });
 
       expect(
