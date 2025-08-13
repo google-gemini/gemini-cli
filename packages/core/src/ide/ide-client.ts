@@ -229,9 +229,8 @@ export class IdeClient {
   }
 
   private validateWorkspacePath(): boolean {
-    const ideWorkspacePaths =
-      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH']?.split(':');
-    if (!ideWorkspacePaths || ideWorkspacePaths.length === 0) {
+    const ideWorkspacePath = process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+    if (ideWorkspacePath === undefined) {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
@@ -240,6 +239,16 @@ export class IdeClient {
       return false;
     }
 
+    if (ideWorkspacePath === '') {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `To use this feature, please open a workspace folder in ${this.currentIdeDisplayName} and try again.`,
+        true,
+      );
+      return false;
+    }
+
+    const ideWorkspacePaths = ideWorkspacePath.split(':');
     const cwd = getRealPath(process.cwd()).toLocaleLowerCase();
     const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) => {
       const idePath = getRealPath(workspacePath).toLocaleLowerCase();
@@ -259,7 +268,6 @@ export class IdeClient {
       );
       return false;
     }
-
     return true;
   }
 
