@@ -197,6 +197,7 @@ export interface ConfigParameters {
   loadMemoryFromIncludeDirectories?: boolean;
   chatCompression?: ChatCompressionSettings;
   interactive?: boolean;
+  trustedFolder?: boolean;
 }
 
 export class Config {
@@ -260,6 +261,7 @@ export class Config {
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly chatCompression: ChatCompressionSettings | undefined;
   private readonly interactive: boolean;
+  private readonly trustedFolder: boolean | undefined;
   private initialized: boolean = false;
 
   constructor(params: ConfigParameters) {
@@ -324,6 +326,7 @@ export class Config {
       params.loadMemoryFromIncludeDirectories ?? false;
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
+    this.trustedFolder = params.trustedFolder;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -662,6 +665,10 @@ export class Config {
 
   getFolderTrust(): boolean {
     return this.folderTrust;
+  }
+
+  isTrustedFolder(): boolean | undefined {
+    return this.trustedFolder;
   }
 
   setIdeMode(value: boolean): void {
