@@ -19,6 +19,11 @@ This guide provides solutions to common issues and debugging tips, including top
     [Google AI Studio](http://aistudio.google.com/app/apikey), which also includes a
     separate free tier.
 
+- **Error: `UNABLE_TO_GET_ISSUER_CERT_LOCALLY` or `unable to get local issuer certificate`**
+  - **Cause:** You may be on a corporate network with a firewall that intercepts and inspects SSL/TLS traffic. This often requires a custom root CA certificate to be trusted by Node.js.
+  - **Solution:** Set the `NODE_EXTRA_CA_CERTS` environment variable to the absolute path of your corporate root CA certificate file.
+    - Example: `export NODE_EXTRA_CA_CERTS=/path/to/your/corporate-ca.crt`
+
 ## Frequently asked questions (FAQs)
 
 - **Q: How do I update Gemini CLI to the latest version?**
