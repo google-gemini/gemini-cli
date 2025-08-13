@@ -29,7 +29,7 @@ function ensureConfigDir(): void {
 /**
  * 加载语言配置
  */
-export function loadLanguageConfig(): LanguageConfig {
+export function loadLanguageConfig(): LanguageConfig | null {
   try {
     if (fs.existsSync(LANGUAGE_CONFIG_FILE)) {
       const content = fs.readFileSync(LANGUAGE_CONFIG_FILE, 'utf-8');
@@ -44,8 +44,7 @@ export function loadLanguageConfig(): LanguageConfig {
     console.warn('Failed to load language config, using default');
   }
   
-  // 返回默认配置
-  return { language: 'en' };
+  return null;
 }
 
 /**
@@ -65,6 +64,12 @@ export function saveLanguageConfig(config: LanguageConfig): void {
  * 从环境变量获取语言
  */
 function getLanguageFromEnv(): SupportedLanguage | null {
+  // 首先检查专用的 GEMINI_CLI_LANGUAGE 环境变量
+  const geminiLang = process.env.GEMINI_CLI_LANGUAGE;
+  if (geminiLang && i18n.isSupportedLanguage(geminiLang)) {
+    return geminiLang;
+  }
+  
   // 检查常见的语言环境变量
   const envLang = process.env.LANG || process.env.LANGUAGE || process.env.LC_ALL;
   
@@ -92,7 +97,7 @@ export function getEffectiveLanguage(cliArg?: string): SupportedLanguage {
   
   // 2. 配置文件
   const savedConfig = loadLanguageConfig();
-  if (savedConfig.language) {
+  if (savedConfig && savedConfig.language) {
     return savedConfig.language;
   }
   
