@@ -10,6 +10,10 @@ import {
   isGenericQuotaExceededError,
 } from './quotaErrorDetection.js';
 
+export interface HttpError extends Error {
+  status?: number;
+}
+
 export interface RetryOptions {
   maxAttempts: number;
   initialDelayMs: number;
@@ -18,7 +22,7 @@ export interface RetryOptions {
   onPersistent429?: (
     authType?: string,
     error?: unknown,
-  ) => Promise<string | null>;
+  ) => Promise<string | boolean | null>;
   authType?: string;
 }
 
@@ -102,13 +106,16 @@ export async function retryWithBackoff<T>(
       ) {
         try {
           const fallbackModel = await onPersistent429(authType, error);
-          if (fallbackModel) {
+          if (fallbackModel !== false && fallbackModel !== null) {
             // Reset attempt counter and try with new model
             attempt = 0;
             consecutive429Count = 0;
             currentDelay = initialDelayMs;
             // With the model updated, we continue to the next attempt
             continue;
+          } else {
+            // Fallback handler returned null/false, meaning don't continue - stop retry process
+            throw error;
           }
         } catch (fallbackError) {
           // If fallback fails, continue with original error
@@ -126,13 +133,16 @@ export async function retryWithBackoff<T>(
       ) {
         try {
           const fallbackModel = await onPersistent429(authType, error);
-          if (fallbackModel) {
+          if (fallbackModel !== false && fallbackModel !== null) {
             // Reset attempt counter and try with new model
             attempt = 0;
             consecutive429Count = 0;
             currentDelay = initialDelayMs;
             // With the model updated, we continue to the next attempt
             continue;
+          } else {
+            // Fallback handler returned null/false, meaning don't continue - stop retry process
+            throw error;
           }
         } catch (fallbackError) {
           // If fallback fails, continue with original error
@@ -155,13 +165,16 @@ export async function retryWithBackoff<T>(
       ) {
         try {
           const fallbackModel = await onPersistent429(authType, error);
-          if (fallbackModel) {
+          if (fallbackModel !== false && fallbackModel !== null) {
             // Reset attempt counter and try with new model
             attempt = 0;
             consecutive429Count = 0;
             currentDelay = initialDelayMs;
             // With the model updated, we continue to the next attempt
             continue;
+          } else {
+            // Fallback handler returned null/false, meaning don't continue - stop retry process
+            throw error;
           }
         } catch (fallbackError) {
           // If fallback fails, continue with original error
@@ -187,7 +200,7 @@ export async function retryWithBackoff<T>(
         // Reset currentDelay for next potential non-429 error, or if Retry-After is not present next time
         currentDelay = initialDelayMs;
       } else {
-        // Fallback to exponential backoff with jitter
+        // Fall back to exponential backoff with jitter
         logRetryAttempt(attempt, error, errorStatus);
         // Add jitter: +/- 30% of currentDelay
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
@@ -207,7 +220,7 @@ export async function retryWithBackoff<T>(
  * @param error The error object.
  * @returns The HTTP status code, or undefined if not found.
  */
-function getErrorStatus(error: unknown): number | undefined {
+export function getErrorStatus(error: unknown): number | undefined {
   if (typeof error === 'object' && error !== null) {
     if ('status' in error && typeof error.status === 'number') {
       return error.status;

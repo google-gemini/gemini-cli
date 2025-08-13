@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { FunctionDeclaration, Schema, Type } from '@google/genai';
-import { Tool, ToolResult, BaseTool } from './tools.js';
+import { FunctionDeclaration } from '@google/genai';
+import { AnyDeclarativeTool, Icon, ToolResult, BaseTool } from './tools.js';
 import { Config } from '../config/config.js';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
@@ -18,7 +18,7 @@ type ToolParams = Record<string, unknown>;
 export class DiscoveredTool extends BaseTool<ToolParams, ToolResult> {
   constructor(
     private readonly config: Config,
-    readonly name: string,
+    name: string,
     readonly description: string,
     readonly parameterSchema: Record<string, unknown>,
   ) {
@@ -44,6 +44,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
       name,
       name,
       description,
+      Icon.Hammer,
       parameterSchema,
       false, // isOutputMarkdown
       false, // canUpdateOutput
@@ -124,7 +125,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
 }
 
 export class ToolRegistry {
-  private tools: Map<string, Tool> = new Map();
+  private tools: Map<string, AnyDeclarativeTool> = new Map();
   private config: Config;
 
   constructor(config: Config) {
@@ -135,27 +136,38 @@ export class ToolRegistry {
    * Registers a tool definition.
    * @param tool - The tool object containing schema and execution logic.
    */
-  registerTool(tool: Tool): void {
+  registerTool(tool: AnyDeclarativeTool): void {
     if (this.tools.has(tool.name)) {
-      // Decide on behavior: throw error, log warning, or allow overwrite
-      console.warn(
-        `Tool with name "${tool.name}" is already registered. Overwriting.`,
-      );
+      if (tool instanceof DiscoveredMCPTool) {
+        tool = tool.asFullyQualifiedTool();
+      } else {
+        // Decide on behavior: throw error, log warning, or allow overwrite
+        console.warn(
+          `Tool with name "${tool.name}" is already registered. Overwriting.`,
+        );
+      }
     }
     this.tools.set(tool.name, tool);
   }
 
-  /**
-   * Discovers tools from project (if available and configured).
-   * Can be called multiple times to update discovered tools.
-   */
-  async discoverTools(): Promise<void> {
-    // remove any previously discovered tools
+  private removeDiscoveredTools(): void {
     for (const tool of this.tools.values()) {
       if (tool instanceof DiscoveredTool || tool instanceof DiscoveredMCPTool) {
         this.tools.delete(tool.name);
       }
     }
+  }
+
+  /**
+   * Discovers tools from project (if available and configured).
+   * Can be called multiple times to update discovered tools.
+   * This will discover tools from the command line and from MCP servers.
+   */
+  async discoverAllTools(): Promise<void> {
+    // remove any previously discovered tools
+    this.removeDiscoveredTools();
+
+    this.config.getPromptRegistry().clear();
 
     await this.discoverAndRegisterToolsFromCommand();
 
@@ -164,7 +176,60 @@ export class ToolRegistry {
       this.config.getMcpServers() ?? {},
       this.config.getMcpServerCommand(),
       this,
+      this.config.getPromptRegistry(),
+      this.config.getDebugMode(),
+      this.config.getWorkspaceContext(),
     );
+  }
+
+  /**
+   * Discovers tools from project (if available and configured).
+   * Can be called multiple times to update discovered tools.
+   * This will NOT discover tools from the command line, only from MCP servers.
+   */
+  async discoverMcpTools(): Promise<void> {
+    // remove any previously discovered tools
+    this.removeDiscoveredTools();
+
+    this.config.getPromptRegistry().clear();
+
+    // discover tools using MCP servers, if configured
+    await discoverMcpTools(
+      this.config.getMcpServers() ?? {},
+      this.config.getMcpServerCommand(),
+      this,
+      this.config.getPromptRegistry(),
+      this.config.getDebugMode(),
+      this.config.getWorkspaceContext(),
+    );
+  }
+
+  /**
+   * Discover or re-discover tools for a single MCP server.
+   * @param serverName - The name of the server to discover tools from.
+   */
+  async discoverToolsForServer(serverName: string): Promise<void> {
+    // Remove any previously discovered tools from this server
+    for (const [name, tool] of this.tools.entries()) {
+      if (tool instanceof DiscoveredMCPTool && tool.serverName === serverName) {
+        this.tools.delete(name);
+      }
+    }
+
+    this.config.getPromptRegistry().removePromptsByServer(serverName);
+
+    const mcpServers = this.config.getMcpServers() ?? {};
+    const serverConfig = mcpServers[serverName];
+    if (serverConfig) {
+      await discoverMcpTools(
+        { [serverName]: serverConfig },
+        undefined,
+        this,
+        this.config.getPromptRegistry(),
+        this.config.getDebugMode(),
+        this.config.getWorkspaceContext(),
+      );
+    }
   }
 
   private async discoverAndRegisterToolsFromCommand(): Promise<void> {
@@ -266,14 +331,12 @@ export class ToolRegistry {
           console.warn('Discovered a tool with no name. Skipping.');
           continue;
         }
-        // Sanitize the parameters before registering the tool.
         const parameters =
-          func.parameters &&
-          typeof func.parameters === 'object' &&
-          !Array.isArray(func.parameters)
-            ? (func.parameters as Schema)
+          func.parametersJsonSchema &&
+          typeof func.parametersJsonSchema === 'object' &&
+          !Array.isArray(func.parametersJsonSchema)
+            ? func.parametersJsonSchema
             : {};
-        sanitizeParameters(parameters);
         this.registerTool(
           new DiscoveredTool(
             this.config,
@@ -304,88 +367,47 @@ export class ToolRegistry {
   }
 
   /**
+   * Retrieves a filtered list of tool schemas based on a list of tool names.
+   * @param toolNames - An array of tool names to include.
+   * @returns An array of FunctionDeclarations for the specified tools.
+   */
+  getFunctionDeclarationsFiltered(toolNames: string[]): FunctionDeclaration[] {
+    const declarations: FunctionDeclaration[] = [];
+    for (const name of toolNames) {
+      const tool = this.tools.get(name);
+      if (tool) {
+        declarations.push(tool.schema);
+      }
+    }
+    return declarations;
+  }
+
+  /**
    * Returns an array of all registered and discovered tool instances.
    */
-  getAllTools(): Tool[] {
-    return Array.from(this.tools.values());
+  getAllTools(): AnyDeclarativeTool[] {
+    return Array.from(this.tools.values()).sort((a, b) =>
+      a.displayName.localeCompare(b.displayName),
+    );
   }
 
   /**
    * Returns an array of tools registered from a specific MCP server.
    */
-  getToolsByServer(serverName: string): Tool[] {
-    const serverTools: Tool[] = [];
+  getToolsByServer(serverName: string): AnyDeclarativeTool[] {
+    const serverTools: AnyDeclarativeTool[] = [];
     for (const tool of this.tools.values()) {
       if ((tool as DiscoveredMCPTool)?.serverName === serverName) {
         serverTools.push(tool);
       }
     }
-    return serverTools;
+    return serverTools.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /**
    * Get the definition of a specific tool.
    */
-  getTool(name: string): Tool | undefined {
+  getTool(name: string): AnyDeclarativeTool | undefined {
     return this.tools.get(name);
-  }
-}
-
-/**
- * Sanitizes a schema object in-place to ensure compatibility with the Gemini API.
- *
- * NOTE: This function mutates the passed schema object.
- *
- * It performs the following actions:
- * - Removes the `default` property when `anyOf` is present.
- * - Removes unsupported `format` values from string properties, keeping only 'enum' and 'date-time'.
- * - Recursively sanitizes nested schemas within `anyOf`, `items`, and `properties`.
- * - Handles circular references within the schema to prevent infinite loops.
- *
- * @param schema The schema object to sanitize. It will be modified directly.
- */
-export function sanitizeParameters(schema?: Schema) {
-  _sanitizeParameters(schema, new Set<Schema>());
-}
-
-/**
- * Internal recursive implementation for sanitizeParameters.
- * @param schema The schema object to sanitize.
- * @param visited A set used to track visited schema objects during recursion.
- */
-function _sanitizeParameters(schema: Schema | undefined, visited: Set<Schema>) {
-  if (!schema || visited.has(schema)) {
-    return;
-  }
-  visited.add(schema);
-
-  if (schema.anyOf) {
-    // Vertex AI gets confused if both anyOf and default are set.
-    schema.default = undefined;
-    for (const item of schema.anyOf) {
-      if (typeof item !== 'boolean') {
-        _sanitizeParameters(item, visited);
-      }
-    }
-  }
-  if (schema.items && typeof schema.items !== 'boolean') {
-    _sanitizeParameters(schema.items, visited);
-  }
-  if (schema.properties) {
-    for (const item of Object.values(schema.properties)) {
-      if (typeof item !== 'boolean') {
-        _sanitizeParameters(item, visited);
-      }
-    }
-  }
-  // Vertex AI only supports 'enum' and 'date-time' for STRING format.
-  if (schema.type === Type.STRING) {
-    if (
-      schema.format &&
-      schema.format !== 'enum' &&
-      schema.format !== 'date-time'
-    ) {
-      schema.format = undefined;
-    }
   }
 }
