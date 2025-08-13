@@ -23,7 +23,7 @@ import {
   ToolCall, // Import from core
   Status as ToolCallStatusType,
   ApprovalMode,
-  Icon,
+  Kind,
   BaseTool,
   AnyDeclarativeTool,
   AnyToolInvocation,
@@ -67,7 +67,7 @@ class MockTool extends BaseTool<object, ToolResult> {
       name,
       displayName,
       'A mock tool for testing',
-      Icon.Hammer,
+      Kind.Other,
       {},
       isOutputMarkdown,
       canUpdateOutput,
