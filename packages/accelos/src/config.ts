@@ -7,6 +7,8 @@ export const AccelosConfigSchema = z.object({
   temperature: z.number().min(0).max(2).default(0.1),
   maxTokens: z.number().positive().default(1000),
   systemPrompt: z.string().default('You are Accelos, a helpful AI assistant.'),
+  guardrailFilePath: z.string().default(process.env.ACCELOS_GUARDRAIL_FILE_PATH || './src/prompts/guardrails.json'),
+  rcaDirectoryPath: z.string().default(process.env.ACCELOS_RCA_DIRECTORY_PATH || './src/rcas'),
 });
 
 export type AccelosConfig = z.infer<typeof AccelosConfigSchema>;
@@ -17,4 +19,6 @@ export const defaultConfig: AccelosConfig = {
   temperature: 0.1,
   maxTokens: 1000,
   systemPrompt: 'You are Accelos, a helpful AI assistant that helps with various tasks including code analysis, document processing, and general assistance.',
+  guardrailFilePath: process.env.ACCELOS_GUARDRAIL_FILE_PATH || './src/prompts/guardrails.json',
+  rcaDirectoryPath: process.env.ACCELOS_RCA_DIRECTORY_PATH || './src/rcas',
 };
