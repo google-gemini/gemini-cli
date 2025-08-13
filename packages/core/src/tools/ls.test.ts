@@ -74,9 +74,11 @@ describe('LSTool', () => {
       const params = {
         path: '/home/user/project/src',
       };
-
-      const error = lsTool.validateToolParams(params);
-      expect(error).toBeNull();
+      vi.mocked(fs.statSync).mockReturnValue({
+        isDirectory: () => true,
+      } as fs.Stats);
+      const invocation = lsTool.build(params);
+      expect(invocation).toBeDefined();
     });
 
     it('should reject relative paths', () => {
@@ -84,8 +86,9 @@ describe('LSTool', () => {
         path: './src',
       };
 
-      const error = lsTool.validateToolParams(params);
-      expect(error).toBe('Path must be absolute: ./src');
+      expect(() => lsTool.build(params)).toThrow(
+        'Path must be absolute: ./src',
+      );
     });
 
     it('should reject paths outside workspace with clear error message', () => {
@@ -93,8 +96,7 @@ describe('LSTool', () => {
         path: '/etc/passwd',
       };
 
-      const error = lsTool.validateToolParams(params);
-      expect(error).toBe(
+      expect(() => lsTool.build(params)).toThrow(
         'Path must be within one of the workspace directories: /home/user/project, /home/user/other-project',
       );
     });
@@ -103,9 +105,11 @@ describe('LSTool', () => {
       const params = {
         path: '/home/user/other-project/lib',
       };
-
-      const error = lsTool.validateToolParams(params);
-      expect(error).toBeNull();
+      vi.mocked(fs.statSync).mockReturnValue({
+        isDirectory: () => true,
+      } as fs.Stats);
+      const invocation = lsTool.build(params);
+      expect(invocation).toBeDefined();
     });
   });
 
@@ -133,10 +137,8 @@ describe('LSTool', () => {
 
       vi.mocked(fs.readdirSync).mockReturnValue(mockFiles as any);
 
-      const result = await lsTool.execute(
-        { path: testPath },
-        new AbortController().signal,
-      );
+      const invocation = lsTool.build({ path: testPath });
+      const result = await invocation.execute(new AbortController().signal);
 
       expect(result.llmContent).toContain('[DIR] subdir');
       expect(result.llmContent).toContain('file1.ts');
@@ -161,10 +163,8 @@ describe('LSTool', () => {
 
       vi.mocked(fs.readdirSync).mockReturnValue(mockFiles as any);
 
-      const result = await lsTool.execute(
-        { path: testPath },
-        new AbortController().signal,
-      );
+      const invocation = lsTool.build({ path: testPath });
+      const result = await invocation.execute(new AbortController().signal);
 
       expect(result.llmContent).toContain('module1.js');
       expect(result.llmContent).toContain('module2.js');
@@ -179,10 +179,8 @@ describe('LSTool', () => {
       } as fs.Stats);
       vi.mocked(fs.readdirSync).mockReturnValue([]);
 
-      const result = await lsTool.execute(
-        { path: testPath },
-        new AbortController().signal,
-      );
+      const invocation = lsTool.build({ path: testPath });
+      const result = await invocation.execute(new AbortController().signal);
 
       expect(result.llmContent).toBe(
         'Directory /home/user/project/empty is empty.',
@@ -207,10 +205,11 @@ describe('LSTool', () => {
       });
       vi.mocked(fs.readdirSync).mockReturnValue(mockFiles as any);
 
-      const result = await lsTool.execute(
-        { path: testPath, ignore: ['*.spec.js'] },
-        new AbortController().signal,
-      );
+      const invocation = lsTool.build({
+        path: testPath,
+        ignore: ['*.spec.js'],
+      });
+      const result = await invocation.execute(new AbortController().signal);
 
       expect(result.llmContent).toContain('test.js');
       expect(result.llmContent).toContain('index.js');
@@ -238,10 +237,8 @@ describe('LSTool', () => {
         (path: string) => path.includes('ignored.js'),
       );
 
-      const result = await lsTool.execute(
-        { path: testPath },
-        new AbortController().signal,
-      );
+      const invocation = lsTool.build({ path: testPath });
+      const result = await invocation.execute(new AbortController().signal);
 
       expect(result.llmContent).toContain('file1.js');
       expect(result.llmContent).toContain('file2.js');
@@ -269,10 +266,8 @@ describe('LSTool', () => {
         (path: string) => path.includes('private.js'),
       );
 
-      const result = await lsTool.execute(
-        { path: testPath },
-        new AbortController().signal,
-      );
+      const invocation = lsTool.build({ path: testPath });
+      const result = await invocation.execute(new AbortController().signal);
 
       expect(result.llmContent).toContain('file1.js');
       expect(result.llmContent).toContain('file2.js');
@@ -287,10 +282,8 @@ describe('LSTool', () => {
         isDirectory: () => false,
       } as fs.Stats);
 
-      const result = await lsTool.execute(
-        { path: testPath },
-        new AbortController().signal,
-      );
+      const invocation = lsTool.build({ path: testPath });
+      const result = await invocation.execute(new AbortController().signal);
 
       expect(result.llmContent).toContain('Path is not a directory');
       expect(result.returnDisplay).toBe('Error: Path is not a directory.');
@@ -303,10 +296,8 @@ describe('LSTool', () => {
         throw new Error('ENOENT: no such file or directory');
       });
 
-      const result = await lsTool.execute(
-        { path: testPath },
-        new AbortController().signal,
-      );
+      const invocation = lsTool.build({ path: testPath });
+      const result = await invocation.execute(new AbortController().signal);
 
       expect(result.llmContent).toContain('Error listing directory');
       expect(result.returnDisplay).toBe('Error: Failed to list directory.');
@@ -336,10 +327,8 @@ describe('LSTool', () => {
 
       vi.mocked(fs.readdirSync).mockReturnValue(mockFiles as any);
 
-      const result = await lsTool.execute(
-        { path: testPath },
-        new AbortController().signal,
-      );
+      const invocation = lsTool.build({ path: testPath });
+      const result = await invocation.execute(new AbortController().signal);
 
       const lines = (
         typeof result.llmContent === 'string' ? result.llmContent : ''
@@ -361,24 +350,18 @@ describe('LSTool', () => {
         throw new Error('EACCES: permission denied');
       });
 
-      const result = await lsTool.execute(
-        { path: testPath },
-        new AbortController().signal,
-      );
+      const invocation = lsTool.build({ path: testPath });
+      const result = await invocation.execute(new AbortController().signal);
 
       expect(result.llmContent).toContain('Error listing directory');
       expect(result.llmContent).toContain('permission denied');
       expect(result.returnDisplay).toBe('Error: Failed to list directory.');
     });
 
-    it('should validate parameters and return error for invalid params', async () => {
-      const result = await lsTool.execute(
-        { path: '../outside' },
-        new AbortController().signal,
+    it('should throw for invalid params at build time', async () => {
+      expect(() => lsTool.build({ path: '../outside' })).toThrow(
+        'Path must be absolute: ../outside',
       );
-
-      expect(result.llmContent).toContain('Invalid parameters provided');
-      expect(result.returnDisplay).toBe('Error: Failed to execute tool.');
     });
 
     it('should handle errors accessing individual files during listing', async () => {
@@ -406,10 +389,8 @@ describe('LSTool', () => {
         .spyOn(console, 'error')
         .mockImplementation(() => {});
 
-      const result = await lsTool.execute(
-        { path: testPath },
-        new AbortController().signal,
-      );
+      const invocation = lsTool.build({ path: testPath });
+      const result = await invocation.execute(new AbortController().signal);
 
       // Should still list the accessible file
       expect(result.llmContent).toContain('accessible.ts');
@@ -428,19 +409,25 @@ describe('LSTool', () => {
   describe('getDescription', () => {
     it('should return shortened relative path', () => {
       const params = {
-        path: path.join(mockPrimaryDir, 'deeply', 'nested', 'directory'),
+        path: `${mockPrimaryDir}/deeply/nested/directory`,
       };
-
-      const description = lsTool.getDescription(params);
+      vi.mocked(fs.statSync).mockReturnValue({
+        isDirectory: () => true,
+      } as fs.Stats);
+      const invocation = lsTool.build(params);
+      const description = invocation.getDescription();
       expect(description).toBe(path.join('deeply', 'nested', 'directory'));
     });
 
     it('should handle paths in secondary workspace', () => {
       const params = {
-        path: path.join(mockSecondaryDir, 'lib'),
+        path: `${mockSecondaryDir}/lib`,
       };
-
-      const description = lsTool.getDescription(params);
+      vi.mocked(fs.statSync).mockReturnValue({
+        isDirectory: () => true,
+      } as fs.Stats);
+      const invocation = lsTool.build(params);
+      const description = invocation.getDescription();
       expect(description).toBe(path.join('..', 'other-project', 'lib'));
     });
   });
@@ -448,22 +435,25 @@ describe('LSTool', () => {
   describe('workspace boundary validation', () => {
     it('should accept paths in primary workspace directory', () => {
       const params = { path: `${mockPrimaryDir}/src` };
-      expect(lsTool.validateToolParams(params)).toBeNull();
+      vi.mocked(fs.statSync).mockReturnValue({
+        isDirectory: () => true,
+      } as fs.Stats);
+      expect(lsTool.build(params)).toBeDefined();
     });
 
     it('should accept paths in secondary workspace directory', () => {
       const params = { path: `${mockSecondaryDir}/lib` };
-      expect(lsTool.validateToolParams(params)).toBeNull();
+      vi.mocked(fs.statSync).mockReturnValue({
+        isDirectory: () => true,
+      } as fs.Stats);
+      expect(lsTool.build(params)).toBeDefined();
     });
 
     it('should reject paths outside all workspace directories', () => {
       const params = { path: '/etc/passwd' };
-      const error = lsTool.validateToolParams(params);
-      expect(error).toContain(
+      expect(() => lsTool.build(params)).toThrow(
         'Path must be within one of the workspace directories',
       );
-      expect(error).toContain(mockPrimaryDir);
-      expect(error).toContain(mockSecondaryDir);
     });
 
     it('should list files from secondary workspace directory', async () => {
@@ -483,10 +473,8 @@ describe('LSTool', () => {
 
       vi.mocked(fs.readdirSync).mockReturnValue(mockFiles as any);
 
-      const result = await lsTool.execute(
-        { path: testPath },
-        new AbortController().signal,
-      );
+      const invocation = lsTool.build({ path: testPath });
+      const result = await invocation.execute(new AbortController().signal);
 
       expect(result.llmContent).toContain('test1.spec.ts');
       expect(result.llmContent).toContain('test2.spec.ts');
