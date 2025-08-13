@@ -229,8 +229,6 @@ export const useSlashCommandProcessor = (
       oneTimeShellAllowlist?: Set<string>,
       overwriteConfirmed?: boolean,
     ): Promise<SlashCommandProcessorResult | false> => {
-      setIsProcessing(true);
-
       if (typeof rawQuery !== 'string') {
         return false;
       }
@@ -239,6 +237,8 @@ export const useSlashCommandProcessor = (
       if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {
         return false;
       }
+
+      setIsProcessing(true);
 
       const userMessageTimestamp = Date.now();
       addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
