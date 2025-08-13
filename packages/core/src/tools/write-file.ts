@@ -15,7 +15,8 @@ import {
   ToolEditConfirmationDetails,
   ToolConfirmationOutcome,
   ToolCallConfirmationDetails,
-  Icon,
+  Kind,
+  ToolLocation,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
@@ -82,7 +83,7 @@ export class WriteFileTool
       `Writes content to a specified file in the local filesystem.
 
       The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
-      Icon.Pencil,
+      Kind.Edit,
       {
         properties: {
           file_path: {
@@ -99,6 +100,10 @@ export class WriteFileTool
         type: 'object',
       },
     );
+  }
+
+  toolLocations(params: WriteFileToolParams): ToolLocation[] {
+    return [{ path: params.file_path }];
   }
 
   validateToolParams(params: WriteFileToolParams): string | null {
