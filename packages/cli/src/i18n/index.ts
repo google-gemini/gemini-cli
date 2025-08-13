@@ -5,13 +5,10 @@
  */
 
 import { I18nMessages, I18nTranslationKey } from './types.js';
+import { SupportedLanguage, SUPPORTED_LANGUAGES, isSupportedLanguage } from './definitions.js';
 import { enMessages } from './locales/en.js';
 import { zhMessages } from './locales/zh.js';
 import { jaMessages } from './locales/ja.js';
-
-type SupportedLanguage = 'en' | 'zh' | 'ja';
-
-const SUPPORTED_LANGUAGES: SupportedLanguage[] = ['en', 'zh', 'ja'];
 
 // 语言包注册表
 const LANGUAGE_REGISTRY: Record<SupportedLanguage, I18nMessages> = {
@@ -50,7 +47,7 @@ class I18n {
    * 检查是否支持指定语言
    */
   public isSupportedLanguage(language: string): language is SupportedLanguage {
-    return SUPPORTED_LANGUAGES.includes(language as SupportedLanguage);
+    return isSupportedLanguage(language);
   }
 
   /**
@@ -114,6 +111,7 @@ export const t = (keyPath: string, params?: Record<string, any>): string => {
 };
 
 // 导出类型和常量
-export { SupportedLanguage, SUPPORTED_LANGUAGES };
+export { SupportedLanguage, SUPPORTED_LANGUAGES, isSupportedLanguage } from './definitions.js';
 export * from './types.js';
-export { initializeLanguage } from '../config/language.js';
+// 注意: 不要从 config/language.js 重新导出以避免循环依赖
+// 如需 initializeLanguage，请直接从 '../config/language.js' 导入

@@ -8,7 +8,17 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { homedir } from 'node:os';
 import process from 'node:process';
-import { i18n, SupportedLanguage, SUPPORTED_LANGUAGES } from '../i18n/index.js';
+import { SupportedLanguage, SUPPORTED_LANGUAGES, isSupportedLanguage } from '../i18n/definitions.js';
+
+// 延迟导入以避免循环依赖
+let i18n: any;
+
+function getI18n() {
+  if (!i18n) {
+    i18n = require('../i18n/index.js').i18n;
+  }
+  return i18n;
+}
 
 export interface LanguageConfig {
   language: SupportedLanguage;
@@ -71,8 +81,8 @@ function getLanguageFromEnv(): SupportedLanguage | null {
     // 提取语言代码（如 'zh_CN.UTF-8' -> 'zh'）
     const langCode = envLang.split('_')[0].split('.')[0].toLowerCase();
     
-    if (i18n.isSupportedLanguage(langCode)) {
-      return langCode;
+    if (isSupportedLanguage(langCode)) {
+      return langCode as SupportedLanguage;
     }
   }
   
@@ -85,14 +95,14 @@ function getLanguageFromEnv(): SupportedLanguage | null {
  */
 export function getEffectiveLanguage(cliArg?: string): SupportedLanguage {
   // 1. CLI 参数优先级最高
-  if (cliArg && i18n.isSupportedLanguage(cliArg)) {
-    return cliArg;
+  if (cliArg && isSupportedLanguage(cliArg)) {
+    return cliArg as SupportedLanguage;
   }
 
   // 2. GEMINI_CLI_LANGUAGE environment variable
   const geminiCliLang = process.env.GEMINI_CLI_LANGUAGE;
-  if (geminiCliLang && i18n.isSupportedLanguage(geminiCliLang)) {
-    return geminiCliLang;
+  if (geminiCliLang && isSupportedLanguage(geminiCliLang)) {
+    return geminiCliLang as SupportedLanguage;
   }
   
   // 3. 配置文件
@@ -115,16 +125,16 @@ export function getEffectiveLanguage(cliArg?: string): SupportedLanguage {
  * 设置并保存语言配置
  */
 export function setLanguage(language: string): boolean {
-  if (!i18n.isSupportedLanguage(language)) {
+  if (!isSupportedLanguage(language)) {
     console.error(`Unsupported language: ${language}. Supported languages: ${SUPPORTED_LANGUAGES.join(', ')}`);
     return false;
   }
   
   // 设置 i18n 语言
-  i18n.setLanguage(language);
+  getI18n().setLanguage(language);
   
   // 保存到配置文件
-  saveLanguageConfig({ language });
+  saveLanguageConfig({ language: language as SupportedLanguage });
   
   return true;
 }
@@ -134,10 +144,10 @@ export function setLanguage(language: string): boolean {
  */
 export function initializeLanguage(cliLanguage?: string): void {
   const effectiveLanguage = getEffectiveLanguage(cliLanguage);
-  i18n.setLanguage(effectiveLanguage);
+  getI18n().setLanguage(effectiveLanguage);
   
   // 如果CLI参数指定了语言，保存到配置文件
-  if (cliLanguage && i18n.isSupportedLanguage(cliLanguage)) {
-    saveLanguageConfig({ language: cliLanguage });
+  if (cliLanguage && isSupportedLanguage(cliLanguage)) {
+    saveLanguageConfig({ language: cliLanguage as SupportedLanguage });
   }
 }
