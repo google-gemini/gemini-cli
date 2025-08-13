@@ -88,7 +88,7 @@ function determineSurface(): string {
     return process.env.SURFACE;
   } else if (process.env.GITHUB_SHA) {
     return 'GitHub';
-  } else if (process.env.TERM_PROGRAM == 'vscode') {
+  } else if (process.env.TERM_PROGRAM === 'vscode') {
     return detectIde() || DetectedIde.VSCode;
   } else {
     return 'SURFACE_NOT_SET';
