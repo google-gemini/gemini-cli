@@ -74,3 +74,39 @@ For example, if both a user and the `gcp` extension define a `deploy` command:
 
 - `/deploy` - Executes the user's deploy command
 - `/gcp.deploy` - Executes the extension's deploy command (marked with `[gcp]` tag)
+
+## Installing Extensions
+
+Gemini CLI extensions can be installed from a Git URL or a local path using the `gemini extensions install` command. Installed extensions are placed in the user-level extension directory (`~/.gemini/extensions`).
+
+### From a Git URL
+
+To install an extension from a Git repository, use the following command:
+
+```bash
+gemini extensions install <git-url>
+```
+
+Replace `<git-url>` with the URL of the Git repository containing the extension. The repository must contain a valid `gemini-extension.json` file at its root.
+
+**Example:**
+
+```bash
+gemini extensions install https://github.com/google/gemini-hello-world.git
+```
+
+### From a Local Path
+
+To install an extension from a local directory on your file system, use the `--path` option:
+
+```bash
+gemini extensions install --path /path/to/your/local/extension
+```
+
+Replace `/path/to/your/local/extension` with the absolute path to the directory containing your extension. This directory must also contain a valid `gemini-extension.json` file at its root.
+
+**Example:**
+
+```bash
+gemini extensions install --path ~/my-gemini-extensions/my-local-extension
+```

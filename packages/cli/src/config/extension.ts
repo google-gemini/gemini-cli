@@ -42,7 +42,7 @@ export function loadExtensions(workspaceDir: string): Extension[] {
   return Array.from(uniqueExtensions.values());
 }
 
-function loadExtensionsFromDir(dir: string): Extension[] {
+export function loadExtensionsFromDir(dir: string): Extension[] {
   const extensionsDir = path.join(dir, EXTENSIONS_DIRECTORY_NAME);
   if (!fs.existsSync(extensionsDir)) {
     return [];
@@ -60,7 +60,7 @@ function loadExtensionsFromDir(dir: string): Extension[] {
   return extensions;
 }
 
-function loadExtension(extensionDir: string): Extension | null {
+export function loadExtension(extensionDir: string): Extension | null {
   if (!fs.statSync(extensionDir).isDirectory()) {
     console.error(
       `Warning: unexpected file ${extensionDir} in extensions directory.`,
