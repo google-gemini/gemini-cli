@@ -96,7 +96,7 @@ class VsCodeInstaller implements IdeInstaller {
     if (!commandPath) {
       return {
         success: false,
-        message: `VS Code CLI not found. Please ensure 'code' is in your system's PATH. For help, see https://code.visualstudio.com/docs/configure/command-line#_code-is-not-recognized-as-an-internal-or-external-command. You can also install the companion extension manually from the VS Code marketplace.`,
+        message: `VS Code CLI not found. Please ensure 'code' is in your system's PATH. For help, see https://code.visualstudio.com/docs/configure/command-line#_code-is-not-recognized-as-an-internal-or-external-command. You can also install the 'Gemini CLI Companion' extension manually from the VS Code marketplace.`,
       };
     }
 
@@ -111,7 +111,7 @@ class VsCodeInstaller implements IdeInstaller {
     } catch (_error) {
       return {
         success: false,
-        message: `Failed to install VS Code companion extension. Please try installing it manually from the VS Code marketplace.`,
+        message: `Failed to install VS Code companion extension. Please try installing 'Gemini CLI Companion' manually from the VS Code extension marketplace.`,
       };
     }
   }
