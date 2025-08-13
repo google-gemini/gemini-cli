@@ -46,8 +46,10 @@ export class GuardrailStore {
   }
 
   async loadFromFile(filePath: string, autoSave: boolean = false): Promise<{ loaded: number; errors: string[] }> {
+    console.log(`🔧 DEBUG: loadFromFile called with filePath: ${filePath}, autoSave: ${autoSave}`);
     this.filePath = filePath;
     this.autoSave = autoSave;
+    console.log(`🔧 DEBUG: Store configured - filePath: ${this.filePath}, autoSave: ${this.autoSave}`);
     const errors: string[] = [];
     
     try {
@@ -91,11 +93,15 @@ export class GuardrailStore {
 
     const guardrailsArray = Array.from(this.guardrails.values());
     
+    console.log(`💾 DEBUG: Saving ${guardrailsArray.length} guardrails to: ${this.filePath}`);
+    
     // Ensure directory exists
     const dir = path.dirname(this.filePath);
     await fs.mkdir(dir, { recursive: true });
     
     await fs.writeFile(this.filePath, JSON.stringify(guardrailsArray, null, 2));
+    
+    console.log(`✅ DEBUG: Successfully saved guardrails to: ${this.filePath}`);
   }
 
   getAll(): Guardrail[] {
@@ -114,10 +120,14 @@ export class GuardrailStore {
       updated_at: now,
     };
 
+    console.log(`➕ DEBUG: Adding guardrail ${newGuardrail.id}, autoSave: ${this.autoSave}`);
     this.guardrails.set(newGuardrail.id, newGuardrail);
     
     if (this.autoSave) {
+      console.log(`🔄 DEBUG: Auto-save triggered for ADD operation`);
       await this.saveToFile();
+    } else {
+      console.log(`⏸️  DEBUG: Auto-save disabled, not saving`);
     }
     
     return newGuardrail;
@@ -154,6 +164,18 @@ export class GuardrailStore {
     }
     
     return deleted;
+  }
+
+  getDebugInfo(): {
+    filePath: string;
+    autoSave: boolean;
+    guardrailCount: number;
+  } {
+    return {
+      filePath: this.filePath,
+      autoSave: this.autoSave,
+      guardrailCount: this.guardrails.size,
+    };
   }
 
   getStats(): {

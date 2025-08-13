@@ -2,7 +2,7 @@ import { createTool } from '@mastra/core';
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { defaultConfig } from '../config.js';
+import { defaultConfig, getCompatiblePaths } from '../config.js';
 
 interface RCADocument {
   filename: string;
@@ -14,7 +14,7 @@ interface RCADocument {
 
 export const rcaLoaderTool = createTool({
   id: 'load-rcas',
-  description: 'Load RCA (Root Cause Analysis) documents from the configured default directory. No directory path needed - uses configured default automatically.',
+  description: 'Load RCA (Root Cause Analysis) documents from the data/RCA directory. Uses the unified data directory structure.',
   inputSchema: z.object({
     directory: z.string().optional().describe('OPTIONAL: Directory path (leave empty to use configured default - recommended)'),
     pattern: z.string().default('*.md').describe('File pattern to match (default: *.md)'),
@@ -50,7 +50,7 @@ export const rcaLoaderTool = createTool({
     }),
   }),
   execute: async ({ context }) => {
-    const { directory = defaultConfig.rcaDirectoryPath, recursive, page, pageSize, maxContentLength, includeMetadataOnly } = context;
+    const { directory = getCompatiblePaths(defaultConfig).rcaDirectory, recursive, page, pageSize, maxContentLength, includeMetadataOnly } = context;
 
     try {
       // Verify directory exists

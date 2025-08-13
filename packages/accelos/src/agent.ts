@@ -3,7 +3,9 @@ import { google } from '@ai-sdk/google';
 import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
 import type { AccelosConfig } from './config.js';
+import { getCompatiblePaths } from './config.js';
 import { fileAnalyzerTool, webSearchTool, codeAnalysisTool } from './tools/index.js';
+import { GuardrailStore } from './tools/shared-guardrail-store.js';
 
 export class AccelosAgent {
   private agent: Agent;
@@ -20,6 +22,27 @@ export class AccelosAgent {
       model: llmProvider,
       tools: [fileAnalyzerTool, webSearchTool, codeAnalysisTool],
     });
+
+    // Initialize guardrails at startup (async, non-blocking)
+    this.initializeGuardrails().catch(error => {
+      console.warn(`⚠️  Failed to initialize guardrails: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    });
+  }
+
+  private async initializeGuardrails(): Promise<void> {
+    console.log(`🔧 DEBUG: initializeGuardrails() started`);
+    const guardrailStore = GuardrailStore.getInstance();
+    const guardrailsFile = getCompatiblePaths(this.config).guardrailsFile;
+    
+    console.log(`🛡️  Loading guardrails from: ${guardrailsFile}`);
+    console.log(`🔧 DEBUG: Calling loadFromFile with autoSave=true`);
+    const result = await guardrailStore.loadFromFile(guardrailsFile, true); // Enable auto-save
+    
+    console.log(`✅ Loaded ${result.loaded} guardrails with auto-save enabled`);
+    console.log(`🔧 DEBUG: Startup initialization completed`);
+    if (result.errors.length > 0) {
+      console.warn(`⚠️  Guardrail loading errors:`, result.errors);
+    }
   }
 
   private getLLMProvider() {
@@ -45,6 +68,10 @@ export class AccelosAgent {
       console.error('Error in Accelos agent chat:', error);
       throw new Error(`Chat failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  getGuardrailStats() {
+    return GuardrailStore.getInstance().getStats();
   }
 
   async analyzeFile(filePath: string, analysisType: 'content' | 'structure' | 'security' | 'all' = 'all') {

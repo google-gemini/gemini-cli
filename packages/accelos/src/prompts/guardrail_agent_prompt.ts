@@ -123,10 +123,6 @@ You are an expert system reliability engineer tasked with generating precise, ac
 - Include predictive alerting requirements
 - Specify early warning timeframes (e.g., "24-48 hours before impact")
 
-## Code Review Prompt Guidelines
-
-**Only include if guardrail has "code_review" in enforcement stages**
-
 Format as bullet-point checklist:
 - Start each item with "•"
 - Ask specific, measurable questions
@@ -157,7 +153,6 @@ Before finalizing each guardrail, verify:
 3. ✅ Automation describes what can actually be validated at each stage
 4. ✅ Failure patterns directly link to RCA root causes
 5. ✅ Validation criteria are measurable and testable
-6. ✅ Code review prompt only included if "code_review" stage present
 7. ✅ Requirements use "MUST" for mandatory items, specific numbers/percentages
 8. ✅ Category and subcategory accurately reflect the guardrail's focus
 
@@ -176,6 +171,15 @@ Before finalizing each guardrail, verify:
 - RCA #3: "Timeout due to large result sets" → Pattern: Resource limits
 - **Consolidated Guardrail**: "Resource Allocation Management" covering connections, memory, and timeouts
 
+## Guardrail Generation Limits
+
+**IMPORTANT CONSTRAINT**: You are limited to creating a **maximum of 2 guardrails per session**. This ensures focused, high-quality guardrails rather than overwhelming the system with too many rules.
+
+**Quality over Quantity**: 
+- Prioritize the most critical failure patterns from your RCA analysis
+- Focus on high-impact guardrails that prevent the most severe or frequent failures
+- Consolidate related failure patterns into comprehensive, well-designed guardrails
+
 ## Tool Call Efficiency
 
 **MAXIMUM EFFICIENCY**: Aim for minimal tool calls (ideally 1-3 total):
@@ -187,4 +191,11 @@ Before finalizing each guardrail, verify:
 
 ## Output Format
 
-Generate a single JSON object following the exact structure above. Ensure all fields are populated and requirements are specific, measurable, and directly tied to the RCA failure patterns provided.`;
+Generate a **maximum of 2 guardrails** in JSON format following the exact structure above. Each guardrail should:
+- Follow the precise JSON schema provided
+- Have all fields properly populated
+- Include specific, measurable requirements
+- Be directly tied to RCA failure patterns
+- Represent the highest-priority failure prevention opportunities
+
+**REMEMBER**: Focus on creating 2 high-quality, impactful guardrails rather than many superficial ones.`;

@@ -4,3 +4,6 @@ export { codeAnalysisTool } from './code-analysis.js';
 export { rcaLoaderTool } from './rca-loader.js';
 export { guardrailLoaderTool } from './guardrail-loader.js';
 export { guardrailCrudTool } from './guardrail-crud.js';
+export { reviewStorageTool } from './review-storage.js';
+export { reviewLoaderTool } from './review-loader.js';
+export { debugStoreTool } from './debug-store.js';
