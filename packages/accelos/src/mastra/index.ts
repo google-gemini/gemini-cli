@@ -74,6 +74,9 @@ const guardrailAgent = new Agent({
   name: 'guardrail-agent',
   instructions: guardrailAgentPrompt,
   model: anthropic('claude-3-7-sonnet-20250219'),
+  defaultGenerateOptions: {
+    maxSteps: 50,
+  },
   tools: {
     rcaLoader: rcaLoaderTool,
     guardrailLoader: guardrailLoaderTool,

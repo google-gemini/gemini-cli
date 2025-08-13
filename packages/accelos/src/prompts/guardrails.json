@@ -694,5 +694,101 @@
       "Request loop detection prevents infinite loops"
     ],
     "code_review_prompt": "Review client-server integration changes:\n• Are all edge cases tested including NULL value scenarios?\n• Is backward compatibility maintained for configuration endpoint changes?\n• Are termination conditions added for all retry and loop logic (max 3-5 attempts)?\n• Is proper request loop detection and prevention implemented?\n• Is client SDK behavior validated across different failure scenarios?\n• Are API endpoints tested with NULL values and edge cases?"
+  },
+  {
+    "id": "GR-016",
+    "title": "Robust Error Handling with Exponential Backoff",
+    "category": "service_reliability",
+    "subcategory": "error_recovery",
+    "description": "Ensures all client-side retry logic implements proper exponential backoff with jitter to prevent retry storms",
+    "rule": {
+      "condition": "When implementing retry logic for network requests or API calls",
+      "requirement": "MUST implement exponential backoff with jitter and appropriate timeout limits",
+      "actions": [
+        "Set initial retry delay to at least 1000ms (not below 100ms)",
+        "Implement exponential backoff using delay = baseDelay * (2^attempt) with 10-20% random jitter",
+        "Cap maximum retry delay at 30 seconds to prevent excessive waiting",
+        "Limit maximum retry attempts to 5 for standard operations",
+        "Add circuit breaker pattern to prevent retries when success probability is low",
+        "Implement request timeout of 30 seconds for standard operations"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "code_review",
+        "ci_cd"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "code_review": "Static analysis to detect retry implementations without exponential backoff",
+        "ci_cd": "Test retry logic with simulated failures to verify backoff behavior"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-06-04-Web_Interface_Recovery_Logic.md"
+    ],
+    "failure_patterns_prevented": [
+      "Retry storms overwhelming both client and server resources",
+      "Linear retry behavior causing cascading failures",
+      "Aggressive retry frequency exhausting connection pools",
+      "Missing circuit breaker allowing continuous retries during outages"
+    ],
+    "validation_criteria": [
+      "Retry delay increases exponentially with each attempt",
+      "Jitter is applied to prevent synchronized retry attempts",
+      "Maximum retry attempts are enforced to prevent infinite loops",
+      "Circuit breaker prevents retries during prolonged failures"
+    ],
+    "code_review_prompt": "• Does the retry logic implement exponential backoff (baseDelay * 2^attempt)?\n• Is the initial retry delay at least 1000ms (not below 100ms)?\n• Is jitter (10-20% randomness) applied to prevent synchronized retries?\n• Is there a maximum retry limit (≤5 for standard operations)?\n• Is there a maximum delay cap (≤30 seconds)?\n• Is a circuit breaker implemented to stop retries during prolonged failures?\n• Are timeouts properly set for the operation type (30s standard)?",
+    "created_at": "2025-08-13T20:24:31.458Z",
+    "updated_at": "2025-08-13T20:24:31.458Z"
+  },
+  {
+    "id": "GR-017",
+    "title": "Proper Error Classification and Handling",
+    "category": "service_reliability",
+    "subcategory": "error_handling",
+    "description": "Ensures all services properly classify and handle different error types to prevent cascading failures",
+    "rule": {
+      "condition": "When implementing error handling in services that process requests",
+      "requirement": "MUST classify errors by type and implement appropriate handling strategies",
+      "actions": [
+        "Categorize errors into at least: temporary/recoverable, permanent/non-recoverable, and warnings",
+        "Handle database warnings separately from critical errors with specific exception types",
+        "Implement graceful degradation for non-critical errors rather than failing completely",
+        "Log warnings without failing the request when encountering non-critical issues",
+        "Return appropriate HTTP status codes based on error type (4xx for client errors, 5xx for server errors)",
+        "Include circuit breaker patterns for external dependencies with >5% error rates"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "code_review",
+        "ci_cd"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "code_review": "Static analysis to detect overly broad exception handling",
+        "ci_cd": "Test error handling with simulated errors of different types"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-07-14-Feature_Flag_Error_Handling.md"
+    ],
+    "failure_patterns_prevented": [
+      "Treating warnings as fatal errors causing service disruption",
+      "Overly broad exception handling causing service failures",
+      "Missing graceful degradation for non-critical errors",
+      "Cascading failures from improper error propagation"
+    ],
+    "validation_criteria": [
+      "Errors are properly categorized by type and severity",
+      "Non-critical warnings don't cause request failures",
+      "Graceful degradation is implemented for recoverable errors",
+      "Circuit breakers prevent cascading failures for external dependencies"
+    ],
+    "code_review_prompt": "• Are exceptions categorized by type (temporary vs. permanent, critical vs. non-critical)?\n• Are database warnings handled separately from critical errors?\n• Is graceful degradation implemented for non-critical errors?\n• Are appropriate HTTP status codes returned based on error type?\n• Are warnings logged without failing the request?\n• Are circuit breakers implemented for external dependencies?\n• Is the exception handling specific rather than using broad catch-all blocks?",
+    "created_at": "2025-08-13T20:24:47.672Z",
+    "updated_at": "2025-08-13T20:24:47.672Z"
   }
 ]
