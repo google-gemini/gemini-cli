@@ -5,6 +5,8 @@
  */
 
 export enum DetectedIde {
+  Devin = 'devin',
+  Replit = 'replit',
   VSCode = 'vscode',
   Cursor = 'cursor',
   CloudShell = 'cloudshell',
@@ -19,6 +21,14 @@ export interface IdeInfo {
 
 export function getIdeInfo(ide: DetectedIde): IdeInfo {
   switch (ide) {
+    case DetectedIde.Devin:
+      return {
+        displayName: 'Devin',
+      };
+    case DetectedIde.Replit:
+      return {
+        displayName: 'Replit',
+      };
     case DetectedIde.VSCode:
       return {
         displayName: 'VS Code',
@@ -56,19 +66,25 @@ export function detectIde(): DetectedIde | undefined {
   if (process.env.TERM_PROGRAM !== 'vscode') {
     return undefined;
   }
+  if (process.env.__COG_BASHRC_SOURCED) {
+    return DetectedIde.Devin;
+  }
+  if (process.env.REPLIT_USER) {
+    return DetectedIde.Replit;
+  }
   if (process.env.CURSOR_TRACE_ID) {
     return DetectedIde.Cursor;
   }
   if (process.env.CODESPACES) {
     return DetectedIde.Codespaces;
   }
-  if (process.env.EDITOR_IN_CLOUD_SHELL) {
+  if (process.env.EDITOR_IN_CLOUD_SHELL || process.env.CLOUD_SHELL) {
     return DetectedIde.CloudShell;
   }
   if (process.env.TERM_PRODUCT === 'Trae') {
     return DetectedIde.Trae;
   }
-  if (process.env.FIREBASE_DEPLOY_AGENT) {
+  if (process.env.FIREBASE_DEPLOY_AGENT || process.env.MONOSPACE_ENV) {
     return DetectedIde.FirebaseStudio;
   }
   return DetectedIde.VSCode;
