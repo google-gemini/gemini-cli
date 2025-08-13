@@ -1285,7 +1285,16 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       const emojis = '🐍🐳🦀🦄';
-      act(() => result.current.handleInput(emojis, {}));
+      act(() =>
+        result.current.handleInput({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: emojis,
+        }),
+      );
       expect(getBufferState(result).text).toBe(emojis);
     });
   });
