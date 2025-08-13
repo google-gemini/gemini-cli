@@ -93,6 +93,34 @@ This section guides contributors on how to build, modify, and understand the dev
     - **Production:** For running the CLI in a production environment, any version of Node.js `>=20` is acceptable.
 2.  **Git**
 
+<details>
+<summary>Windows Users: Required Setup (.env file)</summary>
+
+To avoid build hangs and improve logging, create a `.env` file at the root of the project with the following contents:
+
+```dotenv
+GEMINI_SANDBOX=true
+VERBOSE=true
+````
+
+> **Why?**
+> * `GEMINI_SANDBOX=true` prevents a build hang on Windows by bypassing a problematic sandbox detection script.
+> * `VERBOSE=true` enables progress messages during the build, helping diagnose potential stalls.
+>
+> If you have `dotenv-cli`, then you can use this command to build:
+>
+> ```bash
+> dotenv npm run build
+> ```
+>
+> or
+>
+> ```bash
+> dotenv npm run bundle
+> ```
+
+</details>
+
 ### Build Process
 
 To clone the repository:
