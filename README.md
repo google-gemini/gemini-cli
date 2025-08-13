@@ -214,7 +214,7 @@ Integrate Gemini CLI directly into your GitHub workflows with the [**Gemini CLI 
 ### Advanced Topics
 
 - [**Architecture Overview**](./docs/architecture.md) - How Gemini CLI works
-- [**IDE Integration**](./docs/extension.md) - VS Code companion
+- [**IDE Integration**](./docs/ide-integration.md) - VS Code companion
 - [**Sandboxing & Security**](./docs/sandbox.md) - Safe execution environments
 - [**Enterprise Deployment**](./docs/deployment.md) - Docker, system-wide config
 - [**Telemetry & Monitoring**](./docs/telemetry.md) - Usage tracking
