@@ -24,7 +24,7 @@ import {
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
-import { getLanguageFromFilePath } from '../utils/language-detection.js';
+import { addProgrammingLanguageToEvent } from '../telemetry/telemetry-utils.js';
 import {
   isModifiableDeclarativeTool,
   ModifyContext,
@@ -889,15 +889,7 @@ export class CoreToolScheduler {
 
       for (const call of completedCalls) {
         const event = new ToolCallEvent(call);
-        // Logging programming_language for replace, write_file, and read_file function calls.
-        if (event.function_args) {
-          const filePath =
-            event.function_args.file_path || event.function_args.absolute_path;
-          if (typeof filePath === 'string') {
-            event.programming_language = getLanguageFromFilePath(filePath);
-          }
-        }
-        logToolCall(this.config, event);
+        logToolCall(this.config, addProgrammingLanguageToEvent(event));
       }
 
       if (this.onAllToolCallsComplete) {

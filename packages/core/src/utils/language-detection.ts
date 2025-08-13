@@ -95,5 +95,9 @@ const extensionToLanguageMap: { [key: string]: string } = {
 
 export function getLanguageFromFilePath(filePath: string): string | undefined {
   const extension = path.extname(filePath).toLowerCase();
-  return extensionToLanguageMap[extension];
+  if (extension) {
+    return extensionToLanguageMap[extension];
+  }
+  const filename = path.basename(filePath).toLowerCase();
+  return extensionToLanguageMap[`.${filename}`];
 }
