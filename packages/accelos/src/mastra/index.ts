@@ -73,7 +73,7 @@ const productionReadinessAgent = new Agent({
 const guardrailAgent = new Agent({
   name: 'guardrail-agent',
   instructions: guardrailAgentPrompt,
-  model: openai('gpt-4o'),
+  model: anthropic('claude-3-7-sonnet-20250219'),
   tools: {
     rcaLoader: rcaLoaderTool,
     guardrailLoader: guardrailLoaderTool,
