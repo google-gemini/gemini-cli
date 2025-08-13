@@ -18,8 +18,11 @@ import {
   CloseDiffResponseSchema,
   DiffUpdateResult,
 } from '../ide/ideContext.js';
+import { getIdeProcessId } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -98,12 +101,27 @@ export class IdeClient {
       return;
     }
 
-    const port = this.getPortFromEnv();
-    if (!port) {
-      return;
+    const portFromFile = await this.getPortFromFile();
+    if (portFromFile) {
+      const connected = await this.establishConnection(portFromFile);
+      if (connected) {
+        return;
+      }
     }
 
-    await this.establishConnection(port);
+    const portFromEnv = this.getPortFromEnv();
+    if (portFromEnv) {
+      const connected = await this.establishConnection(portFromEnv);
+      if (connected) {
+        return;
+      }
+    }
+
+    this.setState(
+      IDEConnectionStatus.Disconnected,
+      `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
+      true,
+    );
   }
 
   /**
@@ -251,14 +269,23 @@ export class IdeClient {
   private getPortFromEnv(): string | undefined {
     const port = process.env['GEMINI_CLI_IDE_SERVER_PORT'];
     if (!port) {
-      this.setState(
-        IDEConnectionStatus.Disconnected,
-        `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
-        true,
-      );
       return undefined;
     }
     return port;
+  }
+
+  private async getPortFromFile(): Promise<string | undefined> {
+    try {
+      const ideProcessId = await getIdeProcessId();
+      const portFile = path.join(
+        os.tmpdir(),
+        `gemini-ide-server-${ideProcessId}.port`,
+      );
+      const port = fs.readFileSync(portFile, 'utf8');
+      return port;
+    } catch (_) {
+      return undefined;
+    }
   }
 
   private registerClientHandlers() {
@@ -315,7 +342,7 @@ export class IdeClient {
     );
   }
 
-  private async establishConnection(port: string) {
+  private async establishConnection(port: string): Promise<boolean> {
     let transport: StreamableHTTPClientTransport | undefined;
     try {
       this.client = new Client({
@@ -329,12 +356,8 @@ export class IdeClient {
       await this.client.connect(transport);
       this.registerClientHandlers();
       this.setState(IDEConnectionStatus.Connected);
+      return true;
     } catch (_error) {
-      this.setState(
-        IDEConnectionStatus.Disconnected,
-        `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
-        true,
-      );
       if (transport) {
         try {
           await transport.close();
@@ -342,6 +365,7 @@ export class IdeClient {
           logger.debug('Failed to close transport:', closeError);
         }
       }
+      return false;
     }
   }
 }
