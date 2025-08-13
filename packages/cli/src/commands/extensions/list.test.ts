@@ -49,12 +49,25 @@ describe('extensions list command', () => {
 
   it('should list all installed extensions', () => {
     mockedLoadExtensions.mockReturnValue([
-      { config: { name: 'extension-1', version: '1.0.0' } },
-      { config: { name: 'ext2', version: '2.0.0' } },
+      {
+        config: { name: 'extension-1', version: '1.0.0' },
+        path: '/path/to/extension-1',
+      },
+      { config: { name: 'ext2', version: '2.0.0' }, path: '/path/to/ext2' },
     ]);
     mockedAnnotateActiveExtensions.mockReturnValue([
-      { name: 'extension-1', version: '1.0.0', isActive: true },
-      { name: 'ext2', version: '2.0.0', isActive: true },
+      {
+        name: 'extension-1',
+        version: '1.0.0',
+        isActive: true,
+        path: '/path/to/extension-1',
+      },
+      {
+        name: 'ext2',
+        version: '2.0.0',
+        isActive: true,
+        path: '/path/to/ext2',
+      },
     ]);
 
     if (listCommand.handler) {
@@ -62,9 +75,17 @@ describe('extensions list command', () => {
       handler();
     }
 
-    expect(consoleSpy).toHaveBeenCalledWith('Name        | Enabled');
-    expect(consoleSpy).toHaveBeenCalledWith('----------- | -------');
-    expect(consoleSpy).toHaveBeenCalledWith('extension-1 | true');
-    expect(consoleSpy).toHaveBeenCalledWith('ext2        | true');
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Name        | Version | Enabled | Path',
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '----------- | ------- | ------- | ----',
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'extension-1 | 1.0.0   | true    | /path/to/extension-1',
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'ext2        | 2.0.0   | true    | /path/to/ext2',
+    );
   });
 });

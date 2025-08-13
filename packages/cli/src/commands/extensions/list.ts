@@ -29,21 +29,37 @@ export const listCommand: CommandModule = {
     }
 
     const nameHeader = 'Name';
+    const versionHeader = 'Version';
     const enabledHeader = 'Enabled';
+    const pathHeader = 'Path';
 
     const nameWidth = Math.max(
       nameHeader.length,
       ...annotatedExtensions.map((ext) => ext.name.length),
     );
+    const versionWidth = Math.max(
+      versionHeader.length,
+      ...annotatedExtensions.map((ext) => ext.version.length),
+    );
 
-    console.log(`${nameHeader.padEnd(nameWidth)} | ${enabledHeader}`);
     console.log(
-      `${'-'.repeat(nameWidth)} | ${'-'.repeat(enabledHeader.length)}`,
+      `${nameHeader.padEnd(nameWidth)} | ${versionHeader.padEnd(
+        versionWidth,
+      )} | ${enabledHeader} | ${pathHeader}`,
+    );
+    console.log(
+      `${'-'.repeat(nameWidth)} | ${'-'.repeat(versionWidth)} | ${'-'.repeat(
+        enabledHeader.length,
+      )} | ${'-'.repeat(pathHeader.length)}`,
     );
 
     for (const extension of annotatedExtensions) {
-      const { name, isActive } = extension;
-      console.log(`${name.padEnd(nameWidth)} | ${isActive}`);
+      const { name, version, isActive, path } = extension;
+      console.log(
+        `${name.padEnd(nameWidth)} | ${version.padEnd(
+          versionWidth,
+        )} | ${isActive.toString().padEnd(enabledHeader.length)} | ${path}`,
+      );
     }
   },
 };
