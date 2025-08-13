@@ -626,7 +626,9 @@ Use this tool when the user's query implies needing the content of several files
     );
   }
 
-  protected validateToolParams(params: ReadManyFilesParams): string | null {
+  protected override validateToolParams(
+    params: ReadManyFilesParams,
+  ): string | null {
     const errors = SchemaValidator.validate(
       this.schema.parametersJsonSchema,
       params,

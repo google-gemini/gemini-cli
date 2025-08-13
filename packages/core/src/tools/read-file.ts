@@ -198,7 +198,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
     );
   }
 
-  protected validateToolParams(params: ReadFileToolParams): string | null {
+  protected override validateToolParams(
+    params: ReadFileToolParams,
+  ): string | null {
     const errors = SchemaValidator.validate(
       this.schema.parametersJsonSchema,
       params,

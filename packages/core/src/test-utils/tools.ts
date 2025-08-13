@@ -45,7 +45,7 @@ export class MockTool extends BaseTool<{ [key: string]: unknown }, ToolResult> {
     );
   }
 
-  async shouldConfirmExecute(
+  override async shouldConfirmExecute(
     _params: { [key: string]: unknown },
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {

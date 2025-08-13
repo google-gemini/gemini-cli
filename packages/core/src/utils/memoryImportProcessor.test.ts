@@ -11,7 +11,7 @@ import { marked } from 'marked';
 import { processImports, validateImportPath } from './memoryImportProcessor.js';
 
 // Helper function to create platform-agnostic test paths
-const testPath = (...segments: string[]) => {
+function testPath(...segments: string[]): string {
   // Start with the first segment as is (might be an absolute path on Windows)
   let result = segments[0];
 
@@ -27,9 +27,8 @@ const testPath = (...segments: string[]) => {
   }
 
   return path.normalize(result);
-};
+}
 
-// Mock fs/promises
 vi.mock('fs/promises');
 const mockedFs = vi.mocked(fs);
 
@@ -509,21 +508,21 @@ describe('memoryImportProcessor', () => {
       expect(result.importTree.imports).toHaveLength(2);
 
       // First import: nested.md
-      // Prefix with underscore to indicate they're intentionally unused
-      const _expectedNestedPath = testPath(projectRoot, 'src', 'nested.md');
-      const _expectedInnerPath = testPath(projectRoot, 'src', 'inner.md');
-      const _expectedSimplePath = testPath(projectRoot, 'src', 'simple.md');
-
       // Check that the paths match using includes to handle potential absolute/relative differences
-      expect(result.importTree.imports![0].path).toContain('nested.md');
+      const expectedNestedPath = testPath(projectRoot, 'src', 'nested.md');
+
+      expect(result.importTree.imports![0].path).toContain(expectedNestedPath);
       expect(result.importTree.imports![0].imports).toHaveLength(1);
+
+      const expectedInnerPath = testPath(projectRoot, 'src', 'inner.md');
       expect(result.importTree.imports![0].imports![0].path).toContain(
-        'inner.md',
+        expectedInnerPath,
       );
       expect(result.importTree.imports![0].imports![0].imports).toBeUndefined();
 
       // Second import: simple.md
-      expect(result.importTree.imports![1].path).toContain('simple.md');
+      const expectedSimplePath = testPath(projectRoot, 'src', 'simple.md');
+      expect(result.importTree.imports![1].path).toContain(expectedSimplePath);
       expect(result.importTree.imports![1].imports).toBeUndefined();
     });
 
@@ -724,21 +723,20 @@ describe('memoryImportProcessor', () => {
       expect(result.importTree.imports).toHaveLength(2);
 
       // First import: nested.md
-      // Prefix with underscore to indicate they're intentionally unused
-      const _expectedNestedPath = testPath(projectRoot, 'src', 'nested.md');
-      const _expectedInnerPath = testPath(projectRoot, 'src', 'inner.md');
-      const _expectedSimplePath = testPath(projectRoot, 'src', 'simple.md');
+      const expectedNestedPath = testPath(projectRoot, 'src', 'nested.md');
+      const expectedInnerPath = testPath(projectRoot, 'src', 'inner.md');
+      const expectedSimplePath = testPath(projectRoot, 'src', 'simple.md');
 
       // Check that the paths match using includes to handle potential absolute/relative differences
-      expect(result.importTree.imports![0].path).toContain('nested.md');
+      expect(result.importTree.imports![0].path).toContain(expectedNestedPath);
       expect(result.importTree.imports![0].imports).toHaveLength(1);
       expect(result.importTree.imports![0].imports![0].path).toContain(
-        'inner.md',
+        expectedInnerPath,
       );
       expect(result.importTree.imports![0].imports![0].imports).toBeUndefined();
 
       // Second import: simple.md
-      expect(result.importTree.imports![1].path).toContain('simple.md');
+      expect(result.importTree.imports![1].path).toContain(expectedSimplePath);
       expect(result.importTree.imports![1].imports).toBeUndefined();
     });
 
@@ -899,7 +897,7 @@ describe('memoryImportProcessor', () => {
 
       // Test relative paths - resolve them against basePath
       const relativePath = './file.md';
-      const _resolvedRelativePath = path.resolve(basePath, relativePath);
+      path.resolve(basePath, relativePath);
       expect(validateImportPath(relativePath, basePath, [basePath])).toBe(true);
 
       // Test parent directory access (should be allowed if parent is in allowed paths)
@@ -907,12 +905,12 @@ describe('memoryImportProcessor', () => {
       if (parentPath !== basePath) {
         // Only test if parent is different
         const parentRelativePath = '../file.md';
-        const _resolvedParentPath = path.resolve(basePath, parentRelativePath);
+        path.resolve(basePath, parentRelativePath);
         expect(
           validateImportPath(parentRelativePath, basePath, [parentPath]),
         ).toBe(true);
 
-        const _resolvedSubPath = path.resolve(basePath, 'sub');
+        path.resolve(basePath, 'sub');
         const resultSub = validateImportPath('sub', basePath, [basePath]);
         expect(resultSub).toBe(true);
       }

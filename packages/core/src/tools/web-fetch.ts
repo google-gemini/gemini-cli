@@ -143,7 +143,9 @@ ${textContent}
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
   }
 
-  async shouldConfirmExecute(): Promise<ToolCallConfirmationDetails | false> {
+  override async shouldConfirmExecute(): Promise<
+    ToolCallConfirmationDetails | false
+  > {
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
     }
@@ -337,7 +339,9 @@ export class WebFetchTool extends BaseDeclarativeTool<
     }
   }
 
-  protected validateToolParams(params: WebFetchToolParams): string | null {
+  protected override validateToolParams(
+    params: WebFetchToolParams,
+  ): string | null {
     const errors = SchemaValidator.validate(
       this.schema.parametersJsonSchema,
       params,

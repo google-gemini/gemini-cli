@@ -13,10 +13,7 @@ export class ResultCache {
   private hits = 0;
   private misses = 0;
 
-  constructor(
-    private readonly allFiles: string[],
-    private readonly absoluteDir: string,
-  ) {
+  constructor(private readonly allFiles: string[]) {
     this.cache = new Map();
   }
 

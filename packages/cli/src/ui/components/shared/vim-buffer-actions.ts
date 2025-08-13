@@ -19,6 +19,7 @@ import {
   findWordEndInLine,
 } from './text-buffer.js';
 import { cpLen, toCodePoints } from '../../utils/textUtils.js';
+import { assumeExhaustive } from '../../../utils/checks.js';
 
 // Check if we're at the end of a base word (on the last base character)
 // Returns true if current position has a base character followed only by combining marks until non-word
@@ -806,7 +807,7 @@ export function handleVimAction(
 
     default: {
       // This should never happen if TypeScript is working correctly
-      const _exhaustiveCheck: never = action;
+      assumeExhaustive(action);
       return state;
     }
   }

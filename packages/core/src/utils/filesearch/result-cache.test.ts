@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'node:path';
 import { test, expect } from 'vitest';
 import { ResultCache } from './result-cache.js';
 
@@ -17,7 +16,7 @@ test('ResultCache basic usage', async () => {
     'subdir/other.js',
     'subdir/nested/file.md',
   ];
-  const cache = new ResultCache(files, path.resolve('.'));
+  const cache = new ResultCache(files);
   const { files: resultFiles, isExactMatch } = await cache.get('*.js');
   expect(resultFiles).toEqual(files);
   expect(isExactMatch).toBe(false);
@@ -25,7 +24,7 @@ test('ResultCache basic usage', async () => {
 
 test('ResultCache cache hit/miss', async () => {
   const files = ['foo.txt', 'bar.js', 'baz.md'];
-  const cache = new ResultCache(files, path.resolve('.'));
+  const cache = new ResultCache(files);
   // First call: miss
   const { files: result1Files, isExactMatch: isExactMatch1 } =
     await cache.get('*.js');
@@ -44,7 +43,7 @@ test('ResultCache cache hit/miss', async () => {
 
 test('ResultCache best base query', async () => {
   const files = ['foo.txt', 'foobar.js', 'baz.md'];
-  const cache = new ResultCache(files, path.resolve('.'));
+  const cache = new ResultCache(files);
 
   // Cache a broader query
   cache.set('foo', ['foo.txt', 'foobar.js']);
