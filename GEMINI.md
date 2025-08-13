@@ -117,24 +117,11 @@ TypeScript's power lies in its ability to provide static type checking, catching
 
 ### Type narrowing `switch` clauses
 
-When authoring a switch clause over an enumeration or fixed list of items,
-always prefer to use the `checkExhaustive` helper method within the default
-clause of the switch. This will ensure that all of the possible options within
-the value or enumeration are used.
+Use the `checkExhaustive` helper in the default clause of a switch statement.
+This will ensure that all of the possible options within the value or
+enumeration are used.
 
 This helper method can be found in `packages/cli/src/utils/checks.ts`
-
-Here's an example of using the helper method properly:
-
-```
-switch (someValue) {
-  case 1:
-  case 2:
-    // ...
-  default:
-    return checkExhaustive(someValue);
-}
-```
 
 ### Embracing JavaScript's Array Operators
 
