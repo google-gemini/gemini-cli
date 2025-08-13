@@ -6,10 +6,10 @@
 
 import {
   BaseTool,
+  Kind,
   ToolResult,
   ToolEditConfirmationDetails,
   ToolConfirmationOutcome,
-  Icon,
 } from './tools.js';
 import { FunctionDeclaration } from '@google/genai';
 import * as fs from 'fs/promises';
@@ -122,7 +122,7 @@ export class MemoryTool
       MemoryTool.Name,
       'Save Memory',
       memoryToolDescription,
-      Icon.LightBulb,
+      Kind.Think,
       memoryToolSchemaData.parametersJsonSchema as Record<string, unknown>,
     );
   }

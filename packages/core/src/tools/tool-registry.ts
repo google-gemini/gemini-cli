@@ -5,7 +5,7 @@
  */
 
 import { FunctionDeclaration } from '@google/genai';
-import { AnyDeclarativeTool, Icon, ToolResult, BaseTool } from './tools.js';
+import { AnyDeclarativeTool, Kind, ToolResult, BaseTool } from './tools.js';
 import { Config } from '../config/config.js';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
@@ -44,7 +44,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
       name,
       name,
       description,
-      Icon.Hammer,
+      Kind.Other,
       parameterSchema,
       false, // isOutputMarkdown
       false, // canUpdateOutput
