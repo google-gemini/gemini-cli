@@ -4,8 +4,8 @@ labels: ['kind/bug', 'status/need-triage']
 body:
   - type: markdown
     attributes:
-      value: |
-        > [!IMPORTANT]  
+      value: |-
+        > [!IMPORTANT]
         > Thanks for taking the time to fill out this bug report!
         >
         > Please search **[existing issues](https://github.com/google-gemini/gemini-cli/issues)** to see if an issue already exists for the bug you encountered.
@@ -30,7 +30,7 @@ body:
     attributes:
       label: Client information
       description: Please paste the full text from the `/about` command run from Gemini CLI. Also include which platform (macOS, Windows, Linux).
-      value: |
+      value: |-
         <details>
 
         ```console

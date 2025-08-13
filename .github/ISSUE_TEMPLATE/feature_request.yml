@@ -4,8 +4,8 @@ labels: ['kind/enhancement', 'status/need-triage']
 body:
   - type: markdown
     attributes:
-      value: |
-        > [!IMPORTANT]  
+      value: |-
+        > [!IMPORTANT]
         > Thanks for taking the time to suggest an enhancement!
         >
         > Please search **[existing issues](https://github.com/google-gemini/gemini-cli/issues)** to see if a similar feature has already been requested.
