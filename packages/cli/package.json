@@ -38,7 +38,7 @@
     "dotenv": "^17.1.0",
     "glob": "^10.4.1",
     "highlight.js": "^11.11.1",
-    "ink": "^6.0.1",
+    "ink": "^6.1.1",
     "ink-big-text": "^2.0.0",
     "ink-gradient": "^3.0.0",
     "ink-link": "^4.1.0",
