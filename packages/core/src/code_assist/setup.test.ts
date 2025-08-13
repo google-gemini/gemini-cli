@@ -16,15 +16,17 @@ const mockPaidTier: GeminiUserTier = {
   id: UserTierId.STANDARD,
   name: 'paid',
   description: 'Paid tier',
+  isDefault: true,
 };
 
 const mockFreeTier: GeminiUserTier = {
   id: UserTierId.FREE,
   name: 'free',
   description: 'Free tier',
+  isDefault: true,
 };
 
-describe('setupUser', () => {
+describe('setupUser for existing user', () => {
   let mockLoad: ReturnType<typeof vi.fn>;
   let mockOnboardUser: ReturnType<typeof vi.fn>;
 
@@ -48,7 +50,7 @@ describe('setupUser', () => {
     );
   });
 
-  it('should use GOOGLE_CLOUD_PROJECT when set', async () => {
+  it('should use GOOGLE_CLOUD_PROJECT when set and project from server is undefined', async () => {
     process.env.GOOGLE_CLOUD_PROJECT = 'test-project';
     mockLoad.mockResolvedValue({
       currentTier: mockPaidTier,
@@ -63,8 +65,8 @@ describe('setupUser', () => {
     );
   });
 
-  it('should treat empty GOOGLE_CLOUD_PROJECT as undefined and use project from server', async () => {
-    process.env.GOOGLE_CLOUD_PROJECT = '';
+  it('should ignore GOOGLE_CLOUD_PROJECT when project from server is set', async () => {
+    process.env.GOOGLE_CLOUD_PROJECT = 'test-project';
     mockLoad.mockResolvedValue({
       cloudaicompanionProject: 'server-project',
       currentTier: mockPaidTier,
@@ -72,7 +74,7 @@ describe('setupUser', () => {
     const projectId = await setupUser({} as OAuth2Client);
     expect(CodeAssistServer).toHaveBeenCalledWith(
       {},
-      undefined,
+      'test-project',
       {},
       '',
       undefined,
@@ -94,24 +96,38 @@ describe('setupUser', () => {
       ProjectIdRequiredError,
     );
   });
+});
 
-  it('should return onboarded project for free tier when GOOGLE_CLOUD_PROJECT is set', async () => {
-    process.env.GOOGLE_CLOUD_PROJECT = 'test-project';
-    mockLoad.mockResolvedValue({
-      currentTier: mockFreeTier,
-    });
-    mockOnboardUser.mockResolvedValue({
-      name: 'name',
+describe('setupUser for new user', () => {
+  let mockLoad: ReturnType<typeof vi.fn>;
+  let mockOnboardUser: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockLoad = vi.fn();
+    mockOnboardUser = vi.fn().mockResolvedValue({
       done: true,
       response: {
         cloudaicompanionProject: {
           id: 'server-project',
-          name: '',
         },
       },
     });
-    const result = await setupUser({} as OAuth2Client);
+    vi.mocked(CodeAssistServer).mockImplementation(
+      () =>
+        ({
+          loadCodeAssist: mockLoad,
+          onboardUser: mockOnboardUser,
+        }) as unknown as CodeAssistServer,
+    );
+  });
 
+  it('should use GOOGLE_CLOUD_PROJECT when set and onboard a new paid user', async () => {
+    process.env.GOOGLE_CLOUD_PROJECT = 'test-project';
+    mockLoad.mockResolvedValue({
+      allowedTiers: [mockPaidTier],
+    });
+    const userData = await setupUser({} as OAuth2Client);
     expect(CodeAssistServer).toHaveBeenCalledWith(
       {},
       'test-project',
@@ -119,7 +135,37 @@ describe('setupUser', () => {
       '',
       undefined,
     );
+    expect(mockLoad).toHaveBeenCalled();
+    expect(mockOnboardUser).toHaveBeenCalledWith({
+      tierId: 'standard-tier',
+      cloudaicompanionProject: 'test-project',
+      metadata: {
+        ideType: 'IDE_UNSPECIFIED',
+        platform: 'PLATFORM_UNSPECIFIED',
+        pluginType: 'GEMINI',
+        duetProject: 'test-project',
+      },
+    });
+    expect(userData).toEqual({
+      projectId: 'server-project',
+      userTier: 'standard-tier',
+    });
+  });
 
+  it('should onboard a new free user when GOOGLE_CLOUD_PROJECT is not set', async () => {
+    delete process.env.GOOGLE_CLOUD_PROJECT;
+    mockLoad.mockResolvedValue({
+      allowedTiers: [mockFreeTier],
+    });
+    const userData = await setupUser({} as OAuth2Client);
+    expect(CodeAssistServer).toHaveBeenCalledWith(
+      {},
+      undefined,
+      {},
+      '',
+      undefined,
+    );
+    expect(mockLoad).toHaveBeenCalled();
     expect(mockOnboardUser).toHaveBeenCalledWith({
       tierId: 'free-tier',
       cloudaicompanionProject: undefined,
@@ -127,13 +173,43 @@ describe('setupUser', () => {
         ideType: 'IDE_UNSPECIFIED',
         platform: 'PLATFORM_UNSPECIFIED',
         pluginType: 'GEMINI',
-        duetProject: undefined,
       },
     });
-
-    expect(result).toEqual({
+    expect(userData).toEqual({
       projectId: 'server-project',
       userTier: 'free-tier',
     });
+  });
+
+  it('should use GOOGLE_CLOUD_PROJECT when onboard response has no project ID', async () => {
+    process.env.GOOGLE_CLOUD_PROJECT = 'test-project';
+    mockLoad.mockResolvedValue({
+      allowedTiers: [mockPaidTier],
+    });
+    mockOnboardUser.mockResolvedValue({
+      done: true,
+      response: {
+        cloudaicompanionProject: undefined,
+      },
+    });
+    const userData = await setupUser({} as OAuth2Client);
+    expect(userData).toEqual({
+      projectId: 'test-project',
+      userTier: 'standard-tier',
+    });
+  });
+
+  it('should throw ProjectIdRequiredError when no project ID is available', async () => {
+    delete process.env.GOOGLE_CLOUD_PROJECT;
+    mockLoad.mockResolvedValue({
+      allowedTiers: [mockPaidTier],
+    });
+    mockOnboardUser.mockResolvedValue({
+      done: true,
+      response: {},
+    });
+    await expect(setupUser({} as OAuth2Client)).rejects.toThrow(
+      ProjectIdRequiredError,
+    );
   });
 });
