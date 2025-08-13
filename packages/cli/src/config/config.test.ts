@@ -1633,6 +1633,7 @@ describe('loadCliConfig approval mode', () => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     process.env.GEMINI_API_KEY = 'test-api-key';
+    process.argv = ['node', 'script.js']; // Reset argv for each test
   });
 
   afterEach(() => {
