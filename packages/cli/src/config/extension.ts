@@ -144,15 +144,6 @@ export function annotateActiveExtensions(
 ): GeminiCLIExtension[] {
   const annotatedExtensions: GeminiCLIExtension[] = [];
 
-  if (enabledExtensionNames.length === 0) {
-    return extensions.map((extension) => ({
-      name: extension.config.name,
-      version: extension.config.version,
-      isActive: true,
-      path: extension.path,
-    }));
-  }
-
   const lowerCaseEnabledExtensions = new Set(
     enabledExtensionNames.map((e) => e.trim().toLowerCase()),
   );

@@ -12,6 +12,7 @@ import {
   EXTENSIONS_CONFIG_FILENAME,
   EXTENSIONS_DIRECTORY_NAME,
   annotateActiveExtensions,
+  annotateActiveExtensionsFromDisabled,
   loadExtensions,
 } from './extension.js';
 
@@ -132,10 +133,10 @@ describe('annotateActiveExtensions', () => {
     { config: { name: 'ext3', version: '1.0.0' }, contextFiles: [] },
   ];
 
-  it('should mark all extensions as active if no enabled extensions are provided', () => {
+  it('should mark all extensions as inactive when an empty array is provided', () => {
     const activeExtensions = annotateActiveExtensions(extensions, []);
     expect(activeExtensions).toHaveLength(3);
-    expect(activeExtensions.every((e) => e.isActive)).toBe(true);
+    expect(activeExtensions.every((e) => !e.isActive)).toBe(true);
   });
 
   it('should mark only the enabled extensions as active', () => {
@@ -173,6 +174,49 @@ describe('annotateActiveExtensions', () => {
     annotateActiveExtensions(extensions, ['ext4']);
     expect(consoleSpy).toHaveBeenCalledWith('Extension not found: ext4');
     consoleSpy.mockRestore();
+  });
+});
+
+describe('annotateActiveExtensionsFromDisabled', () => {
+  const extensions = [
+    { config: { name: 'ext1', version: '1.0.0' }, contextFiles: [] },
+    { config: { name: 'ext2', version: '1.0.0' }, contextFiles: [] },
+    { config: { name: 'ext3', version: '1.0.0' }, contextFiles: [] },
+  ];
+
+  it('should mark all extensions as active if no disabled extensions are provided', () => {
+    const activeExtensions = annotateActiveExtensionsFromDisabled(
+      extensions,
+      [],
+    );
+    expect(activeExtensions).toHaveLength(3);
+    expect(activeExtensions.every((e) => e.isActive)).toBe(true);
+  });
+
+  it('should mark only the disabled extensions as inactive', () => {
+    const activeExtensions = annotateActiveExtensionsFromDisabled(extensions, [
+      'ext1',
+      'ext3',
+    ]);
+    expect(activeExtensions).toHaveLength(3);
+    expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
+      false,
+    );
+    expect(activeExtensions.find((e) => e.name === 'ext2')?.isActive).toBe(
+      true,
+    );
+    expect(activeExtensions.find((e) => e.name === 'ext3')?.isActive).toBe(
+      false,
+    );
+  });
+
+  it('should handle case-insensitivity', () => {
+    const activeExtensions = annotateActiveExtensionsFromDisabled(extensions, [
+      'EXT1',
+    ]);
+    expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
+      false,
+    );
   });
 });
 
