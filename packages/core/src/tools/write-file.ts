@@ -102,11 +102,11 @@ export class WriteFileTool
     );
   }
 
-  toolLocations(params: WriteFileToolParams): ToolLocation[] {
+  override toolLocations(params: WriteFileToolParams): ToolLocation[] {
     return [{ path: params.file_path }];
   }
 
-  validateToolParams(params: WriteFileToolParams): string | null {
+  override validateToolParams(params: WriteFileToolParams): string | null {
     const errors = SchemaValidator.validate(
       this.schema.parametersJsonSchema,
       params,

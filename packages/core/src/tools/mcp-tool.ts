@@ -70,7 +70,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     super(params);
   }
 
-  async shouldConfirmExecute(
+  override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const serverAllowListKey = this.serverName;

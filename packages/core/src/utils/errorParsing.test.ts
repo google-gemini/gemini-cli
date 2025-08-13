@@ -13,8 +13,6 @@ import { AuthType } from '../core/contentGenerator.js';
 import { StructuredError } from '../core/turn.js';
 
 describe('parseAndFormatApiError', () => {
-  const _enterpriseMessage =
-    'upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits';
   const vertexMessage = 'request a quota increase through Vertex';
   const geminiMessage = 'request a quota increase through AI Studio';
 

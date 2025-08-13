@@ -4,6 +4,8 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noImplicitAny": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
     "noImplicitThis": true,
     "forceConsistentCasingInFileNames": true,
     "noUnusedLocals": true,

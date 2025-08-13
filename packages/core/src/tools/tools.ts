@@ -284,13 +284,13 @@ export abstract class BaseTool<
    * @param parameterSchema JSON Schema defining the parameters
    */
   constructor(
-    readonly name: string,
-    readonly displayName: string,
-    readonly description: string,
-    readonly kind: Kind,
-    readonly parameterSchema: unknown,
-    readonly isOutputMarkdown: boolean = true,
-    readonly canUpdateOutput: boolean = false,
+    override readonly name: string,
+    override readonly displayName: string,
+    override readonly description: string,
+    override readonly kind: Kind,
+    override readonly parameterSchema: unknown,
+    override readonly isOutputMarkdown: boolean = true,
+    override readonly canUpdateOutput: boolean = false,
   ) {
     super(
       name,
