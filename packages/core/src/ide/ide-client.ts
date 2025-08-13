@@ -5,7 +5,6 @@
  */
 
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import { detectIde, DetectedIde, getIdeInfo } from '../ide/detect-ide.js';
 import {
