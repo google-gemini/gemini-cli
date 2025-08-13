@@ -7,14 +7,15 @@
 import {
   EmbedContentParameters,
   GenerateContentConfig,
-  Part,
-  SchemaUnion,
   PartListUnion,
   Content,
   Tool,
   GenerateContentResponse,
 } from '@google/genai';
-import { getFolderStructure } from '../utils/getFolderStructure.js';
+import {
+  getDirectoryContextString,
+  getEnvironmentContext,
+} from '../utils/environmentContext.js';
 import {
   Turn,
   ServerGeminiStreamEvent,
@@ -22,8 +23,8 @@ import {
   ChatCompressionInfo,
 } from './turn.js';
 import { Config } from '../config/config.js';
+import { UserTierId } from '../code_assist/types.js';
 import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
@@ -41,7 +42,14 @@ import {
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
-import { ideContext } from '../services/ideContext.js';
+import { ideContext } from '../ide/ideContext.js';
+import { logNextSpeakerCheck } from '../telemetry/loggers.js';
+import {
+  MalformedJsonResponseEvent,
+  NextSpeakerCheckEvent,
+} from '../telemetry/types.js';
+import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { IdeContext, File } from '../ide/ideContext.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -103,7 +111,9 @@ export class GeminiClient {
   private readonly COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
   private readonly loopDetector: LoopDetectionService;
-  private lastPromptId?: string;
+  private lastPromptId: string;
+  private lastSentIdeContext: IdeContext | undefined;
+  private forceFullIdeContext = true;
 
   constructor(private config: Config) {
     if (config.getProxy()) {
@@ -112,6 +122,7 @@ export class GeminiClient {
 
     this.embeddingModel = config.getEmbeddingModel();
     this.loopDetector = new LoopDetectionService(config);
+    this.lastPromptId = this.config.getSessionId();
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
@@ -128,6 +139,10 @@ export class GeminiClient {
       throw new Error('Content generator not initialized');
     }
     return this.contentGenerator;
+  }
+
+  getUserTier(): UserTierId | undefined {
+    return this.contentGenerator?.userTier;
   }
 
   async addHistory(content: Content) {
@@ -151,78 +166,34 @@ export class GeminiClient {
 
   setHistory(history: Content[]) {
     this.getChat().setHistory(history);
+    this.forceFullIdeContext = true;
+  }
+
+  async setTools(): Promise<void> {
+    const toolRegistry = await this.config.getToolRegistry();
+    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    this.getChat().setTools(tools);
   }
 
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
   }
 
-  private async getEnvironment(): Promise<Part[]> {
-    const cwd = this.config.getWorkingDir();
-    const today = new Date().toLocaleDateString(undefined, {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    const platform = process.platform;
-    const folderStructure = await getFolderStructure(cwd, {
-      fileService: this.config.getFileService(),
-    });
-    const context = `
-  This is the Gemini CLI. We are setting up the context for our chat.
-  Today's date is ${today}.
-  My operating system is: ${platform}
-  I'm currently working in the directory: ${cwd}
-  ${folderStructure}
-          `.trim();
-
-    const initialParts: Part[] = [{ text: context }];
-    const toolRegistry = await this.config.getToolRegistry();
-
-    // Add full file context if the flag is set
-    if (this.config.getFullContext()) {
-      try {
-        const readManyFilesTool = toolRegistry.getTool(
-          'read_many_files',
-        ) as ReadManyFilesTool;
-        if (readManyFilesTool) {
-          // Read all files in the target directory
-          const result = await readManyFilesTool.execute(
-            {
-              paths: ['**/*'], // Read everything recursively
-              useDefaultExcludes: true, // Use default excludes
-            },
-            AbortSignal.timeout(30000),
-          );
-          if (result.llmContent) {
-            initialParts.push({
-              text: `\n--- Full File Context ---\n${result.llmContent}`,
-            });
-          } else {
-            console.warn(
-              'Full context requested, but read_many_files returned no content.',
-            );
-          }
-        } else {
-          console.warn(
-            'Full context requested, but read_many_files tool not found.',
-          );
-        }
-      } catch (error) {
-        // Not using reportError here as it's a startup/config phase, not a chat/generation phase error.
-        console.error('Error reading full file context:', error);
-        initialParts.push({
-          text: '\n--- Error reading full file context ---',
-        });
-      }
+  async addDirectoryContext(): Promise<void> {
+    if (!this.chat) {
+      return;
     }
 
-    return initialParts;
+    this.getChat().addHistory({
+      role: 'user',
+      parts: [{ text: await getDirectoryContextString(this.config) }],
+    });
   }
 
   async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
-    const envParts = await this.getEnvironment();
+    this.forceFullIdeContext = true;
+    const envParts = await getEnvironmentContext(this.config);
     const toolRegistry = await this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
@@ -271,6 +242,174 @@ export class GeminiClient {
     }
   }
 
+  private getIdeContextParts(forceFullContext: boolean): {
+    contextParts: string[];
+    newIdeContext: IdeContext | undefined;
+  } {
+    const currentIdeContext = ideContext.getIdeContext();
+    if (!currentIdeContext) {
+      return { contextParts: [], newIdeContext: undefined };
+    }
+
+    if (forceFullContext || !this.lastSentIdeContext) {
+      // Send full context as JSON
+      const openFiles = currentIdeContext.workspaceState?.openFiles || [];
+      const activeFile = openFiles.find((f) => f.isActive);
+      const otherOpenFiles = openFiles
+        .filter((f) => !f.isActive)
+        .map((f) => f.path);
+
+      const contextData: Record<string, unknown> = {};
+
+      if (activeFile) {
+        contextData.activeFile = {
+          path: activeFile.path,
+          cursor: activeFile.cursor
+            ? {
+                line: activeFile.cursor.line,
+                character: activeFile.cursor.character,
+              }
+            : undefined,
+          selectedText: activeFile.selectedText || undefined,
+        };
+      }
+
+      if (otherOpenFiles.length > 0) {
+        contextData.otherOpenFiles = otherOpenFiles;
+      }
+
+      if (Object.keys(contextData).length === 0) {
+        return { contextParts: [], newIdeContext: currentIdeContext };
+      }
+
+      const jsonString = JSON.stringify(contextData, null, 2);
+      const contextParts = [
+        "Here is the user's editor context as a JSON object. This is for your information only.",
+        '```json',
+        jsonString,
+        '```',
+      ];
+
+      if (this.config.getDebugMode()) {
+        console.log(contextParts.join('\n'));
+      }
+      return {
+        contextParts,
+        newIdeContext: currentIdeContext,
+      };
+    } else {
+      // Calculate and send delta as JSON
+      const delta: Record<string, unknown> = {};
+      const changes: Record<string, unknown> = {};
+
+      const lastFiles = new Map(
+        (this.lastSentIdeContext.workspaceState?.openFiles || []).map(
+          (f: File) => [f.path, f],
+        ),
+      );
+      const currentFiles = new Map(
+        (currentIdeContext.workspaceState?.openFiles || []).map((f: File) => [
+          f.path,
+          f,
+        ]),
+      );
+
+      const openedFiles: string[] = [];
+      for (const [path] of currentFiles.entries()) {
+        if (!lastFiles.has(path)) {
+          openedFiles.push(path);
+        }
+      }
+      if (openedFiles.length > 0) {
+        changes.filesOpened = openedFiles;
+      }
+
+      const closedFiles: string[] = [];
+      for (const [path] of lastFiles.entries()) {
+        if (!currentFiles.has(path)) {
+          closedFiles.push(path);
+        }
+      }
+      if (closedFiles.length > 0) {
+        changes.filesClosed = closedFiles;
+      }
+
+      const lastActiveFile = (
+        this.lastSentIdeContext.workspaceState?.openFiles || []
+      ).find((f: File) => f.isActive);
+      const currentActiveFile = (
+        currentIdeContext.workspaceState?.openFiles || []
+      ).find((f: File) => f.isActive);
+
+      if (currentActiveFile) {
+        if (!lastActiveFile || lastActiveFile.path !== currentActiveFile.path) {
+          changes.activeFileChanged = {
+            path: currentActiveFile.path,
+            cursor: currentActiveFile.cursor
+              ? {
+                  line: currentActiveFile.cursor.line,
+                  character: currentActiveFile.cursor.character,
+                }
+              : undefined,
+            selectedText: currentActiveFile.selectedText || undefined,
+          };
+        } else {
+          const lastCursor = lastActiveFile.cursor;
+          const currentCursor = currentActiveFile.cursor;
+          if (
+            currentCursor &&
+            (!lastCursor ||
+              lastCursor.line !== currentCursor.line ||
+              lastCursor.character !== currentCursor.character)
+          ) {
+            changes.cursorMoved = {
+              path: currentActiveFile.path,
+              cursor: {
+                line: currentCursor.line,
+                character: currentCursor.character,
+              },
+            };
+          }
+
+          const lastSelectedText = lastActiveFile.selectedText || '';
+          const currentSelectedText = currentActiveFile.selectedText || '';
+          if (lastSelectedText !== currentSelectedText) {
+            changes.selectionChanged = {
+              path: currentActiveFile.path,
+              selectedText: currentSelectedText,
+            };
+          }
+        }
+      } else if (lastActiveFile) {
+        changes.activeFileChanged = {
+          path: null,
+          previousPath: lastActiveFile.path,
+        };
+      }
+
+      if (Object.keys(changes).length === 0) {
+        return { contextParts: [], newIdeContext: currentIdeContext };
+      }
+
+      delta.changes = changes;
+      const jsonString = JSON.stringify(delta, null, 2);
+      const contextParts = [
+        "Here is a summary of changes in the user's editor context, in JSON format. This is for your information only.",
+        '```json',
+        jsonString,
+        '```',
+      ];
+
+      if (this.config.getDebugMode()) {
+        console.log(contextParts.join('\n'));
+      }
+      return {
+        contextParts,
+        newIdeContext: currentIdeContext,
+      };
+    }
+  }
+
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
@@ -279,7 +418,7 @@ export class GeminiClient {
     originalModel?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (this.lastPromptId !== prompt_id) {
-      this.loopDetector.reset();
+      this.loopDetector.reset(prompt_id);
       this.lastPromptId = prompt_id;
     }
     this.sessionTurnCount++;
@@ -306,21 +445,17 @@ export class GeminiClient {
     }
 
     if (this.config.getIdeMode()) {
-      const activeFile = ideContext.getActiveFileContext();
-      if (activeFile?.filePath) {
-        let context = `
-This is the file that the user was most recently looking at:
-- Path: ${activeFile.filePath}`;
-        if (activeFile.cursor) {
-          context += `
-This is the cursor position in the file:
-- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`;
-        }
-        request = [
-          { text: context },
-          ...(Array.isArray(request) ? request : [request]),
-        ];
+      const { contextParts, newIdeContext } = this.getIdeContextParts(
+        this.forceFullIdeContext || this.getHistory().length === 0,
+      );
+      if (contextParts.length > 0) {
+        this.getChat().addHistory({
+          role: 'user',
+          parts: [{ text: contextParts.join('\n') }],
+        });
       }
+      this.lastSentIdeContext = newIdeContext;
+      this.forceFullIdeContext = false;
     }
 
     const turn = new Turn(this.getChat(), prompt_id);
@@ -353,6 +488,14 @@ This is the cursor position in the file:
         this,
         signal,
       );
+      logNextSpeakerCheck(
+        this.config,
+        new NextSpeakerCheckEvent(
+          prompt_id,
+          turn.finishReason?.toString() || '',
+          nextSpeakerCheck?.next_speaker || '',
+        ),
+      );
       if (nextSpeakerCheck?.next_speaker === 'model') {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
@@ -371,7 +514,7 @@ This is the cursor position in the file:
 
   async generateJson(
     contents: Content[],
-    schema: SchemaUnion,
+    schema: Record<string, unknown>,
     abortSignal: AbortSignal,
     model?: string,
     config: GenerateContentConfig = {},
@@ -389,16 +532,19 @@ This is the cursor position in the file:
       };
 
       const apiCall = () =>
-        this.getContentGenerator().generateContent({
-          model: modelToUse,
-          config: {
-            ...requestConfig,
-            systemInstruction,
-            responseSchema: schema,
-            responseMimeType: 'application/json',
+        this.getContentGenerator().generateContent(
+          {
+            model: modelToUse,
+            config: {
+              ...requestConfig,
+              systemInstruction,
+              responseJsonSchema: schema,
+              responseMimeType: 'application/json',
+            },
+            contents,
           },
-          contents,
-        });
+          this.lastPromptId,
+        );
 
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: async (authType?: string, error?: unknown) =>
@@ -406,7 +552,7 @@ This is the cursor position in the file:
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
 
-      const text = getResponseText(result);
+      let text = getResponseText(result);
       if (!text) {
         const error = new Error(
           'API returned an empty response for generateJson.',
@@ -419,6 +565,18 @@ This is the cursor position in the file:
         );
         throw error;
       }
+
+      const prefix = '```json';
+      const suffix = '```';
+      if (text.startsWith(prefix) && text.endsWith(suffix)) {
+        ClearcutLogger.getInstance(this.config)?.logMalformedJsonResponseEvent(
+          new MalformedJsonResponseEvent(modelToUse),
+        );
+        text = text
+          .substring(prefix.length, text.length - suffix.length)
+          .trim();
+      }
+
       try {
         return JSON.parse(text);
       } catch (parseError) {
@@ -432,7 +590,9 @@ This is the cursor position in the file:
           'generateJson-parse',
         );
         throw new Error(
-          `Failed to parse API response as JSON: ${getErrorMessage(parseError)}`,
+          `Failed to parse API response as JSON: ${getErrorMessage(
+            parseError,
+          )}`,
         );
       }
     } catch (error) {
@@ -483,11 +643,14 @@ This is the cursor position in the file:
       };
 
       const apiCall = () =>
-        this.getContentGenerator().generateContent({
-          model: modelToUse,
-          config: requestConfig,
-          contents,
-        });
+        this.getContentGenerator().generateContent(
+          {
+            model: modelToUse,
+            config: requestConfig,
+            contents,
+          },
+          this.lastPromptId,
+        );
 
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: async (authType?: string, error?: unknown) =>
@@ -573,12 +736,16 @@ This is the cursor position in the file:
       return null;
     }
 
+    const contextPercentageThreshold =
+      this.config.getChatCompression()?.contextPercentageThreshold;
+
     // Don't compress if not forced and we are under the limit.
-    if (
-      !force &&
-      originalTokenCount < this.COMPRESSION_TOKEN_THRESHOLD * tokenLimit(model)
-    ) {
-      return null;
+    if (!force) {
+      const threshold =
+        contextPercentageThreshold ?? this.COMPRESSION_TOKEN_THRESHOLD;
+      if (originalTokenCount < threshold * tokenLimit(model)) {
+        return null;
+      }
     }
 
     let compressBeforeIndex = findIndexAfterFraction(
@@ -621,6 +788,7 @@ This is the cursor position in the file:
       },
       ...historyToKeep,
     ]);
+    this.forceFullIdeContext = true;
 
     const { totalTokens: newTokenCount } =
       await this.getContentGenerator().countTokens({
@@ -640,8 +808,8 @@ This is the cursor position in the file:
   }
 
   /**
-   * Handles fallback to Flash model when persistent 429 errors occur for OAuth users.
-   * Uses a fallback handler if provided by the config, otherwise returns null.
+   * Handles falling back to Flash model when persistent 429 errors occur for OAuth users.
+   * Uses a fallback handler if provided by the config; otherwise, returns null.
    */
   private async handleFlashFallback(
     authType?: string,
@@ -671,6 +839,7 @@ This is the cursor position in the file:
         );
         if (accepted !== false && accepted !== null) {
           this.config.setModel(fallbackModel);
+          this.config.setFallbackMode(true);
           return fallbackModel;
         }
         // Check if the model was switched manually in the handler

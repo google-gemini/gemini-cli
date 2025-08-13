@@ -3,7 +3,7 @@
 The Gemini CLI requires you to authenticate with Google's AI services. On initial startup you'll need to configure **one** of the following authentication methods:
 
 1.  **Login with Google (Gemini Code Assist):**
-    - Use this option to log in with your google account.
+    - Use this option to log in with your Google account.
     - During initial startup, Gemini CLI will direct you to a webpage for authentication. Once authenticated, your credentials will be cached locally so the web login can be skipped on subsequent runs.
     - Note that the web login must be done in a browser that can communicate with the machine Gemini CLI is being run from. (Specifically, the browser will be redirected to a localhost url that Gemini CLI will be listening on).
     - <a id="workspace-gca">Users may have to specify a GOOGLE_CLOUD_PROJECT if:</a>
@@ -12,7 +12,7 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
       1. You have been assigned a license to a current Gemini Code Assist standard or enterprise subscription.
       1. You are using the product outside the [supported regions](https://developers.google.com/gemini-code-assist/resources/available-locations) for free individual usage.
       1. You are a Google account holder under the age of 18
-      - If you fall into one of these categories, you must first configure a Google Cloud Project Id to use, [enable the Gemini for Cloud API](https://cloud.google.com/gemini/docs/discover/set-up-gemini#enable-api) and [configure access permissions](https://cloud.google.com/gemini/docs/discover/set-up-gemini#grant-iam).
+      - If you fall into one of these categories, you must first configure a Google Cloud Project ID to use, [enable the Gemini for Cloud API](https://cloud.google.com/gemini/docs/discover/set-up-gemini#enable-api) and [configure access permissions](https://cloud.google.com/gemini/docs/discover/set-up-gemini#grant-iam).
 
       You can temporarily set the environment variable in your current shell session using the following command:
 
@@ -33,11 +33,16 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
         ```bash
         export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
         ```
-      - For repeated use, you can add the environment variable to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
+      - For repeated use, you can add the environment variable to your [.env file](#persisting-environment-variables-with-env-files).
+
+      - Alternatively you can export the API key from your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
+
         ```bash
         echo 'export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"' >> ~/.bashrc
         source ~/.bashrc
         ```
+
+        :warning: Be advised that when you export your API key inside your shell configuration file, any other process executed from the shell can read it.
 
 3.  **Vertex AI:**
     - Obtain your Google Cloud API key: [Get an API Key](https://cloud.google.com/vertex-ai/generative-ai/docs/start/api-keys?usertype=newuser)
@@ -63,20 +68,30 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
           export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
           export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION" # e.g., us-central1
           ```
-        - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
+        - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files)
+
+        - Alternatively you can export the environment variables from your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
+
           ```bash
           echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc
           echo 'export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"' >> ~/.bashrc
           source ~/.bashrc
           ```
+
+          :warning: Be advised that when you export your API key inside your shell configuration file, any other process executed from the shell can read it.
+
 4.  **Cloud Shell:**
     - This option is only available when running in a Google Cloud Shell environment.
     - It automatically uses the credentials of the logged-in user in the Cloud Shell environment.
     - This is the default authentication method when running in Cloud Shell and no other method is configured.
 
+          :warning: Be advised that when you export your API key inside your shell configuration file, any other process executed from the shell can read it.
+
 ### Persisting Environment Variables with `.env` Files
 
 You can create a **`.gemini/.env`** file in your project directory or in your home directory. Creating a plain **`.env`** file also works, but `.gemini/.env` is recommended to keep Gemini variables isolated from other tools.
+
+**Important:** Some environment variables (like `DEBUG` and `DEBUG_MODE`) are automatically excluded from project `.env` files to prevent interference with gemini-cli behavior. Use `.gemini/.env` files for gemini-cli specific variables.
 
 Gemini CLI automatically loads environment variables from the **first** `.env` file it finds, using the following search order:
 
@@ -107,3 +122,24 @@ GOOGLE_CLOUD_PROJECT="your-project-id"
 GEMINI_API_KEY="your-gemini-api-key"
 EOF
 ```
+
+## Non-Interactive Mode / Headless Environments
+
+When running the Gemini CLI in a non-interactive environment, you cannot use the interactive login flow.
+Instead, you must configure authentication using environment variables.
+
+The CLI will automatically detect if it is running in a non-interactive terminal and will use one of the
+following authentication methods if available:
+
+1.  **Gemini API Key:**
+    - Set the `GEMINI_API_KEY` environment variable.
+    - The CLI will use this key to authenticate with the Gemini API.
+
+2.  **Vertex AI:**
+    - Set the `GOOGLE_GENAI_USE_VERTEXAI=true` environment variable.
+    - **Using an API Key:** Set the `GOOGLE_API_KEY` environment variable.
+    - **Using Application Default Credentials (ADC):**
+      - Run `gcloud auth application-default login` in your environment to configure ADC.
+      - Ensure the `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` environment variables are set.
+
+If none of these environment variables are set in a non-interactive session, the CLI will exit with an error.

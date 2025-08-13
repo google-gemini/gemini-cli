@@ -11,11 +11,13 @@ Use `read_many_files` to read content from multiple files specified by paths or 
 
 `read_many_files` can be used to perform tasks such as getting an overview of a codebase, finding where specific functionality is implemented, reviewing documentation, or gathering context from multiple configuration files.
 
+**Note:** `read_many_files` looks for files following the provided paths or glob patterns. A directory path such as `"/docs"` will return an empty result; the tool requires a pattern such as `"/docs/*"` or `"/docs/*.md"` to identify the relevant files.
+
 ### Arguments
 
 `read_many_files` takes the following arguments:
 
-- `paths` (list[string], required): An array of glob patterns or paths relative to the tool's target directory (e.g., `["src/**/*.ts"]`, `["README.md", "docs/", "assets/logo.png"]`).
+- `paths` (list[string], required): An array of glob patterns or paths relative to the tool's target directory (e.g., `["src/**/*.ts"]`, `["README.md", "docs/*", "assets/logo.png"]`).
 - `exclude` (list[string], optional): Glob patterns for files/directories to exclude (e.g., `["**/*.log", "temp/"]`). These are added to default excludes if `useDefaultExcludes` is true.
 - `include` (list[string], optional): Additional glob patterns to include. These are merged with `paths` (e.g., `["*.test.ts"]` to specifically add test files if they were broadly excluded, or `["images/*.jpg"]` to include specific image types).
 - `recursive` (boolean, optional): Whether to search recursively. This is primarily controlled by `**` in glob patterns. Defaults to `true`.
@@ -50,7 +52,7 @@ Read the main README, all Markdown files in the `docs` directory, and a specific
 read_many_files(paths=["README.md", "docs/**/*.md", "assets/logo.png"], exclude=["docs/OLD_README.md"])
 ```
 
-Read all JavaScript files but explicitly including test files and all JPEGs in an `images` folder:
+Read all JavaScript files but explicitly include test files and all JPEGs in an `images` folder:
 
 ```
 read_many_files(paths=["**/*.js"], include=["**/*.test.js", "images/**/*.jpg"], useDefaultExcludes=False)

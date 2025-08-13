@@ -7,40 +7,61 @@
 import React from 'react';
 import { render } from 'ink';
 import { AppWrapper } from './ui/App.js';
-import { loadCliConfig, parseArguments, CliArgs } from './config/config.js';
+import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
 import v8 from 'node:v8';
 import os from 'node:os';
+import dns from 'node:dns';
 import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
 import {
+  DnsResolutionOrder,
   LoadedSettings,
   loadSettings,
-  USER_SETTINGS_PATH,
   SettingScope,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { loadExtensions, Extension } from './config/extension.js';
+import { loadExtensions } from './config/extension.js';
 import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
 import {
-  ApprovalMode,
   Config,
-  EditTool,
-  ShellTool,
-  WriteFileTool,
   sessionId,
   logUserPrompt,
   AuthType,
   getOauthClient,
-  shouldAttemptBrowserLaunch,
+  logIdeConnection,
+  IdeConnectionEvent,
+  IdeConnectionType,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
+import { checkForUpdates } from './ui/utils/updateCheck.js';
+import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
+import { appEvents, AppEvent } from './utils/events.js';
+import { SettingsContext } from './ui/contexts/SettingsContext.js';
+
+export function validateDnsResolutionOrder(
+  order: string | undefined,
+): DnsResolutionOrder {
+  const defaultValue: DnsResolutionOrder = 'ipv4first';
+  if (order === undefined) {
+    return defaultValue;
+  }
+  if (order === 'ipv4first' || order === 'verbatim') {
+    return order;
+  }
+  // We don't want to throw here, just warn and use the default.
+  console.warn(
+    `Invalid value for dnsResolutionOrder in settings: "${order}". Using default "${defaultValue}".`,
+  );
+  return defaultValue;
+}
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -87,7 +108,30 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
 }
 import { runAcpPeer } from './acp/acpPeer.js';
 
+export function setupUnhandledRejectionHandler() {
+  let unhandledRejectionOccurred = false;
+  process.on('unhandledRejection', (reason, _promise) => {
+    const errorMessage = `=========================================
+This is an unexpected error. Please file a bug report using the /bug tool.
+CRITICAL: Unhandled Promise Rejection!
+=========================================
+Reason: ${reason}${
+      reason instanceof Error && reason.stack
+        ? `
+Stack trace:
+${reason.stack}`
+        : ''
+    }`;
+    appEvents.emit(AppEvent.LogError, errorMessage);
+    if (!unhandledRejectionOccurred) {
+      unhandledRejectionOccurred = true;
+      appEvents.emit(AppEvent.OpenDebugConsole);
+    }
+  });
+}
+
 export async function main() {
+  setupUnhandledRejectionHandler();
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
 
@@ -111,6 +155,10 @@ export async function main() {
     extensions,
     sessionId,
     argv,
+  );
+
+  dns.setDefaultResultOrder(
+    validateDnsResolutionOrder(settings.merged.dnsResolutionOrder),
   );
 
   if (argv.promptInteractive && !process.stdin.isTTY) {
@@ -143,6 +191,11 @@ export async function main() {
 
   await config.initialize();
 
+  if (config.getIdeMode()) {
+    await config.getIdeClient().connect();
+    logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
+  }
+
   // Load custom themes from settings
   themeManager.loadCustomThemes(settings.merged.customThemes);
 
@@ -161,7 +214,10 @@ export async function main() {
       : [];
     const sandboxConfig = config.getSandbox();
     if (sandboxConfig) {
-      if (settings.merged.selectedAuthType) {
+      if (
+        settings.merged.selectedAuthType &&
+        !settings.merged.useExternalAuth
+      ) {
         // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
         try {
           const err = validateAuthMethod(settings.merged.selectedAuthType);
@@ -174,7 +230,7 @@ export async function main() {
           process.exit(1);
         }
       }
-      await start_sandbox(sandboxConfig, memoryArgs);
+      await start_sandbox(sandboxConfig, memoryArgs, config);
       process.exit(0);
     } else {
       // Not in a sandbox and not entering one, so relaunch with additional
@@ -188,7 +244,7 @@ export async function main() {
 
   if (
     settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
-    (config.getNoBrowser() || !shouldAttemptBrowserLaunch())
+    config.isBrowserLaunchSuppressed()
   ) {
     // Do oauth before app renders to make copying the link possible.
     try {
@@ -214,24 +270,34 @@ export async function main() {
     ...(await getUserStartupWarnings(workspaceRoot)),
   ];
 
-  const shouldBeInteractive =
-    !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0);
-
   // Render UI, passing necessary config values. Check that there is no command line question.
-  if (shouldBeInteractive) {
+  if (config.isInteractive()) {
     const version = await getCliVersion();
     setWindowTitle(basename(workspaceRoot), settings);
     const instance = render(
       <React.StrictMode>
-        <AppWrapper
-          config={config}
-          settings={settings}
-          startupWarnings={startupWarnings}
-          version={version}
-        />
+        <SettingsContext.Provider value={settings}>
+          <AppWrapper
+            config={config}
+            settings={settings}
+            startupWarnings={startupWarnings}
+            version={version}
+          />
+        </SettingsContext.Provider>
       </React.StrictMode>,
       { exitOnCtrlC: false },
     );
+
+    checkForUpdates()
+      .then((info) => {
+        handleAutoUpdate(info, settings, config.getProjectRoot());
+      })
+      .catch((err) => {
+        // Silently ignore update check errors.
+        if (config.getDebugMode()) {
+          console.error('Update check failed:', err);
+        }
+      });
 
     registerCleanup(() => instance.unmount());
     return;
@@ -256,12 +322,10 @@ export async function main() {
     prompt_length: input.length,
   });
 
-  // Non-interactive mode handled by runNonInteractive
-  const nonInteractiveConfig = await loadNonInteractiveConfig(
+  const nonInteractiveConfig = await validateNonInteractiveAuth(
+    settings.merged.selectedAuthType,
+    settings.merged.useExternalAuth,
     config,
-    extensions,
-    settings,
-    argv,
   );
 
   await runNonInteractive(nonInteractiveConfig, input, prompt_id);
@@ -281,83 +345,4 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
       process.stdout.write(`\x1b]2;\x07`);
     });
   }
-}
-
-// --- Global Unhandled Rejection Handler ---
-process.on('unhandledRejection', (reason, _promise) => {
-  // Log other unexpected unhandled rejections as critical errors
-  console.error('=========================================');
-  console.error('CRITICAL: Unhandled Promise Rejection!');
-  console.error('=========================================');
-  console.error('Reason:', reason);
-  console.error('Stack trace may follow:');
-  if (!(reason instanceof Error)) {
-    console.error(reason);
-  }
-  // Exit for genuinely unhandled errors
-  process.exit(1);
-});
-
-async function loadNonInteractiveConfig(
-  config: Config,
-  extensions: Extension[],
-  settings: LoadedSettings,
-  argv: CliArgs,
-) {
-  let finalConfig = config;
-  if (config.getApprovalMode() !== ApprovalMode.YOLO) {
-    // Everything is not allowed, ensure that only read-only tools are configured.
-    const existingExcludeTools = settings.merged.excludeTools || [];
-    const interactiveTools = [
-      ShellTool.Name,
-      EditTool.Name,
-      WriteFileTool.Name,
-    ];
-
-    const newExcludeTools = [
-      ...new Set([...existingExcludeTools, ...interactiveTools]),
-    ];
-
-    const nonInteractiveSettings = {
-      ...settings.merged,
-      excludeTools: newExcludeTools,
-    };
-    finalConfig = await loadCliConfig(
-      nonInteractiveSettings,
-      extensions,
-      config.getSessionId(),
-      argv,
-    );
-    await finalConfig.initialize();
-  }
-
-  return await validateNonInterActiveAuth(
-    settings.merged.selectedAuthType,
-    finalConfig,
-  );
-}
-
-async function validateNonInterActiveAuth(
-  selectedAuthType: AuthType | undefined,
-  nonInteractiveConfig: Config,
-) {
-  // making a special case for the cli. many headless environments might not have a settings.json set
-  // so if GEMINI_API_KEY is set, we'll use that. However since the oauth things are interactive anyway, we'll
-  // still expect that exists
-  if (!selectedAuthType && !process.env.GEMINI_API_KEY) {
-    console.error(
-      `Please set an Auth method in your ${USER_SETTINGS_PATH} OR specify GEMINI_API_KEY env variable file before running`,
-    );
-    process.exit(1);
-  }
-
-  selectedAuthType = selectedAuthType || AuthType.USE_GEMINI;
-  const err = validateAuthMethod(selectedAuthType);
-  if (err != null) {
-    console.error(err);
-    process.exit(1);
-  }
-
-  await nonInteractiveConfig.refreshAuth(selectedAuthType);
-  return nonInteractiveConfig;
 }

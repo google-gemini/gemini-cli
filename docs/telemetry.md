@@ -19,6 +19,7 @@ The following lists the precedence for applying telemetry settings, with items l
     - `--telemetry-target <local|gcp>`: Overrides `telemetry.target`.
     - `--telemetry-otlp-endpoint <URL>`: Overrides `telemetry.otlpEndpoint`.
     - `--telemetry-log-prompts` / `--no-telemetry-log-prompts`: Overrides `telemetry.logPrompts`.
+    - `--telemetry-outfile <path>`: Redirects telemetry output to a file. See [Exporting to a file](#exporting-to-a-file).
 
 1.  **Environment variables:**
     - `OTEL_EXPORTER_OTLP_ENDPOINT`: Overrides `telemetry.otlpEndpoint`.
@@ -48,6 +49,26 @@ The following code can be added to your workspace (`.gemini/settings.json`) or u
   },
   "sandbox": false
 }
+```
+
+### Exporting to a file
+
+You can export all telemetry data to a file for local inspection.
+
+To enable file export, use the `--telemetry-outfile` flag with a path to your desired output file. This must be run using `--telemetry-target=local`.
+
+```bash
+# Set your desired output file path
+TELEMETRY_FILE=".gemini/telemetry.log"
+
+# Run Gemini CLI with local telemetry
+# NOTE: --telemetry-otlp-endpoint="" is required to override the default
+# OTLP exporter and ensure telemetry is written to the local file.
+gemini --telemetry \
+  --telemetry-target=local \
+  --telemetry-otlp-endpoint="" \
+  --telemetry-outfile="$TELEMETRY_FILE" \
+  --prompt "What is OpenTelemetry?"
 ```
 
 ## Running an OTEL Collector
@@ -162,9 +183,10 @@ Logs are timestamped records of specific events. The following events are logged
     - `function_args`
     - `duration_ms`
     - `success` (boolean)
-    - `decision` (string: "accept", "reject", or "modify", if applicable)
+    - `decision` (string: "accept", "reject", "auto_accept", or "modify", if applicable)
     - `error` (if applicable)
     - `error_type` (if applicable)
+    - `metadata` (if applicable, dictionary of string -> any)
 
 - `gemini_cli.api_request`: This event occurs when making a request to Gemini API.
   - **Attributes**:
@@ -197,6 +219,11 @@ Logs are timestamped records of specific events. The following events are logged
 - `gemini_cli.flash_fallback`: This event occurs when Gemini CLI switches to flash as fallback.
   - **Attributes**:
     - `auth_type`
+
+- `gemini_cli.slash_command`: This event occurs when a user executes a slash command.
+  - **Attributes**:
+    - `command` (string)
+    - `subcommand` (string, if applicable)
 
 ### Metrics
 
@@ -236,3 +263,7 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `lines` (Int, if applicable): Number of lines in the file.
     - `mimetype` (string, if applicable): Mimetype of the file.
     - `extension` (string, if applicable): File extension of the file.
+    - `ai_added_lines` (Int, if applicable): Number of lines added/changed by AI.
+    - `ai_removed_lines` (Int, if applicable): Number of lines removed/changed by AI.
+    - `user_added_lines` (Int, if applicable): Number of lines added/changed by user in AI proposed changes.
+    - `user_removed_lines` (Int, if applicable): Number of lines removed/changed by user in AI proposed changes.

@@ -5,10 +5,11 @@
  */
 
 /**
- * Shades of Purple Theme — for Highlightjs.
+ * Shades of Purple Theme — for Highlight.js.
  * @author Ahmad Awais <https://twitter.com/mrahmadawais/>
  */
 import { type ColorsTheme, Theme } from './theme.js';
+import { darkSemanticColors } from './semantic-tokens.js';
 
 const shadesOfPurpleColors: ColorsTheme = {
   type: 'dark',
@@ -22,6 +23,8 @@ const shadesOfPurpleColors: ColorsTheme = {
   AccentGreen: '#A5FF90', // Strings and many others
   AccentYellow: '#fad000', // Title, main yellow
   AccentRed: '#ff628c', // Error/deletion accent
+  DiffAdded: '#383E45',
+  DiffRemoved: '#572244',
   Comment: '#B362FF', // Comment color (same as AccentPurple)
   Gray: '#726c86', // Gray color
   GradientColors: ['#4d21fc', '#847ace', '#ff628c'],
@@ -345,4 +348,5 @@ export const ShadesOfPurple = new Theme(
     },
   },
   shadesOfPurpleColors,
+  darkSemanticColors,
 );

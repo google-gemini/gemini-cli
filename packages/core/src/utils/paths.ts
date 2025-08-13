@@ -11,6 +11,14 @@ import * as crypto from 'crypto';
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 const TMP_DIR_NAME = 'tmp';
+const COMMANDS_DIR_NAME = 'commands';
+
+/**
+ * Special characters that need to be escaped in file paths for shell compatibility.
+ * Includes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
+ * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
+ */
+export const SHELL_SPECIAL_CHARS = /[ \t()[\]{};|*?$`'"#&<>!~]/;
 
 /**
  * Replaces the home directory with a tilde.
@@ -44,7 +52,7 @@ export function shortenPath(filePath: string, maxLen: number = 35): string {
 
   // Handle cases with no segments after root (e.g., "/", "C:\") or only one segment
   if (segments.length <= 1) {
-    // Fallback to simple start/end truncation for very short paths or single segments
+    // Fall back to simple start/end truncation for very short paths or single segments
     const keepLen = Math.floor((maxLen - 3) / 2);
     // Ensure keepLen is not negative if maxLen is very small
     if (keepLen <= 0) {
@@ -118,26 +126,43 @@ export function makeRelative(
 }
 
 /**
- * Escapes spaces in a file path.
+ * Escapes special characters in a file path like macOS terminal does.
+ * Escapes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
+ * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
  */
 export function escapePath(filePath: string): string {
   let result = '';
   for (let i = 0; i < filePath.length; i++) {
-    // Only escape spaces that are not already escaped.
-    if (filePath[i] === ' ' && (i === 0 || filePath[i - 1] !== '\\')) {
-      result += '\\ ';
+    const char = filePath[i];
+
+    // Count consecutive backslashes before this character
+    let backslashCount = 0;
+    for (let j = i - 1; j >= 0 && filePath[j] === '\\'; j--) {
+      backslashCount++;
+    }
+
+    // Character is already escaped if there's an odd number of backslashes before it
+    const isAlreadyEscaped = backslashCount % 2 === 1;
+
+    // Only escape if not already escaped
+    if (!isAlreadyEscaped && SHELL_SPECIAL_CHARS.test(char)) {
+      result += '\\' + char;
     } else {
-      result += filePath[i];
+      result += char;
     }
   }
   return result;
 }
 
 /**
- * Unescapes spaces in a file path.
+ * Unescapes special characters in a file path.
+ * Removes backslash escaping from shell metacharacters.
  */
 export function unescapePath(filePath: string): string {
-  return filePath.replace(/\\ /g, ' ');
+  return filePath.replace(
+    new RegExp(`\\\\([${SHELL_SPECIAL_CHARS.source.slice(1, -1)}])`, 'g'),
+    '$1',
+  );
 }
 
 /**
@@ -157,4 +182,21 @@ export function getProjectHash(projectRoot: string): string {
 export function getProjectTempDir(projectRoot: string): string {
   const hash = getProjectHash(projectRoot);
   return path.join(os.homedir(), GEMINI_DIR, TMP_DIR_NAME, hash);
+}
+
+/**
+ * Returns the absolute path to the user-level commands directory.
+ * @returns The path to the user's commands directory.
+ */
+export function getUserCommandsDir(): string {
+  return path.join(os.homedir(), GEMINI_DIR, COMMANDS_DIR_NAME);
+}
+
+/**
+ * Returns the absolute path to the project-level commands directory.
+ * @param projectRoot The absolute path to the project's root directory.
+ * @returns The path to the project's commands directory.
+ */
+export function getProjectCommandsDir(projectRoot: string): string {
+  return path.join(projectRoot, GEMINI_DIR, COMMANDS_DIR_NAME);
 }

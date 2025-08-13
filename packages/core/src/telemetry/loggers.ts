@@ -12,20 +12,26 @@ import {
   EVENT_API_REQUEST,
   EVENT_API_RESPONSE,
   EVENT_CLI_CONFIG,
+  EVENT_IDE_CONNECTION,
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
+  EVENT_NEXT_SPEAKER_CHECK,
   SERVICE_NAME,
+  EVENT_SLASH_COMMAND,
 } from './constants.js';
 import {
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
+  IdeConnectionEvent,
   StartSessionEvent,
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  NextSpeakerCheckEvent,
   LoopDetectedEvent,
+  SlashCommandEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -305,6 +311,69 @@ export function logLoopDetected(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Loop detected. Type: ${event.loop_type}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logNextSpeakerCheck(
+  config: Config,
+  event: NextSpeakerCheckEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logNextSpeakerCheck(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_NEXT_SPEAKER_CHECK,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Next speaker check.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logSlashCommand(
+  config: Config,
+  event: SlashCommandEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logSlashCommandEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_SLASH_COMMAND,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Slash command: ${event.command}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logIdeConnection(
+  config: Config,
+  event: IdeConnectionEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logIdeConnectionEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_IDE_CONNECTION,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Ide connection. Type: ${event.connection_type}.`,
     attributes,
   };
   logger.emit(logRecord);

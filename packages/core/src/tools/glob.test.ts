@@ -9,9 +9,10 @@ import { partListUnionToString } from '../core/geminiRequest.js';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'; // Removed vi
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { Config } from '../config/config.js';
+import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 
 describe('GlobTool', () => {
   let tempRootDir: string; // This will be the rootDirectory for the GlobTool instance
@@ -23,6 +24,7 @@ describe('GlobTool', () => {
     getFileService: () => new FileDiscoveryService(tempRootDir),
     getFileFilteringRespectGitIgnore: () => true,
     getTargetDir: () => tempRootDir,
+    getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
   } as unknown as Config;
 
   beforeEach(async () => {
@@ -62,7 +64,8 @@ describe('GlobTool', () => {
   describe('execute', () => {
     it('should find files matching a simple pattern in the root', async () => {
       const params: GlobToolParams = { pattern: '*.txt' };
-      const result = await globTool.execute(params, abortSignal);
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain('Found 2 file(s)');
       expect(result.llmContent).toContain(path.join(tempRootDir, 'fileA.txt'));
       expect(result.llmContent).toContain(path.join(tempRootDir, 'FileB.TXT'));
@@ -71,7 +74,8 @@ describe('GlobTool', () => {
 
     it('should find files case-sensitively when case_sensitive is true', async () => {
       const params: GlobToolParams = { pattern: '*.txt', case_sensitive: true };
-      const result = await globTool.execute(params, abortSignal);
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain('Found 1 file(s)');
       expect(result.llmContent).toContain(path.join(tempRootDir, 'fileA.txt'));
       expect(result.llmContent).not.toContain(
@@ -81,7 +85,8 @@ describe('GlobTool', () => {
 
     it('should find files case-insensitively by default (pattern: *.TXT)', async () => {
       const params: GlobToolParams = { pattern: '*.TXT' };
-      const result = await globTool.execute(params, abortSignal);
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain('Found 2 file(s)');
       expect(result.llmContent).toContain(path.join(tempRootDir, 'fileA.txt'));
       expect(result.llmContent).toContain(path.join(tempRootDir, 'FileB.TXT'));
@@ -92,7 +97,8 @@ describe('GlobTool', () => {
         pattern: '*.TXT',
         case_sensitive: false,
       };
-      const result = await globTool.execute(params, abortSignal);
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain('Found 2 file(s)');
       expect(result.llmContent).toContain(path.join(tempRootDir, 'fileA.txt'));
       expect(result.llmContent).toContain(path.join(tempRootDir, 'FileB.TXT'));
@@ -100,7 +106,8 @@ describe('GlobTool', () => {
 
     it('should find files using a pattern that includes a subdirectory', async () => {
       const params: GlobToolParams = { pattern: 'sub/*.md' };
-      const result = await globTool.execute(params, abortSignal);
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain('Found 2 file(s)');
       expect(result.llmContent).toContain(
         path.join(tempRootDir, 'sub', 'fileC.md'),
@@ -112,7 +119,8 @@ describe('GlobTool', () => {
 
     it('should find files in a specified relative path (relative to rootDir)', async () => {
       const params: GlobToolParams = { pattern: '*.md', path: 'sub' };
-      const result = await globTool.execute(params, abortSignal);
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain('Found 2 file(s)');
       expect(result.llmContent).toContain(
         path.join(tempRootDir, 'sub', 'fileC.md'),
@@ -124,7 +132,8 @@ describe('GlobTool', () => {
 
     it('should find files using a deep globstar pattern (e.g., **/*.log)', async () => {
       const params: GlobToolParams = { pattern: '**/*.log' };
-      const result = await globTool.execute(params, abortSignal);
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain('Found 1 file(s)');
       expect(result.llmContent).toContain(
         path.join(tempRootDir, 'sub', 'deep', 'fileE.log'),
@@ -133,7 +142,8 @@ describe('GlobTool', () => {
 
     it('should return "No files found" message when pattern matches nothing', async () => {
       const params: GlobToolParams = { pattern: '*.nonexistent' };
-      const result = await globTool.execute(params, abortSignal);
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
         'No files found matching pattern "*.nonexistent"',
       );
@@ -142,7 +152,8 @@ describe('GlobTool', () => {
 
     it('should correctly sort files by modification time (newest first)', async () => {
       const params: GlobToolParams = { pattern: '*.sortme' };
-      const result = await globTool.execute(params, abortSignal);
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
       const llmContent = partListUnionToString(result.llmContent);
 
       expect(llmContent).toContain('Found 2 file(s)');
@@ -150,11 +161,19 @@ describe('GlobTool', () => {
       expect(typeof llmContent).toBe('string');
 
       const filesListed = llmContent
-        .substring(llmContent.indexOf(':') + 1)
         .trim()
-        .split('\n');
-      expect(filesListed[0]).toContain(path.join(tempRootDir, 'newer.sortme'));
-      expect(filesListed[1]).toContain(path.join(tempRootDir, 'older.sortme'));
+        .split(/\r?\n/)
+        .slice(1)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      expect(filesListed).toHaveLength(2);
+      expect(path.resolve(filesListed[0])).toBe(
+        path.resolve(tempRootDir, 'newer.sortme'),
+      );
+      expect(path.resolve(filesListed[1])).toBe(
+        path.resolve(tempRootDir, 'older.sortme'),
+      );
     });
   });
 
@@ -232,10 +251,10 @@ describe('GlobTool', () => {
       // Let's try to go further up.
       const paramsOutside: GlobToolParams = {
         pattern: '*.txt',
-        path: '../../../../../../../../../../tmp',
-      }; // Definitely outside
+        path: '../../../../../../../../../../tmp', // Definitely outside
+      };
       expect(specificGlobTool.validateToolParams(paramsOutside)).toContain(
-        "resolves outside the tool's root directory",
+        'resolves outside the allowed workspace directories',
       );
     });
 
@@ -254,6 +273,38 @@ describe('GlobTool', () => {
       expect(globTool.validateToolParams(params)).toContain(
         'Search path is not a directory',
       );
+    });
+  });
+
+  describe('workspace boundary validation', () => {
+    it('should validate search paths are within workspace boundaries', () => {
+      const validPath = { pattern: '*.ts', path: 'sub' };
+      const invalidPath = { pattern: '*.ts', path: '../..' };
+
+      expect(globTool.validateToolParams(validPath)).toBeNull();
+      expect(globTool.validateToolParams(invalidPath)).toContain(
+        'resolves outside the allowed workspace directories',
+      );
+    });
+
+    it('should provide clear error messages when path is outside workspace', () => {
+      const invalidPath = { pattern: '*.ts', path: '/etc' };
+      const error = globTool.validateToolParams(invalidPath);
+
+      expect(error).toContain(
+        'resolves outside the allowed workspace directories',
+      );
+      expect(error).toContain(tempRootDir);
+    });
+
+    it('should work with paths in workspace subdirectories', async () => {
+      const params: GlobToolParams = { pattern: '*.md', path: 'sub' };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Found 2 file(s)');
+      expect(result.llmContent).toContain('fileC.md');
+      expect(result.llmContent).toContain('FileD.MD');
     });
   });
 });
