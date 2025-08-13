@@ -19,8 +19,8 @@ export class DiscoveredTool extends BaseTool<ToolParams, ToolResult> {
   constructor(
     private readonly config: Config,
     name: string,
-    readonly description: string,
-    readonly parameterSchema: Record<string, unknown>,
+    override readonly description: string,
+    override readonly parameterSchema: Record<string, unknown>,
   ) {
     const discoveryCmd = config.getToolDiscoveryCommand()!;
     const callCommand = config.getToolCallCommand()!;
@@ -154,6 +154,18 @@ export class ToolRegistry {
     for (const tool of this.tools.values()) {
       if (tool instanceof DiscoveredTool || tool instanceof DiscoveredMCPTool) {
         this.tools.delete(tool.name);
+      }
+    }
+  }
+
+  /**
+   * Removes all tools from a specific MCP server.
+   * @param serverName The name of the server to remove tools from.
+   */
+  removeMcpToolsByServer(serverName: string): void {
+    for (const [name, tool] of this.tools.entries()) {
+      if (tool instanceof DiscoveredMCPTool && tool.serverName === serverName) {
+        this.tools.delete(name);
       }
     }
   }

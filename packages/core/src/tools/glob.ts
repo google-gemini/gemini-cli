@@ -281,7 +281,7 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   /**
    * Validates the parameters for the tool.
    */
-  validateToolParams(params: GlobToolParams): string | null {
+  override validateToolParams(params: GlobToolParams): string | null {
     const errors = SchemaValidator.validate(
       this.schema.parametersJsonSchema,
       params,

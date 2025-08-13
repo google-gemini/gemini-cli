@@ -35,6 +35,8 @@ import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
 
+import { isWorkspaceTrusted } from './trustedFolders.js';
+
 // Simple console logger for now - replace with actual logger if available
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -317,8 +319,9 @@ export async function loadCliConfig(
   const ideMode = settings.ideMode ?? false;
 
   const folderTrustFeature = settings.folderTrustFeature ?? false;
-  const folderTrustSetting = settings.folderTrust ?? false;
+  const folderTrustSetting = settings.folderTrust ?? true;
   const folderTrust = folderTrustFeature && folderTrustSetting;
+  const trustedFolder = folderTrust ? isWorkspaceTrusted() : true;
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -523,6 +526,7 @@ export async function loadCliConfig(
     folderTrustFeature,
     folderTrust,
     interactive,
+    trustedFolder,
   });
 }
 
