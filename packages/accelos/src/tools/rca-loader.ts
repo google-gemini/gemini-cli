@@ -2,6 +2,7 @@ import { createTool } from '@mastra/core';
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { defaultConfig } from '../config.js';
 
 interface RCADocument {
   filename: string;
@@ -15,7 +16,7 @@ export const rcaLoaderTool = createTool({
   id: 'load-rcas',
   description: 'Load RCA (Root Cause Analysis) documents from a directory of markdown files into memory with pagination support',
   inputSchema: z.object({
-    directory: z.string().describe('Path to the directory containing RCA markdown files'),
+    directory: z.string().optional().describe('Path to the directory containing RCA markdown files (uses configured default if not provided)'),
     pattern: z.string().default('*.md').describe('File pattern to match (default: *.md)'),
     recursive: z.boolean().default(false).describe('Whether to search subdirectories recursively'),
     page: z.number().default(1).describe('Page number to load (starting from 1)'),
@@ -49,7 +50,7 @@ export const rcaLoaderTool = createTool({
     }),
   }),
   execute: async ({ context }) => {
-    const { directory, pattern, recursive, page, pageSize, maxContentLength, includeMetadataOnly } = context;
+    const { directory = defaultConfig.rcaDirectoryPath, recursive, page, pageSize, maxContentLength, includeMetadataOnly } = context;
 
     try {
       // Verify directory exists
