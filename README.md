@@ -147,6 +147,46 @@ gemini
 gemini --include-directories ../lib,../docs
 ```
 
+### 🌍 Multilingual Support
+
+Gemini CLI supports multiple languages for the user interface. You can use the CLI in English, Chinese, or Japanese.
+
+#### Set language via command line
+
+```bash
+# Use Chinese interface
+gemini --language zh
+
+# Use Japanese interface
+gemini --language ja
+
+# Use English interface (default)
+gemini --language en
+
+# Short form with -L flag
+gemini -L zh
+```
+
+#### Set language via environment variable
+
+```bash
+# Set Chinese as default language
+export GEMINI_CLI_LANGUAGE=zh
+gemini
+
+# Set Japanese as default language
+export GEMINI_CLI_LANGUAGE=ja
+gemini
+```
+
+#### Supported languages
+
+- `en` - English (default)
+- `zh` - 简体中文 (Simplified Chinese)
+- `ja` - 日本語 (Japanese)
+
+The language setting affects all CLI messages, prompts, error messages, and help text. The actual conversation with Gemini can be in any language regardless of the UI language setting.
+
 #### Use specific model
 
 ```bash

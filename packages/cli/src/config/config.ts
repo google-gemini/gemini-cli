@@ -28,6 +28,8 @@ import {
   WriteFileTool,
   MCPServerConfig,
 } from '@google/gemini-cli-core';
+import { initializeLanguage, getEffectiveLanguage } from './language.js';
+import { i18n, t } from '../i18n/index.js';
 import { Settings } from './settings.js';
 
 import { Extension, annotateActiveExtensions } from './extension.js';
@@ -70,9 +72,19 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
+  language: string | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
+  // 早期初始化语言系统以支持帮助信息的多语言显示
+  const earlyArgs = process.argv.find(arg => arg.startsWith('-L') || arg.startsWith('--language'));
+  const languageArg = earlyArgs ? earlyArgs.split('=')[1] || process.argv[process.argv.indexOf(earlyArgs) + 1] : undefined;
+  if (languageArg) {
+    initializeLanguage(languageArg);
+  } else {
+    initializeLanguage();
+  }
+
   const yargsInstance = yargs(hideBin(process.argv))
     .scriptName('gemini')
     .usage(
@@ -219,6 +231,12 @@ export async function parseArguments(): Promise<CliArgs> {
           coerce: (dirs: string[]) =>
             // Handle comma-separated values
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
+        })
+        .option('language', {
+          alias: 'L',
+          type: 'string',
+          description: 'Set interface language',
+          choices: ['en', 'zh', 'ja'],
         })
         .check((argv) => {
           if (argv.prompt && argv.promptInteractive) {
