@@ -22,8 +22,9 @@ export async function getIdeProcessId(): Promise<number> {
   const platform = os.platform();
   let currentPid = process.pid;
 
-  // Indefinitely loop upwards through the process tree
-  while (true) {
+  // Loop upwards through the process tree, with a depth limit to prevent infinite loops.
+  const MAX_TRAVERSAL_DEPTH = 32;
+  for (let i = 0; i < MAX_TRAVERSAL_DEPTH; i++) {
     let parentPid: number;
 
     try {
