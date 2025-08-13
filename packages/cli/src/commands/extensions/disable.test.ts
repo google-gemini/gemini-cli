@@ -16,39 +16,52 @@ import {
 import { disableCommand } from './disable.js';
 import {
   loadSettings,
+  saveSettings,
   LoadedSettings,
   SettingScope,
+  SettingsFile,
 } from '../../config/settings.js';
 
 vi.mock('../../config/settings.js');
 
 const mockedLoadSettings = loadSettings as Mock;
+const mockedSaveSettings = saveSettings as Mock;
 
 describe('extensions disable command', () => {
   let consoleSpy: vi.SpyInstance;
   let mockSetValue: vi.Mock;
+  let mockSettingsFile: SettingsFile;
 
   beforeEach(() => {
     vi.resetAllMocks();
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     mockSetValue = vi.fn();
+    mockSettingsFile = {
+      path: '/fake/path/settings.json',
+      settings: {
+        extensions: {
+          disabled: [],
+        },
+      },
+    };
   });
 
   afterEach(() => {
     consoleSpy.mockRestore();
   });
 
-  it('should disable an extension in the workspace', async () => {
-    const mockSettings = {
-      forScope: () => ({
-        settings: {
-          extensions: {
-            disabled: [],
-          },
-        },
-      }),
+  const getMockSettings = (
+    initialDisabled: string[],
+  ): Partial<LoadedSettings> => {
+    mockSettingsFile.settings.extensions!.disabled = initialDisabled;
+    return {
+      forScope: () => mockSettingsFile,
       setValue: mockSetValue,
-    } as unknown as LoadedSettings;
+    };
+  };
+
+  it('should disable an extension and save the settings', async () => {
+    const mockSettings = getMockSettings([]) as LoadedSettings;
     mockedLoadSettings.mockReturnValue(mockSettings);
 
     await disableCommand.handler({
@@ -65,22 +78,14 @@ describe('extensions disable command', () => {
         disabled: ['my-extension'],
       },
     );
+    expect(mockedSaveSettings).toHaveBeenCalledWith(mockSettingsFile);
     expect(consoleSpy).toHaveBeenCalledWith(
       'Extension "my-extension" has been disabled.',
     );
   });
 
-  it('should disable an extension globally', async () => {
-    const mockSettings = {
-      forScope: () => ({
-        settings: {
-          extensions: {
-            disabled: [],
-          },
-        },
-      }),
-      setValue: mockSetValue,
-    } as unknown as LoadedSettings;
+  it('should disable an extension globally and save the settings', async () => {
+    const mockSettings = getMockSettings([]) as LoadedSettings;
     mockedLoadSettings.mockReturnValue(mockSettings);
 
     await disableCommand.handler({
@@ -93,22 +98,14 @@ describe('extensions disable command', () => {
     expect(mockSetValue).toHaveBeenCalledWith(SettingScope.User, 'extensions', {
       disabled: ['my-extension'],
     });
+    expect(mockedSaveSettings).toHaveBeenCalledWith(mockSettingsFile);
     expect(consoleSpy).toHaveBeenCalledWith(
       'Extension "my-extension" has been disabled.',
     );
   });
 
   it('should not disable an already disabled extension', async () => {
-    const mockSettings = {
-      forScope: () => ({
-        settings: {
-          extensions: {
-            disabled: ['my-extension'],
-          },
-        },
-      }),
-      setValue: mockSetValue,
-    } as unknown as LoadedSettings;
+    const mockSettings = getMockSettings(['my-extension']) as LoadedSettings;
     mockedLoadSettings.mockReturnValue(mockSettings);
 
     await disableCommand.handler({
@@ -119,6 +116,7 @@ describe('extensions disable command', () => {
     });
 
     expect(mockSetValue).not.toHaveBeenCalled();
+    expect(mockedSaveSettings).not.toHaveBeenCalled();
     expect(consoleSpy).toHaveBeenCalledWith(
       'Extension "my-extension" is already disabled.',
     );

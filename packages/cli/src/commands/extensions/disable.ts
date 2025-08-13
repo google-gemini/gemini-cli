@@ -5,7 +5,11 @@
  */
 
 import { ArgumentsCamelCase, CommandModule } from 'yargs';
-import { loadSettings, SettingScope } from '../../config/settings.js';
+import {
+  loadSettings,
+  saveSettings,
+  SettingScope,
+} from '../../config/settings.js';
 
 interface DisableArgs {
   name: string;
@@ -47,6 +51,7 @@ export const disableCommand: CommandModule<object, DisableArgs> = {
       disabled: newDisabled,
     };
     settings.setValue(scope, 'extensions', newExtensions);
+    saveSettings(settings.forScope(scope));
 
     console.log(`Extension "${name}" has been disabled.`);
   },
