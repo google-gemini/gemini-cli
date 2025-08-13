@@ -39,6 +39,7 @@ export {
   ApiResponseEvent,
   TelemetryEvent,
   FlashFallbackEvent,
+  KittySequenceOverflowEvent,
   SlashCommandEvent,
   makeSlashCommandEvent,
   SlashCommandStatus,
