@@ -5,16 +5,26 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { loadExtensions } from '../../config/extension.js';
+import {
+  loadExtensions,
+  annotateActiveExtensionsFromDisabled,
+} from '../../config/extension.js';
+import { loadSettings } from '../../config/settings.js';
 
 export const listCommand: CommandModule = {
   command: 'list',
   describe: 'List all available extensions',
   handler: () => {
-    const extensions = loadExtensions(process.cwd());
+    const workspaceRoot = process.cwd();
+    const settings = loadSettings(workspaceRoot);
+    const extensions = loadExtensions(workspaceRoot);
+    const annotatedExtensions = annotateActiveExtensionsFromDisabled(
+      extensions,
+      settings.merged.extensions?.disabled || [],
+    );
     console.log('Installed extensions:');
-    for (const extension of extensions) {
-      console.log(`- ${extension.config.name}`);
+    for (const extension of annotatedExtensions) {
+      console.log(`- ${extension.name}`);
     }
   },
 };

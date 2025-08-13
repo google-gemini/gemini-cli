@@ -193,3 +193,18 @@ export function annotateActiveExtensions(
 
   return annotatedExtensions;
 }
+
+export function annotateActiveExtensionsFromDisabled(
+  extensions: Extension[],
+  disabledExtensionNames: string[],
+): GeminiCLIExtension[] {
+  const allAvailableNames = extensions.map((ext) => ext.config.name);
+  const disabledNamesSet = new Set(
+    disabledExtensionNames.map((name) => name.toLowerCase()),
+  );
+  const enabledExtensions = allAvailableNames.filter(
+    (name) => !disabledNamesSet.has(name.toLowerCase()),
+  );
+
+  return annotateActiveExtensions(extensions, enabledExtensions);
+}

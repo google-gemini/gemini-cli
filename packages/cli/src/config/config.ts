@@ -31,7 +31,11 @@ import {
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
-import { Extension, annotateActiveExtensions } from './extension.js';
+import {
+  Extension,
+  annotateActiveExtensions,
+  annotateActiveExtensionsFromDisabled,
+} from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
@@ -316,26 +320,14 @@ export async function loadCliConfig(
   const folderTrustSetting = settings.folderTrust ?? false;
   const folderTrust = folderTrustFeature && folderTrustSetting;
 
-  let enabledExtensions: string[];
-  if (argv.extensions) {
-    // If the CLI flag is used, it takes precedence.
-    enabledExtensions = argv.extensions;
-  } else {
-    // Otherwise, use the settings to determine the enabled list.
-    const allAvailableNames = extensions.map((ext) => ext.config.name);
-    const disabledFromSettings = settings.extensions?.disabled || [];
-    const disabledNamesSet = new Set(
-      disabledFromSettings.map((name) => name.toLowerCase()),
-    );
-    enabledExtensions = allAvailableNames.filter(
-      (name) => !disabledNamesSet.has(name.toLowerCase()),
-    );
-  }
-
-  const allExtensions = annotateActiveExtensions(
-    extensions,
-    enabledExtensions || [],
-  );
+  const allExtensions = argv.extensions
+    ? // If the CLI flag is used, it takes precedence.
+      annotateActiveExtensions(extensions, argv.extensions)
+    : // Otherwise, use the settings to determine the enabled list.
+      annotateActiveExtensionsFromDisabled(
+        extensions,
+        settings.extensions?.disabled || [],
+      );
 
   const activeExtensions = extensions.filter(
     (_, i) => allExtensions[i].isActive,
