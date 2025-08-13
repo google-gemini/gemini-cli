@@ -58,7 +58,6 @@ const mockConfigInternal = {
   getGeminiClient: vi.fn(), // Initialize as a plain mock function
   getIdeClient: vi.fn(),
   getIdeMode: vi.fn(() => false),
-  getIdeModeFeature: vi.fn(() => false),
   getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
   getApiKey: () => 'test-key',
   getModel: () => 'test-model',
