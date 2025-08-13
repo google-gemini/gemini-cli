@@ -319,6 +319,7 @@ describe('ClearcutLogger', () => {
 
   describe('logToolCallEvent with programming_language', () => {
     it('should include programming_language when provided', () => {
+      const { logger } = setup();
       const createLogEventSpy = vi.spyOn(logger!, 'createLogEvent');
       const toolCallEvent: ToolCallEvent = {
         'event.name': 'tool_call',
@@ -346,6 +347,7 @@ describe('ClearcutLogger', () => {
     });
 
     it('should not include programming_language when not provided', () => {
+      const { logger } = setup();
       const createLogEventSpy = vi.spyOn(logger!, 'createLogEvent');
       const toolCallEvent: ToolCallEvent = {
         'event.name': 'tool_call',
