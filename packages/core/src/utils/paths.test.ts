@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { escapePath, unescapePath } from './paths.js';
+import { escapePath, unescapePath, normalizePath } from './paths.js';
 
 describe('escapePath', () => {
   it('should escape spaces', () => {
@@ -210,5 +210,148 @@ describe('unescapePath', () => {
       'path\\\\\\\\ file.txt',
     );
     expect(unescapePath('file\\\\\\(test\\).txt')).toBe('file\\\\(test).txt');
+  });
+});
+
+describe('normalizePath', () => {
+  it('should convert Windows-style backslashes to forward slashes', () => {
+    expect(normalizePath('C:\\Users\\Documents\\file.txt')).toBe(
+      'C:/Users/Documents/file.txt',
+    );
+    expect(normalizePath('path\\to\\file.txt')).toBe('path/to/file.txt');
+    expect(normalizePath('\\root\\folder\\subfolder\\')).toBe(
+      '/root/folder/subfolder/',
+    );
+  });
+
+  it('should preserve escaped special characters', () => {
+    expect(normalizePath('path\\to\\file\\ with\\ spaces.txt')).toBe(
+      'path/to/file\\ with\\ spaces.txt',
+    );
+    expect(normalizePath('folder\\\\file\\(test\\).txt')).toBe(
+      'folder\\\\file\\(test\\).txt',
+    );
+    expect(normalizePath('path\\\\name\\[backup\\].txt')).toBe(
+      'path\\\\name\\[backup\\].txt',
+    );
+  });
+
+  it('should preserve escaped backslashes', () => {
+    expect(normalizePath('path\\\\\\\\file.txt')).toBe('path\\\\\\\\file.txt');
+    expect(normalizePath('folder\\\\\\\\\\\\name.txt')).toBe(
+      'folder\\\\\\\\\\\\name.txt',
+    );
+  });
+
+  it('should handle mixed separators correctly', () => {
+    expect(normalizePath('C:\\Users/Documents\\file.txt')).toBe(
+      'C:/Users/Documents/file.txt',
+    );
+    expect(normalizePath('path/to\\folder\\file.txt')).toBe(
+      'path/to/folder/file.txt',
+    );
+  });
+
+  it('should preserve escaped shell special characters', () => {
+    expect(normalizePath('path\\to\\file\\$name.txt')).toBe(
+      'path/to/file\\$name.txt',
+    );
+    expect(normalizePath('folder\\\\file\\*.txt')).toBe(
+      'folder\\\\file\\*.txt',
+    );
+    expect(normalizePath('path\\\\name\\?.txt')).toBe('path\\\\name\\?.txt');
+    expect(normalizePath('folder\\\\file\\&name.txt')).toBe(
+      'folder\\\\file\\&name.txt',
+    );
+    expect(normalizePath('path\\\\file\\|name.txt')).toBe(
+      'path\\\\file\\|name.txt',
+    );
+    expect(normalizePath('folder\\\\file\\;name.txt')).toBe(
+      'folder\\\\file\\;name.txt',
+    );
+    expect(normalizePath('path\\\\file\\{name\\}.txt')).toBe(
+      'path\\\\file\\{name\\}.txt',
+    );
+    expect(normalizePath('folder\\\\file\\#name.txt')).toBe(
+      'folder\\\\file\\#name.txt',
+    );
+    expect(normalizePath('path\\\\file\\!name.txt')).toBe(
+      'path\\\\file\\!name.txt',
+    );
+    expect(normalizePath('folder\\\\file\\~name.txt')).toBe(
+      'folder\\\\file\\~name.txt',
+    );
+    expect(normalizePath('path\\\\file\\<name\\>.txt')).toBe(
+      'path\\\\file\\<name\\>.txt',
+    );
+    expect(normalizePath('folder\\\\file\\`name.txt')).toBe(
+      'folder\\\\file\\`name.txt',
+    );
+    expect(normalizePath("path\\\\file\\'name.txt")).toBe(
+      "path\\\\file\\'name.txt",
+    );
+    expect(normalizePath('folder\\\\file\\"name.txt')).toBe(
+      'folder\\\\file\\"name.txt',
+    );
+  });
+
+  it('should handle complex scenarios with multiple escape sequences', () => {
+    expect(
+      normalizePath('path\\\\\\\\folder\\ with\\ spaces\\\\file\\(test\\).txt'),
+    ).toBe('path\\\\\\\\folder\\ with\\ spaces\\\\file\\(test\\).txt');
+    expect(normalizePath('C:\\\\Program\\ Files\\\\App\\[config\\].txt')).toBe(
+      'C:\\\\Program\\ Files\\\\App\\[config\\].txt',
+    );
+  });
+
+  it('should handle edge cases', () => {
+    expect(normalizePath('')).toBe('');
+    expect(normalizePath('\\')).toBe('/');
+    expect(normalizePath('\\\\')).toBe('\\\\');
+    expect(normalizePath('\\\\\\')).toBe('\\\\/');
+    expect(normalizePath('\\\\\\\\')).toBe('\\\\\\\\');
+  });
+
+  it('should handle paths that are already normalized', () => {
+    expect(normalizePath('path/to/file.txt')).toBe('path/to/file.txt');
+    expect(normalizePath('/root/folder/file.txt')).toBe(
+      '/root/folder/file.txt',
+    );
+    expect(normalizePath('file.txt')).toBe('file.txt');
+  });
+
+  it('should handle escaped tabs correctly', () => {
+    expect(normalizePath('path\\\\file\\\tname.txt')).toBe(
+      'path\\\\file\\\tname.txt',
+    );
+    expect(normalizePath('folder\\\\name\\\tfile.txt')).toBe(
+      'folder\\\\name\\\tfile.txt',
+    );
+  });
+
+  it('should handle consecutive backslashes followed by special characters', () => {
+    expect(normalizePath('path\\\\\\\\file\\ name.txt')).toBe(
+      'path\\\\\\\\file\\ name.txt',
+    );
+    expect(normalizePath('folder\\\\\\\\\\\\name\\*.txt')).toBe(
+      'folder\\\\\\\\\\\\name\\*.txt',
+    );
+  });
+
+  it('should handle real-world Windows paths', () => {
+    expect(normalizePath('C:\\Program Files\\MyApp\\config.txt')).toBe(
+      'C:/Program Files/MyApp/config.txt',
+    );
+    expect(
+      normalizePath('D:\\Users\\John\\Documents\\My\\ Project\\file.txt'),
+    ).toBe('D:/Users/John/Documents/My\\ Project/file.txt');
+    expect(normalizePath('\\\\server\\share\\folder\\file.txt')).toBe(
+      '\\\\server/share/folder/file.txt',
+    );
+  });
+
+  it('should handle backslash not followed by anything (end of string)', () => {
+    expect(normalizePath('path\\to\\folder\\')).toBe('path/to/folder/');
+    expect(normalizePath('file\\')).toBe('file/');
   });
 });

@@ -155,6 +155,38 @@ export function escapePath(filePath: string): string {
 }
 
 /**
+ * Normalizes Windows-style paths by converting backslashes to forward slashes.
+ * Preserves backslashes that are used to escape shell special characters.
+ * @param filePath The path to normalize.
+ * @returns The normalized path with forward slashes.
+ */
+export function normalizePath(filePath: string): string {
+  let result = '';
+  for (let i = 0; i < filePath.length; i++) {
+    const char = filePath[i];
+
+    if (char === '\\') {
+      const nextChar = filePath[i + 1];
+
+      // If the backslash is escaping a shell special character or another backslash, keep them both.
+      if (
+        nextChar &&
+        (SHELL_SPECIAL_CHARS.test(nextChar) || nextChar === '\\')
+      ) {
+        result += char + nextChar;
+        i++; // Advance index to skip the escaped character
+      } else {
+        // Otherwise, it's a path separator.
+        result += '/';
+      }
+    } else {
+      result += char;
+    }
+  }
+  return result;
+}
+
+/**
  * Unescapes special characters in a file path.
  * Removes backslash escaping from shell metacharacters.
  */

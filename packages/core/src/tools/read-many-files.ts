@@ -28,6 +28,7 @@ import {
   recordFileOperationMetric,
   FileOperation,
 } from '../telemetry/metrics.js';
+import { normalizePath } from '../utils/paths.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -246,7 +247,7 @@ ${finalExclusionPatternsForDescription
 
       for (const dir of workspaceDirs) {
         const entriesInDir = await glob(
-          searchPatterns.map((p) => p.replace(/\\/g, '/')),
+          searchPatterns.map((p) => normalizePath(p)),
           {
             cwd: dir,
             ignore: effectiveExcludes,
@@ -355,9 +356,9 @@ ${finalExclusionPatternsForDescription
     const fileProcessingPromises = sortedFiles.map(
       async (filePath): Promise<FileProcessingResult> => {
         try {
-          const relativePathForDisplay = path
-            .relative(this.config.getTargetDir(), filePath)
-            .replace(/\\/g, '/');
+          const relativePathForDisplay = normalizePath(
+            path.relative(this.config.getTargetDir(), filePath),
+          );
 
           const fileType = await detectFileType(filePath);
 
@@ -406,9 +407,9 @@ ${finalExclusionPatternsForDescription
             fileReadResult,
           };
         } catch (error) {
-          const relativePathForDisplay = path
-            .relative(this.config.getTargetDir(), filePath)
-            .replace(/\\/g, '/');
+          const relativePathForDisplay = normalizePath(
+            path.relative(this.config.getTargetDir(), filePath),
+          );
 
           return {
             success: false,

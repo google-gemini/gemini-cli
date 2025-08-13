@@ -10,6 +10,8 @@ import {
   Config,
   FileDiscoveryService,
   GlobTool,
+  normalizePath,
+  escapePath,
   ReadManyFilesTool,
   ToolRegistry,
 } from '@google/gemini-cli-core';
@@ -31,7 +33,7 @@ describe('handleAtCommand', () => {
   async function createTestFile(fullPath: string, fileContents: string) {
     await fsPromises.mkdir(path.dirname(fullPath), { recursive: true });
     await fsPromises.writeFile(fullPath, fileContents);
-    return path.resolve(testRootDir, fullPath);
+    return escapePath(normalizePath(path.resolve(testRootDir, fullPath)));
   }
 
   beforeEach(async () => {
@@ -240,8 +242,7 @@ describe('handleAtCommand', () => {
       path.join(testRootDir, 'path', 'to', 'my file.txt'),
       fileContent,
     );
-    const escapedpath = path.join(testRootDir, 'path', 'to', 'my\\ file.txt');
-    const query = `@${escapedpath}`;
+    const query = `@${filePath}`;
 
     const result = await handleAtCommand({
       query,
@@ -855,8 +856,7 @@ describe('handleAtCommand', () => {
         path.join(testRootDir, 'spaced file.txt'),
         fileContent,
       );
-      const escapedPath = path.join(testRootDir, 'spaced\\ file.txt');
-      const query = `Check @${escapedPath}, it has spaces.`;
+      const query = `Check @${filePath}, it has spaces.`;
 
       const result = await handleAtCommand({
         query,

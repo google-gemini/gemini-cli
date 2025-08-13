@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PartUnion } from '@google/genai';
 import mime from 'mime-types';
+import { normalizePath } from './paths.js';
 
 // Constants for text file processing
 const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
@@ -260,9 +261,9 @@ export async function processSingleFileContent(
     }
 
     const fileType = await detectFileType(filePath);
-    const relativePathForDisplay = path
-      .relative(rootDirectory, filePath)
-      .replace(/\\/g, '/');
+    const relativePathForDisplay = normalizePath(
+      path.relative(rootDirectory, filePath),
+    );
 
     switch (fileType) {
       case 'binary': {
@@ -364,9 +365,7 @@ export async function processSingleFileContent(
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const displayPath = path
-      .relative(rootDirectory, filePath)
-      .replace(/\\/g, '/');
+    const displayPath = normalizePath(path.relative(rootDirectory, filePath));
     return {
       llmContent: `Error reading file ${displayPath}: ${errorMessage}`,
       returnDisplay: `Error reading file ${displayPath}: ${errorMessage}`,

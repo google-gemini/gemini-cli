@@ -11,7 +11,7 @@ import os from 'os';
 import pathMod from 'path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
 import stringWidth from 'string-width';
-import { unescapePath } from '@google/gemini-cli-core';
+import { normalizePath, unescapePath } from '@google/gemini-cli-core';
 import { toCodePoints, cpLen, cpSlice } from '../../utils/textUtils.js';
 import { handleVimAction, VimAction } from './vim-buffer-actions.js';
 
@@ -1553,7 +1553,7 @@ export function useTextBuffer({
 
         potentialPath = potentialPath.trim();
         if (isValidPath(unescapePath(potentialPath))) {
-          ch = `@${potentialPath} `;
+          ch = `@${normalizePath(potentialPath)} `;
         }
       }
 

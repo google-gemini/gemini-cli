@@ -13,6 +13,7 @@ import { isGitRepository } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', () => ({
   isGitRepository: vi.fn(),
+  normalizePath: vi.fn((p: string) => p.replace(/\\/g, '/')),
 }));
 
 vi.mock('fs', async (importOriginal) => {

@@ -12,7 +12,9 @@ import {
   Config,
   getErrorMessage,
   isNodeError,
+  normalizePath,
   unescapePath,
+  escapePath,
 } from '@google/gemini-cli-core';
 import {
   HistoryItem,
@@ -104,7 +106,7 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
     }
     const rawAtPath = query.substring(atIndex, pathEndIndex);
     // unescapePath expects the @ symbol to be present, and will handle it.
-    const atPath = unescapePath(rawAtPath);
+    const atPath = unescapePath(normalizePath(rawAtPath));
     parts.push({ type: 'atPath', content: atPath });
     currentIndex = pathEndIndex;
   }
@@ -221,43 +223,47 @@ export async function handleAtCommand({
     if (gitIgnored || geminiIgnored) {
       const reason =
         gitIgnored && geminiIgnored ? 'both' : gitIgnored ? 'git' : 'gemini';
-      ignoredByReason[reason].push(pathName);
+      ignoredByReason[reason].push(escapePath(pathName));
       const reasonText =
         reason === 'both'
           ? 'ignored by both git and gemini'
           : reason === 'git'
             ? 'git-ignored'
             : 'gemini-ignored';
-      onDebugMessage(`Path ${pathName} is ${reasonText} and will be skipped.`);
+      onDebugMessage(
+        `Path ${escapePath(pathName)} is ${reasonText} and will be skipped.`,
+      );
       continue;
     }
 
     for (const dir of config.getWorkspaceContext().getDirectories()) {
-      let currentPathSpec = pathName;
+      let currentPathSpec = escapePath(pathName);
       let resolvedSuccessfully = false;
       try {
         const absolutePath = path.resolve(dir, pathName);
         const stats = await fs.stat(absolutePath);
         if (stats.isDirectory()) {
           currentPathSpec =
-            pathName + (pathName.endsWith(path.sep) ? `**` : `/**`);
+            currentPathSpec + (pathName.endsWith(path.sep) ? `**` : `/**`);
           onDebugMessage(
-            `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
+            `Path ${escapePath(pathName)} resolved to directory, using glob: ${currentPathSpec}`,
           );
         } else {
-          onDebugMessage(`Path ${pathName} resolved to file: ${absolutePath}`);
+          onDebugMessage(
+            `Path ${currentPathSpec} resolved to file: ${absolutePath}`,
+          );
         }
         resolvedSuccessfully = true;
       } catch (error) {
         if (isNodeError(error) && error.code === 'ENOENT') {
           if (config.getEnableRecursiveFileSearch() && globTool) {
             onDebugMessage(
-              `Path ${pathName} not found directly, attempting glob search.`,
+              `Path ${currentPathSpec} not found directly, attempting glob search.`,
             );
             try {
               const globResult = await globTool.buildAndExecute(
                 {
-                  pattern: `**/*${pathName}*`,
+                  pattern: `**/*${currentPathSpec}*`,
                   path: dir,
                 },
                 signal,
@@ -273,45 +279,45 @@ export async function handleAtCommand({
                   const firstMatchAbsolute = lines[1].trim();
                   currentPathSpec = path.relative(dir, firstMatchAbsolute);
                   onDebugMessage(
-                    `Glob search for ${pathName} found ${firstMatchAbsolute}, using relative path: ${currentPathSpec}`,
+                    `Glob search for ${currentPathSpec} found ${firstMatchAbsolute}, using relative path: ${currentPathSpec}`,
                   );
                   resolvedSuccessfully = true;
                 } else {
                   onDebugMessage(
-                    `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
+                    `Glob search for '**/*${currentPathSpec}*' did not return a usable path. Path ${currentPathSpec} will be skipped.`,
                   );
                 }
               } else {
                 onDebugMessage(
-                  `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
+                  `Glob search for '**/*${currentPathSpec}*' found no files or an error. Path ${currentPathSpec} will be skipped.`,
                 );
               }
             } catch (globError) {
               console.error(
-                `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
+                `Error during glob search for ${currentPathSpec}: ${getErrorMessage(globError)}`,
               );
               onDebugMessage(
-                `Error during glob search for ${pathName}. Path ${pathName} will be skipped.`,
+                `Error during glob search for ${currentPathSpec}. Path ${currentPathSpec} will be skipped.`,
               );
             }
           } else {
             onDebugMessage(
-              `Glob tool not found. Path ${pathName} will be skipped.`,
+              `Glob tool not found. Path ${currentPathSpec} will be skipped.`,
             );
           }
         } else {
           console.error(
-            `Error stating path ${pathName}: ${getErrorMessage(error)}`,
+            `Error stating path ${currentPathSpec}: ${getErrorMessage(error)}`,
           );
           onDebugMessage(
-            `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
+            `Error stating path ${currentPathSpec}. Path ${currentPathSpec} will be skipped.`,
           );
         }
       }
       if (resolvedSuccessfully) {
         pathSpecsToRead.push(currentPathSpec);
         atPathToResolvedSpecMap.set(originalAtPath, currentPathSpec);
-        contentLabelsForDisplay.push(pathName);
+        contentLabelsForDisplay.push(currentPathSpec);
         break;
       }
     }
@@ -354,7 +360,7 @@ export async function handleAtCommand({
         ) {
           initialQueryText += ' ';
         }
-        initialQueryText += part.content;
+        initialQueryText += escapePath(part.content);
       }
     }
   }
@@ -439,7 +445,7 @@ export async function handleAtCommand({
             const filePathSpecInContent = match[1]; // This is a resolved pathSpec
             const fileActualContent = match[2].trim();
             processedQueryParts.push({
-              text: `\nContent from @${filePathSpecInContent}:\n`,
+              text: `\nContent from @${escapePath(normalizePath(filePathSpecInContent))}:\n`,
             });
             processedQueryParts.push({ text: fileActualContent });
           } else {
