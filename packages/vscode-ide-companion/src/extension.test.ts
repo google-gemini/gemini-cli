@@ -6,6 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
+import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from '@google/gemini-cli-core';
 import { activate } from './extension.js';
 
 vi.mock('vscode', () => ({
@@ -80,7 +81,7 @@ describe('activate', () => {
     vi.mocked(context.globalState.get).mockReturnValue(undefined);
     await activate(context);
     expect(showInformationMessageMock).toHaveBeenCalledWith(
-      'Gemini CLI Companion extension successfully installed. Please restart your terminal to enable full IDE integration.',
+      `${GEMINI_CLI_COMPANION_EXTENSION_NAME} extension successfully installed. Please restart your terminal to enable full IDE integration.`,
       'Re-launch Gemini CLI',
     );
   });
