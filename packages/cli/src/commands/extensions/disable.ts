@@ -4,9 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { CommandModule } from 'yargs';
+import { ArgumentsCamelCase, CommandModule } from 'yargs';
+import { loadSettings, SettingScope } from '../../config/settings.js';
 
-export const disableCommand: CommandModule = {
+interface DisableArgs {
+  name: string;
+  global: boolean;
+}
+
+export const disableCommand: CommandModule<object, DisableArgs> = {
   command: 'disable <name>',
   describe: 'Disable an extension',
   builder: (yargs) =>
@@ -14,13 +20,34 @@ export const disableCommand: CommandModule = {
       .positional('name', {
         describe: 'Name of the extension to disable',
         type: 'string',
+        demandOption: true,
       })
       .option('global', {
         describe: 'Disable the extension globally',
         type: 'boolean',
         default: false,
       }),
-  handler: () => {
-    // TODO: Implement disable logic
+  handler: async (argv: ArgumentsCamelCase<DisableArgs>) => {
+    const { name, global } = argv;
+    const workspaceRoot = process.cwd();
+    const settings = loadSettings(workspaceRoot);
+    const scope = global ? SettingScope.User : SettingScope.Workspace;
+
+    const settingsFile = settings.forScope(scope);
+    const disabled = settingsFile.settings.extensions?.disabled || [];
+
+    if (disabled.includes(name)) {
+      console.log(`Extension "${name}" is already disabled.`);
+      return;
+    }
+
+    const newDisabled = [...disabled, name];
+    const newExtensions = {
+      ...settingsFile.settings.extensions,
+      disabled: newDisabled,
+    };
+    settings.setValue(scope, 'extensions', newExtensions);
+
+    console.log(`Extension "${name}" has been disabled.`);
   },
 };
