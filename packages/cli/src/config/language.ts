@@ -61,16 +61,10 @@ export function saveLanguageConfig(config: LanguageConfig): void {
 }
 
 /**
- * 从环境变量获取语言
+ * 从系统环境变量获取语言
  */
 function getLanguageFromEnv(): SupportedLanguage | null {
-  // 首先检查专用的 GEMINI_CLI_LANGUAGE 环境变量
-  const geminiLang = process.env.GEMINI_CLI_LANGUAGE;
-  if (geminiLang && i18n.isSupportedLanguage(geminiLang)) {
-    return geminiLang;
-  }
-  
-  // 检查常见的语言环境变量
+  // 检查系统语言环境变量（不包括 GEMINI_CLI_LANGUAGE，因为它在更高优先级处理）
   const envLang = process.env.LANG || process.env.LANGUAGE || process.env.LC_ALL;
   
   if (envLang) {
@@ -87,27 +81,33 @@ function getLanguageFromEnv(): SupportedLanguage | null {
 
 /**
  * 获取有效的语言设置
- * 优先级：CLI参数 > 配置文件 > 环境变量 > 默认值
+ * 优先级：CLI参数 > GEMINI_CLI_LANGUAGE > 配置文件 > 系统环境变量 > 默认值
  */
 export function getEffectiveLanguage(cliArg?: string): SupportedLanguage {
   // 1. CLI 参数优先级最高
   if (cliArg && i18n.isSupportedLanguage(cliArg)) {
     return cliArg;
   }
+
+  // 2. GEMINI_CLI_LANGUAGE environment variable
+  const geminiCliLang = process.env.GEMINI_CLI_LANGUAGE;
+  if (geminiCliLang && i18n.isSupportedLanguage(geminiCliLang)) {
+    return geminiCliLang;
+  }
   
-  // 2. 配置文件
+  // 3. 配置文件
   const savedConfig = loadLanguageConfig();
-  if (savedConfig && savedConfig.language) {
+  if (savedConfig?.language) {
     return savedConfig.language;
   }
   
-  // 3. 环境变量
+  // 4. 系统环境变量
   const envLang = getLanguageFromEnv();
   if (envLang) {
     return envLang;
   }
   
-  // 4. 默认值
+  // 5. 默认值
   return 'en';
 }
 
