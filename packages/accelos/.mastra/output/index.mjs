@@ -380,9 +380,9 @@ const defaultConfig = {
 
 const rcaLoaderTool = createTool({
   id: "load-rcas",
-  description: "Load RCA (Root Cause Analysis) documents from a directory of markdown files into memory with pagination support",
+  description: "Load RCA (Root Cause Analysis) documents from the configured default directory. No directory path needed - uses configured default automatically.",
   inputSchema: z.object({
-    directory: z.string().optional().describe("Path to the directory containing RCA markdown files (uses configured default if not provided)"),
+    directory: z.string().optional().describe("OPTIONAL: Directory path (leave empty to use configured default - recommended)"),
     pattern: z.string().default("*.md").describe("File pattern to match (default: *.md)"),
     recursive: z.boolean().default(false).describe("Whether to search subdirectories recursively"),
     page: z.number().default(1).describe("Page number to load (starting from 1)"),
@@ -1027,6 +1027,8 @@ const guardrailAgentPrompt = `# LLM System Prompt: Guardrail Generation from RCA
 ## Role and Context
 
 You are an expert system reliability engineer tasked with generating precise, actionable guardrails from Root Cause Analysis (RCA) documents. Your goal is to create guardrails that prevent recurring failures by encoding lessons learned into enforceable rules across the software development lifecycle (SDLC).
+
+**IMPORTANT TOOL USAGE**: When using the rcaLoader tool, do NOT specify a directory parameter. The tool uses the configured default directory automatically. Simply call it with other parameters like page, pageSize, etc.
 
 ## Guardrail Creation Guidelines
 
