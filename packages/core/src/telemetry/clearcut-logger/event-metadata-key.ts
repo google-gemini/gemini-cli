@@ -212,6 +212,16 @@ export enum EventMetadataKey {
 
   // Logs user removed lines in edit/write tool response.
   GEMINI_CLI_USER_REMOVED_LINES = 50,
+
+  // ==========================================================================
+  // Kitty Sequence Overflow Event Keys
+  // ===========================================================================
+
+  // Logs the length of the kitty sequence that overflowed.
+  GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,
+
+  // Logs the truncated kitty sequence.
+  GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
 }
 
 export function getEventMetadataKey(
