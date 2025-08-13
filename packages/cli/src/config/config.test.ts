@@ -1368,6 +1368,7 @@ describe('loadCliConfig trustedFolder', () => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     process.env.GEMINI_API_KEY = 'test-api-key';
+    process.argv = ['node', 'script.js']; // Reset argv for each test
   });
 
   afterEach(() => {
@@ -1376,30 +1377,102 @@ describe('loadCliConfig trustedFolder', () => {
     vi.restoreAllMocks();
   });
 
-  it('should set trustedFolder to true when isWorkspaceTrusted returns true', async () => {
-    (isWorkspaceTrusted as vi.Mock).mockReturnValue(true);
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments();
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.isTrustedFolder()).toBe(true);
-  });
+  const testCases = [
+    // Cases where folderTrustFeature is false (feature disabled)
+    {
+      folderTrustFeature: false,
+      folderTrust: true,
+      isWorkspaceTrusted: true,
+      expectedFolderTrust: false,
+      expectedIsTrustedFolder: true,
+      description:
+        'feature disabled, folderTrust true, workspace trusted -> behave as trusted',
+    },
+    {
+      folderTrustFeature: false,
+      folderTrust: true,
+      isWorkspaceTrusted: false,
+      expectedFolderTrust: false,
+      expectedIsTrustedFolder: true,
+      description:
+        'feature disabled, folderTrust true, workspace not trusted -> behave as trusted',
+    },
+    {
+      folderTrustFeature: false,
+      folderTrust: false,
+      isWorkspaceTrusted: true,
+      expectedFolderTrust: false,
+      expectedIsTrustedFolder: true,
+      description:
+        'feature disabled, folderTrust false, workspace trusted -> behave as trusted',
+    },
 
-  it('should set trustedFolder to false when isWorkspaceTrusted returns false', async () => {
-    (isWorkspaceTrusted as vi.Mock).mockReturnValue(false);
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments();
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.isTrustedFolder()).toBe(false);
-  });
+    // Cases where folderTrustFeature is true but folderTrust setting is false
+    {
+      folderTrustFeature: true,
+      folderTrust: false,
+      isWorkspaceTrusted: true,
+      expectedFolderTrust: false,
+      expectedIsTrustedFolder: true,
+      description:
+        'feature on, folderTrust false, workspace trusted -> behave as trusted',
+    },
+    {
+      folderTrustFeature: true,
+      folderTrust: false,
+      isWorkspaceTrusted: false,
+      expectedFolderTrust: false,
+      expectedIsTrustedFolder: true,
+      description:
+        'feature on, folderTrust false, workspace not trusted -> behave as trusted',
+    },
 
-  it('should set trustedFolder to undefined when isWorkspaceTrusted returns undefined', async () => {
-    (isWorkspaceTrusted as vi.Mock).mockReturnValue(undefined);
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments();
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.isTrustedFolder()).toBeUndefined();
-  });
+    // Cases where feature is fully enabled (folderTrustFeature and folderTrust are true)
+    {
+      folderTrustFeature: true,
+      folderTrust: true,
+      isWorkspaceTrusted: true,
+      expectedFolderTrust: true,
+      expectedIsTrustedFolder: true,
+      description:
+        'feature on, folderTrust on, workspace trusted -> is trusted',
+    },
+    {
+      folderTrustFeature: true,
+      folderTrust: true,
+      isWorkspaceTrusted: false,
+      expectedFolderTrust: true,
+      expectedIsTrustedFolder: false,
+      description:
+        'feature on, folderTrust on, workspace NOT trusted -> is NOT trusted',
+    },
+    {
+      folderTrustFeature: true,
+      folderTrust: true,
+      isWorkspaceTrusted: undefined,
+      expectedFolderTrust: true,
+      expectedIsTrustedFolder: undefined,
+      description:
+        'feature on, folderTrust on, workspace trust unknown -> is unknown',
+    },
+  ];
+
+  for (const {
+    folderTrustFeature,
+    folderTrust,
+    isWorkspaceTrusted: mockTrustValue,
+    expectedFolderTrust,
+    expectedIsTrustedFolder,
+    description,
+  } of testCases) {
+    it(`should be correct for: ${description}`, async () => {
+      (isWorkspaceTrusted as vi.Mock).mockReturnValue(mockTrustValue);
+      const argv = await parseArguments();
+      const settings: Settings = { folderTrustFeature, folderTrust };
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      expect(config.getFolderTrust()).toBe(expectedFolderTrust);
+      expect(config.isTrustedFolder()).toBe(expectedIsTrustedFolder);
+    });
+  }
 });

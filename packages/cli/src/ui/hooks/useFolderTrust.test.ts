@@ -8,7 +8,7 @@ import { vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useFolderTrust } from './useFolderTrust.js';
 import { type Config } from '@google/gemini-cli-core';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import { LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import {
   LoadedTrustedFolders,
@@ -56,35 +56,28 @@ describe('useFolderTrust', () => {
     vi.clearAllMocks();
   });
 
-  it('should open dialog when feature is enabled and trust is not set', () => {
-    const { result } = renderHook(() =>
-      useFolderTrust(mockSettings, mockConfig),
-    );
-    expect(result.current.isFolderTrustDialogOpen).toBe(true);
-  });
-
-  it('should not open dialog when feature is disabled', () => {
-    mockSettings.merged.folderTrustFeature = false;
-    const { result } = renderHook(() =>
-      useFolderTrust(mockSettings, mockConfig),
-    );
-    expect(result.current.isFolderTrustDialogOpen).toBe(false);
-  });
-
-  it('should not open dialog when folder trust is explicitly false', () => {
-    mockSettings.merged.folderTrust = false;
-    const { result } = renderHook(() =>
-      useFolderTrust(mockSettings, mockConfig),
-    );
-    expect(result.current.isFolderTrustDialogOpen).toBe(false);
-  });
-
   it('should not open dialog when folder is already trusted', () => {
     (mockConfig.isTrustedFolder as vi.Mock).mockReturnValue(true);
     const { result } = renderHook(() =>
       useFolderTrust(mockSettings, mockConfig),
     );
     expect(result.current.isFolderTrustDialogOpen).toBe(false);
+  });
+
+  it('should not open dialog when folder is already untrusted', () => {
+    (mockConfig.isTrustedFolder as vi.Mock).mockReturnValue(false);
+    const { result } = renderHook(() =>
+      useFolderTrust(mockSettings, mockConfig),
+    );
+    expect(result.current.isFolderTrustDialogOpen).toBe(false);
+  });
+
+  it('should open dialog when folder trust is undefined', () => {
+    (mockConfig.isTrustedFolder as vi.Mock).mockReturnValue(undefined);
+    const { result } = renderHook(() =>
+      useFolderTrust(mockSettings, mockConfig),
+    );
+    expect(result.current.isFolderTrustDialogOpen).toBe(true);
   });
 
   it('should handle TRUST_FOLDER choice', () => {
@@ -100,11 +93,6 @@ describe('useFolderTrust', () => {
     expect(mockTrustedFolders.setValue).toHaveBeenCalledWith(
       '/test/path',
       TrustLevel.TRUST_FOLDER,
-    );
-    expect(mockSettings.setValue).toHaveBeenCalledWith(
-      SettingScope.User,
-      'folderTrust',
-      true,
     );
     expect(result.current.isFolderTrustDialogOpen).toBe(false);
   });

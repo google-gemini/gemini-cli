@@ -313,8 +313,9 @@ export async function loadCliConfig(
     argv.ideModeFeature ?? settings.ideModeFeature ?? false;
 
   const folderTrustFeature = settings.folderTrustFeature ?? false;
-  const folderTrustSetting = settings.folderTrust ?? false;
+  const folderTrustSetting = settings.folderTrust ?? true;
   const folderTrust = folderTrustFeature && folderTrustSetting;
+  const trustedFolder = folderTrust ? isWorkspaceTrusted() : true;
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -410,7 +411,6 @@ export async function loadCliConfig(
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
-  const trustedFolder = isWorkspaceTrusted();
 
   return new Config({
     sessionId,
