@@ -58,6 +58,11 @@ export const useSlashCommandProcessor = (
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<readonly SlashCommand[]>([]);
+  const [reloadTrigger, setReloadTrigger] = useState(0);
+
+  const reloadCommands = useCallback(() => {
+    setReloadTrigger((v) => v + 1);
+  }, []);
   const [shellConfirmationRequest, setShellConfirmationRequest] =
     useState<null | {
       commands: string[];
@@ -173,6 +178,7 @@ export const useSlashCommandProcessor = (
         toggleCorgiMode,
         toggleVimEnabled,
         setGeminiMdFileCount,
+        reloadCommands,
       },
       session: {
         stats: session.stats,
@@ -196,6 +202,7 @@ export const useSlashCommandProcessor = (
       toggleVimEnabled,
       sessionShellAllowlist,
       setGeminiMdFileCount,
+      reloadCommands,
     ],
   );
 
@@ -221,7 +228,7 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config, ideMode]);
+  }, [config, ideMode, reloadTrigger]);
 
   const handleSlashCommand = useCallback(
     async (
