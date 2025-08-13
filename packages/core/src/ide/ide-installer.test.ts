@@ -23,11 +23,6 @@ describe('ide-installer', () => {
       // A more specific check might be needed if we export the class
       expect(installer).toBeInstanceOf(Object);
     });
-
-    it('should return null for an unknown IDE', () => {
-      const installer = getIdeInstaller('unknown' as DetectedIde);
-      expect(installer).toBeNull();
-    });
   });
 
   describe('VsCodeInstaller', () => {

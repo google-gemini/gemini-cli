@@ -58,7 +58,7 @@ To install the latest nightly build, use the `@nightly` tag:
 npm install -g @google/gemini-cli@nightly
 ```
 
-We also run a Google cloud build called [release-docker.yml](../.gcp/release-docker.yaml). Which publishes the sandbox docker to match your release. This will also be moved to GH and combined with the main release file once service account permissions are sorted out.
+We also run a Google cloud build called [release-docker.yml](../.gcp/release-docker.yml). Which publishes the sandbox docker to match your release. This will also be moved to GH and combined with the main release file once service account permissions are sorted out.
 
 ### After the Release
 

@@ -53,9 +53,6 @@ export async function setupUser(client: OAuth2Client): Promise<UserData> {
   }
 
   const tier = getOnboardTier(loadRes);
-  if (tier.userDefinedCloudaicompanionProject && !projectId) {
-    throw new ProjectIdRequiredError();
-  }
 
   const onboardReq: OnboardUserRequest = {
     tierId: tier.id,
@@ -69,8 +66,13 @@ export async function setupUser(client: OAuth2Client): Promise<UserData> {
     await new Promise((f) => setTimeout(f, 5000));
     lroRes = await caServer.onboardUser(onboardReq);
   }
+
+  if (!lroRes.response?.cloudaicompanionProject?.id && !projectId) {
+    throw new ProjectIdRequiredError();
+  }
+
   return {
-    projectId: lroRes.response?.cloudaicompanionProject?.id || '',
+    projectId: lroRes.response?.cloudaicompanionProject?.id || projectId!,
     userTier: tier.id,
   };
 }

@@ -5,12 +5,13 @@
  */
 
 import React, { useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../../config/auth.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface AuthDialogProps {
   onSelect: (authMethod: AuthType | undefined, scope: SettingScope) => void;
@@ -108,23 +109,26 @@ export function AuthDialog({
     }
   };
 
-  useInput((_input, key) => {
-    if (key.escape) {
-      // Prevent exit if there is an error message.
-      // This means they user is not authenticated yet.
-      if (errorMessage) {
-        return;
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape') {
+        // Prevent exit if there is an error message.
+        // This means they user is not authenticated yet.
+        if (errorMessage) {
+          return;
+        }
+        if (settings.merged.selectedAuthType === undefined) {
+          // Prevent exiting if no auth method is set
+          setErrorMessage(
+            'You must select an auth method to proceed. Press Ctrl+C twice to exit.',
+          );
+          return;
+        }
+        onSelect(undefined, SettingScope.User);
       }
-      if (settings.merged.selectedAuthType === undefined) {
-        // Prevent exiting if no auth method is set
-        setErrorMessage(
-          'You must select an auth method to proceed. Press Ctrl+C twice to exit.',
-        );
-        return;
-      }
-      onSelect(undefined, SettingScope.User);
-    }
-  });
+    },
+    { isActive: true },
+  );
 
   return (
     <Box
