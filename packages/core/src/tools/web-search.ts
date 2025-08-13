@@ -5,7 +5,7 @@
  */
 
 import { GroundingMetadata } from '@google/genai';
-import { BaseTool, Icon, ToolResult } from './tools.js';
+import { BaseTool, Kind, ToolResult } from './tools.js';
 import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 
@@ -69,7 +69,7 @@ export class WebSearchTool extends BaseTool<
       WebSearchTool.Name,
       'GoogleSearch',
       'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
-      Icon.Globe,
+      Kind.Search,
       {
         type: Type.OBJECT,
         properties: {
@@ -103,7 +103,7 @@ export class WebSearchTool extends BaseTool<
     return null;
   }
 
-  getDescription(params: WebSearchToolParams): string {
+  override getDescription(params: WebSearchToolParams): string {
     return `Searching the web for: "${params.query}"`;
   }
 
