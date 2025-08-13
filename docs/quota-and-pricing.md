@@ -14,14 +14,14 @@ Generally, there are three categories to choose from:
 
 Your journey begins with a generous free tier, perfect for experimentation and light use.
 
-Your free usage limits depend on your authorization type:
+Your free usage limits depend on your authorization type.
 
 ### Log in with Google (Gemini Code Assist for Individuals)
 
 For users who authenticate by using their Google account to access Gemini Code Assist for individuals. This includes:
 
 - Model requests will be made across the Gemini model family as determined by Gemini CLI.
-- 1,000 model requests / user / day
+- 1000 model requests / user / day
 - 60 model requests / user / minute
 
 Learn more at [Gemini Code Assist for Individuals Limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
