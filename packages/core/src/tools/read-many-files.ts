@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BaseTool, Icon, ToolResult } from './tools.js';
+import { BaseTool, Kind, ToolResult } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as path from 'path';
@@ -16,7 +16,7 @@ import {
   DEFAULT_ENCODING,
   getSpecificMimeType,
 } from '../utils/fileUtils.js';
-import { PartListUnion, Schema, Type } from '@google/genai';
+import { PartListUnion } from '@google/genai';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
 import {
   recordFileOperationMetric,
@@ -150,47 +150,47 @@ export class ReadManyFilesTool extends BaseTool<
   static readonly Name: string = 'read_many_files';
 
   constructor(private config: Config) {
-    const parameterSchema: Schema = {
-      type: Type.OBJECT,
+    const parameterSchema = {
+      type: 'object',
       properties: {
         paths: {
-          type: Type.ARRAY,
+          type: 'array',
           items: {
-            type: Type.STRING,
-            minLength: '1',
+            type: 'string',
+            minLength: 1,
           },
-          minItems: '1',
+          minItems: 1,
           description:
             "Required. An array of glob patterns or paths relative to the tool's target directory. Examples: ['src/**/*.ts'], ['README.md', 'docs/']",
         },
         include: {
-          type: Type.ARRAY,
+          type: 'array',
           items: {
-            type: Type.STRING,
-            minLength: '1',
+            type: 'string',
+            minLength: 1,
           },
           description:
             'Optional. Additional glob patterns to include. These are merged with `paths`. Example: ["*.test.ts"] to specifically add test files if they were broadly excluded.',
           default: [],
         },
         exclude: {
-          type: Type.ARRAY,
+          type: 'array',
           items: {
-            type: Type.STRING,
-            minLength: '1',
+            type: 'string',
+            minLength: 1,
           },
           description:
             'Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: ["**/*.log", "temp/"]',
           default: [],
         },
         recursive: {
-          type: Type.BOOLEAN,
+          type: 'boolean',
           description:
             'Optional. Whether to search recursively (primarily controlled by `**` in glob patterns). Defaults to true.',
           default: true,
         },
         useDefaultExcludes: {
-          type: Type.BOOLEAN,
+          type: 'boolean',
           description:
             'Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.',
           default: true,
@@ -198,17 +198,17 @@ export class ReadManyFilesTool extends BaseTool<
         file_filtering_options: {
           description:
             'Whether to respect ignore patterns from .gitignore or .geminiignore',
-          type: Type.OBJECT,
+          type: 'object',
           properties: {
             respect_git_ignore: {
               description:
                 'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
-              type: Type.BOOLEAN,
+              type: 'boolean',
             },
             respect_gemini_ignore: {
               description:
                 'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
-              type: Type.BOOLEAN,
+              type: 'boolean',
             },
           },
         },
@@ -229,13 +229,16 @@ This tool is useful when you need to understand or analyze a collection of files
 - When the user asks to "read all files in X directory" or "show me the content of all Y files".
 
 Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. Ensure paths are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
-      Icon.FileSearch,
+      Kind.Read,
       parameterSchema,
     );
   }
 
   validateParams(params: ReadManyFilesParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
     if (errors) {
       return errors;
     }

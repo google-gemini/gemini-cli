@@ -10,9 +10,8 @@ import {
   ToolResult,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
-  Icon,
+  Kind,
 } from './tools.js';
-import { Type } from '@google/genai';
 import { getErrorMessage } from '../utils/errors.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
@@ -71,17 +70,17 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
       WebFetchTool.Name,
       'WebFetch',
       "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
-      Icon.Globe,
+      Kind.Fetch,
       {
         properties: {
           prompt: {
             description:
               'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). Must contain as least one URL starting with http:// or https://.',
-            type: Type.STRING,
+            type: 'string',
           },
         },
         required: ['prompt'],
-        type: Type.OBJECT,
+        type: 'object',
       },
     );
     const proxy = config.getProxy();
@@ -156,7 +155,10 @@ ${textContent}
   }
 
   validateParams(params: WebFetchToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
     if (errors) {
       return errors;
     }

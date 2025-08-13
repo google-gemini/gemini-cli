@@ -7,7 +7,6 @@
 import {
   EmbedContentParameters,
   GenerateContentConfig,
-  SchemaUnion,
   PartListUnion,
   Content,
   Tool,
@@ -50,6 +49,7 @@ import {
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { IdeContext, File } from '../ide/ideContext.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -112,6 +112,8 @@ export class GeminiClient {
 
   private readonly loopDetector: LoopDetectionService;
   private lastPromptId: string;
+  private lastSentIdeContext: IdeContext | undefined;
+  private forceFullIdeContext = true;
 
   constructor(private config: Config) {
     if (config.getProxy()) {
@@ -164,6 +166,7 @@ export class GeminiClient {
 
   setHistory(history: Content[]) {
     this.getChat().setHistory(history);
+    this.forceFullIdeContext = true;
   }
 
   async setTools(): Promise<void> {
@@ -189,6 +192,7 @@ export class GeminiClient {
   }
 
   async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
+    this.forceFullIdeContext = true;
     const envParts = await getEnvironmentContext(this.config);
     const toolRegistry = await this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
@@ -238,6 +242,174 @@ export class GeminiClient {
     }
   }
 
+  private getIdeContextParts(forceFullContext: boolean): {
+    contextParts: string[];
+    newIdeContext: IdeContext | undefined;
+  } {
+    const currentIdeContext = ideContext.getIdeContext();
+    if (!currentIdeContext) {
+      return { contextParts: [], newIdeContext: undefined };
+    }
+
+    if (forceFullContext || !this.lastSentIdeContext) {
+      // Send full context as JSON
+      const openFiles = currentIdeContext.workspaceState?.openFiles || [];
+      const activeFile = openFiles.find((f) => f.isActive);
+      const otherOpenFiles = openFiles
+        .filter((f) => !f.isActive)
+        .map((f) => f.path);
+
+      const contextData: Record<string, unknown> = {};
+
+      if (activeFile) {
+        contextData.activeFile = {
+          path: activeFile.path,
+          cursor: activeFile.cursor
+            ? {
+                line: activeFile.cursor.line,
+                character: activeFile.cursor.character,
+              }
+            : undefined,
+          selectedText: activeFile.selectedText || undefined,
+        };
+      }
+
+      if (otherOpenFiles.length > 0) {
+        contextData.otherOpenFiles = otherOpenFiles;
+      }
+
+      if (Object.keys(contextData).length === 0) {
+        return { contextParts: [], newIdeContext: currentIdeContext };
+      }
+
+      const jsonString = JSON.stringify(contextData, null, 2);
+      const contextParts = [
+        "Here is the user's editor context as a JSON object. This is for your information only.",
+        '```json',
+        jsonString,
+        '```',
+      ];
+
+      if (this.config.getDebugMode()) {
+        console.log(contextParts.join('\n'));
+      }
+      return {
+        contextParts,
+        newIdeContext: currentIdeContext,
+      };
+    } else {
+      // Calculate and send delta as JSON
+      const delta: Record<string, unknown> = {};
+      const changes: Record<string, unknown> = {};
+
+      const lastFiles = new Map(
+        (this.lastSentIdeContext.workspaceState?.openFiles || []).map(
+          (f: File) => [f.path, f],
+        ),
+      );
+      const currentFiles = new Map(
+        (currentIdeContext.workspaceState?.openFiles || []).map((f: File) => [
+          f.path,
+          f,
+        ]),
+      );
+
+      const openedFiles: string[] = [];
+      for (const [path] of currentFiles.entries()) {
+        if (!lastFiles.has(path)) {
+          openedFiles.push(path);
+        }
+      }
+      if (openedFiles.length > 0) {
+        changes.filesOpened = openedFiles;
+      }
+
+      const closedFiles: string[] = [];
+      for (const [path] of lastFiles.entries()) {
+        if (!currentFiles.has(path)) {
+          closedFiles.push(path);
+        }
+      }
+      if (closedFiles.length > 0) {
+        changes.filesClosed = closedFiles;
+      }
+
+      const lastActiveFile = (
+        this.lastSentIdeContext.workspaceState?.openFiles || []
+      ).find((f: File) => f.isActive);
+      const currentActiveFile = (
+        currentIdeContext.workspaceState?.openFiles || []
+      ).find((f: File) => f.isActive);
+
+      if (currentActiveFile) {
+        if (!lastActiveFile || lastActiveFile.path !== currentActiveFile.path) {
+          changes.activeFileChanged = {
+            path: currentActiveFile.path,
+            cursor: currentActiveFile.cursor
+              ? {
+                  line: currentActiveFile.cursor.line,
+                  character: currentActiveFile.cursor.character,
+                }
+              : undefined,
+            selectedText: currentActiveFile.selectedText || undefined,
+          };
+        } else {
+          const lastCursor = lastActiveFile.cursor;
+          const currentCursor = currentActiveFile.cursor;
+          if (
+            currentCursor &&
+            (!lastCursor ||
+              lastCursor.line !== currentCursor.line ||
+              lastCursor.character !== currentCursor.character)
+          ) {
+            changes.cursorMoved = {
+              path: currentActiveFile.path,
+              cursor: {
+                line: currentCursor.line,
+                character: currentCursor.character,
+              },
+            };
+          }
+
+          const lastSelectedText = lastActiveFile.selectedText || '';
+          const currentSelectedText = currentActiveFile.selectedText || '';
+          if (lastSelectedText !== currentSelectedText) {
+            changes.selectionChanged = {
+              path: currentActiveFile.path,
+              selectedText: currentSelectedText,
+            };
+          }
+        }
+      } else if (lastActiveFile) {
+        changes.activeFileChanged = {
+          path: null,
+          previousPath: lastActiveFile.path,
+        };
+      }
+
+      if (Object.keys(changes).length === 0) {
+        return { contextParts: [], newIdeContext: currentIdeContext };
+      }
+
+      delta.changes = changes;
+      const jsonString = JSON.stringify(delta, null, 2);
+      const contextParts = [
+        "Here is a summary of changes in the user's editor context, in JSON format. This is for your information only.",
+        '```json',
+        jsonString,
+        '```',
+      ];
+
+      if (this.config.getDebugMode()) {
+        console.log(contextParts.join('\n'));
+      }
+      return {
+        contextParts,
+        newIdeContext: currentIdeContext,
+      };
+    }
+  }
+
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
@@ -272,50 +444,18 @@ export class GeminiClient {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
 
-    if (this.config.getIdeModeFeature() && this.config.getIdeMode()) {
-      const ideContextState = ideContext.getIdeContext();
-      const openFiles = ideContextState?.workspaceState?.openFiles;
-
-      if (openFiles && openFiles.length > 0) {
-        const contextParts: string[] = [];
-        const firstFile = openFiles[0];
-        const activeFile = firstFile.isActive ? firstFile : undefined;
-
-        if (activeFile) {
-          contextParts.push(
-            `This is the file that the user is looking at:\n- Path: ${activeFile.path}`,
-          );
-          if (activeFile.cursor) {
-            contextParts.push(
-              `This is the cursor position in the file:\n- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`,
-            );
-          }
-          if (activeFile.selectedText) {
-            contextParts.push(
-              `This is the selected text in the file:\n- ${activeFile.selectedText}`,
-            );
-          }
-        }
-
-        const otherOpenFiles = activeFile ? openFiles.slice(1) : openFiles;
-
-        if (otherOpenFiles.length > 0) {
-          const recentFiles = otherOpenFiles
-            .map((file) => `- ${file.path}`)
-            .join('\n');
-          const heading = activeFile
-            ? `Here are some other files the user has open, with the most recent at the top:`
-            : `Here are some files the user has open, with the most recent at the top:`;
-          contextParts.push(`${heading}\n${recentFiles}`);
-        }
-
-        if (contextParts.length > 0) {
-          request = [
-            { text: contextParts.join('\n') },
-            ...(Array.isArray(request) ? request : [request]),
-          ];
-        }
+    if (this.config.getIdeMode()) {
+      const { contextParts, newIdeContext } = this.getIdeContextParts(
+        this.forceFullIdeContext || this.getHistory().length === 0,
+      );
+      if (contextParts.length > 0) {
+        this.getChat().addHistory({
+          role: 'user',
+          parts: [{ text: contextParts.join('\n') }],
+        });
       }
+      this.lastSentIdeContext = newIdeContext;
+      this.forceFullIdeContext = false;
     }
 
     const turn = new Turn(this.getChat(), prompt_id);
@@ -374,7 +514,7 @@ export class GeminiClient {
 
   async generateJson(
     contents: Content[],
-    schema: SchemaUnion,
+    schema: Record<string, unknown>,
     abortSignal: AbortSignal,
     model?: string,
     config: GenerateContentConfig = {},
@@ -398,7 +538,7 @@ export class GeminiClient {
             config: {
               ...requestConfig,
               systemInstruction,
-              responseSchema: schema,
+              responseJsonSchema: schema,
               responseMimeType: 'application/json',
             },
             contents,
@@ -648,6 +788,7 @@ export class GeminiClient {
       },
       ...historyToKeep,
     ]);
+    this.forceFullIdeContext = true;
 
     const { totalTokens: newTokenCount } =
       await this.getContentGenerator().countTokens({

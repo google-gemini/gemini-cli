@@ -34,6 +34,9 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
+  logIdeConnection,
+  IdeConnectionEvent,
+  IdeConnectionType,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -41,6 +44,7 @@ import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { SettingsContext } from './ui/contexts/SettingsContext.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -102,7 +106,7 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   await new Promise((resolve) => child.on('close', resolve));
   process.exit(0);
 }
-import { runAcpPeer } from './acp/acpPeer.js';
+import { runZedIntegration } from './zed-integration/zedIntegration.js';
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
@@ -187,6 +191,11 @@ export async function main() {
 
   await config.initialize();
 
+  if (config.getIdeMode()) {
+    await config.getIdeClient().connect();
+    logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
+  }
+
   // Load custom themes from settings
   themeManager.loadCustomThemes(settings.merged.customThemes);
 
@@ -241,8 +250,8 @@ export async function main() {
     await getOauthClient(settings.merged.selectedAuthType, config);
   }
 
-  if (config.getExperimentalAcp()) {
-    return runAcpPeer(config, settings);
+  if (config.getExperimentalZedIntegration()) {
+    return runZedIntegration(config, settings, extensions, argv);
   }
 
   let input = config.getQuestion();
@@ -257,12 +266,14 @@ export async function main() {
     setWindowTitle(basename(workspaceRoot), settings);
     const instance = render(
       <React.StrictMode>
-        <AppWrapper
-          config={config}
-          settings={settings}
-          startupWarnings={startupWarnings}
-          version={version}
-        />
+        <SettingsContext.Provider value={settings}>
+          <AppWrapper
+            config={config}
+            settings={settings}
+            startupWarnings={startupWarnings}
+            version={version}
+          />
+        </SettingsContext.Provider>
       </React.StrictMode>,
       { exitOnCtrlC: false },
     );

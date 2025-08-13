@@ -9,7 +9,7 @@ import * as path from 'path';
 import * as Diff from 'diff';
 import {
   BaseDeclarativeTool,
-  Icon,
+  Kind,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolEditConfirmationDetails,
@@ -19,13 +19,12 @@ import {
   ToolResultDisplay,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
-import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
+import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
 import { IDEConnectionStatus } from '../ide/ide-client.js';
@@ -79,6 +78,11 @@ export interface EditToolParams {
    * Whether the edit was modified manually by the user.
    */
   modified_by_user?: boolean;
+
+  /**
+   * Initially proposed string.
+   */
+  ai_proposed_string?: string;
 }
 
 interface CalculatedEdit {
@@ -246,7 +250,6 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     );
     const ideClient = this.config.getIdeClient();
     const ideConfirmation =
-      this.config.getIdeModeFeature() &&
       this.config.getIdeMode() &&
       ideClient?.getConnectionStatus().status === IDEConnectionStatus.Connected
         ? ideClient.openDiff(this.params.file_path, editData.newContent)
@@ -353,11 +356,20 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           'Proposed',
           DEFAULT_DIFF_OPTIONS,
         );
+        const originallyProposedContent =
+          this.params.ai_proposed_string || this.params.new_string;
+        const diffStat = getDiffStat(
+          fileName,
+          editData.currentContent ?? '',
+          originallyProposedContent,
+          this.params.new_string,
+        );
         displayResult = {
           fileDiff,
           fileName,
           originalContent: editData.currentContent,
           newContent: editData.newContent,
+          diffStat,
         };
       }
 
@@ -423,33 +435,33 @@ Expectation for required parameters:
 4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
 **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
 **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
-      Icon.Pencil,
+      Kind.Edit,
       {
         properties: {
           file_path: {
             description:
               "The absolute path to the file to modify. Must start with '/'.",
-            type: Type.STRING,
+            type: 'string',
           },
           old_string: {
             description:
               'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. For multiple replacements, specify expected_replacements parameter. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
-            type: Type.STRING,
+            type: 'string',
           },
           new_string: {
             description:
               'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
-            type: Type.STRING,
+            type: 'string',
           },
           expected_replacements: {
-            type: Type.NUMBER,
+            type: 'number',
             description:
               'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
             minimum: 1,
           },
         },
         required: ['file_path', 'old_string', 'new_string'],
-        type: Type.OBJECT,
+        type: 'object',
       },
     );
   }
@@ -460,7 +472,10 @@ Expectation for required parameters:
    * @returns Error message string or null if valid
    */
   validateToolParams(params: EditToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
     if (errors) {
       return errors;
     }
@@ -513,12 +528,16 @@ Expectation for required parameters:
         oldContent: string,
         modifiedProposedContent: string,
         originalParams: EditToolParams,
-      ): EditToolParams => ({
-        ...originalParams,
-        old_string: oldContent,
-        new_string: modifiedProposedContent,
-        modified_by_user: true,
-      }),
+      ): EditToolParams => {
+        const content = originalParams.new_string;
+        return {
+          ...originalParams,
+          ai_proposed_string: content,
+          old_string: oldContent,
+          new_string: modifiedProposedContent,
+          modified_by_user: true,
+        };
+      },
     };
   }
 }

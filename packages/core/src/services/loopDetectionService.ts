@@ -9,7 +9,6 @@ import { GeminiEventType, ServerGeminiStreamEvent } from '../core/turn.js';
 import { logLoopDetected } from '../telemetry/loggers.js';
 import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
 import { Config, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
-import { SchemaUnion, Type } from '@google/genai';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -161,20 +160,26 @@ export class LoopDetectionService {
    *    as repetitive code structures are common and not necessarily loops.
    */
   private checkContentLoop(content: string): boolean {
-    // Code blocks can often contain repetitive syntax that is not indicative of a loop.
-    // To avoid false positives, we detect when we are inside a code block and
-    // temporarily disable loop detection.
+    // Different content elements can often contain repetitive syntax that is not indicative of a loop.
+    // To avoid false positives, we detect when we encounter different content types and
+    // reset tracking to avoid analyzing content that spans across different element boundaries.
     const numFences = (content.match(/```/g) ?? []).length;
-    if (numFences) {
-      // Reset tracking when a code fence is detected to avoid analyzing content
-      // that spans across code block boundaries.
+    const hasTable = /(^|\n)\s*(\|.*\||[|+-]{3,})/.test(content);
+    const hasListItem =
+      /(^|\n)\s*[*-+]\s/.test(content) || /(^|\n)\s*\d+\.\s/.test(content);
+    const hasHeading = /(^|\n)#+\s/.test(content);
+    const hasBlockquote = /(^|\n)>\s/.test(content);
+
+    if (numFences || hasTable || hasListItem || hasHeading || hasBlockquote) {
+      // Reset tracking when different content elements are detected to avoid analyzing content
+      // that spans across different element boundaries.
       this.resetContentTracking();
     }
 
     const wasInCodeBlock = this.inCodeBlock;
     this.inCodeBlock =
       numFences % 2 === 0 ? this.inCodeBlock : !this.inCodeBlock;
-    if (wasInCodeBlock) {
+    if (wasInCodeBlock || this.inCodeBlock) {
       return false;
     }
 
@@ -335,16 +340,16 @@ Please analyze the conversation history to determine the possibility that the co
       ...recentHistory,
       { role: 'user', parts: [{ text: prompt }] },
     ];
-    const schema: SchemaUnion = {
-      type: Type.OBJECT,
+    const schema: Record<string, unknown> = {
+      type: 'object',
       properties: {
         reasoning: {
-          type: Type.STRING,
+          type: 'string',
           description:
             'Your reasoning on if the conversation is looping without forward progress.',
         },
         confidence: {
-          type: Type.NUMBER,
+          type: 'number',
           description:
             'A number between 0.0 and 1.0 representing your confidence that the conversation is in an unproductive state.',
         },

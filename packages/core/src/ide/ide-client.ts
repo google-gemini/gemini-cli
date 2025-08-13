@@ -5,11 +5,7 @@
  */
 
 import * as fs from 'node:fs';
-import {
-  detectIde,
-  DetectedIde,
-  getIdeDisplayName,
-} from '../ide/detect-ide.js';
+import { detectIde, DetectedIde, getIdeInfo } from '../ide/detect-ide.js';
 import {
   ideContext,
   IdeContextNotificationSchema,
@@ -70,7 +66,7 @@ export class IdeClient {
   private constructor() {
     this.currentIde = detectIde();
     if (this.currentIde) {
-      this.currentIdeDisplayName = getIdeDisplayName(this.currentIde);
+      this.currentIdeDisplayName = getIdeInfo(this.currentIde).displayName;
     }
   }
 
@@ -82,20 +78,20 @@ export class IdeClient {
   }
 
   async connect(): Promise<void> {
-    this.setState(IDEConnectionStatus.Connecting);
-
     if (!this.currentIde || !this.currentIdeDisplayName) {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: ${Object.values(
           DetectedIde,
         )
-          .map((ide) => getIdeDisplayName(ide))
+          .map((ide) => getIdeInfo(ide).displayName)
           .join(', ')}`,
-        true,
+        false,
       );
       return;
     }
+
+    this.setState(IDEConnectionStatus.Connecting);
 
     if (!this.validateWorkspacePath()) {
       return;
@@ -118,9 +114,9 @@ export class IdeClient {
     }
 
     this.setState(
-      IDEConnectionStatus.Disconnected,
-      `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
-      true,
+        IDEConnectionStatus.Disconnected,
+        `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try restarting your terminal. To install the extension, run /ide install.`,
+        true,
     );
   }
 
@@ -193,7 +189,14 @@ export class IdeClient {
     }
   }
 
-  disconnect() {
+  async disconnect() {
+    if (this.state.status === IDEConnectionStatus.Disconnected) {
+      return;
+    }
+    for (const filePath of this.diffResponses.keys()) {
+      await this.closeDiff(filePath);
+    }
+    this.diffResponses.clear();
     this.setState(
       IDEConnectionStatus.Disconnected,
       'IDE integration disabled. To enable it again, run /ide enable.',
@@ -222,17 +225,22 @@ export class IdeClient {
       this.state.status === IDEConnectionStatus.Disconnected &&
       status === IDEConnectionStatus.Disconnected;
 
-    // Only update details if the state wasn't already disconnected, so that
-    // the first detail message is preserved.
+    // Only update details & log to console if the state wasn't already
+    // disconnected, so that the first detail message is preserved.
     if (!isAlreadyDisconnected) {
       this.state = { status, details };
+      if (details) {
+        if (logToConsole) {
+          logger.error(details);
+        } else {
+          // We only want to log disconnect messages to debug
+          // if they are not already being logged to the console.
+          logger.debug(details);
+        }
+      }
     }
 
     if (status === IDEConnectionStatus.Disconnected) {
-      if (logToConsole) {
-        logger.error(details);
-      }
-      logger.debug(details);
       ideContext.clearIdeContext();
     }
   }
@@ -255,7 +263,11 @@ export class IdeClient {
       );
       return false;
     }
-    if (getRealPath(ideWorkspacePath) !== getRealPath(process.cwd())) {
+
+    const idePath = getRealPath(ideWorkspacePath).toLocaleLowerCase();
+    const cwd = getRealPath(process.cwd()).toLocaleLowerCase();
+    const rel = path.relative(idePath, cwd);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `Directory mismatch. Gemini CLI is running in a different location than the open workspace in ${this.currentIdeDisplayName}. Please run the CLI from the same directory as your project's root folder.`,
@@ -351,7 +363,7 @@ export class IdeClient {
         version: '1.0.0',
       });
       transport = new StreamableHTTPClientTransport(
-        new URL(`http://localhost:${port}/mcp`),
+        new URL(`http://${getIdeServerHost()}:${port}/mcp`),
       );
       await this.client.connect(transport);
       this.registerClientHandlers();
@@ -368,4 +380,10 @@ export class IdeClient {
       return false;
     }
   }
+}
+
+function getIdeServerHost() {
+  const isInContainer =
+    fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
+  return isInContainer ? 'host.docker.internal' : 'localhost';
 }

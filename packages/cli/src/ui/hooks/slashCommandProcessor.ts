@@ -14,10 +14,12 @@ import {
   GitService,
   Logger,
   logSlashCommand,
-  SlashCommandEvent,
+  makeSlashCommandEvent,
+  SlashCommandStatus,
   ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
+import { runExitCleanup } from '../../utils/cleanup.js';
 import {
   Message,
   MessageType,
@@ -49,6 +51,7 @@ export const useSlashCommandProcessor = (
   toggleCorgiMode: () => void,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
+  openSettingsDialog: () => void,
   toggleVimEnabled: () => Promise<boolean>,
   setIsProcessing: (isProcessing: boolean) => void,
   setGeminiMdFileCount: (count: number) => void,
@@ -63,6 +66,11 @@ export const useSlashCommandProcessor = (
         approvedCommands?: string[],
       ) => void;
     }>(null);
+  const [confirmationRequest, setConfirmationRequest] = useState<null | {
+    prompt: React.ReactNode;
+    onConfirm: (confirmed: boolean) => void;
+  }>(null);
+
   const [sessionShellAllowlist, setSessionShellAllowlist] = useState(
     new Set<string>(),
   );
@@ -219,78 +227,73 @@ export const useSlashCommandProcessor = (
     async (
       rawQuery: PartListUnion,
       oneTimeShellAllowlist?: Set<string>,
+      overwriteConfirmed?: boolean,
     ): Promise<SlashCommandProcessorResult | false> => {
       setIsProcessing(true);
-      try {
-        if (typeof rawQuery !== 'string') {
-          return false;
+
+      if (typeof rawQuery !== 'string') {
+        return false;
+      }
+
+      const trimmed = rawQuery.trim();
+      if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {
+        return false;
+      }
+
+      const userMessageTimestamp = Date.now();
+      addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
+
+      const parts = trimmed.substring(1).trim().split(/\s+/);
+      const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
+
+      let currentCommands = commands;
+      let commandToExecute: SlashCommand | undefined;
+      let pathIndex = 0;
+      let hasError = false;
+      const canonicalPath: string[] = [];
+
+      for (const part of commandPath) {
+        // TODO: For better performance and architectural clarity, this two-pass
+        // search could be replaced. A more optimal approach would be to
+        // pre-compute a single lookup map in `CommandService.ts` that resolves
+        // all name and alias conflicts during the initial loading phase. The
+        // processor would then perform a single, fast lookup on that map.
+
+        // First pass: check for an exact match on the primary command name.
+        let foundCommand = currentCommands.find((cmd) => cmd.name === part);
+
+        // Second pass: if no primary name matches, check for an alias.
+        if (!foundCommand) {
+          foundCommand = currentCommands.find((cmd) =>
+            cmd.altNames?.includes(part),
+          );
         }
 
-        const trimmed = rawQuery.trim();
-        if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {
-          return false;
-        }
-
-        const userMessageTimestamp = Date.now();
-        addItem(
-          { type: MessageType.USER, text: trimmed },
-          userMessageTimestamp,
-        );
-
-        const parts = trimmed.substring(1).trim().split(/\s+/);
-        const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
-
-        let currentCommands = commands;
-        let commandToExecute: SlashCommand | undefined;
-        let pathIndex = 0;
-        const canonicalPath: string[] = [];
-
-        for (const part of commandPath) {
-          // TODO: For better performance and architectural clarity, this two-pass
-          // search could be replaced. A more optimal approach would be to
-          // pre-compute a single lookup map in `CommandService.ts` that resolves
-          // all name and alias conflicts during the initial loading phase. The
-          // processor would then perform a single, fast lookup on that map.
-
-          // First pass: check for an exact match on the primary command name.
-          let foundCommand = currentCommands.find((cmd) => cmd.name === part);
-
-          // Second pass: if no primary name matches, check for an alias.
-          if (!foundCommand) {
-            foundCommand = currentCommands.find((cmd) =>
-              cmd.altNames?.includes(part),
-            );
-          }
-
-          if (foundCommand) {
-            commandToExecute = foundCommand;
-            canonicalPath.push(foundCommand.name);
-            pathIndex++;
-            if (foundCommand.subCommands) {
-              currentCommands = foundCommand.subCommands;
-            } else {
-              break;
-            }
+        if (foundCommand) {
+          commandToExecute = foundCommand;
+          canonicalPath.push(foundCommand.name);
+          pathIndex++;
+          if (foundCommand.subCommands) {
+            currentCommands = foundCommand.subCommands;
           } else {
             break;
           }
+        } else {
+          break;
         }
+      }
 
+      const resolvedCommandPath = canonicalPath;
+      const subcommand =
+        resolvedCommandPath.length > 1
+          ? resolvedCommandPath.slice(1).join(' ')
+          : undefined;
+
+      try {
         if (commandToExecute) {
           const args = parts.slice(pathIndex).join(' ');
 
           if (commandToExecute.action) {
-            if (config) {
-              const resolvedCommandPath = canonicalPath;
-              const event = new SlashCommandEvent(
-                resolvedCommandPath[0],
-                resolvedCommandPath.length > 1
-                  ? resolvedCommandPath.slice(1).join(' ')
-                  : undefined,
-              );
-              logSlashCommand(config, event);
-            }
-
             const fullCommandContext: CommandContext = {
               ...commandContext,
               invocation: {
@@ -298,6 +301,7 @@ export const useSlashCommandProcessor = (
                 name: commandToExecute.name,
                 args,
               },
+              overwriteConfirmed,
             };
 
             // If a one-time list is provided for a "Proceed" action, temporarily
@@ -311,7 +315,6 @@ export const useSlashCommandProcessor = (
                 ]),
               };
             }
-
             const result = await commandToExecute.action(
               fullCommandContext,
               args,
@@ -351,6 +354,11 @@ export const useSlashCommandProcessor = (
                     case 'privacy':
                       openPrivacyNotice();
                       return { type: 'handled' };
+                    case 'settings':
+                      openSettingsDialog();
+                      return { type: 'handled' };
+                    case 'help':
+                      return { type: 'handled' };
                     default: {
                       const unhandled: never = result.dialog;
                       throw new Error(
@@ -370,7 +378,8 @@ export const useSlashCommandProcessor = (
                 }
                 case 'quit':
                   setQuittingMessages(result.messages);
-                  setTimeout(() => {
+                  setTimeout(async () => {
+                    await runExitCleanup();
                     process.exit(0);
                   }, 100);
                   return { type: 'handled' };
@@ -420,6 +429,36 @@ export const useSlashCommandProcessor = (
                     new Set(approvedCommands),
                   );
                 }
+                case 'confirm_action': {
+                  const { confirmed } = await new Promise<{
+                    confirmed: boolean;
+                  }>((resolve) => {
+                    setConfirmationRequest({
+                      prompt: result.prompt,
+                      onConfirm: (resolvedConfirmed) => {
+                        setConfirmationRequest(null);
+                        resolve({ confirmed: resolvedConfirmed });
+                      },
+                    });
+                  });
+
+                  if (!confirmed) {
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: 'Operation cancelled.',
+                      },
+                      Date.now(),
+                    );
+                    return { type: 'handled' };
+                  }
+
+                  return await handleSlashCommand(
+                    result.originalInvocation.raw,
+                    undefined,
+                    true,
+                  );
+                }
                 default: {
                   const unhandled: never = result;
                   throw new Error(
@@ -448,8 +487,18 @@ export const useSlashCommandProcessor = (
           content: `Unknown command: ${trimmed}`,
           timestamp: new Date(),
         });
+
         return { type: 'handled' };
-      } catch (e) {
+      } catch (e: unknown) {
+        hasError = true;
+        if (config) {
+          const event = makeSlashCommandEvent({
+            command: resolvedCommandPath[0],
+            subcommand,
+            status: SlashCommandStatus.ERROR,
+          });
+          logSlashCommand(config, event);
+        }
         addItem(
           {
             type: MessageType.ERROR,
@@ -459,6 +508,14 @@ export const useSlashCommandProcessor = (
         );
         return { type: 'handled' };
       } finally {
+        if (config && resolvedCommandPath[0] && !hasError) {
+          const event = makeSlashCommandEvent({
+            command: resolvedCommandPath[0],
+            subcommand,
+            status: SlashCommandStatus.SUCCESS,
+          });
+          logSlashCommand(config, event);
+        }
         setIsProcessing(false);
       }
     },
@@ -473,9 +530,11 @@ export const useSlashCommandProcessor = (
       openPrivacyNotice,
       openEditorDialog,
       setQuittingMessages,
+      openSettingsDialog,
       setShellConfirmationRequest,
       setSessionShellAllowlist,
       setIsProcessing,
+      setConfirmationRequest,
     ],
   );
 
@@ -485,5 +544,6 @@ export const useSlashCommandProcessor = (
     pendingHistoryItems,
     commandContext,
     shellConfirmationRequest,
+    confirmationRequest,
   };
 };

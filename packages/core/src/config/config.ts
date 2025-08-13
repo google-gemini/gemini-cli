@@ -185,13 +185,12 @@ export interface ConfigParameters {
   model: string;
   extensionContextFilePaths?: string[];
   maxSessionTurns?: number;
-  experimentalAcp?: boolean;
+  experimentalZedIntegration?: boolean;
   listExtensions?: boolean;
   extensions?: GeminiCLIExtension[];
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
-  ideModeFeature?: boolean;
   folderTrustFeature?: boolean;
   folderTrust?: boolean;
   ideMode?: boolean;
@@ -240,7 +239,6 @@ export class Config {
   private readonly model: string;
   private readonly extensionContextFilePaths: string[];
   private readonly noBrowser: boolean;
-  private readonly ideModeFeature: boolean;
   private readonly folderTrustFeature: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
@@ -258,7 +256,7 @@ export class Config {
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
-  private readonly experimentalAcp: boolean = false;
+  private readonly experimentalZedIntegration: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly chatCompression: ChatCompressionSettings | undefined;
   private readonly interactive: boolean;
@@ -311,21 +309,17 @@ export class Config {
     this.model = params.model;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
-    this.experimentalAcp = params.experimentalAcp ?? false;
+    this.experimentalZedIntegration =
+      params.experimentalZedIntegration ?? false;
     this.listExtensions = params.listExtensions ?? false;
     this._extensions = params.extensions ?? [];
     this._blockedMcpServers = params.blockedMcpServers ?? [];
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
-    this.ideModeFeature = params.ideModeFeature ?? false;
     this.folderTrustFeature = params.folderTrustFeature ?? false;
     this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
     this.ideClient = IdeClient.getInstance();
-    if (this.ideMode && this.ideModeFeature) {
-      this.ideClient.connect();
-      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
-    }
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
     this.chatCompression = params.chatCompression;
@@ -628,8 +622,8 @@ export class Config {
     return this.extensionContextFilePaths;
   }
 
-  getExperimentalAcp(): boolean {
-    return this.experimentalAcp;
+  getExperimentalZedIntegration(): boolean {
+    return this.experimentalZedIntegration;
   }
 
   getListExtensions(): boolean {
@@ -658,10 +652,6 @@ export class Config {
     return this.summarizeToolOutput;
   }
 
-  getIdeModeFeature(): boolean {
-    return this.ideModeFeature;
-  }
-
   getIdeMode(): boolean {
     return this.ideMode;
   }
@@ -684,7 +674,7 @@ export class Config {
       await this.ideClient.connect();
       logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.SESSION));
     } else {
-      this.ideClient.disconnect();
+      await this.ideClient.disconnect();
     }
   }
 
