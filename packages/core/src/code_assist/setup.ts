@@ -54,6 +54,12 @@ export async function setupUser(client: OAuth2Client): Promise<UserData> {
 
   const tier = getOnboardTier(loadRes);
 
+  if (tier.id === UserTierId.FREE) {
+    // The free tier uses a managed google cloud project. Setting a project in the `onboardUser` request causes a `Precondition Failed` error.
+    projectId = undefined;
+    clientMetadata.duetProject = undefined;
+  }
+
   const onboardReq: OnboardUserRequest = {
     tierId: tier.id,
     cloudaicompanionProject: projectId,
@@ -67,12 +73,16 @@ export async function setupUser(client: OAuth2Client): Promise<UserData> {
     lroRes = await caServer.onboardUser(onboardReq);
   }
 
-  if (!lroRes.response?.cloudaicompanionProject?.id && !projectId) {
+  if (lroRes.response?.cloudaicompanionProject?.id) {
+    projectId = lroRes.response.cloudaicompanionProject.id;
+  }
+
+  if (!projectId) {
     throw new ProjectIdRequiredError();
   }
 
   return {
-    projectId: lroRes.response?.cloudaicompanionProject?.id || projectId!,
+    projectId,
     userTier: tier.id,
   };
 }
