@@ -1,0 +1,698 @@
+[
+  {
+    "id": "GR-001",
+    "title": "Concise, descriptive title",
+    "category": "primary_category",
+    "subcategory": "specific_subcategory",
+    "description": "Hello World",
+    "rule": {
+      "condition": "When [specific trigger scenario]",
+      "requirement": "MUST [specific requirement]",
+      "actions": [
+        "Specific action 1 with measurable criteria",
+        "Specific action 2 with exact thresholds",
+        "Specific action 3 with implementation details"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "only_truly_applicable_stages"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "stage_specific_checks": "What can be automatically validated at each stage"
+      }
+    },
+    "learned_from_rcas": [
+      "List of source RCA documents"
+    ],
+    "failure_patterns_prevented": [
+      "Specific failure patterns this guardrail prevents"
+    ],
+    "validation_criteria": [
+      "Measurable success criteria for compliance"
+    ],
+    "code_review_prompt": "Review resource configuration changes:\n• Are memory/CPU limits set to at least 1.5x observed peak usage?\n• For applications with background processing, is 25% additional headroom added?\n• Are Redis clusters configured with auto-scaling at 75% memory utilization?\n• Are connection pools sized for peak traffic + 25% headroom?\n• Has load testing been completed for capacity-affecting changes?\n• Are monitoring alerts configured at 80% utilization thresholds?",
+    "updated_at": "2025-08-13T00:42:12.803Z"
+  },
+  {
+    "id": "GR-002",
+    "title": "Timeout Configuration Validation",
+    "category": "configuration_management",
+    "subcategory": "timeout_settings",
+    "description": "Ensures timeout configurations align with actual service response time patterns and workload complexity",
+    "rule": {
+      "condition": "When configuring timeouts for API gateways, proxies, or service communications",
+      "requirement": "MUST set timeouts based on actual backend response time patterns",
+      "actions": [
+        "Use 95th percentile response time + 50% safety margin as minimum timeout",
+        "Set complex analytics queries timeout to minimum 45 seconds",
+        "Configure separate timeout tiers for different endpoint complexity levels",
+        "Implement progressive timeout increases for retry scenarios",
+        "Validate timeout settings against real workload patterns before deployment"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "code_review",
+        "ci_cd",
+        "deployment"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "code_review_check": "Validate timeout values in code match complexity requirements",
+        "ci_cd_check": "Validate timeout settings against response time percentiles",
+        "deployment_gate": "Block deployment if timeouts are below minimum thresholds"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-08-06-Upstream_Request_Timeout_Configuration"
+    ],
+    "failure_patterns_prevented": [
+      "Complete service inaccessibility due to premature request timeouts",
+      "Legitimate complex queries being terminated by gateway timeouts",
+      "Cascade failures from inappropriate timeout configurations"
+    ],
+    "validation_criteria": [
+      "Timeout >= 95th percentile response time + 50%",
+      "Complex query endpoints have minimum 45s timeout",
+      "Tiered timeout configuration based on endpoint complexity",
+      "Load testing validates timeout adequacy"
+    ],
+    "code_review_prompt": "Review timeout configuration changes:\n• Are timeouts set to 95th percentile response time + 50% safety margin?\n• Do complex analytics queries have minimum 45-second timeouts?\n• Are timeout tiers configured for different endpoint complexity levels?\n• Are progressive timeout increases implemented for retry scenarios?\n• Has timeout adequacy been validated against real workload patterns?\n• Are separate timeout configurations used for health checks vs operational endpoints?"
+  },
+  {
+    "id": "GR-003",
+    "title": "Configuration Drift Prevention",
+    "category": "monitoring_alerting",
+    "subcategory": "configuration_management",
+    "description": "Prevents configuration drift and ensures critical settings remain aligned with requirements",
+    "rule": {
+      "condition": "When deploying configuration changes to infrastructure components, services, or applications",
+      "requirement": "MUST validate configuration consistency and prevent unauthorized drift",
+      "actions": [
+        "Implement automated cross-region configuration parity validation",
+        "Validate health check endpoints exist and return expected responses",
+        "Ensure monitoring alerts are configured for all infrastructure components at 80% capacity",
+        "Verify configuration changes don't reset critical parameters to unsafe defaults",
+        "Require explicit validation for any configuration parameter changes"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "ci_cd",
+        "deployment",
+        "runtime"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "ci_cd_check": "Validate configuration against approved baselines",
+        "deployment_gate": "Block deployment if configuration drift detected",
+        "runtime_monitoring": "Continuously monitor for configuration drift and alert",
+        "cross_region_validation": "Ensure configuration parity across all regions"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-05-17-ClickHouse_Parts_Merging_Configuration",
+      "RCA-2025-06-02-EU_Networking_Stack_Configuration"
+    ],
+    "failure_patterns_prevented": [
+      "Configuration reset to defaults during upgrades",
+      "Cross-region configuration inconsistencies",
+      "Health check endpoints pointing to deprecated paths",
+      "Missing monitoring coverage for critical components"
+    ],
+    "validation_criteria": [
+      "Configuration matches approved baseline templates",
+      "Health check endpoints return 200 status codes",
+      "Monitoring alerts configured for all infrastructure components",
+      "Cross-region configuration parity validated",
+      "Configuration changes require explicit approval and testing"
+    ]
+  },
+  {
+    "id": "GR-004",
+    "title": "Query Performance and Capacity Management",
+    "category": "capacity_planning",
+    "subcategory": "query_optimization",
+    "description": "Ensures query performance remains optimal and capacity scales with complexity growth",
+    "rule": {
+      "condition": "When deploying changes affecting database queries, analytics processing, or query execution paths",
+      "requirement": "MUST validate query performance impact and ensure adequate capacity for complex operations",
+      "actions": [
+        "Implement query complexity scoring to route requests appropriately",
+        "Create separate worker pools for simple vs complex queries",
+        "Add query result caching for frequently accessed analytics",
+        "Deploy materialized views for common analytical patterns",
+        "Set query timeout limits appropriate for operation complexity (45s+ for complex analytics)"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "code_review",
+        "runtime"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "code_review_check": "Review query logic for complexity and performance impact",
+        "runtime_monitoring": "Alert when query response times exceed 250% of baseline",
+        "capacity_planning": "Auto-scale query workers based on complexity metrics"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-04-17-API_Query_Capacity_Limits"
+    ],
+    "failure_patterns_prevented": [
+      "API query endpoint capacity exhaustion",
+      "Complex queries starving simple operations of resources",
+      "Query timeout failures for legitimate analytical operations"
+    ],
+    "validation_criteria": [
+      "Query complexity scoring implemented and tested",
+      "Separate resource pools configured for different query types",
+      "Materialized views deployed for common patterns",
+      "Query timeout settings align with actual complexity requirements"
+    ],
+    "code_review_prompt": "Review query performance and capacity changes:\n• Is query complexity scoring implemented to route requests appropriately?\n• Are separate worker pools configured for simple vs complex queries?\n• Is query result caching added for frequently accessed analytics?\n• Are materialized views deployed for common analytical patterns?\n• Are query timeout limits set appropriately for operation complexity (45s+ for analytics)?\n• Has performance impact been validated against baseline metrics?"
+  },
+  {
+    "id": "GR-005",
+    "title": "Database Performance and Parts Management",
+    "category": "database_performance",
+    "subcategory": "clickhouse_optimization",
+    "description": "Maintains optimal database performance through proper parts management and merge configuration",
+    "rule": {
+      "condition": "When modifying ClickHouse configuration, ingestion patterns, or merge settings",
+      "requirement": "MUST maintain optimal parts count and merge performance for query efficiency",
+      "actions": [
+        "Keep ClickHouse parts count below 1000 per table at all times",
+        "Configure max_parts_in_total to 1000 (not default 10000)",
+        "Set parts_to_delay_insert to 800 for proactive merge triggering",
+        "Implement automated parts optimization jobs for maintenance",
+        "Monitor parts count with alerting at 750 parts per table"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "ci_cd",
+        "runtime"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "ci_cd_check": "Validate ClickHouse configuration against performance baselines",
+        "runtime_monitoring": "Alert when parts count exceeds 750 per table",
+        "automated_optimization": "Trigger OPTIMIZE TABLE when parts count reaches thresholds"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-05-17-ClickHouse_Parts_Merging_Configuration"
+    ],
+    "failure_patterns_prevented": [
+      "Query performance degradation due to excessive parts accumulation",
+      "ClickHouse merge configuration drift after upgrades",
+      "Exponential query slowdown from uncontrolled parts growth"
+    ],
+    "validation_criteria": [
+      "Parts count per table maintained below 1000",
+      "Merge configuration properly tuned for ingestion patterns",
+      "Automated monitoring and optimization in place",
+      "Configuration changes validated against performance requirements"
+    ],
+    "code_review_prompt": "Review ClickHouse performance and parts management:\n• Is max_parts_in_total set to 1000 (not default 10000)?\n• Is parts_to_delay_insert set to 800 for proactive merge triggering?\n• Are automated parts optimization jobs implemented for maintenance?\n• Is monitoring configured with alerting at 750 parts per table?\n• Has ClickHouse configuration been validated against performance baselines?\n• Are merge configurations properly tuned for current ingestion patterns?"
+  },
+  {
+    "id": "GR-006",
+    "title": "Authentication System Safety",
+    "category": "deployment_safety",
+    "subcategory": "authentication",
+    "description": "Ensures authentication system changes are deployed safely with comprehensive testing and rollback capabilities",
+    "rule": {
+      "condition": "When modifying authentication logic, session management, or security-critical code paths",
+      "requirement": "MUST use canary deployment and comprehensive testing for authentication changes",
+      "actions": [
+        "Implement canary deployment with 1% traffic for authentication changes",
+        "Require comprehensive edge case testing for session validation logic",
+        "Validate authentication changes against multiple session lifecycle scenarios",
+        "Ensure rollback procedures are tested and validated before deployment",
+        "Add circuit breaker patterns for authentication failures"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "code_review",
+        "ci_cd",
+        "deployment"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "code_review_check": "Review authentication logic for edge cases and security patterns",
+        "ci_cd_check": "Require authentication edge case test coverage >95%",
+        "deployment_gate": "Block authentication deployments without canary configuration"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-07-17-API_Recovery_Deployment"
+    ],
+    "failure_patterns_prevented": [
+      "Widespread authentication failures from logic errors",
+      "Session validation edge cases causing user lockouts",
+      "Authentication deployments without proper rollback capabilities"
+    ],
+    "validation_criteria": [
+      "Canary deployment configured for authentication changes",
+      "Edge case test coverage exceeds 95%",
+      "Rollback procedures validated in staging environment",
+      "Circuit breaker patterns implemented for failure scenarios"
+    ],
+    "code_review_prompt": "Review authentication system changes:\n• Are authentication logic changes configured for canary deployment with 1% traffic?\n• Is comprehensive edge case testing implemented for session validation logic (>95% coverage)?\n• Are authentication changes validated against multiple session lifecycle scenarios?\n• Are rollback procedures tested and validated before deployment?\n• Are circuit breaker patterns added for authentication failures?\n• Are timestamp comparisons using correct operators (>= not >) for session validation?"
+  },
+  {
+    "id": "GR-007",
+    "title": "Proactive Monitoring and Alerting",
+    "category": "monitoring_alerting",
+    "subcategory": "performance_monitoring",
+    "description": "Establishes proactive monitoring to detect performance degradation and capacity issues before customer impact",
+    "rule": {
+      "condition": "When deploying new services, infrastructure components, or performance-critical changes",
+      "requirement": "MUST implement comprehensive monitoring with early warning alerts",
+      "actions": [
+        "Configure alerts at 80% resource utilization (not 95%+)",
+        "Implement predictive alerting based on trend analysis",
+        "Monitor performance baselines with anomaly detection",
+        "Set up capacity constraint early warning systems",
+        "Deploy real-time health monitoring for all critical components"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "deployment",
+        "runtime"
+      ],
+      "severity": "warning",
+      "automation": {
+        "deployment_gate": "Require monitoring configuration for all new components",
+        "runtime_monitoring": "Alert when performance degrades 150% from baseline",
+        "trend_analysis": "Predict capacity issues 24-48 hours before impact"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-04-17-API_Query_Capacity_Limits",
+      "RCA-2025-04-28-Infrastructure_Underprovisioning",
+      "RCA-2025-05-17-ClickHouse_Parts_Merging_Configuration",
+      "RCA-2025-06-02-EU_Networking_Stack_Configuration"
+    ],
+    "failure_patterns_prevented": [
+      "Performance degradation detected only after customer impact",
+      "Resource exhaustion without advance warning",
+      "Configuration drift undetected until failure",
+      "Missing monitoring coverage for critical components"
+    ],
+    "validation_criteria": [
+      "Monitoring configured for all infrastructure components",
+      "Alert thresholds set at 80% resource utilization",
+      "Predictive alerting based on trend analysis implemented",
+      "Performance baseline monitoring with anomaly detection active"
+    ]
+  },
+  {
+    "id": "GR-008",
+    "title": "Deployment Testing and Validation",
+    "category": "deployment_safety",
+    "subcategory": "testing_validation",
+    "description": "Ensures all deployments are properly tested including edge cases, load scenarios, and rollback procedures",
+    "rule": {
+      "condition": "When deploying infrastructure changes, configuration updates, or code modifications affecting critical paths",
+      "requirement": "MUST validate deployments with comprehensive testing including peak load scenarios",
+      "actions": [
+        "Implement load testing for all capacity-affecting changes",
+        "Test configuration changes against peak traffic patterns",
+        "Validate infrastructure migrations with burst scenario testing",
+        "Ensure staging environment parity with production workloads",
+        "Test and validate rollback procedures before deployment"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "ci_cd",
+        "deployment"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "ci_cd_check": "Run automated load testing for infrastructure changes",
+        "deployment_gate": "Block deployment without load testing validation",
+        "staging_validation": "Ensure staging tests match production patterns"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-07-17-API_Recovery_Deployment",
+      "RCA-2025-08-02-RDS_Proxy_Configuration_Outage"
+    ],
+    "failure_patterns_prevented": [
+      "Deployments failing under production load conditions",
+      "Configuration changes not tested against actual usage patterns",
+      "Missing rollback validation causing extended outages"
+    ],
+    "validation_criteria": [
+      "Load testing completed for all capacity changes",
+      "Peak traffic scenarios validated in staging",
+      "Rollback procedures tested and documented",
+      "Staging environment matches production workload patterns"
+    ]
+  },
+  {
+    "id": "GR-009",
+    "title": "Error Handling and Recovery Logic Validation",
+    "category": "service_reliability",
+    "subcategory": "error_handling",
+    "description": "Ensures proper error classification, recovery mechanisms, and circuit breaker patterns to prevent cascading failures",
+    "rule": {
+      "condition": "When implementing retry logic, error handling, or recovery mechanisms",
+      "requirement": "MUST implement proper error classification with exponential backoff and circuit breakers",
+      "actions": [
+        "Implement exponential backoff with jitter for all retry scenarios",
+        "Classify warnings vs critical errors with appropriate handling",
+        "Add circuit breakers to prevent cascading failures",
+        "Never let individual failures block entire processing queues",
+        "Ensure all errors generate appropriate alerts and logs"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "code_review",
+        "ci_cd"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "code_review_check": "Review error handling patterns and retry logic implementation",
+        "ci_cd_check": "Validate retry logic uses exponential backoff patterns",
+        "error_classification": "Verify error types are properly classified and handled"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-06-04-Web_Interface_Recovery_Logic",
+      "RCA-2025-07-14-Feature_Flag_Error_Handling",
+      "RCA-2025-07-21-Realtime_Destinations_Error_Handling"
+    ],
+    "failure_patterns_prevented": [
+      "Linear retry causing client resource exhaustion",
+      "Database warnings treated as fatal service errors",
+      "Individual webhook failures blocking queue processing",
+      "Silent error failures preventing incident detection"
+    ],
+    "validation_criteria": [
+      "Retry logic uses exponential backoff with maximum retry limits",
+      "Error classification distinguishes warnings from critical failures",
+      "Circuit breaker patterns prevent cascading failures",
+      "Queue processing isolates individual failure impacts"
+    ],
+    "code_review_prompt": "Review error handling and recovery logic:\n• Is exponential backoff with jitter implemented for all retry scenarios (not linear retry)?\n• Are warnings classified separately from critical errors with appropriate handling?\n• Are circuit breakers added to prevent cascading failures?\n• Do individual failures avoid blocking entire processing queues?\n• Do all errors generate appropriate alerts and logs?\n• Is retry logic using maximum retry limits (3-5 attempts)?"
+  },
+  {
+    "id": "GR-010",
+    "title": "External Dependency Resilience and Failover",
+    "category": "external_dependencies",
+    "subcategory": "failover_mechanisms",
+    "description": "Implements redundant external services and graceful degradation to prevent single points of failure",
+    "rule": {
+      "condition": "When integrating with external services or cloud providers",
+      "requirement": "MUST implement redundant providers and graceful degradation",
+      "actions": [
+        "Configure secondary authentication providers (not single cloud dependent)",
+        "Implement multi-cloud export destinations for critical integrations",
+        "Add proactive external dependency health monitoring",
+        "Build graceful degradation modes for external service failures",
+        "Create automated failover procedures for dependency outages"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "code_review",
+        "ci_cd",
+        "deployment"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "code_review_check": "Review external dependency integration and failover logic",
+        "ci_cd_check": "Validate fallback providers configured for critical dependencies",
+        "deployment_gate": "Ensure graceful degradation modes tested"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-06-12-GCP_Upstream_Outage",
+      "RCA-2025-07-03-US_Session_Replay_Warpstream_Outage"
+    ],
+    "failure_patterns_prevented": [
+      "Complete authentication failure from single provider outage",
+      "Data export pipeline failure from cloud provider issues",
+      "Cascading failures from external dependency chains"
+    ],
+    "validation_criteria": [
+      "Secondary authentication providers configured and tested",
+      "Multi-cloud failover mechanisms implemented",
+      "External dependency health monitoring active",
+      "Graceful degradation modes validated under failure scenarios"
+    ],
+    "code_review_prompt": "Review external dependency resilience:\n• Are secondary authentication providers configured (not single cloud dependent)?\n• Are multi-cloud export destinations implemented for critical integrations?\n• Is proactive external dependency health monitoring added?\n• Are graceful degradation modes built for external service failures?\n• Are automated failover procedures created for dependency outages?\n• Are fallback providers configured for all critical dependencies?"
+  },
+  {
+    "id": "GR-011",
+    "title": "Data Processing Pipeline Health and Resource Management",
+    "category": "data_processing",
+    "subcategory": "pipeline_reliability",
+    "description": "Ensures data processing pipelines have adequate resources and monitoring to prevent silent failures",
+    "rule": {
+      "condition": "When configuring data processing pipelines, workers, or queue systems",
+      "requirement": "MUST implement resource isolation and intelligent scaling",
+      "actions": [
+        "Schedule maintenance operations during off-peak hours only",
+        "Size connection pools for peak load + 50% headroom minimum",
+        "Implement consumer auto-scaling based on queue depth and lag",
+        "Use intelligent partitioning strategies to prevent hotspots",
+        "Add comprehensive monitoring with silent failure detection"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "ci_cd",
+        "deployment",
+        "runtime"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "ci_cd_check": "Validate connection pool sizing against load requirements",
+        "runtime_monitoring": "Alert on queue lag, processing delays, and silent failures",
+        "auto_scaling": "Implement dynamic scaling based on processing metrics"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-04-12-EU_Processing_Delays",
+      "RCA-2025-06-10-Cohort_Recalculation_Delays",
+      "RCA-2025-07-10-Data_Processing_Delays",
+      "RCA-2025-07-14-Cohort_Processing_Backlog",
+      "RCA-2025-08-07-CDP_Consumer_Lag"
+    ],
+    "failure_patterns_prevented": [
+      "Processing delays from resource contention during maintenance",
+      "Consumer group failures from inadequate connection pooling",
+      "Silent worker failures accumulating multi-day backlogs",
+      "Partition hotspots from uneven load distribution"
+    ],
+    "validation_criteria": [
+      "Connection pools sized for peak load + 50% headroom",
+      "Auto-scaling configured based on queue metrics",
+      "Maintenance operations scheduled during off-peak hours",
+      "Silent failure detection monitors all pipeline components"
+    ],
+    "code_review_prompt": "Review data processing pipeline configuration:\n• Are connection pools sized for peak load + 50% headroom minimum?\n• Is consumer auto-scaling implemented based on queue depth and lag?\n• Are intelligent partitioning strategies used to prevent hotspots?\n• Is comprehensive monitoring with silent failure detection added?\n• Are maintenance operations scheduled during off-peak hours only?\n• Is connection pool sizing validated against load requirements?"
+  },
+  {
+    "id": "GR-012",
+    "title": "Database Schema and Maintenance Safety",
+    "category": "database_operations",
+    "subcategory": "schema_management",
+    "description": "Ensures database schema changes and maintenance operations are performed safely with proper validation",
+    "rule": {
+      "condition": "When performing database schema changes, optimizations, or maintenance",
+      "requirement": "MUST ensure atomic operations with comprehensive validation",
+      "actions": [
+        "Apply schema changes atomically across all cluster nodes",
+        "Validate all query templates after schema modifications",
+        "Test database optimizations with production data patterns",
+        "Implement graceful node replacement with minimal capacity impact",
+        "Add automated rollback for failed schema operations"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "code_review",
+        "ci_cd",
+        "deployment"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "code_review_check": "Review database schema changes and migration scripts",
+        "ci_cd_check": "Validate schema changes don't break existing queries",
+        "deployment_gate": "Test schema changes with production data patterns"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-05-15-ClickHouse_Segfault_Outage",
+      "RCA-2025-05-15-US_ClickHouse_Node_Replacement",
+      "RCA-2025-06-14-Failed_Maintenance_API_Errors",
+      "RCA-2025-06-23-Experiment_Query_Failures",
+      "RCA-2025-06-27-Person_Search_Query_Regression"
+    ],
+    "failure_patterns_prevented": [
+      "Partial schema updates causing query template failures",
+      "Database optimization removing critical performance indexes",
+      "Extended capacity reduction during maintenance operations",
+      "Schema migrations causing database segmentation faults"
+    ],
+    "validation_criteria": [
+      "Schema changes applied atomically across cluster",
+      "Query templates validated after schema modifications",
+      "Database optimizations tested with production patterns",
+      "Node replacement procedures minimize capacity impact"
+    ],
+    "code_review_prompt": "Review database schema and maintenance changes:\n• Are schema changes applied atomically across all cluster nodes?\n• Are all query templates validated after schema modifications?\n• Are database optimizations tested with production data patterns?\n• Is graceful node replacement implemented with minimal capacity impact?\n• Is automated rollback added for failed schema operations?\n• Do schema changes avoid breaking existing queries?"
+  },
+  {
+    "id": "GR-013",
+    "title": "Query Performance and Resource Governance",
+    "category": "performance_management",
+    "subcategory": "query_optimization",
+    "description": "Implements query resource limits and complexity analysis to prevent performance degradation",
+    "rule": {
+      "condition": "When processing analytical queries or handling customer data operations",
+      "requirement": "MUST implement query resource limits and complexity analysis",
+      "actions": [
+        "Set per-query memory limits (2GB dashboard, 4GB analytical)",
+        "Implement customer ingestion rate limiting at 200% of baseline",
+        "Add query complexity scoring with automatic optimization",
+        "Configure query timeout limits appropriate for operation type",
+        "Monitor and alert on unusual ingestion or query patterns"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "code_review",
+        "runtime"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "code_review_check": "Review query logic for resource usage and performance impact",
+        "runtime_monitoring": "Alert on queries exceeding resource thresholds",
+        "performance_governance": "Automatically optimize or kill expensive queries"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-06-06-ClickHouse_Query_Performance",
+      "RCA-2025-08-07-ClickHouse_Performance_Degradation"
+    ],
+    "failure_patterns_prevented": [
+      "Memory pressure from uncontrolled large queries",
+      "Customer ingestion spikes overwhelming cluster capacity",
+      "Query performance regression affecting all users"
+    ],
+    "validation_criteria": [
+      "Per-query memory limits enforced (2GB dashboard, 4GB analytical)",
+      "Customer ingestion rate limiting at 200% baseline implemented",
+      "Query complexity scoring and optimization active",
+      "Performance monitoring alerts on unusual patterns"
+    ],
+    "code_review_prompt": "Review query performance and resource governance:\n• Are per-query memory limits set (2GB dashboard, 4GB analytical)?\n• Is customer ingestion rate limiting implemented at 200% of baseline?\n• Is query complexity scoring with automatic optimization added?\n• Are query timeout limits configured appropriately for operation type?\n• Are monitoring and alerts configured for unusual ingestion or query patterns?\n• Are query resource limits properly configured and validated?"
+  },
+  {
+    "id": "GR-014",
+    "title": "Network Configuration Change Safety",
+    "category": "infrastructure_management",
+    "subcategory": "network_configuration",
+    "description": "Ensures network configuration changes are tested and deployed safely with proper validation",
+    "rule": {
+      "condition": "When modifying load balancer, routing, or health check configurations",
+      "requirement": "MUST validate traffic distribution and implement staged rollouts",
+      "actions": [
+        "Test network configurations in staging with production-like traffic",
+        "Implement staged rollout with automatic rollback triggers",
+        "Configure health checks with appropriate timeouts (10s minimum)",
+        "Validate even traffic distribution across all healthy instances",
+        "Add monitoring for configuration-induced service degradation"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "ci_cd",
+        "deployment"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "ci_cd_check": "Validate network configurations with load testing",
+        "deployment_gate": "Ensure staged rollout configured with rollback triggers",
+        "traffic_validation": "Monitor traffic distribution across instances"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-07-16-US_Web_Portal_Network_Config",
+      "RCA-2025-07-21-Feature_Flag_Network_Config"
+    ],
+    "failure_patterns_prevented": [
+      "Traffic concentration causing gateway overload",
+      "Overly strict health checks removing healthy instances",
+      "Network configuration changes causing service availability issues"
+    ],
+    "validation_criteria": [
+      "Network configurations tested with production-like traffic",
+      "Staged rollout with automatic rollback implemented",
+      "Health checks configured with appropriate timeouts (10s+)",
+      "Traffic distribution monitoring active across instances"
+    ]
+  },
+  {
+    "id": "GR-015",
+    "title": "Client-Server Integration Robustness",
+    "category": "integration_safety",
+    "subcategory": "client_server_communication",
+    "description": "Ensures API changes maintain backward compatibility and prevent infinite loops or integration breaks",
+    "rule": {
+      "condition": "When deploying API changes, client SDK updates, or configuration endpoints",
+      "requirement": "MUST ensure backward compatibility and prevent infinite loops",
+      "actions": [
+        "Test all edge cases including NULL value scenarios",
+        "Maintain backward compatibility for configuration endpoint changes",
+        "Add termination conditions for all retry and loop logic (max 3-5 attempts)",
+        "Implement proper request loop detection and prevention",
+        "Validate client SDK behavior across different failure scenarios"
+      ]
+    },
+    "enforcement": {
+      "stages": [
+        "code_review",
+        "ci_cd",
+        "deployment"
+      ],
+      "severity": "blocking",
+      "automation": {
+        "code_review_check": "Review API endpoint logic and client integration patterns",
+        "ci_cd_check": "Test API endpoints with NULL values and edge cases",
+        "deployment_gate": "Validate backward compatibility for configuration changes"
+      }
+    },
+    "learned_from_rcas": [
+      "RCA-2025-06-18-Decide_API_Deployment_Failure",
+      "RCA-2025-06-20-Session_Replay_Config_Endpoint",
+      "RCA-2025-08-01-EU_Request_Loop_Overload"
+    ],
+    "failure_patterns_prevented": [
+      "API failures from NULL value edge cases",
+      "Configuration format changes breaking client integrations",
+      "Infinite request loops causing system overload"
+    ],
+    "validation_criteria": [
+      "Edge case testing includes NULL value scenarios",
+      "Configuration endpoints maintain backward compatibility",
+      "Retry logic has maximum attempt limits (3-5 attempts)",
+      "Request loop detection prevents infinite loops"
+    ],
+    "code_review_prompt": "Review client-server integration changes:\n• Are all edge cases tested including NULL value scenarios?\n• Is backward compatibility maintained for configuration endpoint changes?\n• Are termination conditions added for all retry and loop logic (max 3-5 attempts)?\n• Is proper request loop detection and prevention implemented?\n• Is client SDK behavior validated across different failure scenarios?\n• Are API endpoints tested with NULL values and edge cases?"
+  }
+]

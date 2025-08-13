@@ -361,6 +361,401 @@ function calculateQualityScore(maintainabilityIndex, issues) {
   return Math.max(0, Math.min(10, baseScore - penalty));
 }
 
+const rcaLoaderTool = createTool({
+  id: "load-rcas",
+  description: "Load RCA (Root Cause Analysis) documents from a directory of markdown files into memory with pagination support",
+  inputSchema: z.object({
+    directory: z.string().describe("Path to the directory containing RCA markdown files"),
+    pattern: z.string().default("*.md").describe("File pattern to match (default: *.md)"),
+    recursive: z.boolean().default(false).describe("Whether to search subdirectories recursively"),
+    page: z.number().default(1).describe("Page number to load (starting from 1)"),
+    pageSize: z.number().default(5).describe("Number of RCA documents per page"),
+    maxContentLength: z.number().default(5e4).describe("Maximum content length per RCA document (characters)"),
+    includeMetadataOnly: z.boolean().default(false).describe("If true, only return file metadata without content")
+  }),
+  outputSchema: z.object({
+    rcas: z.array(z.object({
+      filename: z.string(),
+      filepath: z.string(),
+      content: z.string().optional(),
+      contentTruncated: z.boolean().optional(),
+      lastModified: z.string(),
+      size: z.number()
+    })),
+    pagination: z.object({
+      currentPage: z.number(),
+      pageSize: z.number(),
+      totalPages: z.number(),
+      totalFiles: z.number(),
+      hasNextPage: z.boolean(),
+      hasPreviousPage: z.boolean()
+    }),
+    summary: z.object({
+      totalFiles: z.number(),
+      totalSize: z.number(),
+      directory: z.string(),
+      loadedAt: z.string(),
+      filesInCurrentPage: z.number()
+    })
+  }),
+  execute: async ({ context }) => {
+    const { directory, recursive, page, pageSize, maxContentLength, includeMetadataOnly } = context;
+    try {
+      const stats = await fs.stat(directory);
+      if (!stats.isDirectory()) {
+        throw new Error(`Path ${directory} is not a directory`);
+      }
+      const rcas = [];
+      const processDirectory = async (dirPath) => {
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dirPath, entry.name);
+          if (entry.isDirectory() && recursive) {
+            await processDirectory(fullPath);
+          } else if (entry.isFile() && entry.name.endsWith(".md")) {
+            try {
+              const fileStats = await fs.stat(fullPath);
+              let content = "";
+              if (!includeMetadataOnly) {
+                content = await fs.readFile(fullPath, "utf-8");
+              }
+              rcas.push({
+                filename: entry.name,
+                filepath: fullPath,
+                content,
+                lastModified: fileStats.mtime,
+                size: fileStats.size
+              });
+            } catch (fileError) {
+              console.warn(`Failed to read file ${fullPath}:`, fileError);
+            }
+          }
+        }
+      };
+      await processDirectory(directory);
+      rcas.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
+      const totalFiles = rcas.length;
+      const totalPages = Math.ceil(totalFiles / pageSize);
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = Math.min(startIndex + pageSize, totalFiles);
+      const paginatedRcas = rcas.slice(startIndex, endIndex);
+      const totalSize = rcas.reduce((sum, rca) => sum + rca.size, 0);
+      return {
+        rcas: paginatedRcas.map((rca) => {
+          let content = rca.content;
+          let contentTruncated = false;
+          if (!includeMetadataOnly && content.length > maxContentLength) {
+            content = content.substring(0, maxContentLength) + "\n\n[Content truncated...]";
+            contentTruncated = true;
+          }
+          return {
+            filename: rca.filename,
+            filepath: rca.filepath,
+            ...includeMetadataOnly ? {} : { content, contentTruncated },
+            lastModified: rca.lastModified.toISOString(),
+            size: rca.size
+          };
+        }),
+        pagination: {
+          currentPage: page,
+          pageSize,
+          totalPages,
+          totalFiles,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1
+        },
+        summary: {
+          totalFiles,
+          totalSize,
+          directory,
+          loadedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          filesInCurrentPage: paginatedRcas.length
+        }
+      };
+    } catch (error) {
+      throw new Error(`Failed to load RCAs from ${directory}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+});
+
+const GuardrailSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  category: z.string(),
+  subcategory: z.string(),
+  description: z.string(),
+  rule: z.object({
+    condition: z.string(),
+    requirement: z.string(),
+    actions: z.array(z.string())
+  }),
+  enforcement: z.object({
+    stages: z.array(z.string()),
+    severity: z.enum(["blocking", "warning"]),
+    automation: z.record(z.string())
+  }),
+  learned_from_rcas: z.array(z.string()),
+  failure_patterns_prevented: z.array(z.string()),
+  validation_criteria: z.array(z.string()),
+  code_review_prompt: z.string().optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional()
+});
+class GuardrailStore {
+  static instance;
+  guardrails = /* @__PURE__ */ new Map();
+  filePath = "";
+  autoSave = false;
+  constructor() {
+  }
+  static getInstance() {
+    if (!GuardrailStore.instance) {
+      GuardrailStore.instance = new GuardrailStore();
+    }
+    return GuardrailStore.instance;
+  }
+  async loadFromFile(filePath, autoSave = false) {
+    this.filePath = filePath;
+    this.autoSave = autoSave;
+    const errors = [];
+    try {
+      const data = await fs.readFile(filePath, "utf-8");
+      const parsedData = JSON.parse(data);
+      const guardrailsArray = Array.isArray(parsedData) ? parsedData : parsedData.guardrails;
+      if (!Array.isArray(guardrailsArray)) {
+        throw new Error('Invalid JSON format: expected array of guardrails or object with "guardrails" array property');
+      }
+      this.guardrails.clear();
+      let loaded = 0;
+      for (const guardrail of guardrailsArray) {
+        try {
+          const validated = GuardrailSchema.parse(guardrail);
+          this.guardrails.set(validated.id, validated);
+          loaded++;
+        } catch (error) {
+          errors.push(`Invalid guardrail ${guardrail.id || "unknown"}: ${error instanceof Error ? error.message : "Unknown error"}`);
+        }
+      }
+      return { loaded, errors };
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        return { loaded: 0, errors: [`File not found: ${filePath}`] };
+      }
+      throw new Error(`Failed to load guardrails: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  async saveToFile() {
+    if (!this.filePath) {
+      throw new Error("No file path set. Load from file first.");
+    }
+    const guardrailsArray = Array.from(this.guardrails.values());
+    const dir = path.dirname(this.filePath);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(this.filePath, JSON.stringify(guardrailsArray, null, 2));
+  }
+  getAll() {
+    return Array.from(this.guardrails.values());
+  }
+  getById(id) {
+    return this.guardrails.get(id);
+  }
+  async add(guardrail) {
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const newGuardrail = {
+      ...guardrail,
+      created_at: now,
+      updated_at: now
+    };
+    this.guardrails.set(newGuardrail.id, newGuardrail);
+    if (this.autoSave) {
+      await this.saveToFile();
+    }
+    return newGuardrail;
+  }
+  async update(id, updates) {
+    const existing = this.guardrails.get(id);
+    if (!existing) {
+      return null;
+    }
+    const updated = {
+      ...existing,
+      ...updates,
+      id: existing.id,
+      created_at: existing.created_at,
+      updated_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    this.guardrails.set(id, updated);
+    if (this.autoSave) {
+      await this.saveToFile();
+    }
+    return updated;
+  }
+  async delete(id) {
+    const deleted = this.guardrails.delete(id);
+    if (deleted && this.autoSave) {
+      await this.saveToFile();
+    }
+    return deleted;
+  }
+  getStats() {
+    const guardrails = this.getAll();
+    const stats = {
+      total: guardrails.length,
+      byCategory: {},
+      bySeverity: {}
+    };
+    for (const guardrail of guardrails) {
+      stats.byCategory[guardrail.category] = (stats.byCategory[guardrail.category] || 0) + 1;
+      stats.bySeverity[guardrail.enforcement.severity] = (stats.bySeverity[guardrail.enforcement.severity] || 0) + 1;
+    }
+    return stats;
+  }
+}
+
+const guardrailLoaderTool = createTool({
+  id: "load-guardrails",
+  description: "Load guardrails from a JSON file into memory with optional auto-save for future changes",
+  inputSchema: z.object({
+    filePath: z.string().describe("Path to the guardrails JSON file"),
+    autoSave: z.boolean().default(true).describe("Automatically save changes to filesystem when guardrails are modified")
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    loaded: z.number(),
+    errors: z.array(z.string()),
+    message: z.string(),
+    stats: z.object({
+      total: z.number(),
+      byCategory: z.record(z.number()),
+      bySeverity: z.record(z.number())
+    })
+  }),
+  execute: async ({ context }) => {
+    const { filePath, autoSave } = context;
+    const store = GuardrailStore.getInstance();
+    try {
+      const result = await store.loadFromFile(filePath, autoSave);
+      const stats = store.getStats();
+      return {
+        success: true,
+        loaded: result.loaded,
+        errors: result.errors,
+        message: `Loaded ${result.loaded} guardrails from ${filePath}${autoSave ? " (auto-save enabled)" : ""}`,
+        stats
+      };
+    } catch (error) {
+      return {
+        success: false,
+        loaded: 0,
+        errors: [error instanceof Error ? error.message : "Unknown error"],
+        message: `Failed to load guardrails from ${filePath}`,
+        stats: { total: 0, byCategory: {}, bySeverity: {} }
+      };
+    }
+  }
+});
+
+const guardrailCrudTool = createTool({
+  id: "crud-guardrails",
+  description: "Perform CRUD operations (Add, Update, Delete) on guardrails in memory",
+  inputSchema: z.object({
+    operation: z.enum(["list", "add", "update", "delete"]).describe("Operation to perform"),
+    guardrailId: z.string().optional().describe("Guardrail ID (required for update/delete operations)"),
+    guardrail: GuardrailSchema.omit({ created_at: true, updated_at: true }).optional().describe("Guardrail data (required for add operation, partial for update)")
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    operation: z.string(),
+    data: z.union([GuardrailSchema, z.array(GuardrailSchema)]).optional(),
+    message: z.string(),
+    stats: z.object({
+      total: z.number(),
+      byCategory: z.record(z.number()),
+      bySeverity: z.record(z.number())
+    })
+  }),
+  execute: async ({ context }) => {
+    const { operation, guardrailId, guardrail } = context;
+    const store = GuardrailStore.getInstance();
+    try {
+      switch (operation) {
+        case "list": {
+          const allGuardrails = store.getAll();
+          return {
+            success: true,
+            operation: "list",
+            data: allGuardrails,
+            message: `Retrieved ${allGuardrails.length} guardrails`,
+            stats: store.getStats()
+          };
+        }
+        case "add": {
+          if (!guardrail) {
+            throw new Error("guardrail data is required for add operation");
+          }
+          const validatedGuardrail = GuardrailSchema.omit({ created_at: true, updated_at: true }).parse(guardrail);
+          if (store.getById(validatedGuardrail.id)) {
+            throw new Error(`Guardrail with ID ${validatedGuardrail.id} already exists`);
+          }
+          const added = await store.add(validatedGuardrail);
+          return {
+            success: true,
+            operation: "add",
+            data: added,
+            message: `Added guardrail ${added.id}`,
+            stats: store.getStats()
+          };
+        }
+        case "update": {
+          if (!guardrailId) {
+            throw new Error("guardrailId is required for update operation");
+          }
+          if (!guardrail) {
+            throw new Error("guardrail data is required for update operation");
+          }
+          const updated = await store.update(guardrailId, guardrail);
+          if (!updated) {
+            return {
+              success: false,
+              operation: "update",
+              message: `Guardrail ${guardrailId} not found`,
+              stats: store.getStats()
+            };
+          }
+          return {
+            success: true,
+            operation: "update",
+            data: updated,
+            message: `Updated guardrail ${guardrailId}`,
+            stats: store.getStats()
+          };
+        }
+        case "delete": {
+          if (!guardrailId) {
+            throw new Error("guardrailId is required for delete operation");
+          }
+          const deleted = await store.delete(guardrailId);
+          return {
+            success: deleted,
+            operation: "delete",
+            message: deleted ? `Deleted guardrail ${guardrailId}` : `Guardrail ${guardrailId} not found`,
+            stats: store.getStats()
+          };
+        }
+        default:
+          throw new Error(`Unknown operation: ${operation}`);
+      }
+    } catch (error) {
+      return {
+        success: false,
+        operation,
+        message: `Operation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        stats: store.getStats()
+      };
+    }
+  }
+});
+
 z.object({
   llmProvider: z.enum(["openai", "google", "anthropic"]).default("google"),
   apiKey: z.string().optional(),
@@ -381,7 +776,10 @@ const accelosGoogleAgent = new Agent({
   tools: {
     fileAnalyzer: fileAnalyzerTool,
     webSearch: webSearchTool,
-    codeAnalysis: codeAnalysisTool
+    codeAnalysis: codeAnalysisTool,
+    rcaLoader: rcaLoaderTool,
+    guardrailLoader: guardrailLoaderTool,
+    guardrailCrud: guardrailCrudTool
   }
 });
 const accelosOpenAIAgent = new Agent({
@@ -391,7 +789,10 @@ const accelosOpenAIAgent = new Agent({
   tools: {
     fileAnalyzer: fileAnalyzerTool,
     webSearch: webSearchTool,
-    codeAnalysis: codeAnalysisTool
+    codeAnalysis: codeAnalysisTool,
+    rcaLoader: rcaLoaderTool,
+    guardrailLoader: guardrailLoaderTool,
+    guardrailCrud: guardrailCrudTool
   }
 });
 const accelosAnthropicAgent = new Agent({
@@ -401,14 +802,398 @@ const accelosAnthropicAgent = new Agent({
   tools: {
     fileAnalyzer: fileAnalyzerTool,
     webSearch: webSearchTool,
-    codeAnalysis: codeAnalysisTool
+    codeAnalysis: codeAnalysisTool,
+    rcaLoader: rcaLoaderTool,
+    guardrailLoader: guardrailLoaderTool,
+    guardrailCrud: guardrailCrudTool
+  }
+});
+const productionReadinessAgent = new Agent({
+  name: "production-readiness-agent",
+  instructions: `# LLM System Prompt: PR Guardrails Review Generation
+
+## Role and Context
+
+You are an expert software engineering reviewer tasked with analyzing Pull Requests against established guardrails. Your goal is to create concise, actionable reviews that identify risks and compliance issues without redundancy or verbosity.
+
+## Core Principles
+
+1. **Concise Over Comprehensive**: Less is more - focus on essential findings only
+2. **Actionable Insights**: Every point should lead to a specific action
+3. **Risk-Focused**: Prioritize high-impact issues over minor concerns
+4. **Evidence-Based**: Ground assessments in actual code changes and guardrail requirements
+5. **No Redundancy**: Avoid repeating similar points or boilerplate content
+
+## Review Template Structure
+
+Use this exact template for each PR analysis:
+
+\`\`\`markdown
+# PR #{number} Guardrails Review: "{title}"
+
+**PR Link**: https://github.com/PostHog/posthog/pull/{number}
+**Author**: {author} | **Merged**: {merge_date} | **Risk Level**: {Low/Medium/High}
+
+## Changes Summary
+{1-2 sentences describing what changed}
+
+## Guardrails Analysis
+
+### {Applicable guardrails - only list those that apply}
+{For each applicable guardrail, provide brief status and key findings}
+
+### No Applicable Guardrails
+{If no guardrails apply, state this clearly with brief reasoning}
+
+## Issues Found
+{Only list actual issues - omit this section if none found}
+
+- **{Issue Type}**: {Specific problem and impact}
+- **{Issue Type}**: {Specific problem and impact}
+
+## Required Actions
+{Only if blocking issues exist}
+
+- [ ] {Specific action required}
+- [ ] {Specific action required}
+
+## Recommendations
+{Only high-value suggestions - omit if none}
+
+- {Actionable recommendation}
+- {Actionable recommendation}
+
+## Status
+{Choose one}
+\u2705 **APPROVED** - No issues identified
+\u26A0\uFE0F **CONDITIONAL APPROVAL** - Address recommendations before production
+\u274C **BLOCKED** - Required actions must be completed
+\`\`\`
+
+## Guardrail Application Rules
+
+### Only Apply Guardrails If:
+- **Code changes directly affect the guardrail domain**
+- **Risk is material and addressable**
+- **Guardrail requirements are specific and measurable**
+
+### Skip Guardrails If:
+- Changes are purely cosmetic (comments, formatting)
+- Frontend-only changes with no backend impact
+- Risk is theoretical without practical impact
+- Guardrail requirements don't apply to the change type
+
+## Content Guidelines
+
+### What to Include:
+- **Specific code changes** that trigger guardrail concerns
+- **Measurable risks** with clear impact
+- **Actionable recommendations** with implementation guidance
+- **Compliance status** based on actual evidence
+
+### What to Omit:
+- Generic security/performance advice not related to specific changes
+- Theoretical risks without practical impact
+- Boilerplate explanations of what guardrails are
+- Redundant safety recommendations
+- Detailed code explanations unless directly relevant to compliance
+
+## Risk Assessment Guidelines
+
+### Low Risk:
+- UI/cosmetic changes
+- Documentation updates
+- Feature flag removals for stable features
+- Minor configuration tweaks
+
+### Medium Risk:
+- Database query modifications
+- Error handling improvements
+- External dependency updates
+- Configuration changes affecting performance
+
+### High Risk:
+- Infrastructure component upgrades
+- Architectural refactoring
+- Authentication system changes
+- Critical path performance modifications
+
+## Writing Style
+
+### Do:
+- Use bullet points for clarity
+- Start with the most critical issues
+- Be specific about required actions
+- Use clear status indicators (\u2705\u26A0\uFE0F\u274C)
+- Reference specific guardrail IDs (e.g., GR-001)
+
+### Don't:
+- Write lengthy explanations
+- Repeat guardrail definitions
+- Include obvious or generic advice
+- Use uncertain language ("might", "could", "possibly")
+- Add congratulatory comments
+
+## Quality Checklist
+
+Before finalizing each review, verify:
+
+1. \u2705 All applicable guardrails identified (not more, not less)
+2. \u2705 Issues are specific and actionable
+3. \u2705 Risk level matches actual impact
+4. \u2705 No redundant recommendations
+5. \u2705 Status clearly indicates next steps
+6. \u2705 Review is under 200 words (excluding template structure)
+7. \u2705 PR link is correctly formatted
+8. \u2705 Focus is on essential findings only
+
+## Summary Analysis Template
+
+After completing individual reviews, create a summary using this template:
+
+\`\`\`markdown
+# PR Review Summary Analysis
+
+**Review Period**: {date_range}
+**PRs Analyzed**: {count}
+**Repository**: PostHog/posthog
+
+## Risk Distribution
+- **Low Risk**: {count} PRs ({percentage}%)
+- **Medium Risk**: {count} PRs ({percentage}%)  
+- **High Risk**: {count} PRs ({percentage}%)
+
+## Compliance Status
+- **Approved**: {count} PRs
+- **Conditional**: {count} PRs
+- **Blocked**: {count} PRs
+
+## Key Findings
+
+### Critical Issues
+{Only list blocking issues that require immediate action}
+
+### Most Triggered Guardrails
+{List top 3-4 most commonly applicable guardrails}
+
+### Recommendations
+{Top 3 process improvements based on patterns observed}
+
+## Action Items
+- [ ] {High-priority action}
+- [ ] {High-priority action}
+
+**Overall Assessment**: {1-2 sentences on review effectiveness and development team patterns}
+\`\`\`
+
+## Example Output Length
+
+Target review length: **100-150 words per PR** (excluding template structure)
+Target summary length: **200-300 words**
+
+## Success Criteria
+
+A successful review should:
+- Identify all material compliance issues
+- Provide clear next steps
+- Be readable in under 60 seconds
+- Lead to actionable improvements
+- Avoid information the reviewer already knows
+
+Remember: Your goal is to add value through focused analysis, not to demonstrate comprehensive knowledge. Every word should serve the purpose of improving software quality and preventing production issues.`,
+  model: openai("gpt-4o"),
+  tools: {
+    fileAnalyzer: fileAnalyzerTool,
+    webSearch: webSearchTool,
+    codeAnalysis: codeAnalysisTool,
+    rcaLoader: rcaLoaderTool,
+    guardrailLoader: guardrailLoaderTool,
+    guardrailCrud: guardrailCrudTool
+  }
+});
+const guardrailAgent = new Agent({
+  name: "guardrail-agent",
+  instructions: `# LLM System Prompt: Guardrail Generation from RCA Documents
+
+## Role and Context
+
+You are an expert system reliability engineer tasked with generating precise, actionable guardrails from Root Cause Analysis (RCA) documents. Your goal is to create guardrails that prevent recurring failures by encoding lessons learned into enforceable rules across the software development lifecycle (SDLC).
+
+## Guardrail Creation Guidelines
+
+### Core Principles
+
+1. **Prescriptive & Specific**: Include exact thresholds, percentages, and measurable criteria
+2. **Actionable**: Each action must be implementable with clear steps
+3. **Precise Stage Targeting**: Only include SDLC stages where the guardrail is absolutely applicable and enforceable
+4. **Evidence-Based**: Ground all recommendations in specific failure patterns from RCAs
+5. **Consolidation**: Group similar failure patterns from multiple RCAs under unified guardrails
+
+### Required JSON Structure
+
+\`\`\`json
+{
+  "id": "GR-XXX",
+  "title": "Concise, descriptive title",
+  "category": "primary_category", 
+  "subcategory": "specific_subcategory",
+  "description": "One-sentence description of what this guardrail ensures",
+  "rule": {
+    "condition": "When [specific trigger scenario]",
+    "requirement": "MUST [specific requirement]",
+    "actions": [
+      "Specific action 1 with measurable criteria",
+      "Specific action 2 with exact thresholds",
+      "Specific action 3 with implementation details"
+    ]
+  },
+  "enforcement": {
+    "stages": ["only_truly_applicable_stages"],
+    "severity": "blocking|warning",
+    "automation": {
+      "stage_specific_checks": "What can be automatically validated at each stage"
+    }
+  },
+  "learned_from_rcas": [
+    "List of source RCA documents"
+  ],
+  "failure_patterns_prevented": [
+    "Specific failure patterns this guardrail prevents"
+  ],
+  "validation_criteria": [
+    "Measurable success criteria for compliance"
+  ]
+}
+\`\`\`
+
+## SDLC Stage Applicability Rules
+
+**Only include stages where the guardrail is absolutely applicable:**
+
+### code_review
+- \u2705 Include if: Application code logic, API endpoints, authentication logic, query code, error handling patterns, database migrations
+- \u274C Exclude if: Infrastructure configuration, monitoring setup, deployment procedures, network configuration
+
+### ci_cd  
+- \u2705 Include if: Configuration validation, automated testing, pattern detection possible
+- \u274C Exclude if: Requires runtime data, production metrics, or manual validation
+
+### post_deployment
+- \u2705 Include if: Deployment-time validation, configuration application, rollout procedures
+- \u274C Exclude if: Pure runtime concerns, code logic validation
+
+### runtime
+- \u2705 Include if: Live monitoring, performance governance, resource utilization, alert thresholds
+- \u274C Exclude if: Pre-deployment concerns, code logic validation
+
+## Category Guidelines
+
+### Primary Categories
+- \`configuration_management\`: Resource limits, timeout settings, parameter tuning
+- \`capacity_planning\`: Query optimization, scaling, performance management  
+- \`database_performance\`: Schema changes, query governance, parts management
+- \`deployment_safety\`: Authentication, testing validation, rollback procedures
+- \`monitoring_alerting\`: Proactive monitoring, performance baselines
+- \`service_reliability\`: Error handling, circuit breakers, retry patterns
+- \`external_dependencies\`: Failover mechanisms, graceful degradation
+- \`data_processing\`: Pipeline health, resource management, silent failure detection
+- \`database_operations\`: Schema management, maintenance safety
+- \`performance_management\`: Resource governance, query optimization
+- \`infrastructure_management\`: Network configuration, load balancing
+- \`integration_safety\`: Client-server communication, backward compatibility
+
+## Specific Requirements by Category
+
+### Configuration Management
+- Always include exact thresholds (e.g., "1.5x peak usage", "95th percentile + 50%")
+- Specify measurement criteria and validation methods
+- Include safety margins and headroom calculations
+
+### Performance & Query Management  
+- Include specific memory limits (e.g., "2GB dashboard, 4GB analytical")
+- Define complexity scoring and routing criteria
+- Specify timeout requirements for different operation types
+
+### Safety & Reliability
+- Include test coverage requirements (e.g., ">95% edge case coverage")
+- Specify deployment strategies (e.g., "canary deployment with 1% traffic")
+- Define rollback and recovery procedures
+
+### Monitoring & Alerting
+- Use 80% utilization thresholds (not 95%+)
+- Include predictive alerting requirements
+- Specify early warning timeframes (e.g., "24-48 hours before impact")
+
+## Code Review Prompt Guidelines
+
+**Only include if guardrail has "code_review" in enforcement stages**
+
+Format as bullet-point checklist:
+- Start each item with "\u2022"
+- Ask specific, measurable questions
+- Reference exact thresholds from the rule
+- Include negative patterns to avoid (learned from RCAs)
+- Keep focused on reviewable code elements
+
+Example:
+
+## Common Anti-Patterns to Avoid
+
+\u274C **Vague Requirements**: "Ensure good performance" \u2192 \u2705 "Set per-query memory limits (2GB dashboard, 4GB analytical)"
+
+\u274C **Broad Stage Application**: Including all stages \u2192 \u2705 Only stages where absolutely applicable
+
+\u274C **Generic Actions**: "Monitor the system" \u2192 \u2705 "Monitor parts count with alerting at 750 parts per table"
+
+\u274C **Missing Thresholds**: "Set appropriate limits" \u2192 \u2705 "Memory limits >= 1.5x peak observed usage"
+
+\u274C **Unmeasurable Criteria**: "Good test coverage" \u2192 \u2705 "Edge case test coverage exceeds 95%"
+
+## Quality Checklist
+
+Before finalizing each guardrail, verify:
+
+1. \u2705 All actions include specific, measurable criteria
+2. \u2705 Stages are precisely targeted to where enforcement is possible
+3. \u2705 Automation describes what can actually be validated at each stage
+4. \u2705 Failure patterns directly link to RCA root causes
+5. \u2705 Validation criteria are measurable and testable
+6. \u2705 Code review prompt only included if "code_review" stage present
+7. \u2705 Requirements use "MUST" for mandatory items, specific numbers/percentages
+8. \u2705 Category and subcategory accurately reflect the guardrail's focus
+
+## Example Analysis Process
+
+When analyzing an RCA:
+
+1. **Extract Root Cause**: "RDS Proxy configured with 100 connections vs actual 300+ requirement"
+2. **Identify Pattern**: "Connection pool saturation during traffic bursts" 
+3. **Define Requirement**: "MUST size connection pools for peak traffic + 25% headroom"
+4. **Specify Actions**: "Size connection pools for peak load + 25% headroom minimum"
+5. **Determine Stages**: ci_cd (config validation), deployment (deployment gates), runtime (monitoring)
+6. **Create Automation**: What can be automatically checked at each stage
+7. **Set Validation**: "Connection pools sized for peak load + 25% headroom"
+
+## Output Format
+
+Generate a single JSON object following the exact structure above. Ensure all fields are populated and requirements are specific, measurable, and directly tied to the RCA failure patterns provided.`,
+  model: openai("gpt-4o"),
+  tools: {
+    fileAnalyzer: fileAnalyzerTool,
+    webSearch: webSearchTool,
+    codeAnalysis: codeAnalysisTool,
+    rcaLoader: rcaLoaderTool,
+    guardrailLoader: guardrailLoaderTool,
+    guardrailCrud: guardrailCrudTool
   }
 });
 const mastra = new Mastra({
   agents: {
     "accelos-google": accelosGoogleAgent,
     "accelos-openai": accelosOpenAIAgent,
-    "accelos-anthropic": accelosAnthropicAgent
+    "accelos-anthropic": accelosAnthropicAgent,
+    "guardrail-agent": guardrailAgent,
+    "production-readiness-agent": productionReadinessAgent
   },
   logger: new PinoLogger({
     name: "Mastra",
