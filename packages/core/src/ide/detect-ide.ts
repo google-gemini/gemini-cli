@@ -22,9 +22,13 @@ export interface IdeInfo {
 export function getIdeInfo(ide: DetectedIde): IdeInfo {
   switch (ide) {
     case DetectedIde.Devin:
-      return 'Devin';
+      return {
+        displayName: 'Devin',
+      };
     case DetectedIde.Replit:
-      return 'Replit';
+      return {
+        displayName: 'Replit',
+      };
     case DetectedIde.VSCode:
       return {
         displayName: 'VS Code',
