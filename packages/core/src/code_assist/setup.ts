@@ -33,32 +33,58 @@ export interface UserData {
  * @returns the user's actual project id
  */
 export async function setupUser(client: OAuth2Client): Promise<UserData> {
-  let projectId = process.env.GOOGLE_CLOUD_PROJECT || undefined;
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT || undefined;
   const caServer = new CodeAssistServer(client, projectId, {}, '', undefined);
-
-  const clientMetadata: ClientMetadata = {
+  const coreClientMetadata: ClientMetadata = {
     ideType: 'IDE_UNSPECIFIED',
     platform: 'PLATFORM_UNSPECIFIED',
     pluginType: 'GEMINI',
-    duetProject: projectId,
   };
 
   const loadRes = await caServer.loadCodeAssist({
     cloudaicompanionProject: projectId,
-    metadata: clientMetadata,
+    metadata: {
+      ...coreClientMetadata,
+      duetProject: projectId,
+    },
   });
 
-  if (!projectId && loadRes.cloudaicompanionProject) {
-    projectId = loadRes.cloudaicompanionProject;
+  if (loadRes.currentTier) {
+    if (!loadRes.cloudaicompanionProject) {
+      if (projectId) {
+        return {
+          projectId,
+          userTier: loadRes.currentTier.id,
+        };
+      }
+      throw new ProjectIdRequiredError();
+    }
+    return {
+      projectId: loadRes.cloudaicompanionProject,
+      userTier: loadRes.currentTier.id,
+    };
   }
 
   const tier = getOnboardTier(loadRes);
 
-  const onboardReq: OnboardUserRequest = {
-    tierId: tier.id,
-    cloudaicompanionProject: projectId,
-    metadata: clientMetadata,
-  };
+  let onboardReq: OnboardUserRequest;
+  if (tier.id === UserTierId.FREE) {
+    // The free tier uses a managed google cloud project. Setting a project in the `onboardUser` request causes a `Precondition Failed` error.
+    onboardReq = {
+      tierId: tier.id,
+      cloudaicompanionProject: undefined,
+      metadata: coreClientMetadata,
+    };
+  } else {
+    onboardReq = {
+      tierId: tier.id,
+      cloudaicompanionProject: projectId,
+      metadata: {
+        ...coreClientMetadata,
+        duetProject: projectId,
+      },
+    };
+  }
 
   // Poll onboardUser until long running operation is complete.
   let lroRes = await caServer.onboardUser(onboardReq);
@@ -67,20 +93,23 @@ export async function setupUser(client: OAuth2Client): Promise<UserData> {
     lroRes = await caServer.onboardUser(onboardReq);
   }
 
-  if (!lroRes.response?.cloudaicompanionProject?.id && !projectId) {
+  if (!lroRes.response?.cloudaicompanionProject?.id) {
+    if (projectId) {
+      return {
+        projectId,
+        userTier: tier.id,
+      };
+    }
     throw new ProjectIdRequiredError();
   }
 
   return {
-    projectId: lroRes.response?.cloudaicompanionProject?.id || projectId!,
+    projectId: lroRes.response.cloudaicompanionProject.id,
     userTier: tier.id,
   };
 }
 
 function getOnboardTier(res: LoadCodeAssistResponse): GeminiUserTier {
-  if (res.currentTier) {
-    return res.currentTier;
-  }
   for (const tier of res.allowedTiers || []) {
     if (tier.isDefault) {
       return tier;
