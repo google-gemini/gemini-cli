@@ -126,6 +126,13 @@ export class LoadedSettings {
         ...(user.includeDirectories || []),
         ...(workspace.includeDirectories || []),
       ],
+      extensions: {
+        disabled: [
+          ...(system.extensions?.disabled || []),
+          ...(user.extensions?.disabled || []),
+          ...(workspace.extensions?.disabled || []),
+        ],
+      },
       chatCompression: {
         ...(system.chatCompression || {}),
         ...(user.chatCompression || {}),
