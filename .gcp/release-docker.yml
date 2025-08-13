@@ -22,8 +22,8 @@ steps:
     id: 'Determine Docker Image Tag'
     entrypoint: 'bash'
     args:
-      - -c
-      - |
+      - '-c'
+      - |-
         SHELL_TAG_NAME="$TAG_NAME"
         FINAL_TAG="$SHORT_SHA" # Default to SHA
         if [[ "$$SHELL_TAG_NAME" == *"-nightly"* ]]; then
@@ -44,8 +44,8 @@ steps:
     id: 'Build sandbox Docker image'
     entrypoint: 'bash'
     args:
-      - -c
-      - |
+      - '-c'
+      - |-
         export GEMINI_SANDBOX_IMAGE_TAG=$$(cat /workspace/image_tag.txt)
         echo "Using Docker image tag for build: $$GEMINI_SANDBOX_IMAGE_TAG"
         npm run build:sandbox -- --output-file /workspace/final_image_uri.txt
@@ -57,8 +57,8 @@ steps:
     id: 'Publish sandbox Docker image'
     entrypoint: 'bash'
     args:
-      - -c
-      - |
+      - '-c'
+      - |-
         set -e
         FINAL_IMAGE_URI=$$(cat /workspace/final_image_uri.txt)
 
@@ -68,7 +68,7 @@ steps:
       - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
 
 options:
-  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
+  defaultLogsBucketBehavior: 'REGIONAL_USER_OWNED_BUCKET'
   dynamicSubstitutions: true
 
 substitutions:
