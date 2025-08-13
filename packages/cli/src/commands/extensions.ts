@@ -6,6 +6,8 @@
 
 import type { CommandModule, Argv } from 'yargs';
 import { listCommand } from './extensions/list.js';
+import { enableCommand } from './extensions/enable.js';
+import { disableCommand } from './extensions/disable.js';
 
 export const extensionsCommand: CommandModule = {
   command: 'extensions',
@@ -13,6 +15,8 @@ export const extensionsCommand: CommandModule = {
   builder: (yargs: Argv) =>
     yargs
       .command(listCommand)
+      .command(enableCommand)
+      .command(disableCommand)
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {
