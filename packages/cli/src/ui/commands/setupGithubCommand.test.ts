@@ -4,63 +4,103 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+
 import { vi, describe, expect, it, afterEach, beforeEach } from 'vitest';
-import * as child_process from 'child_process';
+import * as gitUtils from '../../utils/gitUtils.js';
 import { setupGithubCommand } from './setupGithubCommand.js';
 import { CommandContext, ToolActionReturn } from './types.js';
+import * as commandUtils from '../utils/commandUtils.js';
 
 vi.mock('child_process');
 
-describe('setupGithubCommand', () => {
-  beforeEach(() => {
+// Mock fetch globally
+global.fetch = vi.fn();
+
+vi.mock('../../utils/gitUtils.js', () => ({
+  isGitHubRepository: vi.fn(),
+  getGitRepoRoot: vi.fn(),
+  getLatestGitHubRelease: vi.fn(),
+  getGitHubRepoInfo: vi.fn(),
+}));
+
+vi.mock('../utils/commandUtils.js', () => ({
+  getUrlOpenCommand: vi.fn(),
+}));
+
+describe('setupGithubCommand', async () => {
+  let scratchDir = '';
+
+  beforeEach(async () => {
     vi.resetAllMocks();
+    scratchDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'setup-github-command-'),
+    );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
+    if (scratchDir) await fs.rm(scratchDir, { recursive: true });
   });
 
-  it('returns a tool action to download github workflows and handles paths', () => {
-    const fakeRepoRoot = '/github.com/fake/repo/root';
-    vi.mocked(child_process.execSync).mockReturnValue(fakeRepoRoot);
+  it('returns a tool action to download github workflows and handles paths', async () => {
+    const fakeRepoOwner = 'fake';
+    const fakeRepoName = 'repo';
+    const fakeRepoRoot = scratchDir;
+    const fakeReleaseVersion = 'v1.2.3';
 
-    const result = setupGithubCommand.action?.(
+    const workflows = [
+      'gemini-cli.yml',
+      'gemini-issue-automated-triage.yml',
+      'gemini-issue-scheduled-triage.yml',
+      'gemini-pr-review.yml',
+    ];
+    for (const workflow of workflows) {
+      vi.mocked(global.fetch).mockReturnValueOnce(
+        Promise.resolve(new Response(workflow)),
+      );
+    }
+
+    vi.mocked(gitUtils.isGitHubRepository).mockReturnValueOnce(true);
+    vi.mocked(gitUtils.getGitRepoRoot).mockReturnValueOnce(fakeRepoRoot);
+    vi.mocked(gitUtils.getLatestGitHubRelease).mockResolvedValueOnce(
+      fakeReleaseVersion,
+    );
+    vi.mocked(gitUtils.getGitHubRepoInfo).mockReturnValue({
+      owner: fakeRepoOwner,
+      repo: fakeRepoName,
+    });
+    vi.mocked(commandUtils.getUrlOpenCommand).mockReturnValueOnce(
+      'fakeOpenCommand',
+    );
+
+    const result = (await setupGithubCommand.action?.(
       {} as CommandContext,
       '',
-    ) as ToolActionReturn;
-
-    expect(result.type).toBe('tool');
-    expect(result.toolName).toBe('run_shell_command');
-    expect(child_process.execSync).toHaveBeenCalledWith(
-      'git rev-parse --show-toplevel',
-      {
-        encoding: 'utf-8',
-      },
-    );
-    expect(child_process.execSync).toHaveBeenCalledWith('git remote -v', {
-      encoding: 'utf-8',
-    });
+    )) as ToolActionReturn;
 
     const { command } = result.toolArgs;
 
     const expectedSubstrings = [
-      `mkdir -p "${fakeRepoRoot}/.github/workflows"`,
-      `curl -fsSL -o "${fakeRepoRoot}/.github/workflows/gemini-cli.yml"`,
-      `curl -fsSL -o "${fakeRepoRoot}/.github/workflows/gemini-issue-automated-triage.yml"`,
-      `curl -fsSL -o "${fakeRepoRoot}/.github/workflows/gemini-issue-scheduled-triage.yml"`,
-      `curl -fsSL -o "${fakeRepoRoot}/.github/workflows/gemini-pr-review.yml"`,
-      'https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/tags/v0/examples/workflows/',
+      `set -eEuo pipefail`,
+      `fakeOpenCommand "https://github.com/google-github-actions/run-gemini-cli`,
     ];
 
     for (const substring of expectedSubstrings) {
       expect(command).toContain(substring);
     }
-  });
 
-  it('throws an error if git root cannot be determined', () => {
-    vi.mocked(child_process.execSync).mockReturnValue('');
-    expect(() => {
-      setupGithubCommand.action?.({} as CommandContext, '');
-    }).toThrow('Unable to determine the Git root directory.');
+    for (const workflow of workflows) {
+      const workflowFile = path.join(
+        scratchDir,
+        '.github',
+        'workflows',
+        workflow,
+      );
+      const contents = await fs.readFile(workflowFile, 'utf8');
+      expect(contents).toContain(workflow);
+    }
   });
 });

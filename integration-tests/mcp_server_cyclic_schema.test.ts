@@ -5,19 +5,14 @@
  */
 
 /**
- * This test verifies MCP (Model Context Protocol) server integration.
- * It uses a minimal MCP server implementation that doesn't require
- * external dependencies, making it compatible with Docker sandbox mode.
+ * This test verifies we can match maximum schema depth errors from Gemini
+ * and then detect and warn about the potential tools that caused the error.
  */
 
-import { test, describe, before } from 'node:test';
-import { strict as assert } from 'node:assert';
-import { TestRig, validateModelOutput } from './test-helper.js';
+import { describe, it, beforeAll, expect } from 'vitest';
+import { TestRig } from './test-helper.js';
 import { join } from 'path';
-import { fileURLToPath } from 'url';
 import { writeFileSync } from 'fs';
-
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // Create a minimal MCP server that doesn't require external dependencies
 // This implements the MCP protocol directly using Node.js built-ins
@@ -50,7 +45,7 @@ class SimpleJSONRPC {
       output: process.stdout,
       terminal: false
     });
-    
+
     this.rl.on('line', (line) => {
       debug(\`Received line: \${line}\`);
       try {
@@ -62,13 +57,13 @@ class SimpleJSONRPC {
       }
     });
   }
-  
+
   send(message) {
     const msgStr = JSON.stringify(message);
     debug(\`Sending message: \${msgStr}\`);
     process.stdout.write(msgStr + '\\n');
   }
-  
+
   async handleMessage(message) {
     if (message.method && this.handlers.has(message.method)) {
       try {
@@ -103,7 +98,7 @@ class SimpleJSONRPC {
       });
     }
   }
-  
+
   on(method, handler) {
     this.handlers.set(method, handler);
   }
@@ -121,7 +116,7 @@ rpc.on('initialize', async (params) => {
       tools: {}
     },
     serverInfo: {
-      name: 'addition-server',
+      name: 'cyclic-schema-server',
       version: '1.0.0'
     }
   };
@@ -132,33 +127,23 @@ rpc.on('tools/list', async () => {
   debug('Handling tools/list request');
   return {
     tools: [{
-      name: 'add',
-      description: 'Add two numbers',
+      name: 'tool_with_cyclic_schema',
       inputSchema: {
         type: 'object',
         properties: {
-          a: { type: 'number', description: 'First number' },
-          b: { type: 'number', description: 'Second number' }
+          data: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                child: { $ref: '#/properties/data/items' },
+              },
+            },
+          },
         },
-        required: ['a', 'b']
       }
     }]
   };
-});
-
-// Handle tools/call
-rpc.on('tools/call', async (params) => {
-  debug(\`Handling tools/call request for tool: \${params.name}\`);
-  if (params.name === 'add') {
-    const { a, b } = params.arguments;
-    return {
-      content: [{
-        type: 'text',
-        text: String(a + b)
-      }]
-    };
-  }
-  throw new Error('Unknown tool: ' + params.name);
 });
 
 // Send initialization notification
@@ -168,15 +153,15 @@ rpc.send({
 });
 `;
 
-describe('simple-mcp-server', () => {
+describe('mcp server with cyclic tool schema is detected', () => {
   const rig = new TestRig();
 
-  before(async () => {
+  beforeAll(async () => {
     // Setup test directory with MCP server configuration
-    await rig.setup('simple-mcp-server', {
+    await rig.setup('cyclic-schema-mcp-server', {
       settings: {
         mcpServers: {
-          'addition-server': {
+          'cyclic-schema-server': {
             command: 'node',
             args: ['mcp-server.cjs'],
           },
@@ -185,7 +170,7 @@ describe('simple-mcp-server', () => {
     });
 
     // Create server script in the test directory
-    const testServerPath = join(rig.testDir, 'mcp-server.cjs');
+    const testServerPath = join(rig.testDir!, 'mcp-server.cjs');
     writeFileSync(testServerPath, serverScript);
 
     // Make the script executable (though running with 'node' should work anyway)
@@ -195,17 +180,15 @@ describe('simple-mcp-server', () => {
     }
   });
 
-  test('should add two numbers', async () => {
-    // Test directory is already set up in before hook
-    // Just run the command - MCP server config is in settings.json
-    const output = await rig.run('add 5 and 10');
+  it('should error and suggest disabling the cyclic tool', async () => {
+    // Just run any command to trigger the schema depth error.
+    // If this test starts failing, check `isSchemaDepthError` from
+    // geminiChat.ts to see if it needs to be updated.
+    // Or, possibly it could mean that gemini has fixed the issue.
+    const output = await rig.run('hello');
 
-    const foundToolCall = await rig.waitForToolCall('add');
-
-    assert.ok(foundToolCall, 'Expected to find an add tool call');
-
-    // Validate model output - will throw if no output, fail if missing expected content
-    validateModelOutput(output, '15', 'MCP server test');
-    assert.ok(output.includes('15'), 'Expected output to contain the sum (15)');
+    expect(output).toMatch(
+      /Skipping tool 'tool_with_cyclic_schema' from MCP server 'cyclic-schema-server' because it has missing types in its parameter schema/,
+    );
   });
 });

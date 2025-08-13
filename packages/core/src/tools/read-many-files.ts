@@ -16,7 +16,7 @@ import {
   DEFAULT_ENCODING,
   getSpecificMimeType,
 } from '../utils/fileUtils.js';
-import { PartListUnion, Schema, Type } from '@google/genai';
+import { PartListUnion } from '@google/genai';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
 import {
   recordFileOperationMetric,
@@ -150,47 +150,47 @@ export class ReadManyFilesTool extends BaseTool<
   static readonly Name: string = 'read_many_files';
 
   constructor(private config: Config) {
-    const parameterSchema: Schema = {
-      type: Type.OBJECT,
+    const parameterSchema = {
+      type: 'object',
       properties: {
         paths: {
-          type: Type.ARRAY,
+          type: 'array',
           items: {
-            type: Type.STRING,
-            minLength: '1',
+            type: 'string',
+            minLength: 1,
           },
-          minItems: '1',
+          minItems: 1,
           description:
             "Required. An array of glob patterns or paths relative to the tool's target directory. Examples: ['src/**/*.ts'], ['README.md', 'docs/']",
         },
         include: {
-          type: Type.ARRAY,
+          type: 'array',
           items: {
-            type: Type.STRING,
-            minLength: '1',
+            type: 'string',
+            minLength: 1,
           },
           description:
             'Optional. Additional glob patterns to include. These are merged with `paths`. Example: ["*.test.ts"] to specifically add test files if they were broadly excluded.',
           default: [],
         },
         exclude: {
-          type: Type.ARRAY,
+          type: 'array',
           items: {
-            type: Type.STRING,
-            minLength: '1',
+            type: 'string',
+            minLength: 1,
           },
           description:
             'Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: ["**/*.log", "temp/"]',
           default: [],
         },
         recursive: {
-          type: Type.BOOLEAN,
+          type: 'boolean',
           description:
             'Optional. Whether to search recursively (primarily controlled by `**` in glob patterns). Defaults to true.',
           default: true,
         },
         useDefaultExcludes: {
-          type: Type.BOOLEAN,
+          type: 'boolean',
           description:
             'Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.',
           default: true,
@@ -198,17 +198,17 @@ export class ReadManyFilesTool extends BaseTool<
         file_filtering_options: {
           description:
             'Whether to respect ignore patterns from .gitignore or .geminiignore',
-          type: Type.OBJECT,
+          type: 'object',
           properties: {
             respect_git_ignore: {
               description:
                 'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
-              type: Type.BOOLEAN,
+              type: 'boolean',
             },
             respect_gemini_ignore: {
               description:
                 'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
-              type: Type.BOOLEAN,
+              type: 'boolean',
             },
           },
         },
@@ -235,7 +235,10 @@ Use this tool when the user's query implies needing the content of several files
   }
 
   validateParams(params: ReadManyFilesParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
     if (errors) {
       return errors;
     }
@@ -524,11 +527,15 @@ Use this tool when the user's query implies needing the content of several files
               '{filePath}',
               filePath,
             );
-            contentParts.push(
-              `${separator}\n\n${fileReadResult.llmContent}\n\n`,
-            );
+            let fileContentForLlm = '';
+            if (fileReadResult.isTruncated) {
+              fileContentForLlm += `[WARNING: This file was truncated. To view the full content, use the 'read_file' tool on this specific file.]\n\n`;
+            }
+            fileContentForLlm += fileReadResult.llmContent;
+            contentParts.push(`${separator}\n\n${fileContentForLlm}\n\n`);
           } else {
-            contentParts.push(fileReadResult.llmContent); // This is a Part for image/pdf
+            // This is a Part for image/pdf, which we don't add the separator to.
+            contentParts.push(fileReadResult.llmContent);
           }
 
           processedFilesRelativePaths.push(relativePathForDisplay);

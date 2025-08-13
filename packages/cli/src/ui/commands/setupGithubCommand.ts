@@ -4,32 +4,93 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'path';
-import { execSync } from 'child_process';
-import { isGitHubRepository } from '../../utils/gitUtils.js';
+import path from 'node:path';
+import * as fs from 'node:fs';
+import { Writable } from 'node:stream';
+import { ProxyAgent } from 'undici';
+
+import { CommandContext } from '../../ui/commands/types.js';
+import {
+  getGitRepoRoot,
+  getLatestGitHubRelease,
+  isGitHubRepository,
+  getGitHubRepoInfo,
+} from '../../utils/gitUtils.js';
 
 import {
   CommandKind,
   SlashCommand,
   SlashCommandActionReturn,
 } from './types.js';
+import { getUrlOpenCommand } from '../../ui/utils/commandUtils.js';
+
+// Generate OS-specific commands to open the GitHub pages needed for setup.
+function getOpenUrlsCommands(readmeUrl: string): string[] {
+  // Determine the OS-specific command to open URLs, ex: 'open', 'xdg-open', etc
+  const openCmd = getUrlOpenCommand();
+
+  // Build a list of URLs to open
+  const urlsToOpen = [readmeUrl];
+
+  const repoInfo = getGitHubRepoInfo();
+  if (repoInfo) {
+    urlsToOpen.push(
+      `https://github.com/${repoInfo.owner}/${repoInfo.repo}/settings/secrets/actions`,
+    );
+  }
+
+  // Create and join the individual commands
+  const commands = urlsToOpen.map((url) => `${openCmd} "${url}"`);
+  return commands;
+}
 
 export const setupGithubCommand: SlashCommand = {
   name: 'setup-github',
   description: 'Set up GitHub Actions',
   kind: CommandKind.BUILT_IN,
-  action: (): SlashCommandActionReturn => {
-    const gitRootRepo = execSync('git rev-parse --show-toplevel', {
-      encoding: 'utf-8',
-    }).trim();
+  action: async (
+    context: CommandContext,
+  ): Promise<SlashCommandActionReturn> => {
+    const abortController = new AbortController();
 
     if (!isGitHubRepository()) {
-      throw new Error('Unable to determine the Git root directory.');
+      throw new Error(
+        'Unable to determine the GitHub repository. /setup-github must be run from a git repository.',
+      );
     }
 
-    const version = 'v0';
-    const workflowBaseUrl = `https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/tags/${version}/examples/workflows/`;
+    // Find the root directory of the repo
+    let gitRepoRoot: string;
+    try {
+      gitRepoRoot = getGitRepoRoot();
+    } catch (_error) {
+      console.debug(`Failed to get git repo root:`, _error);
+      throw new Error(
+        'Unable to determine the GitHub repository. /setup-github must be run from a git repository.',
+      );
+    }
 
+    // Get the latest release tag from GitHub
+    const proxy = context?.services?.config?.getProxy();
+    const releaseTag = await getLatestGitHubRelease(proxy);
+    const readmeUrl = `https://github.com/google-github-actions/run-gemini-cli/blob/${releaseTag}/README.md#quick-start`;
+
+    // Create the .github/workflows directory to download the files into
+    const githubWorkflowsDir = path.join(gitRepoRoot, '.github', 'workflows');
+    try {
+      await fs.promises.mkdir(githubWorkflowsDir, { recursive: true });
+    } catch (_error) {
+      console.debug(
+        `Failed to create ${githubWorkflowsDir} directory:`,
+        _error,
+      );
+      throw new Error(
+        `Unable to create ${githubWorkflowsDir} directory. Do you have file permissions in the current directory?`,
+      );
+    }
+
+    // Download each workflow in parallel - there aren't enough files to warrant
+    // a full workerpool model here.
     const workflows = [
       'gemini-cli/gemini-cli.yml',
       'issue-triage/gemini-issue-automated-triage.yml',
@@ -37,15 +98,63 @@ export const setupGithubCommand: SlashCommand = {
       'pr-review/gemini-pr-review.yml',
     ];
 
-    const command = [
-      'set -e',
-      `mkdir -p "${gitRootRepo}/.github/workflows"`,
-      ...workflows.map((workflow) => {
-        const fileName = path.basename(workflow);
-        return `curl -fsSL -o "${gitRootRepo}/.github/workflows/${fileName}" "${workflowBaseUrl}/${workflow}"`;
-      }),
-      'echo "Workflows downloaded successfully."',
-    ].join(' && ');
+    const downloads = [];
+    for (const workflow of workflows) {
+      downloads.push(
+        (async () => {
+          const endpoint = `https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/tags/${releaseTag}/examples/workflows/${workflow}`;
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            dispatcher: proxy ? new ProxyAgent(proxy) : undefined,
+            signal: AbortSignal.any([
+              AbortSignal.timeout(30_000),
+              abortController.signal,
+            ]),
+          } as RequestInit);
+
+          if (!response.ok) {
+            throw new Error(
+              `Invalid response code downloading ${endpoint}: ${response.status} - ${response.statusText}`,
+            );
+          }
+          const body = response.body;
+          if (!body) {
+            throw new Error(
+              `Empty body while downloading ${endpoint}: ${response.status} - ${response.statusText}`,
+            );
+          }
+
+          const destination = path.resolve(
+            githubWorkflowsDir,
+            path.basename(workflow),
+          );
+
+          const fileStream = fs.createWriteStream(destination, {
+            mode: 0o644, // -rw-r--r--, user(rw), group(r), other(r)
+            flags: 'w', // write and overwrite
+            flush: true,
+          });
+
+          await body.pipeTo(Writable.toWeb(fileStream));
+        })(),
+      );
+    }
+
+    // Wait for all downloads to complete
+    await Promise.all(downloads).finally(() => {
+      // Stop existing downloads
+      abortController.abort();
+    });
+
+    // Print out a message
+    const commands = [];
+    commands.push('set -eEuo pipefail');
+    commands.push(
+      `echo "Successfully downloaded ${workflows.length} workflows. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
+    );
+    commands.push(...getOpenUrlsCommands(readmeUrl));
+
+    const command = `(${commands.join(' && ')})`;
     return {
       type: 'tool',
       toolName: 'run_shell_command',

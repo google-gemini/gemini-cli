@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ShellTool, EditTool, WriteFileTool } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments } from './config.js';
 import { Settings } from './settings.js';
 import { Extension } from './extension.js';
@@ -154,6 +155,93 @@ describe('parseArguments', () => {
     const argv = await parseArguments();
     expect(argv.promptInteractive).toBe('interactive prompt');
     expect(argv.prompt).toBeUndefined();
+  });
+
+  it('should throw an error when both --yolo and --approval-mode are used together', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--yolo',
+      '--approval-mode',
+      'default',
+    ];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments()).rejects.toThrow('process.exit called');
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
+      ),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should throw an error when using short flags -y and --approval-mode together', async () => {
+    process.argv = ['node', 'script.js', '-y', '--approval-mode', 'yolo'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments()).rejects.toThrow('process.exit called');
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
+      ),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should allow --approval-mode without --yolo', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
+    const argv = await parseArguments();
+    expect(argv.approvalMode).toBe('auto_edit');
+    expect(argv.yolo).toBe(false);
+  });
+
+  it('should allow --yolo without --approval-mode', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments();
+    expect(argv.yolo).toBe(true);
+    expect(argv.approvalMode).toBeUndefined();
+  });
+
+  it('should reject invalid --approval-mode values', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'invalid'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments()).rejects.toThrow('process.exit called');
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid values:'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
   });
 });
 
@@ -561,6 +649,17 @@ describe('mergeMcpServers', () => {
 });
 
 describe('mergeExcludeTools', () => {
+  const defaultExcludes = [ShellTool.Name, EditTool.Name, WriteFileTool.Name];
+  const originalIsTTY = process.stdin.isTTY;
+
+  beforeEach(() => {
+    process.stdin.isTTY = true;
+  });
+
+  afterEach(() => {
+    process.stdin.isTTY = originalIsTTY;
+  });
+
   it('should merge excludeTools from settings and extensions', async () => {
     const settings: Settings = { excludeTools: ['tool1', 'tool2'] };
     const extensions: Extension[] = [
@@ -655,7 +754,8 @@ describe('mergeExcludeTools', () => {
     expect(config.getExcludeTools()).toHaveLength(4);
   });
 
-  it('should return an empty array when no excludeTools are specified', async () => {
+  it('should return an empty array when no excludeTools are specified and it is interactive', async () => {
+    process.stdin.isTTY = true;
     const settings: Settings = {};
     const extensions: Extension[] = [];
     process.argv = ['node', 'script.js'];
@@ -667,6 +767,21 @@ describe('mergeExcludeTools', () => {
       argv,
     );
     expect(config.getExcludeTools()).toEqual([]);
+  });
+
+  it('should return default excludes when no excludeTools are specified and it is not interactive', async () => {
+    process.stdin.isTTY = false;
+    const settings: Settings = {};
+    const extensions: Extension[] = [];
+    process.argv = ['node', 'script.js', '-p', 'test'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig(
+      settings,
+      extensions,
+      'test-session',
+      argv,
+    );
+    expect(config.getExcludeTools()).toEqual(defaultExcludes);
   });
 
   it('should handle settings with excludeTools but no extensions', async () => {
@@ -729,6 +844,211 @@ describe('mergeExcludeTools', () => {
     const argv = await parseArguments();
     await loadCliConfig(settings, extensions, 'test-session', argv);
     expect(settings).toEqual(originalSettings);
+  });
+});
+
+describe('Approval mode tool exclusion logic', () => {
+  const originalIsTTY = process.stdin.isTTY;
+
+  beforeEach(() => {
+    process.stdin.isTTY = false; // Ensure non-interactive mode
+  });
+
+  afterEach(() => {
+    process.stdin.isTTY = originalIsTTY;
+  });
+
+  it('should exclude all interactive tools in non-interactive mode with default approval mode', async () => {
+    process.argv = ['node', 'script.js', '-p', 'test'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const extensions: Extension[] = [];
+
+    const config = await loadCliConfig(
+      settings,
+      extensions,
+      'test-session',
+      argv,
+    );
+
+    const excludedTools = config.getExcludeTools();
+    expect(excludedTools).toContain(ShellTool.Name);
+    expect(excludedTools).toContain(EditTool.Name);
+    expect(excludedTools).toContain(WriteFileTool.Name);
+  });
+
+  it('should exclude all interactive tools in non-interactive mode with explicit default approval mode', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--approval-mode',
+      'default',
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const extensions: Extension[] = [];
+
+    const config = await loadCliConfig(
+      settings,
+      extensions,
+      'test-session',
+      argv,
+    );
+
+    const excludedTools = config.getExcludeTools();
+    expect(excludedTools).toContain(ShellTool.Name);
+    expect(excludedTools).toContain(EditTool.Name);
+    expect(excludedTools).toContain(WriteFileTool.Name);
+  });
+
+  it('should exclude only shell tools in non-interactive mode with auto_edit approval mode', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--approval-mode',
+      'auto_edit',
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const extensions: Extension[] = [];
+
+    const config = await loadCliConfig(
+      settings,
+      extensions,
+      'test-session',
+      argv,
+    );
+
+    const excludedTools = config.getExcludeTools();
+    expect(excludedTools).toContain(ShellTool.Name);
+    expect(excludedTools).not.toContain(EditTool.Name);
+    expect(excludedTools).not.toContain(WriteFileTool.Name);
+  });
+
+  it('should exclude no interactive tools in non-interactive mode with yolo approval mode', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--approval-mode',
+      'yolo',
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const extensions: Extension[] = [];
+
+    const config = await loadCliConfig(
+      settings,
+      extensions,
+      'test-session',
+      argv,
+    );
+
+    const excludedTools = config.getExcludeTools();
+    expect(excludedTools).not.toContain(ShellTool.Name);
+    expect(excludedTools).not.toContain(EditTool.Name);
+    expect(excludedTools).not.toContain(WriteFileTool.Name);
+  });
+
+  it('should exclude no interactive tools in non-interactive mode with legacy yolo flag', async () => {
+    process.argv = ['node', 'script.js', '--yolo', '-p', 'test'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const extensions: Extension[] = [];
+
+    const config = await loadCliConfig(
+      settings,
+      extensions,
+      'test-session',
+      argv,
+    );
+
+    const excludedTools = config.getExcludeTools();
+    expect(excludedTools).not.toContain(ShellTool.Name);
+    expect(excludedTools).not.toContain(EditTool.Name);
+    expect(excludedTools).not.toContain(WriteFileTool.Name);
+  });
+
+  it('should not exclude interactive tools in interactive mode regardless of approval mode', async () => {
+    process.stdin.isTTY = true; // Interactive mode
+
+    const testCases = [
+      { args: ['node', 'script.js'] }, // default
+      { args: ['node', 'script.js', '--approval-mode', 'default'] },
+      { args: ['node', 'script.js', '--approval-mode', 'auto_edit'] },
+      { args: ['node', 'script.js', '--approval-mode', 'yolo'] },
+      { args: ['node', 'script.js', '--yolo'] },
+    ];
+
+    for (const testCase of testCases) {
+      process.argv = testCase.args;
+      const argv = await parseArguments();
+      const settings: Settings = {};
+      const extensions: Extension[] = [];
+
+      const config = await loadCliConfig(
+        settings,
+        extensions,
+        'test-session',
+        argv,
+      );
+
+      const excludedTools = config.getExcludeTools();
+      expect(excludedTools).not.toContain(ShellTool.Name);
+      expect(excludedTools).not.toContain(EditTool.Name);
+      expect(excludedTools).not.toContain(WriteFileTool.Name);
+    }
+  });
+
+  it('should merge approval mode exclusions with settings exclusions in auto_edit mode', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--approval-mode',
+      'auto_edit',
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments();
+    const settings: Settings = { excludeTools: ['custom_tool'] };
+    const extensions: Extension[] = [];
+
+    const config = await loadCliConfig(
+      settings,
+      extensions,
+      'test-session',
+      argv,
+    );
+
+    const excludedTools = config.getExcludeTools();
+    expect(excludedTools).toContain('custom_tool'); // From settings
+    expect(excludedTools).toContain(ShellTool.Name); // From approval mode
+    expect(excludedTools).not.toContain(EditTool.Name); // Should be allowed in auto_edit
+    expect(excludedTools).not.toContain(WriteFileTool.Name); // Should be allowed in auto_edit
+  });
+
+  it('should throw an error for invalid approval mode values in loadCliConfig', async () => {
+    // Create a mock argv with an invalid approval mode that bypasses argument parsing validation
+    const invalidArgv: Partial<CliArgs> & { approvalMode: string } = {
+      approvalMode: 'invalid_mode',
+      promptInteractive: '',
+      prompt: '',
+      yolo: false,
+    };
+
+    const settings: Settings = {};
+    const extensions: Extension[] = [];
+
+    await expect(
+      loadCliConfig(settings, extensions, 'test-session', invalidArgv),
+    ).rejects.toThrow(
+      'Invalid approval mode: invalid_mode. Valid values are: yolo, auto_edit, default',
+    );
   });
 });
 
@@ -982,7 +1302,7 @@ describe('loadCliConfig model selection', () => {
   });
 });
 
-describe('loadCliConfig ideModeFeature', () => {
+describe('loadCliConfig folderTrustFeature', () => {
   const originalArgv = process.argv;
   const originalEnv = { ...process.env };
 
@@ -990,8 +1310,6 @@ describe('loadCliConfig ideModeFeature', () => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     process.env.GEMINI_API_KEY = 'test-api-key';
-    delete process.env.SANDBOX;
-    delete process.env.GEMINI_CLI_IDE_SERVER_PORT;
   });
 
   afterEach(() => {
@@ -1005,7 +1323,67 @@ describe('loadCliConfig ideModeFeature', () => {
     const settings: Settings = {};
     const argv = await parseArguments();
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeModeFeature()).toBe(false);
+    expect(config.getFolderTrustFeature()).toBe(false);
+  });
+
+  it('should be true when settings.folderTrustFeature is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = { folderTrustFeature: true };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFolderTrustFeature()).toBe(true);
+  });
+});
+
+describe('loadCliConfig folderTrust', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('should be false if folderTrustFeature is false and folderTrust is false', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = {
+      folderTrustFeature: false,
+      folderTrust: false,
+    };
+    const argv = await parseArguments();
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFolderTrust()).toBe(false);
+  });
+
+  it('should be false if folderTrustFeature is true and folderTrust is false', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = { folderTrustFeature: true, folderTrust: false };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFolderTrust()).toBe(false);
+  });
+
+  it('should be false if folderTrustFeature is false and folderTrust is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = { folderTrustFeature: false, folderTrust: true };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFolderTrust()).toBe(false);
+  });
+
+  it('should be true when folderTrustFeature is true and folderTrust is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = { folderTrustFeature: true, folderTrust: true };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFolderTrust()).toBe(true);
   });
 });
 
@@ -1088,5 +1466,233 @@ describe('loadCliConfig with includeDirectories', () => {
     expect(config.getWorkspaceContext().getDirectories()).toHaveLength(
       expected.length,
     );
+  });
+});
+
+describe('loadCliConfig chatCompression', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('should pass chatCompression settings to the core config', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      chatCompression: {
+        contextPercentageThreshold: 0.5,
+      },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getChatCompression()).toEqual({
+      contextPercentageThreshold: 0.5,
+    });
+  });
+
+  it('should have undefined chatCompression if not in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getChatCompression()).toBeUndefined();
+  });
+});
+
+describe('loadCliConfig tool exclusions', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+  const originalIsTTY = process.stdin.isTTY;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+    process.stdin.isTTY = true;
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    process.stdin.isTTY = originalIsTTY;
+    vi.restoreAllMocks();
+  });
+
+  it('should not exclude interactive tools in interactive mode without YOLO', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getExcludeTools()).not.toContain('run_shell_command');
+    expect(config.getExcludeTools()).not.toContain('replace');
+    expect(config.getExcludeTools()).not.toContain('write_file');
+  });
+
+  it('should not exclude interactive tools in interactive mode with YOLO', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getExcludeTools()).not.toContain('run_shell_command');
+    expect(config.getExcludeTools()).not.toContain('replace');
+    expect(config.getExcludeTools()).not.toContain('write_file');
+  });
+
+  it('should exclude interactive tools in non-interactive mode without YOLO', async () => {
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js', '-p', 'test'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getExcludeTools()).toContain('run_shell_command');
+    expect(config.getExcludeTools()).toContain('replace');
+    expect(config.getExcludeTools()).toContain('write_file');
+  });
+
+  it('should not exclude interactive tools in non-interactive mode with YOLO', async () => {
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js', '-p', 'test', '--yolo'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getExcludeTools()).not.toContain('run_shell_command');
+    expect(config.getExcludeTools()).not.toContain('replace');
+    expect(config.getExcludeTools()).not.toContain('write_file');
+  });
+});
+
+describe('loadCliConfig interactive', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+  const originalIsTTY = process.stdin.isTTY;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+    process.stdin.isTTY = true;
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    process.stdin.isTTY = originalIsTTY;
+    vi.restoreAllMocks();
+  });
+
+  it('should be interactive if isTTY and no prompt', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.isInteractive()).toBe(true);
+  });
+
+  it('should be interactive if prompt-interactive is set', async () => {
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js', '--prompt-interactive', 'test'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.isInteractive()).toBe(true);
+  });
+
+  it('should not be interactive if not isTTY and no prompt', async () => {
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.isInteractive()).toBe(false);
+  });
+
+  it('should not be interactive if prompt is set', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--prompt', 'test'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.isInteractive()).toBe(false);
+  });
+});
+
+describe('loadCliConfig approval mode', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('should default to DEFAULT approval mode when no flags are set', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+  });
+
+  it('should set YOLO approval mode when --yolo flag is used', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+  });
+
+  it('should set YOLO approval mode when -y flag is used', async () => {
+    process.argv = ['node', 'script.js', '-y'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+  });
+
+  it('should set DEFAULT approval mode when --approval-mode=default', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'default'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+  });
+
+  it('should set AUTO_EDIT approval mode when --approval-mode=auto_edit', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.AUTO_EDIT);
+  });
+
+  it('should set YOLO approval mode when --approval-mode=yolo', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'yolo'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+  });
+
+  it('should prioritize --approval-mode over --yolo when both would be valid (but validation prevents this)', async () => {
+    // Note: This test documents the intended behavior, but in practice the validation
+    // prevents both flags from being used together
+    process.argv = ['node', 'script.js', '--approval-mode', 'default'];
+    const argv = await parseArguments();
+    // Manually set yolo to true to simulate what would happen if validation didn't prevent it
+    argv.yolo = true;
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+  });
+
+  it('should fall back to --yolo behavior when --approval-mode is not set', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments();
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
   });
 });

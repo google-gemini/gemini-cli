@@ -1,76 +1,109 @@
-name: Gemini Scheduled Issue Triage
+name: '📋 Gemini Scheduled Issue Triage'
 
 on:
   schedule:
     - cron: '0 * * * *' # Runs every hour
-  workflow_dispatch: {}
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
+
+permissions:
+  contents: 'read'
+  id-token: 'write'
+  issues: 'write'
+  statuses: 'write'
+  packages: 'read'
 
 jobs:
   triage-issues:
     timeout-minutes: 10
     if: ${{ github.repository == 'google-gemini/gemini-cli' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-      issues: write
+    runs-on: 'ubuntu-latest'
+
     steps:
-      - name: Generate GitHub App Token
-        id: generate_token
-        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' # ratchet:actions/checkout@v4
+
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e' # ratchet:actions/create-github-app-token@v2
         with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
 
-      - name: Find untriaged issues
-        id: find_issues
+      - name: 'Find untriaged issues'
+        id: 'find_issues'
         env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-        run: |
-          echo "🔍 Finding issues without labels..."
-          NO_LABEL_ISSUES=$(gh issue list --repo ${{ github.repository }} --search "is:open is:issue no:label" --json number,title,body)
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          GITHUB_REPOSITORY: '${{ github.repository }}'
+          GITHUB_OUTPUT: '${{ github.output }}'
+        run: |-
+          set -euo pipefail
 
-          echo "🏷️ Finding issues that need triage..."
-          NEED_TRIAGE_ISSUES=$(gh issue list --repo ${{ github.repository }} --search "is:open is:issue label:\"status/need-triage\"" --json number,title,body)
+          echo '🔍 Finding issues without labels...'
+          NO_LABEL_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
+            --search 'is:open is:issue no:label' --json number,title,body)"
 
-          echo "🔄 Merging and deduplicating issues..."
-          ISSUES=$(echo "$NO_LABEL_ISSUES" "$NEED_TRIAGE_ISSUES" | jq -c -s 'add | unique_by(.number)')
+          echo '🏷️ Finding issues that need triage...'
+          NEED_TRIAGE_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
+            --search 'is:open is:issue label:"status/needs-triage"' --json number,title,body)"
 
-          echo "📝 Setting output for GitHub Actions..."
-          echo "issues_to_triage=$ISSUES" >> "$GITHUB_OUTPUT"
+          echo '🔄 Merging and deduplicating issues...'
+          ISSUES="$(echo "${NO_LABEL_ISSUES}" "${NEED_TRIAGE_ISSUES}" | jq -c -s 'add | unique_by(.number)')"
 
-          echo "✅ Found $(echo "$ISSUES" | jq 'length') issues to triage! 🎯"
+          echo '📝 Setting output for GitHub Actions...'
+          echo "issues_to_triage=${ISSUES}" >> "${GITHUB_OUTPUT}"
 
-      - name: Run Gemini Issue Triage
-        if: steps.find_issues.outputs.issues_to_triage != '[]'
-        uses: google-gemini/gemini-cli-action@df3f890f003d28c60a2a09d2c29e0126e4d1e2ff
+          ISSUE_COUNT="$(echo "${ISSUES}" | jq 'length')"
+          echo "✅ Found ${ISSUE_COUNT} issues to triage! 🎯"
+
+      - name: 'Run Gemini Issue Triage'
+        if: |-
+          ${{ steps.find_issues.outputs.issues_to_triage != '[]' }}
+        uses: 'google-github-actions/run-gemini-cli@20351b5ea2b4179431f1ae8918a246a0808f8747'
+        id: 'gemini_issue_triage'
         env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-          ISSUES_TO_TRIAGE: ${{ steps.find_issues.outputs.issues_to_triage }}
-          REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          ISSUES_TO_TRIAGE: '${{ steps.find_issues.outputs.issues_to_triage }}'
+          REPOSITORY: '${{ github.repository }}'
         with:
-          version: 0.1.8-rc.0
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OTLP_GCP_WIF_PROVIDER: ${{ secrets.OTLP_GCP_WIF_PROVIDER }}
-          OTLP_GOOGLE_CLOUD_PROJECT: ${{ secrets.OTLP_GOOGLE_CLOUD_PROJECT }}
-          settings_json: |
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          settings: |-
             {
+              "maxSessionTurns": 25,
               "coreTools": [
                 "run_shell_command(echo)",
                 "run_shell_command(gh label list)",
                 "run_shell_command(gh issue edit)",
-                "run_shell_command(gh issue list)",
-                "run_shell_command(gh issue view)"
+                "run_shell_command(gh issue view)",
+                "run_shell_command(gh issue list)"
               ],
               "telemetry": {
                 "enabled": true,
                 "target": "gcp"
-              },
-              "sandbox": false
+              }
             }
-          prompt: |
-            You are an issue triage assistant. Analyze the current GitHub issues apply the most appropriate existing labels. 
-            Steps:
+          prompt: |-
+            ## Role
+
+            You are an issue triage assistant. Analyze issues and apply
+            appropriate labels. Use the available tools to gather information;
+            do not ask for information to be provided.
+
+            ## Steps
+
             1. Run: `gh label list --repo ${{ github.repository }} --limit 100` to get all available labels.
             2. Check environment variable for issues to triage: $ISSUES_TO_TRIAGE (JSON array of issues)
             3. Review the issue title, body and any comments provided in the environment variables.
@@ -95,8 +128,10 @@ jobs:
               - After applying appropriate labels to an issue, remove the "status/need-triage" label if present: `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "status/need-triage"`
               - Execute one `gh issue edit` command per issue, wait for success before proceeding to the next
             Process each issue sequentially and confirm each labeling operation before moving to the next issue.
-            Guidelines:
-              - Only use labels that already exist in the repository.
+
+            ## Guidelines
+
+            - Only use labels that already exist in the repository.
               - Do not add comments or modify the issue content.
               - Do not remove labels titled help wanted or good first issue.
               - Triage only the current issue.
@@ -189,3 +224,105 @@ jobs:
               - could also pertain to latency,
               - other general software performance like, memory usage, CPU consumption, and algorithmic efficiency.
               - Switching models from one to the other unexpectedly.
+
+  refresh-embeddings:
+    if: |-
+      ${{ vars.TRIAGE_DEDUPLICATE_ISSUES != '' && github.repository == 'google-gemini/gemini-cli' }}
+    timeout-minutes: 20
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683'
+
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 'Run Gemini Issue Deduplication Refresh'
+        uses: 'google-github-actions/run-gemini-cli@20351b5ea2b4179431f1ae8918a246a0808f8747'
+        id: 'gemini_refresh_embeddings'
+        env:
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          ISSUE_TITLE: '${{ github.event.issue.title }}'
+          ISSUE_BODY: '${{ github.event.issue.body }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number }}'
+          REPOSITORY: '${{ github.repository }}'
+          FIRESTORE_PROJECT: '${{ vars.FIRESTORE_PROJECT }}'
+        with:
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          settings: |-
+            {
+              "mcpServers": {
+                "issue_deduplication": {
+                  "command": "docker",
+                  "args": [
+                    "run",
+                    "-i",
+                    "--rm",
+                    "--network", "host",
+                    "-e", "GITHUB_TOKEN",
+                    "-e", "GEMINI_API_KEY",
+                    "-e", "DATABASE_TYPE",
+                    "-e", "FIRESTORE_DATABASE_ID",
+                    "-e", "GCP_PROJECT",
+                    "-e", "GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json",
+                    "-v", "${GOOGLE_APPLICATION_CREDENTIALS}:/app/gcp-credentials.json",
+                    "ghcr.io/google-gemini/gemini-cli-issue-triage@sha256:e3de1523f6c83aabb3c54b76d08940a2bf42febcb789dd2da6f95169641f94d3"
+                  ],
+                  "env": {
+                    "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+                    "GEMINI_API_KEY": "${{ secrets.GEMINI_API_KEY }}",
+                    "DATABASE_TYPE":"firestore",
+                    "GCP_PROJECT": "${FIRESTORE_PROJECT}",
+                    "FIRESTORE_DATABASE_ID": "(default)",
+                    "GOOGLE_APPLICATION_CREDENTIALS": "${GOOGLE_APPLICATION_CREDENTIALS}"
+                  },
+                  "enabled": true,
+                  "timeout": 600000
+                }
+              },
+              "maxSessionTurns": 25,
+              "coreTools": [
+                "run_shell_command(echo)"
+              ],
+              "telemetry": {
+                "enabled": true,
+                "target": "gcp"
+              }
+            }
+          prompt: |-
+            ## Role
+
+            You are a database maintenance assistant for a GitHub issue deduplication system.
+
+            ## Goal
+
+            Your sole responsibility is to refresh the embeddings for all open issues in the repository to ensure the deduplication database is up-to-date.
+
+            ## Steps
+
+            1.  **Extract Repository Information:** The repository is ${{ github.repository }}.
+            2.  **Refresh Embeddings:** Call the `refresh` tool with the correct `repo`. Do not use the `force` parameter.
+            3.  **Log Output:** Print the JSON output from the `refresh` tool to the logs.
+
+            ## Guidelines
+
+            - Only use the `refresh` tool.
+            - Do not attempt to find duplicates or modify any issues.
+            - Your only task is to call the `refresh` tool and log its output.

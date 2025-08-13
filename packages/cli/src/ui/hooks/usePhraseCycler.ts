@@ -43,7 +43,6 @@ export const WITTY_LOADING_PHRASES = [
   'Garbage collecting... be right back...',
   'Assembling the interwebs...',
   'Converting coffee into code...',
-  'Pushing to production (and hoping for the best)...',
   'Updating the syntax for reality...',
   'Rewiring the synapses...',
   'Looking for a misplaced semicolon...',
@@ -99,7 +98,7 @@ export const WITTY_LOADING_PHRASES = [
   'Why did the computer go to therapy? It had too many bytes...',
   "Why don't programmers like nature? It has too many bugs...",
   'Why do programmers prefer dark mode? Because light attracts bugs...',
-  'Why did the developer go broke? Because he used up all his cache...',
+  'Why did the developer go broke? Because they used up all their cache...',
   "What can you do with a broken pencil? Nothing, it's pointless...",
   'Applying percussive maintenance...',
   'Searching for the correct USB orientation...',
@@ -136,6 +135,7 @@ export const WITTY_LOADING_PHRASES = [
   "It's not a bug, it's a feature... of this loading screen.",
   'Have you tried turning it off and on again? (The loading screen, not me.)',
   'Constructing additional pylons...',
+  'New line? That’s Ctrl+J.',
 ];
 
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;

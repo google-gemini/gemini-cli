@@ -11,24 +11,24 @@ import {
   ToolConfirmationOutcome,
   Icon,
 } from './tools.js';
-import { FunctionDeclaration, Type } from '@google/genai';
+import { FunctionDeclaration } from '@google/genai';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { homedir } from 'os';
 import * as Diff from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { tildeifyPath } from '../utils/paths.js';
-import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
+import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
   name: 'save_memory',
   description:
     'Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.',
-  parameters: {
-    type: Type.OBJECT,
+  parametersJsonSchema: {
+    type: 'object',
     properties: {
       fact: {
-        type: Type.STRING,
+        type: 'string',
         description:
           'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
       },
@@ -112,7 +112,7 @@ function ensureNewlineSeparation(currentContent: string): string {
 
 export class MemoryTool
   extends BaseTool<SaveMemoryParams, ToolResult>
-  implements ModifiableTool<SaveMemoryParams>
+  implements ModifiableDeclarativeTool<SaveMemoryParams>
 {
   private static readonly allowlist: Set<string> = new Set();
 
@@ -123,7 +123,7 @@ export class MemoryTool
       'Save Memory',
       memoryToolDescription,
       Icon.LightBulb,
-      memoryToolSchemaData.parameters as Record<string, unknown>,
+      memoryToolSchemaData.parametersJsonSchema as Record<string, unknown>,
     );
   }
 
@@ -220,6 +220,7 @@ export class MemoryTool
       type: 'edit',
       title: `Confirm Memory Save: ${tildeifyPath(memoryFilePath)}`,
       fileName: memoryFilePath,
+      filePath: memoryFilePath,
       fileDiff,
       originalContent: currentContent,
       newContent,

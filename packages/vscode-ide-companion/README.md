@@ -4,7 +4,7 @@
   <a href="../../i18n/chinese/packages/vscode-ide-companion/README.md">🌐 简体中文</a> | English
 </p>
 
-The Gemini CLI Companion extension seamlessly integrates [Gemini CLI](https://github.com/google-gemini/gemini-cli) into your VS Code environment. This integration enables Gemini CLI to access active information like your open files.
+The Gemini CLI Companion extension seamlessly integrates [Gemini CLI](https://github.com/google-gemini/gemini-cli) into your IDE.
 
 # Features
 
@@ -12,12 +12,16 @@ The Gemini CLI Companion extension seamlessly integrates [Gemini CLI](https://gi
 
 - Selection Context: Gemini CLI can easily access your cursor's position and selected text within the editor, giving it valuable context directly from your current work.
 
+- Native Diffing: Seamlessly view, modify, and accept code changes suggested by Gemini CLI directly within the editor.
+
+- Launch Gemini CLI: Quickly start a new Gemini CLI session from the Command Palette (Cmd+Shift+P or Ctrl+Shift+P) by running the "Gemini CLI: Run" command.
+
 # Requirements
 
 To use this extension, you'll need:
 
-- VS Code version 1.101.0 or newer
-- Gemini CLI (installed separately) running within the VS Code integrated terminal
+- VS Code version 1.99.0 or newer
+- Gemini CLI (installed separately) running within the integrated terminal
 
 # Terms of Service and Privacy Notice
 
