@@ -2,6 +2,10 @@
 .env
 .env~
 
+# Mastra generated files
+packages/accelos/.mastra/
+packages/accelos/ship/
+
 # gemini-cli settings
 .gemini/
 !gemini/config.yaml

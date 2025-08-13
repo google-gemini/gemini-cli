@@ -5,9 +5,12 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "build": "node ../../scripts/build_package.js",
-    "start": "node dist/index.js",
-    "debug": "node --inspect-brk dist/index.js",
+    "build": "tsc",
+    "build:bundle": "ncc build src/production.ts -o build --minify",
+    "build:binary": "npm run build && pkg dist/production.js --targets node20-linux-x64,node20-macos-x64,node20-win-x64 --out-path binaries",
+    "build:all": "npm run build && npm run build:bundle && npm run build:binary",
+    "start": "node dist/production.js",
+    "start:dev": "tsx src/production.ts",
     "dev": "mastra dev",
     "dev:server": "tsx src/server.ts",
     "lint": "eslint . --ext .ts,.tsx",
@@ -17,8 +20,12 @@
     "typecheck": "tsc --noEmit"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
+  "bin": {
+    "accelos-server": "dist/production.js"
+  },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.0",
     "@ai-sdk/google": "^2.0.5",
@@ -33,6 +40,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
+    "@vercel/ncc": "^0.38.1",
+    "pkg": "^5.8.1",
     "tsx": "^4.7.1",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"
@@ -40,7 +49,18 @@
   "engines": {
     "node": ">=20.9.0"
   },
-  "keywords": [],
+  "pkg": {
+    "scripts": [
+      "dist/**/*.js",
+      "node_modules/@mastra/**/*.js"
+    ],
+    "assets": [
+      "node_modules/@mastra/**/*",
+      ".env"
+    ],
+    "outputPath": "binaries"
+  },
+  "keywords": ["mastra", "ai", "agent", "server"],
   "author": "",
   "license": "ISC"
 }

@@ -1,3 +1,0 @@
-const telemetry = {};
-
-export { telemetry };

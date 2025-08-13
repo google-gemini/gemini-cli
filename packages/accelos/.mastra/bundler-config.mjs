@@ -1,3 +1,0 @@
-const bundler = {};
-
-export { bundler };

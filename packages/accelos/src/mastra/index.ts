@@ -42,7 +42,7 @@ const accelosOpenAIAgent = new Agent({
 const accelosAnthropicAgent = new Agent({
   name: 'accelos-anthropic',
   instructions: defaultConfig.systemPrompt,
-  model: anthropic('claude-3-5-sonnet-20241022'),
+  model: anthropic('claude-3-7-sonnet-20250219'),
   tools: {
     fileAnalyzer: fileAnalyzerTool,
     webSearch: webSearchTool,
@@ -452,7 +452,7 @@ export const mastra = new Mastra({
   }),
   server: {
     port: 4111,
-    host: '0.0.0.0',
+    host: 'localhost',
     build: {
       openAPIDocs: true,
       swaggerUI: true,
