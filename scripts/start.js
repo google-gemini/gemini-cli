@@ -22,10 +22,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
 
-// Exit code used when user clears authentication method
-// NOTE: This constant is also defined in packages/core/src/utils/constants.ts
-// Keep these values synchronized.
-const EXIT_CODE_AUTH_CLEARED = 42;
+import { EXIT_CODE_AUTH_CLEARED } from '../packages/core/dist/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -74,16 +71,17 @@ if (process.env.DEBUG) {
   // than the relaunched process making it harder to debug.
   env.GEMINI_CLI_NO_RELAUNCH = 'true';
 }
-function runCli() {
-  const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
-  child.on('close', (code, signal) => {
-    // If the child process exited with a special code for USER_CLEARED_AUTH_METHOD, restart CLI
-    if (code === EXIT_CODE_AUTH_CLEARED) {
+async function main() {
+  let exitCode;
+  do {
+    exitCode = await new Promise((resolve) => {
+      const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
+      child.on('close', (code) => resolve(code));
+    });
+    if (exitCode === EXIT_CODE_AUTH_CLEARED) {
       console.log('\nAuth method cleared. Restarting Gemini CLI for new authentication...\n');
-      runCli();
-    } else {
-      process.exit(code);
     }
-  });
+  } while (exitCode === EXIT_CODE_AUTH_CLEARED);
+  process.exit(exitCode ?? 1);
 }
-runCli();
+main();

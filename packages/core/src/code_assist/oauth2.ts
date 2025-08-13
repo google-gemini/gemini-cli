@@ -239,8 +239,12 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
       }
     };
     process.stdin.on('data', onCtrlA);
-    rl.question("Enter the authorization code (press CTRL+A to clear auth method): ", (code) => {
+
+    rl.on('close', () => {
       process.stdin.off('data', onCtrlA);
+    });
+
+    rl.question("Enter the authorization code (press CTRL+A to clear auth method): ", (code) => {
       rl.close();
       resolve(code.trim());
     });
