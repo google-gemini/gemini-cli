@@ -30,6 +30,7 @@ import {
 } from '../../utils/user_account.js';
 import { getInstallationId } from '../../utils/user_id.js';
 import { FixedDeque } from 'mnemonist';
+import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -370,6 +371,14 @@ export class ClearcutLogger {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_TELEMETRY_LOG_USER_PROMPTS_ENABLED,
         value: event.telemetry_log_user_prompts_enabled.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
+        value: CLI_VERSION,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
+        value: GIT_COMMIT_INFO,
       },
     ];
 
