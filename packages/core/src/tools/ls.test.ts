@@ -97,12 +97,8 @@ describe('LSTool', () => {
       };
 
       expect(() => lsTool.build(params)).toThrow(
-        'Got path: /etc/passwd, but path must be within one of the workspace directories: /home/user/project, /home/user/other-project',
+        'Path must be within one of the workspace directories: /home/user/project, /home/user/other-project',
       );
-      // TODO
-      // expect(() => lsTool.build(params)).toThrow(
-      //   'Path must be within one of the workspace directories: /home/user/project, /home/user/other-project',
-      // );
     });
 
     it('should accept paths in secondary workspace directory', () => {
@@ -456,12 +452,8 @@ describe('LSTool', () => {
     it('should reject paths outside all workspace directories', () => {
       const params = { path: '/etc/passwd' };
       expect(() => lsTool.build(params)).toThrow(
-        'Got path: /etc/passwd, but path must be within one of the workspace directories',
+        'Path must be within one of the workspace directories',
       );
-      // TODO
-      // expect(() => lsTool.build(params)).toThrow(
-      //   'Path must be within one of the workspace directories',
-      // );
     });
 
     it('should list files from secondary workspace directory', async () => {

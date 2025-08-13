@@ -9,7 +9,6 @@ import path from 'path';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
-  Icon,
   Kind,
   ToolInvocation,
   ToolResult,
@@ -330,7 +329,7 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
     const workspaceContext = this.config.getWorkspaceContext();
     if (!workspaceContext.isPathWithinWorkspace(params.path)) {
       const directories = workspaceContext.getDirectories();
-      return `Got path: ${params.path}, but path must be within one of the workspace directories: ${directories.join(
+      return `Path must be within one of the workspace directories: ${directories.join(
         ', ',
       )}`;
     }
