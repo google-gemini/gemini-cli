@@ -9,6 +9,7 @@ import {
   isProQuotaExceededError,
   isGenericQuotaExceededError,
 } from './quotaErrorDetection.js';
+import { ApiRetryClient, ApiRetryOptions } from './apiRetryClient.js';
 
 export interface HttpError extends Error {
   status?: number;
@@ -336,4 +337,27 @@ function logRetryAttempt(
   } else {
     console.warn(message, error); // Default to warn if error type is unknown
   }
+}
+
+/**
+ * Enhanced retry function with production-grade error handling
+ * Uses the new ApiRetryClient for consistent behavior across interactive/non-interactive modes
+ */
+export async function retryWithEnhancedBackoff<T>(
+  fn: () => Promise<T>,
+  options?: Partial<RetryOptions & { operation?: string }>,
+): Promise<T> {
+  const operation = options?.operation || 'API_REQUEST';
+  
+  const retryClient = new ApiRetryClient({
+    maxRetries: options?.maxAttempts || DEFAULT_RETRY_OPTIONS.maxAttempts,
+    baseDelayMs: options?.initialDelayMs || DEFAULT_RETRY_OPTIONS.initialDelayMs,
+    maxDelayMs: options?.maxDelayMs || DEFAULT_RETRY_OPTIONS.maxDelayMs,
+    operation,
+    authType: options?.authType as AuthType,
+    onPersistent429: options?.onPersistent429,
+    enableDebugLogging: true,
+  });
+
+  return retryClient.makeRequest(fn, operation);
 }

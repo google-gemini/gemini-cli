@@ -47,6 +47,7 @@ export async function runNonInteractive(
       { role: 'user', parts: [{ text: input }] },
     ];
     let turnCount = 0;
+    
     while (true) {
       turnCount++;
       if (
@@ -54,12 +55,14 @@ export async function runNonInteractive(
         turnCount > config.getMaxSessionTurns()
       ) {
         console.error(
-          '\n Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
+          '\n[!] Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
         );
         return;
       }
       const functionCalls: FunctionCall[] = [];
 
+      // The sendMessageStream method already has retry logic built-in via the enhanced retry system
+      // in the GeminiChat class, so we don't need to wrap it here
       const responseStream = geminiClient.sendMessageStream(
         currentMessages[0]?.parts || [],
         abortController.signal,
@@ -68,7 +71,7 @@ export async function runNonInteractive(
 
       for await (const event of responseStream) {
         if (abortController.signal.aborted) {
-          console.error('Operation cancelled.');
+          console.error('[!] Operation cancelled.');
           return;
         }
 
@@ -98,6 +101,7 @@ export async function runNonInteractive(
             prompt_id,
           };
 
+          // Tool execution with basic error handling - most tools don't need retry
           const toolResponse = await executeToolCall(
             config,
             requestInfo,
@@ -107,7 +111,7 @@ export async function runNonInteractive(
 
           if (toolResponse.error) {
             console.error(
-              `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
+              `[X] Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
             );
             if (toolResponse.errorType === ToolErrorType.UNHANDLED_EXCEPTION)
               process.exit(1);
@@ -133,13 +137,19 @@ export async function runNonInteractive(
       }
     }
   } catch (error) {
-    console.error(
-      parseAndFormatApiError(
-        error,
-        config.getContentGeneratorConfig()?.authType,
-      ),
+    // Enhanced error handling - the ApiRetryClient already handled retries
+    // and provided user-friendly error messages, so we just need to ensure
+    // proper exit behavior for non-interactive mode
+    const errorMessage = parseAndFormatApiError(
+      error,
+      config.getContentGeneratorConfig()?.authType,
     );
-    process.exit(1);
+    
+    // Only show the error if it wasn't already handled by the retry client
+    if (!process.exitCode) {
+      console.error(errorMessage);
+      process.exit(1);
+    }
   } finally {
     consolePatcher.cleanup();
     if (isTelemetrySdkInitialized()) {
