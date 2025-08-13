@@ -1,3 +1,6 @@
 export { fileAnalyzerTool } from './file-analyzer.js';
 export { webSearchTool } from './web-search.js';
 export { codeAnalysisTool } from './code-analysis.js';
+export { rcaLoaderTool } from './rca-loader.js';
+export { guardrailLoaderTool } from './guardrail-loader.js';
+export { guardrailCrudTool } from './guardrail-crud.js';
