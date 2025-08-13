@@ -9,18 +9,22 @@ import {
   GenerateContentResponse,
   FunctionCall,
   FunctionDeclaration,
-  GenerateContentResponseUsageMetadata,
+  FinishReason,
 } from '@google/genai';
 import {
   ToolCallConfirmationDetails,
   ToolResult,
   ToolResultDisplay,
 } from '../tools/tools.js';
+import { ToolErrorType } from '../tools/tool-error.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { reportError } from '../utils/errorReporting.js';
-import { getErrorMessage } from '../utils/errors.js';
+import {
+  getErrorMessage,
+  UnauthorizedError,
+  toFriendlyError,
+} from '../utils/errors.js';
 import { GeminiChat } from './geminiChat.js';
-import { UnauthorizedError, toFriendlyError } from '../utils/errors.js';
 
 // Define a structure for tools passed to the server
 export interface ServerTool {
@@ -45,8 +49,10 @@ export enum GeminiEventType {
   UserCancelled = 'user_cancelled',
   Error = 'error',
   ChatCompressed = 'chat_compressed',
-  UsageMetadata = 'usage_metadata',
   Thought = 'thought',
+  MaxSessionTurns = 'max_session_turns',
+  Finished = 'finished',
+  LoopDetected = 'loop_detected',
 }
 
 export interface StructuredError {
@@ -63,6 +69,7 @@ export interface ToolCallRequestInfo {
   name: string;
   args: Record<string, unknown>;
   isClientInitiated: boolean;
+  prompt_id: string;
 }
 
 export interface ToolCallResponseInfo {
@@ -70,6 +77,7 @@ export interface ToolCallResponseInfo {
   responseParts: PartListUnion;
   resultDisplay: ToolResultDisplay | undefined;
   error: Error | undefined;
+  errorType: ToolErrorType | undefined;
 }
 
 export interface ServerToolCallConfirmationDetails {
@@ -126,9 +134,17 @@ export type ServerGeminiChatCompressedEvent = {
   value: ChatCompressionInfo | null;
 };
 
-export type ServerGeminiUsageMetadataEvent = {
-  type: GeminiEventType.UsageMetadata;
-  value: GenerateContentResponseUsageMetadata & { apiTimeMs?: number };
+export type ServerGeminiMaxSessionTurnsEvent = {
+  type: GeminiEventType.MaxSessionTurns;
+};
+
+export type ServerGeminiFinishedEvent = {
+  type: GeminiEventType.Finished;
+  value: FinishReason;
+};
+
+export type ServerGeminiLoopDetectedEvent = {
+  type: GeminiEventType.LoopDetected;
 };
 
 // The original union type, now composed of the individual types
@@ -140,32 +156,40 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiUserCancelledEvent
   | ServerGeminiErrorEvent
   | ServerGeminiChatCompressedEvent
-  | ServerGeminiUsageMetadataEvent
-  | ServerGeminiThoughtEvent;
+  | ServerGeminiThoughtEvent
+  | ServerGeminiMaxSessionTurnsEvent
+  | ServerGeminiFinishedEvent
+  | ServerGeminiLoopDetectedEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
   readonly pendingToolCalls: ToolCallRequestInfo[];
   private debugResponses: GenerateContentResponse[];
-  private lastUsageMetadata: GenerateContentResponseUsageMetadata | null = null;
+  finishReason: FinishReason | undefined;
 
-  constructor(private readonly chat: GeminiChat) {
+  constructor(
+    private readonly chat: GeminiChat,
+    private readonly prompt_id: string,
+  ) {
     this.pendingToolCalls = [];
     this.debugResponses = [];
+    this.finishReason = undefined;
   }
   // The run method yields simpler events suitable for server logic
   async *run(
     req: PartListUnion,
     signal: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
-    const startTime = Date.now();
     try {
-      const responseStream = await this.chat.sendMessageStream({
-        message: req,
-        config: {
-          abortSignal: signal,
+      const responseStream = await this.chat.sendMessageStream(
+        {
+          message: req,
+          config: {
+            abortSignal: signal,
+          },
         },
-      });
+        this.prompt_id,
+      );
 
       for await (const resp of responseStream) {
         if (signal?.aborted) {
@@ -211,18 +235,16 @@ export class Turn {
           }
         }
 
-        if (resp.usageMetadata) {
-          this.lastUsageMetadata =
-            resp.usageMetadata as GenerateContentResponseUsageMetadata;
-        }
-      }
+        // Check if response was truncated or stopped for various reasons
+        const finishReason = resp.candidates?.[0]?.finishReason;
 
-      if (this.lastUsageMetadata) {
-        const durationMs = Date.now() - startTime;
-        yield {
-          type: GeminiEventType.UsageMetadata,
-          value: { ...this.lastUsageMetadata, apiTimeMs: durationMs },
-        };
+        if (finishReason) {
+          this.finishReason = finishReason;
+          yield {
+            type: GeminiEventType.Finished,
+            value: finishReason as FinishReason,
+          };
+        }
       }
     } catch (e) {
       const error = toFriendlyError(e);
@@ -253,6 +275,7 @@ export class Turn {
         message: getErrorMessage(error),
         status,
       };
+      await this.chat.maybeIncludeSchemaDepthContext(structuredError);
       yield { type: GeminiEventType.Error, value: { error: structuredError } };
       return;
     }
@@ -272,6 +295,7 @@ export class Turn {
       name,
       args,
       isClientInitiated: false,
+      prompt_id: this.prompt_id,
     };
 
     this.pendingToolCalls.push(toolCallRequest);
@@ -282,9 +306,5 @@ export class Turn {
 
   getDebugResponses(): GenerateContentResponse[] {
     return this.debugResponses;
-  }
-
-  getUsageMetadata(): GenerateContentResponseUsageMetadata | null {
-    return this.lastUsageMetadata;
   }
 }

@@ -5,18 +5,21 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
+import { darkSemanticColors } from './semantic-tokens.js';
 
 const ansiColors: ColorsTheme = {
   type: 'dark',
   Background: 'black',
   Foreground: 'white',
   LightBlue: 'bluebright',
-  AccentBlue: '#0000FF',
+  AccentBlue: 'blue',
   AccentPurple: 'magenta',
   AccentCyan: 'cyan',
   AccentGreen: 'green',
   AccentYellow: 'yellow',
   AccentRed: 'red',
+  DiffAdded: '#003300',
+  DiffRemoved: '#4D0000',
   Comment: 'gray',
   Gray: 'gray',
   GradientColors: ['cyan', 'green'],
@@ -152,4 +155,5 @@ export const ANSI: Theme = new Theme(
     },
   },
   ansiColors,
+  darkSemanticColors,
 );

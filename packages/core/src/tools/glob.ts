@@ -8,7 +8,13 @@ import fs from 'fs';
 import path from 'path';
 import { glob } from 'glob';
 import { SchemaValidator } from '../utils/schemaValidator.js';
-import { BaseTool, ToolResult } from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Icon,
+  ToolInvocation,
+  ToolResult,
+} from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
 import { Config } from '../config/config.js';
 
@@ -73,23 +79,176 @@ export interface GlobToolParams {
   respect_git_ignore?: boolean;
 }
 
+class GlobToolInvocation extends BaseToolInvocation<
+  GlobToolParams,
+  ToolResult
+> {
+  constructor(
+    private config: Config,
+    params: GlobToolParams,
+  ) {
+    super(params);
+  }
+
+  getDescription(): string {
+    let description = `'${this.params.pattern}'`;
+    if (this.params.path) {
+      const searchDir = path.resolve(
+        this.config.getTargetDir(),
+        this.params.path || '.',
+      );
+      const relativePath = makeRelative(searchDir, this.config.getTargetDir());
+      description += ` within ${shortenPath(relativePath)}`;
+    }
+    return description;
+  }
+
+  async execute(signal: AbortSignal): Promise<ToolResult> {
+    try {
+      const workspaceContext = this.config.getWorkspaceContext();
+      const workspaceDirectories = workspaceContext.getDirectories();
+
+      // If a specific path is provided, resolve it and check if it's within workspace
+      let searchDirectories: readonly string[];
+      if (this.params.path) {
+        const searchDirAbsolute = path.resolve(
+          this.config.getTargetDir(),
+          this.params.path,
+        );
+        if (!workspaceContext.isPathWithinWorkspace(searchDirAbsolute)) {
+          return {
+            llmContent: `Error: Path "${this.params.path}" is not within any workspace directory`,
+            returnDisplay: `Path is not within workspace`,
+          };
+        }
+        searchDirectories = [searchDirAbsolute];
+      } else {
+        // Search across all workspace directories
+        searchDirectories = workspaceDirectories;
+      }
+
+      // Get centralized file discovery service
+      const respectGitIgnore =
+        this.params.respect_git_ignore ??
+        this.config.getFileFilteringRespectGitIgnore();
+      const fileDiscovery = this.config.getFileService();
+
+      // Collect entries from all search directories
+      let allEntries: GlobPath[] = [];
+
+      for (const searchDir of searchDirectories) {
+        const entries = (await glob(this.params.pattern, {
+          cwd: searchDir,
+          withFileTypes: true,
+          nodir: true,
+          stat: true,
+          nocase: !this.params.case_sensitive,
+          dot: true,
+          ignore: ['**/node_modules/**', '**/.git/**'],
+          follow: false,
+          signal,
+        })) as GlobPath[];
+
+        allEntries = allEntries.concat(entries);
+      }
+
+      const entries = allEntries;
+
+      // Apply git-aware filtering if enabled and in git repository
+      let filteredEntries = entries;
+      let gitIgnoredCount = 0;
+
+      if (respectGitIgnore) {
+        const relativePaths = entries.map((p) =>
+          path.relative(this.config.getTargetDir(), p.fullpath()),
+        );
+        const filteredRelativePaths = fileDiscovery.filterFiles(relativePaths, {
+          respectGitIgnore,
+        });
+        const filteredAbsolutePaths = new Set(
+          filteredRelativePaths.map((p) =>
+            path.resolve(this.config.getTargetDir(), p),
+          ),
+        );
+
+        filteredEntries = entries.filter((entry) =>
+          filteredAbsolutePaths.has(entry.fullpath()),
+        );
+        gitIgnoredCount = entries.length - filteredEntries.length;
+      }
+
+      if (!filteredEntries || filteredEntries.length === 0) {
+        let message = `No files found matching pattern "${this.params.pattern}"`;
+        if (searchDirectories.length === 1) {
+          message += ` within ${searchDirectories[0]}`;
+        } else {
+          message += ` within ${searchDirectories.length} workspace directories`;
+        }
+        if (gitIgnoredCount > 0) {
+          message += ` (${gitIgnoredCount} files were git-ignored)`;
+        }
+        return {
+          llmContent: message,
+          returnDisplay: `No files found`,
+        };
+      }
+
+      // Set filtering such that we first show the most recent files
+      const oneDayInMs = 24 * 60 * 60 * 1000;
+      const nowTimestamp = new Date().getTime();
+
+      // Sort the filtered entries using the new helper function
+      const sortedEntries = sortFileEntries(
+        filteredEntries,
+        nowTimestamp,
+        oneDayInMs,
+      );
+
+      const sortedAbsolutePaths = sortedEntries.map((entry) =>
+        entry.fullpath(),
+      );
+      const fileListDescription = sortedAbsolutePaths.join('\n');
+      const fileCount = sortedAbsolutePaths.length;
+
+      let resultMessage = `Found ${fileCount} file(s) matching "${this.params.pattern}"`;
+      if (searchDirectories.length === 1) {
+        resultMessage += ` within ${searchDirectories[0]}`;
+      } else {
+        resultMessage += ` across ${searchDirectories.length} workspace directories`;
+      }
+      if (gitIgnoredCount > 0) {
+        resultMessage += ` (${gitIgnoredCount} additional files were git-ignored)`;
+      }
+      resultMessage += `, sorted by modification time (newest first):\n${fileListDescription}`;
+
+      return {
+        llmContent: resultMessage,
+        returnDisplay: `Found ${fileCount} matching file(s)`,
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(`GlobLogic execute Error: ${errorMessage}`, error);
+      return {
+        llmContent: `Error during glob search operation: ${errorMessage}`,
+        returnDisplay: `Error: An unexpected error occurred.`,
+      };
+    }
+  }
+}
+
 /**
  * Implementation of the Glob tool logic
  */
-export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
+export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   static readonly Name = 'glob';
-  /**
-   * Creates a new instance of the GlobLogic
-   * @param rootDirectory Root directory to ground this tool in.
-   */
-  constructor(
-    private rootDirectory: string,
-    private config: Config,
-  ) {
+
+  constructor(private config: Config) {
     super(
       GlobTool.Name,
       'FindFiles',
       'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
+      Icon.FileSearch,
       {
         properties: {
           pattern: {
@@ -117,50 +276,32 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
         type: 'object',
       },
     );
-
-    this.rootDirectory = path.resolve(rootDirectory);
-  }
-
-  /**
-   * Checks if a path is within the root directory.
-   */
-  private isWithinRoot(pathToCheck: string): boolean {
-    const absolutePathToCheck = path.resolve(pathToCheck);
-    const normalizedPath = path.normalize(absolutePathToCheck);
-    const normalizedRoot = path.normalize(this.rootDirectory);
-    const rootWithSep = normalizedRoot.endsWith(path.sep)
-      ? normalizedRoot
-      : normalizedRoot + path.sep;
-    return (
-      normalizedPath === normalizedRoot ||
-      normalizedPath.startsWith(rootWithSep)
-    );
   }
 
   /**
    * Validates the parameters for the tool.
    */
   validateToolParams(params: GlobToolParams): string | null {
-    if (
-      this.schema.parameters &&
-      !SchemaValidator.validate(
-        this.schema.parameters as Record<string, unknown>,
-        params,
-      )
-    ) {
-      return "Parameters failed schema validation. Ensure 'pattern' is a string, 'path' (if provided) is a string, and 'case_sensitive' (if provided) is a boolean.";
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
+    if (errors) {
+      return errors;
     }
 
     const searchDirAbsolute = path.resolve(
-      this.rootDirectory,
+      this.config.getTargetDir(),
       params.path || '.',
     );
 
-    if (!this.isWithinRoot(searchDirAbsolute)) {
-      return `Search path ("${searchDirAbsolute}") resolves outside the tool's root directory ("${this.rootDirectory}").`;
+    const workspaceContext = this.config.getWorkspaceContext();
+    if (!workspaceContext.isPathWithinWorkspace(searchDirAbsolute)) {
+      const directories = workspaceContext.getDirectories();
+      return `Search path ("${searchDirAbsolute}") resolves outside the allowed workspace directories: ${directories.join(', ')}`;
     }
 
-    const targetDir = searchDirAbsolute || this.rootDirectory;
+    const targetDir = searchDirAbsolute || this.config.getTargetDir();
     try {
       if (!fs.existsSync(targetDir)) {
         return `Search path does not exist ${targetDir}`;
@@ -183,125 +324,9 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
     return null;
   }
 
-  /**
-   * Gets a description of the glob operation.
-   */
-  getDescription(params: GlobToolParams): string {
-    let description = `'${params.pattern}'`;
-    if (params.path) {
-      const searchDir = path.resolve(this.rootDirectory, params.path || '.');
-      const relativePath = makeRelative(searchDir, this.rootDirectory);
-      description += ` within ${shortenPath(relativePath)}`;
-    }
-    return description;
-  }
-
-  /**
-   * Executes the glob search with the given parameters
-   */
-  async execute(
+  protected createInvocation(
     params: GlobToolParams,
-    signal: AbortSignal,
-  ): Promise<ToolResult> {
-    const validationError = this.validateToolParams(params);
-    if (validationError) {
-      return {
-        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: validationError,
-      };
-    }
-
-    try {
-      const searchDirAbsolute = path.resolve(
-        this.rootDirectory,
-        params.path || '.',
-      );
-
-      // Get centralized file discovery service
-      const respectGitIgnore =
-        params.respect_git_ignore ??
-        this.config.getFileFilteringRespectGitIgnore();
-      const fileDiscovery = this.config.getFileService();
-
-      const entries = (await glob(params.pattern, {
-        cwd: searchDirAbsolute,
-        withFileTypes: true,
-        nodir: true,
-        stat: true,
-        nocase: !params.case_sensitive,
-        dot: true,
-        ignore: ['**/node_modules/**', '**/.git/**'],
-        follow: false,
-        signal,
-      })) as GlobPath[];
-
-      // Apply git-aware filtering if enabled and in git repository
-      let filteredEntries = entries;
-      let gitIgnoredCount = 0;
-
-      if (respectGitIgnore) {
-        const relativePaths = entries.map((p) =>
-          path.relative(this.rootDirectory, p.fullpath()),
-        );
-        const filteredRelativePaths = fileDiscovery.filterFiles(relativePaths, {
-          respectGitIgnore,
-        });
-        const filteredAbsolutePaths = new Set(
-          filteredRelativePaths.map((p) => path.resolve(this.rootDirectory, p)),
-        );
-
-        filteredEntries = entries.filter((entry) =>
-          filteredAbsolutePaths.has(entry.fullpath()),
-        );
-        gitIgnoredCount = entries.length - filteredEntries.length;
-      }
-
-      if (!filteredEntries || filteredEntries.length === 0) {
-        let message = `No files found matching pattern "${params.pattern}" within ${searchDirAbsolute}.`;
-        if (gitIgnoredCount > 0) {
-          message += ` (${gitIgnoredCount} files were git-ignored)`;
-        }
-        return {
-          llmContent: message,
-          returnDisplay: `No files found`,
-        };
-      }
-
-      // Set filtering such that we first show the most recent files
-      const oneDayInMs = 24 * 60 * 60 * 1000;
-      const nowTimestamp = new Date().getTime();
-
-      // Sort the filtered entries using the new helper function
-      const sortedEntries = sortFileEntries(
-        filteredEntries,
-        nowTimestamp,
-        oneDayInMs,
-      );
-
-      const sortedAbsolutePaths = sortedEntries.map((entry) =>
-        entry.fullpath(),
-      );
-      const fileListDescription = sortedAbsolutePaths.join('\n');
-      const fileCount = sortedAbsolutePaths.length;
-
-      let resultMessage = `Found ${fileCount} file(s) matching "${params.pattern}" within ${searchDirAbsolute}`;
-      if (gitIgnoredCount > 0) {
-        resultMessage += ` (${gitIgnoredCount} additional files were git-ignored)`;
-      }
-      resultMessage += `, sorted by modification time (newest first):\n${fileListDescription}`;
-
-      return {
-        llmContent: resultMessage,
-        returnDisplay: `Found ${fileCount} matching file(s)`,
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error(`GlobLogic execute Error: ${errorMessage}`, error);
-      return {
-        llmContent: `Error during glob search operation: ${errorMessage}`,
-        returnDisplay: `Error: An unexpected error occurred.`,
-      };
-    }
+  ): ToolInvocation<GlobToolParams, ToolResult> {
+    return new GlobToolInvocation(this.config, params);
   }
 }

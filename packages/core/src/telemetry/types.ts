@@ -7,31 +7,12 @@
 import { GenerateContentResponseUsageMetadata } from '@google/genai';
 import { Config } from '../config/config.js';
 import { CompletedToolCall } from '../core/coreToolScheduler.js';
-import { ToolConfirmationOutcome } from '../tools/tools.js';
+import { FileDiff } from '../tools/tools.js';
 import { AuthType } from '../core/contentGenerator.js';
-
-export enum ToolCallDecision {
-  ACCEPT = 'accept',
-  REJECT = 'reject',
-  MODIFY = 'modify',
-}
-
-export function getDecisionFromOutcome(
-  outcome: ToolConfirmationOutcome,
-): ToolCallDecision {
-  switch (outcome) {
-    case ToolConfirmationOutcome.ProceedOnce:
-    case ToolConfirmationOutcome.ProceedAlways:
-    case ToolConfirmationOutcome.ProceedAlwaysServer:
-    case ToolConfirmationOutcome.ProceedAlwaysTool:
-      return ToolCallDecision.ACCEPT;
-    case ToolConfirmationOutcome.ModifyWithEditor:
-      return ToolCallDecision.MODIFY;
-    case ToolConfirmationOutcome.Cancel:
-    default:
-      return ToolCallDecision.REJECT;
-  }
-}
+import {
+  getDecisionFromOutcome,
+  ToolCallDecision,
+} from './tool-call-decision.js';
 
 export class StartSessionEvent {
   'event.name': 'cli_config';
@@ -95,12 +76,21 @@ export class UserPromptEvent {
   'event.name': 'user_prompt';
   'event.timestamp': string; // ISO 8601
   prompt_length: number;
+  prompt_id: string;
+  auth_type?: string;
   prompt?: string;
 
-  constructor(prompt_length: number, prompt?: string) {
+  constructor(
+    prompt_length: number,
+    prompt_Id: string,
+    auth_type?: string,
+    prompt?: string,
+  ) {
     this['event.name'] = 'user_prompt';
     this['event.timestamp'] = new Date().toISOString();
     this.prompt_length = prompt_length;
+    this.prompt_id = prompt_Id;
+    this.auth_type = auth_type;
     this.prompt = prompt;
   }
 }
@@ -115,6 +105,9 @@ export class ToolCallEvent {
   decision?: ToolCallDecision;
   error?: string;
   error_type?: string;
+  prompt_id: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  metadata?: { [key: string]: any };
 
   constructor(call: CompletedToolCall) {
     this['event.name'] = 'tool_call';
@@ -127,7 +120,25 @@ export class ToolCallEvent {
       ? getDecisionFromOutcome(call.outcome)
       : undefined;
     this.error = call.response.error?.message;
-    this.error_type = call.response.error?.name;
+    this.error_type = call.response.errorType;
+    this.prompt_id = call.request.prompt_id;
+
+    if (
+      call.status === 'success' &&
+      typeof call.response.resultDisplay === 'object' &&
+      call.response.resultDisplay !== null &&
+      'diffStat' in call.response.resultDisplay
+    ) {
+      const diffStat = (call.response.resultDisplay as FileDiff).diffStat;
+      if (diffStat) {
+        this.metadata = {
+          ai_added_lines: diffStat.ai_added_lines,
+          ai_removed_lines: diffStat.ai_removed_lines,
+          user_added_lines: diffStat.user_added_lines,
+          user_removed_lines: diffStat.user_removed_lines,
+        };
+      }
+    }
   }
 }
 
@@ -135,12 +146,14 @@ export class ApiRequestEvent {
   'event.name': 'api_request';
   'event.timestamp': string; // ISO 8601
   model: string;
+  prompt_id: string;
   request_text?: string;
 
-  constructor(model: string, request_text?: string) {
+  constructor(model: string, prompt_id: string, request_text?: string) {
     this['event.name'] = 'api_request';
     this['event.timestamp'] = new Date().toISOString();
     this.model = model;
+    this.prompt_id = prompt_id;
     this.request_text = request_text;
   }
 }
@@ -153,11 +166,15 @@ export class ApiErrorEvent {
   error_type?: string;
   status_code?: number | string;
   duration_ms: number;
+  prompt_id: string;
+  auth_type?: string;
 
   constructor(
     model: string,
     error: string,
     duration_ms: number,
+    prompt_id: string,
+    auth_type?: string,
     error_type?: string,
     status_code?: number | string,
   ) {
@@ -168,6 +185,8 @@ export class ApiErrorEvent {
     this.error_type = error_type;
     this.status_code = status_code;
     this.duration_ms = duration_ms;
+    this.prompt_id = prompt_id;
+    this.auth_type = auth_type;
   }
 }
 
@@ -183,11 +202,16 @@ export class ApiResponseEvent {
   cached_content_token_count: number;
   thoughts_token_count: number;
   tool_token_count: number;
+  total_token_count: number;
   response_text?: string;
+  prompt_id: string;
+  auth_type?: string;
 
   constructor(
     model: string,
     duration_ms: number,
+    prompt_id: string,
+    auth_type?: string,
     usage_data?: GenerateContentResponseUsageMetadata,
     response_text?: string,
     error?: string,
@@ -202,8 +226,102 @@ export class ApiResponseEvent {
     this.cached_content_token_count = usage_data?.cachedContentTokenCount ?? 0;
     this.thoughts_token_count = usage_data?.thoughtsTokenCount ?? 0;
     this.tool_token_count = usage_data?.toolUsePromptTokenCount ?? 0;
+    this.total_token_count = usage_data?.totalTokenCount ?? 0;
     this.response_text = response_text;
     this.error = error;
+    this.prompt_id = prompt_id;
+    this.auth_type = auth_type;
+  }
+}
+
+export class FlashFallbackEvent {
+  'event.name': 'flash_fallback';
+  'event.timestamp': string; // ISO 8601
+  auth_type: string;
+
+  constructor(auth_type: string) {
+    this['event.name'] = 'flash_fallback';
+    this['event.timestamp'] = new Date().toISOString();
+    this.auth_type = auth_type;
+  }
+}
+
+export enum LoopType {
+  CONSECUTIVE_IDENTICAL_TOOL_CALLS = 'consecutive_identical_tool_calls',
+  CHANTING_IDENTICAL_SENTENCES = 'chanting_identical_sentences',
+  LLM_DETECTED_LOOP = 'llm_detected_loop',
+}
+
+export class LoopDetectedEvent {
+  'event.name': 'loop_detected';
+  'event.timestamp': string; // ISO 8601
+  loop_type: LoopType;
+  prompt_id: string;
+
+  constructor(loop_type: LoopType, prompt_id: string) {
+    this['event.name'] = 'loop_detected';
+    this['event.timestamp'] = new Date().toISOString();
+    this.loop_type = loop_type;
+    this.prompt_id = prompt_id;
+  }
+}
+
+export class NextSpeakerCheckEvent {
+  'event.name': 'next_speaker_check';
+  'event.timestamp': string; // ISO 8601
+  prompt_id: string;
+  finish_reason: string;
+  result: string;
+
+  constructor(prompt_id: string, finish_reason: string, result: string) {
+    this['event.name'] = 'next_speaker_check';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
+    this.finish_reason = finish_reason;
+    this.result = result;
+  }
+}
+
+export class SlashCommandEvent {
+  'event.name': 'slash_command';
+  'event.timestamp': string; // ISO 8106
+  command: string;
+  subcommand?: string;
+
+  constructor(command: string, subcommand?: string) {
+    this['event.name'] = 'slash_command';
+    this['event.timestamp'] = new Date().toISOString();
+    this.command = command;
+    this.subcommand = subcommand;
+  }
+}
+
+export class MalformedJsonResponseEvent {
+  'event.name': 'malformed_json_response';
+  'event.timestamp': string; // ISO 8601
+  model: string;
+
+  constructor(model: string) {
+    this['event.name'] = 'malformed_json_response';
+    this['event.timestamp'] = new Date().toISOString();
+    this.model = model;
+  }
+}
+
+export enum IdeConnectionType {
+  START = 'start',
+  SESSION = 'session',
+}
+
+export class IdeConnectionEvent {
+  'event.name': 'ide_connection';
+  'event.timestamp': string; // ISO 8601
+  connection_type: IdeConnectionType;
+
+  constructor(connection_type: IdeConnectionType) {
+    this['event.name'] = 'ide_connection';
+    this['event.timestamp'] = new Date().toISOString();
+    this.connection_type = connection_type;
   }
 }
 
@@ -214,4 +332,10 @@ export type TelemetryEvent =
   | ToolCallEvent
   | ApiRequestEvent
   | ApiErrorEvent
-  | ApiResponseEvent;
+  | ApiResponseEvent
+  | FlashFallbackEvent
+  | LoopDetectedEvent
+  | NextSpeakerCheckEvent
+  | SlashCommandEvent
+  | MalformedJsonResponseEvent
+  | IdeConnectionEvent;

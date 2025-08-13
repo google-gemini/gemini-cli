@@ -22,7 +22,6 @@ import {
   Part,
   SafetySetting,
   PartUnion,
-  SchemaUnion,
   SpeechConfigUnion,
   ThinkingConfig,
   ToolListUnion,
@@ -32,6 +31,7 @@ import {
 export interface CAGenerateContentRequest {
   model: string;
   project?: string;
+  user_prompt_id?: string;
   request: VertexGenerateContentRequest;
 }
 
@@ -44,6 +44,7 @@ interface VertexGenerateContentRequest {
   labels?: Record<string, string>;
   safetySettings?: SafetySetting[];
   generationConfig?: VertexGenerationConfig;
+  session_id?: string;
 }
 
 interface VertexGenerationConfig {
@@ -59,7 +60,7 @@ interface VertexGenerationConfig {
   frequencyPenalty?: number;
   seed?: number;
   responseMimeType?: string;
-  responseSchema?: SchemaUnion;
+  responseJsonSchema?: unknown;
   routingConfig?: GenerationConfigRoutingConfig;
   modelSelectionConfig?: ModelSelectionConfig;
   responseModalities?: string[];
@@ -79,6 +80,7 @@ interface VertexGenerateContentResponse {
   promptFeedback?: GenerateContentResponsePromptFeedback;
   usageMetadata?: GenerateContentResponseUsageMetadata;
 }
+
 export interface CaCountTokenRequest {
   request: VertexCountTokenRequest;
 }
@@ -113,12 +115,15 @@ export function fromCountTokenResponse(
 
 export function toGenerateContentRequest(
   req: GenerateContentParameters,
+  userPromptId: string,
   project?: string,
+  sessionId?: string,
 ): CAGenerateContentRequest {
   return {
     model: req.model,
     project,
-    request: toVertexGenerateContentRequest(req),
+    user_prompt_id: userPromptId,
+    request: toVertexGenerateContentRequest(req, sessionId),
   };
 }
 
@@ -136,6 +141,7 @@ export function fromGenerateContentResponse(
 
 function toVertexGenerateContentRequest(
   req: GenerateContentParameters,
+  sessionId?: string,
 ): VertexGenerateContentRequest {
   return {
     contents: toContents(req.contents),
@@ -146,10 +152,11 @@ function toVertexGenerateContentRequest(
     labels: req.config?.labels,
     safetySettings: req.config?.safetySettings,
     generationConfig: toVertexGenerationConfig(req.config),
+    session_id: sessionId,
   };
 }
 
-function toContents(contents: ContentListUnion): Content[] {
+export function toContents(contents: ContentListUnion): Content[] {
   if (Array.isArray(contents)) {
     // it's a Content[] or a PartsUnion[]
     return contents.map(toContent);
@@ -222,7 +229,7 @@ function toVertexGenerationConfig(
     frequencyPenalty: config.frequencyPenalty,
     seed: config.seed,
     responseMimeType: config.responseMimeType,
-    responseSchema: config.responseSchema,
+    responseJsonSchema: config.responseJsonSchema,
     routingConfig: config.routingConfig,
     modelSelectionConfig: config.modelSelectionConfig,
     responseModalities: config.responseModalities,

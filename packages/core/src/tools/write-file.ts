@@ -15,7 +15,9 @@ import {
   ToolEditConfirmationDetails,
   ToolConfirmationOutcome,
   ToolCallConfirmationDetails,
+  Icon,
 } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
@@ -23,14 +25,14 @@ import {
   ensureCorrectEdit,
   ensureCorrectFileContent,
 } from '../utils/editCorrector.js';
-import { GeminiClient } from '../core/client.js';
-import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
-import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
+import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
+import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
 import {
   recordFileOperationMetric,
   FileOperation,
 } from '../telemetry/metrics.js';
+import { IDEConnectionStatus } from '../ide/ide-client.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -45,6 +47,16 @@ export interface WriteFileToolParams {
    * The content to write to the file
    */
   content: string;
+
+  /**
+   * Whether the proposed content was modified by the user.
+   */
+  modified_by_user?: boolean;
+
+  /**
+   * Initially proposed content.
+   */
+  ai_proposed_content?: string;
 }
 
 interface GetCorrectedFileContentResult {
@@ -59,16 +71,18 @@ interface GetCorrectedFileContentResult {
  */
 export class WriteFileTool
   extends BaseTool<WriteFileToolParams, ToolResult>
-  implements ModifiableTool<WriteFileToolParams>
+  implements ModifiableDeclarativeTool<WriteFileToolParams>
 {
   static readonly Name: string = 'write_file';
-  private readonly client: GeminiClient;
 
   constructor(private readonly config: Config) {
     super(
       WriteFileTool.Name,
       'WriteFile',
-      'Writes content to a specified file in the local filesystem.',
+      `Writes content to a specified file in the local filesystem.
+
+      The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
+      Icon.Pencil,
       {
         properties: {
           file_path: {
@@ -85,38 +99,26 @@ export class WriteFileTool
         type: 'object',
       },
     );
-
-    this.client = this.config.getGeminiClient();
-  }
-
-  private isWithinRoot(pathToCheck: string): boolean {
-    const normalizedPath = path.normalize(pathToCheck);
-    const normalizedRoot = path.normalize(this.config.getTargetDir());
-    const rootWithSep = normalizedRoot.endsWith(path.sep)
-      ? normalizedRoot
-      : normalizedRoot + path.sep;
-    return (
-      normalizedPath === normalizedRoot ||
-      normalizedPath.startsWith(rootWithSep)
-    );
   }
 
   validateToolParams(params: WriteFileToolParams): string | null {
-    if (
-      this.schema.parameters &&
-      !SchemaValidator.validate(
-        this.schema.parameters as Record<string, unknown>,
-        params,
-      )
-    ) {
-      return 'Parameters failed schema validation.';
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
+    if (errors) {
+      return errors;
     }
+
     const filePath = params.file_path;
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute: ${filePath}`;
     }
-    if (!this.isWithinRoot(filePath)) {
-      return `File path must be within the root directory (${this.config.getTargetDir()}): ${filePath}`;
+
+    const workspaceContext = this.config.getWorkspaceContext();
+    if (!workspaceContext.isPathWithinWorkspace(filePath)) {
+      const directories = workspaceContext.getDirectories();
+      return `File path must be within one of the workspace directories: ${directories.join(', ')}`;
     }
 
     try {
@@ -138,8 +140,8 @@ export class WriteFileTool
   }
 
   getDescription(params: WriteFileToolParams): string {
-    if (!params.file_path || !params.content) {
-      return `Model did not provide valid parameters for write file tool`;
+    if (!params.file_path) {
+      return `Model did not provide valid parameters for write file tool, missing or empty "file_path"`;
     }
     const relativePath = makeRelative(
       params.file_path,
@@ -191,16 +193,34 @@ export class WriteFileTool
       DEFAULT_DIFF_OPTIONS,
     );
 
+    const ideClient = this.config.getIdeClient();
+    const ideConfirmation =
+      this.config.getIdeMode() &&
+      ideClient.getConnectionStatus().status === IDEConnectionStatus.Connected
+        ? ideClient.openDiff(params.file_path, correctedContent)
+        : undefined;
+
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
       title: `Confirm Write: ${shortenPath(relativePath)}`,
       fileName,
+      filePath: params.file_path,
       fileDiff,
+      originalContent,
+      newContent: correctedContent,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
         }
+
+        if (ideConfirmation) {
+          const result = await ideConfirmation;
+          if (result.status === 'accepted' && result.content) {
+            params.content = result.content;
+          }
+        }
       },
+      ideConfirmation,
     };
     return confirmationDetails;
   }
@@ -212,8 +232,12 @@ export class WriteFileTool
     const validationError = this.validateToolParams(params);
     if (validationError) {
       return {
-        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: `Error: ${validationError}`,
+        llmContent: `Could not write file due to invalid parameters: ${validationError}`,
+        returnDisplay: validationError,
+        error: {
+          message: validationError,
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
       };
     }
 
@@ -225,10 +249,16 @@ export class WriteFileTool
 
     if (correctedContentResult.error) {
       const errDetails = correctedContentResult.error;
-      const errorMsg = `Error checking existing file: ${errDetails.message}`;
+      const errorMsg = errDetails.code
+        ? `Error checking existing file '${params.file_path}': ${errDetails.message} (${errDetails.code})`
+        : `Error checking existing file: ${errDetails.message}`;
       return {
-        llmContent: `Error checking existing file ${params.file_path}: ${errDetails.message}`,
+        llmContent: errorMsg,
         returnDisplay: errorMsg,
+        error: {
+          message: errorMsg,
+          type: ToolErrorType.FILE_WRITE_FAILURE,
+        },
       };
     }
 
@@ -270,11 +300,33 @@ export class WriteFileTool
         DEFAULT_DIFF_OPTIONS,
       );
 
-      const llmSuccessMessage = isNewFile
-        ? `Successfully created and wrote to new file: ${params.file_path}`
-        : `Successfully overwrote file: ${params.file_path}`;
+      const originallyProposedContent =
+        params.ai_proposed_content || params.content;
+      const diffStat = getDiffStat(
+        fileName,
+        currentContentForDiff,
+        originallyProposedContent,
+        params.content,
+      );
 
-      const displayResult: FileDiff = { fileDiff, fileName };
+      const llmSuccessMessageParts = [
+        isNewFile
+          ? `Successfully created and wrote to new file: ${params.file_path}.`
+          : `Successfully overwrote file: ${params.file_path}.`,
+      ];
+      if (params.modified_by_user) {
+        llmSuccessMessageParts.push(
+          `User modified the \`content\` to be: ${params.content}`,
+        );
+      }
+
+      const displayResult: FileDiff = {
+        fileDiff,
+        fileName,
+        originalContent: correctedContentResult.originalContent,
+        newContent: correctedContentResult.correctedContent,
+        diffStat,
+      };
 
       const lines = fileContent.split('\n').length;
       const mimetype = getSpecificMimeType(params.file_path);
@@ -286,6 +338,7 @@ export class WriteFileTool
           lines,
           mimetype,
           extension,
+          diffStat,
         );
       } else {
         recordFileOperationMetric(
@@ -294,18 +347,52 @@ export class WriteFileTool
           lines,
           mimetype,
           extension,
+          diffStat,
         );
       }
 
       return {
-        llmContent: llmSuccessMessage,
+        llmContent: llmSuccessMessageParts.join(' '),
         returnDisplay: displayResult,
       };
     } catch (error) {
-      const errorMsg = `Error writing to file: ${error instanceof Error ? error.message : String(error)}`;
+      // Capture detailed error information for debugging
+      let errorMsg: string;
+      let errorType = ToolErrorType.FILE_WRITE_FAILURE;
+
+      if (isNodeError(error)) {
+        // Handle specific Node.js errors with their error codes
+        errorMsg = `Error writing to file '${params.file_path}': ${error.message} (${error.code})`;
+
+        // Log specific error types for better debugging
+        if (error.code === 'EACCES') {
+          errorMsg = `Permission denied writing to file: ${params.file_path} (${error.code})`;
+          errorType = ToolErrorType.PERMISSION_DENIED;
+        } else if (error.code === 'ENOSPC') {
+          errorMsg = `No space left on device: ${params.file_path} (${error.code})`;
+          errorType = ToolErrorType.NO_SPACE_LEFT;
+        } else if (error.code === 'EISDIR') {
+          errorMsg = `Target is a directory, not a file: ${params.file_path} (${error.code})`;
+          errorType = ToolErrorType.TARGET_IS_DIRECTORY;
+        }
+
+        // Include stack trace in debug mode for better troubleshooting
+        if (this.config.getDebugMode() && error.stack) {
+          console.error('Write file error stack:', error.stack);
+        }
+      } else if (error instanceof Error) {
+        errorMsg = `Error writing to file: ${error.message}`;
+      } else {
+        errorMsg = `Error writing to file: ${String(error)}`;
+      }
+
       return {
-        llmContent: `Error writing to file ${params.file_path}: ${errorMsg}`,
-        returnDisplay: `Error: ${errorMsg}`,
+        llmContent: errorMsg,
+        returnDisplay: errorMsg,
+        error: {
+          message: errorMsg,
+          type: errorType,
+        },
       };
     }
   }
@@ -346,13 +433,14 @@ export class WriteFileTool
     if (fileExists) {
       // This implies originalContent is available
       const { params: correctedParams } = await ensureCorrectEdit(
+        filePath,
         originalContent,
         {
           old_string: originalContent, // Treat entire current content as old_string
           new_string: proposedContent,
           file_path: filePath,
         },
-        this.client,
+        this.config.getGeminiClient(),
         abortSignal,
       );
       correctedContent = correctedParams.new_string;
@@ -360,7 +448,7 @@ export class WriteFileTool
       // This implies new file (ENOENT)
       correctedContent = await ensureCorrectFileContent(
         proposedContent,
-        this.client,
+        this.config.getGeminiClient(),
         abortSignal,
       );
     }
@@ -392,10 +480,15 @@ export class WriteFileTool
         _oldContent: string,
         modifiedProposedContent: string,
         originalParams: WriteFileToolParams,
-      ) => ({
-        ...originalParams,
-        content: modifiedProposedContent,
-      }),
+      ) => {
+        const content = originalParams.content;
+        return {
+          ...originalParams,
+          ai_proposed_content: content,
+          content: modifiedProposedContent,
+          modified_by_user: true,
+        };
+      },
     };
   }
 }
