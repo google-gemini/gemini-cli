@@ -138,7 +138,7 @@ export const ToolConfirmationMessage: React.FC<
     );
     if (config?.getIdeMode()) {
       options.push({
-        label: 'No (esc)',
+        label: 'No (esc or ctrl+c)',
         value: ToolConfirmationOutcome.Cancel,
       });
     } else {
@@ -147,7 +147,7 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ModifyWithEditor,
       });
       options.push({
-        label: 'No, suggest changes (esc)',
+        label: 'No, suggest changes (esc or ctrl+c)',
         value: ToolConfirmationOutcome.Cancel,
       });
     }
@@ -215,7 +215,7 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedAlways,
       },
       {
-        label: 'No, suggest changes (esc)',
+        label: 'No, suggest changes (esc or ctrl+c)',
         value: ToolConfirmationOutcome.Cancel,
       },
     );
@@ -259,7 +259,7 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedAlwaysServer,
       },
       {
-        label: 'No, suggest changes (esc)',
+        label: 'No, suggest changes (esc or ctrl+c)',
         value: ToolConfirmationOutcome.Cancel,
       },
     );
