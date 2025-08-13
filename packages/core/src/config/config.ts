@@ -185,7 +185,7 @@ export interface ConfigParameters {
   model: string;
   extensionContextFilePaths?: string[];
   maxSessionTurns?: number;
-  experimentalAcp?: boolean;
+  experimentalZedIntegration?: boolean;
   listExtensions?: boolean;
   extensions?: GeminiCLIExtension[];
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
@@ -197,6 +197,7 @@ export interface ConfigParameters {
   loadMemoryFromIncludeDirectories?: boolean;
   chatCompression?: ChatCompressionSettings;
   interactive?: boolean;
+  trustedFolder?: boolean;
 }
 
 export class Config {
@@ -256,10 +257,11 @@ export class Config {
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
-  private readonly experimentalAcp: boolean = false;
+  private readonly experimentalZedIntegration: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly chatCompression: ChatCompressionSettings | undefined;
   private readonly interactive: boolean;
+  private readonly trustedFolder: boolean | undefined;
   private initialized: boolean = false;
 
   constructor(params: ConfigParameters) {
@@ -309,7 +311,8 @@ export class Config {
     this.model = params.model;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
-    this.experimentalAcp = params.experimentalAcp ?? false;
+    this.experimentalZedIntegration =
+      params.experimentalZedIntegration ?? false;
     this.listExtensions = params.listExtensions ?? false;
     this._extensions = params.extensions ?? [];
     this._blockedMcpServers = params.blockedMcpServers ?? [];
@@ -323,6 +326,7 @@ export class Config {
       params.loadMemoryFromIncludeDirectories ?? false;
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
+    this.trustedFolder = params.trustedFolder;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -621,8 +625,8 @@ export class Config {
     return this.extensionContextFilePaths;
   }
 
-  getExperimentalAcp(): boolean {
-    return this.experimentalAcp;
+  getExperimentalZedIntegration(): boolean {
+    return this.experimentalZedIntegration;
   }
 
   getListExtensions(): boolean {
@@ -661,6 +665,10 @@ export class Config {
 
   getFolderTrust(): boolean {
     return this.folderTrust;
+  }
+
+  isTrustedFolder(): boolean | undefined {
+    return this.trustedFolder;
   }
 
   setIdeMode(value: boolean): void {
