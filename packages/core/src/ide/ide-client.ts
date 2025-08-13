@@ -229,8 +229,9 @@ export class IdeClient {
   }
 
   private validateWorkspacePath(): boolean {
-    const ideWorkspacePath = process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
-    if (ideWorkspacePath === undefined) {
+    const ideWorkspacePaths =
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH']?.split(':');
+    if (!ideWorkspacePaths || ideWorkspacePaths.length === 0) {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
@@ -238,26 +239,27 @@ export class IdeClient {
       );
       return false;
     }
-    if (ideWorkspacePath === '') {
+
+    const cwd = getRealPath(process.cwd()).toLocaleLowerCase();
+    const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) => {
+      const idePath = getRealPath(workspacePath).toLocaleLowerCase();
+      const rel = path.relative(idePath, cwd);
+      return !rel.startsWith('..') && !path.isAbsolute(rel);
+    });
+
+    if (!isWithinWorkspace) {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `To use this feature, please open a single workspace folder in ${this.currentIdeDisplayName} and try again.`,
+        `Directory mismatch. Gemini CLI is running in a different location than the open workspace in ${
+          this.currentIdeDisplayName
+        }. Please run the CLI from one of the following directories: ${ideWorkspacePaths.join(
+          ', ',
+        )}`,
         true,
       );
       return false;
     }
 
-    const idePath = getRealPath(ideWorkspacePath).toLocaleLowerCase();
-    const cwd = getRealPath(process.cwd()).toLocaleLowerCase();
-    const rel = path.relative(idePath, cwd);
-    if (rel.startsWith('..') || path.isAbsolute(rel)) {
-      this.setState(
-        IDEConnectionStatus.Disconnected,
-        `Directory mismatch. Gemini CLI is running in a different location than the open workspace in ${this.currentIdeDisplayName}. Please run the CLI from the same directory as your project's root folder.`,
-        true,
-      );
-      return false;
-    }
     return true;
   }
 
