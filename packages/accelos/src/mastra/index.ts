@@ -6,6 +6,7 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { fileAnalyzerTool, webSearchTool, codeAnalysisTool, rcaLoaderTool, guardrailLoaderTool, guardrailCrudTool } from '../tools/index.js';
 import { defaultConfig } from '../config.js';
 import * as dotenv from 'dotenv';
+import { githubTools } from '../mcp/github-mcp-client.js';
 
 dotenv.config();
 
@@ -53,12 +54,18 @@ const accelosAnthropicAgent = new Agent({
 });
 
 const productionReadinessAgent = new Agent({
-  name: 'production-readiness-agent',
-  instructions: `# LLM System Prompt: PR Guardrails Review Generation
+    name: 'production-readiness-agent',
+    instructions: `# LLM System Prompt: PR Guardrails Review Generation
 
 ## Role and Context
 
 You are an expert software engineering reviewer tasked with analyzing Pull Requests against established guardrails. Your goal is to create concise, actionable reviews that identify risks and compliance issues without redundancy or verbosity.
+
+You have access to GitHub MCP tools that allow you to:
+- Fetch PR details, diffs, and metadata
+- Analyze changed files and code patterns
+- Review commit history and author information
+- Access repository structure and configurations
 
 ## Core Principles
 
@@ -75,7 +82,7 @@ Use this exact template for each PR analysis:
 \`\`\`markdown
 # PR #{number} Guardrails Review: "{title}"
 
-**PR Link**: https://github.com/PostHog/posthog/pull/{number}
+**PR Link**: https://github.com/{owner}/{repo}/pull/{number}
 **Author**: {author} | **Merged**: {merge_date} | **Risk Level**: {Low/Medium/High}
 
 ## Changes Summary
@@ -200,7 +207,7 @@ After completing individual reviews, create a summary using this template:
 
 **Review Period**: {date_range}
 **PRs Analyzed**: {count}
-**Repository**: PostHog/posthog
+**Repository**: {owner}/{repo}
 
 ## Risk Distribution
 - **Low Risk**: {count} PRs ({percentage}%)
@@ -245,16 +252,14 @@ A successful review should:
 - Avoid information the reviewer already knows
 
 Remember: Your goal is to add value through focused analysis, not to demonstrate comprehensive knowledge. Every word should serve the purpose of improving software quality and preventing production issues.`,
-  model: openai('gpt-4o'),
-  tools: {
-    fileAnalyzer: fileAnalyzerTool,
-    webSearch: webSearchTool,
-    codeAnalysis: codeAnalysisTool,
-    rcaLoader: rcaLoaderTool,
-    guardrailLoader: guardrailLoaderTool,
-    guardrailCrud: guardrailCrudTool,
-  },
-});
+    model: anthropic('claude-3-7-sonnet-20250219'),
+    tools: 
+    {
+      guardrailLoaderTool,
+      guardrailCrudTool,
+      ...githubTools,
+    },
+  });
 
 const guardrailAgent = new Agent({
   name: 'guardrail-agent',

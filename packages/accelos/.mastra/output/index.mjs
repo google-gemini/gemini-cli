@@ -9,6 +9,7 @@ import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { z, ZodFirstPartyTypeKind } from 'zod';
 import * as dotenv from 'dotenv';
+import { MCPClient } from '@mastra/mcp';
 import * as fs from 'fs/promises';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
@@ -769,6 +770,22 @@ const defaultConfig = {
 };
 
 dotenv.config();
+const githubMCPClient = new MCPClient({
+  servers: {
+    github: {
+      url: new URL(process.env.GITHUB_MCP_SERVER_URL || "http://localhost:3001/mcp"),
+      requestInit: {
+        headers: {
+          "Authorization": `Bearer ${process.env.GITHUB_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    }
+  }
+});
+const githubTools = await githubMCPClient.getTools();
+
+dotenv.config();
 const accelosGoogleAgent = new Agent({
   name: "accelos-google",
   instructions: defaultConfig.systemPrompt,
@@ -816,6 +833,12 @@ const productionReadinessAgent = new Agent({
 
 You are an expert software engineering reviewer tasked with analyzing Pull Requests against established guardrails. Your goal is to create concise, actionable reviews that identify risks and compliance issues without redundancy or verbosity.
 
+You have access to GitHub MCP tools that allow you to:
+- Fetch PR details, diffs, and metadata
+- Analyze changed files and code patterns
+- Review commit history and author information
+- Access repository structure and configurations
+
 ## Core Principles
 
 1. **Concise Over Comprehensive**: Less is more - focus on essential findings only
@@ -831,7 +854,7 @@ Use this exact template for each PR analysis:
 \`\`\`markdown
 # PR #{number} Guardrails Review: "{title}"
 
-**PR Link**: https://github.com/PostHog/posthog/pull/{number}
+**PR Link**: https://github.com/{owner}/{repo}/pull/{number}
 **Author**: {author} | **Merged**: {merge_date} | **Risk Level**: {Low/Medium/High}
 
 ## Changes Summary
@@ -956,7 +979,7 @@ After completing individual reviews, create a summary using this template:
 
 **Review Period**: {date_range}
 **PRs Analyzed**: {count}
-**Repository**: PostHog/posthog
+**Repository**: {owner}/{repo}
 
 ## Risk Distribution
 - **Low Risk**: {count} PRs ({percentage}%)
@@ -1001,14 +1024,11 @@ A successful review should:
 - Avoid information the reviewer already knows
 
 Remember: Your goal is to add value through focused analysis, not to demonstrate comprehensive knowledge. Every word should serve the purpose of improving software quality and preventing production issues.`,
-  model: openai("gpt-4o"),
+  model: anthropic("claude-3-7-sonnet-20250219"),
   tools: {
-    fileAnalyzer: fileAnalyzerTool,
-    webSearch: webSearchTool,
-    codeAnalysis: codeAnalysisTool,
-    rcaLoader: rcaLoaderTool,
-    guardrailLoader: guardrailLoaderTool,
-    guardrailCrud: guardrailCrudTool
+    guardrailLoaderTool,
+    guardrailCrudTool,
+    ...githubTools
   }
 });
 const guardrailAgent = new Agent({
