@@ -114,6 +114,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        toolPermissions: {
+          alwaysAllow: [],
+        },
       });
       expect(settings.errors.length).toBe(0);
     });
@@ -149,6 +152,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        toolPermissions: {
+          alwaysAllow: [],
+        },
       });
     });
 
@@ -184,6 +190,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        toolPermissions: {
+          alwaysAllow: [],
+        },
       });
     });
 
@@ -217,6 +226,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        toolPermissions: {
+          alwaysAllow: [],
+        },
       });
     });
 
@@ -256,6 +268,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        toolPermissions: {
+          alwaysAllow: [],
+        },
       });
     });
 
@@ -307,6 +322,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        toolPermissions: {
+          alwaysAllow: [],
+        },
       });
     });
 
@@ -828,6 +846,46 @@ describe('Settings Loading and Merging', () => {
       ]);
     });
 
+    it('should merge toolPermissions.alwaysAllow from all scopes', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const systemSettingsContent = {
+        toolPermissions: {
+          alwaysAllow: ['system_tool'],
+        },
+      };
+      const userSettingsContent = {
+        toolPermissions: {
+          alwaysAllow: ['user_tool1', 'user_tool2'],
+        },
+      };
+      const workspaceSettingsContent = {
+        toolPermissions: {
+          alwaysAllow: ['workspace_tool'],
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.toolPermissions?.alwaysAllow).toEqual([
+        'system_tool',
+        'user_tool1',
+        'user_tool2',
+        'workspace_tool',
+      ]);
+    });
+
     it('should handle JSON parsing errors gracefully', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true); // Both files "exist"
       const invalidJsonContent = 'invalid json';
@@ -868,6 +926,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        toolPermissions: {
+          alwaysAllow: [],
+        },
       });
 
       // Check that error objects are populated in settings.errors
@@ -1306,6 +1367,9 @@ describe('Settings Loading and Merging', () => {
           mcpServers: {},
           includeDirectories: [],
           chatCompression: {},
+          toolPermissions: {
+            alwaysAllow: [],
+          },
         });
       });
     });

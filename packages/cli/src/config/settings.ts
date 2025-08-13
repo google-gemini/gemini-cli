@@ -128,6 +128,13 @@ export class LoadedSettings {
         ...(user.chatCompression || {}),
         ...(workspace.chatCompression || {}),
       },
+      toolPermissions: {
+        alwaysAllow: [
+          ...(system.toolPermissions?.alwaysAllow || []),
+          ...(user.toolPermissions?.alwaysAllow || []),
+          ...(workspace.toolPermissions?.alwaysAllow || []),
+        ],
+      },
     };
   }
 

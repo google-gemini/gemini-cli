@@ -495,6 +495,19 @@ export const SETTINGS_SCHEMA = {
     description: 'Show line numbers in the chat.',
     showInDialog: true,
   },
+  toolPermissions: {
+    type: 'object',
+    label: 'Tool Permissions',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: undefined as
+      | {
+          alwaysAllow?: string[];
+        }
+      | undefined,
+    description: 'Granular tool permissions.',
+    showInDialog: false,
+  },
 } as const;
 
 type InferSettings<T extends SettingsSchema> = {

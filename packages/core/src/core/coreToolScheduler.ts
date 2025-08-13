@@ -24,6 +24,7 @@ import {
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
+import { getCommandRoots } from '../utils/shell-utils.js';
 import {
   isModifiableDeclarativeTool,
   ModifyContext,
@@ -522,6 +523,30 @@ export class CoreToolScheduler {
     return this._schedule(request, signal);
   }
 
+  private _shouldSkipConfirmation(reqInfo: ToolCallRequestInfo): boolean {
+    const alwaysAllow = this.config.getToolPermissions()?.alwaysAllow ?? [];
+
+    if (
+      alwaysAllow.includes(reqInfo.name) ||
+      this.config.getApprovalMode() === ApprovalMode.YOLO
+    ) {
+      return true;
+    }
+
+    if (
+      reqInfo.name !== 'run_shell_command' ||
+      typeof reqInfo.args.command !== 'string'
+    ) {
+      return false;
+    }
+
+    const commandRoots = getCommandRoots(reqInfo.args.command);
+    return (
+      commandRoots.length > 0 &&
+      commandRoots.every((root) => alwaysAllow.includes(root))
+    );
+  }
+
   private async _schedule(
     request: ToolCallRequestInfo | ToolCallRequestInfo[],
     signal: AbortSignal,
@@ -591,7 +616,7 @@ export class CoreToolScheduler {
         const { request: reqInfo, invocation } = toolCall;
 
         try {
-          if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
+          if (this._shouldSkipConfirmation(reqInfo)) {
             this.setToolCallOutcome(
               reqInfo.callId,
               ToolConfirmationOutcome.ProceedAlways,
