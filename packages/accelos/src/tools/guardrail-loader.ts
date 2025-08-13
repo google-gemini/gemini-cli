@@ -1,12 +1,13 @@
 import { createTool } from '@mastra/core';
 import { z } from 'zod';
 import { GuardrailStore } from './shared-guardrail-store.js';
+import { defaultConfig } from '../config.js';
 
 export const guardrailLoaderTool = createTool({
   id: 'load-guardrails',
   description: 'Load guardrails from a JSON file into memory with optional auto-save for future changes',
   inputSchema: z.object({
-    filePath: z.string().describe('Path to the guardrails JSON file'),
+    filePath: z.string().optional().describe('Path to the guardrails JSON file (uses configured default if not provided)'),
     autoSave: z.boolean().default(true).describe('Automatically save changes to filesystem when guardrails are modified'),
   }),
   outputSchema: z.object({
@@ -21,7 +22,7 @@ export const guardrailLoaderTool = createTool({
     }),
   }),
   execute: async ({ context }) => {
-    const { filePath, autoSave } = context;
+    const { filePath = defaultConfig.guardrailFilePath, autoSave } = context;
     const store = GuardrailStore.getInstance();
 
     try {

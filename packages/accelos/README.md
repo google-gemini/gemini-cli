@@ -58,16 +58,44 @@ interface AccelosConfig {
   temperature: number;
   maxTokens: number;
   systemPrompt: string;
+  guardrailFilePath: string;
 }
 ```
 
 ### Environment Variables
 
-Set your API key using environment variables:
+Set your API key and configuration using environment variables:
 
 - `GOOGLE_API_KEY` - For Google Gemini models
 - `OPENAI_API_KEY` - For OpenAI models  
 - `ANTHROPIC_API_KEY` - For Anthropic Claude models
+- `ACCELOS_GUARDRAIL_FILE_PATH` - Path to the guardrails JSON file
+
+### Guardrails Configuration
+
+The agent supports configurable guardrails for code review and security analysis:
+
+- `guardrailFilePath` - Path to the guardrails JSON file (default: `./src/prompts/guardrails.json`)
+
+You can customize the guardrail file path in several ways:
+
+**Via Environment Variable:**
+```bash
+export ACCELOS_GUARDRAIL_FILE_PATH="./custom/path/to/guardrails.json"
+```
+
+**Via Configuration:**
+```typescript
+const agent = new AccelosAgent({
+  ...defaultConfig,
+  guardrailFilePath: './custom/path/to/guardrails.json'
+});
+```
+
+**Via .env File:**
+```env
+ACCELOS_GUARDRAIL_FILE_PATH=./custom/path/to/guardrails.json
+```
 
 ## Available Tools
 

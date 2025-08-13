@@ -613,11 +613,25 @@ class GuardrailStore {
   }
 }
 
+z.object({
+  llmProvider: z.enum(["openai", "google", "anthropic"]).default("google"),
+  apiKey: z.string().optional(),
+  model: z.string().default("gemini-2.0-flash-exp"),
+  temperature: z.number().min(0).max(2).default(0.1),
+  maxTokens: z.number().positive().default(1e3),
+  systemPrompt: z.string().default("You are Accelos, a helpful AI assistant."),
+  guardrailFilePath: z.string().default(process.env.ACCELOS_GUARDRAIL_FILE_PATH || "./src/prompts/guardrails.json")
+});
+const defaultConfig = {
+  systemPrompt: "You are Accelos, a helpful AI assistant that helps with various tasks including code analysis, document processing, and general assistance.",
+  guardrailFilePath: process.env.ACCELOS_GUARDRAIL_FILE_PATH || "./src/prompts/guardrails.json"
+};
+
 const guardrailLoaderTool = createTool({
   id: "load-guardrails",
   description: "Load guardrails from a JSON file into memory with optional auto-save for future changes",
   inputSchema: z.object({
-    filePath: z.string().describe("Path to the guardrails JSON file"),
+    filePath: z.string().optional().describe("Path to the guardrails JSON file (uses configured default if not provided)"),
     autoSave: z.boolean().default(true).describe("Automatically save changes to filesystem when guardrails are modified")
   }),
   outputSchema: z.object({
@@ -632,7 +646,7 @@ const guardrailLoaderTool = createTool({
     })
   }),
   execute: async ({ context }) => {
-    const { filePath, autoSave } = context;
+    const { filePath = defaultConfig.guardrailFilePath, autoSave } = context;
     const store = GuardrailStore.getInstance();
     try {
       const result = await store.loadFromFile(filePath, autoSave);
@@ -756,18 +770,6 @@ const guardrailCrudTool = createTool({
     }
   }
 });
-
-z.object({
-  llmProvider: z.enum(["openai", "google", "anthropic"]).default("google"),
-  apiKey: z.string().optional(),
-  model: z.string().default("gemini-2.0-flash-exp"),
-  temperature: z.number().min(0).max(2).default(0.1),
-  maxTokens: z.number().positive().default(1e3),
-  systemPrompt: z.string().default("You are Accelos, a helpful AI assistant.")
-});
-const defaultConfig = {
-  systemPrompt: "You are Accelos, a helpful AI assistant that helps with various tasks including code analysis, document processing, and general assistance."
-};
 
 dotenv.config();
 const githubMCPClient = new MCPClient({
