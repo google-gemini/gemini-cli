@@ -27,8 +27,8 @@ describe('extensions list command', () => {
   it('should display message when no extensions are installed', () => {
     mockedLoadExtensions.mockReturnValue([]);
     if (listCommand.handler) {
-        const handler = listCommand.handler as () => void;
-        handler();
+      const handler = listCommand.handler as () => void;
+      handler();
     }
     expect(consoleSpy).toHaveBeenCalledWith('Installed extensions:');
   });
@@ -40,8 +40,8 @@ describe('extensions list command', () => {
     ]);
 
     if (listCommand.handler) {
-        const handler = listCommand.handler as () => void;
-        handler();
+      const handler = listCommand.handler as () => void;
+      handler();
     }
 
     expect(consoleSpy).toHaveBeenCalledWith('Installed extensions:');
