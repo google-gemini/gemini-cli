@@ -9,14 +9,10 @@
  * and then detect and warn about the potential tools that caused the error.
  */
 
-import { test, describe, before } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { describe, it, beforeAll, expect } from 'vitest';
 import { TestRig } from './test-helper.js';
 import { join } from 'path';
-import { fileURLToPath } from 'url';
 import { writeFileSync } from 'fs';
-
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // Create a minimal MCP server that doesn't require external dependencies
 // This implements the MCP protocol directly using Node.js built-ins
@@ -160,7 +156,7 @@ rpc.send({
 describe('mcp server with cyclic tool schema is detected', () => {
   const rig = new TestRig();
 
-  before(async () => {
+  beforeAll(async () => {
     // Setup test directory with MCP server configuration
     await rig.setup('cyclic-schema-mcp-server', {
       settings: {
@@ -174,7 +170,7 @@ describe('mcp server with cyclic tool schema is detected', () => {
     });
 
     // Create server script in the test directory
-    const testServerPath = join(rig.testDir, 'mcp-server.cjs');
+    const testServerPath = join(rig.testDir!, 'mcp-server.cjs');
     writeFileSync(testServerPath, serverScript);
 
     // Make the script executable (though running with 'node' should work anyway)
@@ -184,15 +180,14 @@ describe('mcp server with cyclic tool schema is detected', () => {
     }
   });
 
-  test('should error and suggest disabling the cyclic tool', async () => {
+  it('should error and suggest disabling the cyclic tool', async () => {
     // Just run any command to trigger the schema depth error.
     // If this test starts failing, check `isSchemaDepthError` from
     // geminiChat.ts to see if it needs to be updated.
     // Or, possibly it could mean that gemini has fixed the issue.
     const output = await rig.run('hello');
 
-    assert.match(
-      output,
+    expect(output).toMatch(
       /Skipping tool 'tool_with_cyclic_schema' from MCP server 'cyclic-schema-server' because it has missing types in its parameter schema/,
     );
   });

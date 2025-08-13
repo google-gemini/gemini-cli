@@ -28,10 +28,11 @@ permissions:
   id-token: 'write'
   issues: 'write'
   statuses: 'write'
+  packages: 'read'
 
 jobs:
   triage-issue:
-    if: >
+    if: |-
       github.repository == 'google-gemini/gemini-cli' &&
       (github.event_name == 'issues' ||
        github.event_name == 'workflow_dispatch' ||
@@ -44,18 +45,18 @@ jobs:
     runs-on: 'ubuntu-latest'
 
     steps:
-      - name: 'Checkout repository'
-        uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683'
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
 
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
-        uses: 'actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
 
       - name: 'Run Gemini Issue Triage'
-        uses: 'google-github-actions/run-gemini-cli@20351b5ea2b4179431f1ae8918a246a0808f8747'
+        uses: 'google-github-actions/run-gemini-cli@06123c6a203eb7a964ce3be7c48479cc66059f23' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_issue_triage'
         env:
           GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
@@ -93,13 +94,13 @@ jobs:
 
             ## Steps
 
-            1. Run: `gh label list --repo ${{ github.repository }} --limit 100` to get all available labels.
+            1. Run: `gh label list --repo "${REPOSITORY}" --limit 100` to get all available labels.
             2. Review the issue title and body provided in the environment variables: "${ISSUE_TITLE}" and "${ISSUE_BODY}".
             3. Ignore any existing priorities or tags on the issue. Just report your findings.
-            4. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. For area/* and kind/* limit yourself to only the single most applicable label in each case. 
-            6. Apply the selected labels to this issue using: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`.
+            4. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. For area/* and kind/* limit yourself to only the single most applicable label in each case.
+            6. Apply the selected labels to this issue using: `gh issue edit "${ISSUE_NUMBER}" --repo "${REPOSITORY}" --add-label "label1,label2"`.
             7. For each issue please check if CLI version is present, this is usually in the output of the /about command  and will look like 0.1.5 for anything more than 6 versions older than the most recent should add the status/need-retesting label.
-            8. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label.
+            8. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label.
             9. Use Area definitions mentioned below to help you narrow down issues.
 
             ## Guidelines
@@ -111,7 +112,7 @@ jobs:
             - Apply only one kind/ label.
             - Apply all applicable sub-area/* and priority/* labels based on the issue content. It's ok to have multiple of these.
             - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
-            Categorization Guidelines: 
+            Categorization Guidelines:
             P0: Critical / Blocker
             - A P0 bug is a catastrophic failure that demands immediate attention. It represents a complete showstopper for a significant portion of users or for the development process itself.
             Impact:
@@ -149,16 +150,16 @@ jobs:
             - If users are talking about issues where the model gets downgraded from pro to flash then i want you to categorize that as a performance issue
             - This product is designed to use different models eg.. using pro, downgrading to flash etc. when users report that they dont expect the model to change those would be categorized as feature requests.
             Definition of Areas
-            area/ux: 
+            area/ux:
             - Issues concerning user-facing elements like command usability, interactive features, help docs, and perceived performance.
-            - I am seeing my screen flicker when using Gemini CLI 
-            - I am seeing the output malformed 
-            - Theme changes aren't taking effect 
+            - I am seeing my screen flicker when using Gemini CLI
+            - I am seeing the output malformed
+            - Theme changes aren't taking effect
             - My keyboard inputs arent' being recognzied
-            area/platform: 
+            area/platform:
             - Issues related to installation, packaging, OS compatibility (Windows, macOS, Linux), and the underlying CLI framework.
             area/background: Issues related to long-running background tasks, daemons, and autonomous or proactive agent features.
-            area/models: 
+            area/models:
             - i am not getting a response that is reasonable or expected. this can include things like
             - I am calling a tool and the tool is not performing as expected.
             - i am expecting a tool to be called and it is not getting called ,
@@ -172,10 +173,10 @@ jobs:
             - Memory compression
             - unexpected responses,
             - poor quality of generated code
-            area/tools: 
-            - These are primarily issues related to Model Context Protocol 
-            - These are issues that mention MCP support 
-            - feature requests asking for support for new tools. 
+            area/tools:
+            - These are primarily issues related to Model Context Protocol
+            - These are issues that mention MCP support
+            - feature requests asking for support for new tools.
             area/core: Issues with fundamental components like command parsing, configuration management, session state, and the main API client logic. Introducing multi-modality
             area/contribution: Issues related to improving the developer contribution experience, such as CI/CD pipelines, build scripts, and test automation infrastructure.
             area/authentication: Issues related to user identity, login flows, API key handling, credential storage, and access token management, unable to sign in selecting wrong authentication path etc..
@@ -191,13 +192,162 @@ jobs:
       - name: 'Post Issue Triage Failure Comment'
         if: |-
           ${{ failure() && steps.gemini_issue_triage.outcome == 'failure' }}
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea' # ratchet:actions/github-script@v7
+        env:
+          REPOSITORY: '${{ github.repository }}'
+          RUN_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
         with:
           github-token: '${{ steps.generate_token.outputs.token }}'
           script: |-
             github.rest.issues.createComment({
-              owner: '${{ github.repository }}'.split('/')[0],
-              repo: '${{ github.repository }}'.split('/')[1],
+              owner: process.env.REPOSITORY.split('/')[0],
+              repo: process.env.REPOSITORY.split('/')[1],
               issue_number: '${{ github.event.issue.number }}',
-              body: 'There is a problem with the Gemini CLI issue triaging. Please check the [action logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.'
+              body: `There is a problem with the Gemini CLI issue triaging. Please check the [action logs](${process.env.RUN_URL}) for details.`
             })
+
+  deduplicate-issues:
+    if: |-
+      github.repository == 'google-gemini/gemini-cli' &&
+      vars.TRIAGE_DEDUPLICATE_ISSUES != '' &&
+      (github.event_name == 'issues' ||
+       github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'issue_comment' &&
+       contains(github.event.comment.body, '@gemini-cli /deduplicate') &&
+       (github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'COLLABORATOR')))
+
+    timeout-minutes: 20
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+
+      - name: 'Log in to GitHub Container Registry'
+        uses: 'docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1' # ratchet:docker/login-action@v3
+        with:
+          registry: 'ghcr.io'
+          username: '${{ github.actor }}'
+          password: '${{ secrets.GITHUB_TOKEN }}'
+
+      - name: 'Run Gemini Issue Deduplication'
+        uses: 'google-github-actions/run-gemini-cli@06123c6a203eb7a964ce3be7c48479cc66059f23' # ratchet:google-github-actions/run-gemini-cli@v0
+        id: 'gemini_issue_deduplication'
+        env:
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          ISSUE_TITLE: '${{ github.event.issue.title }}'
+          ISSUE_BODY: '${{ github.event.issue.body }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number }}'
+          REPOSITORY: '${{ github.repository }}'
+          FIRESTORE_PROJECT: '${{ vars.FIRESTORE_PROJECT }}'
+        with:
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          settings: |-
+            {
+              "mcpServers": {
+                "issue_deduplication": {
+                  "command": "docker",
+                  "args": [
+                    "run",
+                    "-i",
+                    "--rm",
+                    "--network", "host",
+                    "-e", "GITHUB_TOKEN",
+                    "-e", "GEMINI_API_KEY",
+                    "-e", "DATABASE_TYPE",
+                    "-e", "FIRESTORE_DATABASE_ID",
+                    "-e", "GCP_PROJECT",
+                    "-e", "GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json",
+                    "-v", "${GOOGLE_APPLICATION_CREDENTIALS}:/app/gcp-credentials.json",
+                    "ghcr.io/google-gemini/gemini-cli-issue-triage@sha256:e3de1523f6c83aabb3c54b76d08940a2bf42febcb789dd2da6f95169641f94d3"
+                  ],
+                  "env": {
+                    "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+                    "GEMINI_API_KEY": "${{ secrets.GEMINI_API_KEY }}",
+                    "DATABASE_TYPE":"firestore",
+                    "GCP_PROJECT": "${FIRESTORE_PROJECT}",
+                    "FIRESTORE_DATABASE_ID": "(default)",
+                    "GOOGLE_APPLICATION_CREDENTIALS": "${GOOGLE_APPLICATION_CREDENTIALS}"
+                  },
+                  "enabled": true,
+                  "timeout": 600000
+                }
+              },
+              "maxSessionTurns": 25,
+              "coreTools": [
+                "run_shell_command(echo)",
+                "run_shell_command(gh issue comment)",
+                "run_shell_command(gh issue view)",
+                "run_shell_command(gh issue edit)"
+              ],
+              "telemetry": {
+                "enabled": true,
+                "target": "gcp"
+              }
+            }
+          prompt: |-
+            ## Role
+            You are an issue de-duplication assistant. Your goal is to find
+            duplicate issues, label the current issue as a duplicate, and notify
+            the user by commenting on the current issue, while avoiding
+            duplicate comments.
+            ## Steps
+            1.  **Find Potential Duplicates:**
+                - The repository is ${{ github.repository }} and the issue number is ${{ github.event.issue.number }}.
+                - Use the `duplicates` tool with the `repo` and `issue_number` to find potential duplicates for the current issue. Do not use the `threshold` parameter.
+                - If no duplicates are found, you are done.
+                - Print the JSON output from the `duplicates` tool to the logs.
+            2.  **Refine Duplicates List (if necessary):**
+                - If the `duplicates` tool returns between 1 and 14 results, you must refine the list.
+                - For each potential duplicate issue, run `gh issue view <issue-number> --json title,body,comments` to fetch its content.
+                - Also fetch the content of the original issue: `gh issue view "${ISSUE_NUMBER}" --json title,body,comments`.
+                - Carefully analyze the content (title, body, comments) of the original issue and all potential duplicates.
+                - It is very important if the comments on either issue mention that they are not duplicates of each other, to treat them as not duplicates.
+                - Based on your analysis, create a final list containing only the issues you are highly confident are actual duplicates.
+                - If your final list is empty, you are done.
+                - Print to the logs if you omitted any potential duplicates based on your analysis.
+                - If the `duplicates` tool returned 15+ results, use the top 15 matches (based on descending similarity score value) to perform this step.
+            3.  **Format Final Duplicates List:**
+                Format the final list of duplicates into a markdown string.
+                The format should be:
+                "Found possible duplicate issues:\n\n- #${issue_number}\n\nIf you believe this is not a duplicate, please remove the `status/possible-duplicate` label."
+                Add an HTML comment to the end for identification: `<!-- gemini-cli-deduplication -->`
+            4.  **Check for Existing Comment:**
+                - Run `gh issue view "${ISSUE_NUMBER}" --json comments` to get all
+                  comments on the issue.
+                - Look for a comment made by a bot (the author's login often ends in `[bot]`) that contains `<!-- gemini-cli-deduplication -->`.
+                - If you find such a comment, store its `id` and `body`.
+            5.  **Decide Action:**
+                - **If an existing comment is found:**
+                    - Compare the new list of duplicate issues with the list from the existing comment's body.
+                    - If they are the same, do nothing.
+                    - If they are different, edit the existing comment. Use
+                      `gh issue comment "${ISSUE_NUMBER}" --edit-comment <comment-id> --body "..."`.
+                      The new body should be the new list of duplicates, but with the header "Found possible duplicate issues (updated):".
+                - **If no existing comment is found:**
+                    - Create a new comment with the list of duplicates.
+                    - Use `gh issue comment "${ISSUE_NUMBER}" --body "..."`.
+            6.  **Add Duplicate Label:**
+                - If you created or updated a comment in the previous step, add the `duplicate` label to the current issue.
+                - Use `gh issue edit "${ISSUE_NUMBER}" --add-label "status/possible-duplicate"`.
+            ## Guidelines
+            - Only use the `duplicates` and `run_shell_command` tools.
+            - The `run_shell_command` tool can be used with `gh issue view`, `gh issue comment`, and `gh issue edit`.
+            - Do not download or read media files like images, videos, or links. The `--json` flag for `gh issue view` will prevent this.
+            - Do not modify the issue content or status.
+            - Only comment on and label the current issue.
+            - Reference all shell variables as "${VAR}" (with quotes and braces).
