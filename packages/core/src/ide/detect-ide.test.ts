@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { detectIde, DetectedIde } from './detect-ide';
+import { detectIde, DetectedIde } from './detect-ide.js';
 
 describe('detectIde', () => {
   afterEach(() => {
