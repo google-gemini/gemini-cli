@@ -23,6 +23,8 @@ import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
 
 // Exit code used when user clears authentication method
+// NOTE: This constant is also defined in packages/core/src/utils/constants.ts
+// Keep these values synchronized.
 const EXIT_CODE_AUTH_CLEARED = 42;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

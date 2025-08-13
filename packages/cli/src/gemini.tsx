@@ -37,6 +37,7 @@ import {
   logIdeConnection,
   IdeConnectionEvent,
   IdeConnectionType,
+  UserClearedAuthMethodError,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -250,7 +251,7 @@ export async function main() {
     try {
       await getOauthClient(settings.merged.selectedAuthType, config);
     } catch (error: any) {
-      if (error?.message === 'USER_CLEARED_AUTH_METHOD') {
+      if (error instanceof UserClearedAuthMethodError) {
         // Clear the selected auth type when user requests it
         settings.setValue(SettingScope.User, 'selectedAuthType', undefined);
         // Re-throw to trigger restart

@@ -19,7 +19,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import * as os from 'os';
 import { Config } from '../config/config.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, UserClearedAuthMethodError } from '../utils/errors.js';
 import {
   cacheGoogleAccount,
   getCachedGoogleAccount,
@@ -27,9 +27,6 @@ import {
 } from '../utils/user_account.js';
 import { AuthType } from '../core/contentGenerator.js';
 import readline from 'node:readline';
-
-// Exit code used when user clears authentication method
-const EXIT_CODE_AUTH_CLEARED = 42;
 
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
@@ -142,19 +139,16 @@ export async function getOauthClient(
       for (let i = 0; !success && i < maxRetries; i++) {
         try {
           success = await authWithUserCode(client);
-          if (!success) {
-            console.error(
-              '\nFailed to authenticate with user code.',
-              i === maxRetries - 1 ? '' : 'Retrying...\n',
-            );
-          }
         } catch (err: any) {
-          if (err?.message === 'USER_CLEARED_AUTH_METHOD') {
+          if (err instanceof UserClearedAuthMethodError) {
             // User cleared auth method, propagate the error to trigger restart
             throw err;
           }
           // For other errors, treat as authentication failure and continue retry logic
           success = false;
+        }
+
+        if (!success) {
           console.error(
             '\nFailed to authenticate with user code.',
             i === maxRetries - 1 ? '' : 'Retrying...\n',
@@ -165,7 +159,7 @@ export async function getOauthClient(
         process.exit(1);
       }
     } catch (err: any) {
-      if (err?.message === 'USER_CLEARED_AUTH_METHOD') {
+      if (err instanceof UserClearedAuthMethodError) {
         // Re-throw to be handled by the caller
         throw err;
       }
@@ -240,7 +234,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         rl.close();
         clearCachedCredentialFile().then(() => {
           // Let the caller handle settings cleanup
-          reject(new Error('USER_CLEARED_AUTH_METHOD'));
+          reject(new UserClearedAuthMethodError());
         });
       }
     };
