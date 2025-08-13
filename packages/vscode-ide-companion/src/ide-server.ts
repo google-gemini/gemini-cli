@@ -57,7 +57,7 @@ export class IDEServer {
     this.diffManager = diffManager;
     this.portFile = path.join(
       os.tmpdir(),
-      `gemini-ide-server-${process.ppid}.port`,
+      `gemini-ide-server-${process.ppid}.json`,
     );
   }
 
@@ -205,7 +205,7 @@ export class IDEServer {
           port.toString(),
         );
         this.log(`IDE server listening on port ${port}`);
-        fs.writeFile(this.portFile, port.toString()).catch((err) => {
+        fs.writeFile(this.portFile, JSON.stringify({ port })).catch((err) => {
           this.log(`Failed to write port to file: ${err}`);
         });
         this.log(this.portFile);

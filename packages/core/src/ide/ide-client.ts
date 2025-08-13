@@ -291,10 +291,11 @@ export class IdeClient {
       const ideProcessId = await getIdeProcessId();
       const portFile = path.join(
         os.tmpdir(),
-        `gemini-ide-server-${ideProcessId}.port`,
+        `gemini-ide-server-${ideProcessId}.json`,
       );
-      const port = fs.readFileSync(portFile, 'utf8');
-      return port;
+      const portFileContents = await fs.promises.readFile(portFile, 'utf8');
+      const port = JSON.parse(portFileContents).port;
+      return port.toString();
     } catch (_) {
       return undefined;
     }
