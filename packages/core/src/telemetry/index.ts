@@ -27,6 +27,7 @@ export {
   logApiResponse,
   logFlashFallback,
   logSlashCommand,
+  logKittySequenceOverflow,
 } from './loggers.js';
 export {
   StartSessionEvent,

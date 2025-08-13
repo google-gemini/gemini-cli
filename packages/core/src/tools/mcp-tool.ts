@@ -10,7 +10,7 @@ import {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolMcpConfirmationDetails,
-  Icon,
+  Kind,
 } from './tools.js';
 import { CallableTool, Part, FunctionCall } from '@google/genai';
 
@@ -67,7 +67,7 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
       nameOverride ?? generateValidName(serverToolName),
       `${serverToolName} (${serverName} MCP Server)`,
       description,
-      Icon.Hammer,
+      Kind.Other,
       parameterSchema,
       true, // isOutputMarkdown
       false, // canUpdateOutput
