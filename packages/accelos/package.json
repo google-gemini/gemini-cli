@@ -32,7 +32,9 @@
     "@ai-sdk/openai": "^1.2.0",
     "@google/genai": "1.9.0",
     "@mastra/core": "^0.13.2",
+    "@mastra/libsql": "^0.13.2",
     "@mastra/mcp": "latest",
+    "@mastra/memory": "^0.12.2",
     "ai": "^4.0.53",
     "dotenv": "^17.1.0",
     "mastra": "^0.10.21",
@@ -60,7 +62,12 @@
     ],
     "outputPath": "binaries"
   },
-  "keywords": ["mastra", "ai", "agent", "server"],
+  "keywords": [
+    "mastra",
+    "ai",
+    "agent",
+    "server"
+  ],
   "author": "",
   "license": "ISC"
 }

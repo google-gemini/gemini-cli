@@ -10,7 +10,8 @@ import * as dotenv from 'dotenv';
 import { githubTools } from '../mcp/github-mcp-client.js';
 import { productionReadinessPrompt } from '../prompts/production_readiness_prompt.js';
 import { guardrailAgentPrompt } from '../prompts/guardrail_agent_prompt.js';
-
+import { Memory } from "@mastra/memory";
+import { LibSQLStore } from "@mastra/libsql";
 dotenv.config();
 
 // Initialize guardrails at startup for Mastra
@@ -38,6 +39,13 @@ async function initializeGuardrails(): Promise<void> {
 // Initialize guardrails (non-blocking)
 initializeGuardrails().catch(error => {
   console.warn(`⚠️  Failed to initialize guardrails: ${error instanceof Error ? error.message : 'Unknown error'}`);
+});
+
+
+const memory = new Memory({
+  storage: new LibSQLStore({
+    url: "file:../../memory.db",
+  }),
 });
 
 // Create agents using the Agent class
@@ -99,6 +107,7 @@ const productionReadinessAgent = new Agent({
       reviewStorage: reviewStorageTool,
       ...githubTools,
     },
+    memory,
   });
 
 const guardrailAgent = new Agent({
@@ -112,6 +121,7 @@ const guardrailAgent = new Agent({
     rcaLoader: rcaLoaderTool,
     guardrailCrud: guardrailCrudTool,
   },
+  memory,
 });
 
 export const mastra = new Mastra({

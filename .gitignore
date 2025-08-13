@@ -45,3 +45,5 @@ packages/cli/src/generated/
 packages/vscode-ide-companion/*.vsix
 
 .mastra/
+*.db
+*.db-*
