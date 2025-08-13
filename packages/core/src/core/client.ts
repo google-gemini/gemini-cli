@@ -164,8 +164,32 @@ export class GeminiClient {
     return this.getChat().getHistory();
   }
 
-  setHistory(history: Content[]) {
-    this.getChat().setHistory(history);
+  setHistory(
+    history: Content[],
+    { stripThoughts = false }: { stripThoughts?: boolean } = {},
+  ) {
+    const historyToSet = stripThoughts
+      ? history.map((content) => {
+          const newContent = { ...content };
+          if (newContent.parts) {
+            newContent.parts = newContent.parts.map((part) => {
+              if (
+                part &&
+                typeof part === 'object' &&
+                'thoughtSignature' in part
+              ) {
+                const newPart = { ...part };
+                delete (newPart as { thoughtSignature?: string })
+                  .thoughtSignature;
+                return newPart;
+              }
+              return part;
+            });
+          }
+          return newContent;
+        })
+      : history;
+    this.getChat().setHistory(historyToSet);
     this.forceFullIdeContext = true;
   }
 
