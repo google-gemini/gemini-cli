@@ -77,13 +77,26 @@ export interface CliArgs {
 
 export async function parseArguments(): Promise<CliArgs> {
   // 早期初始化语言系统以支持帮助信息的多语言显示
-  const earlyArgs = process.argv.find(arg => arg.startsWith('-L') || arg.startsWith('--language'));
-  const languageArg = earlyArgs ? earlyArgs.split('=')[1] || process.argv[process.argv.indexOf(earlyArgs) + 1] : undefined;
-  if (languageArg) {
-    initializeLanguage(languageArg);
-  } else {
-    initializeLanguage();
+  let languageArg: string | undefined;
+  const args = hideBin(process.argv);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--language' || arg === '-L') {
+      if (i + 1 < args.length) {
+        languageArg = args[i + 1];
+        break;
+      }
+    }
+    if (arg.startsWith('--language=')) {
+      languageArg = arg.substring('--language='.length);
+      break;
+    }
+    if (arg.startsWith('-L') && arg.length > 2) {
+      languageArg = arg.substring(2);
+      break;
+    }
   }
+  initializeLanguage(languageArg);
 
   const yargsInstance = yargs(hideBin(process.argv))
     .scriptName('gemini')
