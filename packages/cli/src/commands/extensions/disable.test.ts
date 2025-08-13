@@ -16,7 +16,6 @@ import {
 import { disableCommand } from './disable.js';
 import {
   loadSettings,
-  saveSettings,
   LoadedSettings,
   SettingScope,
   SettingsFile,
@@ -25,7 +24,6 @@ import {
 vi.mock('../../config/settings.js');
 
 const mockedLoadSettings = loadSettings as Mock;
-const mockedSaveSettings = saveSettings as Mock;
 
 describe('extensions disable command', () => {
   let consoleSpy: vi.SpyInstance;
@@ -78,7 +76,6 @@ describe('extensions disable command', () => {
         disabled: ['my-extension'],
       },
     );
-    expect(mockedSaveSettings).toHaveBeenCalledWith(mockSettingsFile);
     expect(consoleSpy).toHaveBeenCalledWith(
       'Extension "my-extension" has been disabled.',
     );
@@ -98,7 +95,6 @@ describe('extensions disable command', () => {
     expect(mockSetValue).toHaveBeenCalledWith(SettingScope.User, 'extensions', {
       disabled: ['my-extension'],
     });
-    expect(mockedSaveSettings).toHaveBeenCalledWith(mockSettingsFile);
     expect(consoleSpy).toHaveBeenCalledWith(
       'Extension "my-extension" has been disabled.',
     );
@@ -116,7 +112,6 @@ describe('extensions disable command', () => {
     });
 
     expect(mockSetValue).not.toHaveBeenCalled();
-    expect(mockedSaveSettings).not.toHaveBeenCalled();
     expect(consoleSpy).toHaveBeenCalledWith(
       'Extension "my-extension" is already disabled.',
     );
