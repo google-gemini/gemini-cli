@@ -138,57 +138,32 @@ describe('ClearcutLogger', () => {
       });
     });
 
-    it.each([
-      {
-        env: {
-          GITHUB_SHA: 'abc13',
-        },
-        expectedValue: 'GITHUB_ACTION',
-      },
-      {
-        env: {
-          CLOUD_SHELL: 'true',
-          GITHUB_SHA: undefined,
-        },
-        expectedValue: 'CLOUD_SHELL',
-      },
-      {
-        env: {
-          MONOSPACE_ENV: 'true',
-          GITHUB_SHA: undefined,
-        },
-        expectedValue: 'FIREBASE_STUDIO',
-      },
-      {
-        env: {
-          REPLIT_USER: 'johnstamos',
-          GITHUB_SHA: undefined,
-        },
-        expectedValue: 'REPLIT',
-      },
-      {
-        env: {
-          GITHUB_SHA: undefined,
-        },
-        expectedValue: 'SURFACE_NOT_SET',
-      },
-    ])(
-      'logs the current surface for $expectedValue',
-      ({ env, expectedValue }) => {
-        const { logger } = setup({});
+    it('logs the current surface from a github action', () => {
+      const { logger } = setup({});
 
-        for (const [key, value] of Object.entries(env)) {
-          vi.stubEnv(key, value);
-        }
+      vi.stubEnv('GITHUB_SHA', '8675309');
 
-        const event = logger?.createLogEvent('abc', []);
+      const event = logger?.createLogEvent('abc', []);
 
-        expect(event?.event_metadata[0][1]).toEqual({
-          gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-          value: expectedValue,
-        });
-      },
-    );
+      expect(event?.event_metadata[0][1]).toEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: 'GitHub',
+      });
+    });
+
+    it('honors the value from env.SURFACE over all others', () => {
+      const { logger } = setup({});
+
+      vi.stubEnv('TERM_PROGRAM', 'vscode');
+      vi.stubEnv('SURFACE', 'ide-1234');
+
+      const event = logger?.createLogEvent('abc', []);
+
+      expect(event?.event_metadata[0][1]).toEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: 'ide-1234',
+      });
+    });
 
     it.each([
       {
@@ -196,35 +171,35 @@ describe('ClearcutLogger', () => {
           CURSOR_TRACE_ID: 'abc123',
           GITHUB_SHA: undefined,
         },
-        expectedValue: 'CURSOR',
+        expectedValue: 'cursor',
       },
       {
         env: {
           TERM_PROGRAM: 'vscode',
           GITHUB_SHA: undefined,
         },
-        expectedValue: 'VSCODE',
+        expectedValue: 'vscode',
       },
       {
         env: {
           MONOSPACE_ENV: 'true',
           GITHUB_SHA: undefined,
         },
-        expectedValue: 'FIREBASE_STUDIO',
+        expectedValue: 'firebasestudio',
       },
       {
         env: {
           __COG_BASHRC_SOURCED: 'true',
           GITHUB_SHA: undefined,
         },
-        expectedValue: 'DEVIN',
+        expectedValue: 'devin',
       },
       {
         env: {
           CLOUD_SHELL: 'true',
           GITHUB_SHA: undefined,
         },
-        expectedValue: 'CLOUD_SHELL',
+        expectedValue: 'cloudshell',
       },
     ])(
       'logs the current surface for as $expectedValue, preempting vscode detection',
