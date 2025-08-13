@@ -1022,62 +1022,7 @@ A successful review should:
 
 Remember: Your goal is to add value through focused analysis, not to demonstrate comprehensive knowledge. Every word should serve the purpose of improving software quality and preventing production issues.`;
 
-dotenv.config();
-const accelosGoogleAgent = new Agent({
-  name: "accelos-google",
-  instructions: defaultConfig.systemPrompt,
-  model: google("gemini-2.0-flash-exp"),
-  tools: {
-    fileAnalyzer: fileAnalyzerTool,
-    webSearch: webSearchTool,
-    codeAnalysis: codeAnalysisTool,
-    rcaLoader: rcaLoaderTool,
-    guardrailLoader: guardrailLoaderTool,
-    guardrailCrud: guardrailCrudTool
-  }
-});
-const accelosOpenAIAgent = new Agent({
-  name: "accelos-openai",
-  instructions: defaultConfig.systemPrompt,
-  model: openai("gpt-4o"),
-  tools: {
-    fileAnalyzer: fileAnalyzerTool,
-    webSearch: webSearchTool,
-    codeAnalysis: codeAnalysisTool,
-    rcaLoader: rcaLoaderTool,
-    guardrailLoader: guardrailLoaderTool,
-    guardrailCrud: guardrailCrudTool
-  }
-});
-const accelosAnthropicAgent = new Agent({
-  name: "accelos-anthropic",
-  instructions: defaultConfig.systemPrompt,
-  model: anthropic("claude-3-5-sonnet-20241022"),
-  tools: {
-    fileAnalyzer: fileAnalyzerTool,
-    webSearch: webSearchTool,
-    codeAnalysis: codeAnalysisTool,
-    rcaLoader: rcaLoaderTool,
-    guardrailLoader: guardrailLoaderTool,
-    guardrailCrud: guardrailCrudTool
-  }
-});
-const productionReadinessAgent = new Agent({
-  name: "production-readiness-agent",
-  instructions: productionReadinessPrompt,
-  model: anthropic("claude-3-7-sonnet-20250219"),
-  defaultGenerateOptions: {
-    maxSteps: 50
-  },
-  tools: {
-    guardrailLoaderTool,
-    guardrailCrudTool,
-    ...githubTools
-  }
-});
-const guardrailAgent = new Agent({
-  name: "guardrail-agent",
-  instructions: `# LLM System Prompt: Guardrail Generation from RCA Documents
+const guardrailAgentPrompt = `# LLM System Prompt: Guardrail Generation from RCA Documents
 
 ## Role and Context
 
@@ -1240,7 +1185,64 @@ When analyzing an RCA:
 
 ## Output Format
 
-Generate a single JSON object following the exact structure above. Ensure all fields are populated and requirements are specific, measurable, and directly tied to the RCA failure patterns provided.`,
+Generate a single JSON object following the exact structure above. Ensure all fields are populated and requirements are specific, measurable, and directly tied to the RCA failure patterns provided.`;
+
+dotenv.config();
+const accelosGoogleAgent = new Agent({
+  name: "accelos-google",
+  instructions: defaultConfig.systemPrompt,
+  model: google("gemini-2.0-flash-exp"),
+  tools: {
+    fileAnalyzer: fileAnalyzerTool,
+    webSearch: webSearchTool,
+    codeAnalysis: codeAnalysisTool,
+    rcaLoader: rcaLoaderTool,
+    guardrailLoader: guardrailLoaderTool,
+    guardrailCrud: guardrailCrudTool
+  }
+});
+const accelosOpenAIAgent = new Agent({
+  name: "accelos-openai",
+  instructions: defaultConfig.systemPrompt,
+  model: openai("gpt-4o"),
+  tools: {
+    fileAnalyzer: fileAnalyzerTool,
+    webSearch: webSearchTool,
+    codeAnalysis: codeAnalysisTool,
+    rcaLoader: rcaLoaderTool,
+    guardrailLoader: guardrailLoaderTool,
+    guardrailCrud: guardrailCrudTool
+  }
+});
+const accelosAnthropicAgent = new Agent({
+  name: "accelos-anthropic",
+  instructions: defaultConfig.systemPrompt,
+  model: anthropic("claude-3-5-sonnet-20241022"),
+  tools: {
+    fileAnalyzer: fileAnalyzerTool,
+    webSearch: webSearchTool,
+    codeAnalysis: codeAnalysisTool,
+    rcaLoader: rcaLoaderTool,
+    guardrailLoader: guardrailLoaderTool,
+    guardrailCrud: guardrailCrudTool
+  }
+});
+const productionReadinessAgent = new Agent({
+  name: "production-readiness-agent",
+  instructions: productionReadinessPrompt,
+  model: anthropic("claude-3-7-sonnet-20250219"),
+  defaultGenerateOptions: {
+    maxSteps: 50
+  },
+  tools: {
+    guardrailLoaderTool,
+    guardrailCrudTool,
+    ...githubTools
+  }
+});
+const guardrailAgent = new Agent({
+  name: "guardrail-agent",
+  instructions: guardrailAgentPrompt,
   model: openai("gpt-4o"),
   tools: {
     rcaLoader: rcaLoaderTool,
