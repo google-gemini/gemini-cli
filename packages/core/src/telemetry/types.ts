@@ -371,7 +371,6 @@ export type TelemetryEvent =
   | FlashFallbackEvent
   | LoopDetectedEvent
   | NextSpeakerCheckEvent
-  | SlashCommandEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
   | SlashCommandEvent;
