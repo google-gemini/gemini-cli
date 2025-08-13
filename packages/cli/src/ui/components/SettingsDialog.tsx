@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import {
   LoadedSettings,
@@ -31,6 +31,7 @@ import {
   getDefaultValue,
 } from '../../utils/settingsUtils.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -256,107 +257,111 @@ export function SettingsDialog({
   const showScrollUp = true;
   const showScrollDown = true;
 
-  useInput((input, key) => {
-    if (key.tab) {
-      setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
-    }
-    if (focusSection === 'settings') {
-      if (key.upArrow || input === 'k') {
-        const newIndex =
-          activeSettingIndex > 0 ? activeSettingIndex - 1 : items.length - 1;
-        setActiveSettingIndex(newIndex);
-        // Adjust scroll offset for wrap-around
-        if (newIndex === items.length - 1) {
-          setScrollOffset(Math.max(0, items.length - maxItemsToShow));
-        } else if (newIndex < scrollOffset) {
-          setScrollOffset(newIndex);
-        }
-      } else if (key.downArrow || input === 'j') {
-        const newIndex =
-          activeSettingIndex < items.length - 1 ? activeSettingIndex + 1 : 0;
-        setActiveSettingIndex(newIndex);
-        // Adjust scroll offset for wrap-around
-        if (newIndex === 0) {
-          setScrollOffset(0);
-        } else if (newIndex >= scrollOffset + maxItemsToShow) {
-          setScrollOffset(newIndex - maxItemsToShow + 1);
-        }
-      } else if (key.return || input === ' ') {
-        items[activeSettingIndex]?.toggle();
-      } else if ((key.ctrl && input === 'c') || (key.ctrl && input === 'l')) {
-        // Ctrl+C or Ctrl+L: Clear current setting and reset to default
-        const currentSetting = items[activeSettingIndex];
-        if (currentSetting) {
-          const defaultValue = getDefaultValue(currentSetting.value);
-          // Ensure defaultValue is a boolean for setPendingSettingValue
-          const booleanDefaultValue =
-            typeof defaultValue === 'boolean' ? defaultValue : false;
+  useKeypress(
+    (key) => {
+      const { name, ctrl } = key;
+      if (name === 'tab') {
+        setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
+      }
+      if (focusSection === 'settings') {
+        if (name === 'up' || name === 'k') {
+          const newIndex =
+            activeSettingIndex > 0 ? activeSettingIndex - 1 : items.length - 1;
+          setActiveSettingIndex(newIndex);
+          // Adjust scroll offset for wrap-around
+          if (newIndex === items.length - 1) {
+            setScrollOffset(Math.max(0, items.length - maxItemsToShow));
+          } else if (newIndex < scrollOffset) {
+            setScrollOffset(newIndex);
+          }
+        } else if (name === 'down' || name === 'j') {
+          const newIndex =
+            activeSettingIndex < items.length - 1 ? activeSettingIndex + 1 : 0;
+          setActiveSettingIndex(newIndex);
+          // Adjust scroll offset for wrap-around
+          if (newIndex === 0) {
+            setScrollOffset(0);
+          } else if (newIndex >= scrollOffset + maxItemsToShow) {
+            setScrollOffset(newIndex - maxItemsToShow + 1);
+          }
+        } else if (name === 'return' || name === 'space') {
+          items[activeSettingIndex]?.toggle();
+        } else if (ctrl && (name === 'c' || name === 'l')) {
+          // Ctrl+C or Ctrl+L: Clear current setting and reset to default
+          const currentSetting = items[activeSettingIndex];
+          if (currentSetting) {
+            const defaultValue = getDefaultValue(currentSetting.value);
+            // Ensure defaultValue is a boolean for setPendingSettingValue
+            const booleanDefaultValue =
+              typeof defaultValue === 'boolean' ? defaultValue : false;
 
-          // Update pending settings to default value
-          setPendingSettings((prev) =>
-            setPendingSettingValue(
-              currentSetting.value,
-              booleanDefaultValue,
-              prev,
-            ),
-          );
-
-          // Remove from modified settings since it's now at default
-          setModifiedSettings((prev) => {
-            const updated = new Set(prev);
-            updated.delete(currentSetting.value);
-            return updated;
-          });
-
-          // Remove from restart-required settings if it was there
-          setRestartRequiredSettings((prev) => {
-            const updated = new Set(prev);
-            updated.delete(currentSetting.value);
-            return updated;
-          });
-
-          // If this setting doesn't require restart, save it immediately
-          if (!requiresRestart(currentSetting.value)) {
-            const immediateSettings = new Set([currentSetting.value]);
-            const immediateSettingsObject = setPendingSettingValue(
-              currentSetting.value,
-              booleanDefaultValue,
-              {},
+            // Update pending settings to default value
+            setPendingSettings((prev) =>
+              setPendingSettingValue(
+                currentSetting.value,
+                booleanDefaultValue,
+                prev,
+              ),
             );
 
-            saveModifiedSettings(
-              immediateSettings,
-              immediateSettingsObject,
-              settings,
-              selectedScope,
-            );
+            // Remove from modified settings since it's now at default
+            setModifiedSettings((prev) => {
+              const updated = new Set(prev);
+              updated.delete(currentSetting.value);
+              return updated;
+            });
+
+            // Remove from restart-required settings if it was there
+            setRestartRequiredSettings((prev) => {
+              const updated = new Set(prev);
+              updated.delete(currentSetting.value);
+              return updated;
+            });
+
+            // If this setting doesn't require restart, save it immediately
+            if (!requiresRestart(currentSetting.value)) {
+              const immediateSettings = new Set([currentSetting.value]);
+              const immediateSettingsObject = setPendingSettingValue(
+                currentSetting.value,
+                booleanDefaultValue,
+                {},
+              );
+
+              saveModifiedSettings(
+                immediateSettings,
+                immediateSettingsObject,
+                settings,
+                selectedScope,
+              );
+            }
           }
         }
       }
-    }
-    if (showRestartPrompt && input === 'r') {
-      // Only save settings that require restart (non-restart settings were already saved immediately)
-      const restartRequiredSettings =
-        getRestartRequiredFromModified(modifiedSettings);
-      const restartRequiredSet = new Set(restartRequiredSettings);
+      if (showRestartPrompt && name === 'r') {
+        // Only save settings that require restart (non-restart settings were already saved immediately)
+        const restartRequiredSettings =
+          getRestartRequiredFromModified(modifiedSettings);
+        const restartRequiredSet = new Set(restartRequiredSettings);
 
-      if (restartRequiredSet.size > 0) {
-        saveModifiedSettings(
-          restartRequiredSet,
-          pendingSettings,
-          settings,
-          selectedScope,
-        );
+        if (restartRequiredSet.size > 0) {
+          saveModifiedSettings(
+            restartRequiredSet,
+            pendingSettings,
+            settings,
+            selectedScope,
+          );
+        }
+
+        setShowRestartPrompt(false);
+        setRestartRequiredSettings(new Set()); // Clear restart-required settings
+        if (onRestartRequest) onRestartRequest();
       }
-
-      setShowRestartPrompt(false);
-      setRestartRequiredSettings(new Set()); // Clear restart-required settings
-      if (onRestartRequest) onRestartRequest();
-    }
-    if (key.escape) {
-      onSelect(undefined, selectedScope);
-    }
-  });
+      if (name === 'escape') {
+        onSelect(undefined, selectedScope);
+      }
+    },
+    { isActive: true },
+  );
 
   return (
     <Box
