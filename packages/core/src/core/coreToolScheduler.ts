@@ -24,6 +24,7 @@ import {
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
+import { addProgrammingLanguageToEvent } from '../telemetry/telemetry-utils.js';
 import {
   isModifiableDeclarativeTool,
   ModifyContext,
@@ -887,7 +888,8 @@ export class CoreToolScheduler {
       this.toolCalls = [];
 
       for (const call of completedCalls) {
-        logToolCall(this.config, new ToolCallEvent(call));
+        const event = new ToolCallEvent(call);
+        logToolCall(this.config, addProgrammingLanguageToEvent(event));
       }
 
       if (this.onAllToolCallsComplete) {

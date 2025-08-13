@@ -13,6 +13,7 @@ import {
   getDecisionFromOutcome,
   ToolCallDecision,
 } from './tool-call-decision.js';
+export { ToolCallDecision };
 
 interface BaseTelemetryEvent {
   'event.name': string;
@@ -114,6 +115,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   error?: string;
   error_type?: string;
   prompt_id: string;
+  programming_language?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
 
