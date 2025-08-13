@@ -471,7 +471,7 @@ Expectation for required parameters:
    * @param params Parameters to validate
    * @returns Error message string or null if valid
    */
-  validateToolParams(params: EditToolParams): string | null {
+  override validateToolParams(params: EditToolParams): string | null {
     const errors = SchemaValidator.validate(
       this.schema.parametersJsonSchema,
       params,

@@ -261,7 +261,7 @@ export async function processImports(
 
       // Process imports in reverse order to handle indices correctly
       for (let i = imports.length - 1; i >= 0; i--) {
-        const { start, _end, path: importPath } = imports[i];
+        const { start, path: importPath } = imports[i];
 
         // Skip if inside a code region
         if (

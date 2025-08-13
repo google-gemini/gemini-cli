@@ -103,7 +103,7 @@ export class WebSearchTool extends BaseTool<
     return null;
   }
 
-  getDescription(params: WebSearchToolParams): string {
+  override getDescription(params: WebSearchToolParams): string {
     return `Searching the web for: "${params.query}"`;
   }
 

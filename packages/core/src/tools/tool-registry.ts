@@ -19,8 +19,8 @@ export class DiscoveredTool extends BaseTool<ToolParams, ToolResult> {
   constructor(
     private readonly config: Config,
     name: string,
-    readonly description: string,
-    readonly parameterSchema: Record<string, unknown>,
+    override readonly description: string,
+    override readonly parameterSchema: Record<string, unknown>,
   ) {
     const discoveryCmd = config.getToolDiscoveryCommand()!;
     const callCommand = config.getToolCallCommand()!;

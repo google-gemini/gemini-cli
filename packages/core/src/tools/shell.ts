@@ -67,7 +67,7 @@ class ShellToolInvocation extends BaseToolInvocation<
     return description;
   }
 
-  async shouldConfirmExecute(
+  override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
@@ -343,7 +343,9 @@ export class ShellTool extends BaseDeclarativeTool<
     );
   }
 
-  protected validateToolParams(params: ShellToolParams): string | null {
+  protected override validateToolParams(
+    params: ShellToolParams,
+  ): string | null {
     const commandCheck = isCommandAllowed(params.command, this.config);
     if (!commandCheck.allowed) {
       if (!commandCheck.reason) {

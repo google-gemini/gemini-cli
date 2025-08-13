@@ -9,7 +9,6 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   CoreToolScheduler,
   ToolCall,
-  ValidatingToolCall,
   convertToFunctionResponse,
 } from './coreToolScheduler.js';
 import {
@@ -54,7 +53,9 @@ class MockModifiableTool
     };
   }
 
-  async shouldConfirmExecute(): Promise<ToolCallConfirmationDetails | false> {
+  override async shouldConfirmExecute(): Promise<
+    ToolCallConfirmationDetails | false
+  > {
     if (this.shouldConfirm) {
       return {
         type: 'edit',
@@ -121,8 +122,6 @@ describe('CoreToolScheduler', () => {
     abortController.abort();
     await scheduler.schedule([request], abortController.signal);
 
-    const _waitingCall = onToolCallsUpdate.mock
-      .calls[1][0][0] as ValidatingToolCall;
     const confirmationDetails = await mockTool.shouldConfirmExecute(
       {},
       abortController.signal,
@@ -394,7 +393,7 @@ describe('CoreToolScheduler edit cancellation', () => {
         );
       }
 
-      async shouldConfirmExecute(
+      override async shouldConfirmExecute(
         _params: Record<string, unknown>,
         _abortSignal: AbortSignal,
       ): Promise<ToolCallConfirmationDetails | false> {

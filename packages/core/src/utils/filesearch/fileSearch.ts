@@ -289,7 +289,7 @@ export class FileSearch {
    * Builds the in-memory cache for fast pattern matching.
    */
   private buildResultCache(): void {
-    this.resultCache = new ResultCache(this.allFiles, this.absoluteDir);
+    this.resultCache = new ResultCache(this.allFiles);
     // The v1 algorithm is much faster since it only looks at the first
     // occurence of the pattern. We use it for search spaces that have >20k
     // files, because the v2 algorithm is just too slow in those cases.
