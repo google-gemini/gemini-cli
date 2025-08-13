@@ -96,6 +96,7 @@ const productionReadinessAgent = new Agent({
     tools: 
     {
       guardrailCrudTool,
+      reviewStorage: reviewStorageTool,
       ...githubTools,
     },
   });
