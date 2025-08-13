@@ -200,3 +200,28 @@ export function getUserCommandsDir(): string {
 export function getProjectCommandsDir(projectRoot: string): string {
   return path.join(projectRoot, GEMINI_DIR, COMMANDS_DIR_NAME);
 }
+
+/**
+ * Checks if a path is a subpath of another path.
+ * @param parentPath The parent path.
+ * @param childPath The child path.
+ * @returns True if childPath is a subpath of parentPath, false otherwise.
+ */
+export function isSubpath(parentPath: string, childPath: string): boolean {
+  // Heuristic to detect Windows paths even on POSIX systems
+  const isWindowsPath =
+    /^[a-zA-Z]:\\/.test(parentPath) || /^[a-zA-Z]:\\/.test(childPath);
+
+  const pathModule = isWindowsPath ? path.win32 : path;
+
+  // On Windows, path.relative is case-insensitive. On POSIX, it's case-sensitive.
+  // The test cases expect case-insensitive behavior for Windows paths.
+  // Using path.win32.relative ensures this behavior regardless of the host OS.
+  const relative = pathModule.relative(parentPath, childPath);
+
+  return (
+    !relative.startsWith(`..${pathModule.sep}`) &&
+    relative !== '..' &&
+    !pathModule.isAbsolute(relative)
+  );
+}

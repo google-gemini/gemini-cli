@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import { detectIde, DetectedIde, getIdeInfo } from '../ide/detect-ide.js';
 import {
   ideContext,
@@ -249,11 +250,10 @@ export class IdeClient {
     }
 
     const ideWorkspacePaths = ideWorkspacePath.split(':');
-    const cwd = getRealPath(process.cwd()).toLocaleLowerCase();
+    const cwd = getRealPath(process.cwd());
     const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) => {
-      const idePath = getRealPath(workspacePath).toLocaleLowerCase();
-      const rel = path.relative(idePath, cwd);
-      return !rel.startsWith('..') && !path.isAbsolute(rel);
+      const idePath = getRealPath(workspacePath);
+      return isSubpath(idePath, cwd);
     });
 
     if (!isWithinWorkspace) {
