@@ -27,15 +27,15 @@ By installing this extension, you agree to the [Terms of Service](https://github
 
 To run the extension locally for development:
 
-1.  Install the dependencies:
+1.  From the root of the repository, install dependencies:
     ```bash
     npm install
     ```
-2.  Compile the extension:
+2.  Open this directory (`packages/vscode-ide-companion`) in VS Code.
+3.  Compile the extension:
     ```bash
     npm run compile
     ```
-3.  Open this directory (`packages/vscode-ide-companion`) in VS Code.
 4.  Press `F5` (fn+f5 on mac) to open a new Extension Development Host window with the extension running.
 
 To watch for changes and have the extension rebuild automatically, run:
