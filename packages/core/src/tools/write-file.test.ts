@@ -174,193 +174,68 @@ describe('WriteFileTool', () => {
     vi.clearAllMocks();
   });
 
-  describe('validateToolParams', () => {
-    it('should return null for valid absolute path within root', () => {
+  describe('build', () => {
+    it('should return an invocation for a valid absolute path within root', () => {
       const params = {
         file_path: path.join(rootDir, 'test.txt'),
         content: 'hello',
       };
-      expect(tool.validateToolParams(params)).toBeNull();
+      const invocation = tool.build(params);
+      expect(invocation).toBeDefined();
+      expect(invocation.params).toEqual(params);
     });
 
-    it('should return error for relative path', () => {
+    it('should throw an error for a relative path', () => {
       const params = { file_path: 'test.txt', content: 'hello' };
-      expect(tool.validateToolParams(params)).toMatch(
-        /File path must be absolute/,
-      );
+      expect(() => tool.build(params)).toThrow(/File path must be absolute/);
     });
 
-    it('should return error for path outside root', () => {
+    it('should throw an error for a path outside root', () => {
       const outsidePath = path.resolve(tempDir, 'outside-root.txt');
       const params = {
         file_path: outsidePath,
         content: 'hello',
       };
-      const error = tool.validateToolParams(params);
-      expect(error).toContain(
-        'File path must be within one of the workspace directories',
+      expect(() => tool.build(params)).toThrow(
+        /File path must be within one of the workspace directories/,
       );
     });
 
-    it('should return error if path is a directory', () => {
+    it('should throw an error if path is a directory', () => {
       const dirAsFilePath = path.join(rootDir, 'a_directory');
       fs.mkdirSync(dirAsFilePath);
       const params = {
         file_path: dirAsFilePath,
         content: 'hello',
       };
-      expect(tool.validateToolParams(params)).toMatch(
+      expect(() => tool.build(params)).toThrow(
         `Path is a directory, not a file: ${dirAsFilePath}`,
       );
     });
 
-    it('should return error if the content is null', () => {
+    it('should throw an error if the content is null', () => {
       const dirAsFilePath = path.join(rootDir, 'a_directory');
       fs.mkdirSync(dirAsFilePath);
       const params = {
         file_path: dirAsFilePath,
         content: null,
       } as unknown as WriteFileToolParams; // Intentionally non-conforming
-      expect(tool.validateToolParams(params)).toMatch(
-        `params/content must be string`,
-      );
+      expect(() => tool.build(params)).toThrow('params/content must be string');
     });
-  });
 
-  describe('getDescription', () => {
-    it('should return error if the file_path is empty', () => {
+    it('should throw error if the file_path is empty', () => {
       const dirAsFilePath = path.join(rootDir, 'a_directory');
       fs.mkdirSync(dirAsFilePath);
       const params = {
         file_path: '',
         content: '',
       };
-      expect(tool.getDescription(params)).toMatch(
-        `Model did not provide valid parameters for write file tool, missing or empty "file_path"`,
-      );
-    });
-  });
-
-  describe('_getCorrectedFileContent', () => {
-    it('should call ensureCorrectFileContent for a new file', async () => {
-      const filePath = path.join(rootDir, 'new_corrected_file.txt');
-      const proposedContent = 'Proposed new content.';
-      const correctedContent = 'Corrected new content.';
-      const abortSignal = new AbortController().signal;
-      // Ensure the mock is set for this specific test case if needed, or rely on beforeEach
-      mockEnsureCorrectFileContent.mockResolvedValue(correctedContent);
-
-      // @ts-expect-error _getCorrectedFileContent is private
-      const result = await tool._getCorrectedFileContent(
-        filePath,
-        proposedContent,
-        abortSignal,
-      );
-
-      expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
-        proposedContent,
-        mockGeminiClientInstance,
-        abortSignal,
-      );
-      expect(mockEnsureCorrectEdit).not.toHaveBeenCalled();
-      expect(result.correctedContent).toBe(correctedContent);
-      expect(result.originalContent).toBe('');
-      expect(result.fileExists).toBe(false);
-      expect(result.error).toBeUndefined();
-    });
-
-    it('should call ensureCorrectEdit for an existing file', async () => {
-      const filePath = path.join(rootDir, 'existing_corrected_file.txt');
-      const originalContent = 'Original existing content.';
-      const proposedContent = 'Proposed replacement content.';
-      const correctedProposedContent = 'Corrected replacement content.';
-      const abortSignal = new AbortController().signal;
-      fs.writeFileSync(filePath, originalContent, 'utf8');
-
-      // Ensure this mock is active and returns the correct structure
-      mockEnsureCorrectEdit.mockResolvedValue({
-        params: {
-          file_path: filePath,
-          old_string: originalContent,
-          new_string: correctedProposedContent,
-        },
-        occurrences: 1,
-      } as CorrectedEditResult);
-
-      // @ts-expect-error _getCorrectedFileContent is private
-      const result = await tool._getCorrectedFileContent(
-        filePath,
-        proposedContent,
-        abortSignal,
-      );
-
-      expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
-        filePath,
-        originalContent,
-        {
-          old_string: originalContent,
-          new_string: proposedContent,
-          file_path: filePath,
-        },
-        mockGeminiClientInstance,
-        abortSignal,
-      );
-      expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
-      expect(result.correctedContent).toBe(correctedProposedContent);
-      expect(result.originalContent).toBe(originalContent);
-      expect(result.fileExists).toBe(true);
-      expect(result.error).toBeUndefined();
-    });
-
-    it('should return error if reading an existing file fails (e.g. permissions)', async () => {
-      const filePath = path.join(rootDir, 'unreadable_file.txt');
-      const proposedContent = 'some content';
-      const abortSignal = new AbortController().signal;
-      fs.writeFileSync(filePath, 'content', { mode: 0o000 });
-
-      const readError = new Error('Permission denied');
-      const originalReadFileSync = fs.readFileSync;
-      vi.spyOn(fs, 'readFileSync').mockImplementationOnce(() => {
-        throw readError;
-      });
-
-      // @ts-expect-error _getCorrectedFileContent is private
-      const result = await tool._getCorrectedFileContent(
-        filePath,
-        proposedContent,
-        abortSignal,
-      );
-
-      expect(fs.readFileSync).toHaveBeenCalledWith(filePath, 'utf8');
-      expect(mockEnsureCorrectEdit).not.toHaveBeenCalled();
-      expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
-      expect(result.correctedContent).toBe(proposedContent);
-      expect(result.originalContent).toBe('');
-      expect(result.fileExists).toBe(true);
-      expect(result.error).toEqual({
-        message: 'Permission denied',
-        code: undefined,
-      });
-
-      vi.spyOn(fs, 'readFileSync').mockImplementation(originalReadFileSync);
-      fs.chmodSync(filePath, 0o600);
+      expect(() => tool.build(params)).toThrow(`Missing or empty "file_path"`);
     });
   });
 
   describe('shouldConfirmExecute', () => {
     const abortSignal = new AbortController().signal;
-    it('should return false if params are invalid (relative path)', async () => {
-      const params = { file_path: 'relative.txt', content: 'test' };
-      const confirmation = await tool.shouldConfirmExecute(params, abortSignal);
-      expect(confirmation).toBe(false);
-    });
-
-    it('should return false if params are invalid (outside root)', async () => {
-      const outsidePath = path.resolve(tempDir, 'outside-root.txt');
-      const params = { file_path: outsidePath, content: 'test' };
-      const confirmation = await tool.shouldConfirmExecute(params, abortSignal);
-      expect(confirmation).toBe(false);
-    });
 
     it('should return false if _getCorrectedFileContent returns an error', async () => {
       const filePath = path.join(rootDir, 'confirm_error_file.txt');
@@ -373,7 +248,8 @@ describe('WriteFileTool', () => {
         throw readError;
       });
 
-      const confirmation = await tool.shouldConfirmExecute(params, abortSignal);
+      const invocation = tool.build(params);
+      const confirmation = await invocation.shouldConfirmExecute(abortSignal);
       expect(confirmation).toBe(false);
 
       vi.spyOn(fs, 'readFileSync').mockImplementation(originalReadFileSync);
@@ -387,8 +263,8 @@ describe('WriteFileTool', () => {
       mockEnsureCorrectFileContent.mockResolvedValue(correctedContent); // Ensure this mock is active
 
       const params = { file_path: filePath, content: proposedContent };
-      const confirmation = (await tool.shouldConfirmExecute(
-        params,
+      const invocation = tool.build(params);
+      const confirmation = (await invocation.shouldConfirmExecute(
         abortSignal,
       )) as ToolEditConfirmationDetails;
 
@@ -430,8 +306,8 @@ describe('WriteFileTool', () => {
       });
 
       const params = { file_path: filePath, content: proposedContent };
-      const confirmation = (await tool.shouldConfirmExecute(
-        params,
+      const invocation = tool.build(params);
+      const confirmation = (await invocation.shouldConfirmExecute(
         abortSignal,
       )) as ToolEditConfirmationDetails;
 
@@ -461,31 +337,6 @@ describe('WriteFileTool', () => {
 
   describe('execute', () => {
     const abortSignal = new AbortController().signal;
-    it('should return error if params are invalid (relative path)', async () => {
-      const params = { file_path: 'relative.txt', content: 'test' };
-      const result = await tool.execute(params, abortSignal);
-      expect(result.llmContent).toContain(
-        'Could not write file due to invalid parameters:',
-      );
-      expect(result.returnDisplay).toMatch(/File path must be absolute/);
-      expect(result.error).toEqual({
-        message: 'File path must be absolute: relative.txt',
-        type: ToolErrorType.INVALID_TOOL_PARAMS,
-      });
-    });
-
-    it('should return error if params are invalid (path outside root)', async () => {
-      const outsidePath = path.resolve(tempDir, 'outside-root.txt');
-      const params = { file_path: outsidePath, content: 'test' };
-      const result = await tool.execute(params, abortSignal);
-      expect(result.llmContent).toContain(
-        'Could not write file due to invalid parameters:',
-      );
-      expect(result.returnDisplay).toContain(
-        'File path must be within one of the workspace directories',
-      );
-      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
-    });
 
     it('should return error if _getCorrectedFileContent returns an error during execute', async () => {
       const filePath = path.join(rootDir, 'execute_error_file.txt');
@@ -498,7 +349,8 @@ describe('WriteFileTool', () => {
         throw readError;
       });
 
-      const result = await tool.execute(params, abortSignal);
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain('Error checking existing file:');
       expect(result.returnDisplay).toMatch(
         /Error checking existing file: Simulated read error for execute/,
@@ -520,11 +372,9 @@ describe('WriteFileTool', () => {
       mockEnsureCorrectFileContent.mockResolvedValue(correctedContent);
 
       const params = { file_path: filePath, content: proposedContent };
+      const invocation = tool.build(params);
 
-      const confirmDetails = await tool.shouldConfirmExecute(
-        params,
-        abortSignal,
-      );
+      const confirmDetails = await invocation.shouldConfirmExecute(abortSignal);
       if (
         typeof confirmDetails === 'object' &&
         'onConfirm' in confirmDetails &&
@@ -533,7 +383,7 @@ describe('WriteFileTool', () => {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      const result = await tool.execute(params, abortSignal);
+      const result = await invocation.execute(abortSignal);
 
       expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
         proposedContent,
@@ -578,11 +428,9 @@ describe('WriteFileTool', () => {
       });
 
       const params = { file_path: filePath, content: proposedContent };
+      const invocation = tool.build(params);
 
-      const confirmDetails = await tool.shouldConfirmExecute(
-        params,
-        abortSignal,
-      );
+      const confirmDetails = await invocation.shouldConfirmExecute(abortSignal);
       if (
         typeof confirmDetails === 'object' &&
         'onConfirm' in confirmDetails &&
@@ -591,7 +439,7 @@ describe('WriteFileTool', () => {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      const result = await tool.execute(params, abortSignal);
+      const result = await invocation.execute(abortSignal);
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
         filePath,
@@ -623,11 +471,9 @@ describe('WriteFileTool', () => {
       mockEnsureCorrectFileContent.mockResolvedValue(content); // Ensure this mock is active
 
       const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
       // Simulate confirmation if your logic requires it before execute, or remove if not needed for this path
-      const confirmDetails = await tool.shouldConfirmExecute(
-        params,
-        abortSignal,
-      );
+      const confirmDetails = await invocation.shouldConfirmExecute(abortSignal);
       if (
         typeof confirmDetails === 'object' &&
         'onConfirm' in confirmDetails &&
@@ -636,7 +482,7 @@ describe('WriteFileTool', () => {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      await tool.execute(params, abortSignal);
+      await invocation.execute(abortSignal);
 
       expect(fs.existsSync(dirPath)).toBe(true);
       expect(fs.statSync(dirPath).isDirectory()).toBe(true);
@@ -654,7 +500,8 @@ describe('WriteFileTool', () => {
         content,
         modified_by_user: true,
       };
-      const result = await tool.execute(params, abortSignal);
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toMatch(/User modified the `content`/);
     });
@@ -669,7 +516,8 @@ describe('WriteFileTool', () => {
         content,
         modified_by_user: false,
       };
-      const result = await tool.execute(params, abortSignal);
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).not.toMatch(/User modified the `content`/);
     });
@@ -683,7 +531,8 @@ describe('WriteFileTool', () => {
         file_path: filePath,
         content,
       };
-      const result = await tool.execute(params, abortSignal);
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).not.toMatch(/User modified the `content`/);
     });
@@ -695,7 +544,7 @@ describe('WriteFileTool', () => {
         file_path: path.join(rootDir, 'file.txt'),
         content: 'test content',
       };
-      expect(tool.validateToolParams(params)).toBeNull();
+      expect(() => tool.build(params)).not.toThrow();
     });
 
     it('should reject paths outside workspace root', () => {
@@ -703,24 +552,9 @@ describe('WriteFileTool', () => {
         file_path: '/etc/passwd',
         content: 'malicious',
       };
-      const error = tool.validateToolParams(params);
-      expect(error).toContain(
-        'File path must be within one of the workspace directories',
+      expect(() => tool.build(params)).toThrow(
+        /File path must be within one of the workspace directories/,
       );
-      expect(error).toContain(rootDir);
-    });
-
-    it('should provide clear error message with workspace directories', () => {
-      const outsidePath = path.join(tempDir, 'outside-root.txt');
-      const params = {
-        file_path: outsidePath,
-        content: 'test',
-      };
-      const error = tool.validateToolParams(params);
-      expect(error).toContain(
-        'File path must be within one of the workspace directories',
-      );
-      expect(error).toContain(rootDir);
     });
   });
 
@@ -740,13 +574,16 @@ describe('WriteFileTool', () => {
       });
 
       const params = { file_path: filePath, content };
-      const result = await tool.execute(params, abortSignal);
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
 
       expect(result.error?.type).toBe(ToolErrorType.PERMISSION_DENIED);
       expect(result.llmContent).toContain(
         `Permission denied writing to file: ${filePath} (EACCES)`,
       );
-      expect(result.returnDisplay).toContain('Permission denied');
+      expect(result.returnDisplay).toContain(
+        `Permission denied writing to file: ${filePath} (EACCES)`,
+      );
 
       vi.spyOn(fs, 'writeFileSync').mockImplementation(originalWriteFileSync);
     });
@@ -766,13 +603,16 @@ describe('WriteFileTool', () => {
       });
 
       const params = { file_path: filePath, content };
-      const result = await tool.execute(params, abortSignal);
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
 
       expect(result.error?.type).toBe(ToolErrorType.NO_SPACE_LEFT);
       expect(result.llmContent).toContain(
         `No space left on device: ${filePath} (ENOSPC)`,
       );
-      expect(result.returnDisplay).toContain('No space left');
+      expect(result.returnDisplay).toContain(
+        `No space left on device: ${filePath} (ENOSPC)`,
+      );
 
       vi.spyOn(fs, 'writeFileSync').mockImplementation(originalWriteFileSync);
     });
@@ -799,13 +639,16 @@ describe('WriteFileTool', () => {
       });
 
       const params = { file_path: dirPath, content };
-      const result = await tool.execute(params, abortSignal);
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
 
       expect(result.error?.type).toBe(ToolErrorType.TARGET_IS_DIRECTORY);
       expect(result.llmContent).toContain(
         `Target is a directory, not a file: ${dirPath} (EISDIR)`,
       );
-      expect(result.returnDisplay).toContain('Target is a directory');
+      expect(result.returnDisplay).toContain(
+        `Target is a directory, not a file: ${dirPath} (EISDIR)`,
+      );
 
       vi.spyOn(fs, 'existsSync').mockImplementation(originalExistsSync);
       vi.spyOn(fs, 'writeFileSync').mockImplementation(originalWriteFileSync);
@@ -824,13 +667,16 @@ describe('WriteFileTool', () => {
       });
 
       const params = { file_path: filePath, content };
-      const result = await tool.execute(params, abortSignal);
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
 
       expect(result.error?.type).toBe(ToolErrorType.FILE_WRITE_FAILURE);
       expect(result.llmContent).toContain(
         'Error writing to file: Generic write error',
       );
-      expect(result.returnDisplay).toContain('Generic write error');
+      expect(result.returnDisplay).toContain(
+        'Error writing to file: Generic write error',
+      );
     });
   });
 });
