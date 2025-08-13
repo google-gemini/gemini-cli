@@ -645,7 +645,7 @@ describe('Logger', () => {
       );
     });
 
-    it.only('should re-throw an error if fs.access fails for reasons other than not existing', async () => {
+    it('should re-throw an error if fs.access fails for reasons other than not existing', async () => {
       vi.spyOn(fs, 'access').mockRejectedValueOnce(
         Object.assign(new Error('EACCES: permission denied'), {
           code: 'EACCES',
