@@ -175,7 +175,7 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedAlways,
       },
       {
-        label: 'No, suggest changes (esc)',
+        label: 'No, suggest changes (esc or ctrl+c)',
         value: ToolConfirmationOutcome.Cancel,
       },
     );
