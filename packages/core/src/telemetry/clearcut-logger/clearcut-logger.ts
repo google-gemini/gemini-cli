@@ -639,6 +639,13 @@ export class ClearcutLogger {
       });
     }
 
+    if (event.status) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_STATUS,
+        value: JSON.stringify(event.status),
+      });
+    }
+
     this.enqueueLogEvent(this.createLogEvent(slash_command_event_name, data));
     this.flushIfNeeded();
   }

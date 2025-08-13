@@ -39,8 +39,10 @@ export {
   ApiResponseEvent,
   TelemetryEvent,
   FlashFallbackEvent,
-  SlashCommandEvent,
   KittySequenceOverflowEvent,
+  SlashCommandEvent,
+  makeSlashCommandEvent,
+  SlashCommandStatus,
 } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
