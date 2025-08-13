@@ -35,9 +35,6 @@ import { Extension, annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
-import { CommandModule } from 'yargs';
-
-import { isWorkspaceTrusted } from './trustedFolders.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
