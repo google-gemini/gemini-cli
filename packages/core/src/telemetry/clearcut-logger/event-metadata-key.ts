@@ -218,7 +218,7 @@ export enum EventMetadataKey {
   // ===========================================================================
 
   // Logs the length of the kitty sequence that overflowed.
-  GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 51,
+  GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,
 
   // Logs the truncated kitty sequence.
   GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,

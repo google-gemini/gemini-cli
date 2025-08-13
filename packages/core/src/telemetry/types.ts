@@ -374,6 +374,4 @@ export type TelemetryEvent =
   | SlashCommandEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
-  | KittySequenceOverflowEvent
-  | SlashCommandEvent;
-
+  | KittySequenceOverflowEvent;
