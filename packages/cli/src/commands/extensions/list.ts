@@ -22,9 +22,28 @@ export const listCommand: CommandModule = {
       extensions,
       settings.merged.extensions?.disabled || [],
     );
-    console.log('Installed extensions:');
+
+    if (annotatedExtensions.length === 0) {
+      console.log('No extensions installed.');
+      return;
+    }
+
+    const nameHeader = 'Name';
+    const enabledHeader = 'Enabled';
+
+    const nameWidth = Math.max(
+      nameHeader.length,
+      ...annotatedExtensions.map((ext) => ext.name.length),
+    );
+
+    console.log(`${nameHeader.padEnd(nameWidth)} | ${enabledHeader}`);
+    console.log(
+      `${'-'.repeat(nameWidth)} | ${'-'.repeat(enabledHeader.length)}`,
+    );
+
     for (const extension of annotatedExtensions) {
-      console.log(`- ${extension.name}`);
+      const { name, isActive } = extension;
+      console.log(`${name.padEnd(nameWidth)} | ${isActive}`);
     }
   },
 };

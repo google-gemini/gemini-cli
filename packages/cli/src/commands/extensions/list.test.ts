@@ -4,13 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { listCommand } from './list.js';
-import { loadExtensions } from '../../config/extension.js';
+import {
+  loadExtensions,
+  annotateActiveExtensionsFromDisabled,
+} from '../../config/extension.js';
 
 vi.mock('../../config/extension.js');
 
-const mockedLoadExtensions = loadExtensions as vi.Mock;
+const mockedLoadExtensions = loadExtensions as Mock;
+const mockedAnnotateActiveExtensions =
+  annotateActiveExtensionsFromDisabled as Mock;
 
 describe('extensions list command', () => {
   let consoleSpy: vi.SpyInstance;
@@ -26,17 +39,22 @@ describe('extensions list command', () => {
 
   it('should display message when no extensions are installed', () => {
     mockedLoadExtensions.mockReturnValue([]);
+    mockedAnnotateActiveExtensions.mockReturnValue([]);
     if (listCommand.handler) {
       const handler = listCommand.handler as () => void;
       handler();
     }
-    expect(consoleSpy).toHaveBeenCalledWith('Installed extensions:');
+    expect(consoleSpy).toHaveBeenCalledWith('No extensions installed.');
   });
 
   it('should list all installed extensions', () => {
     mockedLoadExtensions.mockReturnValue([
-      { config: { name: 'extension-1' } },
-      { config: { name: 'extension-2' } },
+      { config: { name: 'extension-1', version: '1.0.0' } },
+      { config: { name: 'ext2', version: '2.0.0' } },
+    ]);
+    mockedAnnotateActiveExtensions.mockReturnValue([
+      { name: 'extension-1', version: '1.0.0', isActive: true },
+      { name: 'ext2', version: '2.0.0', isActive: true },
     ]);
 
     if (listCommand.handler) {
@@ -44,8 +62,9 @@ describe('extensions list command', () => {
       handler();
     }
 
-    expect(consoleSpy).toHaveBeenCalledWith('Installed extensions:');
-    expect(consoleSpy).toHaveBeenCalledWith('- extension-1');
-    expect(consoleSpy).toHaveBeenCalledWith('- extension-2');
+    expect(consoleSpy).toHaveBeenCalledWith('Name        | Enabled');
+    expect(consoleSpy).toHaveBeenCalledWith('----------- | -------');
+    expect(consoleSpy).toHaveBeenCalledWith('extension-1 | true');
+    expect(consoleSpy).toHaveBeenCalledWith('ext2        | true');
   });
 });
