@@ -6,7 +6,8 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 
 | Shortcut | Description                                                                                                           |
 | -------- | --------------------------------------------------------------------------------------------------------------------- |
-| `Esc` / `Ctrl+C` | Close dialogs, suggestions, and cancels the ongoing input stream. Press `Ctrl+C` twice to exit the application.       |
+| `Esc`    | Close dialogs and suggestions.                                                                                        |
+| `Ctrl+C` | Cancel the ongoing request and clear the input. Press twice to exit the application.                                  |
 | `Ctrl+D` | Exit the application if the input is empty. Press twice to confirm.                                                   |
 | `Ctrl+L` | Clear the screen.                                                                                                     |
 | `Ctrl+O` | Toggle the display of the debug console.                                                                              |
