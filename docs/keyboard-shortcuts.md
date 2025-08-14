@@ -63,6 +63,6 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 
 ## IDE Integration
 
-| Shortcut | Description         |
-| -------- | ------------------- |
-| `Ctrl+G` | Trigger IDE action. |
+| Shortcut | Description                       |
+| -------- | --------------------------------- |
+| `Ctrl+G` | See context CLI received from IDE |
