@@ -59,6 +59,7 @@ describe('createContentGenerator', () => {
       httpOptions: {
         headers: {
           'User-Agent': expect.any(String),
+          'Gemini-Cli-Install-Id': expect.any(String),
         },
       },
     });

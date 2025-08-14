@@ -19,6 +19,7 @@ import { Config } from '../config/config.js';
 
 import { UserTierId } from '../code_assist/types.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
+import { getInstallationId } from '../utils/user_id.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -108,15 +109,16 @@ export async function createContentGenerator(
   sessionId?: string,
 ): Promise<ContentGenerator> {
   const version = process.env.CLI_VERSION || process.version;
-  const httpOptions = {
-    headers: {
-      'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
-    },
-  };
+  const userAgent = `GeminiCLI/${version} (${process.platform}; ${process.arch})`;
   if (
     config.authType === AuthType.LOGIN_WITH_GOOGLE ||
     config.authType === AuthType.CLOUD_SHELL
   ) {
+    const httpOptions = {
+      headers: {
+        'User-Agent': `${userAgent}`,
+      },
+    };
     return new LoggingContentGenerator(
       await createCodeAssistContentGenerator(
         httpOptions,
@@ -132,6 +134,13 @@ export async function createContentGenerator(
     config.authType === AuthType.USE_GEMINI ||
     config.authType === AuthType.USE_VERTEX_AI
   ) {
+    const installationId = getInstallationId();
+    const httpOptions = {
+      headers: {
+        'User-Agent': `${userAgent}`,
+        'Gemini-Cli-Install-Id': `${installationId}`,
+      },
+    };
     const googleGenAI = new GoogleGenAI({
       apiKey: config.apiKey === '' ? undefined : config.apiKey,
       vertexai: config.vertexai,
