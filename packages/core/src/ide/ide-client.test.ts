@@ -4,128 +4,65 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
+import { IdeClient } from './ide-client.js';
 
-describe('IdeClient', () => {
-  const originalEnv = { ...process.env };
-  const originalCwd = process.cwd;
-
-  beforeEach(() => {
-    vi.resetModules();
-    process.env = { ...originalEnv };
-    process.cwd = vi.fn().mockReturnValue('/Users/person/gemini-cli');
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
-    process.cwd = originalCwd;
-  });
-
-  it('should connect if cwd is within the IDE workspace path', async () => {
-    process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/Users/person/gemini-cli';
-    process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '12345';
-
-    vi.doMock('./detect-ide.js', () => ({
-      detectIde: () => 'vscode',
-      getIdeInfo: () => ({ displayName: 'VS Code' }),
-      DetectedIde: { VSCODE: 'vscode' },
-    }));
-    vi.doMock('../utils/paths.js', () => ({
-      isSubpath: () => true,
-    }));
-
-    const { IdeClient, IDEConnectionStatus } = await import('./ide-client.js');
-    const ideClient = IdeClient.getInstance();
-    await ideClient.connect();
-
-    expect(ideClient.getConnectionStatus().status).toBe(
-      IDEConnectionStatus.Disconnected,
+describe('IdeClient.validateWorkspacePath', () => {
+  it('should return valid if cwd is a subpath of the IDE workspace path', () => {
+    const result = IdeClient.validateWorkspacePath(
+      '/Users/person/gemini-cli',
+      'VS Code',
+      '/Users/person/gemini-cli/sub-dir',
     );
-    expect(ideClient.getConnectionStatus().details).toContain(
-      'Failed to connect',
+    expect(result.isValid).toBe(true);
+  });
+
+  it('should return invalid if GEMINI_CLI_IDE_WORKSPACE_PATH is undefined', () => {
+    const result = IdeClient.validateWorkspacePath(
+      undefined,
+      'VS Code',
+      '/Users/person/gemini-cli/sub-dir',
     );
+    expect(result.isValid).toBe(false);
+    expect(result.error).toContain('Failed to connect');
   });
 
-  it('should not connect if GEMINI_CLI_IDE_WORKSPACE_PATH is undefined', async () => {
-    delete process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
-
-    vi.doMock('./detect-ide.js', () => ({
-      detectIde: () => 'vscode',
-      getIdeInfo: () => ({ displayName: 'VS Code' }),
-      DetectedIde: { VSCODE: 'vscode' },
-    }));
-
-    const { IdeClient, IDEConnectionStatus } = await import('./ide-client.js');
-    const ideClient = IdeClient.getInstance();
-    await ideClient.connect();
-
-    const status = ideClient.getConnectionStatus();
-    expect(status.status).toBe(IDEConnectionStatus.Disconnected);
-    expect(status.details).toContain('Failed to connect');
-  });
-
-  it('should not connect if GEMINI_CLI_IDE_WORKSPACE_PATH is empty', async () => {
-    process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '';
-
-    vi.doMock('./detect-ide.js', () => ({
-      detectIde: () => 'vscode',
-      getIdeInfo: () => ({ displayName: 'VS Code' }),
-      DetectedIde: { VSCODE: 'vscode' },
-    }));
-
-    const { IdeClient, IDEConnectionStatus } = await import('./ide-client.js');
-    const ideClient = IdeClient.getInstance();
-    await ideClient.connect();
-
-    const status = ideClient.getConnectionStatus();
-    expect(status.status).toBe(IDEConnectionStatus.Disconnected);
-    expect(status.details).toContain('please open a workspace folder');
-  });
-
-  it('should not connect if cwd is not within the IDE workspace path', async () => {
-    process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/some/other/path';
-
-    vi.doMock('./detect-ide.js', () => ({
-      detectIde: () => 'vscode',
-      getIdeInfo: () => ({ displayName: 'VS Code' }),
-      DetectedIde: { VSCODE: 'vscode' },
-    }));
-    vi.doMock('../utils/paths.js', () => ({
-      isSubpath: () => false,
-    }));
-
-    const { IdeClient, IDEConnectionStatus } = await import('./ide-client.js');
-    const ideClient = IdeClient.getInstance();
-    await ideClient.connect();
-
-    const status = ideClient.getConnectionStatus();
-    expect(status.status).toBe(IDEConnectionStatus.Disconnected);
-    expect(status.details).toContain('Directory mismatch');
-  });
-
-  it('should handle multiple workspace paths', async () => {
-    process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] =
-      '/some/other/path:/Users/person/gemini-cli';
-    process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '12345';
-
-    vi.doMock('./detect-ide.js', () => ({
-      detectIde: () => 'vscode',
-      getIdeInfo: () => ({ displayName: 'VS Code' }),
-      DetectedIde: { VSCODE: 'vscode' },
-    }));
-    vi.doMock('../utils/paths.js', () => ({
-      isSubpath: (parent: string) => parent === '/Users/person/gemini-cli',
-    }));
-
-    const { IdeClient, IDEConnectionStatus } = await import('./ide-client.js');
-    const ideClient = IdeClient.getInstance();
-    await ideClient.connect();
-
-    expect(ideClient.getConnectionStatus().status).toBe(
-      IDEConnectionStatus.Disconnected,
+  it('should return invalid if GEMINI_CLI_IDE_WORKSPACE_PATH is empty', () => {
+    const result = IdeClient.validateWorkspacePath(
+      '',
+      'VS Code',
+      '/Users/person/gemini-cli/sub-dir',
     );
-    expect(ideClient.getConnectionStatus().details).toContain(
-      'Failed to connect',
+    expect(result.isValid).toBe(false);
+    expect(result.error).toContain('please open a workspace folder');
+  });
+
+  it('should return invalid if cwd is not within the IDE workspace path', () => {
+    const result = IdeClient.validateWorkspacePath(
+      '/some/other/path',
+      'VS Code',
+      '/Users/person/gemini-cli/sub-dir',
     );
+    expect(result.isValid).toBe(false);
+    expect(result.error).toContain('Directory mismatch');
+  });
+
+  it('should handle multiple workspace paths and return valid', () => {
+    const result = IdeClient.validateWorkspacePath(
+      '/some/other/path:/Users/person/gemini-cli',
+      'VS Code',
+      '/Users/person/gemini-cli/sub-dir',
+    );
+    expect(result.isValid).toBe(true);
+  });
+
+  it('should return invalid if cwd is not in any of the multiple workspace paths', () => {
+    const result = IdeClient.validateWorkspacePath(
+      '/some/other/path:/another/path',
+      'VS Code',
+      '/Users/person/gemini-cli/sub-dir',
+    );
+    expect(result.isValid).toBe(false);
+    expect(result.error).toContain('Directory mismatch');
   });
 });
