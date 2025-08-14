@@ -108,7 +108,6 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   process.exit(0);
 }
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
-import { stdin } from 'node:process';
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
