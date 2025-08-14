@@ -196,7 +196,7 @@ describe('chatCommand', () => {
 
       mockGetHistory.mockReturnValue([
         { role: 'user', parts: [{ text: 'context for our chat' }] },
-        { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] }
+        { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
       ]);
       result = await saveCommand?.action?.(mockContext, tag);
       expect(result).toEqual({
@@ -208,7 +208,7 @@ describe('chatCommand', () => {
       mockGetHistory.mockReturnValue([
         { role: 'user', parts: [{ text: 'context for our chat' }] },
         { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
-        { role: 'user', parts: [{ text: 'Hello, how are you?' }] }
+        { role: 'user', parts: [{ text: 'Hello, how are you?' }] },
       ]);
       result = await saveCommand?.action?.(mockContext, tag);
       expect(result).toEqual({
