@@ -189,18 +189,18 @@ jobs:
           ${{ steps.vars.outputs.is_dry_run == 'false' }}
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        run: |- 
+        run: |-
           PREVIOUS_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
 
       - name: 'Create GitHub Release and Tag'
-        if: |- 
+        if: |-
           ${{ steps.vars.outputs.is_dry_run == 'false' }}
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_BRANCH: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           RELEASE_TAG: '${{ steps.version.outputs.RELEASE_TAG }}'
           PREVIOUS_TAG: '${{ steps.previous_release.outputs.PREVIOUS_TAG }}'
-        run: |- 
+        run: |-
           gh release create "${RELEASE_TAG}" \
             bundle/gemini.js \
             --target "$RELEASE_BRANCH" \
