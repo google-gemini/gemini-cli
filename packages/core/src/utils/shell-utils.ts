@@ -301,7 +301,7 @@ export function checkCommandPermissions(
       return {
         allAllowed: false,
         disallowedCommands,
-        blockReason: `Command(s) not on the global or session allowlist. Disallowed commands: ${disallowedCommands.join(', ')}`,
+        blockReason: `Command(s) not on the global or session allowlist. Disallowed commands: ${disallowedCommands.map(JSON.stringify).join(', ')}`,
         isHardDenial: false, // This is a soft denial; confirmation is possible.
       };
     }
