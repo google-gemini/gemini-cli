@@ -123,7 +123,7 @@ export class IdeClient {
 
     this.setState(
       IDEConnectionStatus.Disconnected,
-      `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try restarting your terminal. To install the extension, run /ide install.`,
+      `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
       true,
     );
   }
@@ -261,7 +261,7 @@ export class IdeClient {
     if (ideWorkspacePath === undefined) {
       return {
         isValid: false,
-        error: `Failed to connect to IDE companion extension for ${currentIdeDisplayName}. Please ensure the extension is running and try refreshing your terminal. To install the extension, run /ide install.`,
+        error: `Failed to connect to IDE companion extension for ${currentIdeDisplayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
       };
     }
 
