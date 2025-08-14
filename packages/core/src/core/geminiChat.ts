@@ -596,11 +596,24 @@ export class GeminiChat {
   private isLastPartText(
     content: Content | undefined,
   ): content is Content & { parts: [...Part[], { text: string }] } {
-    if (!content || content.role !== 'model' || !content.parts || content.parts.length === 0) {
+    if (
+      !content ||
+      content.role !== 'model' ||
+      !content.parts ||
+      content.parts.length === 0
+    ) {
       return false;
     }
     const lastPart = content.parts[content.parts.length - 1];
-    return typeof lastPart.text === 'string' && lastPart.text !== '';
+    return (
+      typeof lastPart.text === 'string' &&
+      lastPart.text !== '' &&
+      !('functionCall' in lastPart) &&
+      !('functionResponse' in lastPart) &&
+      !('inlineData' in lastPart) &&
+      !('fileData' in lastPart) &&
+      !('thought' in lastPart)
+    );
   }
 
   private isThoughtContent(
