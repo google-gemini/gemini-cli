@@ -13,7 +13,7 @@ import {
   afterEach,
   afterAll,
 } from 'vitest';
-import { Logger, MessageSenderType, LogEntry } from './logger.js';
+import { Logger, MessageSenderType, LogEntry, encode } from './logger.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { Content } from '@google/genai';
@@ -396,19 +396,19 @@ describe('Logger', () => {
     it.each([
       {
         tag: 'test-tag',
-        encodedTag: 'dGVzdC10YWc',
+        encodedTag: encode('test-tag'),
       },
       {
         tag: '你好世界',
-        encodedTag: '5L2g5aW95LiW55WM',
+        encodedTag: encode('你好世界'),
       },
       {
         tag: 'japanese-ひらがなひらがな形声',
-        encodedTag: 'amFwYW5lc2Ut44Gy44KJ44GM44Gq44Gy44KJ44GM44Gq5b2i5aOw',
+        encodedTag: encode('japanese-ひらがなひらがな形声'),
       },
       {
         tag: '../../secret',
-        encodedTag: 'Li4vLi4vc2VjcmV0',
+        encodedTag: encode('../../secret'),
       },
     ])('should save a checkpoint', async ({ tag, encodedTag }) => {
       await logger.saveCheckpoint(conversation, tag);
@@ -452,19 +452,19 @@ describe('Logger', () => {
     it.each([
       {
         tag: 'test-tag',
-        encodedTag: 'dGVzdC10YWc',
+        encodedTag: encode('test-tag'),
       },
       {
         tag: '你好世界',
-        encodedTag: '5L2g5aW95LiW55WM',
+        encodedTag: encode('你好世界'),
       },
       {
         tag: 'japanese-ひらがなひらがな形声',
-        encodedTag: 'amFwYW5lc2Ut44Gy44KJ44GM44Gq44Gy44KJ44GM44Gq5b2i5aOw',
+        encodedTag: encode('japanese-ひらがなひらがな形声'),
       },
       {
         tag: '../../secret',
-        encodedTag: 'Li4vLi4vc2VjcmV0',
+        encodedTag: encode('../../secret'),
       },
     ])('should load from a checkpoint', async ({ tag, encodedTag }) => {
       const taggedConversation = [
@@ -497,7 +497,7 @@ describe('Logger', () => {
 
     it('should return an empty array if the file contains invalid JSON', async () => {
       const tag = 'invalid-json-tag';
-      const encodedTag = 'aW52YWxpZC1qc29uLXRhZw';
+      const encodedTag = encode(tag);
       const taggedFilePath = path.join(
         TEST_GEMINI_DIR,
         `checkpoint-${encodedTag}.json`,
@@ -533,7 +533,7 @@ describe('Logger', () => {
       { role: 'user', parts: [{ text: 'Content to be deleted' }] },
     ];
     const tag = 'delete-me';
-    const encodedTag = 'ZGVsZXRlLW1l';
+    const encodedTag = encode(tag);
     let taggedFilePath: string;
 
     beforeEach(async () => {
@@ -615,7 +615,7 @@ describe('Logger', () => {
 
   describe('checkpointExists', () => {
     const tag = 'exists-test';
-    const encodedTag = 'ZXhpc3RzLXRlc3Q';
+    const encodedTag = encode(tag);
     let taggedFilePath: string;
 
     beforeEach(() => {

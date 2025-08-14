@@ -23,6 +23,22 @@ export interface LogEntry {
   message: string;
 }
 
+// This regex matches any character that is NOT a letter (a-z, A-Z),
+// a number (0-9), a hyphen (-), an underscore (_), or a dot (.).
+
+/**
+ * Encodes a string to be safe for use as a filename.
+ *
+ * It replaces any characters that are not alphanumeric or one of `_`, `-`, `.`
+ * with a URL-like percent-encoding (`%` followed by the 2-digit hex code).
+ *
+ * @param str The input string to encode.
+ * @returns The encoded, filename-safe string.
+ */
+export function encode(str: string): string {
+  return encodeURIComponent(str);
+}
+
 export class Logger {
   private geminiDir: string | undefined;
   private logFilePath: string | undefined;
@@ -239,12 +255,12 @@ export class Logger {
       throw new Error('Checkpoint file path not set.');
     }
     // Encode the tag to handle all special characters safely.
-    const encodedTag = Buffer.from(tag).toString('base64url');
+    const encodedTag = encode(tag);
     return path.join(this.geminiDir, `checkpoint-${encodedTag}.json`);
   }
 
   private async _getCheckpointPath(tag: string): Promise<string> {
-    // 1. Check for the new base64url encoded path first.
+    // 1. Check for the new encoded path first.
     const newPath = this._checkpointPath(tag);
     try {
       await fs.access(newPath);
@@ -329,7 +345,7 @@ export class Logger {
 
     let deletedSomething = false;
 
-    // 1. Attempt to delete the new base64url encoded path.
+    // 1. Attempt to delete the new encoded path.
     const newPath = this._checkpointPath(tag);
     try {
       await fs.unlink(newPath);
