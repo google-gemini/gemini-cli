@@ -196,7 +196,7 @@ export class WriteFileTool
       'Current',
       'Proposed',
       DEFAULT_DIFF_OPTIONS,
-    );
+    ) ?? '';
 
     const ideClient = this.config.getIdeClient();
     const ideConfirmation =
@@ -303,7 +303,7 @@ export class WriteFileTool
         'Original',
         'Written',
         DEFAULT_DIFF_OPTIONS,
-      );
+      ) ?? '';
 
       const originallyProposedContent =
         params.ai_proposed_content || params.content;

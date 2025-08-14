@@ -7,7 +7,7 @@
 import * as Diff from 'diff';
 import { DiffStat } from './tools.js';
 
-export const DEFAULT_DIFF_OPTIONS: Diff.PatchOptions = {
+export const DEFAULT_DIFF_OPTIONS: Diff.CreatePatchOptionsNonabortable = {
   context: 3,
   ignoreWhitespace: true,
 };
