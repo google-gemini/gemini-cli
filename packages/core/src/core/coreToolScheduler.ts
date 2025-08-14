@@ -601,6 +601,14 @@ export class CoreToolScheduler {
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled');
           } else {
+            if (signal.aborted) {
+              this.setStatusInternal(
+                reqInfo.callId,
+                'cancelled',
+                'Tool call cancelled by user.',
+              );
+              continue;
+            }
             const confirmationDetails =
               await invocation.shouldConfirmExecute(signal);
 

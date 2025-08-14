@@ -6,17 +6,63 @@
 
 import { vi } from 'vitest';
 import {
-  BaseTool,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
   ToolCallConfirmationDetails,
+  ToolInvocation,
   ToolResult,
   Kind,
 } from '../tools/tools.js';
 import { Schema, Type } from '@google/genai';
 
+class MockToolInvocation extends BaseToolInvocation<
+  { [key: string]: unknown },
+  ToolResult
+> {
+  constructor(
+    private readonly tool: MockTool,
+    params: { [key: string]: unknown },
+  ) {
+    super(params);
+  }
+
+  async execute(_abortSignal: AbortSignal): Promise<ToolResult> {
+    const result = this.tool.executeFn(this.params);
+    return (
+      result ?? {
+        llmContent: `Tool ${this.tool.name} executed successfully.`,
+        returnDisplay: `Tool ${this.tool.name} executed successfully.`,
+      }
+    );
+  }
+
+  override async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.tool.shouldConfirm) {
+      return {
+        type: 'exec' as const,
+        title: `Confirm ${this.tool.displayName}`,
+        command: this.tool.name,
+        rootCommand: this.tool.name,
+        onConfirm: async () => {},
+      };
+    }
+    return false;
+  }
+
+  getDescription(): string {
+    return `A mock tool invocation for ${this.tool.name}`;
+  }
+}
+
 /**
  * A highly configurable mock tool for testing purposes.
  */
-export class MockTool extends BaseTool<{ [key: string]: unknown }, ToolResult> {
+export class MockTool extends BaseDeclarativeTool<
+  { [key: string]: unknown },
+  ToolResult
+> {
   executeFn = vi.fn();
   shouldConfirm = false;
 
@@ -32,32 +78,9 @@ export class MockTool extends BaseTool<{ [key: string]: unknown }, ToolResult> {
     super(name, displayName ?? name, description, Kind.Other, params);
   }
 
-  async execute(
-    params: { [key: string]: unknown },
-    _abortSignal: AbortSignal,
-  ): Promise<ToolResult> {
-    const result = this.executeFn(params);
-    return (
-      result ?? {
-        llmContent: `Tool ${this.name} executed successfully.`,
-        returnDisplay: `Tool ${this.name} executed successfully.`,
-      }
-    );
-  }
-
-  override async shouldConfirmExecute(
-    _params: { [key: string]: unknown },
-    _abortSignal: AbortSignal,
-  ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.shouldConfirm) {
-      return {
-        type: 'exec' as const,
-        title: `Confirm ${this.displayName}`,
-        command: this.name,
-        rootCommand: this.name,
-        onConfirm: async () => {},
-      };
-    }
-    return false;
+  protected createInvocation(params: {
+    [key: string]: unknown;
+  }): ToolInvocation<{ [key: string]: unknown }, ToolResult> {
+    return new MockToolInvocation(this, params);
   }
 }
