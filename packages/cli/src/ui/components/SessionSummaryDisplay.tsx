@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { StatsDisplay } from './StatsDisplay.js';
+import { useI18n } from '../../i18n/hooks.js';
 
 interface SessionSummaryDisplayProps {
   duration: string;
@@ -13,6 +14,9 @@ interface SessionSummaryDisplayProps {
 
 export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
   duration,
-}) => (
-  <StatsDisplay title="Agent powering down. Goodbye!" duration={duration} />
-);
+}) => {
+  const { t } = useI18n();
+  return (
+    <StatsDisplay title={t('ui.session.goodbye')} duration={duration} />
+  );
+};

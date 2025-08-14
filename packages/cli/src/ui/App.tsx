@@ -80,7 +80,6 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useVimMode, VimModeProvider } from './contexts/VimModeContext.js';
 import { useVim } from './hooks/vim.js';
 import { useKeypress, Key } from './hooks/useKeypress.js';
-import { useKittyKeyboardProtocol } from './hooks/useKittyKeyboardProtocol.js';
 import { keyMatchers, Command } from './keyMatchers.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
@@ -99,6 +98,7 @@ import { SettingsDialog } from './components/SettingsDialog.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
+import { useI18n } from '../i18n/hooks.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -118,6 +118,7 @@ export const AppWrapper = (props: AppProps) => (
 );
 
 const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
+  const { t } = useI18n();
   const isFocused = useFocus();
   useBracketedPaste();
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
@@ -252,10 +253,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
 
-  const { isFolderTrustDialogOpen, handleFolderTrustSelect } = useFolderTrust(
-    settings,
-    config,
-  );
+  const { isFolderTrustDialogOpen, handleFolderTrustSelect } =
+    useFolderTrust(settings, config);
 
   const {
     isAuthDialogOpen,
@@ -608,7 +607,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
   const showAutoAcceptIndicator = useAutoAcceptIndicator({ config });
-  const kittyProtocolStatus = useKittyKeyboardProtocol();
 
   const handleExit = useCallback(
     (
@@ -701,11 +699,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     ],
   );
 
-  useKeypress(handleGlobalKeypress, {
-    isActive: true,
-    kittyProtocolEnabled: kittyProtocolStatus.enabled,
-    config,
-  });
+  useKeypress(handleGlobalKeypress, { isActive: true });
 
   useEffect(() => {
     if (config) {
@@ -1008,7 +1002,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             <>
               <AuthInProgress
                 onTimeout={() => {
-                  setAuthError('Authentication timed out. Please try again.');
+                  setAuthError(t('ui.auth.authenticationTimeout'));
                   cancelAuthentication();
                   openAuthDialog();
                 }}

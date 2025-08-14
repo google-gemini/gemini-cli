@@ -10,6 +10,8 @@ import { homedir } from 'node:os';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
+import { initializeLanguage } from './language.js';
+import { t, getCurrentLanguage } from '../i18n/index.js';
 import { mcpCommand } from '../commands/mcp.js';
 import {
   Config,
@@ -72,166 +74,181 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
+  language: string | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
+  // 早期解析语言参数用于i18n初始化
+  const args = process.argv;
+  let cliLanguage: string | undefined;
+  
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === '-L' || args[i] === '--language') && i + 1 < args.length) {
+      cliLanguage = args[i + 1];
+      break;
+    }
+  }
+  
+  if (cliLanguage) {
+    initializeLanguage(cliLanguage);
+  } else {
+    initializeLanguage();
+  }
+
+  // 获取当前语言并映射到yargs支持的locale
+  const currentLang = getCurrentLanguage();
+  const yargsLocale = currentLang === 'zh' ? 'zh_CN' : currentLang === 'ja' ? 'ja' : 'en';
+
   const yargsInstance = yargs(hideBin(process.argv))
+    .locale(yargsLocale)
     .scriptName('gemini')
     .usage(
-      'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
+      t('usage.main'),
     )
-    .command('$0', 'Launch Gemini CLI', (yargsInstance) =>
+    .command('$0', t('commands.launch'), (yargsInstance) =>
       yargsInstance
         .option('model', {
           alias: 'm',
           type: 'string',
-          description: `Model`,
+          description: t('options.model.description'),
           default: process.env.GEMINI_MODEL,
         })
         .option('prompt', {
           alias: 'p',
           type: 'string',
-          description: 'Prompt. Appended to input on stdin (if any).',
+          description: t('options.prompt.description'),
         })
         .option('prompt-interactive', {
           alias: 'i',
           type: 'string',
-          description:
-            'Execute the provided prompt and continue in interactive mode',
+          description: t('options.promptInteractive.description'),
         })
         .option('sandbox', {
           alias: 's',
           type: 'boolean',
-          description: 'Run in sandbox?',
+          description: t('options.sandbox.description'),
         })
         .option('sandbox-image', {
           type: 'string',
-          description: 'Sandbox image URI.',
+          description: t('options.sandboxImage.description'),
         })
         .option('debug', {
           alias: 'd',
           type: 'boolean',
-          description: 'Run in debug mode?',
+          description: t('options.debug.description'),
           default: false,
         })
         .option('all-files', {
           alias: ['a'],
           type: 'boolean',
-          description: 'Include ALL files in context?',
+          description: t('options.allFiles.description'),
           default: false,
         })
         .option('all_files', {
           type: 'boolean',
-          description: 'Include ALL files in context?',
+          description: t('options.allFiles.description'),
           default: false,
         })
         .deprecateOption(
           'all_files',
-          'Use --all-files instead. We will be removing --all_files in the coming weeks.',
+          t('warnings.deprecatedAllFiles'),
         )
         .option('show-memory-usage', {
           type: 'boolean',
-          description: 'Show memory usage in status bar',
+          description: t('options.showMemoryUsage.description'),
           default: false,
         })
         .option('show_memory_usage', {
           type: 'boolean',
-          description: 'Show memory usage in status bar',
+          description: t('options.showMemoryUsage.description'),
           default: false,
         })
         .deprecateOption(
           'show_memory_usage',
-          'Use --show-memory-usage instead. We will be removing --show_memory_usage in the coming weeks.',
+          t('warnings.deprecatedShowMemoryUsage'),
         )
         .option('yolo', {
           alias: 'y',
           type: 'boolean',
-          description:
-            'Automatically accept all actions (aka YOLO mode, see https://www.youtube.com/watch?v=xvFZjo5PgG0 for more details)?',
+          description: t('options.yolo.description'),
           default: false,
         })
         .option('approval-mode', {
           type: 'string',
           choices: ['default', 'auto_edit', 'yolo'],
-          description:
-            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools)',
+          description: t('options.approvalMode.description'),
         })
         .option('telemetry', {
           type: 'boolean',
-          description:
-            'Enable telemetry? This flag specifically controls if telemetry is sent. Other --telemetry-* flags set specific values but do not enable telemetry on their own.',
+          description: t('options.telemetry.description'),
         })
         .option('telemetry-target', {
           type: 'string',
           choices: ['local', 'gcp'],
-          description:
-            'Set the telemetry target (local or gcp). Overrides settings files.',
+          description: t('options.telemetryTarget.description'),
         })
         .option('telemetry-otlp-endpoint', {
           type: 'string',
-          description:
-            'Set the OTLP endpoint for telemetry. Overrides environment variables and settings files.',
+          description: t('options.telemetryOtlpEndpoint.description'),
         })
         .option('telemetry-log-prompts', {
           type: 'boolean',
-          description:
-            'Enable or disable logging of user prompts for telemetry. Overrides settings files.',
+          description: t('options.telemetryLogPrompts.description'),
         })
         .option('telemetry-outfile', {
           type: 'string',
-          description: 'Redirect all telemetry output to the specified file.',
+          description: t('options.telemetryOutfile.description'),
         })
         .option('checkpointing', {
           alias: 'c',
           type: 'boolean',
-          description: 'Enables checkpointing of file edits',
+          description: t('options.checkpointing.description'),
           default: false,
         })
         .option('experimental-acp', {
           type: 'boolean',
-          description: 'Starts the agent in ACP mode',
+          description: t('options.experimentalAcp.description'),
         })
         .option('allowed-mcp-server-names', {
           type: 'array',
           string: true,
-          description: 'Allowed MCP server names',
+          description: t('options.allowedMcpServerNames.description'),
         })
         .option('extensions', {
           alias: 'e',
           type: 'array',
           string: true,
-          description:
-            'A list of extensions to use. If not provided, all extensions are used.',
+          description: t('options.extensions.description'),
         })
         .option('list-extensions', {
           alias: 'l',
           type: 'boolean',
-          description: 'List all available extensions and exit.',
+          description: t('options.listExtensions.description'),
         })
         .option('proxy', {
           type: 'string',
-          description:
-            'Proxy for gemini client, like schema://user:password@host:port',
+          description: t('options.proxy.description'),
         })
         .option('include-directories', {
           type: 'array',
           string: true,
-          description:
-            'Additional directories to include in the workspace (comma-separated or multiple --include-directories)',
+          description: t('options.includeDirectories.description'),
           coerce: (dirs: string[]) =>
             // Handle comma-separated values
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
         })
+        .option('language', {
+          alias: 'L',
+          type: 'string',
+          choices: ['en', 'zh', 'ja'],
+          description: t('options.language.description'),
+        })
         .check((argv) => {
           if (argv.prompt && argv.promptInteractive) {
-            throw new Error(
-              'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
-            );
+            throw new Error(t('errors.cannotUseBothPromptOptions'));
           }
           if (argv.yolo && argv.approvalMode) {
-            throw new Error(
-              'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
-            );
+            throw new Error(t('errors.cannotUseYoloAndApprovalMode'));
           }
           return true;
         }),

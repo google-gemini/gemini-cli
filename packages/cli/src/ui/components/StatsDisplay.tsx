@@ -10,6 +10,7 @@ import Gradient from 'ink-gradient';
 import { Colors } from '../colors.js';
 import { formatDuration } from '../utils/formatters.js';
 import { useSessionStats, ModelMetrics } from '../contexts/SessionContext.js';
+import { useI18n } from '../../i18n/hooks.js';
 import {
   getStatusColor,
   TOOL_SUCCESS_RATE_HIGH,
@@ -148,6 +149,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   duration,
   title,
 }) => {
+  const { t } = useI18n();
   const { stats } = useSessionStats();
   const { metrics } = stats;
   const { models, tools } = metrics;
@@ -222,26 +224,32 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         </Section>
       )}
 
-      <Section title="Performance">
-        <StatRow title="Wall Time:">
+            <Section title={t('ui.session.performance')}>
+        <StatRow title={t('ui.session.wallTime')}>
           <Text>{duration}</Text>
         </StatRow>
-        <StatRow title="Agent Active:">
+        <StatRow title={t('ui.session.agentActive')}>
           <Text>{formatDuration(computed.agentActiveTime)}</Text>
         </StatRow>
-        <SubStatRow title="API Time:">
+        <SubStatRow title={t('ui.session.apiTime')}>
           <Text>
             {formatDuration(computed.totalApiTime)}{' '}
             <Text color={Colors.Gray}>
-              ({computed.apiTimePercent.toFixed(1)}%)
+              ({((100 * computed.totalApiTime) / computed.agentActiveTime).toFixed(
+                1,
+              )}
+              %)
             </Text>
           </Text>
         </SubStatRow>
-        <SubStatRow title="Tool Time:">
+        <SubStatRow title={t('ui.session.toolTime')}>
           <Text>
             {formatDuration(computed.totalToolTime)}{' '}
             <Text color={Colors.Gray}>
-              ({computed.toolTimePercent.toFixed(1)}%)
+              ({((100 * computed.totalToolTime) / computed.agentActiveTime).toFixed(
+                1,
+              )}
+              %)
             </Text>
           </Text>
         </SubStatRow>
