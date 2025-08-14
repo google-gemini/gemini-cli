@@ -112,7 +112,9 @@ export async function activate(context: vscode.ExtensionContext) {
       const workspaceFolders = vscode.workspace.workspaceFolders;
 
       let targetFolder: vscode.WorkspaceFolder | undefined;
-      if (workspaceFolders && workspaceFolders.length > 1) {
+      if (workspaceFolders?.length === 1) {
+        targetFolder = workspaceFolders[0];
+      } else if (workspaceFolders?.length > 1) {
         const picks = workspaceFolders.map((folder) => ({
           label: folder.name,
           description: folder.uri.fsPath,
@@ -125,8 +127,6 @@ export async function activate(context: vscode.ExtensionContext) {
           return; // User cancelled
         }
         targetFolder = selection.folder;
-      } else if (workspaceFolders && workspaceFolders.length === 1) {
-        targetFolder = workspaceFolders[0];
       }
 
       const terminal = vscode.window.createTerminal({
