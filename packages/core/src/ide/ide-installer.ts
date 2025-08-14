@@ -10,6 +10,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import { DetectedIde } from './detect-ide.js';
+import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
 
 const VSCODE_COMMAND = process.platform === 'win32' ? 'code.cmd' : 'code';
 
@@ -96,7 +97,7 @@ class VsCodeInstaller implements IdeInstaller {
     if (!commandPath) {
       return {
         success: false,
-        message: `VS Code CLI not found. Please ensure 'code' is in your system's PATH. For help, see https://code.visualstudio.com/docs/configure/command-line#_code-is-not-recognized-as-an-internal-or-external-command. You can also install the companion extension manually from the VS Code marketplace.`,
+        message: `VS Code CLI not found. Please ensure 'code' is in your system's PATH. For help, see https://code.visualstudio.com/docs/configure/command-line#_code-is-not-recognized-as-an-internal-or-external-command. You can also install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the VS Code marketplace.`,
       };
     }
 
@@ -111,7 +112,7 @@ class VsCodeInstaller implements IdeInstaller {
     } catch (_error) {
       return {
         success: false,
-        message: `Failed to install VS Code companion extension. Please try installing it manually from the VS Code marketplace.`,
+        message: `Failed to install VS Code companion extension. Please try installing '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' manually from the VS Code extension marketplace.`,
       };
     }
   }
