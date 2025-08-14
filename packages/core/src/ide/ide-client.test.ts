@@ -14,6 +14,16 @@ import * as path from 'node:path';
 vi.mock('node:fs');
 vi.mock('../ide/detect-ide.js');
 
+type IdeClientTestApi = {
+  instance: IdeClient | undefined;
+  establishConnection: (port: string) => Promise<void>;
+  setState: (
+    status: IDEConnectionStatus,
+    details?: string,
+    logToConsole?: boolean,
+  ) => void;
+};
+
 describe('IdeClient', () => {
   let originalProcess: NodeJS.Process;
 
@@ -27,7 +37,9 @@ describe('IdeClient', () => {
     });
 
     // Mock detectIde to simulate being in VSCode
-    vi.mocked(detectIde.detectIde).mockReturnValue(detectIde.DetectedIde.VSCode);
+    vi.mocked(detectIde.detectIde).mockReturnValue(
+      detectIde.DetectedIde.VSCode,
+    );
     vi.mocked(detectIde.getIdeInfo).mockReturnValue({
       displayName: 'VSCode',
     });
@@ -36,13 +48,13 @@ describe('IdeClient', () => {
     vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
 
     // Reset singleton instance before each test
-    (IdeClient as any).instance = undefined;
+    (IdeClient as unknown as IdeClientTestApi).instance = undefined;
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.resetAllMocks();
-    (IdeClient as any).instance = undefined;
+    (IdeClient as unknown as IdeClientTestApi).instance = undefined;
   });
 
   describe('connect', () => {
@@ -73,9 +85,11 @@ describe('IdeClient', () => {
       process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '12345';
       vi.mocked(process.cwd).mockReturnValue('/path/to/workspace/project');
       const establishConnectionSpy = vi
-        .spyOn(ideClient as any, 'establishConnection')
+        .spyOn(ideClient as unknown as IdeClientTestApi, 'establishConnection')
         .mockImplementation(async () => {
-          (ideClient as any).setState(IDEConnectionStatus.Connected);
+          (ideClient as unknown as IdeClientTestApi).setState(
+            IDEConnectionStatus.Connected,
+          );
         });
 
       await ideClient.connect();
@@ -92,9 +106,11 @@ describe('IdeClient', () => {
       process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '12345';
       vi.mocked(process.cwd).mockReturnValue(workspaceRoot);
       const establishConnectionSpy = vi
-        .spyOn(ideClient as any, 'establishConnection')
+        .spyOn(ideClient as unknown as IdeClientTestApi, 'establishConnection')
         .mockImplementation(async () => {
-          (ideClient as any).setState(IDEConnectionStatus.Connected);
+          (ideClient as unknown as IdeClientTestApi).setState(
+            IDEConnectionStatus.Connected,
+          );
         });
 
       await ideClient.connect();
@@ -124,9 +140,11 @@ describe('IdeClient', () => {
       process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '12345';
       vi.mocked(process.cwd).mockReturnValue('/path/to/workspace2/project');
       const establishConnectionSpy = vi
-        .spyOn(ideClient as any, 'establishConnection')
+        .spyOn(ideClient as unknown as IdeClientTestApi, 'establishConnection')
         .mockImplementation(async () => {
-          (ideClient as any).setState(IDEConnectionStatus.Connected);
+          (ideClient as unknown as IdeClientTestApi).setState(
+            IDEConnectionStatus.Connected,
+          );
         });
 
       await ideClient.connect();
@@ -145,9 +163,11 @@ describe('IdeClient', () => {
       process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '12345';
       vi.mocked(process.cwd).mockReturnValue('/path/to/workspace1');
       const establishConnectionSpy = vi
-        .spyOn(ideClient as any, 'establishConnection')
+        .spyOn(ideClient as unknown as IdeClientTestApi, 'establishConnection')
         .mockImplementation(async () => {
-          (ideClient as any).setState(IDEConnectionStatus.Connected);
+          (ideClient as unknown as IdeClientTestApi).setState(
+            IDEConnectionStatus.Connected,
+          );
         });
 
       await ideClient.connect();
@@ -177,9 +197,11 @@ describe('IdeClient', () => {
       process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '12345';
       vi.mocked(process.cwd).mockReturnValue('/path/to/workspace/project');
       const establishConnectionSpy = vi
-        .spyOn(ideClient as any, 'establishConnection')
+        .spyOn(ideClient as unknown as IdeClientTestApi, 'establishConnection')
         .mockImplementation(async () => {
-          (ideClient as any).setState(IDEConnectionStatus.Connected);
+          (ideClient as unknown as IdeClientTestApi).setState(
+            IDEConnectionStatus.Connected,
+          );
         });
 
       await ideClient.connect();
@@ -202,9 +224,11 @@ describe('IdeClient', () => {
         return p.toString();
       });
       const establishConnectionSpy = vi
-        .spyOn(ideClient as any, 'establishConnection')
+        .spyOn(ideClient as unknown as IdeClientTestApi, 'establishConnection')
         .mockImplementation(async () => {
-          (ideClient as any).setState(IDEConnectionStatus.Connected);
+          (ideClient as unknown as IdeClientTestApi).setState(
+            IDEConnectionStatus.Connected,
+          );
         });
 
       await ideClient.connect();

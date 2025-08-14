@@ -171,9 +171,7 @@ describe('multi-root workspace handling', () => {
     });
 
     it('should set an empty workspace path env var for no folders', async () => {
-      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue(
-        [],
-      );
+      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue([]);
       await activate(context);
       expect(
         context.environmentVariableCollection.replace,
@@ -183,9 +181,7 @@ describe('multi-root workspace handling', () => {
 
   describe('gemini-cli.runGeminiCLI command', () => {
     it('should create a terminal with no CWD if no workspace folder is open', async () => {
-      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue(
-        [],
-      );
+      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue([]);
       await activate(context);
       const command = commandMap.get('gemini-cli.runGeminiCLI');
       await (command as () => Promise<void>)();
