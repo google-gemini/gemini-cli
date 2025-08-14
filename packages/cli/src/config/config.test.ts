@@ -1809,7 +1809,14 @@ describe('loadCliConfig trustedFolder', () => {
     description,
   } of testCases) {
     it(`should be correct for: ${description}`, async () => {
-      (isWorkspaceTrusted as vi.Mock).mockReturnValue(mockTrustValue);
+      (isWorkspaceTrusted as vi.Mock).mockImplementation(
+        (settings: Settings) => {
+          const featureIsEnabled =
+            (settings.folderTrustFeature ?? false) &&
+            (settings.folderTrust ?? true);
+          return featureIsEnabled ? mockTrustValue : true;
+        },
+      );
       const argv = await parseArguments();
       const settings: Settings = { folderTrustFeature, folderTrust };
       const config = await loadCliConfig(settings, [], 'test-session', argv);
