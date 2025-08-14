@@ -30,6 +30,7 @@
     "@ai-sdk/anthropic": "^1.2.0",
     "@ai-sdk/google": "^2.0.5",
     "@ai-sdk/openai": "^1.2.0",
+    "@anthropic-ai/claude-code": "^1.0.81",
     "@google/genai": "1.9.0",
     "@mastra/core": "^0.13.2",
     "@mastra/libsql": "^0.13.2",

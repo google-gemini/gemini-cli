@@ -168,7 +168,7 @@ const productionReadinessAgent = new Agent({
   instructions: productionReadinessPrompt,
   model: anthropic('claude-3-7-sonnet-20250219'),
   defaultGenerateOptions: {
-    maxSteps: 500,
+    maxSteps: 1000,
   },
   tools: {
     guardrailCrudTool,
