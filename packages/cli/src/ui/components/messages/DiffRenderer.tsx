@@ -314,14 +314,18 @@ const renderDiffContent = (
                     ? theme.background.diff.added
                     : theme.background.diff.removed
                 }
-                color={
-                  line.type === 'add'
-                    ? theme.status.success
-                    : theme.status.error
-                }
                 wrap="wrap"
               >
-                {prefixSymbol} {colorizeLine(displayContent, language)}
+                <Text
+                  color={
+                    line.type === 'add'
+                      ? theme.status.success
+                      : theme.status.error
+                  }
+                >
+                  {prefixSymbol}
+                </Text>{' '}
+                {colorizeLine(displayContent, language)}
               </Text>
             )}
           </Box>,
