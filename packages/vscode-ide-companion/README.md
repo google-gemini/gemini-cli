@@ -1,6 +1,6 @@
 # Gemini CLI Companion
 
-The Gemini CLI Companion extension pairs with [Gemini CLI](https://github.com/google-gemini/gemini-cli). This is compatible with VS Code and forks of VS Code, and is available in both the VS Code Extensions Marketplace and in the [Open VSX Registry](https://open-vsx.org/extension/Google/gemini-cli-vscode-ide-companion).
+The Gemini CLI Companion extension pairs with [Gemini CLI](https://github.com/google-gemini/gemini-cli). This extension is compatible with both VS Code and VS Code forks.
 
 # Features
 
@@ -11,6 +11,8 @@ The Gemini CLI Companion extension pairs with [Gemini CLI](https://github.com/go
 - Native Diffing: Seamlessly view, modify, and accept code changes suggested by Gemini CLI directly within the editor.
 
 - Launch Gemini CLI: Quickly start a new Gemini CLI session from the Command Palette (Cmd+Shift+P or Ctrl+Shift+P) by running the "Gemini CLI: Run" command.
+
+# Requirements
 
 To use this extension, you'll need:
 
