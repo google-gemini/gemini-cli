@@ -160,7 +160,8 @@ export class UiTelemetryService extends EventEmitter {
     modelMetrics.tokens.thoughts += event.thoughts_token_count;
     modelMetrics.tokens.tool += event.tool_token_count;
 
-    this.#lastPromptTokenCount = event.input_token_count;
+    this.#lastPromptTokenCount =
+      event.input_token_count - event.tool_token_count;
   }
 
   private processApiError(event: ApiErrorEvent) {
