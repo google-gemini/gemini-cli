@@ -9,6 +9,7 @@ import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import { Colors } from '../colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useI18n } from '../../i18n/hooks.js';
 
 interface AuthInProgressProps {
   onTimeout: () => void;
@@ -17,6 +18,7 @@ interface AuthInProgressProps {
 export function AuthInProgress({
   onTimeout,
 }: AuthInProgressProps): React.JSX.Element {
+  const { t } = useI18n();
   const [timedOut, setTimedOut] = useState(false);
 
   useKeypress(
@@ -47,13 +49,12 @@ export function AuthInProgress({
     >
       {timedOut ? (
         <Text color={Colors.AccentRed}>
-          Authentication timed out. Please try again.
+          {t('ui.auth.authenticationTimeout')}
         </Text>
       ) : (
         <Box>
           <Text>
-            <Spinner type="dots" /> Waiting for auth... (Press ESC or CTRL+C to
-            cancel)
+            <Spinner type="dots" /> {t('ui.auth.waitingForAuth')}
           </Text>
         </Box>
       )}

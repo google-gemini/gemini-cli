@@ -1,7 +1,21 @@
 /**
  * @license
- * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
+ * Copyright 2025 Gooexport const Footer: React.FC<FooterProps> = ({
+  model,
+  targetDir,
+  branchName,
+  debugMode,
+  debugMessage,
+  corgiMode,
+  errorCount,
+  showErrorDetails,
+  showMemoryUsage,
+  promptTokenCount,
+  nightly,
+  vimMode,
+}) => {
+  const { t } = useI18n();
+  const { width } = useTerminalSize();-License-Identifier: Apache-2.0
  */
 
 import React from 'react';
@@ -15,6 +29,7 @@ import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
+import { useI18n } from '../../i18n/hooks.js';
 
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
@@ -48,6 +63,7 @@ export const Footer: React.FC<FooterProps> = ({
   nightly,
   vimMode,
 }) => {
+  const { t } = useI18n();
   const { columns: terminalWidth } = useTerminalSize();
 
   const isNarrow = isNarrowWidth(terminalWidth);
@@ -112,7 +128,7 @@ export const Footer: React.FC<FooterProps> = ({
           </Text>
         ) : (
           <Text color={theme.status.error}>
-            no sandbox <Text color={theme.text.secondary}>(see /docs)</Text>
+            {t('ui.status.noSandbox')} <Text color={theme.text.secondary}>({t('ui.status.seeDocs')})</Text>
           </Text>
         )}
       </Box>
