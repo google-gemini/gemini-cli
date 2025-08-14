@@ -180,7 +180,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
     return `in ${tildeifyPath(memoryFilePath)}`;
   }
 
-  async shouldConfirmExecute(
+  override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
   ): Promise<ToolEditConfirmationDetails | false> {
     const memoryFilePath = getGlobalMemoryFilePath();
@@ -294,7 +294,7 @@ export class MemoryTool
     );
   }
 
-  validateToolParams(params: SaveMemoryParams): string | null {
+  override validateToolParams(params: SaveMemoryParams): string | null {
     const errors = SchemaValidator.validate(
       this.schema.parametersJsonSchema,
       params,
