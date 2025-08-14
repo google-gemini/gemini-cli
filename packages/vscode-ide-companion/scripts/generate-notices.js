@@ -87,15 +87,23 @@ async function getDependencyLicense(depName, depVersion) {
 }
 
 function collectDependencies(packageName, packageLock, dependenciesMap) {
-  const packageInfo = packageLock.packages[`node_modules/${packageName}`];
-  if (!packageInfo || !packageInfo.dependencies) {
+  if (dependenciesMap.has(packageName)) {
     return;
   }
 
-  for (const [name, version] of Object.entries(packageInfo.dependencies)) {
-    if (!dependenciesMap.has(name)) {
-      dependenciesMap.set(name, version);
-      collectDependencies(name, packageLock, dependenciesMap);
+  const packageInfo = packageLock.packages[`node_modules/${packageName}`];
+  if (!packageInfo) {
+    console.warn(
+      `Warning: Could not find package info for ${packageName} in package-lock.json.`,
+    );
+    return;
+  }
+
+  dependenciesMap.set(packageName, packageInfo.version);
+
+  if (packageInfo.dependencies) {
+    for (const depName of Object.keys(packageInfo.dependencies)) {
+      collectDependencies(depName, packageLock, dependenciesMap);
     }
   }
 }
@@ -117,7 +125,6 @@ async function main() {
     const directDependencies = Object.keys(packageJson.dependencies);
 
     for (const depName of directDependencies) {
-      allDependencies.set(depName, packageJson.dependencies[depName]);
       collectDependencies(depName, packageLockJson, allDependencies);
     }
 

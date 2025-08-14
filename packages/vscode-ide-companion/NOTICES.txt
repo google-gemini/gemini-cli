@@ -1,7 +1,7 @@
 This file contains third-party software notices and license terms.
 
 ============================================================
-@modelcontextprotocol/sdk@^1.15.1
+@modelcontextprotocol/sdk@1.15.1
 (git+https://github.com/modelcontextprotocol/typescript-sdk.git)
 
 MIT License
@@ -28,7 +28,7 @@ SOFTWARE.
 
 
 ============================================================
-ajv@^6.12.6
+ajv@6.12.6
 (https://github.com/ajv-validator/ajv.git)
 
 The MIT License (MIT)
@@ -56,7 +56,7 @@ SOFTWARE.
 
 
 ============================================================
-fast-deep-equal@^3.1.1
+fast-deep-equal@3.1.3
 (git+https://github.com/epoberezkin/fast-deep-equal.git)
 
 MIT License
@@ -83,7 +83,7 @@ SOFTWARE.
 
 
 ============================================================
-fast-json-stable-stringify@^2.0.0
+fast-json-stable-stringify@2.1.0
 (git://github.com/epoberezkin/fast-json-stable-stringify.git)
 
 This software is released under the MIT license:
@@ -110,7 +110,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-json-schema-traverse@^0.4.1
+json-schema-traverse@0.4.1
 (git+https://github.com/epoberezkin/json-schema-traverse.git)
 
 MIT License
@@ -137,7 +137,7 @@ SOFTWARE.
 
 
 ============================================================
-uri-js@^4.2.2
+uri-js@4.4.1
 (http://github.com/garycourt/uri-js)
 
 Copyright 2011 Gary Court. All rights reserved.
@@ -154,7 +154,7 @@ The views and conclusions contained in the software and documentation are those 
 
 
 ============================================================
-punycode@^2.1.0
+punycode@2.3.1
 (https://github.com/mathiasbynens/punycode.js.git)
 
 Copyright Mathias Bynens <https://mathiasbynens.be/>
@@ -180,7 +180,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-content-type@^1.0.5
+content-type@1.0.5
 (No repository found)
 
 (The MIT License)
@@ -208,7 +208,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-cors@^2.8.5
+cors@2.8.5
 (No repository found)
 
 (The MIT License)
@@ -236,7 +236,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-object-assign@^4
+object-assign@4.1.1
 (No repository found)
 
 The MIT License (MIT)
@@ -263,7 +263,7 @@ THE SOFTWARE.
 
 
 ============================================================
-vary@^1
+vary@1.1.2
 (No repository found)
 
 (The MIT License)
@@ -291,7 +291,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-cross-spawn@^7.0.5
+cross-spawn@7.0.6
 (git@github.com:moxystudio/node-cross-spawn.git)
 
 The MIT License (MIT)
@@ -318,7 +318,7 @@ THE SOFTWARE.
 
 
 ============================================================
-path-key@^3.1.0
+path-key@3.1.1
 (No repository found)
 
 MIT License
@@ -333,7 +333,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 ============================================================
-shebang-command@^2.0.0
+shebang-command@2.0.0
 (No repository found)
 
 MIT License
@@ -348,7 +348,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 ============================================================
-shebang-regex@^3.0.0
+shebang-regex@3.0.0
 (No repository found)
 
 MIT License
@@ -363,7 +363,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 ============================================================
-which@^2.0.1
+which@2.0.2
 (git://github.com/isaacs/node-which.git)
 
 The ISC License
@@ -384,7 +384,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
 ============================================================
-isexe@^2.0.0
+isexe@2.0.0
 (git+https://github.com/isaacs/isexe.git)
 
 The ISC License
@@ -405,7 +405,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
 ============================================================
-eventsource@^3.0.2
+eventsource@3.0.7
 (git://git@github.com/EventSource/eventsource.git)
 
 The MIT License
@@ -433,7 +433,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-eventsource-parser@^3.0.1
+eventsource-parser@3.0.3
 (git+ssh://git@github.com/rexxars/eventsource-parser.git)
 
 MIT License
@@ -460,7 +460,7 @@ SOFTWARE.
 
 
 ============================================================
-express@^5.1.0
+express@5.1.0
 (No repository found)
 
 (The MIT License)
@@ -490,7 +490,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-accepts@^2.0.0
+accepts@2.0.0
 (No repository found)
 
 (The MIT License)
@@ -519,7 +519,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-mime-types@^3.0.0
+mime-types@3.0.1
 (No repository found)
 
 (The MIT License)
@@ -548,7 +548,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-mime-db@^1.54.0
+mime-db@1.54.0
 (No repository found)
 
 (The MIT License)
@@ -577,7 +577,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-negotiator@^1.0.0
+negotiator@1.0.0
 (No repository found)
 
 (The MIT License)
@@ -607,7 +607,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-body-parser@^2.2.0
+body-parser@2.2.0
 (No repository found)
 
 (The MIT License)
@@ -636,7 +636,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-bytes@^3.1.2
+bytes@3.1.2
 (No repository found)
 
 (The MIT License)
@@ -665,7 +665,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-debug@^4.4.0
+debug@4.4.1
 (git://github.com/debug-js/debug.git)
 
 (The MIT License)
@@ -691,7 +691,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-ms@^2.1.3
+ms@2.1.3
 (No repository found)
 
 The MIT License (MIT)
@@ -718,7 +718,7 @@ SOFTWARE.
 
 
 ============================================================
-http-errors@^2.0.0
+http-errors@2.0.0
 (No repository found)
 
 
@@ -816,7 +816,7 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
 ============================================================
-statuses@2.0.1
+statuses@2.0.2
 (No repository found)
 
 
@@ -872,7 +872,7 @@ SOFTWARE.
 
 
 ============================================================
-iconv-lite@^0.6.3
+iconv-lite@0.6.3
 (git://github.com/ashtuchkin/iconv-lite.git)
 
 Copyright (c) 2011 Alexander Shtuchkin
@@ -899,7 +899,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-safer-buffer@>= 2.1.2 < 3.0.0
+safer-buffer@2.1.2
 (git+https://github.com/ChALkeR/safer-buffer.git)
 
 MIT License
@@ -926,7 +926,7 @@ SOFTWARE.
 
 
 ============================================================
-on-finished@^2.4.1
+on-finished@2.4.1
 (No repository found)
 
 (The MIT License)
@@ -983,7 +983,7 @@ THE SOFTWARE.
 
 
 ============================================================
-qs@^6.14.0
+qs@6.14.0
 (https://github.com/ljharb/qs.git)
 
 BSD 3-Clause License
@@ -1018,7 +1018,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ============================================================
-side-channel@^1.1.0
+side-channel@1.1.0
 (git+https://github.com/ljharb/side-channel.git)
 
 MIT License
@@ -1045,7 +1045,7 @@ SOFTWARE.
 
 
 ============================================================
-es-errors@^1.3.0
+es-errors@1.3.0
 (git+https://github.com/ljharb/es-errors.git)
 
 MIT License
@@ -1072,7 +1072,7 @@ SOFTWARE.
 
 
 ============================================================
-object-inspect@^1.13.3
+object-inspect@1.13.4
 (git://github.com/inspect-js/object-inspect.git)
 
 MIT License
@@ -1099,7 +1099,7 @@ SOFTWARE.
 
 
 ============================================================
-side-channel-list@^1.0.0
+side-channel-list@1.0.0
 (git+https://github.com/ljharb/side-channel-list.git)
 
 MIT License
@@ -1126,7 +1126,7 @@ SOFTWARE.
 
 
 ============================================================
-side-channel-map@^1.0.1
+side-channel-map@1.0.1
 (git+https://github.com/ljharb/side-channel-map.git)
 
 MIT License
@@ -1153,7 +1153,7 @@ SOFTWARE.
 
 
 ============================================================
-call-bound@^1.0.2
+call-bound@1.0.4
 (git+https://github.com/ljharb/call-bound.git)
 
 MIT License
@@ -1180,7 +1180,7 @@ SOFTWARE.
 
 
 ============================================================
-call-bind-apply-helpers@^1.0.2
+call-bind-apply-helpers@1.0.2
 (git+https://github.com/ljharb/call-bind-apply-helpers.git)
 
 MIT License
@@ -1207,7 +1207,7 @@ SOFTWARE.
 
 
 ============================================================
-function-bind@^1.1.2
+function-bind@1.1.2
 (https://github.com/Raynos/function-bind.git)
 
 Copyright (c) 2013 Raynos.
@@ -1233,7 +1233,7 @@ THE SOFTWARE.
 
 
 ============================================================
-get-intrinsic@^1.3.0
+get-intrinsic@1.3.0
 (git+https://github.com/ljharb/get-intrinsic.git)
 
 MIT License
@@ -1260,7 +1260,7 @@ SOFTWARE.
 
 
 ============================================================
-es-define-property@^1.0.1
+es-define-property@1.0.1
 (git+https://github.com/ljharb/es-define-property.git)
 
 MIT License
@@ -1287,7 +1287,7 @@ SOFTWARE.
 
 
 ============================================================
-es-object-atoms@^1.1.1
+es-object-atoms@1.1.1
 (git+https://github.com/ljharb/es-object-atoms.git)
 
 MIT License
@@ -1314,7 +1314,7 @@ SOFTWARE.
 
 
 ============================================================
-get-proto@^1.0.1
+get-proto@1.0.1
 (git+https://github.com/ljharb/get-proto.git)
 
 MIT License
@@ -1341,7 +1341,7 @@ SOFTWARE.
 
 
 ============================================================
-dunder-proto@^1.0.1
+dunder-proto@1.0.1
 (git+https://github.com/es-shims/dunder-proto.git)
 
 MIT License
@@ -1368,7 +1368,7 @@ SOFTWARE.
 
 
 ============================================================
-gopd@^1.2.0
+gopd@1.2.0
 (git+https://github.com/ljharb/gopd.git)
 
 MIT License
@@ -1395,7 +1395,7 @@ SOFTWARE.
 
 
 ============================================================
-has-symbols@^1.1.0
+has-symbols@1.1.0
 (git://github.com/inspect-js/has-symbols.git)
 
 MIT License
@@ -1422,7 +1422,7 @@ SOFTWARE.
 
 
 ============================================================
-hasown@^2.0.2
+hasown@2.0.2
 (git+https://github.com/inspect-js/hasOwn.git)
 
 MIT License
@@ -1449,7 +1449,7 @@ SOFTWARE.
 
 
 ============================================================
-math-intrinsics@^1.1.0
+math-intrinsics@1.1.0
 (git+https://github.com/es-shims/math-intrinsics.git)
 
 MIT License
@@ -1476,7 +1476,7 @@ SOFTWARE.
 
 
 ============================================================
-side-channel-weakmap@^1.0.2
+side-channel-weakmap@1.0.2
 (git+https://github.com/ljharb/side-channel-weakmap.git)
 
 MIT License
@@ -1503,7 +1503,7 @@ SOFTWARE.
 
 
 ============================================================
-raw-body@^3.0.0
+raw-body@3.0.0
 (No repository found)
 
 The MIT License (MIT)
@@ -1559,7 +1559,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-type-is@^2.0.0
+type-is@2.0.1
 (No repository found)
 
 (The MIT License)
@@ -1588,7 +1588,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-media-typer@^1.1.0
+media-typer@1.1.0
 (No repository found)
 
 (The MIT License)
@@ -1616,7 +1616,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-content-disposition@^1.0.0
+content-disposition@1.0.0
 (No repository found)
 
 (The MIT License)
@@ -1671,7 +1671,7 @@ THE SOFTWARE.
 
 
 ============================================================
-cookie@^0.7.1
+cookie@0.7.2
 (No repository found)
 
 (The MIT License)
@@ -1701,7 +1701,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-cookie-signature@^1.2.1
+cookie-signature@1.2.2
 (https://github.com/visionmedia/node-cookie-signature.git)
 
 (The MIT License)
@@ -1729,7 +1729,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-encodeurl@^2.0.0
+encodeurl@2.0.0
 (No repository found)
 
 (The MIT License)
@@ -1757,7 +1757,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-escape-html@^1.0.3
+escape-html@1.0.3
 (No repository found)
 
 (The MIT License)
@@ -1787,7 +1787,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-etag@^1.8.1
+etag@1.8.1
 (No repository found)
 
 (The MIT License)
@@ -1815,7 +1815,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-finalhandler@^2.1.0
+finalhandler@2.1.0
 (No repository found)
 
 (The MIT License)
@@ -1843,7 +1843,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-parseurl@^1.3.3
+parseurl@1.3.3
 (No repository found)
 
 
@@ -1873,7 +1873,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-fresh@^2.0.0
+fresh@2.0.0
 (No repository found)
 
 (The MIT License)
@@ -1902,7 +1902,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-merge-descriptors@^2.0.0
+merge-descriptors@2.0.0
 (No repository found)
 
 MIT License
@@ -1919,7 +1919,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 ============================================================
-once@^1.4.0
+once@1.4.0
 (git://github.com/isaacs/once)
 
 The ISC License
@@ -1940,7 +1940,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
 ============================================================
-wrappy@1
+wrappy@1.0.2
 (https://github.com/npm/wrappy)
 
 The ISC License
@@ -1961,7 +1961,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
 ============================================================
-proxy-addr@^2.0.7
+proxy-addr@2.0.7
 (No repository found)
 
 (The MIT License)
@@ -2042,7 +2042,7 @@ THE SOFTWARE.
 
 
 ============================================================
-range-parser@^1.2.1
+range-parser@1.2.1
 (No repository found)
 
 (The MIT License)
@@ -2071,7 +2071,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-router@^2.2.0
+router@2.2.0
 (No repository found)
 
 (The MIT License)
@@ -2100,7 +2100,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-is-promise@^4.0.0
+is-promise@4.0.0
 (https://github.com/then/is-promise.git)
 
 Copyright (c) 2014 Forbes Lindesay
@@ -2124,7 +2124,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ============================================================
-path-to-regexp@^8.0.0
+path-to-regexp@8.2.0
 (https://github.com/pillarjs/path-to-regexp.git)
 
 The MIT License (MIT)
@@ -2151,7 +2151,7 @@ THE SOFTWARE.
 
 
 ============================================================
-send@^1.1.0
+send@1.2.0
 (No repository found)
 
 (The MIT License)
@@ -2180,7 +2180,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-serve-static@^2.2.0
+serve-static@2.2.0
 (No repository found)
 
 (The MIT License)
@@ -2211,7 +2211,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-express-rate-limit@^7.5.0
+express-rate-limit@7.5.1
 (git+https://github.com/express-rate-limit/express-rate-limit.git)
 
 ﻿# MIT License
@@ -2237,7 +2237,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-pkce-challenge@^5.0.0
+pkce-challenge@5.0.0
 (git+https://github.com/crouchcd/pkce-challenge.git)
 
 MIT License
@@ -2264,7 +2264,7 @@ SOFTWARE.
 
 
 ============================================================
-zod@^3.25.76
+zod@3.25.76
 (git+https://github.com/colinhacks/zod.git)
 
 MIT License
@@ -2291,7 +2291,7 @@ SOFTWARE.
 
 
 ============================================================
-zod-to-json-schema@^3.24.1
+zod-to-json-schema@3.24.6
 (https://github.com/StefanTerdell/zod-to-json-schema)
 
 ISC License
