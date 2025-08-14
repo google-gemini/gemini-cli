@@ -66,7 +66,7 @@ function formatFileList(openFiles: File[]): string {
       const isDuplicate = (basenameCounts.get(basename) || 0) > 1;
       const parentDir = path.basename(path.dirname(file.path));
       const displayName = isDuplicate
-        ? `${basename} (/${parentDir})`
+        ? `/${parentDir}/${basename}`
         : basename;
 
       return `  - ${displayName}${file.isActive ? ' (active)' : ''}`;
