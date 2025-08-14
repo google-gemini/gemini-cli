@@ -5,6 +5,7 @@
  */
 
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { IDEServer } from './ide-server.js';
 import { DiffContentProvider, DiffManager } from './diff-manager.js';
 import { createLogger } from './utils/logger.js';
@@ -20,11 +21,13 @@ let log: (message: string) => void = () => {};
 
 function updateWorkspacePath(context: vscode.ExtensionContext) {
   const workspaceFolders = vscode.workspace.workspaceFolders;
-  if (workspaceFolders && workspaceFolders.length === 1) {
-    const workspaceFolder = workspaceFolders[0];
+  if (workspaceFolders && workspaceFolders.length > 0) {
+    const workspacePaths = workspaceFolders.map(
+      (folder) => folder.uri.fsPath,
+    );
     context.environmentVariableCollection.replace(
       IDE_WORKSPACE_PATH_ENV_VAR,
-      workspaceFolder.uri.fsPath,
+      workspacePaths.join(path.delimiter),
     );
   } else {
     context.environmentVariableCollection.replace(
@@ -105,9 +108,32 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       updateWorkspacePath(context);
     }),
-    vscode.commands.registerCommand('gemini-cli.runGeminiCLI', () => {
+    vscode.commands.registerCommand('gemini-cli.runGeminiCLI', async () => {
       const geminiCmd = 'gemini';
-      const terminal = vscode.window.createTerminal(`Gemini CLI`);
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+
+      let targetFolder: vscode.WorkspaceFolder | undefined;
+      if (workspaceFolders && workspaceFolders.length > 1) {
+        const picks = workspaceFolders.map((folder) => ({
+          label: folder.name,
+          description: folder.uri.fsPath,
+          folder,
+        }));
+        const selection = await vscode.window.showQuickPick(picks, {
+          title: 'Select a workspace folder to launch Gemini CLI in',
+        });
+        if (!selection) {
+          return; // User cancelled
+        }
+        targetFolder = selection.folder;
+      } else if (workspaceFolders && workspaceFolders.length === 1) {
+        targetFolder = workspaceFolders[0];
+      }
+
+      const terminal = vscode.window.createTerminal({
+        name: `Gemini CLI`,
+        cwd: targetFolder?.uri.fsPath,
+      });
       terminal.show();
       terminal.sendText(geminiCmd);
     }),

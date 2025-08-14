@@ -241,16 +241,23 @@ export class IdeClient {
     if (ideWorkspacePath === '') {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `To use this feature, please open a single workspace folder in ${this.currentIdeDisplayName} and try again.`,
+        `To use this feature, please open a folder or workspace in ${this.currentIdeDisplayName} and try again.`,
         true,
       );
       return false;
     }
 
-    const idePath = getRealPath(ideWorkspacePath).toLocaleLowerCase();
+    const workspaceRoots = ideWorkspacePath
+      .split(path.delimiter)
+      .map((root) => getRealPath(root).toLocaleLowerCase());
     const cwd = getRealPath(process.cwd()).toLocaleLowerCase();
-    const rel = path.relative(idePath, cwd);
-    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+
+    const isCwdInWorkspace = workspaceRoots.some((root) => {
+      const rel = path.relative(root, cwd);
+      return !rel.startsWith('..') && !path.isAbsolute(rel);
+    });
+
+    if (!isCwdInWorkspace) {
       this.setState(
         IDEConnectionStatus.Disconnected,
         `Directory mismatch. Gemini CLI is running in a different location than the open workspace in ${this.currentIdeDisplayName}. Please run the CLI from the same directory as your project's root folder.`,

@@ -6,6 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { activate } from './extension.js';
 
 vi.mock('vscode', () => ({
@@ -18,6 +19,7 @@ vi.mock('vscode', () => ({
       show: vi.fn(),
       sendText: vi.fn(),
     })),
+    showQuickPick: vi.fn(),
     onDidChangeActiveTextEditor: vi.fn(),
     activeTextEditor: undefined,
     tabGroups: {
@@ -102,5 +104,155 @@ describe('activate', () => {
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       'gemini-cli.runGeminiCLI',
     );
+  });
+});
+
+describe('multi-root workspace handling', () => {
+  let context: vscode.ExtensionContext;
+  let commandMap: Map<string, (...args: never[]) => unknown>;
+
+  beforeEach(() => {
+    commandMap = new Map();
+    vi.mocked(vscode.commands.registerCommand).mockImplementation(
+      (command: string, callback: (...args: never[]) => unknown) => {
+        commandMap.set(command, callback);
+        return {
+          dispose: vi.fn(),
+        };
+      },
+    );
+
+    context = {
+      subscriptions: [],
+      environmentVariableCollection: {
+        replace: vi.fn(),
+        delete: vi.fn(),
+        clear: vi.fn(),
+        get: vi.fn(),
+        forEach: vi.fn(),
+      },
+      globalState: {
+        get: vi.fn().mockReturnValue(true), // Assume not first activation
+        update: vi.fn(),
+      },
+      extensionUri: {
+        fsPath: '/path/to/extension',
+      },
+    } as unknown as vscode.ExtensionContext;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('updateWorkspacePath', () => {
+    it('should set the workspace path env var for a single folder', async () => {
+      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue([
+        { uri: { fsPath: '/foo/bar' } } as vscode.WorkspaceFolder,
+      ]);
+      await activate(context);
+      expect(
+        context.environmentVariableCollection.replace,
+      ).toHaveBeenCalledWith('GEMINI_CLI_IDE_WORKSPACE_PATH', '/foo/bar');
+    });
+
+    it('should set a delimited workspace path env var for multiple folders', async () => {
+      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue([
+        { uri: { fsPath: '/foo/bar' } } as vscode.WorkspaceFolder,
+        { uri: { fsPath: '/baz/qux' } } as vscode.WorkspaceFolder,
+      ]);
+      await activate(context);
+      expect(
+        context.environmentVariableCollection.replace,
+      ).toHaveBeenCalledWith(
+        'GEMINI_CLI_IDE_WORKSPACE_PATH',
+        ['/foo/bar', '/baz/qux'].join(path.delimiter),
+      );
+    });
+
+    it('should set an empty workspace path env var for no folders', async () => {
+      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue(
+        [],
+      );
+      await activate(context);
+      expect(
+        context.environmentVariableCollection.replace,
+      ).toHaveBeenCalledWith('GEMINI_CLI_IDE_WORKSPACE_PATH', '');
+    });
+  });
+
+  describe('gemini-cli.runGeminiCLI command', () => {
+    it('should create a terminal with no CWD if no workspace folder is open', async () => {
+      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue(
+        [],
+      );
+      await activate(context);
+      const command = commandMap.get('gemini-cli.runGeminiCLI');
+      await (command as () => Promise<void>)();
+      expect(vscode.window.createTerminal).toHaveBeenCalledWith({
+        name: 'Gemini CLI',
+        cwd: undefined,
+      });
+    });
+
+    it('should create a terminal with CWD of the single workspace folder', async () => {
+      const workspaceFolder = {
+        uri: { fsPath: '/foo/bar' },
+      } as vscode.WorkspaceFolder;
+      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue([
+        workspaceFolder,
+      ]);
+      await activate(context);
+      const command = commandMap.get('gemini-cli.runGeminiCLI');
+      await (command as () => Promise<void>)();
+      expect(vscode.window.createTerminal).toHaveBeenCalledWith({
+        name: 'Gemini CLI',
+        cwd: '/foo/bar',
+      });
+    });
+
+    it('should prompt user to select a folder in a multi-root workspace', async () => {
+      const workspaceFolders = [
+        { name: 'bar', uri: { fsPath: '/foo/bar' } } as vscode.WorkspaceFolder,
+        { name: 'qux', uri: { fsPath: '/baz/qux' } } as vscode.WorkspaceFolder,
+      ];
+      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue(
+        workspaceFolders,
+      );
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
+        label: 'qux',
+        folder: workspaceFolders[1],
+      } as never);
+
+      await activate(context);
+      const command = commandMap.get('gemini-cli.runGeminiCLI');
+      await (command as () => Promise<void>)();
+
+      expect(vscode.window.showQuickPick).toHaveBeenCalled();
+      expect(vscode.window.createTerminal).toHaveBeenCalledWith({
+        name: 'Gemini CLI',
+        cwd: '/baz/qux',
+      });
+    });
+
+    it('should not create a terminal if user cancels selection', async () => {
+      const workspaceFolders = [
+        { name: 'bar', uri: { fsPath: '/foo/bar' } } as vscode.WorkspaceFolder,
+        { name: 'qux', uri: { fsPath: '/baz/qux' } } as vscode.WorkspaceFolder,
+      ];
+      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue(
+        workspaceFolders,
+      );
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue(
+        undefined as never,
+      );
+
+      await activate(context);
+      const command = commandMap.get('gemini-cli.runGeminiCLI');
+      await (command as () => Promise<void>)();
+
+      expect(vscode.window.showQuickPick).toHaveBeenCalled();
+      expect(vscode.window.createTerminal).not.toHaveBeenCalled();
+    });
   });
 });
