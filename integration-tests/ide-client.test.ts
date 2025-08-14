@@ -9,18 +9,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as net from 'node:net';
 import { IdeClient } from '../packages/core/src/ide/ide-client.js';
-import { vi } from 'vitest';
 import { getIdeProcessId } from '../packages/core/src/ide/process-utils.js';
-
-vi.mock('../packages/core/src/ide/process-utils', () => ({
-  getIdeProcessId: vi.fn(),
-}));
+import { spawn, ChildProcess } from 'child_process';
 
 describe('IdeClient', () => {
   it('reads port from file and connects', async () => {
     const port = 12345;
-    const pid = 54321;
-    vi.mocked(getIdeProcessId).mockResolvedValue(pid);
+    const pid = await getIdeProcessId();
     const portFile = path.join(os.tmpdir(), `gemini-ide-server-${pid}.json`);
     fs.writeFileSync(portFile, JSON.stringify({ port }));
 
@@ -50,13 +45,14 @@ const getFreePort = (): Promise<number> => {
 describe('IdeClient fallback connection logic', () => {
   let server: net.Server;
   let envPort: number;
-  const pid = 98765;
-  const portFile = path.join(os.tmpdir(), `gemini-ide-server-${pid}.json`);
+  let pid: number;
+  let portFile: string;
 
   beforeEach(async () => {
+    pid = await getIdeProcessId();
+    portFile = path.join(os.tmpdir(), `gemini-ide-server-${pid}.json`);
     envPort = await getFreePort();
     server = net.createServer().listen(envPort);
-    vi.mocked(getIdeProcessId).mockResolvedValue(pid);
     process.env['GEMINI_CLI_IDE_SERVER_PORT'] = String(envPort);
     process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = process.cwd();
     // Reset instance
@@ -94,4 +90,50 @@ describe('IdeClient fallback connection logic', () => {
 
     expect(ideClient.getConnectionStatus().status).toBe('connected');
   });
+});
+
+describe('getIdeProcessId', () => {
+  let child: ChildProcess;
+
+  afterEach(() => {
+    if (child) {
+      child.kill();
+    }
+  });
+
+  it('should return the pid of the parent process', async () => {
+    // We need to spawn a child process that will run the test
+    // so that we can check that getIdeProcessId returns the pid of the parent
+    const parentPid = process.pid;
+    const output = await new Promise<string>((resolve, reject) => {
+      child = spawn(
+        'node',
+        [
+          '-e',
+          `
+        const { getIdeProcessId } = require('../packages/core/src/ide/process-utils.js');
+        getIdeProcessId().then(pid => console.log(pid));
+      `,
+        ],
+        {
+          stdio: ['pipe', 'pipe', 'pipe'],
+        },
+      );
+
+      let out = '';
+      child.stdout?.on('data', (data) => {
+        out += data.toString();
+      });
+
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve(out.trim());
+        } else {
+          reject(new Error(`Child process exited with code ${code}`));
+        }
+      });
+    });
+
+    expect(parseInt(output, 10)).toBe(parentPid);
+  }, 10000);
 });
