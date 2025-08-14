@@ -21,16 +21,26 @@ import {
   getErrorMessage,
   isWithinRoot,
   getErrorStatus,
+  MCPServerConfig,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
-import { Agent } from './acp.js';
 import { Readable, Writable } from 'node:stream';
 import { Content, Part, FunctionCall, PartListUnion } from '@google/genai';
 import { LoadedSettings, SettingScope } from '../config/settings.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { z } from 'zod';
 
-export async function runAcpPeer(config: Config, settings: LoadedSettings) {
+import { randomUUID } from 'crypto';
+import { Extension } from '../config/extension.js';
+import { CliArgs, loadCliConfig } from '../config/config.js';
+
+export async function runZedIntegration(
+  config: Config,
+  settings: LoadedSettings,
+  extensions: Extension[],
+  argv: CliArgs,
+) {
   const stdout = Writable.toWeb(process.stdout) as WritableStream;
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
@@ -40,76 +50,176 @@ export async function runAcpPeer(config: Config, settings: LoadedSettings) {
   console.info = console.error;
   console.debug = console.error;
 
-  new acp.ClientConnection(
-    (client: acp.Client) => new GeminiAgent(config, settings, client),
+  new acp.AgentSideConnection(
+    (client: acp.Client) =>
+      new GeminiAgent(config, settings, extensions, argv, client),
     stdout,
     stdin,
   );
 }
 
-class GeminiAgent implements Agent {
-  chat?: GeminiChat;
-  pendingSend?: AbortController;
+class GeminiAgent {
+  private sessions: Map<string, Session> = new Map();
 
   constructor(
     private config: Config,
     private settings: LoadedSettings,
+    private extensions: Extension[],
+    private argv: CliArgs,
     private client: acp.Client,
   ) {}
 
-  async initialize(_: acp.InitializeParams): Promise<acp.InitializeResponse> {
+  async initialize(
+    _args: acp.InitializeRequest,
+  ): Promise<acp.InitializeResponse> {
+    const authMethods = [
+      {
+        id: AuthType.LOGIN_WITH_GOOGLE,
+        name: 'Log in with Google',
+        description: null,
+      },
+      {
+        id: AuthType.USE_GEMINI,
+        name: 'Use Gemini API key',
+        description:
+          'Requires setting the `GEMINI_API_KEY` environment variable',
+      },
+      {
+        id: AuthType.USE_VERTEX_AI,
+        name: 'Vertex AI',
+        description: null,
+      },
+    ];
+
+    return {
+      protocolVersion: acp.PROTOCOL_VERSION,
+      authMethods,
+      agentCapabilities: {
+        loadSession: false,
+      },
+    };
+  }
+
+  async authenticate({ methodId }: acp.AuthenticateRequest): Promise<void> {
+    const method = z.nativeEnum(AuthType).parse(methodId);
+
+    await clearCachedCredentialFile();
+    await this.config.refreshAuth(method);
+    this.settings.setValue(SettingScope.User, 'selectedAuthType', method);
+  }
+
+  async newSession({
+    cwd,
+    mcpServers,
+  }: acp.NewSessionRequest): Promise<acp.NewSessionResponse> {
+    const sessionId = randomUUID();
+    const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
+
     let isAuthenticated = false;
     if (this.settings.merged.selectedAuthType) {
       try {
-        await this.config.refreshAuth(this.settings.merged.selectedAuthType);
+        await config.refreshAuth(this.settings.merged.selectedAuthType);
         isAuthenticated = true;
-      } catch (error) {
-        console.error('Failed to refresh auth:', error);
+      } catch (e) {
+        console.error(`Authentication failed: ${e}`);
       }
     }
-    return { protocolVersion: acp.LATEST_PROTOCOL_VERSION, isAuthenticated };
+
+    if (!isAuthenticated) {
+      throw acp.RequestError.authRequired();
+    }
+
+    const geminiClient = config.getGeminiClient();
+    const chat = await geminiClient.startChat();
+    const session = new Session(sessionId, chat, config, this.client);
+    this.sessions.set(sessionId, session);
+
+    return {
+      sessionId,
+    };
   }
 
-  async authenticate(): Promise<void> {
-    await clearCachedCredentialFile();
-    await this.config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-    this.settings.setValue(
-      SettingScope.User,
-      'selectedAuthType',
-      AuthType.LOGIN_WITH_GOOGLE,
+  async newSessionConfig(
+    sessionId: string,
+    cwd: string,
+    mcpServers: acp.McpServer[],
+  ): Promise<Config> {
+    const mergedMcpServers = { ...this.settings.merged.mcpServers };
+
+    for (const { command, args, env: rawEnv, name } of mcpServers) {
+      const env: Record<string, string> = {};
+      for (const { name: envName, value } of rawEnv) {
+        env[envName] = value;
+      }
+      mergedMcpServers[name] = new MCPServerConfig(command, args, env, cwd);
+    }
+
+    const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
+
+    const config = await loadCliConfig(
+      settings,
+      this.extensions,
+      sessionId,
+      this.argv,
+      cwd,
     );
+
+    await config.initialize();
+    return config;
   }
 
-  async cancelSendMessage(): Promise<void> {
-    if (!this.pendingSend) {
+  async cancel(params: acp.CancelNotification): Promise<void> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`);
+    }
+    await session.cancelPendingPrompt();
+  }
+
+  async prompt(params: acp.PromptRequest): Promise<acp.PromptResponse> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`);
+    }
+    return session.prompt(params);
+  }
+}
+
+class Session {
+  private pendingPrompt: AbortController | null = null;
+
+  constructor(
+    private readonly id: string,
+    private readonly chat: GeminiChat,
+    private readonly config: Config,
+    private readonly client: acp.Client,
+  ) {}
+
+  async cancelPendingPrompt(): Promise<void> {
+    if (!this.pendingPrompt) {
       throw new Error('Not currently generating');
     }
 
-    this.pendingSend.abort();
-    delete this.pendingSend;
+    this.pendingPrompt.abort();
+    this.pendingPrompt = null;
   }
 
-  async sendUserMessage(params: acp.SendUserMessageParams): Promise<void> {
-    this.pendingSend?.abort();
+  async prompt(params: acp.PromptRequest): Promise<acp.PromptResponse> {
+    this.pendingPrompt?.abort();
     const pendingSend = new AbortController();
-    this.pendingSend = pendingSend;
-
-    if (!this.chat) {
-      const geminiClient = this.config.getGeminiClient();
-      this.chat = await geminiClient.startChat();
-    }
+    this.pendingPrompt = pendingSend;
 
     const promptId = Math.random().toString(16).slice(2);
-    const chat = this.chat!;
-    const toolRegistry: ToolRegistry = await this.config.getToolRegistry();
-    const parts = await this.#resolveUserMessage(params, pendingSend.signal);
+    const chat = this.chat;
+
+    const parts = await this.#resolvePrompt(params.prompt, pendingSend.signal);
 
     let nextMessage: Content | null = { role: 'user', parts };
 
     while (nextMessage !== null) {
       if (pendingSend.signal.aborted) {
         chat.addHistory(nextMessage);
-        return;
+        return { stopReason: 'cancelled' };
       }
 
       const functionCalls: FunctionCall[] = [];
@@ -120,11 +230,6 @@ class GeminiAgent implements Agent {
             message: nextMessage?.parts ?? [],
             config: {
               abortSignal: pendingSend.signal,
-              tools: [
-                {
-                  functionDeclarations: toolRegistry.getFunctionDeclarations(),
-                },
-              ],
             },
           },
           promptId,
@@ -133,7 +238,7 @@ class GeminiAgent implements Agent {
 
         for await (const resp of responseStream) {
           if (pendingSend.signal.aborted) {
-            return;
+            return { stopReason: 'cancelled' };
           }
 
           if (resp.candidates && resp.candidates.length > 0) {
@@ -143,10 +248,16 @@ class GeminiAgent implements Agent {
                 continue;
               }
 
-              this.client.streamAssistantMessageChunk({
-                chunk: part.thought
-                  ? { thought: part.text }
-                  : { text: part.text },
+              const content: acp.ContentBlock = {
+                type: 'text',
+                text: part.text,
+              };
+
+              this.sendUpdate({
+                sessionUpdate: part.thought
+                  ? 'agent_thought_chunk'
+                  : 'agent_message_chunk',
+                content,
               });
             }
           }
@@ -170,11 +281,7 @@ class GeminiAgent implements Agent {
         const toolResponseParts: Part[] = [];
 
         for (const fc of functionCalls) {
-          const response = await this.#runTool(
-            pendingSend.signal,
-            promptId,
-            fc,
-          );
+          const response = await this.runTool(pendingSend.signal, promptId, fc);
 
           const parts = Array.isArray(response) ? response : [response];
 
@@ -190,9 +297,20 @@ class GeminiAgent implements Agent {
         nextMessage = { role: 'user', parts: toolResponseParts };
       }
     }
+
+    return { stopReason: 'end_turn' };
   }
 
-  async #runTool(
+  private async sendUpdate(update: acp.SessionUpdate): Promise<void> {
+    const params: acp.SessionNotification = {
+      sessionId: this.id,
+      update,
+    };
+
+    await this.client.sessionUpdate(params);
+  }
+
+  private async runTool(
     abortSignal: AbortSignal,
     promptId: string,
     fc: FunctionCall,
@@ -239,68 +357,82 @@ class GeminiAgent implements Agent {
       );
     }
 
-    let toolCallId: number | undefined = undefined;
-    try {
-      const invocation = tool.build(args);
-      const confirmationDetails =
-        await invocation.shouldConfirmExecute(abortSignal);
-      if (confirmationDetails) {
-        let content: acp.ToolCallContent | null = null;
-        if (confirmationDetails.type === 'edit') {
-          content = {
-            type: 'diff',
-            path: confirmationDetails.fileName,
-            oldText: confirmationDetails.originalContent,
-            newText: confirmationDetails.newContent,
-          };
-        }
+    const invocation = tool.build(args);
+    const confirmationDetails =
+      await invocation.shouldConfirmExecute(abortSignal);
 
-        const result = await this.client.requestToolCallConfirmation({
-          label: invocation.getDescription(),
-          icon: tool.icon,
-          content,
-          confirmation: toAcpToolCallConfirmation(confirmationDetails),
-          locations: invocation.toolLocations(),
+    if (confirmationDetails) {
+      const content: acp.ToolCallContent[] = [];
+
+      if (confirmationDetails.type === 'edit') {
+        content.push({
+          type: 'diff',
+          path: confirmationDetails.fileName,
+          oldText: confirmationDetails.originalContent,
+          newText: confirmationDetails.newContent,
         });
-
-        await confirmationDetails.onConfirm(toToolCallOutcome(result.outcome));
-        switch (result.outcome) {
-          case 'reject':
-            return errorResponse(
-              new Error(`Tool "${fc.name}" not allowed to run by the user.`),
-            );
-
-          case 'cancel':
-            return errorResponse(
-              new Error(`Tool "${fc.name}" was canceled by the user.`),
-            );
-          case 'allow':
-          case 'alwaysAllow':
-          case 'alwaysAllowMcpServer':
-          case 'alwaysAllowTool':
-            break;
-          default: {
-            const resultOutcome: never = result.outcome;
-            throw new Error(`Unexpected: ${resultOutcome}`);
-          }
-        }
-        toolCallId = result.id;
-      } else {
-        const result = await this.client.pushToolCall({
-          icon: tool.icon,
-          label: invocation.getDescription(),
-          locations: invocation.toolLocations(),
-        });
-        toolCallId = result.id;
       }
 
-      const toolResult: ToolResult = await invocation.execute(abortSignal);
-      const toolCallContent = toToolCallContent(toolResult);
+      const params: acp.RequestPermissionRequest = {
+        sessionId: this.id,
+        options: toPermissionOptions(confirmationDetails),
+        toolCall: {
+          toolCallId: callId,
+          status: 'pending',
+          title: invocation.getDescription(),
+          content,
+          locations: invocation.toolLocations(),
+          kind: tool.kind,
+        },
+      };
 
-      await this.client.updateToolCall({
-        toolCallId,
-        status: 'finished',
-        content: toolCallContent,
+      const output = await this.client.requestPermission(params);
+      const outcome =
+        output.outcome.outcome === 'cancelled'
+          ? ToolConfirmationOutcome.Cancel
+          : z
+              .nativeEnum(ToolConfirmationOutcome)
+              .parse(output.outcome.optionId);
+
+      await confirmationDetails.onConfirm(outcome);
+
+      switch (outcome) {
+        case ToolConfirmationOutcome.Cancel:
+          return errorResponse(
+            new Error(`Tool "${fc.name}" was canceled by the user.`),
+          );
+        case ToolConfirmationOutcome.ProceedOnce:
+        case ToolConfirmationOutcome.ProceedAlways:
+        case ToolConfirmationOutcome.ProceedAlwaysServer:
+        case ToolConfirmationOutcome.ProceedAlwaysTool:
+        case ToolConfirmationOutcome.ModifyWithEditor:
+          break;
+        default: {
+          const resultOutcome: never = outcome;
+          throw new Error(`Unexpected: ${resultOutcome}`);
+        }
+      }
+    } else {
+      await this.sendUpdate({
+        sessionUpdate: 'tool_call',
+        toolCallId: callId,
+        status: 'in_progress',
+        title: invocation.getDescription(),
+        content: [],
+        locations: invocation.toolLocations(),
+        kind: tool.kind,
+      });
+    }
+
+    try {
+      const toolResult: ToolResult = await invocation.execute(abortSignal);
+      const content = toToolCallContent(toolResult);
+
+      await this.sendUpdate({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: callId,
+        status: 'completed',
+        content: content ? [content] : [],
       });
 
       const durationMs = Date.now() - startTime;
@@ -317,31 +449,55 @@ class GeminiAgent implements Agent {
       return convertToFunctionResponse(fc.name, callId, toolResult.llmContent);
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
-      if (toolCallId) {
-        await this.client.updateToolCall({
-          toolCallId,
-          status: 'error',
-          content: { type: 'markdown', markdown: error.message },
-        });
-      }
+
+      await this.sendUpdate({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: callId,
+        status: 'failed',
+        content: [
+          { type: 'content', content: { type: 'text', text: error.message } },
+        ],
+      });
+
       return errorResponse(error);
     }
   }
 
-  async #resolveUserMessage(
-    message: acp.SendUserMessageParams,
+  async #resolvePrompt(
+    message: acp.ContentBlock[],
     abortSignal: AbortSignal,
   ): Promise<Part[]> {
-    const atPathCommandParts = message.chunks.filter((part) => 'path' in part);
+    const parts = message.map((part) => {
+      switch (part.type) {
+        case 'text':
+          return { text: part.text };
+        case 'resource_link':
+          return {
+            fileData: {
+              mimeData: part.mimeType,
+              name: part.name,
+              fileUri: part.uri,
+            },
+          };
+        case 'resource': {
+          return {
+            fileData: {
+              mimeData: part.resource.mimeType,
+              name: part.resource.uri,
+              fileUri: part.resource.uri,
+            },
+          };
+        }
+        default: {
+          throw new Error(`Unexpected chunk type: '${part.type}'`);
+        }
+      }
+    });
+
+    const atPathCommandParts = parts.filter((part) => 'fileData' in part);
 
     if (atPathCommandParts.length === 0) {
-      return message.chunks.map((chunk) => {
-        if ('text' in chunk) {
-          return { text: chunk.text };
-        } else {
-          throw new Error('Unexpected chunk type');
-        }
-      });
+      return parts;
     }
 
     // Get centralized file discovery service
@@ -362,8 +518,7 @@ class GeminiAgent implements Agent {
     }
 
     for (const atPathPart of atPathCommandParts) {
-      const pathName = atPathPart.path;
-
+      const pathName = atPathPart.fileData!.fileUri;
       // Check if path should be ignored by git
       if (fileDiscovery.shouldGitIgnoreFile(pathName)) {
         ignoredPaths.push(pathName);
@@ -373,10 +528,8 @@ class GeminiAgent implements Agent {
         console.warn(`Path ${pathName} is ${reason}.`);
         continue;
       }
-
       let currentPathSpec = pathName;
       let resolvedSuccessfully = false;
-
       try {
         const absolutePath = path.resolve(this.config.getTargetDir(), pathName);
         if (isWithinRoot(absolutePath, this.config.getTargetDir())) {
@@ -385,24 +538,22 @@ class GeminiAgent implements Agent {
             currentPathSpec = pathName.endsWith('/')
               ? `${pathName}**`
               : `${pathName}/**`;
-            this.#debug(
+            this.debug(
               `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
             );
           } else {
-            this.#debug(
-              `Path ${pathName} resolved to file: ${currentPathSpec}`,
-            );
+            this.debug(`Path ${pathName} resolved to file: ${currentPathSpec}`);
           }
           resolvedSuccessfully = true;
         } else {
-          this.#debug(
+          this.debug(
             `Path ${pathName} is outside the project directory. Skipping.`,
           );
         }
       } catch (error) {
         if (isNodeError(error) && error.code === 'ENOENT') {
           if (this.config.getEnableRecursiveFileSearch() && globTool) {
-            this.#debug(
+            this.debug(
               `Path ${pathName} not found directly, attempting glob search.`,
             );
             try {
@@ -426,17 +577,17 @@ class GeminiAgent implements Agent {
                     this.config.getTargetDir(),
                     firstMatchAbsolute,
                   );
-                  this.#debug(
+                  this.debug(
                     `Glob search for ${pathName} found ${firstMatchAbsolute}, using relative path: ${currentPathSpec}`,
                   );
                   resolvedSuccessfully = true;
                 } else {
-                  this.#debug(
+                  this.debug(
                     `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
                   );
                 }
               } else {
-                this.#debug(
+                this.debug(
                   `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
                 );
               }
@@ -446,7 +597,7 @@ class GeminiAgent implements Agent {
               );
             }
           } else {
-            this.#debug(
+            this.debug(
               `Glob tool not found. Path ${pathName} will be skipped.`,
             );
           }
@@ -456,23 +607,22 @@ class GeminiAgent implements Agent {
           );
         }
       }
-
       if (resolvedSuccessfully) {
         pathSpecsToRead.push(currentPathSpec);
         atPathToResolvedSpecMap.set(pathName, currentPathSpec);
         contentLabelsForDisplay.push(pathName);
       }
     }
-
     // Construct the initial part of the query for the LLM
     let initialQueryText = '';
-    for (let i = 0; i < message.chunks.length; i++) {
-      const chunk = message.chunks[i];
+    for (let i = 0; i < parts.length; i++) {
+      const chunk = parts[i];
       if ('text' in chunk) {
         initialQueryText += chunk.text;
       } else {
         // type === 'atPath'
-        const resolvedSpec = atPathToResolvedSpecMap.get(chunk.path);
+        const resolvedSpec =
+          chunk.fileData && atPathToResolvedSpecMap.get(chunk.fileData.fileUri);
         if (
           i > 0 &&
           initialQueryText.length > 0 &&
@@ -480,10 +630,11 @@ class GeminiAgent implements Agent {
           resolvedSpec
         ) {
           // Add space if previous part was text and didn't end with space, or if previous was @path
-          const prevPart = message.chunks[i - 1];
+          const prevPart = parts[i - 1];
           if (
             'text' in prevPart ||
-            ('path' in prevPart && atPathToResolvedSpecMap.has(prevPart.path))
+            ('fileData' in prevPart &&
+              atPathToResolvedSpecMap.has(prevPart.fileData!.fileUri))
           ) {
             initialQueryText += ' ';
           }
@@ -497,56 +648,64 @@ class GeminiAgent implements Agent {
             i > 0 &&
             initialQueryText.length > 0 &&
             !initialQueryText.endsWith(' ') &&
-            !chunk.path.startsWith(' ')
+            !chunk.fileData?.fileUri.startsWith(' ')
           ) {
             initialQueryText += ' ';
           }
-          initialQueryText += `@${chunk.path}`;
+          if (chunk.fileData?.fileUri) {
+            initialQueryText += `@${chunk.fileData.fileUri}`;
+          }
         }
       }
     }
     initialQueryText = initialQueryText.trim();
-
     // Inform user about ignored paths
     if (ignoredPaths.length > 0) {
       const ignoreType = respectGitIgnore ? 'git-ignored' : 'custom-ignored';
-      this.#debug(
+      this.debug(
         `Ignored ${ignoredPaths.length} ${ignoreType} files: ${ignoredPaths.join(', ')}`,
       );
     }
-
     // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
     if (pathSpecsToRead.length === 0) {
       console.warn('No valid file paths found in @ commands to read.');
       return [{ text: initialQueryText }];
     }
-
     const processedQueryParts: Part[] = [{ text: initialQueryText }];
-
     const toolArgs = {
       paths: pathSpecsToRead,
       respectGitIgnore, // Use configuration setting
     };
 
-    let toolCallId: number | undefined = undefined;
+    const callId = `${readManyFilesTool.name}-${Date.now()}`;
+
     try {
       const invocation = readManyFilesTool.build(toolArgs);
-      const toolCall = await this.client.pushToolCall({
-        icon: readManyFilesTool.icon,
-        label: invocation.getDescription(),
-      });
-      toolCallId = toolCall.id;
-      const result = await invocation.execute(abortSignal);
-      const content = toToolCallContent(result) || {
-        type: 'markdown',
-        markdown: `Successfully read: ${contentLabelsForDisplay.join(', ')}`,
-      };
-      await this.client.updateToolCall({
-        toolCallId: toolCall.id,
-        status: 'finished',
-        content,
+
+      await this.sendUpdate({
+        sessionUpdate: 'tool_call',
+        toolCallId: callId,
+        status: 'in_progress',
+        title: invocation.getDescription(),
+        content: [],
+        locations: invocation.toolLocations(),
+        kind: readManyFilesTool.kind,
       });
 
+      const result = await invocation.execute(abortSignal);
+      const content = toToolCallContent(result) || {
+        type: 'content',
+        content: {
+          type: 'text',
+          text: `Successfully read: ${contentLabelsForDisplay.join(', ')}`,
+        },
+      };
+      await this.sendUpdate({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: callId,
+        status: 'completed',
+        content: content ? [content] : [],
+      });
       if (Array.isArray(result.llmContent)) {
         const fileContentRegex = /^--- (.*?) ---\n\n([\s\S]*?)\n\n$/;
         processedQueryParts.push({
@@ -576,24 +735,28 @@ class GeminiAgent implements Agent {
           'read_many_files tool returned no content or empty content.',
         );
       }
-
       return processedQueryParts;
     } catch (error: unknown) {
-      if (toolCallId) {
-        await this.client.updateToolCall({
-          toolCallId,
-          status: 'error',
-          content: {
-            type: 'markdown',
-            markdown: `Error reading files (${contentLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
+      await this.sendUpdate({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: callId,
+        status: 'failed',
+        content: [
+          {
+            type: 'content',
+            content: {
+              type: 'text',
+              text: `Error reading files (${contentLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
+            },
           },
-        });
-      }
+        ],
+      });
+
       throw error;
     }
   }
 
-  #debug(msg: string) {
+  debug(msg: string) {
     if (this.config.getDebugMode()) {
       console.warn(msg);
     }
@@ -604,8 +767,8 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
   if (toolResult.returnDisplay) {
     if (typeof toolResult.returnDisplay === 'string') {
       return {
-        type: 'markdown',
-        markdown: toolResult.returnDisplay,
+        type: 'content',
+        content: { type: 'text', text: toolResult.returnDisplay },
       };
     } else {
       return {
@@ -620,57 +783,66 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
   }
 }
 
-function toAcpToolCallConfirmation(
-  confirmationDetails: ToolCallConfirmationDetails,
-): acp.ToolCallConfirmation {
-  switch (confirmationDetails.type) {
-    case 'edit':
-      return { type: 'edit' };
-    case 'exec':
-      return {
-        type: 'execute',
-        rootCommand: confirmationDetails.rootCommand,
-        command: confirmationDetails.command,
-      };
-    case 'mcp':
-      return {
-        type: 'mcp',
-        serverName: confirmationDetails.serverName,
-        toolName: confirmationDetails.toolName,
-        toolDisplayName: confirmationDetails.toolDisplayName,
-      };
-    case 'info':
-      return {
-        type: 'fetch',
-        urls: confirmationDetails.urls || [],
-        description: confirmationDetails.urls?.length
-          ? null
-          : confirmationDetails.prompt,
-      };
-    default: {
-      const unreachable: never = confirmationDetails;
-      throw new Error(`Unexpected: ${unreachable}`);
-    }
-  }
-}
+const basicPermissionOptions = [
+  {
+    optionId: ToolConfirmationOutcome.ProceedOnce,
+    name: 'Allow',
+    kind: 'allow_once',
+  },
+  {
+    optionId: ToolConfirmationOutcome.Cancel,
+    name: 'Reject',
+    kind: 'reject_once',
+  },
+] as const;
 
-function toToolCallOutcome(
-  outcome: acp.ToolCallConfirmationOutcome,
-): ToolConfirmationOutcome {
-  switch (outcome) {
-    case 'allow':
-      return ToolConfirmationOutcome.ProceedOnce;
-    case 'alwaysAllow':
-      return ToolConfirmationOutcome.ProceedAlways;
-    case 'alwaysAllowMcpServer':
-      return ToolConfirmationOutcome.ProceedAlwaysServer;
-    case 'alwaysAllowTool':
-      return ToolConfirmationOutcome.ProceedAlwaysTool;
-    case 'reject':
-    case 'cancel':
-      return ToolConfirmationOutcome.Cancel;
+function toPermissionOptions(
+  confirmation: ToolCallConfirmationDetails,
+): acp.PermissionOption[] {
+  switch (confirmation.type) {
+    case 'edit':
+      return [
+        {
+          optionId: ToolConfirmationOutcome.ProceedAlways,
+          name: 'Allow All Edits',
+          kind: 'allow_always',
+        },
+        ...basicPermissionOptions,
+      ];
+    case 'exec':
+      return [
+        {
+          optionId: ToolConfirmationOutcome.ProceedAlways,
+          name: `Always Allow ${confirmation.rootCommand}`,
+          kind: 'allow_always',
+        },
+        ...basicPermissionOptions,
+      ];
+    case 'mcp':
+      return [
+        {
+          optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
+          name: `Always Allow ${confirmation.serverName}`,
+          kind: 'allow_always',
+        },
+        {
+          optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
+          name: `Always Allow ${confirmation.toolName}`,
+          kind: 'allow_always',
+        },
+        ...basicPermissionOptions,
+      ];
+    case 'info':
+      return [
+        {
+          optionId: ToolConfirmationOutcome.ProceedAlways,
+          name: `Always Allow`,
+          kind: 'allow_always',
+        },
+        ...basicPermissionOptions,
+      ];
     default: {
-      const unreachable: never = outcome;
+      const unreachable: never = confirmation;
       throw new Error(`Unexpected: ${unreachable}`);
     }
   }

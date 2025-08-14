@@ -145,9 +145,9 @@ export interface ToolBuilder<
   description: string;
 
   /**
-   * The icon to display when interacting via ACP.
+   * The kind of tool for categorization and permissions
    */
-  icon: Icon;
+  kind: Kind;
 
   /**
    * Function declaration schema from @google/genai.
@@ -185,7 +185,7 @@ export abstract class DeclarativeTool<
     readonly name: string,
     readonly displayName: string,
     readonly description: string,
-    readonly icon: Icon,
+    readonly kind: Kind,
     readonly parameterSchema: unknown,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
@@ -284,19 +284,19 @@ export abstract class BaseTool<
    * @param parameterSchema JSON Schema defining the parameters
    */
   constructor(
-    readonly name: string,
-    readonly displayName: string,
-    readonly description: string,
-    readonly icon: Icon,
-    readonly parameterSchema: unknown,
-    readonly isOutputMarkdown: boolean = true,
-    readonly canUpdateOutput: boolean = false,
+    override readonly name: string,
+    override readonly displayName: string,
+    override readonly description: string,
+    override readonly kind: Kind,
+    override readonly parameterSchema: unknown,
+    override readonly isOutputMarkdown: boolean = true,
+    override readonly canUpdateOutput: boolean = false,
   ) {
     super(
       name,
       displayName,
       description,
-      icon,
+      kind,
       parameterSchema,
       isOutputMarkdown,
       canUpdateOutput,
@@ -320,7 +320,7 @@ export abstract class BaseTool<
    * @returns An error message string if invalid, null otherwise
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  validateToolParams(params: TParams): string | null {
+  override validateToolParams(params: TParams): string | null {
     // Implementation would typically use a JSON Schema validator
     // This is a placeholder that should be implemented by derived classes
     return null;
@@ -570,15 +570,16 @@ export enum ToolConfirmationOutcome {
   Cancel = 'cancel',
 }
 
-export enum Icon {
-  FileSearch = 'fileSearch',
-  Folder = 'folder',
-  Globe = 'globe',
-  Hammer = 'hammer',
-  LightBulb = 'lightBulb',
-  Pencil = 'pencil',
-  Regex = 'regex',
-  Terminal = 'terminal',
+export enum Kind {
+  Read = 'read',
+  Edit = 'edit',
+  Delete = 'delete',
+  Move = 'move',
+  Search = 'search',
+  Execute = 'execute',
+  Think = 'think',
+  Fetch = 'fetch',
+  Other = 'other',
 }
 
 export interface ToolLocation {
