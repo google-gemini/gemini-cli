@@ -193,10 +193,10 @@ jobs:
         run: |-
           if [[ "${IS_NIGHTLY}" == "true" ]]; then
             echo "Finding latest nightly release..."
-            PREVIOUS_TAG=$(gh release list --limit 100 --json tagName,isPrerelease | jq -r '[.[] | select(.isPrerelease and (.tagName | contains("nightly")))] | .[0].tagName')
+            PREVIOUS_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("nightly"))] | .[0].tagName')
           else
             echo "Finding latest STABLE release (excluding pre-releases)..."
-            PREVIOUS_TAG=$(gh release list --limit 100 --json tagName,isPrerelease | jq -r '[.[] | select(.isPrerelease == false)][0].tagName')
+            PREVIOUS_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("nightly") | not)] | .[0].tagName')
           fi
           echo "PREVIOUS_TAG=${PREVIOUS_TAG}" >> "$GITHUB_OUTPUT"
 
