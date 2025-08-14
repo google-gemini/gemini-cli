@@ -1,28 +1,54 @@
 import { createTool } from '@mastra/core';
 import { z } from 'zod';
-import { Neo4jStore, Neo4jConfigSchema, Neo4jQueryResultSchema, Neo4jSchemaResultSchema } from './shared-neo4j-store.js';
+import {
+  Neo4jStore,
+  Neo4jConfigSchema,
+  Neo4jQueryResultSchema,
+  Neo4jSchemaResultSchema,
+} from './shared-neo4j-store.js';
 
 export const ekgCrudTool = createTool({
   id: 'ekg-database',
-  description: 'Perform EKG (Knowledge Graph) database operations including schema inspection, read queries, and write queries using Neo4j',
+  description:
+    'Read the Engineering Knowledge Graph (EKG) stored in Neo4j. Use cypher query language to do schema inspection, read or and write. EKG contains entities and their relationships, created through pattern matching and semantic analysis of the code repo and cloud specs.\n\n**Key entities:** code repositories, artifacts (containers/binaries), services (frontend/backend apps), resources (databases, compute, storage etc), tools (lint, monitor, test, security etc), CI/CD pipelines, users/groups, and environments.\n\n**Key relationships:** Path-to-production flows (code→artifact→service→environment), service to service or resource dependencies, tool usage, and ownership patterns.\n\n**Core relationships:** Path-to-production flows (code→artifact→service→environment), service dependencies, tool usage, and ownership patterns.\n\n**Example questions you can ask:**\n\n- What services use the postgres database in production?\n- Show me all security tools used by our frontend services\n- What infrastructure resources does the payment service depend on?\n- Who owns the user authentication service?\n- Which CI/CD pipelines deploy to the staging environment?\n- What tools are configured for static code analysis?\n- Which services are deployed in the us-east region?\n- Show me the complete path from code to production for our API service\n- What third-party resources do we use across all environments?',
   inputSchema: z.object({
-    operation: z.enum(['connect', 'disconnect', 'get_schema', 'read_cypher', 'write_cypher']).describe('Operation to perform'),
-    config: Neo4jConfigSchema.optional().describe('Neo4j connection configuration (required for connect operation)'),
-    query: z.string().optional().describe('Cypher query to execute (required for read_cypher and write_cypher operations)'),
-    params: z.record(z.any()).optional().describe('Query parameters (optional for cypher operations)'),
+    operation: z
+      .enum([
+        'connect',
+        'disconnect',
+        'get_schema',
+        'read_cypher',
+        'write_cypher',
+      ])
+      .describe('Operation to perform'),
+    config: Neo4jConfigSchema.optional().describe(
+      'Neo4j connection configuration (required for connect operation)',
+    ),
+    query: z
+      .string()
+      .optional()
+      .describe(
+        'Cypher query to execute (required for read_cypher and write_cypher operations)',
+      ),
+    params: z
+      .record(z.any())
+      .optional()
+      .describe('Query parameters (optional for cypher operations)'),
   }),
   outputSchema: z.object({
     success: z.boolean(),
     operation: z.string(),
-    data: z.union([
-      Neo4jQueryResultSchema,
-      Neo4jSchemaResultSchema,
-      z.object({
-        connected: z.boolean(),
-        uri: z.string().nullable(),
-        database: z.string().nullable(),
-      }),
-    ]).optional(),
+    data: z
+      .union([
+        Neo4jQueryResultSchema,
+        Neo4jSchemaResultSchema,
+        z.object({
+          connected: z.boolean(),
+          uri: z.string().nullable(),
+          database: z.string().nullable(),
+        }),
+      ])
+      .optional(),
     message: z.string(),
     metadata: z.object({
       queryTime: z.number().optional(),
@@ -44,13 +70,13 @@ export const ekgCrudTool = createTool({
         case 'connect': {
           // Use provided config or fallback to environment variables
           let connectionConfig = config;
-          
+
           if (!connectionConfig) {
             const envUri = process.env.NEO4J_URI;
             const envUsername = process.env.NEO4J_USERNAME;
             const envPassword = process.env.NEO4J_PASSWORD;
             const envDatabase = process.env.NEO4J_DATABASE;
-            
+
             if (envUri && envUsername && envPassword) {
               connectionConfig = {
                 uri: envUri,
@@ -58,15 +84,19 @@ export const ekgCrudTool = createTool({
                 password: envPassword,
                 database: envDatabase,
               };
-              console.log('🔧 DEBUG: Using EKG config from environment variables');
+              console.log(
+                '🔧 DEBUG: Using EKG config from environment variables',
+              );
             } else {
-              throw new Error('config is required for connect operation or set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD environment variables');
+              throw new Error(
+                'config is required for connect operation or set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD environment variables',
+              );
             }
           }
 
           await store.connect(connectionConfig);
           const connectionInfo = store.getConnectionInfo();
-          
+
           const response = {
             success: true,
             operation: 'connect',
@@ -77,7 +107,7 @@ export const ekgCrudTool = createTool({
               connectionInfo,
             },
           };
-          
+
           console.log('🔧 DEBUG: EKG tool response:', response);
           return response;
         }
@@ -85,7 +115,7 @@ export const ekgCrudTool = createTool({
         case 'disconnect': {
           await store.disconnect();
           const connectionInfo = store.getConnectionInfo();
-          
+
           const response = {
             success: true,
             operation: 'disconnect',
@@ -95,7 +125,7 @@ export const ekgCrudTool = createTool({
               connectionInfo,
             },
           };
-          
+
           console.log('🔧 DEBUG: EKG tool response:', response);
           return response;
         }
@@ -103,7 +133,7 @@ export const ekgCrudTool = createTool({
         case 'get_schema': {
           const schema = await store.getSchema();
           const connectionInfo = store.getConnectionInfo();
-          
+
           const response = {
             success: true,
             operation: 'get_schema',
@@ -115,7 +145,7 @@ export const ekgCrudTool = createTool({
               connectionInfo,
             },
           };
-          
+
           console.log('🔧 DEBUG: EKG tool response:', response);
           return response;
         }
@@ -127,7 +157,7 @@ export const ekgCrudTool = createTool({
 
           const result = await store.executeReadQuery(query, params || {});
           const connectionInfo = store.getConnectionInfo();
-          
+
           const response = {
             success: true,
             operation: 'read_cypher',
@@ -139,7 +169,7 @@ export const ekgCrudTool = createTool({
               connectionInfo,
             },
           };
-          
+
           console.log('🔧 DEBUG: EKG tool response:', response);
           return response;
         }
@@ -151,20 +181,32 @@ export const ekgCrudTool = createTool({
 
           const result = await store.executeWriteQuery(query, params || {});
           const connectionInfo = store.getConnectionInfo();
-          
+
           // Build a summary of write operations
           const counters = result.summary.counters;
           const changes = [];
-          if (counters.nodesCreated > 0) changes.push(`${counters.nodesCreated} nodes created`);
-          if (counters.nodesDeleted > 0) changes.push(`${counters.nodesDeleted} nodes deleted`);
-          if (counters.relationshipsCreated > 0) changes.push(`${counters.relationshipsCreated} relationships created`);
-          if (counters.relationshipsDeleted > 0) changes.push(`${counters.relationshipsDeleted} relationships deleted`);
-          if (counters.propertiesSet > 0) changes.push(`${counters.propertiesSet} properties set`);
-          if (counters.labelsAdded > 0) changes.push(`${counters.labelsAdded} labels added`);
-          if (counters.labelsRemoved > 0) changes.push(`${counters.labelsRemoved} labels removed`);
-          
-          const changesSummary = changes.length > 0 ? `: ${changes.join(', ')}` : '';
-          
+          if (counters.nodesCreated > 0)
+            changes.push(`${counters.nodesCreated} nodes created`);
+          if (counters.nodesDeleted > 0)
+            changes.push(`${counters.nodesDeleted} nodes deleted`);
+          if (counters.relationshipsCreated > 0)
+            changes.push(
+              `${counters.relationshipsCreated} relationships created`,
+            );
+          if (counters.relationshipsDeleted > 0)
+            changes.push(
+              `${counters.relationshipsDeleted} relationships deleted`,
+            );
+          if (counters.propertiesSet > 0)
+            changes.push(`${counters.propertiesSet} properties set`);
+          if (counters.labelsAdded > 0)
+            changes.push(`${counters.labelsAdded} labels added`);
+          if (counters.labelsRemoved > 0)
+            changes.push(`${counters.labelsRemoved} labels removed`);
+
+          const changesSummary =
+            changes.length > 0 ? `: ${changes.join(', ')}` : '';
+
           const response = {
             success: true,
             operation: 'write_cypher',
@@ -176,7 +218,7 @@ export const ekgCrudTool = createTool({
               connectionInfo,
             },
           };
-          
+
           console.log('🔧 DEBUG: EKG tool response:', response);
           return response;
         }
@@ -186,7 +228,7 @@ export const ekgCrudTool = createTool({
       }
     } catch (error) {
       const connectionInfo = store.getConnectionInfo();
-      
+
       const errorResponse = {
         success: false,
         operation,
@@ -196,7 +238,7 @@ export const ekgCrudTool = createTool({
           connectionInfo,
         },
       };
-      
+
       console.log('🔧 DEBUG: EKG tool error response:', errorResponse);
       return errorResponse;
     }
