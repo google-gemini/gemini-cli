@@ -197,6 +197,7 @@ export interface ConfigParameters {
   loadMemoryFromIncludeDirectories?: boolean;
   chatCompression?: ChatCompressionSettings;
   interactive?: boolean;
+  trustedFolder?: boolean;
 }
 
 export class Config {
@@ -260,6 +261,7 @@ export class Config {
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly chatCompression: ChatCompressionSettings | undefined;
   private readonly interactive: boolean;
+  private readonly trustedFolder: boolean | undefined;
   private initialized: boolean = false;
 
   constructor(params: ConfigParameters) {
@@ -324,6 +326,7 @@ export class Config {
       params.loadMemoryFromIncludeDirectories ?? false;
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
+    this.trustedFolder = params.trustedFolder;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -376,13 +379,21 @@ export class Config {
     const newGeminiClient = new GeminiClient(this);
     await newGeminiClient.initialize(newContentGeneratorConfig);
 
+    // Vertex and Genai have incompatible encryption and sending history with
+    // throughtSignature from Genai to Vertex will fail, we need to strip them
+    const fromGenaiToVertex =
+      this.contentGeneratorConfig?.authType === AuthType.USE_GEMINI &&
+      authMethod === AuthType.LOGIN_WITH_GOOGLE;
+
     // Only assign to instance properties after successful initialization
     this.contentGeneratorConfig = newContentGeneratorConfig;
     this.geminiClient = newGeminiClient;
 
     // Restore the conversation history to the new client
     if (existingHistory.length > 0) {
-      this.geminiClient.setHistory(existingHistory);
+      this.geminiClient.setHistory(existingHistory, {
+        stripThoughts: fromGenaiToVertex,
+      });
     }
 
     // Reset the session flag since we're explicitly changing auth and using default model
@@ -662,6 +673,10 @@ export class Config {
 
   getFolderTrust(): boolean {
     return this.folderTrust;
+  }
+
+  isTrustedFolder(): boolean | undefined {
+    return this.trustedFolder;
   }
 
   setIdeMode(value: boolean): void {

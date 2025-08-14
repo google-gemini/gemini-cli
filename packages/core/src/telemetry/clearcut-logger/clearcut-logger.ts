@@ -19,6 +19,7 @@ import {
   SlashCommandEvent,
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
+  KittySequenceOverflowEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
@@ -29,6 +30,8 @@ import {
 } from '../../utils/user_account.js';
 import { getInstallationId } from '../../utils/user_id.js';
 import { FixedDeque } from 'mnemonist';
+import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
+import { DetectedIde, detectIde } from '../../ide/detect-ide.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -43,6 +46,7 @@ const next_speaker_check_event_name = 'next_speaker_check';
 const slash_command_event_name = 'slash_command';
 const malformed_json_response_event_name = 'malformed_json_response';
 const ide_connection_event_name = 'ide_connection';
+const kitty_sequence_overflow_event_name = 'kitty_sequence_overflow';
 
 export interface LogResponse {
   nextRequestWaitMs?: number;
@@ -83,12 +87,14 @@ export interface LogRequest {
  * methods might have in their runtimes.
  */
 function determineSurface(): string {
-  if (process.env.CLOUD_SHELL === 'true') {
-    return 'CLOUD_SHELL';
-  } else if (process.env.MONOSPACE_ENV === 'true') {
-    return 'FIREBASE_STUDIO';
+  if (process.env.SURFACE) {
+    return process.env.SURFACE;
+  } else if (process.env.GITHUB_SHA) {
+    return 'GitHub';
+  } else if (process.env.TERM_PROGRAM === 'vscode') {
+    return detectIde() || DetectedIde.VSCode;
   } else {
-    return process.env.SURFACE || 'SURFACE_NOT_SET';
+    return 'SURFACE_NOT_SET';
   }
 }
 
@@ -368,6 +374,14 @@ export class ClearcutLogger {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_TELEMETRY_LOG_USER_PROMPTS_ENABLED,
         value: event.telemetry_log_user_prompts_enabled.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
+        value: CLI_VERSION,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
+        value: GIT_COMMIT_INFO,
       },
     ];
 
@@ -672,6 +686,24 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(ide_connection_event_name, data));
+    this.flushIfNeeded();
+  }
+
+  logKittySequenceOverflowEvent(event: KittySequenceOverflowEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_KITTY_SEQUENCE_LENGTH,
+        value: event.sequence_length.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE,
+        value: event.truncated_sequence,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(kitty_sequence_overflow_event_name, data),
+    );
     this.flushIfNeeded();
   }
 
