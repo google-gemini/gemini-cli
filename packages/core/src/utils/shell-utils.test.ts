@@ -39,7 +39,7 @@ describe('isCommandAllowed', () => {
     const result = isCommandAllowed('rm -rf /', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
-      `Command(s) not in the allowed commands list. Disallowed commands: rm -rf /`,
+      `Command(s) not in the allowed commands list. Disallowed commands: "rm -rf /"`,
     );
   });
 
@@ -159,7 +159,7 @@ describe('checkCommandPermissions', () => {
       expect(result).toEqual({
         allAllowed: false,
         disallowedCommands: ['git status'],
-        blockReason: `Command(s) not in the allowed commands list. Disallowed commands: git status`,
+        blockReason: `Command(s) not in the allowed commands list. Disallowed commands: "git status"`,
         isHardDenial: false,
       });
     });
