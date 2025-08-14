@@ -20,11 +20,13 @@ let log: (message: string) => void = () => {};
 
 function updateWorkspacePath(context: vscode.ExtensionContext) {
   const workspaceFolders = vscode.workspace.workspaceFolders;
-  if (workspaceFolders && workspaceFolders.length === 1) {
-    const workspaceFolder = workspaceFolders[0];
+  if (workspaceFolders && workspaceFolders.length > 0) {
+    const workspacePaths = workspaceFolders
+      .map((folder) => folder.uri.fsPath)
+      .join(':');
     context.environmentVariableCollection.replace(
       IDE_WORKSPACE_PATH_ENV_VAR,
-      workspaceFolder.uri.fsPath,
+      workspacePaths,
     );
   } else {
     context.environmentVariableCollection.replace(
