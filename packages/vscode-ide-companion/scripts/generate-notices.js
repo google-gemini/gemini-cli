@@ -49,7 +49,7 @@ async function getDependencyLicense(depName, depVersion) {
       'LICENSE',
       'LICENSE.md',
       'LICENSE.txt',
-      'LICENSE-MIT.txt'
+      'LICENSE-MIT.txt',
     ].filter(Boolean);
 
     let licenseFile;
@@ -86,11 +86,7 @@ async function getDependencyLicense(depName, depVersion) {
   };
 }
 
-function collectDependencies(
-  packageName,
-  packageLock,
-  dependenciesMap,
-) {
+function collectDependencies(packageName, packageLock, dependenciesMap) {
   const packageInfo = packageLock.packages[`node_modules/${packageName}`];
   if (!packageInfo || !packageInfo.dependencies) {
     return;
@@ -122,11 +118,7 @@ async function main() {
 
     for (const depName of directDependencies) {
       allDependencies.set(depName, packageJson.dependencies[depName]);
-      collectDependencies(
-        depName,
-        packageLockJson,
-        allDependencies,
-      );
+      collectDependencies(depName, packageLockJson, allDependencies);
     }
 
     const dependencyEntries = Array.from(allDependencies.entries());
