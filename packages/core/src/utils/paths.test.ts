@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { escapePath, unescapePath, isSubpath } from './paths.js';
 
 describe('escapePath', () => {
@@ -250,34 +250,67 @@ describe('isSubpath', () => {
     expect(isSubpath('/a/b', '/a/b/c/')).toBe(true);
     expect(isSubpath('/a/b/', '/a/b/c/')).toBe(true);
   });
+});
 
-  it('should handle drive letters', () => {
+describe('isSubpath on Windows', () => {
+  const originalPlatform = process.platform;
+
+  beforeAll(() => {
+    Object.defineProperty(process, 'platform', {
+      value: 'win32',
+    });
+  });
+
+  afterAll(() => {
+    Object.defineProperty(process, 'platform', {
+      value: originalPlatform,
+    });
+  });
+
+  it('should return true for a direct subpath on Windows', () => {
     expect(isSubpath('C:\\Users\\Test', 'C:\\Users\\Test\\file.txt')).toBe(
       true,
     );
-    expect(isSubpath('C:\\Users\\Test', 'D:\\Users\\Test\\file.txt')).toBe(
+  });
+
+  it('should return true for the same path on Windows', () => {
+    expect(isSubpath('C:\\Users\\Test', 'C:\\Users\\Test')).toBe(true);
+  });
+
+  it('should return false for a parent path on Windows', () => {
+    expect(isSubpath('C:\\Users\\Test\\file.txt', 'C:\\Users\\Test')).toBe(
       false,
     );
   });
 
-  it('should be case-insensitive for drive letters', () => {
+  it('should return false for a different drive on Windows', () => {
+    expect(isSubpath('C:\\Users\\Test', 'D:\\Users\\Test')).toBe(false);
+  });
+
+  it('should be case-insensitive for drive letters on Windows', () => {
     expect(isSubpath('c:\\Users\\Test', 'C:\\Users\\Test\\file.txt')).toBe(
       true,
     );
-    expect(isSubpath('C:\\Users\\Test', 'c:\\Users\\Test\\file.txt')).toBe(
+  });
+
+  it('should be case-insensitive for path components on Windows', () => {
+    expect(isSubpath('C:\\Users\\Test', 'c:\\users\\test\\file.txt')).toBe(
       true,
     );
   });
 
-  it('should be case-insensitive for windows path components', () => {
-    expect(isSubpath('C:\\Users\\Test', 'C:\\users\\test\\file.txt')).toBe(
+  it('should handle mixed slashes on Windows', () => {
+    expect(isSubpath('C:/Users/Test', 'C:\\Users\\Test\\file.txt')).toBe(true);
+  });
+
+  it('should handle trailing slashes on Windows', () => {
+    expect(isSubpath('C:\\Users\\Test\\', 'C:\\Users\\Test\\file.txt')).toBe(
       true,
     );
-    expect(isSubpath('C:\\users\\test', 'C:\\Users\\Test\\file.txt')).toBe(
-      true,
-    );
-    expect(isSubpath('C:\\Users\\Test\\file.txt', 'C:\\users\\test')).toBe(
-      false,
-    );
+  });
+
+  it('should handle relative paths correctly on Windows', () => {
+    expect(isSubpath('Users\\Test', 'Users\\Test\\file.txt')).toBe(true);
+    expect(isSubpath('Users\\Test\\file.txt', 'Users\\Test')).toBe(false);
   });
 });
