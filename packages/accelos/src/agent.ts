@@ -4,7 +4,7 @@ import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
 import type { AccelosConfig } from './config.js';
 import { getCompatiblePaths } from './config.js';
-import { fileAnalyzerTool, webSearchTool, codeAnalysisTool } from './tools/index.js';
+import { fileAnalyzerTool, webSearchTool, codeAnalysisTool, claudeCodeTool } from './tools/index.js';
 import { GuardrailStore } from './tools/shared-guardrail-store.js';
 
 export class AccelosAgent {
@@ -20,7 +20,7 @@ export class AccelosAgent {
       name: 'Accelos',
       instructions: config.systemPrompt,
       model: llmProvider,
-      tools: [fileAnalyzerTool, webSearchTool, codeAnalysisTool],
+      tools: [fileAnalyzerTool, webSearchTool, codeAnalysisTool, claudeCodeTool],
     });
 
     // Initialize guardrails at startup (async, non-blocking)
