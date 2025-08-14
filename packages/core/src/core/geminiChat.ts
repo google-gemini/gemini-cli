@@ -583,13 +583,22 @@ export class GeminiChat {
   private isFirstPartText(
     content: Content | undefined,
   ): content is Content & { parts: [{ text: string }, ...Part[]] } {
-    return !!(
-      content &&
-      content.role === 'model' &&
-      content.parts &&
-      content.parts.length > 0 &&
-      typeof content.parts[0].text === 'string' &&
-      content.parts[0].text !== ''
+    if (
+      !content ||
+      content.role !== 'model' ||
+      !content.parts ||
+      content.parts.length === 0
+    ) {
+      return false;
+    }
+    const firstPart = content.parts[0];
+    return (
+      typeof firstPart.text === 'string' &&
+      !('functionCall' in firstPart) &&
+      !('functionResponse' in firstPart) &&
+      !('inlineData' in firstPart) &&
+      !('fileData' in firstPart) &&
+      !('thought' in firstPart)
     );
   }
 
