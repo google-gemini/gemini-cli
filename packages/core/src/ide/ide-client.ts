@@ -248,7 +248,7 @@ export class IdeClient {
     }
 
     const workspaceRoots = ideWorkspacePath
-      .split(path.delimiter)
+      .split(path.delimiter).filter(Boolean)
       .map((root) => getRealPath(root).toLocaleLowerCase());
     const cwd = getRealPath(process.cwd()).toLocaleLowerCase();
 
