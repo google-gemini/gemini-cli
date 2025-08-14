@@ -103,4 +103,57 @@ describe('<Footer />', () => {
     expect(lastFrame()).toContain(defaultProps.model);
     expect(lastFrame()).toMatch(/\(\d+% context[\s\S]*left\)/);
   });
+
+  describe('sandbox and trust info', () => {
+    it('should display untrusted when isTrustedFolder is false', () => {
+      const { lastFrame } = renderWithWidth(120, {
+        ...defaultProps,
+        isTrustedFolder: false,
+      });
+      expect(lastFrame()).toContain('untrusted');
+    });
+
+    it('should display custom sandbox info when SANDBOX env is set', () => {
+      vi.stubEnv('SANDBOX', 'gemini-cli-test-sandbox');
+      const { lastFrame } = renderWithWidth(120, {
+        ...defaultProps,
+        isTrustedFolder: undefined,
+      });
+      expect(lastFrame()).toContain('test');
+      vi.unstubAllEnvs();
+    });
+
+    it('should display macOS Seatbelt info when SANDBOX is sandbox-exec', () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+      vi.stubEnv('SEATBELT_PROFILE', 'test-profile');
+      const { lastFrame } = renderWithWidth(120, {
+        ...defaultProps,
+        isTrustedFolder: true,
+      });
+      expect(lastFrame()).toMatch(/macOS Seatbelt.*\(test-profile\)/s);
+      vi.unstubAllEnvs();
+    });
+
+    it('should display "no sandbox" when SANDBOX is not set and folder is trusted', () => {
+      // Clear any SANDBOX env var that might be set.
+      vi.stubEnv('SANDBOX', '');
+      const { lastFrame } = renderWithWidth(120, {
+        ...defaultProps,
+        isTrustedFolder: true,
+      });
+      expect(lastFrame()).toContain('no sandbox');
+      vi.unstubAllEnvs();
+    });
+
+    it('should prioritize untrusted message over sandbox info', () => {
+      vi.stubEnv('SANDBOX', 'gemini-cli-test-sandbox');
+      const { lastFrame } = renderWithWidth(120, {
+        ...defaultProps,
+        isTrustedFolder: false,
+      });
+      expect(lastFrame()).toContain('untrusted');
+      expect(lastFrame()).not.toMatch(/test-sandbox/s);
+      vi.unstubAllEnvs();
+    });
+  });
 });
