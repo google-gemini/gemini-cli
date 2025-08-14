@@ -185,6 +185,98 @@ describe('DiscoveredMCPTool', () => {
       ).rejects.toThrow(expectedError);
     });
 
+    it.each([
+      { isErrorValue: true, description: 'true (bool)' },
+      { isErrorValue: 'true', description: '"true" (str)' },
+    ])(
+      'should consider a ToolResult with isError $description to be a failure',
+      async ({ isErrorValue }) => {
+        const tool = new DiscoveredMCPTool(
+          mockCallableToolInstance,
+          serverName,
+          serverToolName,
+          baseDescription,
+          inputSchema,
+        );
+        const params = { param: 'isErrorTrueCase' };
+
+        const errorResponse = { isError: isErrorValue };
+        const mockMcpToolResponseParts: Part[] = [
+          {
+            functionResponse: {
+              name: serverToolName,
+              response: { error: errorResponse },
+            },
+          },
+        ];
+        mockCallTool.mockResolvedValue(mockMcpToolResponseParts);
+        const expectedError = new Error(
+          `MCP tool '${serverToolName}' reported tool error with response: ${JSON.stringify(
+            mockMcpToolResponseParts,
+          )}`,
+        );
+
+        const invocation = tool.build(params);
+        await expect(
+          invocation.execute(new AbortController().signal),
+        ).rejects.toThrow(expectedError);
+      },
+    );
+
+    it.each([
+      { isErrorValue: false, description: 'false (bool)' },
+      { isErrorValue: 'false', description: '"false" (str)' },
+    ])(
+      'should consider a ToolResult with isError ${description} to be a success',
+      async ({ isErrorValue }) => {
+        const tool = new DiscoveredMCPTool(
+          mockCallableToolInstance,
+          serverName,
+          serverToolName,
+          baseDescription,
+          inputSchema,
+        );
+        const params = { param: 'isErrorFalseCase' };
+        const mockToolSuccessResultObject = {
+          success: true,
+          details: 'executed',
+        };
+        const mockFunctionResponseContent = [
+          {
+            type: 'text',
+            text: JSON.stringify(mockToolSuccessResultObject),
+          },
+        ];
+
+        const errorResponse = { isError: isErrorValue };
+        const mockMcpToolResponseParts: Part[] = [
+          {
+            functionResponse: {
+              name: serverToolName,
+              response: {
+                error: errorResponse,
+                content: mockFunctionResponseContent,
+              },
+            },
+          },
+        ];
+        mockCallTool.mockResolvedValue(mockMcpToolResponseParts);
+
+        const invocation = tool.build(params);
+        const toolResult = await invocation.execute(
+          new AbortController().signal,
+        );
+
+        const stringifiedResponseContent = JSON.stringify(
+          mockToolSuccessResultObject,
+        );
+        expect(toolResult.llmContent).toEqual([
+          { text: stringifiedResponseContent },
+        ]);
+        expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
+      },
+    );
+
     it('should handle a simple text response correctly', async () => {
       const params = { query: 'test' };
       const successMessage = 'This is a success message.';
