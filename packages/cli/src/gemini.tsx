@@ -300,8 +300,8 @@ export async function main() {
   // This is for cases where the user pipes input directly into the command
   if (!process.stdin.isTTY) {
     const stdinData = await readStdin();
-    if (stdin) {
-      input = `${stdinData}\n\n${input}`
+    if (stdinData) {
+      input = `${stdinData}\n\n${input}`;
     }
   }
   if (!input) {
