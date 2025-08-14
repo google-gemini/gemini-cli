@@ -4,15 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ConfirmationRequiredError, ShellProcessor } from './shellProcessor.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { CommandContext } from '../../ui/commands/types.js';
 import { Config } from '@google/gemini-cli-core';
+import os from 'os';
+import { quote } from 'shell-quote';
+
+// Helper function to determine the expected escaped string based on the current OS,
+// mirroring the logic in the actual `escapeShellArg` implementation. This makes
+// our tests robust and platform-agnostic.
+function getExpectedEscapedArgForPlatform(arg: string): string {
+  if (os.platform() === 'win32') {
+    const comSpec = (process.env.ComSpec || 'cmd.exe').toLowerCase();
+    const isPowerShell =
+      comSpec.endsWith('powershell.exe') || comSpec.endsWith('pwsh.exe');
+
+    if (isPowerShell) {
+      return `'${arg.replace(/'/g, "''")}'`;
+    } else {
+      return `"${arg.replace(/"/g, '""')}"`;
+    }
+  } else {
+    return quote([arg]);
+  }
+}
 
 const mockCheckCommandPermissions = vi.hoisted(() => vi.fn());
 const mockShellExecute = vi.hoisted(() => vi.fn());
-const mockEscapeShellArg = vi.hoisted(() => vi.fn());
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original = await importOriginal<object>();
@@ -22,7 +42,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ShellExecutionService: {
       execute: mockShellExecute,
     },
-    escapeShellArg: mockEscapeShellArg,
   };
 });
 
@@ -40,8 +59,6 @@ describe('ShellProcessor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    mockEscapeShellArg.mockImplementation((arg) => `ESCAPED:${arg}`);
 
     mockConfig = {
       getTargetDir: vi.fn().mockReturnValue('/test/dir'),
@@ -284,11 +301,13 @@ describe('ShellProcessor', () => {
 
   it('should trim whitespace from the command inside the injection before interpolation', async () => {
     const processor = new ShellProcessor('test-command');
-    // Command content is '  ls {{args}} -l  '
     const prompt = 'Files: !{  ls {{args}} -l  }';
 
-    // The expected command uses the escaped arguments (default args from context)
-    const expectedCommand = 'ls ESCAPED:default args -l';
+    const rawArgs = context.invocation!.args;
+
+    const expectedEscapedArgs = getExpectedEscapedArgForPlatform(rawArgs);
+
+    const expectedCommand = `ls ${expectedEscapedArgs} -l`;
 
     mockCheckCommandPermissions.mockReturnValue({
       allAllowed: true,
@@ -466,7 +485,6 @@ describe('ShellProcessor', () => {
 
   describe('Context-Aware Argument Interpolation ({{args}})', () => {
     const rawArgs = 'user input';
-    const escapedArgs = 'ESCAPED:user input'; // Based on the mock setup
 
     beforeEach(() => {
       // Update context for these tests to use specific arguments
@@ -481,13 +499,10 @@ describe('ShellProcessor', () => {
 
       expect(result).toBe(`The user said: ${rawArgs}`);
       expect(mockShellExecute).not.toHaveBeenCalled();
-      // Optimization path should avoid calling escape if no !{} is present.
-      expect(mockEscapeShellArg).not.toHaveBeenCalled();
     });
 
     it('should perform raw replacement outside !{} blocks', async () => {
       const processor = new ShellProcessor('test-command');
-      // Includes a shell injection to trigger the main logic path.
       const prompt = 'Outside: {{args}}. Inside: !{echo "hello"}';
       mockShellExecute.mockReturnValue({
         result: Promise.resolve({ ...SUCCESS_RESULT, output: 'hello' }),
@@ -496,8 +511,6 @@ describe('ShellProcessor', () => {
       const result = await processor.process(prompt, context);
 
       expect(result).toBe(`Outside: ${rawArgs}. Inside: hello`);
-      // Escaping is pre-calculated if any !{} exists in the prompt.
-      expect(mockEscapeShellArg).toHaveBeenCalledWith(rawArgs);
     });
 
     it('should perform escaped replacement inside !{} blocks', async () => {
@@ -509,11 +522,9 @@ describe('ShellProcessor', () => {
 
       const result = await processor.process(prompt, context);
 
-      // Verify the escape utility was called
-      expect(mockEscapeShellArg).toHaveBeenCalledWith(rawArgs);
+      const expectedEscapedArgs = getExpectedEscapedArgForPlatform(rawArgs);
+      const expectedCommand = `grep ${expectedEscapedArgs} file.txt`;
 
-      // Verify the command executed used the escaped arguments
-      const expectedCommand = `grep ${escapedArgs} file.txt`;
       expect(mockShellExecute).toHaveBeenCalledWith(
         expectedCommand,
         expect.any(String),
@@ -533,8 +544,8 @@ describe('ShellProcessor', () => {
 
       const result = await processor.process(prompt, context);
 
-      // Verify the command executed used the escaped arguments
-      const expectedCommand = `search ${escapedArgs}`;
+      const expectedEscapedArgs = getExpectedEscapedArgForPlatform(rawArgs);
+      const expectedCommand = `search ${expectedEscapedArgs}`;
       expect(mockShellExecute).toHaveBeenCalledWith(
         expectedCommand,
         expect.any(String),
@@ -542,7 +553,6 @@ describe('ShellProcessor', () => {
         expect.any(Object),
       );
 
-      // Verify the final prompt used the raw arguments outside
       expect(result).toBe(`User "(${rawArgs})" requested search: results`);
     });
 
@@ -550,19 +560,18 @@ describe('ShellProcessor', () => {
       const processor = new ShellProcessor('test-command');
       const prompt = '!{rm {{args}}}';
 
-      // Configure the permission check to fail for the resolved command
-      const expectedResolvedCommand = `rm ${escapedArgs}`;
+      const expectedEscapedArgs = getExpectedEscapedArgForPlatform(rawArgs);
+      const expectedResolvedCommand = `rm ${expectedEscapedArgs}`;
       mockCheckCommandPermissions.mockReturnValue({
         allAllowed: false,
         disallowedCommands: [expectedResolvedCommand],
-        isHardDenial: false, // Soft denial triggers confirmation
+        isHardDenial: false,
       });
 
       await expect(processor.process(prompt, context)).rejects.toThrow(
         ConfirmationRequiredError,
       );
 
-      // Verify that the check was performed on the resolved command
       expect(mockCheckCommandPermissions).toHaveBeenCalledWith(
         expectedResolvedCommand,
         expect.any(Object),
@@ -573,18 +582,65 @@ describe('ShellProcessor', () => {
     it('should report the resolved command if a hard denial occurs', async () => {
       const processor = new ShellProcessor('test-command');
       const prompt = '!{rm {{args}}}';
-
-      const expectedResolvedCommand = `rm ${escapedArgs}`;
+      const expectedEscapedArgs = getExpectedEscapedArgForPlatform(rawArgs);
+      const expectedResolvedCommand = `rm ${expectedEscapedArgs}`;
       mockCheckCommandPermissions.mockReturnValue({
         allAllowed: false,
         disallowedCommands: [expectedResolvedCommand],
-        isHardDenial: true, // Hard denial throws a standard Error
+        isHardDenial: true,
         blockReason: 'It is forbidden.',
       });
 
-      // Check that the error message includes the resolved command for clarity.
       await expect(processor.process(prompt, context)).rejects.toThrow(
         `Blocked command: "${expectedResolvedCommand}". Reason: It is forbidden.`,
+      );
+    });
+  });
+  describe('Real-World Escaping Scenarios', () => {
+    it('should correctly handle multiline arguments', async () => {
+      const processor = new ShellProcessor('test-command');
+      const multilineArgs = 'first line\nsecond line';
+      context.invocation!.args = multilineArgs;
+      const prompt = 'Commit message: !{git commit -m {{args}}}';
+
+      const expectedEscapedArgs =
+        getExpectedEscapedArgForPlatform(multilineArgs);
+      const expectedCommand = `git commit -m ${expectedEscapedArgs}`;
+
+      await processor.process(prompt, context);
+
+      expect(mockShellExecute).toHaveBeenCalledWith(
+        expectedCommand,
+        expect.any(String),
+        expect.any(Function),
+        expect.any(Object),
+      );
+    });
+
+    it.each([
+      { name: 'spaces', input: 'file with spaces.txt' },
+      { name: 'double quotes', input: 'a "quoted" string' },
+      { name: 'single quotes', input: "it's a string" },
+      { name: 'command substitution (backticks)', input: '`reboot`' },
+      { name: 'command substitution (dollar)', input: '$(reboot)' },
+      { name: 'variable expansion', input: '$HOME' },
+      { name: 'command chaining (semicolon)', input: 'a; reboot' },
+      { name: 'command chaining (ampersand)', input: 'a && reboot' },
+    ])('should safely escape args containing $name', async ({ input }) => {
+      const processor = new ShellProcessor('test-command');
+      context.invocation!.args = input;
+      const prompt = '!{echo {{args}}}';
+
+      const expectedEscapedArgs = getExpectedEscapedArgForPlatform(input);
+      const expectedCommand = `echo ${expectedEscapedArgs}`;
+
+      await processor.process(prompt, context);
+
+      expect(mockShellExecute).toHaveBeenCalledWith(
+        expectedCommand,
+        expect.any(String),
+        expect.any(Function),
+        expect.any(Object),
       );
     });
   });

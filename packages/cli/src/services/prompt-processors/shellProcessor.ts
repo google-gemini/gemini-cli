@@ -7,6 +7,7 @@
 import {
   checkCommandPermissions,
   escapeShellArg,
+  getShellConfiguration,
   ShellExecutionService,
 } from '@google/gemini-cli-core';
 
@@ -75,7 +76,8 @@ export class ShellProcessor implements IPromptProcessor {
       return prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, userArgsRaw);
     }
 
-    const userArgsEscaped = escapeShellArg(userArgsRaw);
+    const { shell } = getShellConfiguration();
+    const userArgsEscaped = escapeShellArg(userArgsRaw, shell);
 
     const resolvedInjections = injections.map((injection) => {
       if (injection.command === '') {

@@ -9,6 +9,11 @@ import os from 'os';
 import { quote } from 'shell-quote';
 
 /**
+ * An identifier for the shell type.
+ */
+export type ShellType = 'cmd' | 'powershell' | 'bash';
+
+/**
  * Defines the configuration required to execute a command string within a specific shell.
  */
 export interface ShellConfiguration {
@@ -18,6 +23,8 @@ export interface ShellConfiguration {
    * The arguments required by the shell to execute a subsequent string argument.
    */
   argsPrefix: string[];
+  /** An identifier for the shell type. */
+  shell: ShellType;
 }
 
 /**
@@ -40,7 +47,11 @@ export function getShellConfiguration(): ShellConfiguration {
       // For PowerShell, the arguments are different.
       // -NoProfile: Speeds up startup.
       // -Command: Executes the following command.
-      return { executable: comSpec, argsPrefix: ['-NoProfile', '-Command'] };
+      return {
+        executable: comSpec,
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
     }
 
     // Default to cmd.exe for anything else on Windows.
@@ -48,11 +59,15 @@ export function getShellConfiguration(): ShellConfiguration {
     // /d: Skip execution of AutoRun commands.
     // /s: Modifies the treatment of the command string (important for quoting).
     // /c: Carries out the command specified by the string and then terminates.
-    return { executable: comSpec, argsPrefix: ['/d', '/s', '/c'] };
+    return {
+      executable: comSpec,
+      argsPrefix: ['/d', '/s', '/c'],
+      shell: 'cmd',
+    };
   }
 
   // Unix-like systems (Linux, macOS)
-  return { executable: 'bash', argsPrefix: ['-c'] };
+  return { executable: 'bash', argsPrefix: ['-c'], shell: 'bash' };
 }
 
 /**
@@ -65,28 +80,25 @@ export const isWindows = os.platform() === 'win32';
  * in a shell command, preventing command injection.
  *
  * @param arg The argument string to escape.
+ * @param shell The type of shell the argument is for.
  * @returns The shell-escaped string.
  */
-export function escapeShellArg(arg: string): string {
+export function escapeShellArg(arg: string, shell: ShellType): string {
   if (!arg) {
     return '';
   }
 
-  if (os.platform() === 'win32') {
-    const comSpec = (process.env.ComSpec || 'cmd.exe').toLowerCase();
-    const isPowerShell =
-      comSpec.endsWith('powershell.exe') || comSpec.endsWith('pwsh.exe');
-
-    if (isPowerShell) {
+  switch (shell) {
+    case 'powershell':
       // For PowerShell, wrap in single quotes and escape internal single quotes by doubling them.
       return `'${arg.replace(/'/g, "''")}'`;
-    } else {
+    case 'cmd':
       // Simple Windows escaping for cmd.exe: wrap in double quotes and escape inner double quotes.
       return `"${arg.replace(/"/g, '""')}"`;
-    }
-  } else {
-    // POSIX shell escaping using shell-quote.
-    return quote([arg]);
+    case 'bash':
+    default:
+      // POSIX shell escaping using shell-quote.
+      return quote([arg]);
   }
 }
 
