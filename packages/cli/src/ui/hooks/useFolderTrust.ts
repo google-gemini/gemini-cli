@@ -21,12 +21,14 @@ export const useFolderTrust = (
   const [isTrusted, setIsTrusted] = useState<boolean | undefined>(undefined);
   const [isFolderTrustDialogOpen, setIsFolderTrustDialogOpen] = useState(false);
 
+  const { folderTrust, folderTrustFeature } = settings.merged;
   useEffect(() => {
     const trusted = isWorkspaceTrusted(settings.merged);
     setIsTrusted(trusted);
     setIsFolderTrustDialogOpen(trusted === undefined);
     onTrustChange(trusted);
-  }, [onTrustChange, settings.merged]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onTrustChange, folderTrust, folderTrustFeature]);
 
   const handleFolderTrustSelect = useCallback(
     (choice: FolderTrustChoice) => {
@@ -54,7 +56,8 @@ export const useFolderTrust = (
       setIsFolderTrustDialogOpen(false);
       onTrustChange(trusted);
     },
-    [onTrustChange, settings.merged],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onTrustChange, folderTrust, folderTrustFeature],
   );
 
   return {
