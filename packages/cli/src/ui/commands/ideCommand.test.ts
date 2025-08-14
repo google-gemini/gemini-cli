@@ -70,7 +70,7 @@ describe('ideCommand', () => {
       getCurrentIde: () => DetectedIde.VSCode,
       getDetectedIdeDisplayName: () => 'VS Code',
       getConnectionStatus: () => ({
-        status: core.IDEConnectionStatus.Disconnected,
+        status: core.IDEConnectionStatus.Connected,
       }),
     } as ReturnType<Config['getIdeClient']>);
     const command = ideCommand(mockConfig);
