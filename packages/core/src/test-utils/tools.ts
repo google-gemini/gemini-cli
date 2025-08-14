@@ -7,9 +7,9 @@
 import { vi } from 'vitest';
 import {
   BaseTool,
-  Icon,
   ToolCallConfirmationDetails,
   ToolResult,
+  Kind,
 } from '../tools/tools.js';
 import { Schema, Type } from '@google/genai';
 
@@ -29,7 +29,7 @@ export class MockTool extends BaseTool<{ [key: string]: unknown }, ToolResult> {
       properties: { param: { type: Type.STRING } },
     },
   ) {
-    super(name, displayName ?? name, description, Icon.Hammer, params);
+    super(name, displayName ?? name, description, Kind.Other, params);
   }
 
   async execute(
@@ -45,7 +45,7 @@ export class MockTool extends BaseTool<{ [key: string]: unknown }, ToolResult> {
     );
   }
 
-  async shouldConfirmExecute(
+  override async shouldConfirmExecute(
     _params: { [key: string]: unknown },
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {

@@ -134,9 +134,14 @@ describe('useKeypress', () => {
     expect(onKeypress).not.toHaveBeenCalled();
   });
 
-  it('should listen for keypress when active', () => {
+  it.each([
+    { key: { name: 'a', sequence: 'a' } },
+    { key: { name: 'left', sequence: '\x1b[D' } },
+    { key: { name: 'right', sequence: '\x1b[C' } },
+    { key: { name: 'up', sequence: '\x1b[A' } },
+    { key: { name: 'down', sequence: '\x1b[B' } },
+  ])('should listen for keypress when active for key $key.name', ({ key }) => {
     renderHook(() => useKeypress(onKeypress, { isActive: true }));
-    const key = { name: 'a', sequence: 'a' };
     act(() => stdin.pressKey(key));
     expect(onKeypress).toHaveBeenCalledWith(expect.objectContaining(key));
   });
@@ -187,7 +192,7 @@ describe('useKeypress', () => {
       },
       isLegacy: true,
     },
-  ])('Paste Handling in $description', ({ setup, isLegacy }) => {
+  ])('in $description', ({ setup, isLegacy }) => {
     beforeEach(() => {
       setup();
       stdin.setLegacy(isLegacy);
