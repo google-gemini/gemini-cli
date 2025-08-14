@@ -529,7 +529,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('1 open file (ctrl+e to view)');
+    expect(lastFrame()).toContain('1 open file (ctrl+g to view)');
   });
 
   it('should not display any files when not available', async () => {
@@ -584,7 +584,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('3 open files (ctrl+e to view)');
+    expect(lastFrame()).toContain('3 open files (ctrl+g to view)');
   });
 
   it('should display active file and other context', async () => {
@@ -613,7 +613,7 @@ describe('App UI', () => {
     currentUnmount = unmount;
     await Promise.resolve();
     expect(lastFrame()).toContain(
-      'Using: 1 open file (ctrl+e to view) | 1 GEMINI.md file',
+      'Using: 1 open file (ctrl+g to view) | 1 GEMINI.md file',
     );
   });
 
