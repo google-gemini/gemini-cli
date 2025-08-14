@@ -13,7 +13,11 @@ import {
   vi,
   type Mocked,
 } from 'vitest';
-import { WriteFileTool, WriteFileToolParams } from './write-file.js';
+import {
+  getCorrectedFileContent,
+  WriteFileTool,
+  WriteFileToolParams,
+} from './write-file.js';
 import { ToolErrorType } from './tool-error.js';
 import {
   FileDiff,
@@ -231,6 +235,112 @@ describe('WriteFileTool', () => {
         content: '',
       };
       expect(() => tool.build(params)).toThrow(`Missing or empty "file_path"`);
+    });
+  });
+
+  describe('getCorrectedFileContent', () => {
+    it('should call ensureCorrectFileContent for a new file', async () => {
+      const filePath = path.join(rootDir, 'new_corrected_file.txt');
+      const proposedContent = 'Proposed new content.';
+      const correctedContent = 'Corrected new content.';
+      const abortSignal = new AbortController().signal;
+      // Ensure the mock is set for this specific test case if needed, or rely on beforeEach
+      mockEnsureCorrectFileContent.mockResolvedValue(correctedContent);
+
+      const result = await getCorrectedFileContent(
+        mockConfig,
+        filePath,
+        proposedContent,
+        abortSignal,
+      );
+
+      expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
+        proposedContent,
+        mockGeminiClientInstance,
+        abortSignal,
+      );
+      expect(mockEnsureCorrectEdit).not.toHaveBeenCalled();
+      expect(result.correctedContent).toBe(correctedContent);
+      expect(result.originalContent).toBe('');
+      expect(result.fileExists).toBe(false);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should call ensureCorrectEdit for an existing file', async () => {
+      const filePath = path.join(rootDir, 'existing_corrected_file.txt');
+      const originalContent = 'Original existing content.';
+      const proposedContent = 'Proposed replacement content.';
+      const correctedProposedContent = 'Corrected replacement content.';
+      const abortSignal = new AbortController().signal;
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+
+      // Ensure this mock is active and returns the correct structure
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: originalContent,
+          new_string: correctedProposedContent,
+        },
+        occurrences: 1,
+      } as CorrectedEditResult);
+
+      const result = await getCorrectedFileContent(
+        mockConfig,
+        filePath,
+        proposedContent,
+        abortSignal,
+      );
+
+      expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
+        filePath,
+        originalContent,
+        {
+          old_string: originalContent,
+          new_string: proposedContent,
+          file_path: filePath,
+        },
+        mockGeminiClientInstance,
+        abortSignal,
+      );
+      expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
+      expect(result.correctedContent).toBe(correctedProposedContent);
+      expect(result.originalContent).toBe(originalContent);
+      expect(result.fileExists).toBe(true);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should return error if reading an existing file fails (e.g. permissions)', async () => {
+      const filePath = path.join(rootDir, 'unreadable_file.txt');
+      const proposedContent = 'some content';
+      const abortSignal = new AbortController().signal;
+      fs.writeFileSync(filePath, 'content', { mode: 0o000 });
+
+      const readError = new Error('Permission denied');
+      const originalReadFileSync = fs.readFileSync;
+      vi.spyOn(fs, 'readFileSync').mockImplementationOnce(() => {
+        throw readError;
+      });
+
+      const result = await getCorrectedFileContent(
+        mockConfig,
+        filePath,
+        proposedContent,
+        abortSignal,
+      );
+
+      expect(fs.readFileSync).toHaveBeenCalledWith(filePath, 'utf8');
+      expect(mockEnsureCorrectEdit).not.toHaveBeenCalled();
+      expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
+      expect(result.correctedContent).toBe(proposedContent);
+      expect(result.originalContent).toBe('');
+      expect(result.fileExists).toBe(true);
+      expect(result.error).toEqual({
+        message: 'Permission denied',
+        code: undefined,
+      });
+
+      vi.spyOn(fs, 'readFileSync').mockImplementation(originalReadFileSync);
+      fs.chmodSync(filePath, 0o600);
     });
   });
 

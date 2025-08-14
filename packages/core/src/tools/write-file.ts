@@ -69,7 +69,7 @@ interface GetCorrectedFileContentResult {
   error?: { message: string; code?: string };
 }
 
-async function getCorrectedFileContent(
+export async function getCorrectedFileContent(
   config: Config,
   filePath: string,
   proposedContent: string,
