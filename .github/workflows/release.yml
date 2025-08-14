@@ -190,7 +190,7 @@ jobs:
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |-
-          PREVIOUS_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
+          echo "PREVIOUS_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')" >> "$GITHUB_OUTPUT"
 
       - name: 'Create GitHub Release and Tag'
         if: |-
