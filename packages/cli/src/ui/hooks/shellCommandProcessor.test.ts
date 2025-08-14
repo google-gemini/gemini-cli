@@ -104,8 +104,6 @@ describe('useShellCommandProcessor', () => {
   ): ShellExecutionResult => ({
     rawOutput: Buffer.from(overrides.output || ''),
     output: 'Success',
-    stdout: 'Success',
-    stderr: '',
     exitCode: 0,
     signal: null,
     error: null,
@@ -223,7 +221,6 @@ describe('useShellCommandProcessor', () => {
       act(() => {
         mockShellOutputCallback({
           type: 'data',
-          stream: 'stdout',
           chunk: 'hello',
         });
       });
