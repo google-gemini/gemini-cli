@@ -5,7 +5,6 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { useInput } from 'ink';
 import {
   Config,
   GeminiClient,
@@ -26,6 +25,7 @@ import {
   UnauthorizedError,
   UserPromptEvent,
   DEFAULT_GEMINI_FLASH_MODEL,
+  parseAndFormatApiError,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import {
@@ -38,7 +38,6 @@ import {
   ToolCallStatus,
 } from '../types.js';
 import { isAtCommand } from '../utils/commandUtils.js';
-import { parseAndFormatApiError } from '../utils/errorParsing.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
@@ -55,6 +54,7 @@ import {
   TrackedCancelledToolCall,
 } from './useReactToolScheduler.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
+import { useKeypress } from './useKeypress.js';
 
 export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
   const resultParts: PartListUnion = [];
@@ -183,28 +183,44 @@ export const useGeminiStream = (
     return StreamingState.Idle;
   }, [isResponding, toolCalls]);
 
-  useInput((_input, key) => {
-    if (streamingState === StreamingState.Responding && key.escape) {
-      if (turnCancelledRef.current) {
-        return;
-      }
-      turnCancelledRef.current = true;
-      abortControllerRef.current?.abort();
-      if (pendingHistoryItemRef.current) {
-        addItem(pendingHistoryItemRef.current, Date.now());
-      }
-      addItem(
-        {
-          type: MessageType.INFO,
-          text: 'Request cancelled.',
-        },
-        Date.now(),
-      );
-      setPendingHistoryItem(null);
-      onCancelSubmit();
-      setIsResponding(false);
+  const cancelOngoingRequest = useCallback(() => {
+    if (streamingState !== StreamingState.Responding) {
+      return;
     }
-  });
+    if (turnCancelledRef.current) {
+      return;
+    }
+    turnCancelledRef.current = true;
+    abortControllerRef.current?.abort();
+    if (pendingHistoryItemRef.current) {
+      addItem(pendingHistoryItemRef.current, Date.now());
+    }
+    addItem(
+      {
+        type: MessageType.INFO,
+        text: 'Request cancelled.',
+      },
+      Date.now(),
+    );
+    setPendingHistoryItem(null);
+    onCancelSubmit();
+    setIsResponding(false);
+  }, [
+    streamingState,
+    addItem,
+    setPendingHistoryItem,
+    onCancelSubmit,
+    pendingHistoryItemRef,
+  ]);
+
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape') {
+        cancelOngoingRequest();
+      }
+    },
+    { isActive: streamingState === StreamingState.Responding },
+  );
 
   const prepareQueryForGemini = useCallback(
     async (
@@ -954,5 +970,6 @@ export const useGeminiStream = (
     initError,
     pendingHistoryItems,
     thought,
+    cancelOngoingRequest,
   };
 };

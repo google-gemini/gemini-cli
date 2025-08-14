@@ -5,20 +5,16 @@
  */
 
 import {
-  BaseTool,
-  ToolResult,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
+  ToolInvocation,
   ToolMcpConfirmationDetails,
-  Icon,
+  ToolResult,
 } from './tools.js';
-import {
-  CallableTool,
-  Part,
-  FunctionCall,
-  FunctionDeclaration,
-  Type,
-} from '@google/genai';
+import { CallableTool, FunctionCall, Part } from '@google/genai';
 
 type ToolParams = Record<string, unknown>;
 
@@ -56,15 +52,90 @@ type McpContentBlock =
   | McpResourceBlock
   | McpResourceLinkBlock;
 
-export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
+class DiscoveredMCPToolInvocation extends BaseToolInvocation<
+  ToolParams,
+  ToolResult
+> {
   private static readonly allowlist: Set<string> = new Set();
 
   constructor(
     private readonly mcpTool: CallableTool,
     readonly serverName: string,
     readonly serverToolName: string,
+    readonly displayName: string,
+    readonly timeout?: number,
+    readonly trust?: boolean,
+    params: ToolParams = {},
+  ) {
+    super(params);
+  }
+
+  override async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    const serverAllowListKey = this.serverName;
+    const toolAllowListKey = `${this.serverName}.${this.serverToolName}`;
+
+    if (this.trust) {
+      return false; // server is trusted, no confirmation needed
+    }
+
+    if (
+      DiscoveredMCPToolInvocation.allowlist.has(serverAllowListKey) ||
+      DiscoveredMCPToolInvocation.allowlist.has(toolAllowListKey)
+    ) {
+      return false; // server and/or tool already allowlisted
+    }
+
+    const confirmationDetails: ToolMcpConfirmationDetails = {
+      type: 'mcp',
+      title: 'Confirm MCP Tool Execution',
+      serverName: this.serverName,
+      toolName: this.serverToolName, // Display original tool name in confirmation
+      toolDisplayName: this.displayName, // Display global registry name exposed to model and user
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
+          DiscoveredMCPToolInvocation.allowlist.add(serverAllowListKey);
+        } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysTool) {
+          DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
+        }
+      },
+    };
+    return confirmationDetails;
+  }
+
+  async execute(): Promise<ToolResult> {
+    const functionCalls: FunctionCall[] = [
+      {
+        name: this.serverToolName,
+        args: this.params,
+      },
+    ];
+
+    const rawResponseParts = await this.mcpTool.callTool(functionCalls);
+    const transformedParts = transformMcpContentToParts(rawResponseParts);
+
+    return {
+      llmContent: transformedParts,
+      returnDisplay: getStringifiedResultForDisplay(rawResponseParts),
+    };
+  }
+
+  getDescription(): string {
+    return this.displayName;
+  }
+}
+
+export class DiscoveredMCPTool extends BaseDeclarativeTool<
+  ToolParams,
+  ToolResult
+> {
+  constructor(
+    private readonly mcpTool: CallableTool,
+    readonly serverName: string,
+    readonly serverToolName: string,
     description: string,
-    readonly parameterSchemaJson: unknown,
+    override readonly parameterSchema: unknown,
     readonly timeout?: number,
     readonly trust?: boolean,
     nameOverride?: string,
@@ -73,8 +144,8 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
       nameOverride ?? generateValidName(serverToolName),
       `${serverToolName} (${serverName} MCP Server)`,
       description,
-      Icon.Hammer,
-      { type: Type.OBJECT }, // this is a dummy Schema for MCP, will be not be used to construct the FunctionDeclaration
+      Kind.Other,
+      parameterSchema,
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
@@ -86,75 +157,25 @@ export class DiscoveredMCPTool extends BaseTool<ToolParams, ToolResult> {
       this.serverName,
       this.serverToolName,
       this.description,
-      this.parameterSchemaJson,
+      this.parameterSchema,
       this.timeout,
       this.trust,
       `${this.serverName}__${this.serverToolName}`,
     );
   }
 
-  /**
-   * Overrides the base schema to use parametersJsonSchema when building
-   * FunctionDeclaration
-   */
-  override get schema(): FunctionDeclaration {
-    return {
-      name: this.name,
-      description: this.description,
-      parametersJsonSchema: this.parameterSchemaJson,
-    };
-  }
-
-  async shouldConfirmExecute(
-    _params: ToolParams,
-    _abortSignal: AbortSignal,
-  ): Promise<ToolCallConfirmationDetails | false> {
-    const serverAllowListKey = this.serverName;
-    const toolAllowListKey = `${this.serverName}.${this.serverToolName}`;
-
-    if (this.trust) {
-      return false; // server is trusted, no confirmation needed
-    }
-
-    if (
-      DiscoveredMCPTool.allowlist.has(serverAllowListKey) ||
-      DiscoveredMCPTool.allowlist.has(toolAllowListKey)
-    ) {
-      return false; // server and/or tool already allowlisted
-    }
-
-    const confirmationDetails: ToolMcpConfirmationDetails = {
-      type: 'mcp',
-      title: 'Confirm MCP Tool Execution',
-      serverName: this.serverName,
-      toolName: this.serverToolName, // Display original tool name in confirmation
-      toolDisplayName: this.name, // Display global registry name exposed to model and user
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
-          DiscoveredMCPTool.allowlist.add(serverAllowListKey);
-        } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysTool) {
-          DiscoveredMCPTool.allowlist.add(toolAllowListKey);
-        }
-      },
-    };
-    return confirmationDetails;
-  }
-
-  async execute(params: ToolParams): Promise<ToolResult> {
-    const functionCalls: FunctionCall[] = [
-      {
-        name: this.serverToolName,
-        args: params,
-      },
-    ];
-
-    const rawResponseParts = await this.mcpTool.callTool(functionCalls);
-    const transformedParts = transformMcpContentToParts(rawResponseParts);
-
-    return {
-      llmContent: transformedParts,
-      returnDisplay: getStringifiedResultForDisplay(rawResponseParts),
-    };
+  protected createInvocation(
+    params: ToolParams,
+  ): ToolInvocation<ToolParams, ToolResult> {
+    return new DiscoveredMCPToolInvocation(
+      this.mcpTool,
+      this.serverName,
+      this.serverToolName,
+      this.displayName,
+      this.timeout,
+      this.trust,
+      params,
+    );
   }
 }
 

@@ -28,6 +28,19 @@ import {
 import { ContentGenerator } from './contentGenerator.js';
 import { toContents } from '../code_assist/converter.js';
 
+interface StructuredError {
+  status: number;
+}
+
+export function isStructuredError(error: unknown): error is StructuredError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    typeof (error as StructuredError).status === 'number'
+  );
+}
+
 /**
  * A decorator that wraps a ContentGenerator to add logging to API calls.
  */
@@ -85,6 +98,9 @@ export class LoggingContentGenerator implements ContentGenerator {
         prompt_id,
         this.config.getContentGeneratorConfig()?.authType,
         errorType,
+        isStructuredError(error)
+          ? (error as StructuredError).status
+          : undefined,
       ),
     );
   }
