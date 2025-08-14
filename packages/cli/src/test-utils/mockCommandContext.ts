@@ -54,7 +54,8 @@ export const createMockCommandContext = (
       loadHistory: vi.fn(),
       toggleCorgiMode: vi.fn(),
       toggleVimEnabled: vi.fn(),
-    },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any,
     session: {
       sessionShellAllowlist: new Set<string>(),
       stats: {
