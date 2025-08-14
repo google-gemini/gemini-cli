@@ -45,40 +45,68 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
         :warning: Be advised that when you export your API key inside your shell configuration file, any other process executed from the shell can read it.
 
 3.  **Vertex AI:**
-    - Obtain your Google Cloud API key: [Get an API Key](https://cloud.google.com/vertex-ai/generative-ai/docs/start/api-keys?usertype=newuser)
+    - **API Key:**
+      - Obtain your Google Cloud API key: [Get an API Key](https://cloud.google.com/vertex-ai/generative-ai/docs/start/api-keys?usertype=newuser)
       - Set the `GOOGLE_API_KEY` environment variable. In the following methods, replace `YOUR_GOOGLE_API_KEY` with your Vertex AI API key:
-        - You can temporarily set these environment variables in your current shell session using the following commands:
+        - You can temporarily set the environment variable in your current shell session using the following command:
           ```bash
           export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
           ```
-        - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
+        - For repeated use, you can add the environment variable to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
+
           ```bash
           echo 'export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"' >> ~/.bashrc
           source ~/.bashrc
           ```
-    - To use Application Default Credentials (ADC), use the following command:
-      - Ensure you have a Google Cloud project and have enabled the Vertex AI API.
-        ```bash
-        gcloud auth application-default login
-        ```
-        For more information, see [Set up Application Default Credentials for Google Cloud](https://cloud.google.com/docs/authentication/provide-credentials-adc).
-      - Set the `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` environment variables. In the following methods, replace `YOUR_PROJECT_ID` and `YOUR_PROJECT_LOCATION` with the relevant values for your project:
-        - You can temporarily set these environment variables in your current shell session using the following commands:
-          ```bash
-          export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
-          export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION" # e.g., us-central1
-          ```
-        - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files)
-
-        - Alternatively you can export the environment variables from your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
-
-          ```bash
-          echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc
-          echo 'export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"' >> ~/.bashrc
-          source ~/.bashrc
-          ```
 
           :warning: Be advised that when you export your API key inside your shell configuration file, any other process executed from the shell can read it.
+
+          > **Note:**
+          > If you encounter an error like `"API keys are not supported by this API - Expected OAuth2 access token or other authentication credentials that assert a principal"`, it is likely that your organization has restricted the creation of service account API keys. In this case, please try the [service account JSON key](#service-account-json-key) method described below.
+
+    - **Application Default Credentials (ADC):**
+
+      > **Note:**
+      > If you have previously set the `GOOGLE_API_KEY` or `GEMINI_API_KEY` environment variables, you must unset them to use Application Default Credentials.
+      >
+      > ```bash
+      > unset GOOGLE_API_KEY GEMINI_API_KEY
+      > ```
+      - **Using `gcloud` (for local development):**
+        - Ensure you have a Google Cloud project and have enabled the Vertex AI API.
+        - Log in with your user credentials:
+          ```bash
+          gcloud auth application-default login
+          ```
+          For more information, see [Set up Application Default Credentials for Google Cloud](https://cloud.google.com/docs/authentication/provide-credentials-adc).
+      - **<a id="service-account-json-key"></a>Using a Service Account (for applications or when service account API keys are restricted):**
+        - If you are unable to create an API key due to [organization policies](https://cloud.google.com/vertex-ai/generative-ai/docs/start/api-keys?usertype=existinguser#expandable-2), or if you are running in a non-interactive environment, you can authenticate using a service account key.
+        - [Create a service account and key](https://cloud.google.com/iam/docs/keys-create-delete), and download the JSON key file. The service account will need to be assigned the "Vertex AI User" role.
+        - Set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to the absolute path of the JSON file.
+          - You can temporarily set the environment variable in your current shell session:
+            ```bash
+            export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/keyfile.json"
+            ```
+          - For repeated use, you can add the command to your shell's configuration file (e.g., `~/.bashrc`).
+            ```bash
+            echo 'export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/keyfile.json"' >> ~/.bashrc
+            source ~/.bashrc
+            ```
+            :warning: Be advised that when you export service account credentials inside your shell configuration file, any other process executed from the shell can read it.
+
+      - **Required Environment Variables for ADC:**
+        - When using ADC (either with `gcloud` or a service account), you must also set the `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` environment variables. In the following methods, replace `YOUR_PROJECT_ID` and `YOUR_PROJECT_LOCATION` with the relevant values for your project:
+          - You can temporarily set these environment variables in your current shell session using the following commands:
+            ```bash
+            export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+            export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION" # e.g., us-central1
+            ```
+          - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
+            ```bash
+            echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc
+            echo 'export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"' >> ~/.bashrc
+            source ~/.bashrc
+            ```
 
 4.  **Cloud Shell:**
     - This option is only available when running in a Google Cloud Shell environment.
