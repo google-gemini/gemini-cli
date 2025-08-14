@@ -333,6 +333,20 @@ export function setPendingSettingValue(
 }
 
 /**
+ * Generic setter: Set a setting value (boolean, number, string, etc.) in the pending settings
+ */
+export function setPendingSettingValueAny(
+  key: string,
+  value: unknown,
+  pendingSettings: Settings,
+): Settings {
+  const path = key.split('.');
+  const newSettings = JSON.parse(JSON.stringify(pendingSettings));
+  setNestedValue(newSettings, path, value);
+  return newSettings;
+}
+
+/**
  * Check if any modified settings require a restart
  */
 export function hasRestartRequiredSettings(
@@ -382,11 +396,9 @@ export function saveModifiedSettings(
       // We need to set the whole parent object.
       const [parentKey] = path;
       if (parentKey) {
-        // Ensure value is a boolean for setPendingSettingValue
-        const booleanValue = typeof value === 'boolean' ? value : false;
-        const newParentValue = setPendingSettingValue(
+        const newParentValue = setPendingSettingValueAny(
           settingKey,
-          booleanValue,
+          value,
           loadedSettings.forScope(scope).settings,
         )[parentKey as keyof Settings];
 
@@ -431,14 +443,48 @@ export function getDisplayValue(
   const isChangedFromDefault =
     typeof defaultValue === 'boolean' ? value !== defaultValue : value === true;
   const isInModifiedSettings = modifiedSettings.has(key);
-  const hasPendingChanges =
-    pendingSettings && settingExistsInScope(key, pendingSettings);
 
-  // Add * indicator when value differs from default, is in modified settings, or has pending changes
-  if (isChangedFromDefault || isInModifiedSettings || hasPendingChanges) {
+  // Only show * if value actually differs from default, not just if key exists
+  if (isChangedFromDefault || isInModifiedSettings) {
     return `${valueString}*`; // * indicates changed from default value
   }
 
+  return valueString;
+}
+
+/**
+ * Generic display helper that supports boolean and number settings.
+ * Returns a string representation with a trailing * when changed from default or pending/modified.
+ */
+export function getDisplayValueGeneric(
+  key: string,
+  settings: Settings,
+  _mergedSettings: Settings,
+  modifiedSettings: Set<string>,
+  pendingSettings?: Settings,
+): string {
+  let value: unknown;
+  if (pendingSettings && settingExistsInScope(key, pendingSettings)) {
+    value = getEffectiveValue(key, pendingSettings, {});
+  } else if (settingExistsInScope(key, settings)) {
+    value = getEffectiveValue(key, settings, {});
+  } else {
+    value = getDefaultValue(key);
+  }
+
+  const valueString =
+    value === undefined ? '' : typeof value === 'object' ? '' : String(value);
+
+  const defaultValue = getDefaultValue(key);
+  const isChangedFromDefault =
+    defaultValue === undefined ? value !== undefined : value !== defaultValue;
+  const isInModifiedSettings = modifiedSettings.has(key);
+  const hasPendingChanges =
+    !!pendingSettings && settingExistsInScope(key, pendingSettings);
+
+  if (isChangedFromDefault || isInModifiedSettings || hasPendingChanges) {
+    return `${valueString}*`;
+  }
   return valueString;
 }
 
