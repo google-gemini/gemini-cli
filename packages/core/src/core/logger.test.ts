@@ -20,7 +20,7 @@ import {
   encodeTagName,
   decodeTagName,
 } from './logger.js';
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync } from 'node:fs';
 import path from 'node:path';
 import { Content } from '@google/genai';
 
@@ -575,22 +575,16 @@ describe('Logger', () => {
       await fs.writeFile(oldStylePath, '{}');
       await fs.writeFile(newStylePath, '{}');
 
+      // Verify both files exist before deletion
+      expect(existsSync(oldStylePath)).toBe(true);
+      expect(existsSync(newStylePath)).toBe(true);
+
       const result = await logger.deleteCheckpoint(oldTag);
       expect(result).toBe(true);
 
       // Verify both are gone
-      expect(
-        await fs
-          .access(oldStylePath)
-          .then(() => true)
-          .catch(() => false),
-      ).toBe(false);
-      expect(
-        await fs
-          .access(newStylePath)
-          .then(() => true)
-          .catch(() => false),
-      ).toBe(false);
+      expect(existsSync(oldStylePath)).toBe(false);
+      expect(existsSync(newStylePath)).toBe(false);
     });
 
     it('should return false if the checkpoint file does not exist', async () => {
