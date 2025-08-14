@@ -8,3 +8,4 @@ export { reviewStorageTool } from './review-storage.js';
 export { reviewLoaderTool } from './review-loader.js';
 export { debugStoreTool } from './debug-store.js';
 export { claudeCodeTool } from './claude-code.js';
+export { ekgCrudTool } from './ekg-crud.js';

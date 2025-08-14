@@ -38,6 +38,7 @@
     "ai": "^4.0.53",
     "dotenv": "^17.1.0",
     "mastra": "^0.10.21",
+    "neo4j-driver": "^5.28.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {
