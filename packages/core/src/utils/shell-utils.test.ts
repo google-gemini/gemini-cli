@@ -302,80 +302,57 @@ describe('stripShellWrapper', () => {
 });
 
 describe('escapeShellArg', () => {
-  const originalEnv = { ...process.env };
-
-  afterEach(() => {
-    process.env = originalEnv;
-  });
-
-  describe('POSIX (Linux/macOS)', () => {
-    beforeEach(() => {
-      mockPlatform.mockReturnValue('linux');
-    });
-
+  describe('POSIX (bash)', () => {
     it('should use shell-quote for escaping', () => {
       mockQuote.mockReturnValueOnce("'escaped value'");
-      const result = escapeShellArg('raw value');
+      const result = escapeShellArg('raw value', 'bash');
       expect(mockQuote).toHaveBeenCalledWith(['raw value']);
       expect(result).toBe("'escaped value'");
     });
 
     it('should handle empty strings', () => {
-      const result = escapeShellArg('');
+      const result = escapeShellArg('', 'bash');
       expect(result).toBe('');
       expect(mockQuote).not.toHaveBeenCalled();
     });
   });
 
   describe('Windows', () => {
-    beforeEach(() => {
-      mockPlatform.mockReturnValue('win32');
-    });
-
     describe('when shell is cmd.exe', () => {
-      beforeEach(() => {
-        process.env.ComSpec = 'C:\\Windows\\System32\\cmd.exe';
-      });
-
       it('should wrap simple arguments in double quotes', () => {
-        const result = escapeShellArg('search term');
+        const result = escapeShellArg('search term', 'cmd');
         expect(result).toBe('"search term"');
       });
 
       it('should escape internal double quotes by doubling them', () => {
-        const result = escapeShellArg('He said "Hello"');
+        const result = escapeShellArg('He said "Hello"', 'cmd');
         expect(result).toBe('"He said ""Hello"""');
       });
 
       it('should handle empty strings', () => {
-        const result = escapeShellArg('');
+        const result = escapeShellArg('', 'cmd');
         expect(result).toBe('');
       });
     });
 
     describe('when shell is PowerShell', () => {
-      beforeEach(() => {
-        process.env.ComSpec =
-          'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
-      });
-
       it('should wrap simple arguments in single quotes', () => {
-        const result = escapeShellArg('search term');
+        const result = escapeShellArg('search term', 'powershell');
         expect(result).toBe("'search term'");
       });
 
       it('should escape internal single quotes by doubling them', () => {
-        const result = escapeShellArg("It's a test");
+        const result = escapeShellArg("It's a test", 'powershell');
         expect(result).toBe("'It''s a test'");
       });
 
       it('should handle double quotes without escaping them', () => {
-        const result = escapeShellArg('He said "Hello"');
+        const result = escapeShellArg('He said "Hello"', 'powershell');
         expect(result).toBe('\'He said "Hello"\'');
       });
 
       it('should handle empty strings', () => {
-        const result = escapeShellArg('');
+        const result = escapeShellArg('', 'powershell');
         expect(result).toBe('');
       });
     });
@@ -394,6 +371,7 @@ describe('getShellConfiguration', () => {
     const config = getShellConfiguration();
     expect(config.executable).toBe('bash');
     expect(config.argsPrefix).toEqual(['-c']);
+    expect(config.shell).toBe('bash');
   });
 
   it('should return bash configuration on macOS (darwin)', () => {
@@ -401,6 +379,7 @@ describe('getShellConfiguration', () => {
     const config = getShellConfiguration();
     expect(config.executable).toBe('bash');
     expect(config.argsPrefix).toEqual(['-c']);
+    expect(config.shell).toBe('bash');
   });
 
   describe('on Windows', () => {
@@ -413,6 +392,7 @@ describe('getShellConfiguration', () => {
       const config = getShellConfiguration();
       expect(config.executable).toBe('cmd.exe');
       expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd');
     });
 
     it('should respect ComSpec for cmd.exe', () => {
@@ -421,6 +401,7 @@ describe('getShellConfiguration', () => {
       const config = getShellConfiguration();
       expect(config.executable).toBe(cmdPath);
       expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd');
     });
 
     it('should return PowerShell configuration if ComSpec points to powershell.exe', () => {
@@ -430,6 +411,7 @@ describe('getShellConfiguration', () => {
       const config = getShellConfiguration();
       expect(config.executable).toBe(psPath);
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
     });
 
     it('should return PowerShell configuration if ComSpec points to pwsh.exe', () => {
@@ -438,6 +420,7 @@ describe('getShellConfiguration', () => {
       const config = getShellConfiguration();
       expect(config.executable).toBe(pwshPath);
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
     });
 
     it('should be case-insensitive when checking ComSpec', () => {
@@ -445,6 +428,7 @@ describe('getShellConfiguration', () => {
       const config = getShellConfiguration();
       expect(config.executable).toBe('C:\\Path\\To\\POWERSHELL.EXE');
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
     });
   });
 });
