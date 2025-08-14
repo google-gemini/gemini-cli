@@ -15,7 +15,7 @@ import { LibSQLStore } from "@mastra/libsql";
 dotenv.config();
 
 // Initialize guardrails at startup for Mastra
-async function initializeGuardrails(): Promise<void> {
+async function initializeGuardrails() {
   try {
     console.log(`🔧 DEBUG: Mastra initializeGuardrails() started`);
     const guardrailStore = GuardrailStore.getInstance();
