@@ -91,7 +91,10 @@ export function getRestartRequiredSettings(): string[] {
 /**
  * Recursively gets a value from a nested object using a key path array.
  */
-function getNestedValue(obj: Record<string, unknown>, path: string[]): unknown {
+export function getNestedValue(
+  obj: Record<string, unknown>,
+  path: string[],
+): unknown {
   const [first, ...rest] = path;
   if (!first || !(first in obj)) {
     return undefined;
@@ -449,42 +452,6 @@ export function getDisplayValue(
     return `${valueString}*`; // * indicates changed from default value
   }
 
-  return valueString;
-}
-
-/**
- * Generic display helper that supports boolean and number settings.
- * Returns a string representation with a trailing * when changed from default or pending/modified.
- */
-export function getDisplayValueGeneric(
-  key: string,
-  settings: Settings,
-  _mergedSettings: Settings,
-  modifiedSettings: Set<string>,
-  pendingSettings?: Settings,
-): string {
-  let value: unknown;
-  if (pendingSettings && settingExistsInScope(key, pendingSettings)) {
-    value = getEffectiveValue(key, pendingSettings, {});
-  } else if (settingExistsInScope(key, settings)) {
-    value = getEffectiveValue(key, settings, {});
-  } else {
-    value = getDefaultValue(key);
-  }
-
-  const valueString =
-    value === undefined ? '' : typeof value === 'object' ? '' : String(value);
-
-  const defaultValue = getDefaultValue(key);
-  const isChangedFromDefault =
-    defaultValue === undefined ? value !== undefined : value !== defaultValue;
-  const isInModifiedSettings = modifiedSettings.has(key);
-  const hasPendingChanges =
-    !!pendingSettings && settingExistsInScope(key, pendingSettings);
-
-  if (isChangedFromDefault || isInModifiedSettings || hasPendingChanges) {
-    return `${valueString}*`;
-  }
   return valueString;
 }
 

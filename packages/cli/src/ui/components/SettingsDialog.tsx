@@ -30,6 +30,7 @@ import {
   getRestartRequiredFromModified,
   getDefaultValue,
   setPendingSettingValueAny,
+  getNestedValue,
 } from '../../utils/settingsUtils.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -496,15 +497,7 @@ export function SettingsDialog({
           } else if (item.type === 'number') {
             // For numbers, get the actual current value from pending settings
             const path = item.value.split('.');
-            let currentValue: unknown = pendingSettings;
-            for (const part of path) {
-              if (currentValue && typeof currentValue === 'object') {
-                currentValue = (currentValue as Record<string, unknown>)[part];
-              } else {
-                currentValue = undefined;
-                break;
-              }
-            }
+            const currentValue = getNestedValue(pendingSettings, path);
 
             const defaultValue = getDefaultValue(item.value);
 
