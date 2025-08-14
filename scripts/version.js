@@ -35,7 +35,7 @@ if (!versionType) {
 run(`npm version ${versionType} --no-git-tag-version --allow-same-version`);
 
 // 3. Get all workspaces and filter out the one we don't want to version.
-const workspacesToExclude = ['gemini-cli-vscode-ide-companion'];
+const workspacesToExclude = [];
 const lsOutput = JSON.parse(
   execSync('npm ls --workspaces --json --depth=0').toString(),
 );
