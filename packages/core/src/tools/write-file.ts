@@ -15,7 +15,8 @@ import {
   ToolEditConfirmationDetails,
   ToolConfirmationOutcome,
   ToolCallConfirmationDetails,
-  Icon,
+  Kind,
+  ToolLocation,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
@@ -82,7 +83,7 @@ export class WriteFileTool
       `Writes content to a specified file in the local filesystem.
 
       The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
-      Icon.Pencil,
+      Kind.Edit,
       {
         properties: {
           file_path: {
@@ -101,7 +102,11 @@ export class WriteFileTool
     );
   }
 
-  validateToolParams(params: WriteFileToolParams): string | null {
+  override toolLocations(params: WriteFileToolParams): ToolLocation[] {
+    return [{ path: params.file_path }];
+  }
+
+  override validateToolParams(params: WriteFileToolParams): string | null {
     const errors = SchemaValidator.validate(
       this.schema.parametersJsonSchema,
       params,
@@ -139,7 +144,7 @@ export class WriteFileTool
     return null;
   }
 
-  getDescription(params: WriteFileToolParams): string {
+  override getDescription(params: WriteFileToolParams): string {
     if (!params.file_path) {
       return `Model did not provide valid parameters for write file tool, missing or empty "file_path"`;
     }
@@ -153,7 +158,7 @@ export class WriteFileTool
   /**
    * Handles the confirmation prompt for the WriteFile tool.
    */
-  async shouldConfirmExecute(
+  override async shouldConfirmExecute(
     params: WriteFileToolParams,
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
@@ -195,7 +200,6 @@ export class WriteFileTool
 
     const ideClient = this.config.getIdeClient();
     const ideConfirmation =
-      this.config.getIdeModeFeature() &&
       this.config.getIdeMode() &&
       ideClient.getConnectionStatus().status === IDEConnectionStatus.Connected
         ? ideClient.openDiff(params.file_path, correctedContent)

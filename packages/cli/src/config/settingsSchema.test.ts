@@ -44,7 +44,6 @@ describe('SettingsSchema', () => {
         'telemetry',
         'bugCommand',
         'summarizeToolOutput',
-        'ideModeFeature',
         'dnsResolutionOrder',
         'excludedProjectEnvVars',
         'disableUpdateNag',

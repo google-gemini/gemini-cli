@@ -11,7 +11,7 @@ import { SchemaValidator } from '../utils/schemaValidator.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
-  Icon,
+  Kind,
   ToolInvocation,
   ToolResult,
 } from './tools.js';
@@ -248,7 +248,7 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
       GlobTool.Name,
       'FindFiles',
       'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
-      Icon.FileSearch,
+      Kind.Search,
       {
         properties: {
           pattern: {
@@ -281,7 +281,7 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   /**
    * Validates the parameters for the tool.
    */
-  validateToolParams(params: GlobToolParams): string | null {
+  override validateToolParams(params: GlobToolParams): string | null {
     const errors = SchemaValidator.validate(
       this.schema.parametersJsonSchema,
       params,
