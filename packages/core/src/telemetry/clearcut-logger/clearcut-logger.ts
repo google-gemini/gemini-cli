@@ -31,6 +31,7 @@ import {
 import { getInstallationId } from '../../utils/user_id.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
+import { DetectedIde, detectIde } from '../../ide/detect-ide.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -86,12 +87,14 @@ export interface LogRequest {
  * methods might have in their runtimes.
  */
 function determineSurface(): string {
-  if (process.env.CLOUD_SHELL === 'true') {
-    return 'CLOUD_SHELL';
-  } else if (process.env.MONOSPACE_ENV === 'true') {
-    return 'FIREBASE_STUDIO';
+  if (process.env.SURFACE) {
+    return process.env.SURFACE;
+  } else if (process.env.GITHUB_SHA) {
+    return 'GitHub';
+  } else if (process.env.TERM_PROGRAM === 'vscode') {
+    return detectIde() || DetectedIde.VSCode;
   } else {
-    return process.env.SURFACE || 'SURFACE_NOT_SET';
+    return 'SURFACE_NOT_SET';
   }
 }
 
@@ -645,6 +648,13 @@ export class ClearcutLogger {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_SUBCOMMAND,
         value: JSON.stringify(event.subcommand),
+      });
+    }
+
+    if (event.status) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_STATUS,
+        value: JSON.stringify(event.status),
       });
     }
 

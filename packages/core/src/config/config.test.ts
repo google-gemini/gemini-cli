@@ -15,6 +15,7 @@ import {
 } from '../telemetry/index.js';
 import {
   AuthType,
+  ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
@@ -249,6 +250,7 @@ describe('Server Config (config.ts)', () => {
       // Verify that history was restored to the new client
       expect(mockNewClient.setHistory).toHaveBeenCalledWith(
         mockExistingHistory,
+        { stripThoughts: false },
       );
     });
 
@@ -281,6 +283,92 @@ describe('Server Config (config.ts)', () => {
 
       // Verify that setHistory was not called since there was no existing history
       expect(mockNewClient.setHistory).not.toHaveBeenCalled();
+    });
+
+    it('should strip thoughts when switching from GenAI to Vertex', async () => {
+      const config = new Config(baseParams);
+      const mockContentConfig = {
+        model: 'gemini-pro',
+        apiKey: 'test-key',
+        authType: AuthType.USE_GEMINI,
+      };
+      (
+        config as unknown as { contentGeneratorConfig: ContentGeneratorConfig }
+      ).contentGeneratorConfig = mockContentConfig;
+
+      (createContentGeneratorConfig as Mock).mockReturnValue({
+        ...mockContentConfig,
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      });
+
+      const mockExistingHistory = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ];
+      const mockExistingClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue(mockExistingHistory),
+      };
+      const mockNewClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        initialize: vi.fn().mockResolvedValue(undefined),
+      };
+
+      (
+        config as unknown as { geminiClient: typeof mockExistingClient }
+      ).geminiClient = mockExistingClient;
+      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
+
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(mockNewClient.setHistory).toHaveBeenCalledWith(
+        mockExistingHistory,
+        { stripThoughts: true },
+      );
+    });
+
+    it('should not strip thoughts when switching from Vertex to GenAI', async () => {
+      const config = new Config(baseParams);
+      const mockContentConfig = {
+        model: 'gemini-pro',
+        apiKey: 'test-key',
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      };
+      (
+        config as unknown as { contentGeneratorConfig: ContentGeneratorConfig }
+      ).contentGeneratorConfig = mockContentConfig;
+
+      (createContentGeneratorConfig as Mock).mockReturnValue({
+        ...mockContentConfig,
+        authType: AuthType.USE_GEMINI,
+      });
+
+      const mockExistingHistory = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ];
+      const mockExistingClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue(mockExistingHistory),
+      };
+      const mockNewClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        initialize: vi.fn().mockResolvedValue(undefined),
+      };
+
+      (
+        config as unknown as { geminiClient: typeof mockExistingClient }
+      ).geminiClient = mockExistingClient;
+      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(mockNewClient.setHistory).toHaveBeenCalledWith(
+        mockExistingHistory,
+        { stripThoughts: false },
+      );
     });
   });
 
