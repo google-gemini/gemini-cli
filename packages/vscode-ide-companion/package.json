@@ -127,12 +127,5 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "zod": "^3.25.76"
-  },
-  "dependencies": {
-    "@google/gemini-cli-core": "workspace:^",
-    "@modelcontextprotocol/sdk": "^1.15.1",
-    "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "zod": "^3.25.76"
   }
 }

@@ -5,7 +5,6 @@
  */
 
 import * as vscode from 'vscode';
-import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from '@google/gemini-cli-core';
 import { IDEServer } from './ide-server.js';
 import { DiffContentProvider, DiffManager } from './diff-manager.js';
 import { createLogger } from './utils/logger.js';
@@ -36,9 +35,7 @@ function updateWorkspacePath(context: vscode.ExtensionContext) {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-  logger = vscode.window.createOutputChannel(
-    GEMINI_CLI_COMPANION_EXTENSION_NAME,
-  );
+  logger = vscode.window.createOutputChannel('Gemini CLI IDE Companion');
   log = createLogger(context, logger);
   log('Extension activated');
 
@@ -88,7 +85,7 @@ export async function activate(context: vscode.ExtensionContext) {
   if (!context.globalState.get(INFO_MESSAGE_SHOWN_KEY)) {
     void vscode.window
       .showInformationMessage(
-        `${GEMINI_CLI_COMPANION_EXTENSION_NAME} extension successfully installed. Please restart your terminal to enable full IDE integration.`,
+        'Gemini CLI Companion extension successfully installed. Please restart your terminal to enable full IDE integration.',
         'Re-launch Gemini CLI',
       )
       .then(
