@@ -183,18 +183,29 @@ jobs:
             --workspace="@google/gemini-cli" \
             --tag="${NPM_TAG}"
 
+      - name: 'Get previous release tag'
+        id: 'previous_release'
+        if: |
+          ${{ steps.vars.outputs.is_dry_run == 'false' }}
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |- 
+          PREVIOUS_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
+
       - name: 'Create GitHub Release and Tag'
-        if: |-
+        if: |- 
           ${{ steps.vars.outputs.is_dry_run == 'false' }}
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_BRANCH: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           RELEASE_TAG: '${{ steps.version.outputs.RELEASE_TAG }}'
-        run: |-
+          PREVIOUS_TAG: '${{ steps.previous_release.outputs.PREVIOUS_TAG }}'
+        run: |- 
           gh release create "${RELEASE_TAG}" \
             bundle/gemini.js \
             --target "$RELEASE_BRANCH" \
             --title "Release ${RELEASE_TAG}" \
+            --notes-start-tag "$PREVIOUS_TAG" \
             --generate-notes
 
       - name: 'Create Issue on Failure'
