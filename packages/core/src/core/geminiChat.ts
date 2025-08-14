@@ -596,7 +596,7 @@ export class GeminiChat {
   private isLastPartText(
     content: Content | undefined,
   ): content is Content & { parts: [...Part[], { text: string }] } {
-    if (!content || !content.parts || content.parts.length === 0) {
+    if (!content || content.role !== 'model' || !content.parts || content.parts.length === 0) {
       return false;
     }
     const lastPart = content.parts[content.parts.length - 1];
