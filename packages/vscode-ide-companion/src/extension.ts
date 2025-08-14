@@ -107,9 +107,32 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       updateWorkspacePath(context);
     }),
-    vscode.commands.registerCommand('gemini-cli.runGeminiCLI', () => {
+    vscode.commands.registerCommand('gemini-cli.runGeminiCLI', async () => {
       const geminiCmd = 'gemini';
-      const terminal = vscode.window.createTerminal(`Gemini CLI`);
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+
+      let targetFolder: vscode.WorkspaceFolder | undefined;
+      if (workspaceFolders && workspaceFolders.length > 1) {
+        const picks = workspaceFolders.map((folder) => ({
+          label: folder.name,
+          description: folder.uri.fsPath,
+          folder,
+        }));
+        const selection = await vscode.window.showQuickPick(picks, {
+          title: 'Select a workspace folder to launch Gemini CLI in',
+        });
+        if (!selection) {
+          return; // User cancelled
+        }
+        targetFolder = selection.folder;
+      } else if (workspaceFolders && workspaceFolders.length === 1) {
+        targetFolder = workspaceFolders[0];
+      }
+
+      const terminal = vscode.window.createTerminal({
+        name: `Gemini CLI`,
+        cwd: targetFolder?.uri.fsPath,
+      });
       terminal.show();
       terminal.sendText(geminiCmd);
     }),
