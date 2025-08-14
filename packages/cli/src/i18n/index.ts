@@ -121,4 +121,5 @@ export const getCurrentLanguage = (): SupportedLanguage => {
 // 导出类型和常量
 export { SupportedLanguage, SUPPORTED_LANGUAGES };
 export * from './types.js';
-export { initializeLanguage } from '../config/language.js';
+// 移除循环依赖 - 不要从这里导出 initializeLanguage
+// export { initializeLanguage } from '../config/language.js';

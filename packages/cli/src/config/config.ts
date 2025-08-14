@@ -83,8 +83,17 @@ export async function parseArguments(): Promise<CliArgs> {
   let cliLanguage: string | undefined;
   
   for (let i = 0; i < args.length; i++) {
-    if ((args[i] === '-L' || args[i] === '--language') && i + 1 < args.length) {
-      cliLanguage = args[i + 1];
+    const arg = args[i];
+    // 处理 --language=en 格式
+    if (arg.startsWith('--language=')) {
+      cliLanguage = arg.substring('--language='.length);
+      break;
+    }
+    // 处理 -L en 或 --language en 格式
+    if (arg === '-L' || arg === '--language') {
+      if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+        cliLanguage = args[i + 1];
+      }
       break;
     }
   }
