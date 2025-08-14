@@ -55,6 +55,7 @@ describe('ShellTool', () => {
       getExcludeTools: vi.fn().mockReturnValue([]),
       getDebugMode: vi.fn().mockReturnValue(false),
       getTargetDir: vi.fn().mockReturnValue('/test/dir'),
+      getProjectRoot: vi.fn().mockReturnValue('/test/dir'),
       getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
       getWorkspaceContext: () => createMockWorkspaceContext('.'),
       getGeminiClient: vi.fn(),
@@ -429,10 +430,13 @@ describe('build', () => {
       getCoreTools: () => undefined,
       getExcludeTools: () => undefined,
       getTargetDir: () => '/root',
+      getProjectRoot: () => '/root',
       getWorkspaceContext: () =>
         createMockWorkspaceContext('/root', ['/users/test']),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
+    // Simulate only /root/test exists
+    vi.mocked(fs.existsSync).mockImplementation((p) => p === '/root/test');
     const invocation = shellTool.build({
       command: 'ls',
       directory: 'test',
@@ -440,20 +444,197 @@ describe('build', () => {
     expect(invocation).toBeDefined();
   });
 
-  it('should throw an error for directory outside workspace', () => {
+  it('should return ambiguous error for directory in multiple workspace dirs', () => {
     const config = {
       getCoreTools: () => undefined,
       getExcludeTools: () => undefined,
       getTargetDir: () => '/root',
+      getProjectRoot: () => '/root',
       getWorkspaceContext: () =>
         createMockWorkspaceContext('/root', ['/users/test']),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
-    expect(() =>
-      shellTool.build({
-        command: 'ls',
-        directory: 'test2',
-      }),
-    ).toThrow('is not a registered workspace directory');
+    // Simulate both /root/test and /users/test/test exist
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => p === '/root/test' || p === '/users/test/test',
+    );
+    const result = shellTool.validateToolParams({
+      command: 'ls',
+      directory: 'test',
+    });
+    expect(result).toContain(
+      'is ambiguous as it exists in multiple workspace locations',
+    );
+  });
+
+  it('should return error for directory outside workspace', () => {
+    const config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getTargetDir: () => '/root',
+      getProjectRoot: () => '/root',
+      getWorkspaceContext: () =>
+        createMockWorkspaceContext('/root', ['/users/test']),
+    } as unknown as Config;
+    const shellTool = new ShellTool(config);
+    // Simulate neither /root/test2 nor /users/test/test2 exist
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    const result = shellTool.validateToolParams({
+      command: 'ls',
+      directory: 'test2',
+    });
+    expect(result).toContain('is not a registered workspace directory');
+  });
+
+  it('should accept a subdirectory that exists in only one workspace directory as valid', () => {
+    const config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getTargetDir: () => '/root',
+      getProjectRoot: () => '/root',
+      getWorkspaceContext: () =>
+        createMockWorkspaceContext('/root', ['/users/test']),
+    } as unknown as Config;
+    const shellTool = new ShellTool(config);
+    // Only /users/test/subdir exists
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => p === '/users/test/subdir',
+    );
+    const result = shellTool.validateToolParams({
+      command: 'ls',
+      directory: 'subdir',
+    });
+    expect(result).toBeNull();
+  });
+
+  it('should reject absolute path for directory parameter', () => {
+    const config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getTargetDir: () => '/root',
+      getProjectRoot: () => '/root',
+      getWorkspaceContext: () =>
+        createMockWorkspaceContext('/root', ['/users/test']),
+    } as unknown as Config;
+    const shellTool = new ShellTool(config);
+    const result = shellTool.validateToolParams({
+      command: 'ls',
+      directory: '/absolute/path',
+    });
+    expect(result).toContain('Directory cannot be absolute');
+  });
+
+  it('should reject directory that exists but is not within workspace', () => {
+    const config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getTargetDir: () => '/root',
+      getProjectRoot: () => '/root',
+      getWorkspaceContext: () => {
+        const mockContext = createMockWorkspaceContext('/root', [
+          '/users/test',
+        ]);
+        // Mock isPathWithinWorkspace to return false for /users/test/dir (simulating it's outside workspace)
+        mockContext.isPathWithinWorkspace = vi
+          .fn()
+          .mockImplementation((p) => p !== '/users/test/dir');
+        return mockContext;
+      },
+    } as unknown as Config;
+    const shellTool = new ShellTool(config);
+    // Directory exists at /users/test/dir but isPathWithinWorkspace returns false for it
+    vi.mocked(fs.existsSync).mockImplementation((p) => p === '/users/test/dir');
+    const result = shellTool.validateToolParams({
+      command: 'ls',
+      directory: 'dir',
+    });
+    expect(result).toContain('is not a registered workspace directory');
+  });
+
+  it('should handle directory name that is prefix of another', () => {
+    const config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getTargetDir: () => '/root',
+      getProjectRoot: () => '/root',
+      getWorkspaceContext: () =>
+        createMockWorkspaceContext('/root', ['/users/test']),
+    } as unknown as Config;
+    const shellTool = new ShellTool(config);
+    // Only /root/foo exists, not /root/foobar
+    vi.mocked(fs.existsSync).mockImplementation((p) => p === '/root/foo');
+    const result = shellTool.validateToolParams({
+      command: 'ls',
+      directory: 'foo',
+    });
+    expect(result).toBeNull();
+  });
+
+  it('should handle empty workspace directories list', () => {
+    const config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getTargetDir: () => '/root',
+      getProjectRoot: () => '/root',
+      getWorkspaceContext: () => {
+        const mockContext = createMockWorkspaceContext('/root', []);
+        // Return empty directories list
+        mockContext.getDirectories = vi.fn().mockReturnValue([]);
+        return mockContext;
+      },
+    } as unknown as Config;
+    const shellTool = new ShellTool(config);
+    const result = shellTool.validateToolParams({
+      command: 'ls',
+      directory: 'anydir',
+    });
+    expect(result).toContain('is not a registered workspace directory');
+  });
+
+  it('should execute command in correct directory when subdirectory is specified', async () => {
+    const config = {
+      getCoreTools: () => undefined,
+      getExcludeTools: () => undefined,
+      getTargetDir: () => '/root',
+      getProjectRoot: () => '/root',
+      getDebugMode: () => false,
+      getSummarizeToolOutputConfig: () => undefined,
+      getWorkspaceContext: () =>
+        createMockWorkspaceContext('/root', ['/users/test']),
+      getGeminiClient: vi.fn(),
+    } as unknown as Config;
+    const shellTool = new ShellTool(config);
+
+    // Only /users/test/subdir exists
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => p === '/users/test/subdir',
+    );
+
+    const mockAbortSignal = new AbortController().signal;
+
+    // Mock the shell execution service to capture the cwd parameter
+    let capturedCwd: string | undefined;
+    mockShellExecutionService.mockImplementation((_cmd, cwd, _callback) => {
+      capturedCwd = cwd;
+      return {
+        pid: 12345,
+        result: Promise.resolve({
+          rawOutput: Buffer.from(''),
+          output: '/users/test/subdir',
+          stdout: '/users/test/subdir',
+          stderr: '',
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+        }),
+      };
+    });
+
+    const invocation = shellTool.build({ command: 'pwd', directory: 'subdir' });
+    await invocation.execute(mockAbortSignal);
+
+    expect(capturedCwd).toBe('/users/test/subdir');
   });
 });

@@ -126,10 +126,16 @@ class ShellToolInvocation extends BaseToolInvocation<
             return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
           })();
 
-      const cwd = path.resolve(
-        this.config.getTargetDir(),
-        this.params.directory || '',
-      );
+      const cwd = (() => {
+        const projectRoot = this.config.getProjectRoot();
+        const requestedDir = this.params.directory?.trim();
+        if (!requestedDir) return projectRoot;
+        const { path: resolvedPath } = resolveDirectory(
+          this.config,
+          requestedDir,
+        );
+        return resolvedPath ?? projectRoot;
+      })();
 
       let cumulativeOutput = '';
       let lastUpdateTime = Date.now();
@@ -390,17 +396,9 @@ export class ShellTool extends BaseDeclarativeTool<
       if (path.isAbsolute(params.directory)) {
         return 'Directory cannot be absolute. Please refer to workspace directories by their name.';
       }
-      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
-      const matchingDirs = workspaceDirs.filter(
-        (dir) => path.basename(dir) === params.directory,
-      );
-
-      if (matchingDirs.length === 0) {
-        return `Directory '${params.directory}' is not a registered workspace directory.`;
-      }
-
-      if (matchingDirs.length > 1) {
-        return `Directory name '${params.directory}' is ambiguous as it matches multiple workspace directories.`;
+      const { error } = resolveDirectory(this.config, params.directory);
+      if (error) {
+        return error;
       }
     }
     return null;
@@ -411,4 +409,38 @@ export class ShellTool extends BaseDeclarativeTool<
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(this.config, params, this.allowlist);
   }
+}
+
+function resolveDirectory(
+  config: Config,
+  relativeDir: string,
+): { path: string | null; error: string | null } {
+  const workspaceContext = config.getWorkspaceContext();
+  const workspaceDirs = workspaceContext.getDirectories();
+  const candidates: string[] = [];
+  for (const dir of workspaceDirs) {
+    const resolved = path.join(dir, relativeDir);
+    if (
+      fs.existsSync(resolved) &&
+      workspaceContext.isPathWithinWorkspace(resolved) &&
+      !candidates.includes(resolved)
+    ) {
+      candidates.push(resolved);
+    }
+  }
+  if (candidates.length === 0) {
+    return {
+      path: null,
+      error: `Directory '${relativeDir}' is not a registered workspace directory.`,
+    };
+  }
+  if (candidates.length > 1) {
+    return {
+      path: null,
+      error: `Directory '${relativeDir}' is ambiguous as it exists in multiple workspace locations: ${candidates.join(
+        ', ',
+      )}`,
+    };
+  }
+  return { path: candidates[0], error: null };
 }
