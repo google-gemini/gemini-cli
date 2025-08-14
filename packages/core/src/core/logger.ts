@@ -35,8 +35,28 @@ export interface LogEntry {
  * @param str The input string to encode.
  * @returns The encoded, filename-safe string.
  */
-export function encode(str: string): string {
+export function encodeTagName(str: string): string {
   return encodeURIComponent(str);
+}
+
+/**
+ * Decodes a string that was encoded with the `encode` function.
+ *
+ * It finds any percent-encoded characters and converts them back to their
+ * original representation.
+ *
+ * @param str The encoded string to decode.
+ * @returns The decoded, original string.
+ */
+export function decodeTagName(str: string): string {
+  try {
+    return decodeURIComponent(str);
+  } catch (_e) {
+    // Fallback for old, potentially malformed encoding
+    return str.replace(/%([0-9A-F]{2})/g, (_, hex) =>
+      String.fromCharCode(parseInt(hex, 16)),
+    );
+  }
 }
 
 export class Logger {
@@ -255,7 +275,7 @@ export class Logger {
       throw new Error('Checkpoint file path not set.');
     }
     // Encode the tag to handle all special characters safely.
-    const encodedTag = encode(tag);
+    const encodedTag = encodeTagName(tag);
     return path.join(this.geminiDir, `checkpoint-${encodedTag}.json`);
   }
 

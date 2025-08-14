@@ -15,28 +15,9 @@ import {
   CommandKind,
   SlashCommandActionReturn,
 } from './types.js';
+import { decodeTagName } from '@google/gemini-cli-core';
 import path from 'path';
 import { HistoryItemWithoutId, MessageType } from '../types.js';
-
-/**
- * Decodes a string that was encoded with the `encode` function.
- *
- * It finds any percent-encoded characters and converts them back to their
- * original representation.
- *
- * @param str The encoded string to decode.
- * @returns The decoded, original string.
- */
-export function decode(str: string): string {
-  try {
-    return decodeURIComponent(str);
-  } catch (_e) {
-    // Fallback for old, potentially malformed encoding
-    return str.replace(/%([0-9A-F]{2})/g, (_, hex) =>
-      String.fromCharCode(parseInt(hex, 16)),
-    );
-  }
-}
 
 interface ChatDetail {
   name: string;
@@ -63,7 +44,7 @@ const getSavedChatTags = async (
         const stats = await fsPromises.stat(filePath);
         const tagName = file.slice(file_head.length, -file_tail.length);
         chatDetails.push({
-          name: decode(tagName),
+          name: decodeTagName(tagName),
           mtime: stats.mtime,
         });
       }
@@ -168,7 +149,7 @@ const saveCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint saved with tag: ${decode(tag)}.`,
+        content: `Conversation checkpoint saved with tag: ${decodeTagName(tag)}.`,
       };
     } else {
       return {
@@ -204,7 +185,7 @@ const resumeCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `No saved checkpoint found with tag: ${decode(tag)}.`,
+        content: `No saved checkpoint found with tag: ${decodeTagName(tag)}.`,
       };
     }
 
@@ -273,13 +254,13 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint '${decode(tag)}' has been deleted.`,
+        content: `Conversation checkpoint '${decodeTagName(tag)}' has been deleted.`,
       };
     } else {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Error: No checkpoint found with tag '${decode(tag)}'.`,
+        content: `Error: No checkpoint found with tag '${decodeTagName(tag)}'.`,
       };
     }
   },
