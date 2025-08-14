@@ -100,9 +100,6 @@ export const Footer: React.FC<FooterProps> = ({
         display="flex"
         paddingX={isNarrow ? 0 : 1}
         paddingTop={isNarrow ? 1 : 0}
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        testID="sandbox-info"
       >
         {isTrustedFolder === false ? (
           <Text color={theme.status.warning}>untrusted</Text>
