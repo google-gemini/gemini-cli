@@ -189,8 +189,16 @@ jobs:
           ${{ steps.vars.outputs.is_dry_run == 'false' }}
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          IS_NIGHTLY: '${{ steps.vars.outputs.is_nightly }}'
         run: |-
-          echo "PREVIOUS_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')" >> "$GITHUB_OUTPUT"
+          if [[ "${IS_NIGHTLY}" == "true" ]]; then
+            echo "Finding latest nightly release..."
+            PREVIOUS_TAG=$(gh release list --limit 100 --json tagName,isPrerelease | jq -r '[.[] | select(.isPrerelease and (.tagName | contains("nightly")))] | .[0].tagName')
+          else
+            echo "Finding latest STABLE release (excluding pre-releases)..."
+            PREVIOUS_TAG=$(gh release list --limit 100 --json tagName,isPrerelease | jq -r '[.[] | select(.isPrerelease == false)][0].tagName')
+          fi
+          echo "PREVIOUS_TAG=${PREVIOUS_TAG}" >> "$GITHUB_OUTPUT"
 
       - name: 'Create GitHub Release and Tag'
         if: |-
