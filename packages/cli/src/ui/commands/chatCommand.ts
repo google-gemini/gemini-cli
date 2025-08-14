@@ -142,7 +142,7 @@ const saveCommand: SlashCommand = {
     }
 
     const history = chat.getHistory();
-    if (history.length > 0) {
+    if (history.length > 2) {
       await logger.saveCheckpoint(history, tag);
       return {
         type: 'message',

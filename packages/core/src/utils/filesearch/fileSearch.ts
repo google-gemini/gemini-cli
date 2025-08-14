@@ -88,15 +88,12 @@ export interface FileSearch {
 }
 
 class RecursiveFileSearch implements FileSearch {
-  private readonly absoluteDir: string;
   private ignore: Ignore | undefined;
   private resultCache: ResultCache | undefined;
   private allFiles: string[] = [];
   private fzf: AsyncFzf<string[]> | undefined;
 
-  constructor(private readonly options: FileSearchOptions) {
-    this.absoluteDir = path.resolve(options.projectRoot);
-  }
+  constructor(private readonly options: FileSearchOptions) {}
 
   async initialize(): Promise<void> {
     this.ignore = loadIgnoreRules(this.options);
@@ -173,7 +170,10 @@ class RecursiveFileSearch implements FileSearch {
   }
 
   private buildResultCache(): void {
-    this.resultCache = new ResultCache(this.allFiles, this.absoluteDir);
+    this.resultCache = new ResultCache(this.allFiles);
+    // The v1 algorithm is much faster since it only looks at the first
+    // occurence of the pattern. We use it for search spaces that have >20k
+    // files, because the v2 algorithm is just too slow in those cases.
     this.fzf = new AsyncFzf(this.allFiles, {
       fuzzy: this.allFiles.length > 20000 ? 'v1' : 'v2',
     });

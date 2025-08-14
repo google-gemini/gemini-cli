@@ -1,0 +1,88 @@
+rules:
+  anchors:
+    forbid-duplicated-anchors: true
+    forbid-undeclared-aliases: true
+    forbid-unused-anchors: true
+
+  braces:
+    forbid: 'non-empty'
+    min-spaces-inside-empty: 0
+    max-spaces-inside-empty: 0
+
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 0
+    min-spaces-inside-empty: 0
+    max-spaces-inside-empty: 0
+
+  colons:
+    max-spaces-before: 0
+    max-spaces-after: 1
+
+  commas:
+    max-spaces-before: 0
+    min-spaces-after: 1
+    max-spaces-after: 1
+
+  comments:
+    require-starting-space: true
+    ignore-shebangs: true
+    min-spaces-from-content: 1
+
+  comments-indentation: 'disable'
+
+  document-end:
+    present: false
+
+  document-start:
+    present: false
+
+  empty-lines:
+    max: 2
+    max-start: 0
+    max-end: 1
+
+  empty-values:
+    forbid-in-block-mappings: false
+    forbid-in-flow-mappings: true
+
+  float-values:
+    forbid-inf: false
+    forbid-nan: false
+    forbid-scientific-notation: false
+    require-numeral-before-decimal: false
+
+  hyphens:
+    max-spaces-after: 1
+
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  key-duplicates: {}
+
+  new-line-at-end-of-file: {}
+
+  new-lines:
+    type: 'unix'
+
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: false
+
+  quoted-strings:
+    quote-type: 'single'
+    required: true
+    allow-quoted-quotes: true
+
+  trailing-spaces: {}
+
+  truthy:
+    allowed-values: ['true', 'false', 'on'] # GitHub Actions uses "on"
+    check-keys: true
+
+ignore:
+  - 'thirdparty/'
+  - 'third_party/'
+  - 'vendor/'

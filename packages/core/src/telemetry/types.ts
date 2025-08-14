@@ -371,7 +371,7 @@ export type TelemetryEvent =
   | FlashFallbackEvent
   | LoopDetectedEvent
   | NextSpeakerCheckEvent
-  | SlashCommandEvent
+  | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
-  | KittySequenceOverflowEvent;
+  | SlashCommandEvent;

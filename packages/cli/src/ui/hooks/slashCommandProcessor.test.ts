@@ -311,6 +311,39 @@ describe('useSlashCommandProcessor', () => {
       );
     });
 
+    it('sets isProcessing to false if the the input is not a command', async () => {
+      const setMockIsProcessing = vi.fn();
+      const result = setupProcessorHook([], [], [], setMockIsProcessing);
+
+      await act(async () => {
+        await result.current.handleSlashCommand('imnotacommand');
+      });
+
+      expect(setMockIsProcessing).not.toHaveBeenCalled();
+    });
+
+    it('sets isProcessing to false if the command has an error', async () => {
+      const setMockIsProcessing = vi.fn();
+      const failCommand = createTestCommand({
+        name: 'fail',
+        action: vi.fn().mockRejectedValue(new Error('oh no!')),
+      });
+
+      const result = setupProcessorHook(
+        [failCommand],
+        [],
+        [],
+        setMockIsProcessing,
+      );
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/fail');
+      });
+
+      expect(setMockIsProcessing).toHaveBeenNthCalledWith(1, true);
+      expect(setMockIsProcessing).toHaveBeenNthCalledWith(2, false);
+    });
+
     it('should set isProcessing to true during execution and false afterwards', async () => {
       const mockSetIsProcessing = vi.fn();
       const command = createTestCommand({
@@ -326,14 +359,14 @@ describe('useSlashCommandProcessor', () => {
       });
 
       // It should be true immediately after starting
-      expect(mockSetIsProcessing).toHaveBeenCalledWith(true);
+      expect(mockSetIsProcessing).toHaveBeenNthCalledWith(1, true);
       // It should not have been called with false yet
       expect(mockSetIsProcessing).not.toHaveBeenCalledWith(false);
 
       await executionPromise;
 
       // After the promise resolves, it should be called with false
-      expect(mockSetIsProcessing).toHaveBeenCalledWith(false);
+      expect(mockSetIsProcessing).toHaveBeenNthCalledWith(2, false);
       expect(mockSetIsProcessing).toHaveBeenCalledTimes(2);
     });
   });

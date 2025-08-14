@@ -39,8 +39,8 @@ export {
   ApiResponseEvent,
   TelemetryEvent,
   FlashFallbackEvent,
-  SlashCommandEvent,
   KittySequenceOverflowEvent,
+  SlashCommandEvent,
   makeSlashCommandEvent,
   SlashCommandStatus,
 } from './types.js';

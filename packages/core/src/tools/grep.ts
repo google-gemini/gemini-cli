@@ -614,7 +614,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
    */
-  validateToolParams(params: GrepToolParams): string | null {
+  override validateToolParams(params: GrepToolParams): string | null {
     const errors = SchemaValidator.validate(
       this.schema.parametersJsonSchema,
       params,
