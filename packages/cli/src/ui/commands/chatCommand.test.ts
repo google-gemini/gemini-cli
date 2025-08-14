@@ -185,30 +185,32 @@ describe('chatCommand', () => {
       });
     });
 
-    it('should inform if conversation history is empty', async () => {
+    it('should inform if conversation history is empty or only contains system context', async () => {
       mockGetHistory.mockReturnValue([]);
-      const result = await saveCommand?.action?.(mockContext, tag);
+      let result = await saveCommand?.action?.(mockContext, tag);
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
         content: 'No conversation found to save.',
       });
-    });
 
-    it('should save the conversation if checkpoint does not exist', async () => {
-      const history: HistoryItemWithoutId[] = [
-        {
-          type: 'user',
-          text: 'hello',
-        },
-      ];
-      mockGetHistory.mockReturnValue(history);
-      mockCheckpointExists.mockResolvedValue(false);
+      mockGetHistory.mockReturnValue([
+        { role: 'user', parts: [{ text: 'context for our chat' }] },
+        { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
+      ]);
+      result = await saveCommand?.action?.(mockContext, tag);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'No conversation found to save.',
+      });
 
-      const result = await saveCommand?.action?.(mockContext, tag);
-
-      expect(mockCheckpointExists).toHaveBeenCalledWith(tag);
-      expect(mockSaveCheckpoint).toHaveBeenCalledWith(history, tag);
+      mockGetHistory.mockReturnValue([
+        { role: 'user', parts: [{ text: 'context for our chat' }] },
+        { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
+        { role: 'user', parts: [{ text: 'Hello, how are you?' }] },
+      ]);
+      result = await saveCommand?.action?.(mockContext, tag);
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -237,11 +239,11 @@ describe('chatCommand', () => {
     });
 
     it('should save the conversation if overwrite is confirmed', async () => {
-      const history: HistoryItemWithoutId[] = [
-        {
-          type: 'user',
-          text: 'hello',
-        },
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'context for our chat' }] },
+        { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
+        { role: 'user', parts: [{ text: 'hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there!' }] },
       ];
       mockGetHistory.mockReturnValue(history);
       mockContext.overwriteConfirmed = true;
