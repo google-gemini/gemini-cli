@@ -579,8 +579,18 @@ describe('Logger', () => {
       expect(result).toBe(true);
 
       // Verify both are gone
-      await expect(fs.access(oldStylePath)).rejects.toThrow(/ENOENT/);
-      await expect(fs.access(newStylePath)).rejects.toThrow(/ENOENT/);
+      expect(
+        await fs
+          .access(oldStylePath)
+          .then(() => true)
+          .catch(() => false),
+      ).toBe(false);
+      expect(
+        await fs
+          .access(newStylePath)
+          .then(() => true)
+          .catch(() => false),
+      ).toBe(false);
     });
 
     it('should return false if the checkpoint file does not exist', async () => {
