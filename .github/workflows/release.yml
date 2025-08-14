@@ -185,7 +185,7 @@ jobs:
 
       - name: 'Get previous release tag'
         id: 'previous_release'
-        if: |
+        if: |-
           ${{ steps.vars.outputs.is_dry_run == 'false' }}
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
