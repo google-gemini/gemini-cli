@@ -14,7 +14,8 @@ import {
   GitService,
   Logger,
   logSlashCommand,
-  SlashCommandEvent,
+  makeSlashCommandEvent,
+  SlashCommandStatus,
   ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
@@ -57,6 +58,11 @@ export const useSlashCommandProcessor = (
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<readonly SlashCommand[]>([]);
+  const [reloadTrigger, setReloadTrigger] = useState(0);
+
+  const reloadCommands = useCallback(() => {
+    setReloadTrigger((v) => v + 1);
+  }, []);
   const [shellConfirmationRequest, setShellConfirmationRequest] =
     useState<null | {
       commands: string[];
@@ -172,6 +178,7 @@ export const useSlashCommandProcessor = (
         toggleCorgiMode,
         toggleVimEnabled,
         setGeminiMdFileCount,
+        reloadCommands,
       },
       session: {
         stats: session.stats,
@@ -195,6 +202,7 @@ export const useSlashCommandProcessor = (
       toggleVimEnabled,
       sessionShellAllowlist,
       setGeminiMdFileCount,
+      reloadCommands,
     ],
   );
 
@@ -220,7 +228,7 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config, ideMode]);
+  }, [config, ideMode, reloadTrigger]);
 
   const handleSlashCommand = useCallback(
     async (
@@ -228,77 +236,71 @@ export const useSlashCommandProcessor = (
       oneTimeShellAllowlist?: Set<string>,
       overwriteConfirmed?: boolean,
     ): Promise<SlashCommandProcessorResult | false> => {
+      if (typeof rawQuery !== 'string') {
+        return false;
+      }
+
+      const trimmed = rawQuery.trim();
+      if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {
+        return false;
+      }
+
       setIsProcessing(true);
-      try {
-        if (typeof rawQuery !== 'string') {
-          return false;
+
+      const userMessageTimestamp = Date.now();
+      addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
+
+      const parts = trimmed.substring(1).trim().split(/\s+/);
+      const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
+
+      let currentCommands = commands;
+      let commandToExecute: SlashCommand | undefined;
+      let pathIndex = 0;
+      let hasError = false;
+      const canonicalPath: string[] = [];
+
+      for (const part of commandPath) {
+        // TODO: For better performance and architectural clarity, this two-pass
+        // search could be replaced. A more optimal approach would be to
+        // pre-compute a single lookup map in `CommandService.ts` that resolves
+        // all name and alias conflicts during the initial loading phase. The
+        // processor would then perform a single, fast lookup on that map.
+
+        // First pass: check for an exact match on the primary command name.
+        let foundCommand = currentCommands.find((cmd) => cmd.name === part);
+
+        // Second pass: if no primary name matches, check for an alias.
+        if (!foundCommand) {
+          foundCommand = currentCommands.find((cmd) =>
+            cmd.altNames?.includes(part),
+          );
         }
 
-        const trimmed = rawQuery.trim();
-        if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {
-          return false;
-        }
-
-        const userMessageTimestamp = Date.now();
-        addItem(
-          { type: MessageType.USER, text: trimmed },
-          userMessageTimestamp,
-        );
-
-        const parts = trimmed.substring(1).trim().split(/\s+/);
-        const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
-
-        let currentCommands = commands;
-        let commandToExecute: SlashCommand | undefined;
-        let pathIndex = 0;
-        const canonicalPath: string[] = [];
-
-        for (const part of commandPath) {
-          // TODO: For better performance and architectural clarity, this two-pass
-          // search could be replaced. A more optimal approach would be to
-          // pre-compute a single lookup map in `CommandService.ts` that resolves
-          // all name and alias conflicts during the initial loading phase. The
-          // processor would then perform a single, fast lookup on that map.
-
-          // First pass: check for an exact match on the primary command name.
-          let foundCommand = currentCommands.find((cmd) => cmd.name === part);
-
-          // Second pass: if no primary name matches, check for an alias.
-          if (!foundCommand) {
-            foundCommand = currentCommands.find((cmd) =>
-              cmd.altNames?.includes(part),
-            );
-          }
-
-          if (foundCommand) {
-            commandToExecute = foundCommand;
-            canonicalPath.push(foundCommand.name);
-            pathIndex++;
-            if (foundCommand.subCommands) {
-              currentCommands = foundCommand.subCommands;
-            } else {
-              break;
-            }
+        if (foundCommand) {
+          commandToExecute = foundCommand;
+          canonicalPath.push(foundCommand.name);
+          pathIndex++;
+          if (foundCommand.subCommands) {
+            currentCommands = foundCommand.subCommands;
           } else {
             break;
           }
+        } else {
+          break;
         }
+      }
 
+      const resolvedCommandPath = canonicalPath;
+      const subcommand =
+        resolvedCommandPath.length > 1
+          ? resolvedCommandPath.slice(1).join(' ')
+          : undefined;
+
+      try {
         if (commandToExecute) {
           const args = parts.slice(pathIndex).join(' ');
 
           if (commandToExecute.action) {
-            if (config) {
-              const resolvedCommandPath = canonicalPath;
-              const event = new SlashCommandEvent(
-                resolvedCommandPath[0],
-                resolvedCommandPath.length > 1
-                  ? resolvedCommandPath.slice(1).join(' ')
-                  : undefined,
-              );
-              logSlashCommand(config, event);
-            }
-
             const fullCommandContext: CommandContext = {
               ...commandContext,
               invocation: {
@@ -320,7 +322,6 @@ export const useSlashCommandProcessor = (
                 ]),
               };
             }
-
             const result = await commandToExecute.action(
               fullCommandContext,
               args,
@@ -493,8 +494,18 @@ export const useSlashCommandProcessor = (
           content: `Unknown command: ${trimmed}`,
           timestamp: new Date(),
         });
+
         return { type: 'handled' };
-      } catch (e) {
+      } catch (e: unknown) {
+        hasError = true;
+        if (config) {
+          const event = makeSlashCommandEvent({
+            command: resolvedCommandPath[0],
+            subcommand,
+            status: SlashCommandStatus.ERROR,
+          });
+          logSlashCommand(config, event);
+        }
         addItem(
           {
             type: MessageType.ERROR,
@@ -504,6 +515,14 @@ export const useSlashCommandProcessor = (
         );
         return { type: 'handled' };
       } finally {
+        if (config && resolvedCommandPath[0] && !hasError) {
+          const event = makeSlashCommandEvent({
+            command: resolvedCommandPath[0],
+            subcommand,
+            status: SlashCommandStatus.SUCCESS,
+          });
+          logSlashCommand(config, event);
+        }
         setIsProcessing(false);
       }
     },
