@@ -6,7 +6,8 @@
     "lib": ["ES2022", "dom"],
     "sourceMap": true,
     "rootDir": "src",
-    "strict": true /* enable all strict type-checking options */
+    "strict": true /* enable all strict type-checking options */,
+    "skipLibCheck": true /* Helps avoid potential type conflicts between different third-party libraries in node_modules. */
     /* Additional Checks */
     // "noImplicitReturns": true, /* Report error when not all code paths in function return a value. */
     // "noFallthroughCasesInSwitch": true, /* Report errors for fallthrough cases in switch statement. */
