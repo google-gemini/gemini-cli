@@ -130,6 +130,10 @@ export const addCommand: CommandModule = {
   builder: (yargs) =>
     yargs
       .usage('Usage: gemini mcp add [options] <name> <commandOrUrl> [args...]')
+      .parserConfiguration({
+        'unknown-options-as-args': true, // Pass unknown options as server args
+        'populate--': true, // Populate server args after -- separator
+      })
       .positional('name', {
         describe: 'Name of the server',
         type: 'string',
@@ -189,6 +193,13 @@ export const addCommand: CommandModule = {
         describe: 'A comma-separated list of tools to exclude',
         type: 'array',
         string: true,
+      })
+      .middleware((argv) => {
+        // Handle -- separator args as server args if present
+        if (argv['--']) {
+          const existingArgs = (argv.args as Array<string | number>) || [];
+          argv.args = [...existingArgs, ...(argv['--'] as string[])];
+        }
       }),
   handler: async (argv) => {
     await addMcpServer(

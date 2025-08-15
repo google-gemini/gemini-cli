@@ -85,4 +85,38 @@ describe('mcp add command', () => {
       },
     );
   });
+
+  it('should handle MCP server args with -- separator', async () => {
+    await parser.parseAsync(
+      'add my-server npx -- -y http://example.com/some-package',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(
+      SettingScope.Workspace,
+      'mcpServers',
+      {
+        'my-server': {
+          command: 'npx',
+          args: ['-y', 'http://example.com/some-package'],
+        },
+      },
+    );
+  });
+
+  it('should handle unknown options as MCP server args', async () => {
+    await parser.parseAsync(
+      'add test-server npx -y http://example.com/some-package',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(
+      SettingScope.Workspace,
+      'mcpServers',
+      {
+        'test-server': {
+          command: 'npx',
+          args: ['-y', 'http://example.com/some-package'],
+        },
+      },
+    );
+  });
 });
