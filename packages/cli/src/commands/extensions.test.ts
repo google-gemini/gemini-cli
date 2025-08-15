@@ -18,7 +18,7 @@ describe('extensions command', () => {
   });
 
   it('should have exactly one option (help flag)', () => {
-    // Test to ensure that the global 'gemini' flags are not added to the mcp command
+    // Test to ensure that the global 'gemini' flags are not added to the extensions command
     const yargsInstance = yargs();
     const builtYargs = extensionsCommand.builder(yargsInstance);
     const options = builtYargs.getOptions();
