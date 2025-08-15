@@ -12,6 +12,7 @@ import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 import licenseHeader from 'eslint-plugin-license-header';
+import noSelfPackageImport from './eslint-rules/no-self-package-import.js';
 import path from 'node:path'; // Use node: prefix for built-ins
 import url from 'node:url';
 
@@ -245,6 +246,25 @@ export default tseslint.config(
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
           caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+    },
+  },
+  // Custom eslint rules for this repo
+  {
+    files: ['packages/**/*.{js,jsx,ts,tsx}'],
+    plugins: {
+      custom: {
+        rules: {
+          'no-self-package-import': noSelfPackageImport,
+        },
+      },
+    },
+    rules: {
+      'custom/no-self-package-import': [
+        'error',
+        {
+          root: path.join(projectRoot, 'packages'),
         },
       ],
     },
