@@ -110,15 +110,16 @@ export async function createContentGenerator(
 ): Promise<ContentGenerator> {
   const version = process.env.CLI_VERSION || process.version;
   const userAgent = `GeminiCLI/${version} (${process.platform}; ${process.arch})`;
+
+  const baseHeaders: Record<string, string> = {
+    'User-Agent': userAgent,
+  };
+
   if (
     config.authType === AuthType.LOGIN_WITH_GOOGLE ||
     config.authType === AuthType.CLOUD_SHELL
   ) {
-    const httpOptions = {
-      headers: {
-        'User-Agent': `${userAgent}`,
-      },
-    };
+    const httpOptions = { headers: baseHeaders };
     return new LoggingContentGenerator(
       await createCodeAssistContentGenerator(
         httpOptions,
@@ -134,13 +135,16 @@ export async function createContentGenerator(
     config.authType === AuthType.USE_GEMINI ||
     config.authType === AuthType.USE_VERTEX_AI
   ) {
-    const installationId = getInstallationId();
-    const httpOptions = {
-      headers: {
-        'User-Agent': `${userAgent}`,
-        'Gemini-Cli-Install-Id': `${installationId}`,
-      },
-    };
+    let headers: Record<string, string> = { ...baseHeaders };
+    if (gcConfig?.getUsageStatisticsEnabled()) {
+      const installationId = getInstallationId();
+      headers = {
+        ...headers,
+        'x-gemini-api-privileged-user-id': `${installationId}`,
+      };
+    }
+    const httpOptions = { headers };
+
     const googleGenAI = new GoogleGenAI({
       apiKey: config.apiKey === '' ? undefined : config.apiKey,
       vertexai: config.vertexai,
