@@ -33,8 +33,10 @@ async function cloneFromGit(
 ): Promise<void> {
   try {
     await simpleGit().clone(gitUrl, destination, ['--depth', '1']);
-  } catch (_error) {
-    throw new Error(`Failed to clone Git repository from ${gitUrl}`);
+  } catch (error) {
+    throw new Error(`Failed to clone Git repository from ${gitUrl}`, {
+      cause: error,
+    });
   }
 }
 
@@ -144,10 +146,9 @@ export const installCommand: CommandModule = {
         // Since an extension with the same name exists, the command fails and                                                                                                    │
         // informs the user they need to uninstall it first or use the update
         // command.
-        console.error(
+        throw new Error(
           `Error: Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
         );
-        process.exit(1);
       }
 
       // Copy the local extension copy to the user-level extensions directory.
