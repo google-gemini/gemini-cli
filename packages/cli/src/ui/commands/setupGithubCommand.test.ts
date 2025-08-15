@@ -113,11 +113,11 @@ describe('setupGithubCommand', async () => {
 
     // Mock fetch to simulate a slow response that can be aborted
     vi.mocked(global.fetch).mockImplementation(
-      () =>
+      (_url, options) =>
         new Promise((resolve, reject) => {
           const timeout = setTimeout(() => resolve(new Response('test')), 5000);
 
-          abortController.signal.addEventListener('abort', () => {
+          options?.signal?.addEventListener('abort', () => {
             clearTimeout(timeout);
             reject(new DOMException('Request aborted', 'AbortError'));
           });
