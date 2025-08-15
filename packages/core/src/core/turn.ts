@@ -179,6 +179,7 @@ export class Turn {
   async *run(
     req: PartListUnion,
     signal: AbortSignal,
+    model?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
       const responseStream = await this.chat.sendMessageStream(
@@ -189,6 +190,7 @@ export class Turn {
           },
         },
         this.prompt_id,
+        model ? model : undefined,
       );
 
       for await (const resp of responseStream) {

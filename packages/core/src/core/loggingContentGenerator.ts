@@ -63,6 +63,7 @@ export class LoggingContentGenerator implements ContentGenerator {
   }
 
   private _logApiResponse(
+    model: string,
     durationMs: number,
     prompt_id: string,
     usageMetadata?: GenerateContentResponseUsageMetadata,
@@ -71,7 +72,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     logApiResponse(
       this.config,
       new ApiResponseEvent(
-        this.config.getModel(),
+        model,
         durationMs,
         prompt_id,
         this.config.getContentGeneratorConfig()?.authType,
@@ -82,6 +83,7 @@ export class LoggingContentGenerator implements ContentGenerator {
   }
 
   private _logApiError(
+    model: string,
     durationMs: number,
     error: unknown,
     prompt_id: string,
@@ -92,7 +94,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     logApiError(
       this.config,
       new ApiErrorEvent(
-        this.config.getModel(),
+        model,
         errorMessage,
         durationMs,
         prompt_id,
@@ -115,6 +117,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       const response = await this.wrapped.generateContent(req, userPromptId);
       const durationMs = Date.now() - startTime;
       this._logApiResponse(
+        req.model,
         durationMs,
         userPromptId,
         response.usageMetadata,
@@ -123,7 +126,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       return response;
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, userPromptId);
+      this._logApiError(req.model, durationMs, error, userPromptId);
       throw error;
     }
   }
@@ -140,17 +143,23 @@ export class LoggingContentGenerator implements ContentGenerator {
       stream = await this.wrapped.generateContentStream(req, userPromptId);
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, userPromptId);
+      this._logApiError(req.model, durationMs, error, userPromptId);
       throw error;
     }
 
-    return this.loggingStreamWrapper(stream, startTime, userPromptId);
+    return this.loggingStreamWrapper(
+      stream,
+      startTime,
+      userPromptId,
+      req.model,
+    );
   }
 
   private async *loggingStreamWrapper(
     stream: AsyncGenerator<GenerateContentResponse>,
     startTime: number,
     userPromptId: string,
+    model: string,
   ): AsyncGenerator<GenerateContentResponse> {
     let lastResponse: GenerateContentResponse | undefined;
     let lastUsageMetadata: GenerateContentResponseUsageMetadata | undefined;
@@ -164,12 +173,13 @@ export class LoggingContentGenerator implements ContentGenerator {
       }
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, userPromptId);
+      this._logApiError(model, durationMs, error, userPromptId);
       throw error;
     }
     const durationMs = Date.now() - startTime;
     if (lastResponse) {
       this._logApiResponse(
+        model,
         durationMs,
         userPromptId,
         lastUsageMetadata,

@@ -20,6 +20,7 @@ import {
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
   KittySequenceOverflowEvent,
+  ModelRoutingEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
@@ -704,6 +705,45 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(kitty_sequence_overflow_event_name, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logModelRoutingEvent(event: ModelRoutingEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_DECISION_MODEL,
+        value: event.decision_model,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_DECISION_SOURCE,
+        value: event.decision_source,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_LATENCY_MS,
+        value: event.routing_latency_ms.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_FAILED,
+        value: event.failed.toString(),
+      },
+    ];
+
+    if (event.classifier_reasoning) {
+      data.push({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_ROUTING_CLASSIFIER_REASONING,
+        value: event.classifier_reasoning,
+      });
+    }
+
+    if (event.error_message) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_ERROR_MESSAGE,
+        value: event.error_message,
+      });
+    }
+
+    this.enqueueLogEvent(this.createLogEvent('model_routing', data));
     this.flushIfNeeded();
   }
 

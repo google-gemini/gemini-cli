@@ -22,6 +22,7 @@ import { EventMetadataKey } from './event-metadata-key.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../mocks/msw.js';
+import { ModelRoutingEvent } from '../types.js';
 
 vi.mock('../../utils/user_account');
 vi.mock('../../utils/user_id');
@@ -384,6 +385,96 @@ describe('ClearcutLogger', () => {
         getEvents(logger!)[0][0].source_extension_json,
       );
       expect(firstRequeuedEvent.event_id).toBe('failed_5');
+    });
+  });
+
+  describe('logModelRoutingEvent', () => {
+    it('should log a model routing event with all fields', () => {
+      const { logger } = setup();
+      const event: ModelRoutingEvent = {
+        'event.name': 'model_routing',
+        'event.timestamp': new Date().toISOString(),
+        decision_model: 'gemini-pro',
+        decision_source: 'Classifier',
+        routing_latency_ms: 123,
+        failed: false,
+        classifier_reasoning: 'high confidence',
+        error_message: 'no error',
+      };
+
+      logger!.logModelRoutingEvent(event);
+
+      const loggedEvent = JSON.parse(
+        getEvents(logger!)[0][0].source_extension_json,
+      );
+      expect(loggedEvent.event_name).toBe('model_routing');
+      expect(loggedEvent.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_DECISION_MODEL,
+        value: 'gemini-pro',
+      });
+      expect(loggedEvent.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_DECISION_SOURCE,
+        value: 'Classifier',
+      });
+      expect(loggedEvent.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_LATENCY_MS,
+        value: '123',
+      });
+      expect(loggedEvent.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_FAILED,
+        value: 'false',
+      });
+      expect(loggedEvent.event_metadata[0]).toContainEqual({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_ROUTING_CLASSIFIER_REASONING,
+        value: 'high confidence',
+      });
+      expect(loggedEvent.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_ERROR_MESSAGE,
+        value: 'no error',
+      });
+    });
+
+    it('should log a model routing event with minimal fields', () => {
+      const { logger } = setup();
+      const event: ModelRoutingEvent = {
+        'event.name': 'model_routing',
+        'event.timestamp': new Date().toISOString(),
+        decision_model: 'gemini-pro',
+        decision_source: 'Fallback',
+        routing_latency_ms: 456,
+        failed: true,
+      };
+
+      logger!.logModelRoutingEvent(event);
+
+      const loggedEvent = JSON.parse(
+        getEvents(logger!)[0][0].source_extension_json,
+      );
+      expect(loggedEvent.event_name).toBe('model_routing');
+      expect(loggedEvent.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_DECISION_MODEL,
+        value: 'gemini-pro',
+      });
+      expect(loggedEvent.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_DECISION_SOURCE,
+        value: 'Fallback',
+      });
+      expect(loggedEvent.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_LATENCY_MS,
+        value: '456',
+      });
+      expect(loggedEvent.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_FAILED,
+        value: 'true',
+      });
+      expect(loggedEvent.event_metadata[0]).not.toContainEqual({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_ROUTING_CLASSIFIER_REASONING,
+      });
+      expect(loggedEvent.event_metadata[0]).not.toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_ERROR_MESSAGE,
+      });
     });
   });
 });

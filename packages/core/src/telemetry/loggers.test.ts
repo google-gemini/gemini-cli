@@ -34,6 +34,7 @@ import {
   logUserPrompt,
   logToolCall,
   logFlashFallback,
+  logModelRouting,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -43,6 +44,7 @@ import {
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  ModelRoutingEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
 import * as sdk from './sdk.js';
@@ -759,6 +761,50 @@ describe('loggers', () => {
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
       });
+    });
+  });
+
+  describe('logModelRouting', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    const mockMetrics = {
+      recordModelRoutingMetrics: vi.fn(),
+    };
+
+    beforeEach(() => {
+      vi.spyOn(metrics, 'recordModelRoutingMetrics').mockImplementation(
+        mockMetrics.recordModelRoutingMetrics,
+      );
+    });
+
+    it('should log a model routing event', () => {
+      const event: ModelRoutingEvent = {
+        'event.name': 'model_routing',
+        'event.timestamp': new Date().toISOString(),
+        decision_model: 'gemini-pro',
+        decision_source: 'Classifier',
+        routing_latency_ms: 123,
+        failed: false,
+      };
+
+      logModelRouting(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Model routing decision. Model: gemini-pro, Source: Classifier',
+        attributes: {
+          'session.id': 'test-session-id',
+          ...event,
+          'event.name': 'model_routing',
+        },
+      });
+
+      expect(mockMetrics.recordModelRoutingMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        event,
+      );
     });
   });
 });

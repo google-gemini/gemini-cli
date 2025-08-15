@@ -24,3 +24,6 @@ export const METRIC_API_REQUEST_LATENCY = 'gemini_cli.api.request.latency';
 export const METRIC_TOKEN_USAGE = 'gemini_cli.token.usage';
 export const METRIC_SESSION_COUNT = 'gemini_cli.session.count';
 export const METRIC_FILE_OPERATION_COUNT = 'gemini_cli.file.operation.count';
+export const METRIC_MODEL_ROUTING_LATENCY = 'gemini_cli.model_routing.latency';
+export const METRIC_MODEL_ROUTING_FAILURE_COUNT =
+  'gemini_cli.model_routing.failure.count';

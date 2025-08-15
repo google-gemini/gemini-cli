@@ -21,6 +21,7 @@ import {
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { ModelRouterService } from '../routing/modelRouterService.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -94,6 +95,11 @@ vi.mock('../services/gitService.js', () => {
   const GitServiceMock = vi.fn();
   GitServiceMock.prototype.initialize = vi.fn();
   return { GitService: GitServiceMock };
+});
+
+vi.mock('../routing/modelRouterService.js', () => {
+  const ModelRouterServiceMock = vi.fn();
+  return { ModelRouterService: ModelRouterServiceMock };
 });
 
 describe('Server Config (config.ts)', () => {
@@ -566,6 +572,13 @@ describe('Server Config (config.ts)', () => {
       delete paramsWithoutTelemetry.telemetry;
       const config = new Config(paramsWithoutTelemetry);
       expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
+    });
+  });
+  describe('getModelRouterService', () => {
+    it('should return the model router service instance', () => {
+      const config = new Config(baseParams);
+      expect(config.getModelRouterService()).toBeDefined();
+      expect(ModelRouterService).toHaveBeenCalledWith(config);
     });
   });
 });

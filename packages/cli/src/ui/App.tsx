@@ -443,7 +443,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       }
 
       // Switch model for future use but return false to stop current retry
-      config.setModel(fallbackModel);
       config.setFallbackMode(true);
       logFlashFallback(
         config,

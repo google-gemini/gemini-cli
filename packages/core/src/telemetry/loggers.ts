@@ -33,12 +33,14 @@ import {
   LoopDetectedEvent,
   SlashCommandEvent,
   KittySequenceOverflowEvent,
+  ModelRoutingEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
   recordTokenUsageMetrics,
   recordApiResponseMetrics,
   recordToolCallMetrics,
+  recordModelRoutingMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import { uiTelemetryService, UiEvent } from './uiTelemetry.js';
@@ -357,6 +359,28 @@ export function logSlashCommand(
     attributes,
   };
   logger.emit(logRecord);
+}
+
+export function logModelRouting(
+  config: Config,
+  event: ModelRoutingEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logModelRoutingEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': 'model_routing',
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Model routing decision. Model: ${event.decision_model}, Source: ${event.decision_source}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+  recordModelRoutingMetrics(config, event);
 }
 
 export function logIdeConnection(

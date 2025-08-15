@@ -15,6 +15,8 @@ import {
 import { GeminiChat } from './geminiChat.js';
 import { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
+import { AuthType } from './contentGenerator.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 // Mocks
 const mockModelsModule = {
@@ -45,6 +47,7 @@ describe('GeminiChat', () => {
       setModel: vi.fn(),
       getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
       setQuotaErrorOccurred: vi.fn(),
+      setFallbackMode: vi.fn(),
       flashFallbackHandler: undefined,
     } as unknown as Config;
 
@@ -121,6 +124,42 @@ describe('GeminiChat', () => {
           config: {},
         },
         'prompt-id-1',
+      );
+    });
+    it('should use the override model if provided', async () => {
+      const overrideModel = 'specific-override-model';
+      const response = (async function* () {
+        yield {
+          // ... (mock response data)
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        response,
+      );
+
+      // Call with the override model
+      await chat.sendMessageStream(
+        { message: 'hello' },
+        'prompt-id-override',
+        overrideModel,
+      );
+
+      // Verify the content generator was called with the override model
+      expect(mockModelsModule.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: overrideModel,
+          contents: expect.any(Array),
+          config: expect.any(Object),
+        }),
+        'prompt-id-override',
+      );
+
+      // Ensure it didn't accidentally use the config default ('gemini-pro')
+      expect(mockModelsModule.generateContentStream).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gemini-pro',
+        }),
+        expect.any(String),
       );
     });
   });
@@ -443,6 +482,37 @@ describe('GeminiChat', () => {
       expect(history[0]).toEqual(userInput);
       expect(history[1].role).toBe('model');
       expect(history[1].parts).toEqual([{ text: 'Visible text' }]);
+    });
+  });
+
+  describe('handleFlashFallback', () => {
+    it('should return fallback model and set fallback mode when handler accepts', async () => {
+      const fallbackHandler = vi.fn().mockResolvedValue(true);
+      mockConfig.flashFallbackHandler = fallbackHandler;
+
+      const result = await chat['handleFlashFallback'](
+        AuthType.LOGIN_WITH_GOOGLE,
+      );
+
+      expect(result).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+      expect(fallbackHandler).toHaveBeenCalledWith(
+        'gemini-pro',
+        DEFAULT_GEMINI_FLASH_MODEL,
+        undefined,
+      );
+      expect(mockConfig.setFallbackMode).toHaveBeenCalledWith(true);
+      expect(mockConfig.setModel).not.toHaveBeenCalled();
+    });
+
+    it('should return null when handler rejects', async () => {
+      const fallbackHandler = vi.fn().mockResolvedValue(false);
+      mockConfig.flashFallbackHandler = fallbackHandler;
+
+      // @ts-expect-error Accessing private method
+      const result = await chat.handleFlashFallback(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(result).toBeNull();
+      expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
     });
   });
 

@@ -21,9 +21,12 @@ import {
   METRIC_TOKEN_USAGE,
   METRIC_SESSION_COUNT,
   METRIC_FILE_OPERATION_COUNT,
+  METRIC_MODEL_ROUTING_LATENCY,
+  METRIC_MODEL_ROUTING_FAILURE_COUNT,
 } from './constants.js';
 import { Config } from '../config/config.js';
 import { DiffStat } from '../tools/tools.js';
+import { ModelRoutingEvent } from './types.js';
 
 export enum FileOperation {
   CREATE = 'create',
@@ -38,6 +41,8 @@ let apiRequestCounter: Counter | undefined;
 let apiRequestLatencyHistogram: Histogram | undefined;
 let tokenUsageCounter: Counter | undefined;
 let fileOperationCounter: Counter | undefined;
+let modelRoutingLatencyHistogram: Histogram | undefined;
+let modelRoutingFailureCounter: Counter | undefined;
 let isMetricsInitialized = false;
 
 function getCommonAttributes(config: Config): Attributes {
@@ -88,6 +93,21 @@ export function initializeMetrics(config: Config): void {
     description: 'Counts file operations (create, read, update).',
     valueType: ValueType.INT,
   });
+  modelRoutingLatencyHistogram = meter.createHistogram(
+    METRIC_MODEL_ROUTING_LATENCY,
+    {
+      description: 'Latency of model routing decisions in milliseconds.',
+      unit: 'ms',
+      valueType: ValueType.INT,
+    },
+  );
+  modelRoutingFailureCounter = meter.createCounter(
+    METRIC_MODEL_ROUTING_FAILURE_COUNT,
+    {
+      description: 'Counts model routing failures.',
+      valueType: ValueType.INT,
+    },
+  );
   const sessionCounter = meter.createCounter(METRIC_SESSION_COUNT, {
     description: 'Count of CLI sessions started.',
     valueType: ValueType.INT,
@@ -207,4 +227,29 @@ export function recordFileOperationMetric(
     attributes.user_removed_lines = diffStat.user_removed_lines;
   }
   fileOperationCounter.add(1, attributes);
+}
+
+export function recordModelRoutingMetrics(
+  config: Config,
+  event: ModelRoutingEvent,
+): void {
+  if (
+    !modelRoutingLatencyHistogram ||
+    !modelRoutingFailureCounter ||
+    !isMetricsInitialized
+  )
+    return;
+
+  modelRoutingLatencyHistogram.record(event.routing_latency_ms, {
+    ...getCommonAttributes(config),
+    'routing.decision_model': event.decision_model,
+    'routing.decision_source': event.decision_source,
+  });
+
+  if (event.failed) {
+    modelRoutingFailureCounter.add(1, {
+      ...getCommonAttributes(config),
+      'routing.decision_source': event.decision_source,
+    });
+  }
 }

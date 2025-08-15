@@ -102,6 +102,7 @@ describe('Turn', () => {
           config: { abortSignal: expect.any(AbortSignal) },
         },
         'prompt-id-1',
+        undefined,
       );
 
       expect(events).toEqual([
@@ -109,6 +110,39 @@ describe('Turn', () => {
         { type: GeminiEventType.Content, value: ' world' },
       ]);
       expect(turn.getDebugResponses().length).toBe(2);
+    });
+
+    it('should pass the model parameter to sendMessageStream', async () => {
+      const mockResponseStream = (async function* () {
+        yield {
+          candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
+        } as unknown as GenerateContentResponse;
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      const reqParts: Part[] = [{ text: 'Hi' }];
+      for await (const event of turn.run(
+        reqParts,
+        new AbortController().signal,
+        'test-model',
+      )) {
+        events.push(event);
+      }
+
+      expect(mockSendMessageStream).toHaveBeenCalledWith(
+        {
+          message: reqParts,
+          config: { abortSignal: expect.any(AbortSignal) },
+        },
+        'prompt-id-1',
+        'test-model',
+      );
+
+      expect(events).toEqual([
+        { type: GeminiEventType.Content, value: 'Hello' },
+      ]);
+      expect(turn.getDebugResponses().length).toBe(1);
     });
 
     it('should yield tool_call_request events for function calls', async () => {

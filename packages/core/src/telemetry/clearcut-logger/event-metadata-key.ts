@@ -228,6 +228,28 @@ export enum EventMetadataKey {
 
   // Logs the truncated kitty sequence.
   GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
+
+  // ==========================================================================
+  // Model Routing Event Keys
+  // ===========================================================================
+
+  // Logs the model chosen for routing.
+  GEMINI_CLI_ROUTING_DECISION_MODEL = 56,
+
+  // Logs the source of the routing decision (e.g., Classifier, Fallback).
+  GEMINI_CLI_ROUTING_DECISION_SOURCE = 57,
+
+  // Logs the latency of the routing decision in milliseconds.
+  GEMINI_CLI_ROUTING_LATENCY_MS = 58,
+
+  // Logs whether the routing decision failed.
+  GEMINI_CLI_ROUTING_FAILED = 59,
+
+  // Logs the reasoning provided by the classifier for its decision.
+  GEMINI_CLI_ROUTING_CLASSIFIER_REASONING = 60,
+
+  // Logs the error message if the routing strategy failed.
+  GEMINI_CLI_ROUTING_ERROR_MESSAGE = 61,
 }
 
 export function getEventMetadataKey(

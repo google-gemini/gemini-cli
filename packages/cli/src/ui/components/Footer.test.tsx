@@ -100,7 +100,7 @@ describe('<Footer />', () => {
 
   it('displays the model name and context percentage', () => {
     const { lastFrame } = renderWithWidth(120);
-    expect(lastFrame()).toContain(defaultProps.model);
+    expect(lastFrame()).toContain('gemini-2.5-*');
     expect(lastFrame()).toMatch(/\(\d+% context[\s\S]*left\)/);
   });
 

@@ -360,6 +360,17 @@ export class KittySequenceOverflowEvent {
   }
 }
 
+export interface ModelRoutingEvent {
+  'event.name': 'model_routing';
+  'event.timestamp': string; // ISO 8601
+  decision_model: string;
+  decision_source: 'Classifier' | 'Fallback' | 'Forced';
+  routing_latency_ms: number;
+  classifier_reasoning?: string;
+  failed: boolean;
+  error_message?: string;
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -374,4 +385,5 @@ export type TelemetryEvent =
   | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
-  | SlashCommandEvent;
+  | SlashCommandEvent
+  | ModelRoutingEvent;

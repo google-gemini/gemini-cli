@@ -14,6 +14,7 @@ import type {
 } from '@opentelemetry/api';
 import { Config } from '../config/config.js';
 import { FileOperation } from './metrics.js';
+import { ModelRoutingEvent } from './types.js';
 
 const mockCounterAddFn: Mock<
   (value: number, attributes?: Attributes, context?: Context) => void
@@ -301,6 +302,81 @@ describe('Telemetry Metrics', () => {
         ai_removed_lines: 0,
         user_added_lines: 0,
         user_removed_lines: 0,
+      });
+    });
+  });
+
+  describe('recordModelRoutingMetrics', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+    } as unknown as Config;
+
+    let recordModelRoutingMetricsModule: typeof import('./metrics.js').recordModelRoutingMetrics;
+
+    beforeEach(async () => {
+      const metricsJsModule = await import('./metrics.js');
+      recordModelRoutingMetricsModule =
+        metricsJsModule.recordModelRoutingMetrics;
+    });
+
+    it('should not record metrics if not initialized', () => {
+      const event: ModelRoutingEvent = {
+        routing_latency_ms: 100,
+        decision_model: 'gemini-pro',
+        decision_source: 'Classifier',
+        failed: false,
+        'event.name': 'model_routing',
+        'event.timestamp': new Date().toISOString(),
+      };
+      recordModelRoutingMetricsModule(mockConfig, event);
+      expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('should record latency for a successful routing event', () => {
+      initializeMetricsModule(mockConfig);
+      const event: ModelRoutingEvent = {
+        routing_latency_ms: 123,
+        decision_model: 'gemini-pro',
+        decision_source: 'Classifier',
+        failed: false,
+        'event.name': 'model_routing',
+        'event.timestamp': new Date().toISOString(),
+      };
+      recordModelRoutingMetricsModule(mockConfig, event);
+
+      expect(mockHistogramRecordFn).toHaveBeenCalledWith(123, {
+        'session.id': 'test-session-id',
+        'routing.decision_model': 'gemini-pro',
+        'routing.decision_source': 'Classifier',
+      });
+      // NthCalled(1) is the session counter
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should record latency and failure for a failed routing event', () => {
+      initializeMetricsModule(mockConfig);
+      const event: ModelRoutingEvent = {
+        routing_latency_ms: 234,
+        decision_model: 'gemini-pro',
+        decision_source: 'Classifier',
+        failed: true,
+        'event.name': 'model_routing',
+        'event.timestamp': new Date().toISOString(),
+      };
+      recordModelRoutingMetricsModule(mockConfig, event);
+
+      expect(mockHistogramRecordFn).toHaveBeenCalledWith(234, {
+        'session.id': 'test-session-id',
+        'routing.decision_model': 'gemini-pro',
+        'routing.decision_source': 'Classifier',
+      });
+
+      // NthCalled(1) is the session counter, NthCalled(2) is the failure
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
+      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+        'session.id': 'test-session-id',
+        'routing.decision_source': 'Classifier',
       });
     });
   });
