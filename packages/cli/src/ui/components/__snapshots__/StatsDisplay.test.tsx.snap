@@ -65,11 +65,6 @@ exports[`<StatsDisplay /> > Conditional Rendering Tests > hides Efficiency secti
 │                                                                                                  │
 │  Session Stats                                                                                   │
 │                                                                                                  │
-│  Interaction Summary                                                                             │
-│  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✔ 0 ✖ 0 )                                                       │
-│  Success Rate:               0.0%                                                                │
-│                                                                                                  │
 │  Performance                                                                                     │
 │  Wall Time:                  1s                                                                  │
 │  Agent Active:               100ms                                                               │
@@ -109,11 +104,6 @@ exports[`<StatsDisplay /> > Title Rendering > renders the custom title when a ti
 │                                                                                                  │
 │  Agent powering down. Goodbye!                                                                   │
 │                                                                                                  │
-│  Interaction Summary                                                                             │
-│  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✔ 0 ✖ 0 )                                                       │
-│  Success Rate:               0.0%                                                                │
-│                                                                                                  │
 │  Performance                                                                                     │
 │  Wall Time:                  1s                                                                  │
 │  Agent Active:               0s                                                                  │
@@ -129,11 +119,6 @@ exports[`<StatsDisplay /> > Title Rendering > renders the default title when no 
 │                                                                                                  │
 │  Session Stats                                                                                   │
 │                                                                                                  │
-│  Interaction Summary                                                                             │
-│  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✔ 0 ✖ 0 )                                                       │
-│  Success Rate:               0.0%                                                                │
-│                                                                                                  │
 │  Performance                                                                                     │
 │  Wall Time:                  1s                                                                  │
 │  Agent Active:               0s                                                                  │
@@ -148,11 +133,6 @@ exports[`<StatsDisplay /> > renders a table with two models correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │  Session Stats                                                                                   │
-│                                                                                                  │
-│  Interaction Summary                                                                             │
-│  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✔ 0 ✖ 0 )                                                       │
-│  Success Rate:               0.0%                                                                │
 │                                                                                                  │
 │  Performance                                                                                     │
 │  Wall Time:                  1s                                                                  │
@@ -209,7 +189,7 @@ exports[`<StatsDisplay /> > renders only the Performance section in its zero sta
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✔ 0 ✖ 0 )                                                       │
+│  Tool Calls:                 1 ( ✔ 0 ✖ 0 )                                                       │
 │  Success Rate:               0.0%                                                                │
 │                                                                                                  │
 │  Performance                                                                                     │
