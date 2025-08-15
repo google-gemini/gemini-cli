@@ -22,6 +22,7 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { Config } from '../config/config.js';
+import { COMMON_IGNORE_PATTERNS } from '../utils/ignorePatterns.js';
 
 // --- Interfaces ---
 
@@ -387,7 +388,12 @@ class GrepToolInvocation extends BaseToolInvocation<
       if (grepAvailable) {
         strategyUsed = 'system grep';
         const grepArgs = ['-r', '-n', '-H', '-E'];
-        const commonExcludes = ['.git', 'node_modules', 'bower_components'];
+        // Extract directory names from glob patterns for grep --exclude-dir
+        const commonExcludes = COMMON_IGNORE_PATTERNS.map((pattern) =>
+          pattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, ''),
+        )
+          .filter((dir) => !dir.includes('*'))
+          .concat(['bower_components']); // Add bower_components as it was in original
         commonExcludes.forEach((dir) => grepArgs.push(`--exclude-dir=${dir}`));
         if (include) {
           grepArgs.push(`--include=${include}`);
@@ -471,8 +477,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       strategyUsed = 'javascript fallback';
       const globPattern = include ? include : '**/*';
       const ignorePatterns = [
-        '.git/**',
-        'node_modules/**',
+        ...COMMON_IGNORE_PATTERNS,
         'bower_components/**',
         '.svn/**',
         '.hg/**',
