@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec, execSync, spawn, type ChildProcess } from 'node:child_process';
+import { exec, execSync, execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -378,10 +378,16 @@ export async function start_sandbox(
           console.error(`using ${projectSandboxDockerfile} for sandbox`);
           buildArgs += `-f ${path.resolve(projectSandboxDockerfile)} -i ${image}`;
         }
-        execSync(
-          `cd ${gcRoot} && node scripts/build_sandbox.js -s ${buildArgs}`,
+        // Split buildArgs into an array for execFileSync
+        const buildArgsArray = buildArgs
+          ? ['-s', ...buildArgs.split(' ').filter(Boolean)]
+          : ['-s'];
+        execFileSync(
+          'node',
+          ['scripts/build_sandbox.js', ...buildArgsArray],
           {
             stdio: 'inherit',
+            cwd: gcRoot,
             env: {
               ...process.env,
               GEMINI_SANDBOX: config.command, // in case sandbox is enabled via flags (see config.ts under cli package)
