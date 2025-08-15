@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import { Colors } from '../../colors.js';
+import { theme } from '../../semantic-colors.js';
 
 interface UserMessageProps {
   text: string;
@@ -17,8 +17,8 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
   const prefixWidth = prefix.length;
   const isSlashCommand = text.startsWith('/');
 
-  const textColor = isSlashCommand ? Colors.AccentPurple : Colors.Gray;
-  const borderColor = isSlashCommand ? Colors.AccentPurple : Colors.Gray;
+  const textColor = isSlashCommand ? theme.text.accent : theme.text.secondary;
+  const borderColor = isSlashCommand ? theme.text.accent : theme.border.default;
 
   return (
     <Box
