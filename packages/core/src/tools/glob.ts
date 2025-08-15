@@ -7,7 +7,6 @@
 import fs from 'fs';
 import path from 'path';
 import { glob } from 'glob';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -281,15 +280,9 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   /**
    * Validates the parameters for the tool.
    */
-  override validateToolParams(params: GlobToolParams): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
-    }
-
+  protected override validateToolParamValues(
+    params: GlobToolParams,
+  ): string | null {
     const searchDirAbsolute = path.resolve(
       this.config.getTargetDir(),
       params.path || '.',
