@@ -329,10 +329,16 @@ async function handleAutomaticOAuth(
     };
 
     // Perform OAuth authentication
+    // Pass the server URL for proper discovery
+    const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
     console.log(
       `Starting OAuth authentication for server '${mcpServerName}'...`,
     );
-    await MCPOAuthProvider.authenticate(mcpServerName, oauthAuthConfig);
+    await MCPOAuthProvider.authenticate(
+      mcpServerName,
+      oauthAuthConfig,
+      serverUrl,
+    );
 
     console.log(
       `OAuth authentication successful for server '${mcpServerName}'`,
@@ -1035,12 +1041,15 @@ export async function connectToMcpServer(
               };
 
               // Perform OAuth authentication
+              // Pass the server URL for proper discovery
+              const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
               console.log(
                 `Starting OAuth authentication for server '${mcpServerName}'...`,
               );
               await MCPOAuthProvider.authenticate(
                 mcpServerName,
                 oauthAuthConfig,
+                serverUrl,
               );
 
               // Retry connection with OAuth token
