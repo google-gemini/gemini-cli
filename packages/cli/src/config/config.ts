@@ -12,7 +12,6 @@ import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
-import { extensionsCommand } from '../commands/extensions.js';
 import {
   Config,
   loadServerHierarchicalMemory,
@@ -39,7 +38,6 @@ import { resolvePath } from '../utils/resolvePath.js';
 import { CommandModule } from 'yargs';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { CommandModule } from 'yargs';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -78,13 +76,6 @@ export interface CliArgs {
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
 }
-
-// The set of all command modules to register. It's required for the key to be
-// a string, in order to detect when they're executed and handoff execution.
-const commandModules: Map<string, CommandModule> = new Map([
-  [mcpCommand.command as string, mcpCommand],
-  [extensionsCommand.command as string, extensionsCommand],
-]);
 
 // The set of all command modules to register. It's required for the key to be
 // a string, in order to detect when they're executed and handoff execution.
@@ -263,24 +254,18 @@ export async function parseArguments(): Promise<CliArgs> {
     )
     // Register command modules
     .command([...commandModules.values()])
-    // Register command modules
-    .command([...commandModules.values()])
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
     .strict()
     .demandCommand(0, 0); // Allow base command to run with no command modules
-    .demandCommand(0, 0); // Allow base command to run with no command modules
 
   yargsInstance.wrap(yargsInstance.terminalWidth());
   const result = await yargsInstance.parse();
 
-  // Handle case where command modules are executed - they should exit the process
-  // Handle case where command modules are executed - they should exit the process
-  // and not return to main CLI logic
-  if (result._.length > 0 && commandModules.has(result._[0].toString())) {
-    // Command modules handle their own execution and process exit
+  // Handle case where command modules are executed - they should exit the
+  // process and not return to main CLI logic
   if (result._.length > 0 && commandModules.has(result._[0].toString())) {
     // Command modules handle their own execution and process exit
     process.exit(0);
