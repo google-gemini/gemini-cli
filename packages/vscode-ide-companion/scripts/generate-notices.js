@@ -43,16 +43,34 @@ async function getDependencyLicense(depName, depVersion) {
 
     repositoryUrl = depPackageJson.repository?.url || repositoryUrl;
 
-    const licenseFile = depPackageJson.licenseFile
-      ? path.join(path.dirname(depPackageJsonPath), depPackageJson.licenseFile)
-      : path.join(path.dirname(depPackageJsonPath), 'LICENSE');
+    const packageDir = path.dirname(depPackageJsonPath);
+    const licenseFileCandidates = [
+      depPackageJson.licenseFile,
+      'LICENSE',
+      'LICENSE.md',
+      'LICENSE.txt',
+      'LICENSE-MIT.txt',
+    ].filter(Boolean);
 
-    try {
-      licenseContent = await fs.readFile(licenseFile, 'utf-8');
-    } catch (e) {
-      console.warn(
-        `Warning: Failed to read license file for ${depName}: ${e.message}`,
-      );
+    let licenseFile;
+    for (const candidate of licenseFileCandidates) {
+      const potentialFile = path.join(packageDir, candidate);
+      if (await fs.stat(potentialFile).catch(() => false)) {
+        licenseFile = potentialFile;
+        break;
+      }
+    }
+
+    if (licenseFile) {
+      try {
+        licenseContent = await fs.readFile(licenseFile, 'utf-8');
+      } catch (e) {
+        console.warn(
+          `Warning: Failed to read license file for ${depName}: ${e.message}`,
+        );
+      }
+    } else {
+      console.warn(`Warning: Could not find license file for ${depName}`);
     }
   } catch (e) {
     console.warn(
@@ -68,14 +86,49 @@ async function getDependencyLicense(depName, depVersion) {
   };
 }
 
+function collectDependencies(packageName, packageLock, dependenciesMap) {
+  if (dependenciesMap.has(packageName)) {
+    return;
+  }
+
+  const packageInfo = packageLock.packages[`node_modules/${packageName}`];
+  if (!packageInfo) {
+    console.warn(
+      `Warning: Could not find package info for ${packageName} in package-lock.json.`,
+    );
+    return;
+  }
+
+  dependenciesMap.set(packageName, packageInfo.version);
+
+  if (packageInfo.dependencies) {
+    for (const depName of Object.keys(packageInfo.dependencies)) {
+      collectDependencies(depName, packageLock, dependenciesMap);
+    }
+  }
+}
+
 async function main() {
   try {
     const packageJsonPath = path.join(packagePath, 'package.json');
     const packageJsonContent = await fs.readFile(packageJsonPath, 'utf-8');
     const packageJson = JSON.parse(packageJsonContent);
 
-    const dependencies = packageJson.dependencies || {};
-    const dependencyEntries = Object.entries(dependencies);
+    const packageLockJsonPath = path.join(projectRoot, 'package-lock.json');
+    const packageLockJsonContent = await fs.readFile(
+      packageLockJsonPath,
+      'utf-8',
+    );
+    const packageLockJson = JSON.parse(packageLockJsonContent);
+
+    const allDependencies = new Map();
+    const directDependencies = Object.keys(packageJson.dependencies);
+
+    for (const depName of directDependencies) {
+      collectDependencies(depName, packageLockJson, allDependencies);
+    }
+
+    const dependencyEntries = Array.from(allDependencies.entries());
 
     const licensePromises = dependencyEntries.map(([depName, depVersion]) =>
       getDependencyLicense(depName, depVersion),

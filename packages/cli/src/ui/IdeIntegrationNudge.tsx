@@ -92,11 +92,7 @@ export function IdeIntegrationNudge({
         </Text>
         <Text dimColor>{installText}</Text>
       </Box>
-      <RadioButtonSelect
-        items={OPTIONS}
-        onSelect={onComplete}
-        isFocused={true}
-      />
+      <RadioButtonSelect items={OPTIONS} onSelect={onComplete} />
     </Box>
   );
 }

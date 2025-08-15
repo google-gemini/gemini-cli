@@ -5,6 +5,7 @@
  */
 
 import stripAnsi from 'strip-ansi';
+import { stripVTControlCharacters } from 'util';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
@@ -496,21 +497,44 @@ export const replaceRangeInternal = (
 /**
  * Strip characters that can break terminal rendering.
  *
- * Strip ANSI escape codes and control characters except for line breaks.
- * Control characters such as delete break terminal UI rendering.
+ * Uses Node.js built-in stripVTControlCharacters to handle VT sequences,
+ * then filters remaining control characters that can disrupt display.
+ *
+ * Characters stripped:
+ * - ANSI escape sequences (via strip-ansi)
+ * - VT control sequences (via Node.js util.stripVTControlCharacters)
+ * - C0 control chars (0x00-0x1F) except CR/LF which are handled elsewhere
+ * - C1 control chars (0x80-0x9F) that can cause display issues
+ *
+ * Characters preserved:
+ * - All printable Unicode including emojis
+ * - DEL (0x7F) - handled functionally by applyOperations, not a display issue
+ * - CR/LF (0x0D/0x0A) - needed for line breaks
  */
 function stripUnsafeCharacters(str: string): string {
-  const stripped = stripAnsi(str);
-  return toCodePoints(stripped)
+  const strippedAnsi = stripAnsi(str);
+  const strippedVT = stripVTControlCharacters(strippedAnsi);
+
+  return toCodePoints(strippedVT)
     .filter((char) => {
-      if (char.length > 1) return false;
       const code = char.codePointAt(0);
-      if (code === undefined) {
-        return false;
-      }
-      const isUnsafe =
-        code === 127 || (code <= 31 && code !== 13 && code !== 10);
-      return !isUnsafe;
+      if (code === undefined) return false;
+
+      // Preserve CR/LF for line handling
+      if (code === 0x0a || code === 0x0d) return true;
+
+      // Remove C0 control chars (except CR/LF) that can break display
+      // Examples: BELL(0x07) makes noise, BS(0x08) moves cursor, VT(0x0B), FF(0x0C)
+      if (code >= 0x00 && code <= 0x1f) return false;
+
+      // Remove C1 control chars (0x80-0x9F) - legacy 8-bit control codes
+      if (code >= 0x80 && code <= 0x9f) return false;
+
+      // Preserve DEL (0x7F) - it's handled functionally by applyOperations as backspace
+      // and doesn't cause rendering issues when displayed
+
+      // Preserve all other characters including Unicode/emojis
+      return true;
     })
     .join('');
 }

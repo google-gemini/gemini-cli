@@ -91,7 +91,6 @@ export class MCPOAuthProvider {
   private static readonly REDIRECT_PORT = 7777;
   private static readonly REDIRECT_PATH = '/oauth/callback';
   private static readonly HTTP_OK = 200;
-  private static readonly HTTP_REDIRECT = 302;
 
   /**
    * Register a client dynamically with the OAuth server.

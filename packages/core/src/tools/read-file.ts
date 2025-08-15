@@ -10,7 +10,7 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
-  Icon,
+  Kind,
   ToolInvocation,
   ToolLocation,
   ToolResult,
@@ -173,7 +173,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
       ReadFileTool.Name,
       'ReadFile',
       `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.`,
-      Icon.FileSearch,
+      Kind.Read,
       {
         properties: {
           absolute_path: {
@@ -198,7 +198,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
     );
   }
 
-  protected validateToolParams(params: ReadFileToolParams): string | null {
+  protected override validateToolParams(
+    params: ReadFileToolParams,
+  ): string | null {
     const errors = SchemaValidator.validate(
       this.schema.parametersJsonSchema,
       params,

@@ -7,7 +7,7 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 | Shortcut | Description                                                                                                           |
 | -------- | --------------------------------------------------------------------------------------------------------------------- |
 | `Esc`    | Close dialogs and suggestions.                                                                                        |
-| `Ctrl+C` | Exit the application. Press twice to confirm.                                                                         |
+| `Ctrl+C` | Cancel the ongoing request and clear the input. Press twice to exit the application.                                  |
 | `Ctrl+D` | Exit the application if the input is empty. Press twice to confirm.                                                   |
 | `Ctrl+L` | Clear the screen.                                                                                                     |
 | `Ctrl+O` | Toggle the display of the debug console.                                                                              |
@@ -60,3 +60,9 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 | `Up Arrow` / `k`   | Move selection up.                                                                                            |
 | `1-9`              | Select an item by its number.                                                                                 |
 | (multi-digit)      | For items with numbers greater than 9, press the digits in quick succession to select the corresponding item. |
+
+## IDE Integration
+
+| Shortcut | Description                       |
+| -------- | --------------------------------- |
+| `Ctrl+G` | See context CLI received from IDE |

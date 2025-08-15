@@ -23,7 +23,7 @@ import {
   ToolCall, // Import from core
   Status as ToolCallStatusType,
   ApprovalMode,
-  Icon,
+  Kind,
   BaseTool,
   AnyDeclarativeTool,
   AnyToolInvocation,
@@ -33,6 +33,13 @@ import {
   ToolCallStatus,
   HistoryItemToolGroup,
 } from '../types.js';
+
+vi.mock('./useTerminalSize', () => ({
+  useTerminalSize: () => ({
+    columns: 80,
+    rows: 24,
+  }),
+}));
 
 // Mocks
 vi.mock('@google/gemini-cli-core', async () => {
@@ -67,7 +74,7 @@ class MockTool extends BaseTool<object, ToolResult> {
       name,
       displayName,
       'A mock tool for testing',
-      Icon.Hammer,
+      Kind.Other,
       {},
       isOutputMarkdown,
       canUpdateOutput,
@@ -179,6 +186,8 @@ describe('useReactToolScheduler in YOLO Mode', () => {
       request.args,
       expect.any(AbortSignal),
       undefined,
+      80,
+      24,
     );
 
     // Check that onComplete was called with success
@@ -326,6 +335,8 @@ describe('useReactToolScheduler', () => {
       request.args,
       expect.any(AbortSignal),
       undefined,
+      80,
+      24,
     );
     expect(onComplete).toHaveBeenCalledWith([
       expect.objectContaining({
