@@ -11,7 +11,7 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import * as versionUtils from '../../utils/version.js';
 import { MessageType } from '../types.js';
 
-import { type IdeClient } from '../../../../core/src/ide/ide-client.js';
+import { IdeClient } from '../../../../core/src/ide/ide-client.js';
 
 vi.mock('../../utils/version.js', () => ({
   getCliVersion: vi.fn(),
@@ -27,6 +27,7 @@ describe('aboutCommand', () => {
       services: {
         config: {
           getModel: vi.fn(),
+          getIdeClient: vi.fn(),
         },
         settings: {
           merged: {
@@ -136,6 +137,13 @@ describe('aboutCommand', () => {
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
+        type: MessageType.ABOUT,
+        cliVersion: 'test-version',
+        osVersion: 'test-os',
+        sandboxEnv: 'no sandbox',
+        modelVersion: 'test-model',
+        selectedAuthType: 'test-auth',
+        gcpProject: 'test-gcp-project',
         ideClient: '',
       }),
       expect.any(Number),
