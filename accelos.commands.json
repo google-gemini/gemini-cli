@@ -6,8 +6,15 @@
     {
       "name": "init",
       "description": "Initialize a new Accelos project or workspace",
-      "command": "../../../accelos/a0/scripts/agentic-ekg.sh",
-      "arguments": ["--workflow", "ekg_generation", "--repo-path", "."],
+      "command": "../a0/scripts/agentic-ekg.sh",
+      "arguments": [
+        "--workflow",
+        "ekg_generation",
+        "--repo-path",
+        ".",
+        "--output-dir",
+        "./.accelos/ekg"
+      ],
       "options": {}
     },
     {
