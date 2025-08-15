@@ -17,6 +17,7 @@ import {
   uiTelemetryService,
   SessionMetrics,
   ModelMetrics,
+  sessionId,
 } from '@google/gemini-cli-core';
 
 // --- Interface Definitions ---
@@ -24,6 +25,7 @@ import {
 export type { SessionMetrics, ModelMetrics };
 
 export interface SessionStatsState {
+  sessionId: string;
   sessionStartTime: Date;
   metrics: SessionMetrics;
   lastPromptTokenCount: number;
@@ -64,6 +66,7 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [stats, setStats] = useState<SessionStatsState>({
+    sessionId,
     sessionStartTime: new Date(),
     metrics: uiTelemetryService.getMetrics(),
     lastPromptTokenCount: 0,
