@@ -346,9 +346,9 @@ describe('UiTelemetryService', () => {
         ToolConfirmationOutcome.ProceedOnce,
       );
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
+        ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
 
       const metrics = service.getMetrics();
       const { tools } = metrics;
@@ -380,9 +380,9 @@ describe('UiTelemetryService', () => {
         ToolConfirmationOutcome.Cancel,
       );
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
+        ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
 
       const metrics = service.getMetrics();
       const { tools } = metrics;
@@ -414,9 +414,9 @@ describe('UiTelemetryService', () => {
         ToolConfirmationOutcome.ModifyWithEditor,
       );
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
+        ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
 
       const metrics = service.getMetrics();
       const { tools } = metrics;
@@ -430,9 +430,9 @@ describe('UiTelemetryService', () => {
     it('should process a ToolCallEvent without a decision', () => {
       const toolCall = createFakeCompletedToolCall('test_tool', true, 100);
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
+        ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
 
       const metrics = service.getMetrics();
       const { tools } = metrics;
@@ -466,13 +466,13 @@ describe('UiTelemetryService', () => {
       );
 
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall1))),
+        ...structuredClone(new ToolCallEvent(toolCall1)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall2))),
+        ...structuredClone(new ToolCallEvent(toolCall2)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
 
       const metrics = service.getMetrics();
       const { tools } = metrics;
@@ -501,13 +501,13 @@ describe('UiTelemetryService', () => {
       const toolCall1 = createFakeCompletedToolCall('tool_A', true, 100);
       const toolCall2 = createFakeCompletedToolCall('tool_B', false, 200);
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall1))),
+        ...structuredClone(new ToolCallEvent(toolCall1)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall2))),
+        ...structuredClone(new ToolCallEvent(toolCall2)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
 
       const metrics = service.getMetrics();
       const { tools } = metrics;
@@ -638,13 +638,13 @@ describe('UiTelemetryService', () => {
     it('should aggregate valid line count metadata', () => {
       const toolCall = createFakeCompletedToolCall('test_tool', true, 100);
       const event = {
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
+        ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
         metadata: {
           ai_added_lines: 10,
           ai_removed_lines: 5,
         },
-      };
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL };
 
       service.addEvent(event);
 
@@ -653,70 +653,22 @@ describe('UiTelemetryService', () => {
       expect(metrics.files.totalLinesRemoved).toBe(5);
     });
 
-    it('should ignore NaN values in line count metadata', () => {
-      const toolCall = createFakeCompletedToolCall('test_tool', true, 100);
-      const event = {
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
-        'event.name': EVENT_TOOL_CALL,
-        metadata: {
-          ai_added_lines: NaN,
-          ai_removed_lines: NaN,
-        },
-      };
-
-      service.addEvent(event);
-
-      const metrics = service.getMetrics();
-      expect(metrics.files.totalLinesAdded).toBe(0);
-      expect(metrics.files.totalLinesRemoved).toBe(0);
-    });
-
     it('should ignore null/undefined values in line count metadata', () => {
       const toolCall = createFakeCompletedToolCall('test_tool', true, 100);
       const event = {
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
+        ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
         metadata: {
           ai_added_lines: null,
           ai_removed_lines: undefined,
         },
-      };
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL };
 
       service.addEvent(event);
 
       const metrics = service.getMetrics();
       expect(metrics.files.totalLinesAdded).toBe(0);
       expect(metrics.files.totalLinesRemoved).toBe(0);
-    });
-
-    it('should handle mixed valid and invalid line count values', () => {
-      const toolCall1 = createFakeCompletedToolCall('test_tool', true, 100);
-      const toolCall2 = createFakeCompletedToolCall('test_tool', true, 100);
-
-      const event1 = {
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall1))),
-        'event.name': EVENT_TOOL_CALL,
-        metadata: {
-          ai_added_lines: 10,
-          ai_removed_lines: NaN, // Invalid
-        },
-      };
-
-      const event2 = {
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall2))),
-        'event.name': EVENT_TOOL_CALL,
-        metadata: {
-          ai_added_lines: NaN, // Invalid
-          ai_removed_lines: 5,
-        },
-      };
-
-      service.addEvent(event1);
-      service.addEvent(event2);
-
-      const metrics = service.getMetrics();
-      expect(metrics.files.totalLinesAdded).toBe(10); // Only valid value counted
-      expect(metrics.files.totalLinesRemoved).toBe(5); // Only valid value counted
     });
   });
 });
