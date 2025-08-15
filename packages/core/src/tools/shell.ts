@@ -10,14 +10,15 @@ import os from 'os';
 import crypto from 'crypto';
 import { Config } from '../config/config.js';
 import {
-  BaseTool,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  ToolInvocation,
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
   ToolConfirmationOutcome,
-  Icon,
+  Kind,
 } from './tools.js';
-import { ToolErrorType } from './tool-error.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
@@ -40,7 +41,257 @@ export interface ShellToolParams {
   directory?: string;
 }
 
-export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
+class ShellToolInvocation extends BaseToolInvocation<
+  ShellToolParams,
+  ToolResult
+> {
+  constructor(
+    private readonly config: Config,
+    params: ShellToolParams,
+    private readonly allowlist: Set<string>,
+  ) {
+    super(params);
+  }
+
+  getDescription(): string {
+    let description = `${this.params.command}`;
+    // append optional [in directory]
+    // note description is needed even if validation fails due to absolute path
+    if (this.params.directory) {
+      description += ` [in ${this.params.directory}]`;
+    }
+    // append optional (description), replacing any line breaks with spaces
+    if (this.params.description) {
+      description += ` (${this.params.description.replace(/\n/g, ' ')})`;
+    }
+    return description;
+  }
+
+  override async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    const command = stripShellWrapper(this.params.command);
+    const rootCommands = [...new Set(getCommandRoots(command))];
+    const commandsToConfirm = rootCommands.filter(
+      (command) => !this.allowlist.has(command),
+    );
+
+    if (commandsToConfirm.length === 0) {
+      return false; // already approved and whitelisted
+    }
+
+    const confirmationDetails: ToolExecuteConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Shell Command',
+      command: this.params.command,
+      rootCommand: commandsToConfirm.join(', '),
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          commandsToConfirm.forEach((command) => this.allowlist.add(command));
+        }
+      },
+    };
+    return confirmationDetails;
+  }
+
+  async execute(
+    signal: AbortSignal,
+    updateOutput?: (output: string) => void,
+    terminalColumns?: number,
+    terminalRows?: number,
+  ): Promise<ToolResult> {
+    const strippedCommand = stripShellWrapper(this.params.command);
+
+    if (signal.aborted) {
+      return {
+        llmContent: 'Command was cancelled by user before it could start.',
+        returnDisplay: 'Command cancelled by user.',
+      };
+    }
+
+    const isWindows = os.platform() === 'win32';
+    const tempFileName = `shell_pgrep_${crypto
+      .randomBytes(6)
+      .toString('hex')}.tmp`;
+    const tempFilePath = path.join(os.tmpdir(), tempFileName);
+
+    try {
+      // pgrep is not available on Windows, so we can't get background PIDs
+      const commandToExecute = isWindows
+        ? strippedCommand
+        : (() => {
+            // wrap command to append subprocess pids (via pgrep) to temporary file
+            let command = strippedCommand.trim();
+            if (!command.endsWith('&')) command += ';';
+            return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+          })();
+
+      const cwd = path.resolve(
+        this.config.getTargetDir(),
+        this.params.directory || '',
+      );
+
+      let cumulativeOutput = '';
+      let lastUpdateTime = Date.now();
+      let isBinaryStream = false;
+
+      const { result: resultPromise } = ShellExecutionService.execute(
+        commandToExecute,
+        cwd,
+        (event: ShellOutputEvent) => {
+          if (!updateOutput) {
+            return;
+          }
+
+          let currentDisplayOutput = '';
+          let shouldUpdate = false;
+
+          switch (event.type) {
+            case 'data':
+              if (isBinaryStream) break;
+              cumulativeOutput = event.chunk;
+              currentDisplayOutput = cumulativeOutput;
+              if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
+                shouldUpdate = true;
+              }
+              break;
+            case 'binary_detected':
+              isBinaryStream = true;
+              currentDisplayOutput =
+                '[Binary output detected. Halting stream...]';
+              shouldUpdate = true;
+              break;
+            case 'binary_progress':
+              isBinaryStream = true;
+              currentDisplayOutput = `[Receiving binary output... ${formatMemoryUsage(
+                event.bytesReceived,
+              )} received]`;
+              if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
+                shouldUpdate = true;
+              }
+              break;
+            default: {
+              throw new Error('An unhandled ShellOutputEvent was found.');
+            }
+          }
+
+          if (shouldUpdate) {
+            updateOutput(currentDisplayOutput);
+            lastUpdateTime = Date.now();
+          }
+        },
+        signal,
+        terminalColumns,
+        terminalRows,
+      );
+
+      const result = await resultPromise;
+
+      const backgroundPIDs: number[] = [];
+      if (os.platform() !== 'win32') {
+        if (fs.existsSync(tempFilePath)) {
+          const pgrepLines = fs
+            .readFileSync(tempFilePath, 'utf8')
+            .split('\n')
+            .filter(Boolean);
+          for (const line of pgrepLines) {
+            if (!/^\d+$/.test(line)) {
+              console.error(`pgrep: ${line}`);
+            }
+            const pid = Number(line);
+            if (pid !== result.pid) {
+              backgroundPIDs.push(pid);
+            }
+          }
+        } else {
+          if (!signal.aborted) {
+            console.error('missing pgrep output');
+          }
+        }
+      }
+
+      let llmContent = '';
+      if (result.aborted) {
+        llmContent = 'Command was cancelled by user before it could complete.';
+        if (result.output.trim()) {
+          llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
+        } else {
+          llmContent += ' There was no output before it was cancelled.';
+        }
+      } else {
+        // Create a formatted error string for display, replacing the wrapper command
+        // with the user-facing command.
+        const finalError = result.error
+          ? result.error.message.replace(commandToExecute, this.params.command)
+          : '(none)';
+
+        llmContent = [
+          `Command: ${this.params.command}`,
+          `Directory: ${this.params.directory || '(root)'}`,
+          `Output: ${result.output || '(empty)'}`,
+          `Error: ${finalError}`, // Use the cleaned error string.
+          `Exit Code: ${result.exitCode ?? '(none)'}`,
+          `Signal: ${result.signal ?? '(none)'}`,
+          `Background PIDs: ${
+            backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'
+          }`,
+          `Process Group PGID: ${result.pid ?? '(none)'}`,
+        ].join('\n');
+      }
+
+      let returnDisplayMessage = '';
+      if (this.config.getDebugMode()) {
+        returnDisplayMessage = llmContent;
+      } else {
+        if (result.output.trim()) {
+          returnDisplayMessage = result.output;
+        } else {
+          if (result.aborted) {
+            returnDisplayMessage = 'Command cancelled by user.';
+          } else if (result.signal) {
+            returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
+          } else if (result.error) {
+            returnDisplayMessage = `Command failed: ${getErrorMessage(
+              result.error,
+            )}`;
+          } else if (result.exitCode !== null && result.exitCode !== 0) {
+            returnDisplayMessage = `Command exited with code: ${result.exitCode}`;
+          }
+          // If output is empty and command succeeded (code 0, no error/signal/abort),
+          // returnDisplayMessage will remain empty, which is fine.
+        }
+      }
+
+      const summarizeConfig = this.config.getSummarizeToolOutputConfig();
+      if (summarizeConfig && summarizeConfig[ShellTool.Name]) {
+        const summary = await summarizeToolOutput(
+          llmContent,
+          this.config.getGeminiClient(),
+          signal,
+          summarizeConfig[ShellTool.Name].tokenBudget,
+        );
+        return {
+          llmContent: summary,
+          returnDisplay: returnDisplayMessage,
+        };
+      }
+
+      return {
+        llmContent,
+        returnDisplay: returnDisplayMessage,
+      };
+    } finally {
+      if (fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+      }
+    }
+  }
+}
+
+export class ShellTool extends BaseDeclarativeTool<
+  ShellToolParams,
+  ToolResult
+> {
   static Name: string = 'run_shell_command';
   private allowlist: Set<string> = new Set();
 
@@ -61,7 +312,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       Signal: Signal number or \`(none)\` if no signal was received.
       Background PIDs: List of background processes started or \`(none)\`.
       Process Group PGID: Process group started or \`(none)\``,
-      Icon.Terminal,
+      Kind.Execute,
       {
         type: 'object',
         properties: {
@@ -87,21 +338,9 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     );
   }
 
-  getDescription(params: ShellToolParams): string {
-    let description = `${params.command}`;
-    // append optional [in directory]
-    // note description is needed even if validation fails due to absolute path
-    if (params.directory) {
-      description += ` [in ${params.directory}]`;
-    }
-    // append optional (description), replacing any line breaks with spaces
-    if (params.description) {
-      description += ` (${params.description.replace(/\n/g, ' ')})`;
-    }
-    return description;
-  }
-
-  validateToolParams(params: ShellToolParams): string | null {
+  protected override validateToolParams(
+    params: ShellToolParams,
+  ): string | null {
     const commandCheck = isCommandAllowed(params.command, this.config);
     if (!commandCheck.allowed) {
       if (!commandCheck.reason) {
@@ -145,248 +384,9 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     return null;
   }
 
-  async shouldConfirmExecute(
+  protected createInvocation(
     params: ShellToolParams,
-    _abortSignal: AbortSignal,
-  ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.validateToolParams(params)) {
-      return false; // skip confirmation, execute call will fail immediately
-    }
-
-    const command = stripShellWrapper(params.command);
-    const rootCommands = [...new Set(getCommandRoots(command))];
-    const commandsToConfirm = rootCommands.filter(
-      (command) => !this.allowlist.has(command),
-    );
-
-    if (commandsToConfirm.length === 0) {
-      return false; // already approved and whitelisted
-    }
-
-    const confirmationDetails: ToolExecuteConfirmationDetails = {
-      type: 'exec',
-      title: 'Confirm Shell Command',
-      command: params.command,
-      rootCommand: commandsToConfirm.join(', '),
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          commandsToConfirm.forEach((command) => this.allowlist.add(command));
-        }
-      },
-    };
-    return confirmationDetails;
-  }
-
-  async execute(
-    params: ShellToolParams,
-    signal: AbortSignal,
-    updateOutput?: (output: string) => void,
-  ): Promise<ToolResult> {
-    const strippedCommand = stripShellWrapper(params.command);
-    const validationError = this.validateToolParams({
-      ...params,
-      command: strippedCommand,
-    });
-    if (validationError) {
-      return {
-        llmContent: `Could not execute command due to invalid parameters: ${validationError}`,
-        returnDisplay: validationError,
-        error: {
-          message: validationError,
-          type: ToolErrorType.INVALID_TOOL_PARAMS,
-        },
-      };
-    }
-
-    if (signal.aborted) {
-      return {
-        llmContent: 'Command was cancelled by user before it could start.',
-        returnDisplay: 'Command cancelled by user.',
-      };
-    }
-
-    const isWindows = os.platform() === 'win32';
-    const tempFileName = `shell_pgrep_${crypto
-      .randomBytes(6)
-      .toString('hex')}.tmp`;
-    const tempFilePath = path.join(os.tmpdir(), tempFileName);
-
-    try {
-      // pgrep is not available on Windows, so we can't get background PIDs
-      const commandToExecute = isWindows
-        ? strippedCommand
-        : (() => {
-            // wrap command to append subprocess pids (via pgrep) to temporary file
-            let command = strippedCommand.trim();
-            if (!command.endsWith('&')) command += ';';
-            return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
-          })();
-
-      const cwd = path.resolve(
-        this.config.getTargetDir(),
-        params.directory || '',
-      );
-
-      let cumulativeStdout = '';
-      let cumulativeStderr = '';
-
-      let lastUpdateTime = Date.now();
-      let isBinaryStream = false;
-
-      const { result: resultPromise } = ShellExecutionService.execute(
-        commandToExecute,
-        cwd,
-        (event: ShellOutputEvent) => {
-          if (!updateOutput) {
-            return;
-          }
-
-          let currentDisplayOutput = '';
-          let shouldUpdate = false;
-
-          switch (event.type) {
-            case 'data':
-              if (isBinaryStream) break; // Don't process text if we are in binary mode
-              if (event.stream === 'stdout') {
-                cumulativeStdout += event.chunk;
-              } else {
-                cumulativeStderr += event.chunk;
-              }
-              currentDisplayOutput =
-                cumulativeStdout +
-                (cumulativeStderr ? `\n${cumulativeStderr}` : '');
-              if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                shouldUpdate = true;
-              }
-              break;
-            case 'binary_detected':
-              isBinaryStream = true;
-              currentDisplayOutput =
-                '[Binary output detected. Halting stream...]';
-              shouldUpdate = true;
-              break;
-            case 'binary_progress':
-              isBinaryStream = true;
-              currentDisplayOutput = `[Receiving binary output... ${formatMemoryUsage(
-                event.bytesReceived,
-              )} received]`;
-              if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                shouldUpdate = true;
-              }
-              break;
-            default: {
-              throw new Error('An unhandled ShellOutputEvent was found.');
-            }
-          }
-
-          if (shouldUpdate) {
-            updateOutput(currentDisplayOutput);
-            lastUpdateTime = Date.now();
-          }
-        },
-        signal,
-      );
-
-      const result = await resultPromise;
-
-      const backgroundPIDs: number[] = [];
-      if (os.platform() !== 'win32') {
-        if (fs.existsSync(tempFilePath)) {
-          const pgrepLines = fs
-            .readFileSync(tempFilePath, 'utf8')
-            .split('\n')
-            .filter(Boolean);
-          for (const line of pgrepLines) {
-            if (!/^\d+$/.test(line)) {
-              console.error(`pgrep: ${line}`);
-            }
-            const pid = Number(line);
-            if (pid !== result.pid) {
-              backgroundPIDs.push(pid);
-            }
-          }
-        } else {
-          if (!signal.aborted) {
-            console.error('missing pgrep output');
-          }
-        }
-      }
-
-      let llmContent = '';
-      if (result.aborted) {
-        llmContent = 'Command was cancelled by user before it could complete.';
-        if (result.output.trim()) {
-          llmContent += ` Below is the output (on stdout and stderr) before it was cancelled:\n${result.output}`;
-        } else {
-          llmContent += ' There was no output before it was cancelled.';
-        }
-      } else {
-        // Create a formatted error string for display, replacing the wrapper command
-        // with the user-facing command.
-        const finalError = result.error
-          ? result.error.message.replace(commandToExecute, params.command)
-          : '(none)';
-
-        llmContent = [
-          `Command: ${params.command}`,
-          `Directory: ${params.directory || '(root)'}`,
-          `Stdout: ${result.stdout || '(empty)'}`,
-          `Stderr: ${result.stderr || '(empty)'}`,
-          `Error: ${finalError}`, // Use the cleaned error string.
-          `Exit Code: ${result.exitCode ?? '(none)'}`,
-          `Signal: ${result.signal ?? '(none)'}`,
-          `Background PIDs: ${
-            backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'
-          }`,
-          `Process Group PGID: ${result.pid ?? '(none)'}`,
-        ].join('\n');
-      }
-
-      let returnDisplayMessage = '';
-      if (this.config.getDebugMode()) {
-        returnDisplayMessage = llmContent;
-      } else {
-        if (result.output.trim()) {
-          returnDisplayMessage = result.output;
-        } else {
-          if (result.aborted) {
-            returnDisplayMessage = 'Command cancelled by user.';
-          } else if (result.signal) {
-            returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
-          } else if (result.error) {
-            returnDisplayMessage = `Command failed: ${getErrorMessage(
-              result.error,
-            )}`;
-          } else if (result.exitCode !== null && result.exitCode !== 0) {
-            returnDisplayMessage = `Command exited with code: ${result.exitCode}`;
-          }
-          // If output is empty and command succeeded (code 0, no error/signal/abort),
-          // returnDisplayMessage will remain empty, which is fine.
-        }
-      }
-
-      const summarizeConfig = this.config.getSummarizeToolOutputConfig();
-      if (summarizeConfig && summarizeConfig[this.name]) {
-        const summary = await summarizeToolOutput(
-          llmContent,
-          this.config.getGeminiClient(),
-          signal,
-          summarizeConfig[this.name].tokenBudget,
-        );
-        return {
-          llmContent: summary,
-          returnDisplay: returnDisplayMessage,
-        };
-      }
-
-      return {
-        llmContent,
-        returnDisplay: returnDisplayMessage,
-      };
-    } finally {
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
-      }
-    }
+  ): ToolInvocation<ShellToolParams, ToolResult> {
+    return new ShellToolInvocation(this.config, params, this.allowlist);
   }
 }
