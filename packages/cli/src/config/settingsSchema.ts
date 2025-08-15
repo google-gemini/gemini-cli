@@ -500,7 +500,7 @@ export const SETTINGS_SCHEMA = {
     type: 'object',
     label: 'Thinking Config',
     category: 'General',
-    requiresRestart: false,
+    requiresRestart: true,
     default: undefined as ThinkingConfig | undefined,
     description: 'Configuration for model thinking behavior.',
     showInDialog: false,
