@@ -66,6 +66,7 @@ describe('ShellTool', () => {
       Buffer.from('abcdef', 'hex'),
     );
 
+    // Capture the output callback to simulate streaming events from the service
     mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
       mockShellOutputCallback = callback;
       return {
@@ -122,6 +123,8 @@ describe('ShellTool', () => {
       const fullResult: ShellExecutionResult = {
         rawOutput: Buffer.from(result.output || ''),
         output: 'Success',
+        stdout: 'Success',
+        stderr: '',
         exitCode: 0,
         signal: null,
         error: null,
@@ -138,7 +141,7 @@ describe('ShellTool', () => {
       resolveShellExecution({ pid: 54321 });
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('54321\n54322\n');
+      vi.mocked(fs.readFileSync).mockReturnValue('54321\n54322\n'); // Service PID and background PID
 
       const result = await promise;
 
@@ -149,8 +152,6 @@ describe('ShellTool', () => {
         expect.any(String),
         expect.any(Function),
         mockAbortSignal,
-        undefined,
-        undefined,
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(tmpFile);
@@ -163,6 +164,8 @@ describe('ShellTool', () => {
       resolveShellExecution({
         rawOutput: Buffer.from(''),
         output: '',
+        stdout: '',
+        stderr: '',
         exitCode: 0,
         signal: null,
         error: null,
@@ -175,8 +178,6 @@ describe('ShellTool', () => {
         expect.any(String),
         expect.any(Function),
         mockAbortSignal,
-        undefined,
-        undefined,
       );
     });
 
@@ -188,13 +189,16 @@ describe('ShellTool', () => {
         error,
         exitCode: 1,
         output: 'err',
+        stderr: 'err',
         rawOutput: Buffer.from('err'),
+        stdout: '',
         signal: null,
         aborted: false,
         pid: 12345,
       });
 
       const result = await promise;
+      // The final llmContent should contain the user's command, not the wrapper
       expect(result.llmContent).toContain('Error: wrapped command failed');
       expect(result.llmContent).not.toContain('pgrep');
     });
@@ -227,6 +231,8 @@ describe('ShellTool', () => {
       resolveExecutionPromise({
         output: 'long output',
         rawOutput: Buffer.from('long output'),
+        stdout: 'long output',
+        stderr: '',
         exitCode: 0,
         signal: null,
         error: null,
@@ -251,7 +257,7 @@ describe('ShellTool', () => {
       mockShellExecutionService.mockImplementation(() => {
         throw error;
       });
-      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.existsSync).mockReturnValue(true); // Pretend the file exists
 
       const invocation = shellTool.build({ command: 'a-command' });
       await expect(invocation.execute(mockAbortSignal)).rejects.toThrow(error);
@@ -274,26 +280,33 @@ describe('ShellTool', () => {
         const invocation = shellTool.build({ command: 'stream' });
         const promise = invocation.execute(mockAbortSignal, updateOutputMock);
 
+        // First chunk, should be throttled.
         mockShellOutputCallback({
           type: 'data',
+          stream: 'stdout',
           chunk: 'hello ',
         });
         expect(updateOutputMock).not.toHaveBeenCalled();
 
+        // Advance time past the throttle interval.
         await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
 
+        // Send a second chunk. THIS event triggers the update with the CUMULATIVE content.
         mockShellOutputCallback({
           type: 'data',
-          chunk: 'hello world',
+          stream: 'stderr',
+          chunk: 'world',
         });
 
         // It should have been called once now with the combined output.
         expect(updateOutputMock).toHaveBeenCalledOnce();
-        expect(updateOutputMock).toHaveBeenCalledWith('hello world');
+        expect(updateOutputMock).toHaveBeenCalledWith('hello \nworld');
 
         resolveExecutionPromise({
           rawOutput: Buffer.from(''),
           output: '',
+          stdout: '',
+          stderr: '',
           exitCode: 0,
           signal: null,
           error: null,
@@ -319,13 +332,16 @@ describe('ShellTool', () => {
         });
         expect(updateOutputMock).toHaveBeenCalledOnce();
 
+        // Advance time past the throttle interval.
         await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
 
+        // Send a SECOND progress event. This one will trigger the flush.
         mockShellOutputCallback({
           type: 'binary_progress',
           bytesReceived: 2048,
         });
 
+        // Now it should be called a second time with the latest progress.
         expect(updateOutputMock).toHaveBeenCalledTimes(2);
         expect(updateOutputMock).toHaveBeenLastCalledWith(
           '[Receiving binary output... 2.0 KB received]',
@@ -334,6 +350,8 @@ describe('ShellTool', () => {
         resolveExecutionPromise({
           rawOutput: Buffer.from(''),
           output: '',
+          stdout: '',
+          stderr: '',
           exitCode: 0,
           signal: null,
           error: null,

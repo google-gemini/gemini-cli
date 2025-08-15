@@ -91,14 +91,6 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "@lydell/node-pty": "1.1.0",
     "node-fetch": "^3.3.2"
-  },
-  "optionalDependencies": {
-    "@lydell/node-pty-darwin-arm64": "1.1.0",
-    "@lydell/node-pty-darwin-x64": "1.1.0",
-    "@lydell/node-pty-linux-x64": "1.1.0",
-    "@lydell/node-pty-win32-arm64": "1.1.0",
-    "@lydell/node-pty-win32-x64": "1.1.0"
   }
 }

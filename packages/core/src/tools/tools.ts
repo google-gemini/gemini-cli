@@ -50,8 +50,6 @@ export interface ToolInvocation<
   execute(
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
-    terminalColumns?: number,
-    terminalRows?: number,
   ): Promise<TResult>;
 }
 
@@ -80,8 +78,6 @@ export abstract class BaseToolInvocation<
   abstract execute(
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
-    terminalColumns?: number,
-    terminalRows?: number,
   ): Promise<TResult>;
 }
 
@@ -200,16 +196,9 @@ export abstract class DeclarativeTool<
     params: TParams,
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
-    terminalColumns?: number,
-    terminalRows?: number,
   ): Promise<TResult> {
     const invocation = this.build(params);
-    return invocation.execute(
-      signal,
-      updateOutput,
-      terminalColumns,
-      terminalRows,
-    );
+    return invocation.execute(signal, updateOutput);
   }
 }
 
