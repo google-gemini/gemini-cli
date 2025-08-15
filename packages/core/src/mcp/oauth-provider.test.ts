@@ -37,7 +37,15 @@ const createMockResponse = (options: {
   text?: string | (() => Promise<string>);
   json?: unknown | (() => Promise<unknown>);
 }) => {
-  const response: any = {
+  const response: {
+    ok: boolean;
+    status?: number;
+    headers: {
+      get: (name: string) => string | null;
+    };
+    text?: () => Promise<string>;
+    json?: () => Promise<unknown>;
+  } = {
     ok: options.ok,
     headers: {
       get: (name: string) => {
