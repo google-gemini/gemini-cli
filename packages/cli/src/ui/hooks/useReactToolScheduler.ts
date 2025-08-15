@@ -253,6 +253,7 @@ export function mapToDisplay(
             status: mapCoreStatusToDisplayStatus(trackedCall.status),
             resultDisplay: trackedCall.response.resultDisplay,
             confirmationDetails: undefined,
+            outputFile: trackedCall.response.outputFile,
           };
         case 'error':
           return {

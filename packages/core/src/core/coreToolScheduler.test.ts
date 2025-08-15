@@ -5,11 +5,12 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   CoreToolScheduler,
   ToolCall,
   convertToFunctionResponse,
+  truncateAndSaveToFile,
 } from './coreToolScheduler.js';
 import {
   BaseTool,
@@ -28,6 +29,13 @@ import {
   ModifyContext,
 } from '../tools/modifiable-tool.js';
 import { MockTool } from '../test-utils/tools.js';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+
+// Mock fs for testing
+vi.mock('fs/promises', () => ({
+  writeFile: vi.fn(),
+}));
 
 class MockModifiableTool
   extends MockTool
@@ -99,6 +107,7 @@ describe('CoreToolScheduler', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getProjectTempDir: () => '/tmp',
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -169,6 +178,7 @@ describe('CoreToolScheduler with payload', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getProjectTempDir: () => '/tmp',
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -205,7 +215,11 @@ describe('CoreToolScheduler with payload', () => {
       );
     }
 
-    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    // Wait for the tool execution to complete
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
     expect(completedCalls[0].status).toBe('success');
@@ -447,6 +461,7 @@ describe('CoreToolScheduler edit cancellation', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getProjectTempDir: () => '/tmp',
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -543,6 +558,7 @@ describe('CoreToolScheduler YOLO mode', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.YOLO,
+      getProjectTempDir: () => '/tmp',
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -567,6 +583,11 @@ describe('CoreToolScheduler YOLO mode', () => {
     // Act
     await scheduler.schedule([request], abortController.signal);
 
+    // Wait for the tool execution to complete
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
     // Assert
     // 1. The tool's execute method was called directly.
     expect(mockTool.executeFn).toHaveBeenCalledWith({ param: 'value' });
@@ -584,7 +605,6 @@ describe('CoreToolScheduler YOLO mode', () => {
     ]);
 
     // 3. The final callback indicates the tool call was successful.
-    expect(onAllToolCallsComplete).toHaveBeenCalled();
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
     expect(completedCalls).toHaveLength(1);
@@ -629,6 +649,7 @@ describe('CoreToolScheduler request queueing', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
+      getProjectTempDir: () => '/tmp',
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -739,6 +760,7 @@ describe('CoreToolScheduler request queueing', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.YOLO,
+      getProjectTempDir: () => '/tmp',
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -787,5 +809,125 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Ensure completion callbacks were called twice.
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('truncateAndSaveToFile', () => {
+  const mockWriteFile = vi.mocked(fs.writeFile);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return content unchanged if below threshold', async () => {
+    const content = 'Short content';
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+
+    const result = await truncateAndSaveToFile(content, callId, projectTempDir);
+
+    expect(result).toEqual({ content });
+    expect(mockWriteFile).not.toHaveBeenCalled();
+  });
+
+  it('should truncate content by lines when content has many lines', async () => {
+    // Create content that exceeds 100,000 character threshold with many lines
+    const lines = Array(2000).fill('x'.repeat(100)); // 100 chars per line * 2000 lines = 200,000 chars
+    const content = lines.join('\n');
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    const result = await truncateAndSaveToFile(content, callId, projectTempDir);
+
+    expect(result.outputFile).toBe(path.join(projectTempDir, `${callId}.txt`));
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      path.join(projectTempDir, `${callId}.txt`),
+      content,
+    );
+
+    // Should contain last 1000 lines
+    const expectedTruncated = lines.slice(-1000).join('\n');
+    expect(result.content).toContain(
+      'Tool output was too large and has been truncated',
+    );
+    expect(result.content).toContain('Last 1000 lines of output:');
+    expect(result.content).toContain(expectedTruncated);
+  });
+
+  it('should truncate content by characters when content has few lines', async () => {
+    const content = 'a'.repeat(200_000); // Single very long line
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    const result = await truncateAndSaveToFile(content, callId, projectTempDir);
+
+    expect(result.outputFile).toBe(path.join(projectTempDir, `${callId}.txt`));
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      path.join(projectTempDir, `${callId}.txt`),
+      content,
+    );
+
+    // Should contain last 80000 characters (1000 * 80)
+    const maxChars = 1000 * 80;
+    const expectedTruncated = content.slice(-maxChars);
+    expect(result.content).toContain(
+      'Tool output was too large and has been truncated',
+    );
+    expect(result.content).toContain(expectedTruncated);
+  });
+
+  it('should handle file write errors gracefully', async () => {
+    const content = 'a'.repeat(200_000);
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+
+    mockWriteFile.mockRejectedValue(new Error('File write failed'));
+
+    const result = await truncateAndSaveToFile(content, callId, projectTempDir);
+
+    expect(result.outputFile).toBeUndefined();
+    expect(result.content).toContain(
+      '[Note: Could not save full output to file]',
+    );
+    expect(mockWriteFile).toHaveBeenCalled();
+  });
+
+  it('should save to correct file path with call ID', async () => {
+    const content = 'a'.repeat(200_000);
+    const callId = 'unique-call-123';
+    const projectTempDir = '/custom/temp/dir';
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    const result = await truncateAndSaveToFile(content, callId, projectTempDir);
+
+    const expectedPath = path.join(projectTempDir, `${callId}.txt`);
+    expect(result.outputFile).toBe(expectedPath);
+    expect(mockWriteFile).toHaveBeenCalledWith(expectedPath, content);
+  });
+
+  it('should include helpful instructions in truncated message', async () => {
+    const content = 'a'.repeat(200_000);
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    const result = await truncateAndSaveToFile(content, callId, projectTempDir);
+
+    expect(result.content).toContain(
+      'read_file tool with the absolute file path above',
+    );
+    expect(result.content).toContain('read_file tool with offset=0, limit=100');
+    expect(result.content).toContain(
+      'read_file tool with offset=N to skip N lines',
+    );
+    expect(result.content).toContain(
+      'read_file tool with limit=M to read only M lines',
+    );
   });
 });

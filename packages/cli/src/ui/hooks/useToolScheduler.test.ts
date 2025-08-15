@@ -60,6 +60,7 @@ const mockConfig = {
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
   getUsageStatisticsEnabled: () => true,
   getDebugMode: () => false,
+  getProjectTempDir: () => '/tmp',
 };
 
 class MockTool extends BaseTool<object, ToolResult> {

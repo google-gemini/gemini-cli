@@ -5,7 +5,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { Box } from 'ink';
+import { Box, Text } from 'ink';
 import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
@@ -118,6 +118,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                   terminalWidth={innerWidth}
                 />
               )}
+            {tool.outputFile && (
+              <Box marginX={1}>
+                <Text>Output too long and was saved to: {tool.outputFile}</Text>
+              </Box>
+            )}
           </Box>
         );
       })}
