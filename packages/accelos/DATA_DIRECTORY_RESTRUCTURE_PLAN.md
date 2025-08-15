@@ -8,7 +8,7 @@ This plan restructures the file path management system to consolidate RCAs, guar
 
 ### Current File Paths
 - **Guardrails**: `./src/prompts/guardrails.json` (configurable via `ACCELOS_GUARDRAIL_FILE_PATH`)
-- **RCAs**: `./src/rcas/` (configurable via `ACCELOS_RCA_DIRECTORY_PATH`)
+- **RCAs**: `./src/rcas/` (configurable via `RCA_DIRECTORY_PATH`)
 
 ### Current Configuration (src/config.ts:10-11, 22-23)
 - `guardrailFilePath`: Environment variable or default path

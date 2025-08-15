@@ -11,7 +11,6 @@ export const AccelosConfigSchema = z.object({
   dataDirectoryPath: z.string().default(process.env.ACCELOS_DATA_DIRECTORY_PATH || './data'),
   // Legacy support - will be deprecated
   guardrailFilePath: z.string().optional(),
-  rcaDirectoryPath: z.string().optional(),
 });
 
 export type AccelosConfig = z.infer<typeof AccelosConfigSchema>;
@@ -25,9 +24,6 @@ export function validateAndMigrateConfig(config: Partial<AccelosConfig>): Accelo
   // Warn about deprecated configuration
   if (config.guardrailFilePath) {
     console.warn('⚠️  DEPRECATED: guardrailFilePath is deprecated. Use dataDirectoryPath instead.');
-  }
-  if (config.rcaDirectoryPath) {
-    console.warn('⚠️  DEPRECATED: rcaDirectoryPath is deprecated. Use dataDirectoryPath instead.');
   }
   
   return validatedConfig;
@@ -47,7 +43,7 @@ export const defaultConfig: AccelosConfig = {
  */
 export function getDataPaths(dataDir: string) {
   return {
-    rcaDirectory: path.join(dataDir, 'RCA'),
+    rcaDirectory: process.env.RCA_DIRECTORY_PATH || path.join(dataDir, 'RCA'),
     guardrailsFile: path.join(dataDir, 'guardrails.json'),
     reviewsDirectory: path.join(dataDir, 'reviews'),
   };
@@ -60,7 +56,7 @@ export function getCompatiblePaths(config: AccelosConfig) {
   const dataPaths = getDataPaths(config.dataDirectoryPath);
   
   return {
-    rcaDirectory: config.rcaDirectoryPath || dataPaths.rcaDirectory,
+    rcaDirectory: dataPaths.rcaDirectory,
     guardrailsFile: config.guardrailFilePath || dataPaths.guardrailsFile,
     reviewsDirectory: dataPaths.reviewsDirectory,
   };

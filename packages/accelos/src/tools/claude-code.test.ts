@@ -32,6 +32,7 @@ describe('Claude Code Tool', () => {
     const validInput = {
       prompt: 'Test prompt',
       options: {
+        mode: 'basic',
         customSystemPrompt: 'Test system prompt',
         maxTurns: 10,
       },
@@ -41,9 +42,27 @@ describe('Claude Code Tool', () => {
     expect(result.success).toBe(true);
   });
 
+  it('should validate input schema with cwd parameter', () => {
+    const validInputWithCwd = {
+      prompt: 'Test prompt',
+      options: {
+        mode: 'streaming',
+        cwd: '/custom/working/directory',
+        customSystemPrompt: 'Test system prompt',
+        maxTurns: 10,
+      },
+    };
+
+    const result = claudeCodeTool.inputSchema.safeParse(validInputWithCwd);
+    expect(result.success).toBe(true);
+  });
+
   it('should reject invalid input', () => {
     const invalidInput = {
       prompt: '', // Empty prompt should fail
+      options: {
+        mode: 'basic',
+      },
     };
 
     const result = claudeCodeTool.inputSchema.safeParse(invalidInput);
@@ -54,6 +73,7 @@ describe('Claude Code Tool', () => {
     const validOutput = {
       result: 'Test result',
       metadata: {
+        mode: 'basic',
         turnsUsed: 5,
         toolsCalled: ['bash', 'read'],
         sessionId: 'test-session-id',
@@ -69,13 +89,17 @@ describe('Claude Code Tool', () => {
   it('should throw error when ANTHROPIC_API_KEY is not set', async () => {
     delete process.env.ANTHROPIC_API_KEY;
 
-    await expect(
-      claudeCodeTool.execute({
-        context: {
-          prompt: 'Test prompt',
+    const result = await claudeCodeTool.execute({
+      context: {
+        prompt: 'Test prompt',
+        options: {
+          mode: 'basic',
         },
-      })
-    ).rejects.toThrow('Authentication failed');
+      },
+    });
+
+    expect(result.result).toContain('ANTHROPIC_API_KEY environment variable is required');
+    expect(result.metadata.hasErrors).toBe(true);
   });
 
   it('should handle basic execution flow', async () => {
@@ -129,6 +153,7 @@ describe('Claude Code Tool', () => {
       context: {
         prompt: 'Test prompt',
         options: {
+          mode: 'basic',
           maxTurns: 5,
           debug: false,
         },
@@ -178,6 +203,9 @@ describe('Claude Code Tool', () => {
     const result = await claudeCodeTool.execute({
       context: {
         prompt: 'Test prompt that will hit max turns',
+        options: {
+          mode: 'basic',
+        },
       },
     });
 
@@ -198,6 +226,9 @@ describe('Claude Code Tool', () => {
       claudeCodeTool.execute({
         context: {
           prompt: 'Test prompt',
+          options: {
+            mode: 'basic',
+          },
         },
       })
     ).rejects.toThrow('Rate limit or quota exceeded');
@@ -214,11 +245,113 @@ describe('Claude Code Tool', () => {
     const result = await claudeCodeTool.execute({
       context: {
         prompt: 'Test prompt',
+        options: {
+          mode: 'basic',
+        },
       },
     });
 
     expect(result.result).toContain('Error executing Claude Code');
     expect(result.metadata.hasErrors).toBe(true);
     expect(result.metadata.executionTime).toBeGreaterThanOrEqual(0);
+  });
+
+  it('should use REPOSITORY_PATH as default cwd when no cwd provided', async () => {
+    const { query } = await import('@anthropic-ai/claude-code');
+    const mockQuery = vi.mocked(query);
+    
+    // Set REPOSITORY_PATH for the test
+    const originalRepoPath = process.env.REPOSITORY_PATH;
+    process.env.REPOSITORY_PATH = '/test/repo/path';
+    
+    let capturedOptions: any;
+    mockQuery.mockImplementation((params) => {
+      capturedOptions = params.options;
+      return {
+        async *[Symbol.asyncIterator]() {
+          yield {
+            type: 'result' as const,
+            subtype: 'success' as const,
+            result: 'Test result',
+            num_turns: 1,
+            session_id: 'test-session',
+            duration_ms: 1000,
+            duration_api_ms: 800,
+            is_error: false,
+            total_cost_usd: 0.01,
+            usage: { input_tokens: 10, output_tokens: 20, cache_creation_input_tokens: null, cache_read_input_tokens: null },
+            permission_denials: [],
+          };
+        }
+      } as unknown;
+    });
+
+    await claudeCodeTool.execute({
+      context: {
+        prompt: 'Test prompt',
+        options: {
+          mode: 'basic',
+        },
+      },
+    });
+
+    expect(capturedOptions.cwd).toBe('/test/repo/path');
+    
+    // Restore original value
+    if (originalRepoPath) {
+      process.env.REPOSITORY_PATH = originalRepoPath;
+    } else {
+      delete process.env.REPOSITORY_PATH;
+    }
+  });
+
+  it('should use provided cwd over REPOSITORY_PATH', async () => {
+    const { query } = await import('@anthropic-ai/claude-code');
+    const mockQuery = vi.mocked(query);
+    
+    // Set REPOSITORY_PATH for the test
+    const originalRepoPath = process.env.REPOSITORY_PATH;
+    process.env.REPOSITORY_PATH = '/default/repo/path';
+    
+    let capturedOptions: any;
+    mockQuery.mockImplementation((params) => {
+      capturedOptions = params.options;
+      return {
+        async *[Symbol.asyncIterator]() {
+          yield {
+            type: 'result' as const,
+            subtype: 'success' as const,
+            result: 'Test result',
+            num_turns: 1,
+            session_id: 'test-session',
+            duration_ms: 1000,
+            duration_api_ms: 800,
+            is_error: false,
+            total_cost_usd: 0.01,
+            usage: { input_tokens: 10, output_tokens: 20, cache_creation_input_tokens: null, cache_read_input_tokens: null },
+            permission_denials: [],
+          };
+        }
+      } as unknown;
+    });
+
+    await claudeCodeTool.execute({
+      context: {
+        prompt: 'Test prompt',
+        options: {
+          mode: 'basic',
+          cwd: '/custom/working/directory',
+        },
+      },
+    });
+
+    expect(capturedOptions.cwd).toBe('/custom/working/directory');
+    
+    // Restore original value
+    if (originalRepoPath) {
+      process.env.REPOSITORY_PATH = originalRepoPath;
+    } else {
+      delete process.env.REPOSITORY_PATH;
+    }
   });
 });

@@ -123,6 +123,8 @@ Please format your response clearly with sections for each analysis area. Provid
       context: {
         prompt: comprehensivePrompt,
         options: {
+          mode: "basic",
+          cwd: process.env.REPOSITORY_PATH,
           customSystemPrompt: "You are an expert code reviewer with deep knowledge in software quality, security, and performance. Provide thorough, constructive feedback with specific examples and actionable recommendations.",
           maxTurns: 25,
           allowedTools: ["read", "grep", "web_search"],

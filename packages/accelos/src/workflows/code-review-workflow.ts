@@ -106,6 +106,8 @@ Provide a detailed analysis with specific issues and strengths identified.
       context: {
         prompt: analysisPrompt,
         options: {
+          mode: "basic",
+          cwd: process.env.REPOSITORY_PATH,
           customSystemPrompt: "You are an expert code reviewer. Analyze code thoroughly and provide constructive feedback with specific examples and line references where possible.",
           maxTurns: 15,
           allowedTools: ["read", "grep", "web_search"],
@@ -226,6 +228,8 @@ For each finding, specify:
       context: {
         prompt: securityPrompt,
         options: {
+          mode: "basic",
+          cwd: process.env.REPOSITORY_PATH,
           customSystemPrompt: "You are a cybersecurity expert specializing in secure code review. Identify security vulnerabilities with precision and provide actionable remediation guidance.",
           maxTurns: 20,
           allowedTools: ["read", "grep", "web_search"],
@@ -307,6 +311,8 @@ For each performance issue found:
       context: {
         prompt: performancePrompt,
         options: {
+          mode: "basic",
+          cwd: process.env.REPOSITORY_PATH,
           customSystemPrompt: "You are a performance optimization expert. Analyze code for performance bottlenecks and provide specific, actionable optimization recommendations.",
           maxTurns: 15,
           allowedTools: ["read", "web_search"],
@@ -406,6 +412,8 @@ Focus on actionable improvements that provide the most value.
       context: {
         prompt: enhancementPrompt,
         options: {
+          mode: "basic",
+          cwd: process.env.REPOSITORY_PATH,
           customSystemPrompt: "You are a senior software architect. Provide strategic improvement recommendations that balance code quality, security, performance, and maintainability.",
           maxTurns: 20,
           allowedTools: ["read", "write", "web_search"],
@@ -480,6 +488,8 @@ Format the documentation in clear, professional markdown suitable for developers
       context: {
         prompt: documentationPrompt,
         options: {
+          mode: "basic",
+          cwd: process.env.REPOSITORY_PATH,
           customSystemPrompt: "You are a technical documentation expert. Create clear, comprehensive, and developer-friendly documentation.",
           maxTurns: 10,
           allowedTools: ["write", "read"],

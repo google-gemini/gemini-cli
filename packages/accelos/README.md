@@ -58,8 +58,7 @@ interface AccelosConfig {
   temperature: number;
   maxTokens: number;
   systemPrompt: string;
-  guardrailFilePath: string;
-  rcaDirectoryPath: string;
+  dataDirectoryPath: string;
 }
 ```
 
@@ -71,36 +70,34 @@ Set your API key and configuration using environment variables:
 - `OPENAI_API_KEY` - For OpenAI models  
 - `ANTHROPIC_API_KEY` - For Anthropic Claude models
 - `ACCELOS_GUARDRAIL_FILE_PATH` - Path to the guardrails JSON file
-- `ACCELOS_RCA_DIRECTORY_PATH` - Path to the RCA documents directory
+- `RCA_DIRECTORY_PATH` - Path to the RCA documents directory
 
 ### Guardrails and RCA Configuration
 
 The agent supports configurable paths for guardrails and RCA documents:
 
-- `guardrailFilePath` - Path to the guardrails JSON file (default: `./src/prompts/guardrails.json`)
-- `rcaDirectoryPath` - Path to the RCA documents directory (default: `./src/rcas`)
+- `dataDirectoryPath` - Path to the data directory containing RCA docs and guardrails (default: `./data`)
 
 You can customize these paths in several ways:
 
 **Via Environment Variables:**
 ```bash
 export ACCELOS_GUARDRAIL_FILE_PATH="./custom/path/to/guardrails.json"
-export ACCELOS_RCA_DIRECTORY_PATH="./custom/path/to/rcas"
+export RCA_DIRECTORY_PATH="./custom/path/to/rcas"
 ```
 
 **Via Configuration:**
 ```typescript
 const agent = new AccelosAgent({
   ...defaultConfig,
-  guardrailFilePath: './custom/path/to/guardrails.json',
-  rcaDirectoryPath: './custom/path/to/rcas'
+  dataDirectoryPath: './custom/data/path'
 });
 ```
 
 **Via .env File:**
 ```env
 ACCELOS_GUARDRAIL_FILE_PATH=./custom/path/to/guardrails.json
-ACCELOS_RCA_DIRECTORY_PATH=./custom/path/to/rcas
+RCA_DIRECTORY_PATH=./custom/path/to/rcas
 ```
 
 ## Available Tools

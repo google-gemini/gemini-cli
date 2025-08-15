@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mastra Streaming Workflow Test</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.4;
+        }
+        
+        .header {
+            border-bottom: 2px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            color: #4fc3f7;
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        .header p {
+            color: #888;
+            margin: 5px 0 0 0;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-family: inherit;
+        }
+        
+        .btn:hover {
+            background: #005a9e;
+        }
+        
+        .btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        
+        .status.connecting {
+            background: #333;
+            color: #ffa726;
+        }
+        
+        .status.connected {
+            background: #1b5e20;
+            color: #4caf50;
+        }
+        
+        .status.error {
+            background: #b71c1c;
+            color: #f44336;
+        }
+        
+        .status.completed {
+            background: #1a237e;
+            color: #3f51b5;
+        }
+        
+        .log-container {
+            background: #252526;
+            border: 1px solid #333;
+            border-radius: 4px;
+            height: 600px;
+            overflow-y: auto;
+            padding: 15px;
+            font-size: 13px;
+        }
+        
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 4px 0;
+            border-left: 3px solid transparent;
+            padding-left: 10px;
+        }
+        
+        .log-entry.connection {
+            border-left-color: #4fc3f7;
+            color: #4fc3f7;
+        }
+        
+        .log-entry.workflow-phase {
+            border-left-color: #66bb6a;
+            color: #66bb6a;
+        }
+        
+        .log-entry.claude-code-progress {
+            border-left-color: #ffa726;
+            color: #ffa726;
+        }
+        
+        .log-entry.workflow-complete {
+            border-left-color: #ab47bc;
+            color: #ab47bc;
+        }
+        
+        .log-entry.error {
+            border-left-color: #f44336;
+            color: #f44336;
+        }
+        
+        .log-entry.heartbeat {
+            border-left-color: #78909c;
+            color: #78909c;
+            opacity: 0.7;
+        }
+        
+        .timestamp {
+            color: #78909c;
+            font-size: 11px;
+        }
+        
+        .claude-details {
+            margin-left: 20px;
+            font-size: 12px;
+            color: #bbb;
+            margin-top: 4px;
+        }
+        
+        .summary-stats {
+            background: #2d2d30;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #4fc3f7;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 2px;
+        }
+        
+        .workflow-info {
+            background: #2d2d30;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔄 Mastra Streaming Workflow Test</h1>
+        <p>Real-time visualization of Claude Code streaming progress</p>
+    </div>
+
+    <div class="controls">
+        <button class="btn" id="startBtn" onclick="startStreaming()">Start Streaming Test</button>
+        <button class="btn" id="stopBtn" onclick="stopStreaming()" disabled>Stop Stream</button>
+        <button class="btn" onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <div class="status connecting" id="status">
+        Click "Start Streaming Test" to begin
+    </div>
+
+    <div class="status error" id="fileProtocolWarning" style="display: none;">
+        ⚠️ <strong>File Protocol Detected!</strong><br>
+        Please access this page via the Mastra server: <a href="http://localhost:4111/streaming-test.html" style="color: #4fc3f7;">http://localhost:4111/streaming-test.html</a><br>
+        Make sure your dev server is running with <code>npm run dev</code>
+    </div>
+
+    <div class="workflow-info" id="workflowInfo" style="display: none;">
+        <div><strong>Workflow:</strong> review-to-pr-streaming-workflow</div>
+        <div><strong>Input:</strong> { reviewAssessmentId: "sse-streaming-test-[timestamp]", dryRun: true }</div>
+    </div>
+
+    <div class="summary-stats" id="summaryStats" style="display: none;">
+        <div class="stat">
+            <div class="stat-value" id="totalEvents">0</div>
+            <div class="stat-label">Total Events</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="claudeEvents">0</div>
+            <div class="stat-label">Claude Code Events</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="duration">0s</div>
+            <div class="stat-label">Duration</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="status-value">-</div>
+            <div class="stat-label">Status</div>
+        </div>
+    </div>
+
+    <div class="log-container" id="logContainer">
+        <div class="log-entry connection">
+            <span class="timestamp">[Ready]</span> Waiting to start streaming test...
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let startTime = null;
+        let totalEvents = 0;
+        let claudeCodeEvents = 0;
+        let baseUrl = '';
+
+        // Initialize and check for file protocol on page load
+        function initializePage() {
+            // Detect if page is opened from file system
+            if (window.location.protocol === 'file:') {
+                document.getElementById('fileProtocolWarning').style.display = 'block';
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('status').style.display = 'none';
+                addLogEntry('error', 'Cannot connect: Page opened from file system. Please use http://localhost:4111/streaming-test.html');
+                return;
+            }
+
+            // Auto-detect base URL from current location
+            baseUrl = window.location.origin;
+            
+            // Show current server info
+            addLogEntry('connection', `Initialized for server: ${baseUrl}`);
+            
+            // Check if server is reachable
+            checkServerConnection();
+        }
+
+        // Check if the Mastra server is running
+        function checkServerConnection() {
+            fetch(`${baseUrl}/api/streaming-sse`, { method: 'HEAD' })
+                .then(response => {
+                    if (response.ok || response.status === 405) { // 405 Method Not Allowed is expected for HEAD on SSE endpoint
+                        addLogEntry('connection', 'Server connection verified - ready to stream');
+                    } else {
+                        addLogEntry('error', `Server responded with status ${response.status}`);
+                    }
+                })
+                .catch(error => {
+                    addLogEntry('error', `Cannot connect to server at ${baseUrl}. Make sure Mastra dev server is running.`);
+                    document.getElementById('startBtn').disabled = true;
+                    updateStatus('Server not reachable - check if "npm run dev" is running', 'error');
+                });
+        }
+
+        function updateStatus(message, className) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${className}`;
+        }
+
+        function updateStats() {
+            document.getElementById('totalEvents').textContent = totalEvents;
+            document.getElementById('claudeEvents').textContent = claudeCodeEvents;
+            
+            if (startTime) {
+                const duration = Math.round((Date.now() - startTime) / 1000);
+                document.getElementById('duration').textContent = duration + 's';
+            }
+        }
+
+        function addLogEntry(type, message, data = null) {
+            const logContainer = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            let content = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+            
+            // Add Claude Code specific details
+            if (type === 'claude-code-progress' && data) {
+                const claudeType = data.originalEvent?.payload?.type || 'unknown';
+                const claudeMessage = data.originalEvent?.payload?.message;
+                const toolName = data.originalEvent?.payload?.toolName;
+                
+                if (claudeMessage) {
+                    content += `<div class="claude-details">💬 ${claudeMessage}</div>`;
+                }
+                if (toolName) {
+                    content += `<div class="claude-details">🔧 Tool: ${toolName}</div>`;
+                }
+            }
+            
+            entry.innerHTML = content;
+            logContainer.appendChild(entry);
+            
+            // Auto-scroll to bottom
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            // Limit log entries to prevent memory issues
+            if (logContainer.children.length > 500) {
+                logContainer.removeChild(logContainer.firstChild);
+            }
+        }
+
+        function startStreaming() {
+            if (eventSource) {
+                return;
+            }
+
+            // Check if we're in file protocol mode
+            if (window.location.protocol === 'file:') {
+                addLogEntry('error', 'Cannot start streaming from file:// protocol');
+                return;
+            }
+
+            startTime = Date.now();
+            totalEvents = 0;
+            claudeCodeEvents = 0;
+
+            updateStatus('Connecting to streaming endpoint...', 'connecting');
+            
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('workflowInfo').style.display = 'block';
+            document.getElementById('summaryStats').style.display = 'grid';
+
+            // Use the detected base URL for EventSource connection
+            const sseUrl = `${baseUrl}/api/streaming-sse`;
+            addLogEntry('connection', `Connecting to: ${sseUrl}`);
+            
+            eventSource = new EventSource(sseUrl);
+
+            eventSource.onopen = function() {
+                updateStatus('Connected - Streaming workflow events', 'connected');
+                addLogEntry('connection', 'Connected to streaming endpoint');
+            };
+
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleStreamingEvent(data);
+                } catch (error) {
+                    addLogEntry('error', `Failed to parse event: ${error.message}`);
+                }
+            };
+
+            eventSource.onerror = function(error) {
+                updateStatus('Connection error occurred', 'error');
+                addLogEntry('error', 'Connection error - check server status');
+                stopStreaming();
+            };
+        }
+
+        function handleStreamingEvent(data) {
+            const { type, timestamp, message } = data;
+
+            switch (type) {
+                case 'connection':
+                    addLogEntry('connection', message);
+                    break;
+
+                case 'workflow-found':
+                    addLogEntry('workflow-phase', message);
+                    break;
+
+                case 'workflow-event':
+                    totalEvents = data.eventCount || totalEvents + 1;
+                    claudeCodeEvents = data.claudeCodeEvents || claudeCodeEvents;
+                    
+                    const originalEvent = data.originalEvent;
+                    if (originalEvent) {
+                        handleWorkflowEvent(originalEvent, data);
+                    }
+                    updateStats();
+                    break;
+
+                case 'heartbeat':
+                    totalEvents = data.eventCount || totalEvents;
+                    claudeCodeEvents = data.claudeCodeEvents || claudeCodeEvents;
+                    addLogEntry('heartbeat', `Heartbeat - ${totalEvents} events processed`);
+                    updateStats();
+                    break;
+
+                case 'workflow-complete':
+                    updateStatus('Workflow completed successfully', 'completed');
+                    document.getElementById('status-value').textContent = data.summary?.finalStatus || 'Unknown';
+                    addLogEntry('workflow-complete', `Workflow completed: ${JSON.stringify(data.summary, null, 2)}`);
+                    stopStreaming();
+                    break;
+
+                case 'error':
+                    updateStatus('Error occurred during streaming', 'error');
+                    addLogEntry('error', `Error: ${message}`);
+                    if (data.error?.details) {
+                        addLogEntry('error', `Details: ${data.error.details}`);
+                    }
+                    stopStreaming();
+                    break;
+
+                case 'connection-close':
+                    addLogEntry('connection', 'Streaming session ended');
+                    stopStreaming();
+                    break;
+
+                default:
+                    addLogEntry('unknown', `Unknown event: ${type} - ${message}`);
+            }
+        }
+
+        function handleWorkflowEvent(originalEvent, data) {
+            const { type, payload } = originalEvent;
+
+            switch (type) {
+                case 'workflow-phase':
+                    addLogEntry('workflow-phase', `Phase: ${payload?.phase} - ${payload?.message || 'No message'}`);
+                    break;
+
+                case 'claude-code-progress':
+                    const claudeType = payload?.type || 'unknown';
+                    const claudeMessage = payload?.message || 'Processing...';
+                    addLogEntry('claude-code-progress', `Claude Code: ${claudeType} - ${claudeMessage}`, data);
+                    break;
+
+                default:
+                    addLogEntry('workflow-event', `${type}: ${payload?.message || 'Event received'}`);
+            }
+        }
+
+        function stopStreaming() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+
+            if (document.getElementById('status').classList.contains('connected')) {
+                updateStatus('Streaming stopped', 'completed');
+            }
+        }
+
+        function clearLog() {
+            const logContainer = document.getElementById('logContainer');
+            logContainer.innerHTML = '<div class="log-entry connection"><span class="timestamp">[Ready]</span> Log cleared - ready for new test</div>';
+            
+            // Reset stats
+            totalEvents = 0;
+            claudeCodeEvents = 0;
+            startTime = null;
+            updateStats();
+            document.getElementById('status-value').textContent = '-';
+        }
+
+        // Handle page unload
+        window.addEventListener('beforeunload', function() {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+
+        // Initialize page when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initializePage();
+        });
+    </script>
+</body>
+</html>
