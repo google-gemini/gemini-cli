@@ -213,7 +213,10 @@ describe('useSlashCommandProcessor', () => {
       });
 
       await act(async () => {
-        await result.current.handleSlashCommand('/override');
+        await result.current.handleSlashCommand(
+          '/override',
+          new AbortController().signal,
+        );
       });
 
       // Only the file-based command's action should be called.
@@ -228,7 +231,10 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toBeDefined());
 
       await act(async () => {
-        await result.current.handleSlashCommand('/nonexistent');
+        await result.current.handleSlashCommand(
+          '/nonexistent',
+          new AbortController().signal,
+        );
       });
 
       // Expect 2 calls: one for the user's input, one for the error message.
@@ -259,7 +265,10 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
-        await result.current.handleSlashCommand('/parent');
+        await result.current.handleSlashCommand(
+          '/parent',
+          new AbortController().signal,
+        );
       });
 
       expect(mockAddItem).toHaveBeenCalledTimes(2);
@@ -293,7 +302,10 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
-        await result.current.handleSlashCommand('/parent child with args');
+        await result.current.handleSlashCommand(
+          '/parent child with args',
+          new AbortController().signal,
+        );
       });
 
       expect(childAction).toHaveBeenCalledTimes(1);
@@ -355,7 +367,10 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       const executionPromise = act(async () => {
-        await result.current.handleSlashCommand('/long-running');
+        await result.current.handleSlashCommand(
+          '/long-running',
+          new AbortController().signal,
+        );
       });
 
       // It should be true immediately after starting
@@ -381,7 +396,10 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
-        await result.current.handleSlashCommand('/themecmd');
+        await result.current.handleSlashCommand(
+          '/themecmd',
+          new AbortController().signal,
+        );
       });
 
       expect(mockOpenThemeDialog).toHaveBeenCalled();
@@ -400,7 +418,10 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
-        await result.current.handleSlashCommand('/load');
+        await result.current.handleSlashCommand(
+          '/load',
+          new AbortController().signal,
+        );
       });
 
       expect(mockClearItems).toHaveBeenCalledTimes(1);
@@ -431,7 +452,10 @@ describe('useSlashCommandProcessor', () => {
 
         try {
           await act(async () => {
-            await result.current.handleSlashCommand('/exit');
+            await result.current.handleSlashCommand(
+              '/exit',
+              new AbortController().signal,
+            );
           });
 
           await act(async () => {
@@ -463,7 +487,10 @@ describe('useSlashCommandProcessor', () => {
 
         try {
           await act(async () => {
-            await result.current.handleSlashCommand('/exit');
+            await result.current.handleSlashCommand(
+              '/exit',
+              new AbortController().signal,
+            );
           });
 
           await act(async () => {
@@ -495,7 +522,10 @@ describe('useSlashCommandProcessor', () => {
 
       let actionResult;
       await act(async () => {
-        actionResult = await result.current.handleSlashCommand('/filecmd');
+        actionResult = await result.current.handleSlashCommand(
+          '/filecmd',
+          new AbortController().signal,
+        );
       });
 
       expect(actionResult).toEqual({
@@ -527,7 +557,10 @@ describe('useSlashCommandProcessor', () => {
 
       let actionResult;
       await act(async () => {
-        actionResult = await result.current.handleSlashCommand('/mcpcmd');
+        actionResult = await result.current.handleSlashCommand(
+          '/mcpcmd',
+          new AbortController().signal,
+        );
       });
 
       expect(actionResult).toEqual({
@@ -570,7 +603,10 @@ describe('useSlashCommandProcessor', () => {
       // This is intentionally not awaited, because the promise it returns
       // will not resolve until the user responds to the confirmation.
       act(() => {
-        result.current.handleSlashCommand('/shellcmd');
+        result.current.handleSlashCommand(
+          '/shellcmd',
+          new AbortController().signal,
+        );
       });
 
       // We now wait for the state to be updated with the request.
@@ -588,7 +624,10 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       act(() => {
-        result.current.handleSlashCommand('/shellcmd');
+        result.current.handleSlashCommand(
+          '/shellcmd',
+          new AbortController().signal,
+        );
       });
 
       // Wait for the confirmation dialog to be set
@@ -621,7 +660,10 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       act(() => {
-        result.current.handleSlashCommand('/shellcmd');
+        result.current.handleSlashCommand(
+          '/shellcmd',
+          new AbortController().signal,
+        );
       });
       await waitFor(() => {
         expect(result.current.shellConfirmationRequest).not.toBeNull();
@@ -664,7 +706,10 @@ describe('useSlashCommandProcessor', () => {
       // Verify the session-wide allowlist was NOT permanently updated.
       // Re-render the hook by calling a no-op command to get the latest context.
       await act(async () => {
-        result.current.handleSlashCommand('/no-op');
+        result.current.handleSlashCommand(
+          '/no-op',
+          new AbortController().signal,
+        );
       });
       const finalContext = result.current.commandContext;
       expect(finalContext.session.sessionShellAllowlist.size).toBe(0);
@@ -675,7 +720,10 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       act(() => {
-        result.current.handleSlashCommand('/shellcmd');
+        result.current.handleSlashCommand(
+          '/shellcmd',
+          new AbortController().signal,
+        );
       });
       await waitFor(() => {
         expect(result.current.shellConfirmationRequest).not.toBeNull();
@@ -720,7 +768,10 @@ describe('useSlashCommandProcessor', () => {
 
       await act(async () => {
         // Use uppercase when command is lowercase
-        await result.current.handleSlashCommand('/Test');
+        await result.current.handleSlashCommand(
+          '/Test',
+          new AbortController().signal,
+        );
       });
 
       // It should fail and call addItem with an error
@@ -745,7 +796,10 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
-        await result.current.handleSlashCommand('/alias');
+        await result.current.handleSlashCommand(
+          '/alias',
+          new AbortController().signal,
+        );
       });
 
       expect(action).toHaveBeenCalledTimes(1);
@@ -761,7 +815,10 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
-        await result.current.handleSlashCommand('  /test  with-args  ');
+        await result.current.handleSlashCommand(
+          '  /test  with-args  ',
+          new AbortController().signal,
+        );
       });
 
       expect(action).toHaveBeenCalledWith(expect.anything(), 'with-args');
@@ -774,7 +831,10 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
-        await result.current.handleSlashCommand('?help');
+        await result.current.handleSlashCommand(
+          '?help',
+          new AbortController().signal,
+        );
       });
 
       expect(action).toHaveBeenCalledTimes(1);
@@ -807,7 +867,10 @@ describe('useSlashCommandProcessor', () => {
       });
 
       await act(async () => {
-        await result.current.handleSlashCommand('/override');
+        await result.current.handleSlashCommand(
+          '/override',
+          new AbortController().signal,
+        );
       });
 
       // Only the file-based command's action should be called.
@@ -842,7 +905,10 @@ describe('useSlashCommandProcessor', () => {
       });
 
       await act(async () => {
-        await result.current.handleSlashCommand('/exit');
+        await result.current.handleSlashCommand(
+          '/exit',
+          new AbortController().signal,
+        );
       });
 
       // The action for the command whose primary name is 'exit' should be called.
@@ -866,7 +932,10 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
 
       await act(async () => {
-        await result.current.handleSlashCommand('/exit');
+        await result.current.handleSlashCommand(
+          '/exit',
+          new AbortController().signal,
+        );
       });
 
       // It should be added to the history.
@@ -949,7 +1018,10 @@ describe('useSlashCommandProcessor', () => {
         expect(result.current.slashCommands.length).toBeGreaterThan(0),
       );
       await act(async () => {
-        await result.current.handleSlashCommand('/logtest');
+        await result.current.handleSlashCommand(
+          '/logtest',
+          new AbortController().signal,
+        );
       });
 
       expect(logSlashCommand).toHaveBeenCalledWith(
@@ -999,7 +1071,10 @@ describe('useSlashCommandProcessor', () => {
         expect(result.current.slashCommands.length).toBeGreaterThan(0),
       );
       await act(async () => {
-        await result.current.handleSlashCommand('/logwithsub sub');
+        await result.current.handleSlashCommand(
+          '/logwithsub sub',
+          new AbortController().signal,
+        );
       });
 
       expect(logSlashCommand).toHaveBeenCalledWith(
@@ -1017,7 +1092,10 @@ describe('useSlashCommandProcessor', () => {
         expect(result.current.slashCommands.length).toBeGreaterThan(0),
       );
       await act(async () => {
-        await result.current.handleSlashCommand('/la');
+        await result.current.handleSlashCommand(
+          '/la',
+          new AbortController().signal,
+        );
       });
       expect(logSlashCommand).toHaveBeenCalledWith(
         mockConfig,
@@ -1033,9 +1111,126 @@ describe('useSlashCommandProcessor', () => {
         expect(result.current.slashCommands.length).toBeGreaterThan(0),
       );
       await act(async () => {
-        await result.current.handleSlashCommand('/unknown');
+        await result.current.handleSlashCommand(
+          '/unknown',
+          new AbortController().signal,
+        );
       });
       expect(logSlashCommand).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('AbortSignal Support', () => {
+    it('should provide default signal in commandContext', async () => {
+      const result = setupProcessorHook();
+
+      await waitFor(() => {
+        expect(result.current.commandContext.signal).toBeInstanceOf(
+          AbortSignal,
+        );
+        expect(result.current.commandContext.signal.aborted).toBe(false);
+      });
+    });
+
+    it('should pass AbortSignal to CommandContext when executing commands', async () => {
+      const mockAction = vi.fn().mockResolvedValue({
+        type: 'message',
+        messageType: 'info',
+        content: 'test',
+      });
+
+      const testCommand = createTestCommand({
+        name: 'test',
+        action: mockAction,
+      });
+
+      const result = setupProcessorHook([testCommand]);
+      const abortController = new AbortController();
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand(
+          '/test',
+          abortController.signal,
+        );
+      });
+
+      expect(mockAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          signal: abortController.signal,
+        }),
+        expect.any(String),
+      );
+    });
+
+    it('should respect AbortSignal in recursive handleSlashCommand calls', async () => {
+      const mockAction = vi.fn().mockResolvedValue({
+        type: 'message',
+        messageType: 'info',
+        content: 'test executed',
+      });
+
+      const testCommand = createTestCommand({
+        name: 'test',
+        action: mockAction,
+      });
+
+      const result = setupProcessorHook([testCommand]);
+      const abortController = new AbortController();
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      // Abort the signal to test propagation
+      abortController.abort();
+
+      await act(async () => {
+        await result.current.handleSlashCommand(
+          '/test',
+          abortController.signal,
+        );
+      });
+
+      // Verify the command received the aborted signal
+      expect(mockAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          signal: expect.objectContaining({
+            aborted: true,
+          }),
+        }),
+        expect.any(String),
+      );
+    });
+
+    it('should propagate signal through confirm_action recursive calls', async () => {
+      let capturedSignal: AbortSignal | undefined;
+
+      const mockAction = vi.fn().mockImplementation((context) => {
+        capturedSignal = context.signal;
+        return Promise.resolve({
+          type: 'message',
+          messageType: 'info',
+          content: 'test completed',
+        });
+      });
+
+      const testCommand = createTestCommand({
+        name: 'test',
+        action: mockAction,
+      });
+
+      const result = setupProcessorHook([testCommand]);
+      const abortController = new AbortController();
+      const testSignal = abortController.signal;
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/test', testSignal);
+      });
+
+      // Verify the same signal was passed through
+      expect(capturedSignal).toBe(testSignal);
     });
   });
 });

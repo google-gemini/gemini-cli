@@ -103,4 +103,62 @@ describe('setupGithubCommand', async () => {
       expect(contents).toContain(workflow);
     }
   });
+
+  it('should cancel downloads when AbortSignal is triggered', async () => {
+    const abortController = new AbortController();
+
+    vi.mocked(gitUtils.isGitHubRepository).mockReturnValueOnce(true);
+    vi.mocked(gitUtils.getGitRepoRoot).mockReturnValueOnce(scratchDir);
+    vi.mocked(gitUtils.getLatestGitHubRelease).mockResolvedValueOnce('v1.0.0');
+
+    // Mock fetch to simulate a slow response that can be aborted
+    vi.mocked(global.fetch).mockImplementation(
+      () =>
+        new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => resolve(new Response('test')), 5000);
+
+          abortController.signal.addEventListener('abort', () => {
+            clearTimeout(timeout);
+            reject(new DOMException('Request aborted', 'AbortError'));
+          });
+        }),
+    );
+
+    const commandPromise = setupGithubCommand.action?.(
+      { signal: abortController.signal } as CommandContext,
+      '',
+    );
+
+    // Abort after 100ms
+    setTimeout(() => abortController.abort(), 100);
+
+    await expect(commandPromise).rejects.toThrow('Request aborted');
+  });
+
+  it('should use AbortSignal.any() to combine timeout and context signals', async () => {
+    const contextController = new AbortController();
+
+    vi.mocked(gitUtils.isGitHubRepository).mockReturnValueOnce(true);
+    vi.mocked(gitUtils.getGitRepoRoot).mockReturnValueOnce(scratchDir);
+    vi.mocked(gitUtils.getLatestGitHubRelease).mockResolvedValueOnce('v1.0.0');
+
+    // Mock fetch to capture the signal
+    let capturedSignal: AbortSignal | undefined;
+    vi.mocked(global.fetch).mockImplementation((_url, options) => {
+      capturedSignal = (options as RequestInit)?.signal as AbortSignal;
+      return Promise.resolve(new Response('test'));
+    });
+
+    await setupGithubCommand.action?.(
+      { signal: contextController.signal } as CommandContext,
+      '',
+    );
+
+    // Verify that a signal was passed
+    expect(capturedSignal).toBeDefined();
+
+    // Test that context abort affects the combined signal
+    contextController.abort();
+    expect(capturedSignal?.aborted).toBe(true);
+  });
 });
