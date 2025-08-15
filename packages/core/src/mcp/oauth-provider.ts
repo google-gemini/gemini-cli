@@ -388,20 +388,20 @@ export class MCPOAuthProvider {
 
     if (!response.ok) {
       // Try to parse error from form-urlencoded response
+      let errorMessage: string | null = null;
       try {
         const errorParams = new URLSearchParams(responseText);
         const error = errorParams.get('error');
         const errorDescription = errorParams.get('error_description');
         if (error) {
-          throw new Error(
-            `Token exchange failed: ${error} - ${errorDescription || 'No description'}`,
-          );
+          errorMessage = `Token exchange failed: ${error} - ${errorDescription || 'No description'}`;
         }
       } catch {
         // Fall back to raw error
       }
       throw new Error(
-        `Token exchange failed: ${response.status} - ${responseText}`,
+        errorMessage ||
+          `Token exchange failed: ${response.status} - ${responseText}`,
       );
     }
 
@@ -509,8 +509,21 @@ export class MCPOAuthProvider {
     const contentType = response.headers.get('content-type') || '';
 
     if (!response.ok) {
+      // Try to parse error from form-urlencoded response
+      let errorMessage: string | null = null;
+      try {
+        const errorParams = new URLSearchParams(responseText);
+        const error = errorParams.get('error');
+        const errorDescription = errorParams.get('error_description');
+        if (error) {
+          errorMessage = `Token refresh failed: ${error} - ${errorDescription || 'No description'}`;
+        }
+      } catch {
+        // Fall back to raw error
+      }
       throw new Error(
-        `Token refresh failed: ${response.status} - ${responseText}`,
+        errorMessage ||
+          `Token refresh failed: ${response.status} - ${responseText}`,
       );
     }
 
