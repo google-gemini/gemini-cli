@@ -8,6 +8,7 @@ import {
   ToolCallConfirmationDetails,
   ToolResultDisplay,
 } from '@google/gemini-cli-core';
+import { type PartListUnion } from '@google/genai';
 
 // Only defining the state enum needed by the UI
 export enum StreamingState {
@@ -237,7 +238,7 @@ export interface ConsoleMessageItem {
  */
 export interface SubmitPromptResult {
   type: 'submit_prompt';
-  content: string;
+  content: PartListUnion | string;
 }
 
 /**
