@@ -592,9 +592,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     (result: IdeIntegrationNudgeResult) => {
       if (result.userSelection === 'yes') {
         if (result.isExtensionPreInstalled) {
-          handleSlashCommand('/ide enable');
+          handleSlashCommand('/ide enable', new AbortController().signal);
         } else {
-          handleSlashCommand('/ide install');
+          handleSlashCommand('/ide install', new AbortController().signal);
         }
         settings.setValue(
           SettingScope.User,
@@ -632,7 +632,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           clearTimeout(timerRef.current);
         }
         // Directly invoke the central command handler.
-        handleSlashCommand('/quit');
+        handleSlashCommand('/quit', new AbortController().signal);
       } else {
         setPressedOnce(true);
         timerRef.current = setTimeout(() => {
@@ -660,7 +660,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
         const mcpServers = config.getMcpServers();
         if (Object.keys(mcpServers || {}).length > 0) {
-          handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
+          handleSlashCommand(
+            newValue ? '/mcp desc' : '/mcp nodesc',
+            new AbortController().signal,
+          );
         }
       } else if (
         keyMatchers[Command.TOGGLE_IDE_CONTEXT_DETAIL](key) &&
@@ -668,7 +671,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         ideContextState
       ) {
         // Show IDE status when in IDE mode and context is available.
-        handleSlashCommand('/ide status');
+        handleSlashCommand('/ide status', new AbortController().signal);
       } else if (keyMatchers[Command.QUIT](key)) {
         // When authenticating, let AuthInProgress component handle Ctrl+C.
         if (isAuthenticating) {
