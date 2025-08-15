@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '@testing-library/react';
 import {
   RadioButtonSelect,
@@ -20,21 +20,21 @@ const ITEMS: Array<RadioSelectItem<string>> = [
 
 describe('<RadioButtonSelect />', () => {
   it('renders a list of items and matches snapshot', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <RadioButtonSelect items={ITEMS} onSelect={() => {}} isFocused={true} />,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders with the second item selected and matches snapshot', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <RadioButtonSelect items={ITEMS} initialIndex={1} onSelect={() => {}} />,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders with numbers hidden and matches snapshot', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <RadioButtonSelect
         items={ITEMS}
         onSelect={() => {}}
@@ -49,7 +49,7 @@ describe('<RadioButtonSelect />', () => {
       label: `Item ${i + 1}`,
       value: `item-${i + 1}`,
     }));
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <RadioButtonSelect
         items={manyItems}
         onSelect={() => {}}
@@ -75,7 +75,7 @@ describe('<RadioButtonSelect />', () => {
         themeTypeDisplay: '(Dark)',
       },
     ];
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <RadioButtonSelect items={themeItems} onSelect={() => {}} />,
     );
     expect(lastFrame()).toMatchSnapshot();
@@ -86,14 +86,14 @@ describe('<RadioButtonSelect />', () => {
       label: `Item ${i + 1}`,
       value: `item-${i + 1}`,
     }));
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <RadioButtonSelect items={manyItems} onSelect={() => {}} />,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders nothing when no items are provided', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <RadioButtonSelect items={[]} onSelect={() => {}} isFocused={true} />,
     );
     expect(lastFrame()).toBe('');
@@ -103,7 +103,7 @@ describe('<RadioButtonSelect />', () => {
 describe('keyboard navigation', () => {
   it('should call onSelect when "enter" is pressed', () => {
     const onSelect = vi.fn();
-    const { stdin } = render(
+    const { stdin } = renderWithProviders(
       <RadioButtonSelect items={ITEMS} onSelect={onSelect} />,
     );
 
@@ -115,7 +115,7 @@ describe('keyboard navigation', () => {
   describe('when isFocused is false', () => {
     it('should not handle any keyboard input', () => {
       const onSelect = vi.fn();
-      const { stdin } = render(
+      const { stdin } = renderWithProviders(
         <RadioButtonSelect
           items={ITEMS}
           onSelect={onSelect}
@@ -137,7 +137,7 @@ describe('keyboard navigation', () => {
   ])('$description', ({ isFocused }) => {
     it('should navigate down with arrow key and select with enter', async () => {
       const onSelect = vi.fn();
-      const { stdin, lastFrame } = render(
+      const { stdin, lastFrame } = renderWithProviders(
         <RadioButtonSelect
           items={ITEMS}
           onSelect={onSelect}
@@ -158,7 +158,7 @@ describe('keyboard navigation', () => {
 
     it('should navigate up with arrow key and select with enter', async () => {
       const onSelect = vi.fn();
-      const { stdin, lastFrame } = render(
+      const { stdin, lastFrame } = renderWithProviders(
         <RadioButtonSelect
           items={ITEMS}
           onSelect={onSelect}
