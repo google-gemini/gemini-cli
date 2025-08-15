@@ -221,10 +221,13 @@ export class GeminiClient {
     const toolRegistry = await this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    const preloadMemory = this.config.getLoadUserMemoryInHistory && this.config.getLoadUserMemoryInHistory();
+    const geminiMemory = preloadMemory ? await this.config.getGeminiMemory() : '';
+    console.log(`Starting chat with memory: ${geminiMemory}`);
     const history: Content[] = [
       {
         role: 'user',
-        parts: envParts,
+        parts: [...envParts, ...(preloadMemory ? [{ text: geminiMemory }] : [])],
       },
       {
         role: 'model',

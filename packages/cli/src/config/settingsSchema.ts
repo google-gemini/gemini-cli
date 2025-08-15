@@ -495,6 +495,16 @@ export const SETTINGS_SCHEMA = {
     description: 'Show line numbers in the chat.',
     showInDialog: true,
   },
+  loadUserMemoryInHistory: {
+    type: 'boolean',
+    label: 'Preload User Memory for New Chats',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description:
+      'Load user memory (including GEMINI.md files) into the chat history for new / cleared chats.',
+    showInDialog: true,
+  },
 } as const;
 
 type InferSettings<T extends SettingsSchema> = {

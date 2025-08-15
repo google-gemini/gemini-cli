@@ -527,6 +527,7 @@ export async function loadCliConfig(
     folderTrust,
     interactive,
     trustedFolder,
+    loadUserMemoryInHistory: settings.loadUserMemoryInHistory ?? false,
   });
 }
 

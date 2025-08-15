@@ -54,6 +54,7 @@ import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -198,6 +199,7 @@ export interface ConfigParameters {
   chatCompression?: ChatCompressionSettings;
   interactive?: boolean;
   trustedFolder?: boolean;
+  loadUserMemoryInHistory?: boolean;
 }
 
 export class Config {
@@ -262,6 +264,7 @@ export class Config {
   private readonly chatCompression: ChatCompressionSettings | undefined;
   private readonly interactive: boolean;
   private readonly trustedFolder: boolean | undefined;
+  private readonly loadUserMemoryInHistory: boolean;
   private initialized: boolean = false;
 
   constructor(params: ConfigParameters) {
@@ -327,6 +330,7 @@ export class Config {
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
+    this.loadUserMemoryInHistory = params.loadUserMemoryInHistory ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -528,6 +532,16 @@ export class Config {
     this.userMemory = newUserMemory;
   }
 
+  async getGeminiMemory(): Promise<string> {
+    const result = await loadServerHierarchicalMemory(
+      this.targetDir,
+      [], // includeDirectoriesToReadGemini
+      this.debugMode,
+      this.getFileService()
+    );
+    return result.memoryContent;
+  }
+
   getGeminiMdFileCount(): number {
     return this.geminiMdFileCount;
   }
@@ -703,6 +717,10 @@ export class Config {
 
   isInteractive(): boolean {
     return this.interactive;
+  }
+
+  getLoadUserMemoryInHistory(): boolean {
+    return this.loadUserMemoryInHistory;
   }
 
   async getGitService(): Promise<GitService> {

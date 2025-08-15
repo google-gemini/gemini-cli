@@ -288,6 +288,14 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "showLineNumbers": false
     ```
 
+- **`loadUserMemoryInHistory`** (boolean):
+  - **Description:** Controls whether user memory (including GEMINI.md files and other context files) is loaded into the chat history for new or cleared chats. When enabled, the content from your context files is added as a user message at the start of each new conversation, making the AI aware of your project-specific instructions throughout the entire conversation. When disabled, context files are only included in the system prompt.
+  - **Default:** `false`
+  - **Example:**
+    ```json
+    "loadUserMemoryInHistory": true
+    ```
+
 ### Example `settings.json`:
 
 ```json
