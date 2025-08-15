@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as pty from '@lydell/node-pty';
+import { getPty, PtyProcess } from '../utils/getPty.js';
+import { spawn as cpSpawn } from 'child_process';
 import { TextDecoder } from 'util';
 import os from 'os';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
@@ -39,6 +40,8 @@ export interface ShellExecutionResult {
   aborted: boolean;
   /** The process ID of the spawned shell. */
   pid: number | undefined;
+  /** The method used to execute the shell command. */
+  executionMethod: 'lydell-node-pty' | 'node-pty' | 'child_process' | 'none';
 }
 
 /** A handle for an ongoing shell execution. */
@@ -100,35 +103,85 @@ export class ShellExecutionService {
       ? ['/c', commandToExecute]
       : ['-c', commandToExecute];
 
-    let ptyProcess;
-    try {
-      ptyProcess = pty.spawn(shell, args, {
-        cwd,
-        name: 'xterm-color',
-        cols: terminalColumns ?? 200,
-        rows: terminalRows ?? 20,
-        env: {
-          ...process.env,
-          GEMINI_CLI: '1',
-        },
-        handleFlowControl: true,
-      });
-    } catch (e) {
-      const error = e as Error;
-      return {
-        pid: undefined,
-        result: Promise.resolve({
-          rawOutput: Buffer.from(''),
-          output: '',
-          exitCode: 1,
-          signal: null,
-          error,
-          aborted: false,
-          pid: undefined,
-        }),
-      };
+    let ptyProcess: PtyProcess | undefined;
+    let executionMethod: ShellExecutionResult['executionMethod'] = 'none';
+    const ptyInfo = getPty();
+    const pty = ptyInfo?.module;
+
+    if (pty) {
+      try {
+        ptyProcess = pty.spawn(shell, args, {
+          cwd,
+          name: 'xterm-color',
+          cols: terminalColumns ?? 200,
+          rows: terminalRows ?? 20,
+          env: {
+            ...process.env,
+            GEMINI_CLI: '1',
+          },
+          handleFlowControl: true,
+        });
+        executionMethod = ptyInfo?.name ?? 'node-pty';
+      } catch (_e) {
+        // Fallback to child_process
+      }
     }
 
+    if (!ptyProcess) {
+      try {
+        const spawnProcess = cpSpawn(commandToExecute, [], {
+          cwd,
+          env: { ...process.env, GEMINI_CLI: '1' },
+          shell: true,
+        });
+
+        if (spawnProcess.pid === undefined) {
+          throw new Error('Failed to get PID from child_process.spawn');
+        }
+
+        executionMethod = 'child_process';
+        ptyProcess = {
+          pid: spawnProcess.pid,
+          onData: (cb: (data: string) => void) => {
+            spawnProcess.stdout.on('data', (data: Buffer) =>
+              cb(data.toString()),
+            );
+            spawnProcess.stderr.on('data', (data: Buffer) =>
+              cb(data.toString()),
+            );
+          },
+          onExit: (cb: (e: { exitCode: number; signal?: number }) => void) => {
+            spawnProcess.on('exit', (code, signal) => {
+              cb({
+                exitCode: code ?? 1,
+                signal: signal ? os.constants.signals[signal] : undefined,
+              });
+            });
+          },
+          kill: (signal?: string) => {
+            spawnProcess.kill((signal ?? 'SIGHUP') as NodeJS.Signals);
+          },
+        };
+      } catch (e) {
+        const error = e as Error;
+        return {
+          pid: undefined,
+          result: Promise.resolve({
+            rawOutput: Buffer.from(''),
+            output: '',
+            exitCode: 1,
+            signal: null,
+            error,
+            aborted: false,
+            pid: undefined,
+            executionMethod: 'none',
+          }),
+        };
+      }
+    }
+
+    const finalPtyProcess = ptyProcess;
+    console.error(executionMethod);
     const result = new Promise<ShellExecutionResult>((resolve) => {
       const headlessTerminal = new Terminal({
         allowProposedApi: true,
@@ -202,12 +255,12 @@ export class ShellExecutionService {
         );
       };
 
-      ptyProcess.onData((data) => {
+      finalPtyProcess.onData((data) => {
         const bufferData = Buffer.from(data, 'utf-8');
         handleOutput(bufferData);
       });
 
-      ptyProcess.onExit(({ exitCode, signal }) => {
+      finalPtyProcess.onExit(({ exitCode, signal }) => {
         exited = true;
         abortSignal.removeEventListener('abort', abortHandler);
 
@@ -221,20 +274,21 @@ export class ShellExecutionService {
             signal: signal ?? null,
             error,
             aborted: abortSignal.aborted,
-            pid: ptyProcess.pid,
+            pid: finalPtyProcess.pid,
+            executionMethod,
           });
         });
       });
 
       const abortHandler = async () => {
-        if (ptyProcess.pid && !exited) {
-          ptyProcess.kill('SIGHUP');
+        if (finalPtyProcess.pid && !exited) {
+          finalPtyProcess.kill('SIGHUP');
         }
       };
 
       abortSignal.addEventListener('abort', abortHandler, { once: true });
     });
 
-    return { pid: ptyProcess.pid, result };
+    return { pid: finalPtyProcess.pid, result };
   }
 }

@@ -50,10 +50,11 @@
     "simple-git": "^3.28.0",
     "undici": "^7.10.0",
     "ws": "^8.18.0",
-    "@lydell/node-pty": "1.1.0",
     "@xterm/headless": "5.5.0"
   },
   "optionalDependencies": {
+    "@lydell/node-pty": "1.1.0",
+    "node-pty": "^1.0.0",
     "@lydell/node-pty-darwin-arm64": "1.1.0",
     "@lydell/node-pty-darwin-x64": "1.1.0",
     "@lydell/node-pty-linux-x64": "1.1.0",

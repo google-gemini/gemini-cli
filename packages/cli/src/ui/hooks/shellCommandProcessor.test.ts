@@ -109,6 +109,7 @@ describe('useShellCommandProcessor', () => {
     error: null,
     aborted: false,
     pid: 12345,
+    executionMethod: 'child_process',
     ...overrides,
   });
 

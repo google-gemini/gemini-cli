@@ -127,6 +127,7 @@ describe('ShellTool', () => {
         error: null,
         aborted: false,
         pid: 12345,
+        executionMethod: 'child_process',
         ...result,
       };
       resolveExecutionPromise(fullResult);
@@ -168,6 +169,7 @@ describe('ShellTool', () => {
         error: null,
         aborted: false,
         pid: 12345,
+        executionMethod: 'child_process',
       });
       await promise;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
@@ -192,6 +194,7 @@ describe('ShellTool', () => {
         signal: null,
         aborted: false,
         pid: 12345,
+        executionMethod: 'child_process',
       });
 
       const result = await promise;
@@ -232,6 +235,7 @@ describe('ShellTool', () => {
         error: null,
         aborted: false,
         pid: 12345,
+        executionMethod: 'child_process',
       });
 
       const result = await promise;
@@ -299,6 +303,7 @@ describe('ShellTool', () => {
           error: null,
           aborted: false,
           pid: 12345,
+          executionMethod: 'child_process',
         });
         await promise;
       });
@@ -339,6 +344,7 @@ describe('ShellTool', () => {
           error: null,
           aborted: false,
           pid: 12345,
+          executionMethod: 'child_process',
         });
         await promise;
       });
