@@ -66,7 +66,7 @@ export interface OauthWebLogin {
   loginCompletePromise: Promise<void>;
 }
 
-let oauthClientPromise: Promise<OAuth2Client> | undefined;
+const oauthClientPromises = new Map<AuthType, Promise<OAuth2Client>>();
 
 async function initOauthClient(
   authType: AuthType,
@@ -193,10 +193,10 @@ export async function getOauthClient(
   authType: AuthType,
   config: Config,
 ): Promise<OAuth2Client> {
-  if (!oauthClientPromise) {
-    oauthClientPromise = initOauthClient(authType, config);
+  if (!oauthClientPromises.has(authType)) {
+    oauthClientPromises.set(authType, initOauthClient(authType, config));
   }
-  return oauthClientPromise;
+  return oauthClientPromises.get(authType)!;
 }
 
 async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
@@ -430,5 +430,5 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
 }
 
 export function resetOauthClient() {
-  oauthClientPromise = undefined;
+  oauthClientPromises.clear();
 }
