@@ -24,6 +24,7 @@ const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 const renderWithMockedStats = (metrics: SessionMetrics) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
+      sessionId: 'test-session-id',
       sessionStartTime: new Date(),
       metrics,
       lastPromptTokenCount: 0,
@@ -59,7 +60,7 @@ describe('<StatsDisplay />', () => {
     const output = lastFrame();
 
     expect(output).toContain('Performance');
-    expect(output).not.toContain('Interaction Summary');
+    expect(output).toContain('Interaction Summary');
     expect(output).not.toContain('Efficiency & Optimizations');
     expect(output).not.toContain('Model'); // The table header
     expect(output).toMatchSnapshot();
@@ -377,6 +378,7 @@ describe('<StatsDisplay />', () => {
     it('renders the custom title when a title prop is provided', () => {
       useSessionStatsMock.mockReturnValue({
         stats: {
+          sessionId: 'test-session-id',
           sessionStartTime: new Date(),
           metrics: zeroMetrics,
           lastPromptTokenCount: 0,

@@ -10,8 +10,7 @@
  * external dependencies, making it compatible with Docker sandbox mode.
  */
 
-import { test, describe, before } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { describe, it, beforeAll, expect } from 'vitest';
 import { TestRig, validateModelOutput } from './test-helper.js';
 import { join } from 'path';
 import { writeFileSync } from 'fs';
@@ -168,7 +167,7 @@ rpc.send({
 describe('simple-mcp-server', () => {
   const rig = new TestRig();
 
-  before(async () => {
+  beforeAll(async () => {
     // Setup test directory with MCP server configuration
     await rig.setup('simple-mcp-server', {
       settings: {
@@ -192,17 +191,20 @@ describe('simple-mcp-server', () => {
     }
   });
 
-  test('should add two numbers', async () => {
+  it('should add two numbers', async () => {
     // Test directory is already set up in before hook
     // Just run the command - MCP server config is in settings.json
     const output = await rig.run('add 5 and 10');
 
     const foundToolCall = await rig.waitForToolCall('add');
 
-    assert.ok(foundToolCall, 'Expected to find an add tool call');
+    expect(foundToolCall, 'Expected to find an add tool call').toBeTruthy();
 
     // Validate model output - will throw if no output, fail if missing expected content
     validateModelOutput(output, '15', 'MCP server test');
-    assert.ok(output.includes('15'), 'Expected output to contain the sum (15)');
+    expect(
+      output.includes('15'),
+      'Expected output to contain the sum (15)',
+    ).toBeTruthy();
   });
 });
