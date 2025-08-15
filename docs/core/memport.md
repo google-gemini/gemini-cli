@@ -32,7 +32,9 @@ More content here.
 
 ### Absolute Paths
 
-- `@/absolute/path/to/file.md` - Import using absolute path
+- `@/absolute/path/to/file.md` - Import using an absolute path.
+
+**Note on Security:** For security reasons, an absolute path is only allowed if it resolves to a file located *within the same directory as (or a subdirectory of) the file that contains the import statement*. This is a strict security measure to prevent a malicious markdown file from accessing arbitrary files on your system (e.g., `C:\Users\YourUser\secrets.txt` or `/etc/passwd`).
 
 ## Examples
 
@@ -88,7 +90,13 @@ The processor automatically detects and prevents circular imports:
 
 ### File Access Security
 
-The `validateImportPath` function ensures that imports are only allowed from specified directories, preventing access to sensitive files outside the allowed scope.
+To prevent path traversal attacks, the import processor (`validateImportPath` function)enforces that the resolved path of the file to be imported is a sub-path of the directory containing the file that defines the import (`basePath`).
+
+For example, if your file is in `/project/docs/` and you try to import `@/etc/passwd`, the output will contain:
+
+```markdown
+<!-- Import failed: /etc/passwd - Path traversal attempt -->
+```
 
 ### Maximum Import Depth
 
