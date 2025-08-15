@@ -11,6 +11,8 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import * as versionUtils from '../../utils/version.js';
 import { MessageType } from '../types.js';
 
+import { IdeClient } from '../../../../core/src/ide/ide-client.js';
+
 vi.mock('../../utils/version.js', () => ({
   getCliVersion: vi.fn(),
 }));
@@ -25,6 +27,7 @@ describe('aboutCommand', () => {
       services: {
         config: {
           getModel: vi.fn(),
+          getIdeClient: vi.fn(),
         },
         settings: {
           merged: {
@@ -45,6 +48,9 @@ describe('aboutCommand', () => {
     Object.defineProperty(process, 'platform', {
       value: 'test-os',
     });
+    vi.spyOn(mockContext.services.config!, 'getIdeClient').mockReturnValue({
+      getDetectedIdeDisplayName: vi.fn().mockReturnValue('test-ide'),
+    } as Partial<IdeClient> as IdeClient);
   });
 
   afterEach(() => {
@@ -78,6 +84,7 @@ describe('aboutCommand', () => {
         modelVersion: 'test-model',
         selectedAuthType: 'test-auth',
         gcpProject: 'test-gcp-project',
+        ideClient: 'test-ide',
       },
       expect.any(Number),
     );
@@ -111,6 +118,33 @@ describe('aboutCommand', () => {
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
         sandboxEnv: 'sandbox-exec (test-profile)',
+      }),
+      expect.any(Number),
+    );
+  });
+
+  it('should not show ide client when it is not detected', async () => {
+    vi.spyOn(mockContext.services.config!, 'getIdeClient').mockReturnValue({
+      getDetectedIdeDisplayName: vi.fn().mockReturnValue(undefined),
+    } as Partial<IdeClient> as IdeClient);
+
+    process.env.SANDBOX = '';
+    if (!aboutCommand.action) {
+      throw new Error('The about command must have an action.');
+    }
+
+    await aboutCommand.action(mockContext, '');
+
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageType.ABOUT,
+        cliVersion: 'test-version',
+        osVersion: 'test-os',
+        sandboxEnv: 'no sandbox',
+        modelVersion: 'test-model',
+        selectedAuthType: 'test-auth',
+        gcpProject: 'test-gcp-project',
+        ideClient: '',
       }),
       expect.any(Number),
     );
