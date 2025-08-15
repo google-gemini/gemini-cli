@@ -272,7 +272,7 @@ export class IdeClient {
       };
     }
 
-    const ideWorkspacePaths = ideWorkspacePath.split(':');
+    const ideWorkspacePaths = ideWorkspacePath.split(path.delimiter);
     const realCwd = getRealPath(cwd);
     const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) => {
       const idePath = getRealPath(workspacePath);
