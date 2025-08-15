@@ -158,6 +158,7 @@ export const useSlashCommandProcessor = (
   );
   const commandContext = useMemo(
     (): CommandContext => ({
+      signal: new AbortController().signal, // Default signal, will be overridden in handleSlashCommand
       services: {
         config,
         settings,
@@ -233,6 +234,7 @@ export const useSlashCommandProcessor = (
   const handleSlashCommand = useCallback(
     async (
       rawQuery: PartListUnion,
+      signal: AbortSignal,
       oneTimeShellAllowlist?: Set<string>,
       overwriteConfirmed?: boolean,
     ): Promise<SlashCommandProcessorResult | false> => {
@@ -303,6 +305,7 @@ export const useSlashCommandProcessor = (
           if (commandToExecute.action) {
             const fullCommandContext: CommandContext = {
               ...commandContext,
+              signal,
               invocation: {
                 raw: trimmed,
                 name: commandToExecute.name,
@@ -432,6 +435,7 @@ export const useSlashCommandProcessor = (
 
                   return await handleSlashCommand(
                     result.originalInvocation.raw,
+                    signal,
                     // Pass the approved commands as a one-time grant for this execution.
                     new Set(approvedCommands),
                   );
@@ -462,6 +466,7 @@ export const useSlashCommandProcessor = (
 
                   return await handleSlashCommand(
                     result.originalInvocation.raw,
+                    signal,
                     undefined,
                     true,
                   );

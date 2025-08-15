@@ -15,6 +15,8 @@ import { SessionStatsState } from '../contexts/SessionContext.js';
 
 // Grouped dependencies for clarity and easier mocking
 export interface CommandContext {
+  // An abort signal that is tied to the lifecycle of the current user prompt.
+  signal: AbortSignal;
   // Invocation properties for when commands are called.
   invocation?: {
     /** The raw, untrimmed input string from the user. */

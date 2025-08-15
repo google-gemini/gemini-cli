@@ -77,7 +77,7 @@ describe('setupGithubCommand', async () => {
     );
 
     const result = (await setupGithubCommand.action?.(
-      {} as CommandContext,
+      { signal: new AbortController().signal } as CommandContext,
       '',
     )) as ToolActionReturn;
 

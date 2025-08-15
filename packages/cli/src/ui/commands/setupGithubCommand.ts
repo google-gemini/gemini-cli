@@ -51,8 +51,6 @@ export const setupGithubCommand: SlashCommand = {
   action: async (
     context: CommandContext,
   ): Promise<SlashCommandActionReturn> => {
-    const abortController = new AbortController();
-
     if (!isGitHubRepository()) {
       throw new Error(
         'Unable to determine the GitHub repository. /setup-github must be run from a git repository.',
@@ -108,7 +106,7 @@ export const setupGithubCommand: SlashCommand = {
             dispatcher: proxy ? new ProxyAgent(proxy) : undefined,
             signal: AbortSignal.any([
               AbortSignal.timeout(30_000),
-              abortController.signal,
+              context.signal,
             ]),
           } as RequestInit);
 
@@ -141,10 +139,7 @@ export const setupGithubCommand: SlashCommand = {
     }
 
     // Wait for all downloads to complete
-    await Promise.all(downloads).finally(() => {
-      // Stop existing downloads
-      abortController.abort();
-    });
+    await Promise.all(downloads);
 
     // Print out a message
     const commands = [];

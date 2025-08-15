@@ -1130,7 +1130,10 @@ describe('useGeminiStream', () => {
       });
 
       await waitFor(() => {
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith('/help');
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/help',
+          expect.any(AbortSignal),
+        );
         expect(mockScheduleToolCalls).not.toHaveBeenCalled();
         expect(mockSendMessageStream).not.toHaveBeenCalled(); // No LLM call made
       });
@@ -1153,6 +1156,7 @@ describe('useGeminiStream', () => {
       await waitFor(() => {
         expect(mockHandleSlashCommand).toHaveBeenCalledWith(
           '/my-custom-command',
+          expect.any(AbortSignal),
         );
 
         expect(localMockSendMessageStream).not.toHaveBeenCalledWith(
@@ -1186,7 +1190,10 @@ describe('useGeminiStream', () => {
       });
 
       await waitFor(() => {
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith('/emptycmd');
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/emptycmd',
+          expect.any(AbortSignal),
+        );
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           '',
           expect.any(AbortSignal),
