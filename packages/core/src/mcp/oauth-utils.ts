@@ -43,18 +43,36 @@ export interface OAuthProtectedResourceMetadata {
 export class OAuthUtils {
   /**
    * Construct well-known OAuth endpoint URLs.
+   * By default, uses standard root-based well-known URLs.
+   * If includePathSuffix is true, appends any path from the base URL to the well-known endpoints.
    */
-  static buildWellKnownUrls(baseUrl: string) {
+  static buildWellKnownUrls(baseUrl: string, includePathSuffix = false) {
     const serverUrl = new URL(baseUrl);
     const base = `${serverUrl.protocol}//${serverUrl.host}`;
 
+    if (!includePathSuffix) {
+      // Standard discovery: use root-based well-known URLs
+      return {
+        protectedResource: new URL(
+          '/.well-known/oauth-protected-resource',
+          base,
+        ).toString(),
+        authorizationServer: new URL(
+          '/.well-known/oauth-authorization-server',
+          base,
+        ).toString(),
+      };
+    }
+
+    // Path-based discovery: append path suffix to well-known URLs
+    const pathSuffix = serverUrl.pathname.replace(/\/$/, ''); // Remove trailing slash
     return {
       protectedResource: new URL(
-        '/.well-known/oauth-protected-resource',
+        `/.well-known/oauth-protected-resource${pathSuffix}`,
         base,
       ).toString(),
       authorizationServer: new URL(
-        '/.well-known/oauth-authorization-server',
+        `/.well-known/oauth-authorization-server${pathSuffix}`,
         base,
       ).toString(),
     };
@@ -132,24 +150,55 @@ export class OAuthUtils {
     serverUrl: string,
   ): Promise<MCPOAuthConfig | null> {
     try {
-      const wellKnownUrls = this.buildWellKnownUrls(serverUrl);
+      // First try standard root-based discovery
+      const wellKnownUrls = this.buildWellKnownUrls(serverUrl, false);
 
-      // First, try to get the protected resource metadata
-      const resourceMetadata = await this.fetchProtectedResourceMetadata(
+      // Try to get the protected resource metadata at root
+      let resourceMetadata = await this.fetchProtectedResourceMetadata(
         wellKnownUrls.protectedResource,
       );
+
+      // If root discovery fails and we have a path, try path-based discovery
+      if (!resourceMetadata) {
+        const url = new URL(serverUrl);
+        if (url.pathname && url.pathname !== '/') {
+          const pathBasedUrls = this.buildWellKnownUrls(serverUrl, true);
+          resourceMetadata = await this.fetchProtectedResourceMetadata(
+            pathBasedUrls.protectedResource,
+          );
+        }
+      }
 
       if (resourceMetadata?.authorization_servers?.length) {
         // Use the first authorization server
         const authServerUrl = resourceMetadata.authorization_servers[0];
-        const authServerMetadataUrl = new URL(
-          '/.well-known/oauth-authorization-server',
-          authServerUrl,
+
+        // The authorization server URL may include a path (e.g., https://github.com/login/oauth)
+        // We need to preserve this path when constructing the metadata URL
+        const authServerUrlObj = new URL(authServerUrl);
+        const authServerPath =
+          authServerUrlObj.pathname === '/' ? '' : authServerUrlObj.pathname;
+
+        // Try with the authorization server's path first
+        let authServerMetadataUrl = new URL(
+          `/.well-known/oauth-authorization-server${authServerPath}`,
+          `${authServerUrlObj.protocol}//${authServerUrlObj.host}`,
         ).toString();
 
-        const authServerMetadata = await this.fetchAuthorizationServerMetadata(
+        let authServerMetadata = await this.fetchAuthorizationServerMetadata(
           authServerMetadataUrl,
         );
+
+        // If that fails, try root as fallback
+        if (!authServerMetadata && authServerPath) {
+          authServerMetadataUrl = new URL(
+            '/.well-known/oauth-authorization-server',
+            `${authServerUrlObj.protocol}//${authServerUrlObj.host}`,
+          ).toString();
+          authServerMetadata = await this.fetchAuthorizationServerMetadata(
+            authServerMetadataUrl,
+          );
+        }
 
         if (authServerMetadata) {
           const config = this.metadataToOAuthConfig(authServerMetadata);
@@ -221,10 +270,6 @@ export class OAuthUtils {
       return null;
     }
 
-    console.log(
-      `Found resource metadata URI from www-authenticate header: ${resourceMetadataUri}`,
-    );
-
     const resourceMetadata =
       await this.fetchProtectedResourceMetadata(resourceMetadataUri);
     if (!resourceMetadata?.authorization_servers?.length) {
@@ -232,19 +277,36 @@ export class OAuthUtils {
     }
 
     const authServerUrl = resourceMetadata.authorization_servers[0];
+
+    // The authorization server URL may include a path (e.g., https://github.com/login/oauth)
+    // We need to preserve this path when constructing the metadata URL
+    const authServerUrlObj = new URL(authServerUrl);
+    const authServerPath =
+      authServerUrlObj.pathname === '/' ? '' : authServerUrlObj.pathname;
+
+    // Build auth server metadata URL with the authorization server's path
     const authServerMetadataUrl = new URL(
-      '/.well-known/oauth-authorization-server',
-      authServerUrl,
+      `/.well-known/oauth-authorization-server${authServerPath}`,
+      `${authServerUrlObj.protocol}//${authServerUrlObj.host}`,
     ).toString();
 
-    const authServerMetadata = await this.fetchAuthorizationServerMetadata(
+    let authServerMetadata = await this.fetchAuthorizationServerMetadata(
       authServerMetadataUrl,
     );
 
-    if (authServerMetadata) {
-      console.log(
-        'OAuth configuration discovered successfully from www-authenticate header',
+    // If that fails and we have a path, also try the root path as a fallback
+    if (!authServerMetadata && authServerPath) {
+      const rootAuthServerMetadataUrl = new URL(
+        '/.well-known/oauth-authorization-server',
+        `${authServerUrlObj.protocol}//${authServerUrlObj.host}`,
+      ).toString();
+
+      authServerMetadata = await this.fetchAuthorizationServerMetadata(
+        rootAuthServerMetadataUrl,
       );
+    }
+
+    if (authServerMetadata) {
       return this.metadataToOAuthConfig(authServerMetadata);
     }
 
