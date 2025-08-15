@@ -55,15 +55,31 @@ jobs:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
 
-      - name: 'Run Gemini Issue Triage'
+      - name: 'Get Repository Labels'
+        id: 'get_labels'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          script: |-
+            const { data: labels } = await github.rest.issues.listLabelsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const labelNames = labels.map(label => label.name);
+            core.setOutput('available_labels', labelNames.join(','));
+            core.info(`Found ${labelNames.length} labels: ${labelNames.join(', ')}`);
+            return labelNames;
+
+      - name: 'Run Gemini Issue Analysis'
         uses: 'google-github-actions/run-gemini-cli@06123c6a203eb7a964ce3be7c48479cc66059f23' # ratchet:google-github-actions/run-gemini-cli@v0
-        id: 'gemini_issue_triage'
+        id: 'gemini_issue_analysis'
         env:
-          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
           ISSUE_TITLE: '${{ github.event.issue.title }}'
           ISSUE_BODY: '${{ github.event.issue.body }}'
           ISSUE_NUMBER: '${{ github.event.issue.number }}'
           REPOSITORY: '${{ github.repository }}'
+          AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         with:
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
@@ -76,10 +92,7 @@ jobs:
             {
               "maxSessionTurns": 25,
               "coreTools": [
-                "run_shell_command(echo)",
-                "run_shell_command(gh label list)",
-                "run_shell_command(gh issue edit)",
-                "run_shell_command(gh issue list)"
+                "run_shell_command(echo)"
               ],
               "telemetry": {
                 "enabled": true,
@@ -89,29 +102,42 @@ jobs:
           prompt: |-
             ## Role
 
-            You are an issue triage assistant. Analyze the current GitHub issue and apply the most appropriate existing labels. Use the available
-            tools to gather information; do not ask for information to be provided. Do not remove labels titled help wanted or good first issue.
+            You are an issue triage assistant. Analyze the current GitHub issue
+            and identify the most appropriate existing labels. Use the available
+            tools to gather information; do not ask for information to be
+            provided. Do not remove labels titled help wanted or good first issue.
 
             ## Steps
 
-            1. Run: `gh label list --repo "${REPOSITORY}" --limit 100` to get all available labels.
+            1. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
             2. Review the issue title and body provided in the environment variables: "${ISSUE_TITLE}" and "${ISSUE_BODY}".
             3. Ignore any existing priorities or tags on the issue. Just report your findings.
             4. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. For area/* and kind/* limit yourself to only the single most applicable label in each case.
-            6. Apply the selected labels to this issue using: `gh issue edit "${ISSUE_NUMBER}" --repo "${REPOSITORY}" --add-label "label1,label2"`.
-            7. For each issue please check if CLI version is present, this is usually in the output of the /about command  and will look like 0.1.5 for anything more than 6 versions older than the most recent should add the status/need-retesting label.
-            8. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label.
+            5. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5 for anything more than 6 versions older than the most recent should add the status/need-retesting label.
+            6. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label.
+            7. Output the appropriate labels for this issue in JSON format with explanation, for example:
+               ```
+               {"labels_to_set": ["kind/bug", "priority/p0"], "explanation": "This is a critical bug report affecting main functionality"}
+               ```
+            8. If the issue cannot be classified using the available labels, output:
+               ```
+               {"labels_to_set": [], "explanation": "Unable to classify this issue with available labels"}
+               ```
             9. Use Area definitions mentioned below to help you narrow down issues.
 
             ## Guidelines
 
-            - Only use labels that already exist in the repository.
-            - Do not add comments or modify the issue content.
-            - Triage only the current issue.
-            - Apply only one area/ label.
-            - Apply only one kind/ label.
-            - Apply all applicable sub-area/* and priority/* labels based on the issue content. It's ok to have multiple of these.
-            - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
+            - Only use labels that already exist in the repository
+            - Do not add comments or modify the issue content
+            - Triage only the current issue
+            - Identify only one area/ label
+            - Identify only one kind/ label
+            - Identify all applicable sub-area/* and priority/* labels based on the issue content. It's ok to have multiple of these
+            - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario
+            - Reference all shell variables as "${VAR}" (with quotes and braces)
+            - Output only valid JSON format
+            - Do not include any explanation or additional text, just the JSON
+
             Categorization Guidelines:
             P0: Critical / Blocker
             - A P0 bug is a catastrophic failure that demands immediate attention. It represents a complete showstopper for a significant portion of users or for the development process itself.
@@ -189,165 +215,61 @@ jobs:
             - other general software performance like, memory usage, CPU consumption, and algorithmic efficiency.
             - Switching models from one to the other unexpectedly.
 
-      - name: 'Post Issue Triage Failure Comment'
+      - name: 'Apply Labels to Issue'
         if: |-
-          ${{ failure() && steps.gemini_issue_triage.outcome == 'failure' }}
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea' # ratchet:actions/github-script@v7
+          ${{ steps.gemini_issue_analysis.outputs.summary != '' }}
         env:
           REPOSITORY: '${{ github.repository }}'
-          RUN_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number }}'
+          LABELS_OUTPUT: '${{ steps.gemini_issue_analysis.outputs.summary }}'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
-          github-token: '${{ steps.generate_token.outputs.token }}'
+          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          script: |-
+            // Strip code block markers if present
+            const rawLabels = process.env.LABELS_OUTPUT;
+            core.info(`Raw labels JSON: ${rawLabels}`);
+            let parsedLabels;
+            try {
+              const trimmedLabels = rawLabels.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '').trim();
+              parsedLabels = JSON.parse(trimmedLabels);
+              core.info(`Parsed labels JSON: ${JSON.stringify(parsedLabels)}`);
+            } catch (err) {
+              core.setFailed(`Failed to parse labels JSON from Gemini output: ${err.message}\nRaw output: ${rawLabels}`);
+              return;
+            }
+
+            const issueNumber = parseInt(process.env.ISSUE_NUMBER);
+
+            // Set labels based on triage result
+            if (parsedLabels.labels_to_set && parsedLabels.labels_to_set.length > 0) {
+              await github.rest.issues.setLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                labels: parsedLabels.labels_to_set
+              });
+              const explanation = parsedLabels.explanation ? ` - ${parsedLabels.explanation}` : '';
+              core.info(`Successfully set labels for #${issueNumber}: ${parsedLabels.labels_to_set.join(', ')}${explanation}`);
+            } else {
+              // If no labels to set, leave the issue as is
+              const explanation = parsedLabels.explanation ? ` - ${parsedLabels.explanation}` : '';
+              core.info(`No labels to set for #${issueNumber}, leaving as is${explanation}`);
+            }
+
+      - name: 'Post Issue Analysis Failure Comment'
+        if: |-
+          ${{ failure() && steps.gemini_issue_analysis.outcome == 'failure' }}
+        env:
+          ISSUE_NUMBER: '${{ github.event.issue.number }}'
+          RUN_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           script: |-
             github.rest.issues.createComment({
-              owner: process.env.REPOSITORY.split('/')[0],
-              repo: process.env.REPOSITORY.split('/')[1],
-              issue_number: '${{ github.event.issue.number }}',
-              body: `There is a problem with the Gemini CLI issue triaging. Please check the [action logs](${process.env.RUN_URL}) for details.`
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(process.env.ISSUE_NUMBER),
+              body: 'There is a problem with the Gemini CLI issue triaging. Please check the [action logs](${process.env.RUN_URL}) for details.'
             })
-
-  deduplicate-issues:
-    if: |-
-      github.repository == 'google-gemini/gemini-cli' &&
-      vars.TRIAGE_DEDUPLICATE_ISSUES != '' &&
-      (github.event_name == 'issues' ||
-       github.event_name == 'workflow_dispatch' ||
-       (github.event_name == 'issue_comment' &&
-       contains(github.event.comment.body, '@gemini-cli /deduplicate') &&
-       (github.event.comment.author_association == 'OWNER' ||
-        github.event.comment.author_association == 'MEMBER' ||
-        github.event.comment.author_association == 'COLLABORATOR')))
-
-    timeout-minutes: 20
-    runs-on: 'ubuntu-latest'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
-
-      - name: 'Generate GitHub App Token'
-        id: 'generate_token'
-        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
-        with:
-          app-id: '${{ secrets.APP_ID }}'
-          private-key: '${{ secrets.PRIVATE_KEY }}'
-
-      - name: 'Log in to GitHub Container Registry'
-        uses: 'docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1' # ratchet:docker/login-action@v3
-        with:
-          registry: 'ghcr.io'
-          username: '${{ github.actor }}'
-          password: '${{ secrets.GITHUB_TOKEN }}'
-
-      - name: 'Run Gemini Issue Deduplication'
-        uses: 'google-github-actions/run-gemini-cli@06123c6a203eb7a964ce3be7c48479cc66059f23' # ratchet:google-github-actions/run-gemini-cli@v0
-        id: 'gemini_issue_deduplication'
-        env:
-          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
-          ISSUE_TITLE: '${{ github.event.issue.title }}'
-          ISSUE_BODY: '${{ github.event.issue.body }}'
-          ISSUE_NUMBER: '${{ github.event.issue.number }}'
-          REPOSITORY: '${{ github.repository }}'
-          FIRESTORE_PROJECT: '${{ vars.FIRESTORE_PROJECT }}'
-        with:
-          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
-          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
-          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
-          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
-          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
-          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
-          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
-          settings: |-
-            {
-              "mcpServers": {
-                "issue_deduplication": {
-                  "command": "docker",
-                  "args": [
-                    "run",
-                    "-i",
-                    "--rm",
-                    "--network", "host",
-                    "-e", "GITHUB_TOKEN",
-                    "-e", "GEMINI_API_KEY",
-                    "-e", "DATABASE_TYPE",
-                    "-e", "FIRESTORE_DATABASE_ID",
-                    "-e", "GCP_PROJECT",
-                    "-e", "GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json",
-                    "-v", "${GOOGLE_APPLICATION_CREDENTIALS}:/app/gcp-credentials.json",
-                    "ghcr.io/google-gemini/gemini-cli-issue-triage@sha256:e3de1523f6c83aabb3c54b76d08940a2bf42febcb789dd2da6f95169641f94d3"
-                  ],
-                  "env": {
-                    "GITHUB_TOKEN": "${GITHUB_TOKEN}",
-                    "GEMINI_API_KEY": "${{ secrets.GEMINI_API_KEY }}",
-                    "DATABASE_TYPE":"firestore",
-                    "GCP_PROJECT": "${FIRESTORE_PROJECT}",
-                    "FIRESTORE_DATABASE_ID": "(default)",
-                    "GOOGLE_APPLICATION_CREDENTIALS": "${GOOGLE_APPLICATION_CREDENTIALS}"
-                  },
-                  "enabled": true,
-                  "timeout": 600000
-                }
-              },
-              "maxSessionTurns": 25,
-              "coreTools": [
-                "run_shell_command(echo)",
-                "run_shell_command(gh issue comment)",
-                "run_shell_command(gh issue view)",
-                "run_shell_command(gh issue edit)"
-              ],
-              "telemetry": {
-                "enabled": true,
-                "target": "gcp"
-              }
-            }
-          prompt: |-
-            ## Role
-            You are an issue de-duplication assistant. Your goal is to find
-            duplicate issues, label the current issue as a duplicate, and notify
-            the user by commenting on the current issue, while avoiding
-            duplicate comments.
-            ## Steps
-            1.  **Find Potential Duplicates:**
-                - The repository is ${{ github.repository }} and the issue number is ${{ github.event.issue.number }}.
-                - Use the `duplicates` tool with the `repo` and `issue_number` to find potential duplicates for the current issue. Do not use the `threshold` parameter.
-                - If no duplicates are found, you are done.
-                - Print the JSON output from the `duplicates` tool to the logs.
-            2.  **Refine Duplicates List (if necessary):**
-                - If the `duplicates` tool returns between 1 and 14 results, you must refine the list.
-                - For each potential duplicate issue, run `gh issue view <issue-number> --json title,body,comments` to fetch its content.
-                - Also fetch the content of the original issue: `gh issue view "${ISSUE_NUMBER}" --json title,body,comments`.
-                - Carefully analyze the content (title, body, comments) of the original issue and all potential duplicates.
-                - It is very important if the comments on either issue mention that they are not duplicates of each other, to treat them as not duplicates.
-                - Based on your analysis, create a final list containing only the issues you are highly confident are actual duplicates.
-                - If your final list is empty, you are done.
-                - Print to the logs if you omitted any potential duplicates based on your analysis.
-                - If the `duplicates` tool returned 15+ results, use the top 15 matches (based on descending similarity score value) to perform this step.
-            3.  **Format Final Duplicates List:**
-                Format the final list of duplicates into a markdown string.
-                The format should be:
-                "Found possible duplicate issues:\n\n- #${issue_number}\n\nIf you believe this is not a duplicate, please remove the `status/possible-duplicate` label."
-                Add an HTML comment to the end for identification: `<!-- gemini-cli-deduplication -->`
-            4.  **Check for Existing Comment:**
-                - Run `gh issue view "${ISSUE_NUMBER}" --json comments` to get all
-                  comments on the issue.
-                - Look for a comment made by a bot (the author's login often ends in `[bot]`) that contains `<!-- gemini-cli-deduplication -->`.
-                - If you find such a comment, store its `id` and `body`.
-            5.  **Decide Action:**
-                - **If an existing comment is found:**
-                    - Compare the new list of duplicate issues with the list from the existing comment's body.
-                    - If they are the same, do nothing.
-                    - If they are different, edit the existing comment. Use
-                      `gh issue comment "${ISSUE_NUMBER}" --edit-comment <comment-id> --body "..."`.
-                      The new body should be the new list of duplicates, but with the header "Found possible duplicate issues (updated):".
-                - **If no existing comment is found:**
-                    - Create a new comment with the list of duplicates.
-                    - Use `gh issue comment "${ISSUE_NUMBER}" --body "..."`.
-            6.  **Add Duplicate Label:**
-                - If you created or updated a comment in the previous step, add the `duplicate` label to the current issue.
-                - Use `gh issue edit "${ISSUE_NUMBER}" --add-label "status/possible-duplicate"`.
-            ## Guidelines
-            - Only use the `duplicates` and `run_shell_command` tools.
-            - The `run_shell_command` tool can be used with `gh issue view`, `gh issue comment`, and `gh issue edit`.
-            - Do not download or read media files like images, videos, or links. The `--json` flag for `gh issue view` will prevent this.
-            - Do not modify the issue content or status.
-            - Only comment on and label the current issue.
-            - Reference all shell variables as "${VAR}" (with quotes and braces).

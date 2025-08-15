@@ -147,6 +147,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'return', command: true },
     { key: 'return', paste: true },
     { key: 'return', shift: true },
+    { key: 'j', ctrl: true },
   ],
 
   // External tools
@@ -163,8 +164,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'o', ctrl: true }],
   // Original: key.ctrl && key.name === 't'
   [Command.TOGGLE_TOOL_DESCRIPTIONS]: [{ key: 't', ctrl: true }],
-  // Original: key.ctrl && key.name === 'e'
-  [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'e', ctrl: true }],
+  // Original: key.ctrl && key.name === 'g'
+  [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
   // Original: key.ctrl && (key.name === 'c' || key.name === 'C')
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   // Original: key.ctrl && (key.name === 'd' || key.name === 'D')

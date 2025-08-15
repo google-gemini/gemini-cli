@@ -163,6 +163,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
           getCurrentIde: vi.fn(() => 'vscode'),
           getDetectedIdeDisplayName: vi.fn(() => 'VSCode'),
         })),
+        isTrustedFolder: vi.fn(() => true),
       };
     });
 
@@ -528,7 +529,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('1 open file (ctrl+e to view)');
+    expect(lastFrame()).toContain('1 open file (ctrl+g to view)');
   });
 
   it('should not display any files when not available', async () => {
@@ -583,7 +584,7 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain('3 open files (ctrl+e to view)');
+    expect(lastFrame()).toContain('3 open files (ctrl+g to view)');
   });
 
   it('should display active file and other context', async () => {
@@ -612,7 +613,7 @@ describe('App UI', () => {
     currentUnmount = unmount;
     await Promise.resolve();
     expect(lastFrame()).toContain(
-      'Using: 1 open file (ctrl+e to view) | 1 GEMINI.md file',
+      'Using: 1 open file (ctrl+g to view) | 1 GEMINI.md file',
     );
   });
 
@@ -1117,6 +1118,46 @@ describe('App UI', () => {
       currentUnmount = unmount;
       await Promise.resolve();
       expect(lastFrame()).toContain('Do you trust this folder?');
+    });
+
+    it('should display the folder trust dialog when the feature is enabled but the folder is not trusted', async () => {
+      const { useFolderTrust } = await import('./hooks/useFolderTrust.js');
+      vi.mocked(useFolderTrust).mockReturnValue({
+        isFolderTrustDialogOpen: true,
+        handleFolderTrustSelect: vi.fn(),
+      });
+      mockConfig.isTrustedFolder.mockReturnValue(false);
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      await Promise.resolve();
+      expect(lastFrame()).toContain('Do you trust this folder?');
+    });
+
+    it('should not display the folder trust dialog when the feature is disabled', async () => {
+      const { useFolderTrust } = await import('./hooks/useFolderTrust.js');
+      vi.mocked(useFolderTrust).mockReturnValue({
+        isFolderTrustDialogOpen: false,
+        handleFolderTrustSelect: vi.fn(),
+      });
+      mockConfig.isTrustedFolder.mockReturnValue(false);
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      await Promise.resolve();
+      expect(lastFrame()).not.toContain('Do you trust this folder?');
     });
   });
 });

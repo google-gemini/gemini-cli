@@ -8,7 +8,6 @@ import { useCallback, useMemo, useEffect, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { useStateAndRef } from './useStateAndRef.js';
 import {
   Config,
   GitService,
@@ -93,16 +92,16 @@ export const useSlashCommandProcessor = (
     return l;
   }, [config]);
 
-  const [pendingCompressionItemRef, setPendingCompressionItem] =
-    useStateAndRef<HistoryItemWithoutId | null>(null);
+  const [pendingCompressionItem, setPendingCompressionItem] =
+    useState<HistoryItemWithoutId | null>(null);
 
   const pendingHistoryItems = useMemo(() => {
     const items: HistoryItemWithoutId[] = [];
-    if (pendingCompressionItemRef.current != null) {
-      items.push(pendingCompressionItemRef.current);
+    if (pendingCompressionItem != null) {
+      items.push(pendingCompressionItem);
     }
     return items;
-  }, [pendingCompressionItemRef]);
+  }, [pendingCompressionItem]);
 
   const addMessage = useCallback(
     (message: Message) => {
@@ -117,6 +116,7 @@ export const useSlashCommandProcessor = (
           modelVersion: message.modelVersion,
           selectedAuthType: message.selectedAuthType,
           gcpProject: message.gcpProject,
+          ideClient: message.ideClient,
         };
       } else if (message.type === MessageType.HELP) {
         historyItemContent = {
@@ -173,7 +173,7 @@ export const useSlashCommandProcessor = (
         },
         loadHistory,
         setDebugMessage: onDebugMessage,
-        pendingItem: pendingCompressionItemRef.current,
+        pendingItem: pendingCompressionItem,
         setPendingItem: setPendingCompressionItem,
         toggleCorgiMode,
         toggleVimEnabled,
@@ -196,7 +196,7 @@ export const useSlashCommandProcessor = (
       refreshStatic,
       session.stats,
       onDebugMessage,
-      pendingCompressionItemRef,
+      pendingCompressionItem,
       setPendingCompressionItem,
       toggleCorgiMode,
       toggleVimEnabled,
