@@ -19,7 +19,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import * as os from 'os';
 import { Config } from '../config/config.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, UserClearedAuthMethodError } from '../utils/errors.js';
 import {
   cacheGoogleAccount,
   getCachedGoogleAccount,
@@ -135,16 +135,35 @@ export async function getOauthClient(
   if (config.isBrowserLaunchSuppressed()) {
     let success = false;
     const maxRetries = 2;
-    for (let i = 0; !success && i < maxRetries; i++) {
-      success = await authWithUserCode(client);
-      if (!success) {
-        console.error(
-          '\nFailed to authenticate with user code.',
-          i === maxRetries - 1 ? '' : 'Retrying...\n',
-        );
+    try {
+      for (let i = 0; !success && i < maxRetries; i++) {
+        try {
+          success = await authWithUserCode(client);
+        } catch (err: any) {
+          if (err instanceof UserClearedAuthMethodError) {
+            // User cleared auth method, propagate the error to trigger restart
+            throw err;
+          }
+          // For other errors, treat as authentication failure and continue retry logic
+          success = false;
+        }
+
+        if (!success) {
+          console.error(
+            '\nFailed to authenticate with user code.',
+            i === maxRetries - 1 ? '' : 'Retrying...\n',
+          );
+        }
       }
-    }
-    if (!success) {
+      if (!success) {
+        process.exit(1);
+      }
+    } catch (err: any) {
+      if (err instanceof UserClearedAuthMethodError) {
+        // Re-throw to be handled by the caller
+        throw err;
+      }
+      // For any other errors, exit
       process.exit(1);
     }
   } else {
@@ -204,12 +223,28 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
   console.log(authUrl);
   console.log('');
 
-  const code = await new Promise<string>((resolve) => {
+  const code = await new Promise<string>((resolve, reject) => {
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
     });
-    rl.question('Enter the authorization code: ', (code) => {
+    // Listen for CTRL+A to clear auth method
+    const onCtrlA = (chunk: Buffer) => {
+      if (chunk.length === 1 && chunk[0] === 1) { // CTRL+A is \u0001
+        rl.close();
+        clearCachedCredentialFile().then(() => {
+          // Let the caller handle settings cleanup
+          reject(new UserClearedAuthMethodError());
+        });
+      }
+    };
+    process.stdin.on('data', onCtrlA);
+
+    rl.on('close', () => {
+      process.stdin.off('data', onCtrlA);
+    });
+
+    rl.question("Enter the authorization code (press CTRL+A to clear auth method): ", (code) => {
       rl.close();
       resolve(code.trim());
     });

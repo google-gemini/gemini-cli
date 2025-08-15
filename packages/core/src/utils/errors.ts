@@ -29,6 +29,17 @@ export class ForbiddenError extends Error {}
 export class UnauthorizedError extends Error {}
 export class BadRequestError extends Error {}
 
+/**
+ * Error thrown when user clears authentication method.
+ * This error should trigger a restart of the CLI for new authentication.
+ */
+export class UserClearedAuthMethodError extends Error {
+  constructor() {
+    super('USER_CLEARED_AUTH_METHOD');
+    this.name = 'UserClearedAuthMethodError';
+  }
+}
+
 interface ResponseData {
   error?: {
     code?: number;

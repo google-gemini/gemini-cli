@@ -38,6 +38,7 @@ import {
   logIdeConnection,
   IdeConnectionEvent,
   IdeConnectionType,
+  UserClearedAuthMethodError,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -256,7 +257,17 @@ export async function main() {
     config.isBrowserLaunchSuppressed()
   ) {
     // Do oauth before app renders to make copying the link possible.
-    await getOauthClient(settings.merged.selectedAuthType, config);
+    try {
+      await getOauthClient(settings.merged.selectedAuthType, config);
+    } catch (error: any) {
+      if (error instanceof UserClearedAuthMethodError) {
+        // Clear the selected auth type when user requests it
+        settings.setValue(SettingScope.User, 'selectedAuthType', undefined);
+        // Re-throw to trigger restart
+        throw error;
+      }
+      throw error;
+    }
   }
 
   if (config.getExperimentalZedIntegration()) {
