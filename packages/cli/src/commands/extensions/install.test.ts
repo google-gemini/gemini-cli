@@ -167,24 +167,13 @@ describe('extensions install command', () => {
       },
     ]);
 
-    const consoleErrorSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-    const processExitSpy = vi
-      .spyOn(process, 'exit')
-      .mockImplementation(() => undefined as never);
-
-    await parser.parseAsync(
-      'install https://github.com/google/gemini-hello-world.git',
-    );
-
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    await expect(
+      parser.parseAsync(
+        'install https://github.com/google/gemini-hello-world.git',
+      ),
+    ).rejects.toThrow(
       'Error: Extension "my-extension" is already installed. Please uninstall it first.',
     );
-    expect(processExitSpy).toHaveBeenCalledWith(1);
-
-    consoleErrorSpy.mockRestore();
-    processExitSpy.mockRestore();
   });
 
   it('should fail if gemini-extension.json is not found', async () => {
