@@ -60,8 +60,10 @@ export interface CustomTheme {
   AccentRed: string;
   DiffAdded: string;
   DiffRemoved: string;
+  DiffModified: string;
   Comment: string;
   Gray: string;
+  GradientColors: string[];
 }
 
 /**

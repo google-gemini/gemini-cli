@@ -67,6 +67,9 @@ export function ThemeDialog({
           fileThemes,
           allThemes,
         });
+
+        // Update the theme manager with the combined themes so it can find file-based themes
+        await themeManager.loadCustomThemes(allThemes);
       } catch (error) {
         console.warn('Failed to load combined themes:', error);
         const mergedSettingsThemes = settings.merged.customThemes || {};
@@ -130,15 +133,24 @@ export function ThemeDialog({
       };
     }),
   ];
-  const [selectInputKey, setSelectInputKey] = useState(Date.now());
-
-  // Find the index of the selected theme, but only if it exists in the list
+  
+  // Calculate initial theme index after themes are loaded
   const selectedThemeName = settings.merged.theme || DEFAULT_THEME.name;
-  const initialThemeIndex = themeItems.findIndex(
+  const initialThemeIndex = combinedThemes ? themeItems.findIndex(
     (item) => item.value === selectedThemeName,
-  );
+  ) : -1;
   // If not found, fall back to the first theme
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
+  
+  // Update select key when themes are loaded to force re-initialization with correct index
+  const [selectInputKey, setSelectInputKey] = useState(Date.now());
+  
+  // Update the select key when combined themes change to re-initialize with correct index
+  useEffect(() => {
+    if (combinedThemes) {
+      setSelectInputKey(Date.now());
+    }
+  }, [combinedThemes]);
 
   const scopeItems = getScopeItems();
 
@@ -279,17 +291,21 @@ export function ThemeDialog({
             {currentFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
             <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
           </Text>
-          <RadioButtonSelect
-            key={selectInputKey}
-            items={themeItems}
-            initialIndex={safeInitialThemeIndex}
-            onSelect={handleThemeSelect}
-            onHighlight={handleThemeHighlight}
-            isFocused={currentFocusedSection === 'theme'}
-            maxItemsToShow={8}
-            showScrollArrows={true}
-            showNumbers={currentFocusedSection === 'theme'}
-          />
+          {combinedThemes ? (
+            <RadioButtonSelect
+              key={selectInputKey}
+              items={themeItems}
+              initialIndex={safeInitialThemeIndex}
+              onSelect={handleThemeSelect}
+              onHighlight={handleThemeHighlight}
+              isFocused={currentFocusedSection === 'theme'}
+              maxItemsToShow={8}
+              showScrollArrows={true}
+              showNumbers={currentFocusedSection === 'theme'}
+            />
+          ) : (
+            <Text color={Colors.Gray}>Loading themes...</Text>
+          )}
 
           {/* Scope Selection */}
           {showScopeSelection && (

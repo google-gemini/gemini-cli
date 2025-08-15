@@ -8,9 +8,9 @@ import type { Config } from '../config/config.js';
 import type { ToolResult, ToolCallConfirmationDetails, ToolLocation } from './tools.js';
 import { BaseTool, Icon } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { Schema, Type } from '@google/genai';
+import {  Type } from '@google/genai';
 
-import type { InstallVSCodeThemeToolParams, VSCodeTheme, CustomTheme } from './theme-types.js';
+import type { InstallVSCodeThemeToolParams, VSCodeTheme } from './theme-types.js';
 import { convertVSCodeThemeToCustomTheme } from './theme-converter.js';
 import { generateThemeWithAI, createDefaultTheme } from './theme-generator.js';
 import { extractExtensionId, downloadVsix, extractThemeFromVsix } from './theme-extractor.js';
