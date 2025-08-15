@@ -59,6 +59,8 @@ export function useKeypress(
 ) {
   const { stdin, setRawMode } = useStdin();
   const onKeypressRef = useRef(onKeypress);
+  const fastInputBufferRef = useRef<string>('');
+  const fastInputTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     onKeypressRef.current = onKeypress;
@@ -86,6 +88,7 @@ export function useKeypress(
 
     let isPaste = false;
     let pasteBuffer = Buffer.alloc(0);
+
     let kittySequenceBuffer = '';
     let backslashTimeout: NodeJS.Timeout | null = null;
     let waitingForEnterAfterBackslash = false;
@@ -151,6 +154,7 @@ export function useKeypress(
       // Handle other keys as needed
       return null;
     };
+
 
     const handleKeypress = (_: unknown, key: Key) => {
       // Handle VS Code's backslash+return pattern (Shift+Enter)
@@ -292,8 +296,32 @@ export function useKeypress(
       }
       if (key.name === 'paste-start') {
         isPaste = true;
+        // Clear any existing paste timeout
+        if (pasteTimeout) {
+          clearTimeout(pasteTimeout);
+        }
+        // Set a safety timeout for incomplete paste operations
+        pasteTimeout = setTimeout(() => {
+          if (isPaste && pasteBuffer.length > 0) {
+            // Paste operation timed out, send whatever we have
+            onKeypressRef.current({
+              name: '',
+              ctrl: false,
+              meta: false,
+              shift: false,
+              paste: true,
+              sequence: pasteBuffer.toString(),
+            });
+            pasteBuffer = Buffer.alloc(0);
+            isPaste = false;
+          }
+        }, 1000); // 1 second timeout
       } else if (key.name === 'paste-end') {
         isPaste = false;
+        if (pasteTimeout) {
+          clearTimeout(pasteTimeout);
+          pasteTimeout = null;
+        }
         onKeypressRef.current({
           name: '',
           ctrl: false,
@@ -307,6 +335,53 @@ export function useKeypress(
         if (isPaste) {
           pasteBuffer = Buffer.concat([pasteBuffer, Buffer.from(key.sequence)]);
         } else {
+          // Detect potential paste operations that don't use bracketed paste
+          // by looking for rapid multi-character input
+          if (
+            key.sequence &&
+            key.sequence.length > 1 &&
+            !key.ctrl &&
+            !key.meta
+          ) {
+            // Clear existing fast input timeout
+            if (fastInputTimeoutRef.current) {
+              clearTimeout(fastInputTimeoutRef.current);
+            }
+
+            fastInputBufferRef.current += key.sequence;
+
+            // If we have accumulated significant content quickly, treat as paste
+            fastInputTimeoutRef.current = setTimeout(() => {
+              if (fastInputBufferRef.current.length > 0) {
+                const content = fastInputBufferRef.current;
+                fastInputBufferRef.current = '';
+
+                // If content contains newlines and is substantial, treat as paste
+                if (content.includes('\n') && content.length > 10) {
+                  onKeypressRef.current({
+                    name: '',
+                    ctrl: false,
+                    meta: false,
+                    shift: false,
+                    paste: true,
+                    sequence: content,
+                  });
+                  return;
+                }
+              }
+              fastInputBufferRef.current = '';
+            }, 50); // 50ms detection window
+
+            // For now, still send the original key event
+          } else {
+            // Reset fast input buffer for single character inputs
+            fastInputBufferRef.current = '';
+            if (fastInputTimeoutRef.current) {
+              clearTimeout(fastInputTimeoutRef.current);
+              fastInputTimeoutRef.current = null;
+            }
+          }
+
           // Handle special keys
           if (key.name === 'return' && key.sequence === `${ESC}\r`) {
             key.meta = true;
@@ -398,6 +473,7 @@ export function useKeypress(
       if (backslashTimeout) {
         clearTimeout(backslashTimeout);
         backslashTimeout = null;
+
       }
 
       // If we are in the middle of a paste, send what we have.
