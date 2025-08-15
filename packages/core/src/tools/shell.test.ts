@@ -391,6 +391,20 @@ describe('ShellTool', () => {
       expect(() => shellTool.build({ command: '' })).toThrow();
     });
   });
+
+  describe('getDescription', () => {
+    it('should return the windows description when on windows', () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      const shellTool = new ShellTool(mockConfig);
+      expect(shellTool.description).toMatchSnapshot();
+    });
+
+    it('should return the non-windows description when not on windows', () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      const shellTool = new ShellTool(mockConfig);
+      expect(shellTool.description).toMatchSnapshot();
+    });
+  });
 });
 
 describe('build', () => {
