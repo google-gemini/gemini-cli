@@ -6,6 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { activate } from './extension.js';
 
 vi.mock('vscode', () => ({
@@ -102,7 +103,7 @@ describe('activate with multiple folders', () => {
     );
   });
 
-  it('should set multiple folder paths, separated by a colon', async () => {
+  it('should set multiple folder paths, separated by OS-specific path delimiter', async () => {
     const workspaceFoldersSpy = vi.spyOn(
       vscode.workspace,
       'workspaceFolders',
@@ -117,7 +118,7 @@ describe('activate with multiple folders', () => {
 
     expect(context.environmentVariableCollection.replace).toHaveBeenCalledWith(
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
-      '/foo/bar:/baz/qux',
+      ['/foo/bar', '/baz/qux'].join(path.delimiter),
     );
   });
 
@@ -166,7 +167,7 @@ describe('activate with multiple folders', () => {
 
     expect(context.environmentVariableCollection.replace).toHaveBeenCalledWith(
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
-      '/foo/bar:/baz/qux',
+      ['/foo/bar', '/baz/qux'].join(path.delimiter),
     );
 
     // Simulate removing a folder
@@ -183,4 +184,28 @@ describe('activate with multiple folders', () => {
       '/baz/qux',
     );
   });
+
+  it.skipIf(process.platform !== 'win32')(
+    'should handle windows paths',
+    async () => {
+      const workspaceFoldersSpy = vi.spyOn(
+        vscode.workspace,
+        'workspaceFolders',
+        'get',
+      );
+      workspaceFoldersSpy.mockReturnValue([
+        { uri: { fsPath: 'c:/foo/bar' } },
+        { uri: { fsPath: 'd:/baz/qux' } },
+      ] as vscode.WorkspaceFolder[]);
+
+      await activate(context);
+
+      expect(
+        context.environmentVariableCollection.replace,
+      ).toHaveBeenCalledWith(
+        'GEMINI_CLI_IDE_WORKSPACE_PATH',
+        'c:/foo/bar;d:/baz/qux',
+      );
+    },
+  );
 });
