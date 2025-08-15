@@ -559,15 +559,58 @@ export async function connectAndDiscover(
 }
 
 /**
+ * Resolves a JSON Schema reference path to its corresponding definition.
+ *
+ * This function takes a JSON Schema reference path (e.g., "#/definitions/MyType")
+ * and traverses the root schema to find and return the referenced definition.
+ *
+ * @param path - The JSON Schema reference path starting with "#/" (e.g., "#/definitions/MyType")
+ * @param rootSchema - The root schema object to search within (optional)
+ * @returns The referenced schema definition, or null if the path cannot be resolved
+ *
+ * @example
+ * ```typescript
+ * const schema = {
+ *   definitions: {
+ *     User: { type: "object", properties: { name: { type: "string" } } }
+ *   }
+ * };
+ * const userDef = getRefDefinition("#/definitions/User", schema);
+ * // Returns: { type: "object", properties: { name: { type: "string" } } }
+ * ```
+ */
+export function getRefDefinition(
+  path: `#/${string}`,
+  rootSchema?: Record<string, unknown>,
+): unknown {
+  if (!path.startsWith('#/')) {
+    return null;
+  }
+  const subPaths = path.substring('#/'.length).split('/');
+  return subPaths.reduce((schema: unknown, prop: string) => {
+    if (typeof schema !== 'object' || schema === null) {
+      return null;
+    }
+    // Unescape JSON Pointer path segments.
+    const unescapedProp = prop.replace(/~1/g, '/').replace(/~0/g, '~');
+    return Reflect.get(schema, unescapedProp) ?? null;
+  }, rootSchema);
+}
+
+/**
  * Recursively validates that a JSON schema and all its nested properties and
- * items have a `type` defined.
+ * items have a `type` defined. Handles $ref references by treating them as valid.
  *
  * @param schema The JSON schema to validate.
+ * @param rootSchema The root schema containing definitions (optional).
  * @returns `true` if the schema is valid, `false` otherwise.
  *
  * @visiblefortesting
  */
-export function hasValidTypes(schema: unknown): boolean {
+export function hasValidTypes(
+  schema: unknown,
+  rootSchema?: Record<string, unknown>,
+): boolean {
   if (typeof schema !== 'object' || schema === null) {
     // Not a schema object we can validate, or not a schema at all.
     // Treat as valid as it has no properties to be invalid.
@@ -575,6 +618,20 @@ export function hasValidTypes(schema: unknown): boolean {
   }
 
   const s = schema as Record<string, unknown>;
+
+  // Handle $ref references
+  if (s['$ref']) {
+    const refPath = s['$ref'] as string;
+
+    // Local reference within the schema
+    if (refPath.startsWith('#/')) {
+      const definition = getRefDefinition(refPath as `#/${string}`, rootSchema);
+      return hasValidTypes(definition, rootSchema);
+    }
+
+    // External references are also treated as valid for now
+    return true;
+  }
 
   if (!s['type']) {
     // These keywords contain an array of schemas that should be validated.
@@ -587,7 +644,7 @@ export function hasValidTypes(schema: unknown): boolean {
       if (Array.isArray(subSchemas)) {
         hasSubSchema = true;
         for (const subSchema of subSchemas) {
-          if (!hasValidTypes(subSchema)) {
+          if (!hasValidTypes(subSchema, rootSchema)) {
             return false;
           }
         }
@@ -601,7 +658,7 @@ export function hasValidTypes(schema: unknown): boolean {
   if (s['type'] === 'object' && s['properties']) {
     if (typeof s['properties'] === 'object' && s['properties'] !== null) {
       for (const prop of Object.values(s['properties'])) {
-        if (!hasValidTypes(prop)) {
+        if (!hasValidTypes(prop, rootSchema)) {
           return false;
         }
       }
@@ -609,7 +666,7 @@ export function hasValidTypes(schema: unknown): boolean {
   }
 
   if (s['type'] === 'array' && s['items']) {
-    if (!hasValidTypes(s['items'])) {
+    if (!hasValidTypes(s['items'], rootSchema)) {
       return false;
     }
   }
@@ -649,7 +706,12 @@ export async function discoverTools(
           continue;
         }
 
-        if (!hasValidTypes(funcDecl.parametersJsonSchema)) {
+        // Pass the full schema context for $ref resolution
+        const rootSchema = funcDecl.parametersJsonSchema as Record<
+          string,
+          unknown
+        >;
+        if (!hasValidTypes(funcDecl.parametersJsonSchema, rootSchema)) {
           console.warn(
             `Skipping tool '${funcDecl.name}' from MCP server '${mcpServerName}' ` +
               `because it has missing types in its parameter schema. Please file an ` +
@@ -800,7 +862,7 @@ export async function connectToMcpServer(
   workspaceContext: WorkspaceContext,
 ): Promise<Client> {
   const mcpClient = new Client({
-    name: 'gemini-cli-mcp-client',
+    name: 'codebuddy-cli-mcp-client',
     version: '0.0.1',
   });
 

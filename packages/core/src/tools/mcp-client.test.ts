@@ -12,6 +12,7 @@ import {
   isEnabled,
   hasValidTypes,
   McpClient,
+  getRefDefinition,
 } from './mcp-client.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -59,6 +60,7 @@ describe('mcp-client', () => {
           ],
         }),
       } as unknown as GenAiLib.CallableTool);
+
       const mockedToolRegistry = {
         registerTool: vi.fn(),
       } as unknown as ToolRegistry;
@@ -149,6 +151,220 @@ describe('mcp-client', () => {
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'validTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {},
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('validTool');
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should discover tool with $ref references in schema', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'toolWithRef',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    user: { $ref: '#/definitions/User' },
+                    address: { $ref: '#/definitions/Address' },
+                  },
+                  definitions: {
+                    User: {
+                      type: 'object',
+                      properties: {
+                        name: { type: 'string' },
+                        age: { type: 'number' },
+                      },
+                    },
+                    Address: {
+                      type: 'object',
+                      properties: {
+                        street: { type: 'string' },
+                        city: { type: 'string' },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('toolWithRef');
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should discover tool with complex $ref schema including arrays', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'complexTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    users: {
+                      type: 'array',
+                      items: { $ref: '#/definitions/User' },
+                    },
+                    metadata: {
+                      type: 'object',
+                      additionalProperties: { $ref: '#/definitions/Metadata' },
+                    },
+                  },
+                  definitions: {
+                    User: {
+                      type: 'object',
+                      properties: {
+                        id: { type: 'string' },
+                        profile: { $ref: '#/definitions/Profile' },
+                      },
+                    },
+                    Profile: {
+                      type: 'object',
+                      properties: {
+                        name: { type: 'string' },
+                        email: { type: 'string' },
+                      },
+                    },
+                    Metadata: {
+                      type: 'string',
+                    },
+                  },
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('complexTool');
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should discover tool with $defs instead of definitions', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'toolWithDefs',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    config: { $ref: '#/$defs/Config' },
+                  },
+                  $defs: {
+                    Config: {
+                      type: 'object',
+                      properties: {
+                        timeout: { type: 'number' },
+                        retries: { type: 'integer' },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe(
+        'toolWithDefs',
+      );
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should discover tool with components/schemas structure', async () => {
+      const mockedClient = {} as unknown as ClientLib.Client;
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'apiTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    request: { $ref: '#/components/schemas/ApiRequest' },
+                  },
+                  components: {
+                    schemas: {
+                      ApiRequest: {
+                        type: 'object',
+                        properties: {
+                          endpoint: { type: 'string' },
+                          method: {
+                            type: 'string',
+                            enum: ['GET', 'POST', 'PUT', 'DELETE'],
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+
+      const tools = await discoverTools('test-server', {}, mockedClient);
+
+      expect(tools.length).toBe(1);
+      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('apiTool');
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      consoleWarnSpy.mockRestore();
+    });
+  });
+
+  describe('connectToMcpServer', () => {
+    it('should register a roots/list handler', async () => {
       const mockedClient = {
         connect: vi.fn(),
         discover: vi.fn(),
@@ -413,14 +629,14 @@ describe('mcp-client', () => {
       const schema = {
         anyOf: [{ type: 'string' }, { type: 'number' }],
       };
-      expect(hasValidTypes(schema)).toBe(true);
+      expect(hasValidTypes(schema, schema)).toBe(true);
     });
 
     it('should return false for an invalid schema with anyOf', () => {
       const schema = {
         anyOf: [{ type: 'string' }, { description: 'no type' }],
       };
-      expect(hasValidTypes(schema)).toBe(false);
+      expect(hasValidTypes(schema, schema)).toBe(false);
     });
 
     it('should return true for a valid schema with allOf', () => {
@@ -430,28 +646,28 @@ describe('mcp-client', () => {
           { type: 'object', properties: { foo: { type: 'string' } } },
         ],
       };
-      expect(hasValidTypes(schema)).toBe(true);
+      expect(hasValidTypes(schema, schema)).toBe(true);
     });
 
     it('should return false for an invalid schema with allOf', () => {
       const schema = {
         allOf: [{ type: 'string' }, { description: 'no type' }],
       };
-      expect(hasValidTypes(schema)).toBe(false);
+      expect(hasValidTypes(schema, schema)).toBe(false);
     });
 
     it('should return true for a valid schema with oneOf', () => {
       const schema = {
         oneOf: [{ type: 'string' }, { type: 'number' }],
       };
-      expect(hasValidTypes(schema)).toBe(true);
+      expect(hasValidTypes(schema, schema)).toBe(true);
     });
 
     it('should return false for an invalid schema with oneOf', () => {
       const schema = {
         oneOf: [{ type: 'string' }, { description: 'no type' }],
       };
-      expect(hasValidTypes(schema)).toBe(false);
+      expect(hasValidTypes(schema, schema)).toBe(false);
     });
 
     it('should return true for a valid schema with nested subschemas', () => {
@@ -466,7 +682,7 @@ describe('mcp-client', () => {
           },
         ],
       };
-      expect(hasValidTypes(schema)).toBe(true);
+      expect(hasValidTypes(schema, schema)).toBe(true);
     });
 
     it('should return false for an invalid schema with nested subschemas', () => {
@@ -481,7 +697,7 @@ describe('mcp-client', () => {
           },
         ],
       };
-      expect(hasValidTypes(schema)).toBe(false);
+      expect(hasValidTypes(schema, schema)).toBe(false);
     });
 
     it('should return true for a schema with a type and subschemas', () => {
@@ -489,14 +705,14 @@ describe('mcp-client', () => {
         type: 'string',
         anyOf: [{ minLength: 1 }, { maxLength: 5 }],
       };
-      expect(hasValidTypes(schema)).toBe(true);
+      expect(hasValidTypes(schema, schema)).toBe(true);
     });
 
     it('should return false for a schema with no type and no subschemas', () => {
       const schema = {
         description: 'a schema with no type',
       };
-      expect(hasValidTypes(schema)).toBe(false);
+      expect(hasValidTypes(schema, schema)).toBe(false);
     });
 
     it('should return true for a valid schema', () => {
@@ -506,7 +722,7 @@ describe('mcp-client', () => {
           param1: { type: 'string' },
         },
       };
-      expect(hasValidTypes(schema)).toBe(true);
+      expect(hasValidTypes(schema, schema)).toBe(true);
     });
 
     it('should return false if a parameter is missing a type', () => {
@@ -516,7 +732,7 @@ describe('mcp-client', () => {
           param1: { description: 'a param with no type' },
         },
       };
-      expect(hasValidTypes(schema)).toBe(false);
+      expect(hasValidTypes(schema, schema)).toBe(false);
     });
 
     it('should return false if a nested parameter is missing a type', () => {
@@ -533,7 +749,7 @@ describe('mcp-client', () => {
           },
         },
       };
-      expect(hasValidTypes(schema)).toBe(false);
+      expect(hasValidTypes(schema, schema)).toBe(false);
     });
 
     it('should return false if an array item is missing a type', () => {
@@ -548,14 +764,14 @@ describe('mcp-client', () => {
           },
         },
       };
-      expect(hasValidTypes(schema)).toBe(false);
+      expect(hasValidTypes(schema, schema)).toBe(false);
     });
 
     it('should return true for a schema with no properties', () => {
       const schema = {
         type: 'object',
       };
-      expect(hasValidTypes(schema)).toBe(true);
+      expect(hasValidTypes(schema, schema)).toBe(true);
     });
 
     it('should return true for a schema with an empty properties object', () => {
@@ -563,7 +779,311 @@ describe('mcp-client', () => {
         type: 'object',
         properties: {},
       };
-      expect(hasValidTypes(schema)).toBe(true);
+      expect(hasValidTypes(schema, schema)).toBe(true);
+    });
+
+    describe('$ref handling', () => {
+      it('should return true for a schema with local $ref reference', () => {
+        const schema = {
+          $ref: '#/definitions/User',
+        };
+        expect(hasValidTypes(schema, schema)).toBe(true);
+      });
+
+      it('should return false for a schema with local $ref reference has no type', () => {
+        const schema = {
+          $ref: '#/definitions/User',
+          definitions: {
+            User: {
+              properties: {
+                name: {
+                  type: 'string',
+                },
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema, schema)).toBe(false);
+      });
+
+      it('should return true for a schema with external $ref reference', () => {
+        const schema = {
+          $ref: 'https://example.com/schema.json#/definitions/User',
+        };
+        expect(hasValidTypes(schema, schema)).toBe(true);
+      });
+
+      it('should return true for a schema with nested $ref in properties', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            user: { $ref: '#/definitions/User' },
+            address: { $ref: '#/definitions/Address' },
+          },
+        };
+        expect(hasValidTypes(schema, schema)).toBe(true);
+      });
+
+      it('should return true for a schema with $ref in array items', () => {
+        const schema = {
+          type: 'array',
+          items: { $ref: '#/definitions/User' },
+        };
+        expect(hasValidTypes(schema, schema)).toBe(true);
+      });
+
+      it('should return true for a schema with $ref in anyOf', () => {
+        const schema = {
+          anyOf: [
+            { $ref: '#/definitions/StringType' },
+            { $ref: '#/definitions/NumberType' },
+          ],
+        };
+        expect(hasValidTypes(schema, schema)).toBe(true);
+      });
+
+      it('should return true for a schema with $ref in allOf', () => {
+        const schema = {
+          allOf: [
+            { $ref: '#/definitions/BaseUser' },
+            { $ref: '#/definitions/ExtendedUser' },
+          ],
+        };
+        expect(hasValidTypes(schema, schema)).toBe(true);
+      });
+
+      it('should return true for a schema with $ref in oneOf', () => {
+        const schema = {
+          oneOf: [
+            { $ref: '#/definitions/Admin' },
+            { $ref: '#/definitions/User' },
+          ],
+        };
+        expect(hasValidTypes(schema, schema)).toBe(true);
+      });
+
+      it('should return true for a schema with definitions containing types', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            user: { $ref: '#/definitions/User' },
+          },
+          definitions: {
+            User: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                age: { type: 'number' },
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema, schema)).toBe(true);
+      });
+
+      it('should return true for a schema with $defs containing types', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            user: { $ref: '#/$defs/User' },
+          },
+          $defs: {
+            User: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                age: { type: 'number' },
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema, schema)).toBe(true);
+      });
+
+      it('should return true for a schema with components containing types', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            user: { $ref: '#/components/schemas/User' },
+          },
+          components: {
+            schemas: {
+              User: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  age: { type: 'number' },
+                },
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema, schema)).toBe(true);
+      });
+
+      it('should return true for a complex schema with mixed $ref and inline types', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            user: { $ref: '#/definitions/User' },
+            tags: {
+              type: 'array',
+              items: { $ref: '#/definitions/Tag' },
+            },
+            metadata: {
+              type: 'object',
+              properties: {
+                created: { type: 'string' },
+                updated: { type: 'string' },
+              },
+            },
+          },
+          definitions: {
+            User: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                email: { type: 'string' },
+              },
+            },
+            Tag: {
+              type: 'string',
+            },
+          },
+        };
+        expect(hasValidTypes(schema, schema)).toBe(true);
+      });
+    });
+  });
+
+  describe('getRefDefinition', () => {
+    it('should resolve a simple reference path', () => {
+      const schema = {
+        definitions: {
+          User: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              age: { type: 'number' },
+            },
+          },
+        },
+      };
+      const result = getRefDefinition('#/definitions/User', schema);
+      expect(result).toEqual({
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          age: { type: 'number' },
+        },
+      });
+    });
+
+    it('should resolve a nested reference path', () => {
+      const schema = {
+        definitions: {
+          User: {
+            properties: {
+              profile: {
+                $ref: '#/definitions/Profile',
+              },
+            },
+          },
+          Profile: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+            },
+          },
+        },
+      };
+      const result = getRefDefinition(
+        '#/definitions/User/properties/profile',
+        schema,
+      );
+      expect(result).toEqual({
+        $ref: '#/definitions/Profile',
+      });
+    });
+
+    it('should return null for non-existent path', () => {
+      const schema = {
+        definitions: {
+          User: {
+            type: 'object',
+          },
+        },
+      };
+      const result = getRefDefinition('#/definitions/NonExistent', schema);
+      expect(result).toBeNull();
+    });
+
+    it('should return null for invalid path format', () => {
+      const schema = {
+        definitions: {
+          User: {
+            type: 'object',
+          },
+        },
+      };
+      const result = getRefDefinition('#/invalid/path', schema);
+      expect(result).toBeNull();
+    });
+
+    it('should handle empty root schema', () => {
+      const result = getRefDefinition('#/definitions/User', {});
+      expect(result).toBeNull();
+    });
+
+    it('should handle undefined root schema', () => {
+      const result = getRefDefinition('#/definitions/User', undefined);
+      expect(result).toBeNull();
+    });
+
+    it('should resolve reference in $defs', () => {
+      const schema = {
+        $defs: {
+          Config: {
+            type: 'object',
+            properties: {
+              timeout: { type: 'number' },
+            },
+          },
+        },
+      };
+      const result = getRefDefinition('#/$defs/Config', schema);
+      expect(result).toEqual({
+        type: 'object',
+        properties: {
+          timeout: { type: 'number' },
+        },
+      });
+    });
+
+    it('should resolve reference in components/schemas', () => {
+      const schema = {
+        components: {
+          schemas: {
+            ApiRequest: {
+              type: 'object',
+              properties: {
+                endpoint: { type: 'string' },
+              },
+            },
+          },
+        },
+      };
+      const result = getRefDefinition(
+        '#/components/schemas/ApiRequest',
+        schema,
+      );
+      expect(result).toEqual({
+        type: 'object',
+        properties: {
+          endpoint: { type: 'string' },
+        },
+      });
     });
   });
 });
