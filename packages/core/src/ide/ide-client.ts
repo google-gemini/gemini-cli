@@ -316,13 +316,15 @@ export class IdeClient {
 
   private createProxyAwareFetch() {
     // ignore proxy for 'localhost' by deafult to allow connecting to the ide mcp server
+    const existingNoProxy = process.env.NO_PROXY || '';
     const agent = new EnvHttpProxyAgent({
-      noProxy: "localhost"
+      noProxy: [existingNoProxy, 'localhost'].filter(Boolean).join(','),
     });
     
+    const undiciPromise = import('undici');
+    
     return async (url: string | URL, init?: RequestInit): Promise<Response> => {
-      const undiciModule = await import('undici');
-      const fetchFn = undiciModule.fetch;
+      const { fetch: fetchFn } = await undiciPromise;
       const fetchOptions: RequestInit & { dispatcher?: unknown } = {
         ...init,
         dispatcher: agent,
