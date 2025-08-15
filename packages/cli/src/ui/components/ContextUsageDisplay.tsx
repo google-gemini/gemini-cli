@@ -5,7 +5,7 @@
  */
 
 import { Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { tokenLimit } from '@google/gemini-cli-core';
 
 export const ContextUsageDisplay = ({
@@ -18,7 +18,7 @@ export const ContextUsageDisplay = ({
   const percentage = promptTokenCount / tokenLimit(model);
 
   return (
-    <Text color={Colors.Gray}>
+    <Text color={theme.text.secondary}>
       ({((1 - percentage) * 100).toFixed(0)}% context left)
     </Text>
   );

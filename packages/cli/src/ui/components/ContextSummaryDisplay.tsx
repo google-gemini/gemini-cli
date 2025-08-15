@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { type IdeContext, type MCPServerConfig } from '@google/gemini-cli-core';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
@@ -99,9 +99,9 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   if (isNarrow) {
     return (
       <Box flexDirection="column">
-        <Text color={Colors.Gray}>Using:</Text>
+        <Text color={theme.text.secondary}>Using:</Text>
         {summaryParts.map((part, index) => (
-          <Text key={index} color={Colors.Gray}>
+          <Text key={index} color={theme.text.secondary}>
             {'  '}- {part}
           </Text>
         ))}
@@ -111,7 +111,9 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
 
   return (
     <Box>
-      <Text color={Colors.Gray}>Using: {summaryParts.join(' | ')}</Text>
+      <Text color={theme.text.secondary}>
+        Using: {summaryParts.join(' | ')}
+      </Text>
     </Box>
   );
 };

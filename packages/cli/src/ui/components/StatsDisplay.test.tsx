@@ -43,7 +43,7 @@ describe('<StatsDisplay />', () => {
     const zeroMetrics: SessionMetrics = {
       models: {},
       tools: {
-        totalCalls: 0,
+        totalCalls: 1,
         totalSuccess: 0,
         totalFail: 0,
         totalDurationMs: 0,

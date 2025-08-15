@@ -38,7 +38,7 @@ import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { FolderTrustDialog } from './components/FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
 import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
-import { Colors } from './colors.js';
+import { theme } from './semantic-colors.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { LoadedSettings, SettingScope } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
@@ -949,13 +949,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           {startupWarnings.length > 0 && (
             <Box
               borderStyle="round"
-              borderColor={Colors.AccentYellow}
+              borderColor={theme.status.warning}
               paddingX={1}
               marginY={1}
               flexDirection="column"
             >
               {startupWarnings.map((warning, index) => (
-                <Text key={index} color={Colors.AccentYellow}>
+                <Text key={index} color={theme.status.warning}>
                   {warning}
                 </Text>
               ))}
@@ -991,7 +991,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             <Box flexDirection="column">
               {themeError && (
                 <Box marginBottom={1}>
-                  <Text color={Colors.AccentRed}>{themeError}</Text>
+                  <Text color={theme.status.error}>{themeError}</Text>
                 </Box>
               )}
               <ThemeDialog
@@ -1050,7 +1050,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             <Box flexDirection="column">
               {editorError && (
                 <Box marginBottom={1}>
-                  <Text color={Colors.AccentRed}>{editorError}</Text>
+                  <Text color={theme.status.error}>{editorError}</Text>
                 </Box>
               )}
               <EditorSettingsDialog
@@ -1090,18 +1090,20 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               >
                 <Box>
                   {process.env.GEMINI_SYSTEM_MD && (
-                    <Text color={Colors.AccentRed}>|⌐■_■| </Text>
+                    <Text color={theme.status.error}>|⌐■_■| </Text>
                   )}
                   {ctrlCPressedOnce ? (
-                    <Text color={Colors.AccentYellow}>
+                    <Text color={theme.status.warning}>
                       Press Ctrl+C again to exit.
                     </Text>
                   ) : ctrlDPressedOnce ? (
-                    <Text color={Colors.AccentYellow}>
+                    <Text color={theme.status.warning}>
                       Press Ctrl+D again to exit.
                     </Text>
                   ) : showEscapePrompt ? (
-                    <Text color={Colors.Gray}>Press Esc again to clear.</Text>
+                    <Text color={theme.text.secondary}>
+                      Press Esc again to clear.
+                    </Text>
                   ) : (
                     <ContextSummaryDisplay
                       ideContext={ideContextState}
@@ -1164,7 +1166,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           {initError && streamingState !== StreamingState.Responding && (
             <Box
               borderStyle="round"
-              borderColor={Colors.AccentRed}
+              borderColor={theme.status.error}
               paddingX={1}
               marginBottom={1}
             >
@@ -1172,7 +1174,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 (item) =>
                   item.type === 'error' && item.text?.includes(initError),
               )?.text ? (
-                <Text color={Colors.AccentRed}>
+                <Text color={theme.status.error}>
                   {
                     history.find(
                       (item) =>
@@ -1182,10 +1184,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 </Text>
               ) : (
                 <>
-                  <Text color={Colors.AccentRed}>
+                  <Text color={theme.status.error}>
                     Initialization Error: {initError}
                   </Text>
-                  <Text color={Colors.AccentRed}>
+                  <Text color={theme.status.error}>
                     {' '}
                     Please check API key and configuration.
                   </Text>
