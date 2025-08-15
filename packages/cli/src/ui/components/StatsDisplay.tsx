@@ -8,6 +8,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import Gradient from 'ink-gradient';
 import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { formatDuration } from '../utils/formatters.js';
 import { useSessionStats, ModelMetrics } from '../contexts/SessionContext.js';
 import {
@@ -125,7 +126,7 @@ const ModelUsageTable: React.FC<{
       {cacheEfficiency > 0 && (
         <Box flexDirection="column" marginTop={1}>
           <Text>
-            <Text color={Colors.AccentGreen}>Savings Highlight:</Text>{' '}
+            <Text color={theme.status.success}>Savings Highlight:</Text>{' '}
             {totalCachedTokens.toLocaleString()} ({cacheEfficiency.toFixed(1)}
             %) of input tokens were served from the cache, reducing costs.
           </Text>
@@ -204,8 +205,8 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         <StatRow title="Tool Calls:">
           <Text>
             {tools.totalCalls} ({' '}
-            <Text color={Colors.AccentGreen}>✔ {tools.totalSuccess}</Text>{' '}
-            <Text color={Colors.AccentRed}>✖ {tools.totalFail}</Text> )
+            <Text color={theme.status.success}>✔ {tools.totalSuccess}</Text>{' '}
+            <Text color={theme.status.error}>✖ {tools.totalFail}</Text> )
           </Text>
         </StatRow>
         <StatRow title="Success Rate:">
@@ -214,10 +215,10 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         {(computed.totalLinesAdded > 0 || computed.totalLinesRemoved > 0) && (
           <StatRow title="Code Changes:">
             <Text>
-              <Text color={Colors.AccentGreen}>
+              <Text color={theme.status.success}>
                 +{computed.totalLinesAdded}
               </Text>{' '}
-              <Text color={Colors.AccentRed}>
+              <Text color={theme.status.error}>
                 -{computed.totalLinesRemoved}
               </Text>
             </Text>

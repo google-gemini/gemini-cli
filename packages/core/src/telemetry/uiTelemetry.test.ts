@@ -633,4 +633,90 @@ describe('UiTelemetryService', () => {
       expect(spy).toHaveBeenCalledOnce();
     });
   });
+
+  describe('Tool Call Event with Line Count Metadata', () => {
+    it('should aggregate valid line count metadata', () => {
+      const toolCall = createFakeCompletedToolCall('test_tool', true, 100);
+      const event = {
+        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
+        'event.name': EVENT_TOOL_CALL,
+        metadata: {
+          ai_added_lines: 10,
+          ai_removed_lines: 5,
+        },
+      };
+
+      service.addEvent(event);
+
+      const metrics = service.getMetrics();
+      expect(metrics.files.totalLinesAdded).toBe(10);
+      expect(metrics.files.totalLinesRemoved).toBe(5);
+    });
+
+    it('should ignore NaN values in line count metadata', () => {
+      const toolCall = createFakeCompletedToolCall('test_tool', true, 100);
+      const event = {
+        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
+        'event.name': EVENT_TOOL_CALL,
+        metadata: {
+          ai_added_lines: NaN,
+          ai_removed_lines: NaN,
+        },
+      };
+
+      service.addEvent(event);
+
+      const metrics = service.getMetrics();
+      expect(metrics.files.totalLinesAdded).toBe(0);
+      expect(metrics.files.totalLinesRemoved).toBe(0);
+    });
+
+    it('should ignore null/undefined values in line count metadata', () => {
+      const toolCall = createFakeCompletedToolCall('test_tool', true, 100);
+      const event = {
+        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
+        'event.name': EVENT_TOOL_CALL,
+        metadata: {
+          ai_added_lines: null,
+          ai_removed_lines: undefined,
+        },
+      };
+
+      service.addEvent(event);
+
+      const metrics = service.getMetrics();
+      expect(metrics.files.totalLinesAdded).toBe(0);
+      expect(metrics.files.totalLinesRemoved).toBe(0);
+    });
+
+    it('should handle mixed valid and invalid line count values', () => {
+      const toolCall1 = createFakeCompletedToolCall('test_tool', true, 100);
+      const toolCall2 = createFakeCompletedToolCall('test_tool', true, 100);
+
+      const event1 = {
+        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall1))),
+        'event.name': EVENT_TOOL_CALL,
+        metadata: {
+          ai_added_lines: 10,
+          ai_removed_lines: NaN, // Invalid
+        },
+      };
+
+      const event2 = {
+        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall2))),
+        'event.name': EVENT_TOOL_CALL,
+        metadata: {
+          ai_added_lines: NaN, // Invalid
+          ai_removed_lines: 5,
+        },
+      };
+
+      service.addEvent(event1);
+      service.addEvent(event2);
+
+      const metrics = service.getMetrics();
+      expect(metrics.files.totalLinesAdded).toBe(10); // Only valid value counted
+      expect(metrics.files.totalLinesRemoved).toBe(5); // Only valid value counted
+    });
+  });
 });

@@ -220,10 +220,16 @@ export class UiTelemetryService extends EventEmitter {
 
     // Aggregate line count data from metadata
     if (event.metadata) {
-      if (Number.isFinite(event.metadata.ai_added_lines)) {
+      if (
+        typeof event.metadata.ai_added_lines === 'number' &&
+        !isNaN(event.metadata.ai_added_lines)
+      ) {
         files.totalLinesAdded += event.metadata.ai_added_lines;
       }
-      if (Number.isFinite(event.metadata.ai_removed_lines)) {
+      if (
+        typeof event.metadata.ai_removed_lines === 'number' &&
+        !isNaN(event.metadata.ai_removed_lines)
+      ) {
         files.totalLinesRemoved += event.metadata.ai_removed_lines;
       }
     }
