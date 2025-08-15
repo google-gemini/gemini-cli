@@ -468,7 +468,15 @@ export class GeminiClient {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
 
-    if (this.config.getIdeMode()) {
+    const history = this.getHistory();
+    const lastMessage =
+      history.length > 0 ? history[history.length - 1] : undefined;
+    const hasPendingToolCall =
+      !!lastMessage &&
+      lastMessage.role === 'model' &&
+      (lastMessage.parts?.some((p) => 'functionCall' in p) || false);
+
+    if (this.config.getIdeMode() && !hasPendingToolCall) {
       const { contextParts, newIdeContext } = this.getIdeContextParts(
         this.forceFullIdeContext || this.getHistory().length === 0,
       );
