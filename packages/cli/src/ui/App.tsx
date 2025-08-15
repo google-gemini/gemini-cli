@@ -976,6 +976,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               {confirmationRequest.prompt}
               <Box paddingY={1}>
                 <RadioButtonSelect
+                  isFocused={!!confirmationRequest}
                   items={[
                     { label: 'Yes', value: true },
                     { label: 'No', value: false },
