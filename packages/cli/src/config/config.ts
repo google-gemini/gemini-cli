@@ -28,6 +28,8 @@ import {
   WriteFileTool,
   MCPServerConfig,
 } from '@google/gemini-cli-core';
+import { initializeLanguage, getEffectiveLanguage } from './language.js';
+import { i18n, t } from '../i18n/index.js';
 import { Settings } from './settings.js';
 
 import { Extension, annotateActiveExtensions } from './extension.js';
@@ -72,9 +74,32 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
+  language: string | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
+  // 早期初始化语言系统以支持帮助信息的多语言显示
+  let languageArg: string | undefined;
+  const args = hideBin(process.argv);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--language' || arg === '-L') {
+      if (i + 1 < args.length) {
+        languageArg = args[i + 1];
+        break;
+      }
+    }
+    if (arg.startsWith('--language=')) {
+      languageArg = arg.substring('--language='.length);
+      break;
+    }
+    if (arg.startsWith('-L') && arg.length > 2) {
+      languageArg = arg.substring(2);
+      break;
+    }
+  }
+  initializeLanguage(languageArg);
+
   const yargsInstance = yargs(hideBin(process.argv))
     .scriptName('gemini')
     .usage(
@@ -221,6 +246,12 @@ export async function parseArguments(): Promise<CliArgs> {
           coerce: (dirs: string[]) =>
             // Handle comma-separated values
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
+        })
+        .option('language', {
+          alias: 'L',
+          type: 'string',
+          description: 'Set interface language',
+          choices: ['en', 'zh', 'ja'],
         })
         .check((argv) => {
           if (argv.prompt && argv.promptInteractive) {
