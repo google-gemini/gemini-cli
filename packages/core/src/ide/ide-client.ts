@@ -20,6 +20,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { EnvHttpProxyAgent } from 'undici';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -313,6 +314,30 @@ export class IdeClient {
     }
   }
 
+  private createProxyAwareFetch() {
+    // ignore proxy for 'localhost' by deafult to allow connecting to the ide mcp server
+    const agent = new EnvHttpProxyAgent({
+      noProxy: "localhost"
+    });
+    
+    return async (url: string | URL, init?: RequestInit): Promise<Response> => {
+      const undiciModule = await import('undici');
+      const fetchFn = undiciModule.fetch;
+      const fetchOptions: RequestInit & { dispatcher?: unknown } = {
+        ...init,
+        dispatcher: agent,
+      };
+  
+      const options = fetchOptions as unknown as import('undici').RequestInit;
+      const response = await fetchFn(url, options);
+      return new Response(response.body as ReadableStream<any> | null, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      });
+    };
+  }
+
   private registerClientHandlers() {
     if (!this.client) {
       return;
@@ -377,12 +402,20 @@ export class IdeClient {
       });
       transport = new StreamableHTTPClientTransport(
         new URL(`http://${getIdeServerHost()}:${port}/mcp`),
-      );
+        {
+          fetch: this.createProxyAwareFetch()
+        });
       await this.client.connect(transport);
       this.registerClientHandlers();
       this.setState(IDEConnectionStatus.Connected);
       return true;
     } catch (_error) {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try restarting your terminal. To install the extension, run /ide install.`,
+        true,
+      );
+      logger.debug('Failed to connect to IDE companion extension. Error:\n', _error);
       if (transport) {
         try {
           await transport.close();
