@@ -41,7 +41,8 @@ export function convertVSCodeThemeToCustomTheme(vscodeTheme: VSCodeTheme): Custo
   const accentYellow = getScopeColor('string', colors['editorGutter.modifiedBackground'] || '#ce9178');
   const accentRed = getScopeColor('comment', colors['editorGutter.deletedBackground'] || '#f44747');
   const comment = getScopeColor('comment', colors['editorLineNumber.foreground'] || '#6a9955');
-  const gray = getColor('editor.background', '#858585');
+  // Gray should be used for borders, frames, and inactive/unselected items (per colormap.md)
+  const gray = getColor('editorLineNumber.foreground', colors['tab.inactiveForeground'] || colors['editorGroupHeader.tabsBorder'] || colors['panel.border'] || '#858585');
 
   // Try to get diff colors from theme first, fallback to generation
   // Check multiple VS Code diff color properties

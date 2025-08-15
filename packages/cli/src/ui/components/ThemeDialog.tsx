@@ -133,7 +133,7 @@ export function ThemeDialog({
       };
     }),
   ];
-  
+
   // Calculate initial theme index after themes are loaded
   const selectedThemeName = settings.merged.theme || DEFAULT_THEME.name;
   const initialThemeIndex = combinedThemes ? themeItems.findIndex(
@@ -141,10 +141,10 @@ export function ThemeDialog({
   ) : -1;
   // If not found, fall back to the first theme
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
-  
+
   // Update select key when themes are loaded to force re-initialization with correct index
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
-  
+
   // Update the select key when combined themes change to re-initialize with correct index
   useEffect(() => {
     if (combinedThemes) {
@@ -188,8 +188,8 @@ export function ThemeDialog({
       setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
     }
     if (key.escape) {
-  // Cancel: restore previously active theme by signaling undefined
-  onSelect(undefined, selectedScope);
+      // Cancel: restore previously active theme by signaling undefined
+      onSelect(undefined, selectedScope);
     }
   });
 

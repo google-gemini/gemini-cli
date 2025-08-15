@@ -63,9 +63,14 @@ async function parseZipBuffer(buffer: Buffer): Promise<Map<string, string>> {
       return zipContent;
     }
   } catch (error) {
-    console.warn('Real ZIP parsing failed, falling back to mock data:', error);
+    console.warn('❌ Real ZIP parsing failed:', error);
+    console.warn('⚠️ This will result in the AI generation being used instead of VSIX extraction');
+    // Don't fall back to mock data - return empty so AI generation can be used
+    return new Map<string, string>();
   }
   
+  // This should not be reached if ZIP parsing works
+  console.warn('⚠️ ZIP parsing returned no files, falling back to mock data - this will result in default theme colors');
   // Fallback to mock structure for demo purposes
   const mockPackageJson = {
     name: "extracted-theme",
@@ -124,16 +129,29 @@ async function parseZipBuffer(buffer: Buffer): Promise<Map<string, string>> {
 async function parseRealZipStructure(buffer: Buffer): Promise<Map<string, string>> {
   const files = new Map<string, string>();
   
+  console.log(`🔍 Attempting to parse ZIP structure, buffer size: ${buffer.length} bytes`);
+  
   // Look for ZIP file signature
   if (buffer.length < 4) {
     throw new Error('Buffer too small to be a ZIP file');
   }
+  
+  // Check for ZIP signature at the beginning
+  const signature = buffer.readUInt32LE(0);
+  console.log(`🔍 Buffer signature: 0x${signature.toString(16)} (expected ZIP signatures: 0x04034b50 or 0x06054b50)`);
+  
+  // Common ZIP signatures:
+  // 0x04034b50 - Local file header
+  // 0x02014b50 - Central directory file header  
+  // 0x06054b50 - End of central directory record
 
   // Find end of central directory record
   const endOfCentralDir = findEndOfCentralDirectory(buffer);
   if (!endOfCentralDir) {
     throw new Error('Invalid ZIP file: End of central directory not found');
   }
+  
+  console.log(`🔍 Found central directory: ${endOfCentralDir.totalEntries} entries, offset: ${endOfCentralDir.centralDirOffset}`);
 
   // Read central directory entries
   let offset = endOfCentralDir.centralDirOffset;
@@ -148,9 +166,13 @@ async function parseRealZipStructure(buffer: Buffer): Promise<Map<string, string
     const fileData = readFileData(buffer, entry);
     if (fileData) {
       files.set(entry.fileName, fileData);
+      console.log(`✅ Successfully extracted file: ${entry.fileName} (${fileData.length} chars)`);
+    } else {
+      console.warn(`⚠️ Failed to extract file: ${entry.fileName}`);
     }
   }
-
+  
+  console.log(`🔍 Successfully extracted ${files.size} files from ZIP`);
   return files;
 }
 

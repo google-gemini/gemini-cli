@@ -27,31 +27,35 @@ export const useThemeCommand = (
 ): UseThemeCommandReturn => {
   const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(false);
 
-  // Load custom themes from both sources on startup
+  // Load custom themes and apply configured theme on startup
   useEffect(() => {
-    const loadThemes = async () => {
+    const loadThemesAndApply = async () => {
       try {
+        // First, load custom themes from both settings and files
         if (loadedSettings.merged.customThemes) {
           await themeManager.loadCustomThemes(loadedSettings.merged.customThemes);
+        }
+        
+        // Then, apply the configured theme if it exists and is valid
+        const effectiveTheme = loadedSettings.merged.theme;
+        if (effectiveTheme) {
+          if (themeManager.findThemeByName(effectiveTheme)) {
+            themeManager.setActiveTheme(effectiveTheme);
+            setThemeError(null);
+          } else {
+            setIsThemeDialogOpen(true);
+            setThemeError(`Theme "${effectiveTheme}" not found.`);
+          }
+        } else {
+          setThemeError(null);
         }
       } catch (error) {
         console.warn('Failed to load custom themes on startup:', error);
       }
     };
     
-    loadThemes();
-  }, [loadedSettings.merged.customThemes]);
-
-  // Check for invalid theme configuration on startup
-  useEffect(() => {
-    const effectiveTheme = loadedSettings.merged.theme;
-    if (effectiveTheme && !themeManager.findThemeByName(effectiveTheme)) {
-      setIsThemeDialogOpen(true);
-      setThemeError(`Theme "${effectiveTheme}" not found.`);
-    } else {
-      setThemeError(null);
-    }
-  }, [loadedSettings.merged.theme, setThemeError]);
+    loadThemesAndApply();
+  }, [loadedSettings.merged.customThemes, loadedSettings.merged.theme, setThemeError]);
 
   const openThemeDialog = useCallback(() => {
     if (process.env.NO_COLOR) {

@@ -42,7 +42,7 @@ export function createColorPalettePreview(debugInfo: ThemeDebugInfo): string {
   const colors = debugInfo.colorValues;
   
   return `
-🎨 **Color Palette Preview:**
+🎨 Color Palette Preview:
 ${renderColorValue(colors.Background, 'Background')}  ${renderColorValue(colors.Foreground, 'Foreground')}
 ${renderColorValue(colors.LightBlue, 'LightBlue')}  ${renderColorValue(colors.AccentBlue, 'AccentBlue')}
 ${renderColorValue(colors.AccentPurple, 'AccentPurple')}  ${renderColorValue(colors.AccentCyan, 'AccentCyan')}
@@ -57,7 +57,7 @@ ${renderColorValue(colors.Gray, 'Gray')}`;
  */
 export function createSimpleColorPreview(theme: import('./theme-types.js').CustomTheme): string {
   return `
-🎨 **Color Palette Preview:**
+🎨 Color Palette Preview:
 ${renderColorValue(theme.Background, 'Background')}  ${renderColorValue(theme.Foreground, 'Foreground')}
 ${renderColorValue(theme.LightBlue, 'LightBlue')}  ${renderColorValue(theme.AccentBlue, 'AccentBlue')}
 ${renderColorValue(theme.AccentPurple, 'AccentPurple')}  ${renderColorValue(theme.AccentCyan, 'AccentCyan')}

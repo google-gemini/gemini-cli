@@ -107,18 +107,24 @@ Do you want to proceed?`,
       let extractionMethod = '';
       
       // Try 1: Extract from VSIX file
+      console.log(`Attempting to extract theme from VSIX for ${extensionId.name}...`);
       themeData = await extractThemeFromVsix(vsixBuffer, signal, extensionId.name);
       if (themeData) {
         extractionMethod = 'VSIX Extraction';
+        console.log(`✅ Successfully extracted theme from VSIX: ${themeData.name}`);
       } else {
+        console.log(`⚠️ VSIX extraction failed, trying AI generation...`);
         // Try 2: Generate with AI based on extension name
-        themeData = await generateThemeWithAI(extensionId.name, signal);
+        themeData = await generateThemeWithAI(extensionId.name, signal, this.config);
         if (themeData) {
           extractionMethod = 'AI Generation';
+          console.log(`✅ Successfully generated theme with AI: ${themeData.name}`);
         } else {
+          console.log(`⚠️ AI generation failed, using default theme...`);
           // Try 3: Use default theme
           themeData = createDefaultTheme(extensionId.name);
           extractionMethod = 'Default Theme';
+          console.log(`📦 Using default theme: ${themeData.name}`);
         }
       }
 
@@ -140,18 +146,18 @@ Do you want to proceed?`,
 
       return {
         llmContent: `Successfully installed VS Code theme "${customTheme.name}" from ${params.marketplaceUrl}`,
-        returnDisplay: `✅ **Theme Installed Successfully!**
+        returnDisplay: `✅ Theme Installed Successfully!
 
-🎨 **Theme Name**: ${customTheme.name}
-📦 **Source**: ${params.marketplaceUrl}
-🔧 **Method**: ${extractionMethod}
+🎨 Theme Name: ${customTheme.name}
+📦 Source: ${params.marketplaceUrl}
+🔧 Method: ${extractionMethod}
 
 ${colorPalettePreview}
 
 The theme has been saved to your dedicated theme files and is now available for selection.
 
-**To use the theme:**
-1. Type \`/theme\` to open the theme selection dialog
+To use the theme:
+1. Type /theme to open the theme selection dialog
 2. Look for "${customTheme.name}" in the custom themes section
 3. Select it to apply the theme
 
@@ -161,7 +167,7 @@ The theme will be automatically saved to your theme directory and will persist a
       const errorMessage = getErrorMessage(error);
       return {
         llmContent: `Error installing VS Code theme: ${errorMessage}`,
-        returnDisplay: `❌ **Error Installing Theme**
+        returnDisplay: `❌ Error Installing Theme
 
 ${errorMessage}
 

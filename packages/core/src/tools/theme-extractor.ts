@@ -50,42 +50,73 @@ export async function downloadVsix(vsixUrl: string, _signal: AbortSignal): Promi
  */
 export async function extractThemeFromVsix(vsixBuffer: Buffer, _signal: AbortSignal, extensionName?: string): Promise<VSCodeTheme | null> {
   try {
+    console.log(`📦 Extracting VSIX content for ${extensionName}...`);
     // VSIX files are ZIP archives - extract them
     const vsixContent = await extractVsixContent(vsixBuffer);
+    console.log(`📁 Extracted ${vsixContent.files.size} files from VSIX`);
+    
+    // List extracted files for debugging
+    const fileList = Array.from(vsixContent.files.keys());
+    console.log(`📋 Files in VSIX: ${fileList.slice(0, 10).join(', ')}${fileList.length > 10 ? '...' : ''}`);
     
     // Parse package.json to find theme contributions
     const packageJson = vsixContent.files.get('extension/package.json');
     if (!packageJson) {
-      console.warn('No package.json found in VSIX');
+      console.warn('❌ No package.json found in VSIX');
       return null;
     }
     
+    console.log(`📄 Found package.json, parsing theme contributions...`);
     const manifest = JSON.parse(packageJson);
     const themeContributions = manifest.contributes?.themes;
     
     if (!themeContributions || !Array.isArray(themeContributions) || themeContributions.length === 0) {
-      console.warn('No theme contributions found in extension');
+      console.warn('❌ No theme contributions found in extension');
+      console.log(`🔍 Extension contributes: ${Object.keys(manifest.contributes || {}).join(', ')}`);
       return null;
     }
+    
+    console.log(`🎨 Found ${themeContributions.length} theme(s) in extension`);
     
     // For now, take the first theme. TODO: Handle multiple themes with user selection
     const firstTheme = themeContributions[0];
     const themePath = firstTheme.path;
     
     if (!themePath) {
-      console.warn('Theme path not specified in contribution');
+      console.warn('❌ Theme path not specified in contribution');
       return null;
     }
     
+    console.log(`📂 Looking for theme file: ${themePath}`);
+    
+    // Clean up the theme path (remove ./ prefix if present)
+    const cleanThemePath = themePath.startsWith('./') ? themePath.slice(2) : themePath;
+    
     // Read the theme JSON file
-    const themeFilePath = `extension/${themePath}`;
+    const themeFilePath = `extension/${cleanThemePath}`;
     const themeContent = vsixContent.files.get(themeFilePath);
     
     if (!themeContent) {
-      console.warn(`Theme file not found: ${themeFilePath}`);
+      console.warn(`❌ Theme file not found: ${themeFilePath}`);
+      // Try without 'extension/' prefix using cleaned path
+      const altThemeContent = vsixContent.files.get(cleanThemePath);
+      if (altThemeContent) {
+        console.log(`✅ Found theme file at alternate path: ${themePath}`);
+        const themeData = JSON.parse(altThemeContent);
+        const extractedTheme: VSCodeTheme = {
+          name: firstTheme.label || themeData.name || extensionName || 'Extracted Theme',
+          type: themeData.type === 'light' ? 'light' : 'dark',
+          colors: themeData.colors || {},
+          tokenColors: themeData.tokenColors || []
+        };
+        console.log(`🎨 Successfully extracted theme: ${extractedTheme.name} (${extractedTheme.type})`);
+        console.log(`🎨 Theme has ${Object.keys(extractedTheme.colors).length} colors and ${extractedTheme.tokenColors.length} token colors`);
+        return extractedTheme;
+      }
       return null;
     }
     
+    console.log(`📄 Parsing theme JSON...`);
     // Parse theme JSON
     const themeData = JSON.parse(themeContent);
     
@@ -97,9 +128,12 @@ export async function extractThemeFromVsix(vsixBuffer: Buffer, _signal: AbortSig
       tokenColors: themeData.tokenColors || []
     };
     
+    console.log(`🎨 Successfully extracted theme: ${extractedTheme.name} (${extractedTheme.type})`);
+    console.log(`🎨 Theme has ${Object.keys(extractedTheme.colors).length} colors and ${extractedTheme.tokenColors.length} token colors`);
+    
     return extractedTheme;
   } catch (error) {
-    console.error('Failed to extract theme from VSIX:', error);
+    console.error('❌ Failed to extract theme from VSIX:', error);
     return null;
   }
 } 
