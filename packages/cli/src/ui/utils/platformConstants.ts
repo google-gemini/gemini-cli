@@ -18,6 +18,12 @@
 export const KITTY_CTRL_C = '[99;5u';
 
 /**
+ * Kitty keyboard protocol keycodes
+ */
+export const KITTY_KEYCODE_ENTER = 13;
+export const KITTY_KEYCODE_NUMPAD_ENTER = 57414;
+
+/**
  * Timing constants for terminal interactions
  */
 export const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
