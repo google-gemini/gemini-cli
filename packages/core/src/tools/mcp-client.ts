@@ -33,7 +33,7 @@ import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, sanitizeErrorMessage } from '../utils/errors.js';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
@@ -415,10 +415,10 @@ export async function connectAndDiscover(
     if (mcpClient) {
       mcpClient.close();
     }
+    const rawErrorMsg = getErrorMessage(error);
+    const safeErrorMsg = sanitizeErrorMessage(rawErrorMsg);
     console.error(
-      `Error connecting to MCP server '${mcpServerName}': ${getErrorMessage(
-        error,
-      )}`,
+      `Error connecting to MCP server '${mcpServerName}': ${safeErrorMsg}`,
     );
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   }
