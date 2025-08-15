@@ -22,6 +22,8 @@ import { PassThrough } from 'stream';
 import {
   BACKSLASH_ENTER_DETECTION_WINDOW_MS,
   KITTY_CTRL_C,
+  KITTY_KEYCODE_ENTER,
+  KITTY_KEYCODE_NUMPAD_ENTER,
   MAX_KITTY_SEQUENCE_LENGTH,
 } from '../utils/platformConstants.js';
 
@@ -30,10 +32,6 @@ import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 const ESC = '\u001B';
 export const PASTE_MODE_PREFIX = `${ESC}[200~`;
 export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
-
-// Kitty protocol keycodes
-const KITTY_KEYCODE_ENTER = 13;
-const KITTY_KEYCODE_NUMPAD_ENTER = 57414;
 
 export interface Key {
   name: string;
@@ -136,7 +134,10 @@ export function KeypressProvider({
         };
       }
 
-      if (keyCode === KITTY_KEYCODE_ENTER || keyCode === KITTY_KEYCODE_NUMPAD_ENTER) {
+      if (
+        keyCode === KITTY_KEYCODE_ENTER ||
+        keyCode === KITTY_KEYCODE_NUMPAD_ENTER
+      ) {
         return {
           name: 'return',
           ctrl,
