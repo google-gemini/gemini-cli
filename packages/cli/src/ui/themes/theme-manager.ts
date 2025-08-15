@@ -26,6 +26,7 @@ import { SemanticColors } from './semantic-tokens.js';
 import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
 import { NoColorTheme } from './no-color.js';
+import { DarkModern } from './dark-modern.js';
 import process from 'node:process';
 
 export interface ThemeDisplay {
@@ -46,6 +47,7 @@ class ThemeManager {
       AyuDark,
       AyuLight,
       AtomOneDark,
+      DarkModern,
       Dracula,
       DefaultLight,
       DefaultDark,
