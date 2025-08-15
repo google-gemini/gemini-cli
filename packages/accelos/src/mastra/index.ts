@@ -1,4 +1,5 @@
 import { Mastra, Agent } from '@mastra/core';
+import { registerApiRoute } from '@mastra/core/server';
 import { PinoLogger } from '@mastra/loggers';
 import { google } from '@ai-sdk/google';
 import { openai } from '@ai-sdk/openai';
@@ -29,6 +30,8 @@ import { productionReadinessPrompt } from '../prompts/production_readiness_promp
 import { guardrailAgentPrompt } from '../prompts/guardrail_agent_prompt.js';
 import { Memory } from '@mastra/memory';
 import { LibSQLStore } from '@mastra/libsql';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 dotenv.config();
 
 // Initialize guardrails at startup for Mastra
@@ -109,6 +112,76 @@ const memory = new Memory({
   storage: new LibSQLStore({
     url: 'file:../../memory.db',
   }),
+});
+
+// Custom API route for reviews
+const reviewsApiRoute = registerApiRoute('/accelos/reviews', {
+  method: 'ALL', // Handle both GET and OPTIONS
+  handler: async (c) => {
+    // Get the request origin
+    const origin = c.req.header('origin');
+    
+    // Allow any localhost origin (flexible for development)
+    if (origin && origin.match(/^http:\/\/localhost:\d+$/)) {
+      c.header('Access-Control-Allow-Origin', origin);
+    }
+    
+    // Set comprehensive CORS headers
+    c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, x-mastra-client-type');
+    c.header('Access-Control-Expose-Headers', 'Content-Length, X-Requested-With');
+    c.header('Access-Control-Max-Age', '3600');
+    
+    // Handle preflight OPTIONS request
+    if (c.req.method === 'OPTIONS') {
+      return new Response('', { status: 204 });
+    }
+    
+    // Handle GET request
+    if (c.req.method === 'GET') {
+      try {
+        const dataDir = process.env.ACCELOS_DATA_DIRECTORY_PATH || './data';
+        const reviewsDir = path.join(dataDir, 'reviews');
+        
+        // Read all files in the reviews directory
+        const files = await fs.readdir(reviewsDir);
+        
+        // Filter files that start with "REVIEW" and end with ".json"
+        const reviewFiles = files.filter(file => 
+          file.startsWith('REVIEW') && file.endsWith('.json')
+        );
+        
+        // Read and parse each review file
+        const reviews = [];
+        for (const file of reviewFiles) {
+          try {
+            const filePath = path.join(reviewsDir, file);
+            const content = await fs.readFile(filePath, 'utf-8');
+            const review = JSON.parse(content);
+            reviews.push(review);
+          } catch (error) {
+            console.warn(`Failed to parse review file ${file}:`, error);
+          }
+        }
+        
+        return c.json({
+          success: true,
+          data: reviews,
+          count: reviews.length
+        });
+      } catch (error) {
+        console.error('Error fetching reviews:', error);
+        return c.json({
+          success: false,
+          error: 'Failed to fetch reviews',
+          message: error instanceof Error ? error.message : 'Unknown error'
+        }, 500);
+      }
+    }
+    
+    // Method not allowed
+    return c.text('Method Not Allowed', 405);
+  },
 });
 
 // Create agents using the Agent class
@@ -217,5 +290,19 @@ export const mastra = new Mastra({
       openAPIDocs: true,
       swaggerUI: true,
     },
+    cors: {
+      origin: [
+        'http://localhost:3000',  // Dev server
+        'http://localhost:5173',  // Vite preview
+        'http://localhost:5273',  // CLI interface
+        /^http:\/\/localhost:\d+$/ // Allow any localhost port
+      ],
+      allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'x-mastra-client-type'],
+      exposeHeaders: ['Content-Length', 'X-Requested-With'],
+      maxAge: 3600,
+      credentials: false,
+    },
+    apiRoutes: [reviewsApiRoute],
   },
 });
