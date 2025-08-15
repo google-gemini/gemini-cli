@@ -621,6 +621,21 @@ export class Config {
     };
   }
 
+  /**
+   * Gets custom file exclusion patterns from configuration.
+   * TODO: This is a placeholder implementation. In the future, this could
+   * read from settings files, CLI arguments, or environment variables.
+   */
+  getCustomExcludes(): string[] {
+    // Placeholder implementation - returns empty array for now
+    // Future implementation could read from:
+    // - User settings file
+    // - Project-specific configuration
+    // - Environment variables
+    // - CLI arguments
+    return [];
+  }
+
   getCheckpointingEnabled(): boolean {
     return this.checkpointing;
   }

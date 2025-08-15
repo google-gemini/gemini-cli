@@ -16,6 +16,7 @@ import {
 } from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
 import { Config } from '../config/config.js';
+import { FileExclusions } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
 
 // Subset of 'Path' interface provided by 'glob' that we can implement for testing
@@ -155,7 +156,7 @@ class GlobToolInvocation extends BaseToolInvocation<
           stat: true,
           nocase: !this.params.case_sensitive,
           dot: true,
-          ignore: ['**/node_modules/**', '**/.git/**'],
+          ignore: new FileExclusions(this.config).getGlobExcludes(),
           follow: false,
           signal,
         })) as GlobPath[];
