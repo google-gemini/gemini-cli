@@ -66,7 +66,9 @@ export interface OauthWebLogin {
   loginCompletePromise: Promise<void>;
 }
 
-export async function getOauthClient(
+let oauthClientPromise: Promise<OAuth2Client> | undefined;
+
+async function initOauthClient(
   authType: AuthType,
   config: Config,
 ): Promise<OAuth2Client> {
@@ -185,6 +187,16 @@ export async function getOauthClient(
   }
 
   return client;
+}
+
+export async function getOauthClient(
+  authType: AuthType,
+  config: Config,
+): Promise<OAuth2Client> {
+  if (!oauthClientPromise) {
+    oauthClientPromise = initOauthClient(authType, config);
+  }
+  return oauthClientPromise;
 }
 
 async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
@@ -415,4 +427,8 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
   } catch (error) {
     console.error('Error retrieving user info:', error);
   }
+}
+
+export function resetOauthClient() {
+  oauthClientPromise = undefined;
 }
