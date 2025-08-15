@@ -38,6 +38,7 @@ interface GeminiFileContent {
   content: string | null;
 }
 
+
 async function findProjectRoot(startDir: string): Promise<string | null> {
   let currentDir = path.resolve(startDir);
   while (true) {
@@ -103,25 +104,30 @@ async function getGeminiMdFilePathsInternal(
 
   for (let i = 0; i < dirsArray.length; i += CONCURRENT_LIMIT) {
     const batch = dirsArray.slice(i, i + CONCURRENT_LIMIT);
-    const batchPromises = batch.map(async (dir) => {
-      try {
-        return await getGeminiMdFilePathsInternalForEachDir(
-          dir,
-          userHomePath,
-          debugMode,
-          fileService,
-          extensionContextFilePaths,
-          fileFilteringOptions,
-          maxDirs,
-        );
-      } catch (error) {
+    const batchPromises = batch.map((dir) => 
+      getGeminiMdFilePathsInternalForEachDir(
+        dir,
+        userHomePath,
+        debugMode,
+        fileService,
+        extensionContextFilePaths,
+        fileFilteringOptions,
+        maxDirs,
+      )
+    );
+    
+    const batchResults = await Promise.allSettled(batchPromises);
+    
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled') {
+        pathsArrays.push(result.value);
+      } else {
+        const error = result.reason;
         const message = error instanceof Error ? error.message : String(error);
-        logger.error(`Error discovering files in directory ${dir}: ${message}`);
-        return []; // Return an empty array to allow other directories to be processed
+        logger.error(`Error discovering files in directory: ${message}`);
+        // Continue processing other directories
       }
-    });
-    const batchResults = await Promise.all(batchPromises);
-    pathsArrays.push(...batchResults);
+    }
   }
 
   const paths = pathsArrays.flat();
@@ -248,7 +254,7 @@ async function readGeminiMdFiles(
 
   for (let i = 0; i < filePaths.length; i += CONCURRENT_LIMIT) {
     const batch = filePaths.slice(i, i + CONCURRENT_LIMIT);
-    const batchPromises = batch.map(async (filePath) => {
+    const batchPromises = batch.map(async (filePath): Promise<GeminiFileContent> => {
       try {
         const content = await fs.readFile(filePath, 'utf-8');
 
@@ -282,8 +288,19 @@ async function readGeminiMdFiles(
       }
     });
 
-    const batchResults = await Promise.all(batchPromises);
-    results.push(...batchResults);
+    const batchResults = await Promise.allSettled(batchPromises);
+    
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled') {
+        results.push(result.value);
+      } else {
+        // This case shouldn't happen since we catch all errors above,
+        // but handle it for completeness
+        const error = result.reason;
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error(`Unexpected error processing file: ${message}`);
+      }
+    }
   }
 
   return results;
