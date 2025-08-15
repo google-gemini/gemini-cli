@@ -47,7 +47,7 @@ import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js'
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
-import type { Content } from '@google/genai';
+import type { Content, ThinkingConfig } from '@google/genai';
 import { logIdeConnection } from '../telemetry/loggers.js';
 import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 
@@ -198,6 +198,7 @@ export interface ConfigParameters {
   chatCompression?: ChatCompressionSettings;
   interactive?: boolean;
   trustedFolder?: boolean;
+  thinkingConfig?: ThinkingConfig;
 }
 
 export class Config {
@@ -262,6 +263,7 @@ export class Config {
   private readonly chatCompression: ChatCompressionSettings | undefined;
   private readonly interactive: boolean;
   private readonly trustedFolder: boolean | undefined;
+  private readonly thinkingConfig: ThinkingConfig | undefined;
   private initialized: boolean = false;
 
   constructor(params: ConfigParameters) {
@@ -327,6 +329,7 @@ export class Config {
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
+    this.thinkingConfig = params.thinkingConfig;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -703,6 +706,10 @@ export class Config {
 
   isInteractive(): boolean {
     return this.interactive;
+  }
+
+  getThinkingConfig(): ThinkingConfig | undefined {
+    return this.thinkingConfig;
   }
 
   async getGitService(): Promise<GitService> {
