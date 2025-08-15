@@ -183,6 +183,23 @@ jobs:
             --workspace="@google/gemini-cli" \
             --tag="${NPM_TAG}"
 
+      - name: 'Get previous release tag'
+        id: 'previous_release'
+        if: |-
+          ${{ steps.vars.outputs.is_dry_run == 'false' }}
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          IS_NIGHTLY: '${{ steps.vars.outputs.is_nightly }}'
+        run: |-
+          if [[ "${IS_NIGHTLY}" == "true" ]]; then
+            echo "Finding latest nightly release..."
+            PREVIOUS_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("nightly"))] | .[0].tagName')
+          else
+            echo "Finding latest STABLE release (excluding pre-releases)..."
+            PREVIOUS_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("nightly") | not)] | .[0].tagName')
+          fi
+          echo "PREVIOUS_TAG=${PREVIOUS_TAG}" >> "$GITHUB_OUTPUT"
+
       - name: 'Create GitHub Release and Tag'
         if: |-
           ${{ steps.vars.outputs.is_dry_run == 'false' }}
@@ -190,11 +207,13 @@ jobs:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_BRANCH: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           RELEASE_TAG: '${{ steps.version.outputs.RELEASE_TAG }}'
+          PREVIOUS_TAG: '${{ steps.previous_release.outputs.PREVIOUS_TAG }}'
         run: |-
           gh release create "${RELEASE_TAG}" \
             bundle/gemini.js \
             --target "$RELEASE_BRANCH" \
             --title "Release ${RELEASE_TAG}" \
+            --notes-start-tag "$PREVIOUS_TAG" \
             --generate-notes
 
       - name: 'Create Issue on Failure'
