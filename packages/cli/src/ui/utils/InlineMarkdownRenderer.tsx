@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import stringWidth from 'string-width';
 
 // Constants for Markdown parsing
@@ -31,7 +31,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
   while ((match = inlineRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
       nodes.push(
-        <Text key={`t-${lastIndex}`}>
+        <Text key={`t-${lastIndex}`} color={theme.text.primary}>
           {text.slice(lastIndex, match.index)}
         </Text>,
       );
@@ -48,7 +48,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
         fullMatch.length > BOLD_MARKER_LENGTH * 2
       ) {
         renderedNode = (
-          <Text key={key} bold>
+          <Text key={key} bold color={theme.text.primary}>
             {fullMatch.slice(BOLD_MARKER_LENGTH, -BOLD_MARKER_LENGTH)}
           </Text>
         );
@@ -60,13 +60,13 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
         !/\w/.test(
           text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 1),
         ) &&
-        !/\S[./\\]/.test(text.substring(match.index - 2, match.index)) &&
-        !/[./\\]\S/.test(
+        !/\S[./]/.test(text.substring(match.index - 2, match.index)) &&
+        !/[./]\S/.test(
           text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 2),
         )
       ) {
         renderedNode = (
-          <Text key={key} italic>
+          <Text key={key} italic color={theme.text.primary}>
             {fullMatch.slice(ITALIC_MARKER_LENGTH, -ITALIC_MARKER_LENGTH)}
           </Text>
         );
@@ -76,7 +76,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
         fullMatch.length > STRIKETHROUGH_MARKER_LENGTH * 2
       ) {
         renderedNode = (
-          <Text key={key} strikethrough>
+          <Text key={key} strikethrough color={theme.text.primary}>
             {fullMatch.slice(
               STRIKETHROUGH_MARKER_LENGTH,
               -STRIKETHROUGH_MARKER_LENGTH,
@@ -91,7 +91,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
         const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
         if (codeMatch && codeMatch[2]) {
           renderedNode = (
-            <Text key={key} color={Colors.AccentPurple}>
+            <Text key={key} color={theme.text.accent}>
               {codeMatch[2]}
             </Text>
           );
@@ -106,9 +106,9 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
           const linkText = linkMatch[1];
           const url = linkMatch[2];
           renderedNode = (
-            <Text key={key}>
+            <Text key={key} color={theme.text.primary}>
               {linkText}
-              <Text color={Colors.AccentBlue}> ({url})</Text>
+              <Text color={theme.text.link}> ({url})</Text>
             </Text>
           );
         }
@@ -116,10 +116,10 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
         fullMatch.startsWith('<u>') &&
         fullMatch.endsWith('</u>') &&
         fullMatch.length >
-          UNDERLINE_TAG_START_LENGTH + UNDERLINE_TAG_END_LENGTH - 1 // -1 because length is compared to combined length of start and end tags
+          UNDERLINE_TAG_START_LENGTH + UNDERLINE_TAG_END_LENGTH - 1
       ) {
         renderedNode = (
-          <Text key={key} underline>
+          <Text key={key} underline color={theme.text.primary}>
             {fullMatch.slice(
               UNDERLINE_TAG_START_LENGTH,
               -UNDERLINE_TAG_END_LENGTH,
@@ -132,12 +132,22 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
       renderedNode = null;
     }
 
-    nodes.push(renderedNode ?? <Text key={key}>{fullMatch}</Text>);
+    nodes.push(
+      renderedNode ?? (
+        <Text key={key} color={theme.text.primary}>
+          {fullMatch}
+        </Text>
+      ),
+    );
     lastIndex = inlineRegex.lastIndex;
   }
 
   if (lastIndex < text.length) {
-    nodes.push(<Text key={`t-${lastIndex}`}>{text.slice(lastIndex)}</Text>);
+    nodes.push(
+      <Text key={`t-${lastIndex}`} color={theme.text.primary}>
+        {text.slice(lastIndex)}
+      </Text>,
+    );
   }
 
   return <>{nodes.filter((node) => node !== null)}</>;

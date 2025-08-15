@@ -6,7 +6,7 @@
 
 import { Text } from 'ink';
 import { useEffect, useRef, useState } from 'react';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 
 export const DebugProfiler = () => {
@@ -31,6 +31,6 @@ export const DebugProfiler = () => {
   }
 
   return (
-    <Text color={Colors.AccentYellow}>Renders: {numRenders.current} </Text>
+    <Text color={theme.status.warning}>Renders: {numRenders.current} </Text>
   );
 };

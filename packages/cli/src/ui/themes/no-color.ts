@@ -43,8 +43,6 @@ const noColorSemanticColors: SemanticColors = {
     focused: '',
   },
   ui: {
-    comment: '',
-    symbol: '',
     gradient: [],
   },
   status: {

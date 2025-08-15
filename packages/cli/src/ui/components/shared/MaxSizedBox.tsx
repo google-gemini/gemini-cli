@@ -7,7 +7,7 @@
 import React, { Fragment, useEffect, useId } from 'react';
 import { Box, Text } from 'ink';
 import stringWidth from 'string-width';
-import { Colors } from '../../colors.js';
+import { theme } from '../../semantic-colors.js';
 import { toCodePoints } from '../../utils/textUtils.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
 
@@ -173,6 +173,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
     <Box key={index}>
       {line.length > 0 ? (
         line.map((segment, segIndex) => (
+          // Avoid adding color styles to this <Text> element, breaks code colorization
           <Text key={segIndex} {...segment.props}>
             {segment.text}
           </Text>
@@ -186,14 +187,14 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   return (
     <Box flexDirection="column" width={maxWidth} flexShrink={0}>
       {totalHiddenLines > 0 && overflowDirection === 'top' && (
-        <Text color={Colors.Gray} wrap="truncate">
+        <Text color={theme.text.secondary} wrap="truncate">
           ... first {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
           hidden ...
         </Text>
       )}
       {visibleLines}
       {totalHiddenLines > 0 && overflowDirection === 'bottom' && (
-        <Text color={Colors.Gray} wrap="truncate">
+        <Text color={theme.text.secondary} wrap="truncate">
           ... last {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
           hidden ...
         </Text>
