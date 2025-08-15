@@ -31,6 +31,10 @@ const ESC = '\u001B';
 export const PASTE_MODE_PREFIX = `${ESC}[200~`;
 export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
 
+// Kitty protocol keycodes
+const KITTY_KEYCODE_ENTER = 13;
+const KITTY_KEYCODE_NUMPAD_ENTER = 57414;
+
 export interface Key {
   name: string;
   ctrl: boolean;
@@ -132,7 +136,7 @@ export function KeypressProvider({
         };
       }
 
-      if (keyCode === 13) {
+      if (keyCode === KITTY_KEYCODE_ENTER || keyCode === KITTY_KEYCODE_NUMPAD_ENTER) {
         return {
           name: 'return',
           ctrl,
