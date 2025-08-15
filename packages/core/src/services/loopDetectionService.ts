@@ -324,18 +324,28 @@ export class LoopDetectionService {
       .getHistory()
       .slice(-LLM_LOOP_CHECK_HISTORY_COUNT);
 
-    const prompt = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
+    const prompt = `You are a sophisticated AI diagnostic agent. Your task is to analyze a conversation history and determine if the assistant is stuck in an unproductive loop.
 
-An unproductive state is characterized by one or more of the following patterns over the last 5 or more assistant turns:
+To perform your analysis, follow these steps:
+1.  Briefly summarize the assistant's last 5-10 actions to understand the recent activity.
+2.  Evaluate these actions against the criteria below to determine if they constitute a loop.
+3.  Provide your final assessment in a JSON object with your reasoning and a confidence score.
 
-Repetitive Actions: The assistant repeats the same tool calls or conversational responses a decent number of times. This includes simple loops (e.g., tool_A, tool_A, tool_A) and alternating patterns (e.g., tool_A, tool_B, tool_A, tool_B, ...).
+---
+### Criteria for Evaluation
 
-Cognitive Loop: The assistant seems unable to determine the next logical step. It might express confusion, repeatedly ask the same questions, or generate responses that don't logically follow from the previous turns, indicating it's stuck and not advancing the task.
+#### What IS an Unproductive Loop:
+1.  **Repetitive Actions without Progress:** The assistant repeats the same tool calls or responses, resulting in no net change. This includes simple loops (A, A, A) and alternating patterns (A, B, A, B) that don't advance the goal.
+2.  **Cognitive Stagnation:** The assistant seems confused, repeatedly asks the same questions, or gives illogical responses, indicating it cannot determine the next step.
 
-Crucially, differentiate between a true unproductive state and legitimate, incremental progress.
-For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distinct changes to the same file (like adding docstrings to functions one by one) is considered forward progress and is NOT a loop. A loop would be repeatedly replacing the same text with the same content, or cycling between a small set of files with no net change.
+#### What is NOT a Loop (Legitimate Progress):
+1.  **Incremental Progress:** A series of similar tool calls that each make a small, distinct, and cumulative change.
+    *   **Example:** Applying docstrings to several functions in a file, one by one. Each call, though similar, makes forward progress.
+2.  **User-Directed Repetition:** A repetitive sequence of actions explicitly requested by the user.
+    *   **Example:** The user asks to "apply the same change to all 10 of these files." This is a valid, user-driven task, not a loop.
 
-Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state.`;
+---
+Based on your analysis, determine the possibility that the conversation is stuck in a repetitive, non-productive state. Your output must be a JSON object.`;
     const contents = [
       ...recentHistory,
       { role: 'user', parts: [{ text: prompt }] },
