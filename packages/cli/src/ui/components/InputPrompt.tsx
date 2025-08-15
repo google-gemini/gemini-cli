@@ -17,7 +17,6 @@ import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
-import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
@@ -67,7 +66,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [escPressCount, setEscPressCount] = useState(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const kittyProtocolStatus = useKittyKeyboardProtocol();
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -529,8 +527,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   useKeypress(handleInput, {
     isActive: true,
-    kittyProtocolEnabled: kittyProtocolStatus.enabled,
-    config,
   });
 
   const linesToRender = buffer.viewportVisualLines;
@@ -563,7 +559,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         <Box flexGrow={1} flexDirection="column">
           {buffer.text.length === 0 && placeholder ? (
             focus ? (
-              <Text>
+              <Text color={theme.text.primary}>
                 {chalk.inverse(placeholder.slice(0, 1))}
                 <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
               </Text>
@@ -604,7 +600,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 }
               }
               return (
-                <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
+                <Text
+                  key={`line-${visualIdxInRenderedSet}`}
+                  color={theme.text.primary}
+                >
+                  {display}
+                </Text>
               );
             })
           )}

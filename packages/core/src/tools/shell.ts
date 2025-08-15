@@ -97,8 +97,6 @@ class ShellToolInvocation extends BaseToolInvocation<
   async execute(
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
-    terminalColumns?: number,
-    terminalRows?: number,
   ): Promise<ToolResult> {
     const strippedCommand = stripShellWrapper(this.params.command);
 
@@ -131,7 +129,9 @@ class ShellToolInvocation extends BaseToolInvocation<
         this.params.directory || '',
       );
 
-      let cumulativeOutput = '';
+      let cumulativeStdout = '';
+      let cumulativeStderr = '';
+
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
 
@@ -148,9 +148,15 @@ class ShellToolInvocation extends BaseToolInvocation<
 
           switch (event.type) {
             case 'data':
-              if (isBinaryStream) break;
-              cumulativeOutput = event.chunk;
-              currentDisplayOutput = cumulativeOutput;
+              if (isBinaryStream) break; // Don't process text if we are in binary mode
+              if (event.stream === 'stdout') {
+                cumulativeStdout += event.chunk;
+              } else {
+                cumulativeStderr += event.chunk;
+              }
+              currentDisplayOutput =
+                cumulativeStdout +
+                (cumulativeStderr ? `\n${cumulativeStderr}` : '');
               if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
                 shouldUpdate = true;
               }
@@ -181,8 +187,6 @@ class ShellToolInvocation extends BaseToolInvocation<
           }
         },
         signal,
-        terminalColumns,
-        terminalRows,
       );
 
       const result = await resultPromise;
@@ -214,7 +218,7 @@ class ShellToolInvocation extends BaseToolInvocation<
       if (result.aborted) {
         llmContent = 'Command was cancelled by user before it could complete.';
         if (result.output.trim()) {
-          llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
+          llmContent += ` Below is the output (on stdout and stderr) before it was cancelled:\n${result.output}`;
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
@@ -228,7 +232,8 @@ class ShellToolInvocation extends BaseToolInvocation<
         llmContent = [
           `Command: ${this.params.command}`,
           `Directory: ${this.params.directory || '(root)'}`,
-          `Output: ${result.output || '(empty)'}`,
+          `Stdout: ${result.stdout || '(empty)'}`,
+          `Stderr: ${result.stderr || '(empty)'}`,
           `Error: ${finalError}`, // Use the cleaned error string.
           `Exit Code: ${result.exitCode ?? '(none)'}`,
           `Signal: ${result.signal ?? '(none)'}`,
@@ -288,18 +293,8 @@ class ShellToolInvocation extends BaseToolInvocation<
   }
 }
 
-export class ShellTool extends BaseDeclarativeTool<
-  ShellToolParams,
-  ToolResult
-> {
-  static Name: string = 'run_shell_command';
-  private allowlist: Set<string> = new Set();
-
-  constructor(private readonly config: Config) {
-    super(
-      ShellTool.Name,
-      'Shell',
-      `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
+function getShellToolDescription(): string {
+  const returnedInfo = `
 
       The following information is returned:
 
@@ -311,14 +306,42 @@ export class ShellTool extends BaseDeclarativeTool<
       Exit Code: Exit code or \`(none)\` if terminated by signal.
       Signal: Signal number or \`(none)\` if no signal was received.
       Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\``,
+      Process Group PGID: Process group started or \`(none)\``;
+
+  if (os.platform() === 'win32') {
+    return `This tool executes a given shell command as \`cmd.exe /c <command>\`. Command can start background processes using \`start /b\`.${returnedInfo}`;
+  } else {
+    return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
+  }
+}
+
+function getCommandDescription(): string {
+  if (os.platform() === 'win32') {
+    return 'Exact command to execute as `cmd.exe /c <command>`';
+  } else {
+    return 'Exact bash command to execute as `bash -c <command>`';
+  }
+}
+
+export class ShellTool extends BaseDeclarativeTool<
+  ShellToolParams,
+  ToolResult
+> {
+  static Name: string = 'run_shell_command';
+  private allowlist: Set<string> = new Set();
+
+  constructor(private readonly config: Config) {
+    super(
+      ShellTool.Name,
+      'Shell',
+      getShellToolDescription(),
       Kind.Execute,
       {
         type: 'object',
         properties: {
           command: {
             type: 'string',
-            description: 'Exact bash command to execute as `bash -c <command>`',
+            description: getCommandDescription(),
           },
           description: {
             type: 'string',
