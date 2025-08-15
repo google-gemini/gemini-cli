@@ -50,9 +50,10 @@ const shouldLogUserPrompts = (config: Config): boolean =>
   config.getTelemetryLogPromptsEnabled();
 
 function getCommonAttributes(config: Config): LogAttributes {
+  const email = getCachedGoogleAccount();
   return {
     'session.id': config.getSessionId(),
-    'user.email': getCachedGoogleAccount(),
+    ...(email && { 'user.email': email }),
   };
 }
 
