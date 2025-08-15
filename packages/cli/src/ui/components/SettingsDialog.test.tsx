@@ -22,6 +22,7 @@
  */
 
 import { render } from 'ink-testing-library';
+import { waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
@@ -285,12 +286,15 @@ describe('SettingsDialog', () => {
 
       // Switch to scope focus
       stdin.write('\t'); // Tab key
-      await wait();
-      expect(lastFrame()).toContain('> Apply To');
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Apply To');
+      });
 
       // Select a scope
       stdin.write('1'); // Select first scope option
-      await wait();
+      await waitFor(() => {
+        expect(lastFrame()).toContain('  Apply To');
+      });
 
       // Wait a bit more to ensure React state has updated
       await wait(100);
@@ -356,9 +360,9 @@ describe('SettingsDialog', () => {
 
       // Press Escape key
       stdin.write('\u001B'); // ESC key
-      await wait();
-
-      expect(onSelect).toHaveBeenCalledWith(undefined, SettingScope.User);
+      await waitFor(() => {
+        expect(onSelect).toHaveBeenCalledWith(undefined, SettingScope.User);
+      });
 
       unmount();
     });
@@ -554,9 +558,9 @@ describe('SettingsDialog', () => {
   describe('Settings Display Values', () => {
     it('should show correct values for inherited settings', () => {
       const settings = createMockSettings(
-        {}, // No user settings
+        {},
         { vimMode: true, hideWindowTitle: false }, // System settings
-        {}, // No workspace settings
+        {},
       );
       const onSelect = vi.fn();
 
@@ -573,7 +577,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings(
         { vimMode: false }, // User overrides
         { vimMode: true }, // System default
-        {}, // No workspace settings
+        {},
       );
       const onSelect = vi.fn();
 
@@ -671,15 +675,17 @@ describe('SettingsDialog', () => {
 
       // Tab to scope section
       stdin.write('\t');
-      await wait();
-      expect(lastFrame()).toContain('> Apply To');
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Apply To');
+      });
 
       // Tab back to settings section
       stdin.write('\t');
-      await wait(100); // Extra wait for state update
-      output = lastFrame();
-      expect(output).toContain('Apply To');
-      expect(output).not.toContain('> Apply To');
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('  Apply To');
+      });
+
 
       unmount();
     });
@@ -755,9 +761,9 @@ describe('SettingsDialog', () => {
 
       // Exit
       stdin.write('\u001B'); // Escape
-      await wait();
-
-      expect(onSelect).toHaveBeenCalledWith(undefined, expect.any(String));
+      await waitFor(() => {
+        expect(onSelect).toHaveBeenCalledWith(undefined, expect.any(String));
+      });
 
       unmount();
     });
