@@ -117,7 +117,7 @@ export const ModelStatsDisplay: React.FC = () => {
       <StatRow title="API" values={[]} isSection />
       <StatRow
         title="Requests"
-        values={getModelValues((m) => m.api.totalRequests.toLocaleString())}
+        values={getModelValues((m) => m.api.totalRequests.toLocaleString('en-US'))}
       />
       <StatRow
         title="Errors"
@@ -129,7 +129,7 @@ export const ModelStatsDisplay: React.FC = () => {
                 m.api.totalErrors > 0 ? Colors.AccentRed : Colors.Foreground
               }
             >
-              {m.api.totalErrors.toLocaleString()} ({errorRate.toFixed(1)}%)
+              {m.api.totalErrors.toLocaleString('en-US')} ({errorRate.toFixed(1)}%)
             </Text>
           );
         })}
@@ -150,14 +150,14 @@ export const ModelStatsDisplay: React.FC = () => {
         title="Total"
         values={getModelValues((m) => (
           <Text color={Colors.AccentYellow}>
-            {m.tokens.total.toLocaleString()}
+            {m.tokens.total.toLocaleString('en-US')}
           </Text>
         ))}
       />
       <StatRow
         title="Prompt"
         isSubtle
-        values={getModelValues((m) => m.tokens.prompt.toLocaleString())}
+        values={getModelValues((m) => m.tokens.prompt.toLocaleString('en-US'))}
       />
       {hasCached && (
         <StatRow
@@ -167,7 +167,7 @@ export const ModelStatsDisplay: React.FC = () => {
             const cacheHitRate = calculateCacheHitRate(m);
             return (
               <Text color={Colors.AccentGreen}>
-                {m.tokens.cached.toLocaleString()} ({cacheHitRate.toFixed(1)}%)
+                {m.tokens.cached.toLocaleString('en-US')} ({cacheHitRate.toFixed(1)}%)
               </Text>
             );
           })}
@@ -177,20 +177,20 @@ export const ModelStatsDisplay: React.FC = () => {
         <StatRow
           title="Thoughts"
           isSubtle
-          values={getModelValues((m) => m.tokens.thoughts.toLocaleString())}
+          values={getModelValues((m) => m.tokens.thoughts.toLocaleString('en-US'))}
         />
       )}
       {hasTool && (
         <StatRow
           title="Tool"
           isSubtle
-          values={getModelValues((m) => m.tokens.tool.toLocaleString())}
+          values={getModelValues((m) => m.tokens.tool.toLocaleString('en-US'))}
         />
       )}
       <StatRow
         title="Output"
         isSubtle
-        values={getModelValues((m) => m.tokens.candidates.toLocaleString())}
+        values={getModelValues((m) => m.tokens.candidates.toLocaleString('en-US'))}
       />
     </Box>
   );
