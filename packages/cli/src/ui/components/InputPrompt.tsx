@@ -65,7 +65,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const bufferRef = useRef(buffer);
   const imeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isSubmittingRef = useRef(false);
   useEffect(() => {
     bufferRef.current = buffer;
   }, [buffer]);
@@ -148,30 +147,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
-      // Prevent duplicate submissions by checking if already processing
-      if (isSubmittingRef.current) {
-        return;
+      // Handle shell mode logic
+      if (shellModeActive) {
+        shellHistory.addCommandToHistory(submittedValue);
       }
       
-      isSubmittingRef.current = true;
+      // Clear the buffer and reset completion states first
+      buffer.setText('');
+      resetCompletionState();
+      resetReverseSearchCompletionState();
       
-      try {
-        // Handle shell mode logic
-        if (shellModeActive) {
-          shellHistory.addCommandToHistory(submittedValue);
-        }
-        
-        // Clear the buffer and reset completion states first
-        buffer.setText('');
-        resetCompletionState();
-        resetReverseSearchCompletionState();
-        
-        // Call onSubmit last to prevent potential re-submission issues
-        onSubmit(submittedValue);
-      } finally {
-        // Always reset the submission flag
-        isSubmittingRef.current = false;
-      }
+      // Call onSubmit last to prevent potential re-submission issues
+      onSubmit(submittedValue);
     },
     [
       onSubmit,
@@ -266,8 +253,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
-      // If a submission is in progress, ignore all keypresses.
-      if (isSubmittingRef.current) {
+      // If IME timeout is pending, ignore all keypresses.
+      if (imeTimeoutRef.current) {
         return;
       }
 
@@ -490,13 +477,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             if (imeTimeoutRef.current) {
               clearTimeout(imeTimeoutRef.current);
             }
-            isSubmittingRef.current = true;
             imeTimeoutRef.current = setTimeout(() => {
               try {
                 handleSubmitAndClear(bufferRef.current.text);
               } finally {
                 imeTimeoutRef.current = null;
-                isSubmittingRef.current = false;
               }
             }, 50);
           }
