@@ -374,7 +374,7 @@ const productionReadinessAgent = new Agent({
     {
       guardrailCrudTool,
       reviewStorage: reviewStorageTool,
-      //ekgCrud: ekgCrudTool,
+      ekgCrud: ekgCrudTool,
       reviewLoader: reviewLoaderTool,
       prCreation: prCreationWorkflowTool,
       ...githubTools,
