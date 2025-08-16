@@ -64,6 +64,7 @@ export interface CliArgs {
   checkpointing: boolean | undefined;
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
+  telemetryOtlpProtocol: string | undefined;
   telemetryLogPrompts: boolean | undefined;
   telemetryOutfile: string | undefined;
   allowedMcpServerNames: string[] | undefined;
@@ -171,6 +172,12 @@ export async function parseArguments(): Promise<CliArgs> {
           type: 'string',
           description:
             'Set the OTLP endpoint for telemetry. Overrides environment variables and settings files.',
+        })
+        .option('telemetry-otlp-protocol', {
+          type: 'string',
+          choices: ['grpc', 'http'],
+          description:
+            'Set the OTLP protocol for telemetry (grpc or http). Overrides settings files.',
         })
         .option('telemetry-log-prompts', {
           type: 'boolean',
@@ -491,6 +498,11 @@ export async function loadCliConfig(
         argv.telemetryOtlpEndpoint ??
         process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
         settings.telemetry?.otlpEndpoint,
+      otlpProtocol: (['grpc', 'http'] as const).find(
+        (p) =>
+          p ===
+          (argv.telemetryOtlpProtocol ?? settings.telemetry?.otlpProtocol),
+      ),
       logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
       outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
     },

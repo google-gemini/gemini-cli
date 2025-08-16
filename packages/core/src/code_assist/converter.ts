@@ -61,6 +61,7 @@ interface VertexGenerationConfig {
   seed?: number;
   responseMimeType?: string;
   responseJsonSchema?: unknown;
+  responseSchema?: unknown;
   routingConfig?: GenerationConfigRoutingConfig;
   modelSelectionConfig?: ModelSelectionConfig;
   responseModalities?: string[];
@@ -229,6 +230,7 @@ function toVertexGenerationConfig(
     frequencyPenalty: config.frequencyPenalty,
     seed: config.seed,
     responseMimeType: config.responseMimeType,
+    responseSchema: config.responseSchema,
     responseJsonSchema: config.responseJsonSchema,
     routingConfig: config.routingConfig,
     modelSelectionConfig: config.modelSelectionConfig,

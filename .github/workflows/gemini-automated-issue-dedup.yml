@@ -175,10 +175,12 @@ jobs:
 
       - name: 'Comment and Label Duplicate Issue'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        env:
+          DUPLICATES_OUTPUT: '${{ needs.find-duplicates.outputs.duplicate_issues_json }}'
         with:
           github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           script: |-
-            const rawJson = '${{ needs.find-duplicates.outputs.duplicate_issues_json }}';
+            const rawJson = process.env.DUPLICATES_OUTPUT;
             core.info(`Raw duplicates JSON: ${rawJson}`);
             let parsedJson;
             try {

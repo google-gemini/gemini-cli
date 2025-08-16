@@ -74,7 +74,11 @@ gemini --telemetry \
 ## Running an OTEL Collector
 
 An OTEL Collector is a service that receives, processes, and exports telemetry data.
-The CLI sends data using the OTLP/gRPC protocol.
+The CLI can send data using either the OTLP/gRPC or OTLP/HTTP protocol.
+You can specify which protocol to use via the `--telemetry-otlp-protocol` flag
+or the `telemetry.otlpProtocol` setting in your `settings.json` file. See the
+[configuration docs](./cli/configuration.md#--telemetry-otlp-protocol) for more
+details.
 
 Learn more about OTEL exporter standard configuration in [documentation][otel-config-docs].
 
