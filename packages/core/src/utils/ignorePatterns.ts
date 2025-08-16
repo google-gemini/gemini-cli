@@ -44,6 +44,7 @@ export const BINARY_FILE_PATTERNS: string[] = [
   '**/*.odt',
   '**/*.ods',
   '**/*.odp',
+  '**/*.pdf'
 ];
 
 /**
