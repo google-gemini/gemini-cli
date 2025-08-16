@@ -13,9 +13,11 @@ export async function readStdin(): Promise<string> {
     let totalSize = 0;
     process.stdin.setEncoding('utf8');
 
-    const pipedInputShouldBeAvailableInMs = 100;
+    const pipedInputShouldBeAvailableInMs = 500;
     const pipedInputTimeout = setTimeout(() => {
       // stop reading if input is not available yet
+      // this is needed in terminals where stdin is never TTY
+      // which causes the program to get stuck expecting data from stdin 
       onEnd();
     }, pipedInputShouldBeAvailableInMs);
 
