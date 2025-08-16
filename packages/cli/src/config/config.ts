@@ -500,7 +500,8 @@ export async function loadCliConfig(
         settings.telemetry?.otlpEndpoint,
       otlpProtocol: (['grpc', 'http'] as const).find(
         (p) =>
-          p === (argv.telemetryOtlpProtocol ?? settings.telemetry?.otlpProtocol)
+          p ===
+          (argv.telemetryOtlpProtocol ?? settings.telemetry?.otlpProtocol),
       ),
       logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
       outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
