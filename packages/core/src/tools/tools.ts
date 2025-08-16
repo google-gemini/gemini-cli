@@ -236,6 +236,19 @@ export abstract class DeclarativeTool<
     const invocation = this.build(params);
     return invocation.execute(signal, updateOutput);
   }
+
+  async validateBuildAndExecute(
+    args: TParams,
+    abortSignal: AbortSignal,
+  ): Promise<ToolResult> {
+    const validationError = this.validateToolParams(args);
+    if (validationError) {
+      return {
+        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
+        returnDisplay: validationError,
+      };   }
+    return this.buildAndExecute(args, abortSignal);
+  }
 }
 
 /**
