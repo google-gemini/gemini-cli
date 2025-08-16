@@ -67,4 +67,33 @@ describe('run_shell_command', () => {
     // Validate model output - will throw if no output, warn if missing expected content
     validateModelOutput(result, 'test-stdin', 'Shell command stdin test');
   });
+
+  it('should propagate environment variables to the shell', async () => {
+    const rig = new TestRig();
+    await rig.setup('should propagate environment variables to the shell');
+
+    process.env['GEMINI_CLI_TEST_VAR'] = 'test-value';
+
+    const prompt = `Please run the command "echo $GEMINI_CLI_TEST_VAR" and show me the output`;
+
+    const result = await rig.run(prompt);
+
+    const foundToolCall = await rig.waitForToolCall('run_shell_command');
+
+    // Add debugging information
+    if (!foundToolCall || !result.includes('test-value')) {
+      printDebugInfo(rig, result, {
+        'Found tool call': foundToolCall,
+        'Contains test-value': result.includes('test-value'),
+      });
+    }
+
+    expect(
+      foundToolCall,
+      'Expected to find a run_shell_command tool call',
+    ).toBeTruthy();
+
+    // Validate model output - will throw if no output, warn if missing expected content
+    validateModelOutput(result, 'test-value', 'Shell command env var test');
+  });
 });
