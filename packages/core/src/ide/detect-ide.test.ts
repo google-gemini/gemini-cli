@@ -4,65 +4,72 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { detectIde, DetectedIde } from './detect-ide.js';
+import { detectIde, detectIdeByEnvVar, DetectedIde } from './detect-ide.js';
 
 describe('detectIde', () => {
+  const originalEnv = { ...process.env };
+
   afterEach(() => {
-    vi.unstubAllEnvs();
+    process.env = { ...originalEnv };
   });
 
-  it.each([
-    {
-      env: {},
-      expected: DetectedIde.VSCode,
-    },
-    {
-      env: { __COG_BASHRC_SOURCED: '1' },
-      expected: DetectedIde.Devin,
-    },
-    {
-      env: { REPLIT_USER: 'test' },
-      expected: DetectedIde.Replit,
-    },
-    {
-      env: { CURSOR_TRACE_ID: 'test' },
-      expected: DetectedIde.Cursor,
-    },
-    {
-      env: { CODESPACES: 'true' },
-      expected: DetectedIde.Codespaces,
-    },
-    {
-      env: { EDITOR_IN_CLOUD_SHELL: 'true' },
-      expected: DetectedIde.CloudShell,
-    },
-    {
-      env: { CLOUD_SHELL: 'true' },
-      expected: DetectedIde.CloudShell,
-    },
-    {
-      env: { TERM_PRODUCT: 'Trae' },
-      expected: DetectedIde.Trae,
-    },
-    {
-      env: { FIREBASE_DEPLOY_AGENT: 'true' },
-      expected: DetectedIde.FirebaseStudio,
-    },
-    {
-      env: { MONOSPACE_ENV: 'true' },
-      expected: DetectedIde.FirebaseStudio,
-    },
-  ])('detects the IDE for $expected', ({ env, expected }) => {
-    vi.stubEnv('TERM_PROGRAM', 'vscode');
-    for (const [key, value] of Object.entries(env)) {
-      vi.stubEnv(key, value);
-    }
-    expect(detectIde()).toBe(expected);
+  it('should return undefined when no IDE is detected', () => {
+    expect(detectIdeByEnvVar()).toBeUndefined();
   });
 
-  it('returns undefined for non-vscode', () => {
-    vi.stubEnv('TERM_PROGRAM', 'definitely-not-vscode');
-    expect(detectIde()).toBeUndefined();
+  it('should detect Devin when __COG_BASHRC_SOURCED is set', () => {
+    process.env['__COG_BASHRC_SOURCED'] = 'true';
+    expect(detectIdeByEnvVar()).toBe(DetectedIde.Devin);
+  });
+
+  it('should detect Replit when REPLIT_USER is set', () => {
+    process.env['REPLIT_USER'] = 'test';
+    expect(detectIdeByEnvVar()).toBe(DetectedIde.Replit);
+  });
+
+  it('should detect Cursor when CURSOR_TRACE_ID is set', () => {
+    process.env['CURSOR_TRACE_ID'] = 'test';
+    expect(detectIdeByEnvVar()).toBe(DetectedIde.Cursor);
+  });
+
+  it('should detect Codespaces when CODESPACES is set', () => {
+    process.env['CODESPACES'] = 'true';
+    expect(detectIdeByEnvVar()).toBe(DetectedIde.Codespaces);
+  });
+
+  it('should detect Cloud Shell when EDITOR_IN_CLOUD_SHELL is set', () => {
+    process.env['EDITOR_IN_CLOUD_SHELL'] = 'true';
+    expect(detectIdeByEnvVar()).toBe(DetectedIde.CloudShell);
+  });
+
+  it('should detect Cloud Shell when CLOUD_SHELL is set', () => {
+    process.env['CLOUD_SHELL'] = 'true';
+    expect(detectIdeByEnvVar()).toBe(DetectedIde.CloudShell);
+  });
+
+  it('should detect Trae when TERM_PRODUCT is set to Trae', () => {
+    process.env['TERM_PRODUCT'] = 'Trae';
+    expect(detectIdeByEnvVar()).toBe(DetectedIde.Trae);
+  });
+
+  it('should detect Firebase Studio when FIREBASE_DEPLOY_AGENT is set', () => {
+    process.env['FIREBASE_DEPLOY_AGENT'] = 'true';
+    expect(detectIdeByEnvVar()).toBe(DetectedIde.FirebaseStudio);
+  });
+
+  it('should detect Firebase Studio when MONOSPACE_ENV is set', () => {
+    process.env['MONOSPACE_ENV'] = 'true';
+    expect(detectIdeByEnvVar()).toBe(DetectedIde.FirebaseStudio);
+  });
+
+  it('should detect VSCode when TERM_PROGRAM is vscode', () => {
+    process.env['TERM_PROGRAM'] = 'vscode';
+    expect(detectIdeByEnvVar()).toBe(DetectedIde.VSCode);
+  });
+
+  it('should detect a VSCode fork when the command includes "vscode" (case-insensitive) and TERM_PROGRAM is vscode', () => {
+    process.env['TERM_PROGRAM'] = 'vscode';
+    expect(detectIde('path/to/vscode-fork')).toBe(DetectedIde.VSCodeFork);
+    expect(detectIde('path/to/VSCODE-fork')).toBe(DetectedIde.VSCodeFork);
   });
 });

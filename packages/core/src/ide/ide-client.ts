@@ -15,7 +15,7 @@ import {
   CloseDiffResponseSchema,
   DiffUpdateResult,
 } from '../ide/ideContext.js';
-import { getIdeProcessId } from './process-utils.js';
+import { getIdeProcess } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import * as os from 'node:os';
@@ -60,8 +60,8 @@ export class IdeClient {
     details:
       'IDE integration is currently disabled. To enable it, run /ide enable.',
   };
-  private readonly currentIde: DetectedIde | undefined;
-  private readonly currentIdeDisplayName: string | undefined;
+  private currentIde: DetectedIde | undefined;
+  private currentIdeDisplayName: string | undefined;
   private diffResponses = new Map<string, (result: DiffUpdateResult) => void>();
 
   private constructor() {
@@ -79,6 +79,12 @@ export class IdeClient {
   }
 
   async connect(): Promise<void> {
+    const { command } = await getIdeProcess();
+    this.currentIde = detectIde(command);
+    if (this.currentIde) {
+      this.currentIdeDisplayName = getIdeInfo(this.currentIde).displayName;
+    }
+
     if (!this.currentIde || !this.currentIdeDisplayName) {
       this.setState(
         IDEConnectionStatus.Disconnected,
@@ -300,11 +306,8 @@ export class IdeClient {
 
   private async getPortFromFile(): Promise<string | undefined> {
     try {
-      const ideProcessId = await getIdeProcessId();
-      const portFile = path.join(
-        os.tmpdir(),
-        `gemini-ide-server-${ideProcessId}.json`,
-      );
+      const { pid } = await getIdeProcess();
+      const portFile = path.join(os.tmpdir(), `gemini-ide-server-${pid}.json`);
       const portFileContents = await fs.promises.readFile(portFile, 'utf8');
       const port = JSON.parse(portFileContents).port;
       return port.toString();

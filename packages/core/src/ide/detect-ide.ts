@@ -8,6 +8,7 @@ export enum DetectedIde {
   Devin = 'devin',
   Replit = 'replit',
   VSCode = 'vscode',
+  VSCodeFork = 'vscode-fork',
   Cursor = 'cursor',
   CloudShell = 'cloudshell',
   Codespaces = 'codespaces',
@@ -30,6 +31,7 @@ export function getIdeInfo(ide: DetectedIde): IdeInfo {
         displayName: 'Replit',
       };
     case DetectedIde.VSCode:
+    case DetectedIde.VSCodeFork:
       return {
         displayName: 'VS Code',
       };
@@ -61,11 +63,8 @@ export function getIdeInfo(ide: DetectedIde): IdeInfo {
   }
 }
 
-export function detectIde(): DetectedIde | undefined {
-  // Only VSCode-based integrations are currently supported.
-  if (process.env.TERM_PROGRAM !== 'vscode') {
-    return undefined;
-  }
+// Detects the current IDE using only environment variables.
+export function detectIdeByEnvVar(): DetectedIde | undefined {
   if (process.env.__COG_BASHRC_SOURCED) {
     return DetectedIde.Devin;
   }
@@ -87,5 +86,20 @@ export function detectIde(): DetectedIde | undefined {
   if (process.env.FIREBASE_DEPLOY_AGENT || process.env.MONOSPACE_ENV) {
     return DetectedIde.FirebaseStudio;
   }
-  return DetectedIde.VSCode;
+  if (process.env.TERM_PROGRAM === 'vscode') {
+    return DetectedIde.VSCode;
+  }
+  return;
+}
+
+// More precise-- detects the current IDE using environment variables and the current command.
+export function detectIde(command: string): DetectedIde | undefined {
+  const ide = detectIdeByEnvVar();
+  if (ide === DetectedIde.VSCode) {
+    if (command && command.toLowerCase().includes('vscode')) {
+      return DetectedIde.VSCode;
+    }
+    return DetectedIde.VSCodeFork;
+  }
+  return ide;
 }

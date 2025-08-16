@@ -31,7 +31,12 @@ import {
 import { getInstallationId } from '../../utils/user_id.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
-import { DetectedIde, detectIde } from '../../ide/detect-ide.js';
+import {
+  DetectedIde,
+  detectIdeByEnvVar,
+  ideDetector,
+} from '../../ide/detect-ide.js';
+import { IdeClient } from '../../ide/ide-client.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -92,7 +97,7 @@ function determineSurface(): string {
   } else if (process.env.GITHUB_SHA) {
     return 'GitHub';
   } else if (process.env.TERM_PROGRAM === 'vscode') {
-    return detectIde() || DetectedIde.VSCode;
+    return detectIdeByEnvVar() || DetectedIde.VSCode;
   } else {
     return 'SURFACE_NOT_SET';
   }
