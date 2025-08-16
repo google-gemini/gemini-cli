@@ -16,6 +16,8 @@ export const COMMON_IGNORE_PATTERNS: string[] = [
   '**/node_modules/**',
   '**/.git/**',
   '**/bower_components/**',
+  '**/.svn/**',
+  '**/.hg/**',
 ];
 
 /**
@@ -242,9 +244,11 @@ export function extractExtensionsFromPatterns(patterns: string[]): string[] {
           // '.tar.gz' -> '.gz' and '.profile' -> '.profile' correctly.
           const extracted = path.extname(`dummy${extPart}`);
           // If extname returns empty (e.g. for '.'), use the original part.
-          // Then filter out empty or '.' results.
+          // Then filter out empty or '.' results and invalid double dot patterns.
           const result = extracted || extPart;
-          return result && result !== '.' ? [result] : [];
+          return result && result !== '.' && !result.substring(1).includes('.')
+            ? [result]
+            : [];
         }
         return [];
       }),
