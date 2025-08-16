@@ -259,13 +259,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const handleInput = useCallback(
     (key: Key) => {
       // If an IME submission timeout is pending, only allow the Escape key
-      // to cancel it. Ignore all other keypresses to prevent race conditions.
+      // to cancel it. Other keys are blocked to prevent race conditions.
       if (imeTimeoutRef.current) {
         if (keyMatchers[Command.ESCAPE](key)) {
           clearTimeout(imeTimeoutRef.current);
           imeTimeoutRef.current = null;
+        } else {
+          return;
         }
-        return;
       }
 
       /// We want to handle paste even when not focused to support drag and drop.
