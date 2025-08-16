@@ -5,12 +5,7 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
-import {
-  cacheGoogleAccount,
-  getCachedGoogleAccount,
-  clearCachedGoogleAccount,
-  getLifetimeGoogleAccounts,
-} from './user_account.js';
+import { UserAccountManager } from './userAccountManager.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import path from 'node:path';
@@ -23,16 +18,21 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
-describe('user_account', () => {
+describe('UserAccountManager', () => {
   let tempHomeDir: string;
-  const accountsFile = () =>
-    path.join(tempHomeDir, '.gemini', 'google_accounts.json');
+  let userAccountManager: UserAccountManager;
+  let accountsFile: () => string;
+
   beforeEach(() => {
     tempHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
     (os.homedir as Mock).mockReturnValue(tempHomeDir);
+    accountsFile = () =>
+      path.join(tempHomeDir, '.gemini', 'google_accounts.json');
+    userAccountManager = new UserAccountManager();
   });
+
   afterEach(() => {
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
     vi.clearAllMocks();
@@ -40,7 +40,7 @@ describe('user_account', () => {
 
   describe('cacheGoogleAccount', () => {
     it('should create directory and write initial account file', async () => {
-      await cacheGoogleAccount('test1@google.com');
+      await userAccountManager.cacheGoogleAccount('test1@google.com');
 
       // Verify Google Account ID was cached
       expect(fs.existsSync(accountsFile())).toBe(true);
@@ -60,7 +60,7 @@ describe('user_account', () => {
         ),
       );
 
-      await cacheGoogleAccount('test3@google.com');
+      await userAccountManager.cacheGoogleAccount('test3@google.com');
 
       expect(fs.readFileSync(accountsFile(), 'utf-8')).toBe(
         JSON.stringify(
@@ -84,8 +84,8 @@ describe('user_account', () => {
           2,
         ),
       );
-      await cacheGoogleAccount('test2@google.com');
-      await cacheGoogleAccount('test1@google.com');
+      await userAccountManager.cacheGoogleAccount('test2@google.com');
+      await userAccountManager.cacheGoogleAccount('test1@google.com');
 
       expect(fs.readFileSync(accountsFile(), 'utf-8')).toBe(
         JSON.stringify(
@@ -103,7 +103,7 @@ describe('user_account', () => {
         .spyOn(console, 'debug')
         .mockImplementation(() => {});
 
-      await cacheGoogleAccount('test1@google.com');
+      await userAccountManager.cacheGoogleAccount('test1@google.com');
 
       expect(consoleDebugSpy).toHaveBeenCalled();
       expect(JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'))).toEqual({
@@ -120,19 +120,19 @@ describe('user_account', () => {
         accountsFile(),
         JSON.stringify({ active: 'active@google.com', old: [] }, null, 2),
       );
-      const account = getCachedGoogleAccount();
+      const account = userAccountManager.getCachedGoogleAccount();
       expect(account).toBe('active@google.com');
     });
 
     it('should return null if file does not exist', () => {
-      const account = getCachedGoogleAccount();
+      const account = userAccountManager.getCachedGoogleAccount();
       expect(account).toBeNull();
     });
 
     it('should return null if file is empty', () => {
       fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
       fs.writeFileSync(accountsFile(), '');
-      const account = getCachedGoogleAccount();
+      const account = userAccountManager.getCachedGoogleAccount();
       expect(account).toBeNull();
     });
 
@@ -143,7 +143,7 @@ describe('user_account', () => {
         .spyOn(console, 'debug')
         .mockImplementation(() => {});
 
-      const account = getCachedGoogleAccount();
+      const account = userAccountManager.getCachedGoogleAccount();
 
       expect(account).toBeNull();
       expect(consoleDebugSpy).toHaveBeenCalled();
@@ -162,7 +162,7 @@ describe('user_account', () => {
         ),
       );
 
-      await clearCachedGoogleAccount();
+      await userAccountManager.clearCachedGoogleAccount();
 
       const stored = JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'));
       expect(stored.active).toBeNull();
@@ -172,7 +172,7 @@ describe('user_account', () => {
     it('should handle empty file gracefully', async () => {
       fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
       fs.writeFileSync(accountsFile(), '');
-      await clearCachedGoogleAccount();
+      await userAccountManager.clearCachedGoogleAccount();
       const stored = JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'));
       expect(stored.active).toBeNull();
       expect(stored.old).toEqual([]);
@@ -181,13 +181,13 @@ describe('user_account', () => {
 
   describe('getLifetimeGoogleAccounts', () => {
     it('should return 0 if the file does not exist', () => {
-      expect(getLifetimeGoogleAccounts()).toBe(0);
+      expect(userAccountManager.getLifetimeGoogleAccounts()).toBe(0);
     });
 
     it('should return 0 if the file is empty', () => {
       fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
       fs.writeFileSync(accountsFile(), '');
-      expect(getLifetimeGoogleAccounts()).toBe(0);
+      expect(userAccountManager.getLifetimeGoogleAccounts()).toBe(0);
     });
 
     it('should return 0 if the file is corrupted', () => {
@@ -197,7 +197,7 @@ describe('user_account', () => {
         .spyOn(console, 'debug')
         .mockImplementation(() => {});
 
-      expect(getLifetimeGoogleAccounts()).toBe(0);
+      expect(userAccountManager.getLifetimeGoogleAccounts()).toBe(0);
       expect(consoleDebugSpy).toHaveBeenCalled();
     });
 
@@ -207,7 +207,7 @@ describe('user_account', () => {
         accountsFile(),
         JSON.stringify({ active: 'test1@google.com', old: [] }),
       );
-      expect(getLifetimeGoogleAccounts()).toBe(1);
+      expect(userAccountManager.getLifetimeGoogleAccounts()).toBe(1);
     });
 
     it('should correctly count old accounts when active is null', () => {
@@ -219,7 +219,7 @@ describe('user_account', () => {
           old: ['test1@google.com', 'test2@google.com'],
         }),
       );
-      expect(getLifetimeGoogleAccounts()).toBe(2);
+      expect(userAccountManager.getLifetimeGoogleAccounts()).toBe(2);
     });
 
     it('should correctly count both active and old accounts', () => {
@@ -231,7 +231,7 @@ describe('user_account', () => {
           old: ['test1@google.com', 'test2@google.com'],
         }),
       );
-      expect(getLifetimeGoogleAccounts()).toBe(3);
+      expect(userAccountManager.getLifetimeGoogleAccounts()).toBe(3);
     });
   });
 });

@@ -18,7 +18,19 @@ import * as os from 'os';
 import { ToolConfirmationOutcome } from './tools.js';
 
 // Mock dependencies
-vi.mock('fs/promises');
+vi.mock(import('fs/promises'), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    mkdir: vi.fn(),
+    readFile: vi.fn(),
+  };
+});
+
+vi.mock('fs', () => ({
+  mkdirSync: vi.fn(),
+}));
+
 vi.mock('os');
 
 const MEMORY_SECTION_HEADER = '## Gemini Added Memories';

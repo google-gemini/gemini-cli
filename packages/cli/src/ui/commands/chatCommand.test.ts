@@ -67,7 +67,7 @@ describe('chatCommand', () => {
     mockContext = createMockCommandContext({
       services: {
         config: {
-          getProjectTempDir: () => '/tmp/gemini',
+          getProjectRoot: () => '/project/root',
           getGeminiClient: () =>
             ({
               getChat: mockGetChat,

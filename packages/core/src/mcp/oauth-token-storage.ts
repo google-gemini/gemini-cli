@@ -6,7 +6,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
+import { Storage } from '../config/storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 
 /**
@@ -36,17 +36,13 @@ export interface MCPOAuthCredentials {
  * Class for managing MCP OAuth token storage and retrieval.
  */
 export class MCPOAuthTokenStorage {
-  private static readonly TOKEN_FILE = 'mcp-oauth-tokens.json';
-  private static readonly CONFIG_DIR = '.gemini';
-
   /**
    * Get the path to the token storage file.
    *
    * @returns The full path to the token storage file
    */
   private static getTokenFilePath(): string {
-    const homeDir = os.homedir();
-    return path.join(homeDir, this.CONFIG_DIR, this.TOKEN_FILE);
+    return Storage.getMcpOAuthTokensPath();
   }
 
   /**

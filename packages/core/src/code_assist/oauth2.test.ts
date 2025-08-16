@@ -5,8 +5,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import { getOauthClient, resetOauthClientForTesting } from './oauth2.js';
-import { getCachedGoogleAccount } from '../utils/user_account.js';
 import { OAuth2Client, Compute } from 'google-auth-library';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -17,6 +15,7 @@ import * as os from 'os';
 import { AuthType } from '../core/contentGenerator.js';
 import { Config } from '../config/config.js';
 import readline from 'node:readline';
+import { UserAccountManager } from '../utils/userAccountManager.js';
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();
@@ -29,7 +28,6 @@ vi.mock('os', async (importOriginal) => {
 vi.mock('google-auth-library');
 vi.mock('http');
 vi.mock('open');
-vi.mock('crypto');
 vi.mock('node:readline');
 vi.mock('../utils/browser.js', () => ({
   shouldAttemptBrowserLaunch: () => true,
@@ -44,17 +42,27 @@ const mockConfig = {
 // Mock fetch globally
 global.fetch = vi.fn();
 
+let getOauthClient: (
+  authType: AuthType,
+  config: Config,
+) => Promise<OAuth2Client>;
+
 describe('oauth2', () => {
   let tempHomeDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tempHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
     (os.homedir as Mock).mockReturnValue(tempHomeDir);
+    vi.spyOn(process, 'cwd').mockReturnValue(tempHomeDir);
+    vi.resetModules();
+    const mod = await import('./oauth2.js');
+    getOauthClient = mod.getOauthClient;
   });
   afterEach(() => {
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     resetOauthClientForTesting();
     delete process.env.CLOUD_SHELL;
@@ -177,7 +185,10 @@ describe('oauth2', () => {
     });
 
     // Verify the getCachedGoogleAccount function works
-    expect(getCachedGoogleAccount()).toBe('test-google-account@gmail.com');
+    const userAccountManager = new UserAccountManager();
+    expect(userAccountManager.getCachedGoogleAccount()).toBe(
+      'test-google-account@gmail.com',
+    );
   });
 
   it('should perform login with user code', async () => {

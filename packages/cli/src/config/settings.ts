@@ -11,6 +11,7 @@ import * as dotenv from 'dotenv';
 import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
+  Storage,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -19,9 +20,10 @@ import { Settings, MemoryImportFormat } from './settingsSchema.js';
 
 export type { Settings, MemoryImportFormat };
 
-export const SETTINGS_DIRECTORY_NAME = '.gemini';
-export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
-export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
+export const SETTINGS_DIRECTORY_NAME = '.gemini'; // retained for text uses
+
+export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
+export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
 export function getSystemSettingsPath(): string {
@@ -37,9 +39,7 @@ export function getSystemSettingsPath(): string {
   }
 }
 
-export function getWorkspaceSettingsPath(workspaceDir: string): string {
-  return path.join(workspaceDir, SETTINGS_DIRECTORY_NAME, 'settings.json');
-}
+// Caller should use storage directly for workspace path
 
 export type { DnsResolutionOrder } from './settingsSchema.js';
 
@@ -260,7 +260,9 @@ export function loadEnvironment(settings?: Settings): void {
   // If no settings provided, try to load workspace settings for exclusions
   let resolvedSettings = settings;
   if (!resolvedSettings) {
-    const workspaceSettingsPath = getWorkspaceSettingsPath(process.cwd());
+    const workspaceSettingsPath = new Storage(
+      process.cwd(),
+    ).getWorkspaceSettingsPath();
     try {
       if (fs.existsSync(workspaceSettingsPath)) {
         const workspaceContent = fs.readFileSync(
@@ -333,7 +335,9 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   // We expect homedir to always exist and be resolvable.
   const realHomeDir = fs.realpathSync(resolvedHomeDir);
 
-  const workspaceSettingsPath = getWorkspaceSettingsPath(workspaceDir);
+  const workspaceSettingsPath = new Storage(
+    workspaceDir,
+  ).getWorkspaceSettingsPath();
 
   // Load system settings
   try {
