@@ -74,14 +74,14 @@ export function SuggestionsDisplay({
             <Box flexDirection="row">
               {userInput.startsWith('/') ? (
                 // only use box model for (/) command mode
-                <Box width={20} flexShrink={0}>
+                <Box width={35} flexShrink={0}>
                   {labelElement}
                 </Box>
               ) : (
                 labelElement
               )}
               {suggestion.description ? (
-                <Box flexGrow={1}>
+                <Box flexGrow={1} marginLeft={1}>
                   <Text color={textColor} wrap="truncate">
                     {suggestion.description}
                   </Text>

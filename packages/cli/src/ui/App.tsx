@@ -475,7 +475,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     20,
     Math.floor(terminalWidth * widthFraction) - 3,
   );
-  const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 0.8));
+  const suggestionsWidth = inputWidth;
 
   // Utility callbacks
   const isValidPath = useCallback((filePath: string): boolean => {
