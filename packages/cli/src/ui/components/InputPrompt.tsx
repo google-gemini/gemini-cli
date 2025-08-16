@@ -4,29 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text } from 'ink';
-import { theme } from '../semantic-colors.js';
-import { SuggestionsDisplay } from './SuggestionsDisplay.js';
-import { useInputHistory } from '../hooks/useInputHistory.js';
-import { TextBuffer, logicalPosToOffset } from './shared/text-buffer.js';
-import { cpSlice, cpLen } from '../utils/textUtils.js';
-import chalk from 'chalk';
-import stringWidth from 'string-width';
-import { useShellHistory } from '../hooks/useShellHistory.js';
-import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
-import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
-import { useKeypress, Key } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
-import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
+import chalk from 'chalk';
+import { Box, Text } from 'ink';
+import path from 'path';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import stringWidth from 'string-width';
+import { CommandContext, SlashCommand } from '../commands/types.js';
+import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import { useInputHistory } from '../hooks/useInputHistory.js';
+import { Key, useKeypress } from '../hooks/useKeypress.js';
+import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
+import { useShellHistory } from '../hooks/useShellHistory.js';
+import { Command, keyMatchers } from '../keyMatchers.js';
+import { theme } from '../semantic-colors.js';
 import {
   cleanupOldClipboardImages,
   clipboardHasImage,
   saveClipboardImage,
 } from '../utils/clipboardUtils.js';
 import { cpLen, cpSlice } from '../utils/textUtils.js';
-import { TextBuffer } from './shared/text-buffer.js';
+import { TextBuffer, logicalPosToOffset } from './shared/text-buffer.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 
 export interface InputPromptProps {
@@ -81,7 +79,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     },
     [],
   );
-  
+
   const [escPressCount, setEscPressCount] = useState(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
