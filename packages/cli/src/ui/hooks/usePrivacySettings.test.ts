@@ -14,6 +14,7 @@ import {
   GeminiClient,
   ContentGenerator,
 } from '@google/gemini-cli-core';
+import { OAuth2Client } from 'google-auth-library';
 import { usePrivacySettings } from './usePrivacySettings.js';
 
 // Mock the dependencies
@@ -67,7 +68,7 @@ describe('usePrivacySettings', () => {
 
     // Create mock CodeAssistServer instance
     mockCodeAssistServer = new CodeAssistServer(
-      null as unknown as GeminiClient,
+      null as unknown as OAuth2Client,
       'test-project-id',
     ) as unknown as CodeAssistServer;
     (
@@ -93,7 +94,7 @@ describe('usePrivacySettings', () => {
     // Create mock LoggingContentGenerator that wraps the CodeAssistServer
     mockLoggingContentGenerator = new LoggingContentGenerator(
       mockCodeAssistServer,
-      null as unknown as Record<string, unknown>,
+      null as unknown as Config,
     ) as unknown as LoggingContentGenerator;
     (
       mockLoggingContentGenerator.getWrapped as ReturnType<typeof vi.fn>
@@ -134,7 +135,7 @@ describe('usePrivacySettings', () => {
   it('should work with direct CodeAssistServer (no wrapper)', async () => {
     // Test case where the content generator is directly a CodeAssistServer
     const directServer = new CodeAssistServer(
-      null as unknown as GeminiClient,
+      null as unknown as OAuth2Client,
       'test-project-id',
     ) as unknown as CodeAssistServer;
     (directServer.loadCodeAssist as ReturnType<typeof vi.fn>).mockResolvedValue(
