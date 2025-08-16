@@ -47,6 +47,21 @@ export const BINARY_FILE_PATTERNS: string[] = [
 ];
 
 /**
+ * Media file patterns that require special handling in tools like read-many-files.
+ * These files can be processed as inlineData when explicitly requested.
+ */
+export const MEDIA_FILE_PATTERNS: string[] = [
+  '**/*.pdf',
+  '**/*.png',
+  '**/*.jpg',
+  '**/*.jpeg',
+  '**/*.gif',
+  '**/*.webp',
+  '**/*.bmp',
+  '**/*.svg',
+];
+
+/**
  * Common directory patterns that are typically ignored in development projects.
  */
 export const COMMON_DIRECTORY_EXCLUDES: string[] = [
@@ -71,6 +86,7 @@ export const SYSTEM_FILE_EXCLUDES: string[] = ['**/.DS_Store', '**/.env'];
 /**
  * Comprehensive file exclusion patterns combining all common ignore patterns.
  * These patterns are compatible with glob ignore patterns.
+ * Note: Media files (PDF, images) are not excluded here as they need special handling in read-many-files.
  */
 export const DEFAULT_FILE_EXCLUDES: string[] = [
   ...COMMON_IGNORE_PATTERNS,
@@ -214,6 +230,7 @@ function extractExtensionsFromPatterns(patterns: string[]): string[] {
 export const BINARY_EXTENSIONS: string[] = [
   ...extractExtensionsFromPatterns([
     ...BINARY_FILE_PATTERNS,
+    ...MEDIA_FILE_PATTERNS,
     ...PYTHON_EXCLUDES,
   ]),
   // Additional binary extensions not in the main patterns

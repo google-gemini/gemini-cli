@@ -395,9 +395,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         // Extract directory names from glob patterns for grep --exclude-dir
         const commonExcludes = COMMON_IGNORE_PATTERNS.map((pattern) =>
           pattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, ''),
-        )
-          .filter((dir) => !dir.includes('*'))
-          .concat(['bower_components']); // Add bower_components as it was in original
+        ).filter((dir) => !dir.includes('*'));
         commonExcludes.forEach((dir) => grepArgs.push(`--exclude-dir=${dir}`));
         if (include) {
           grepArgs.push(`--include=${include}`);
@@ -480,12 +478,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       );
       strategyUsed = 'javascript fallback';
       const globPattern = include ? include : '**/*';
-      const ignorePatterns = [
-        ...COMMON_IGNORE_PATTERNS,
-        'bower_components/**',
-        '.svn/**',
-        '.hg/**',
-      ]; // Use glob patterns for ignores here
+      const ignorePatterns = [...COMMON_IGNORE_PATTERNS, '.svn/**', '.hg/**']; // Use glob patterns for ignores here
 
       const filesStream = globStream(globPattern, {
         cwd: absolutePath,
