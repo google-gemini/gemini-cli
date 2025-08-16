@@ -539,6 +539,7 @@ export async function loadCliConfig(
     folderTrust,
     interactive,
     trustedFolder,
+    enablePromptCompletion: settings.enablePromptCompletion ?? false,
   });
 }
 
