@@ -26,10 +26,32 @@ export interface ExtensionConfig {
   excludeTools?: string[];
 }
 
+function getSystemExtensionsPath(): string {
+  if (process.env.GEMINI_CLI_SYSTEM_EXTENSIONS_PATH) {
+    return process.env.GEMINI_CLI_SYSTEM_EXTENSIONS_PATH;
+  }
+  if (os.platform() === 'darwin') {
+    return path.join(
+      '/Library',
+      'Application Support',
+      'GeminiCli',
+      'extensions',
+    );
+  } else if (os.platform() === 'win32') {
+    if (process.env.PROGRAMDATA) {
+      return path.join(process.env.PROGRAMDATA, 'gemini-cli', 'extensions');
+    }
+    return '';
+  } else {
+    return '/usr/share/gemini-cli/extensions';
+  }
+}
+
 export function loadExtensions(workspaceDir: string): Extension[] {
   const allExtensions = [
-    ...loadExtensionsFromDir(workspaceDir),
-    ...loadExtensionsFromDir(os.homedir()),
+    ...loadExtensionsFromBaseDir(workspaceDir),
+    ...loadExtensionsFromBaseDir(os.homedir()),
+    ...loadExtensionsFromDir(getSystemExtensionsPath()),
   ];
 
   const uniqueExtensions = new Map<string, Extension>();
@@ -42,8 +64,12 @@ export function loadExtensions(workspaceDir: string): Extension[] {
   return Array.from(uniqueExtensions.values());
 }
 
-function loadExtensionsFromDir(dir: string): Extension[] {
-  const extensionsDir = path.join(dir, EXTENSIONS_DIRECTORY_NAME);
+function loadExtensionsFromBaseDir(baseDir: string): Extension[] {
+  const extensionsDir = path.join(baseDir, EXTENSIONS_DIRECTORY_NAME);
+  return loadExtensionsFromDir(extensionsDir);
+}
+
+function loadExtensionsFromDir(extensionsDir: string): Extension[] {
   if (!fs.existsSync(extensionsDir)) {
     return [];
   }
@@ -118,15 +144,6 @@ export function annotateActiveExtensions(
 ): GeminiCLIExtension[] {
   const annotatedExtensions: GeminiCLIExtension[] = [];
 
-  if (enabledExtensionNames.length === 0) {
-    return extensions.map((extension) => ({
-      name: extension.config.name,
-      version: extension.config.version,
-      isActive: true,
-      path: extension.path,
-    }));
-  }
-
   const lowerCaseEnabledExtensions = new Set(
     enabledExtensionNames.map((e) => e.trim().toLowerCase()),
   );
@@ -166,4 +183,19 @@ export function annotateActiveExtensions(
   }
 
   return annotatedExtensions;
+}
+
+export function annotateActiveExtensionsFromDisabled(
+  extensions: Extension[],
+  disabledExtensionNames: string[],
+): GeminiCLIExtension[] {
+  const allAvailableNames = extensions.map((ext) => ext.config.name);
+  const disabledNamesSet = new Set(
+    disabledExtensionNames.map((name) => name.toLowerCase()),
+  );
+  const enabledExtensions = allAvailableNames.filter(
+    (name) => !disabledNamesSet.has(name.toLowerCase()),
+  );
+
+  return annotateActiveExtensions(extensions, enabledExtensions);
 }
