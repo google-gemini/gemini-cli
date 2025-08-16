@@ -18,7 +18,7 @@ fi
 # Copy all necessary files from Mastra build
 echo "📋 Copying Mastra build files..."
 cp .mastra/output/index.mjs ship/
-[ -f .mastra/output/mastra.mjs ] && cp .mastra/output/mastra.mjs ship/
+cp .mastra/output/mastra.mjs ship/
 cp .mastra/output/tools.mjs ship/
 cp .mastra/output/instrumentation.mjs ship/
 cp .mastra/output/telemetry-config.mjs ship/
@@ -51,6 +51,26 @@ cat > ship/start.sh << 'EOF'
 
 echo "🚀 Starting Accelos Server..."
 
+# Ensure package.json exists for npm operations
+if [ ! -f package.json ] && [ -f mastra-package.json ]; then
+  echo "📦 Setting up package.json..."
+  cp mastra-package.json package.json
+fi
+
+# Check if node_modules exists and has native binaries that might have signing issues
+if [ -d "node_modules" ] && [ -f "node_modules/@libsql/darwin-arm64/index.node" ]; then
+  echo "🔧 Checking for native module signing issues..."
+  # Test if the native module can load - if not, we need to reinstall
+  if ! node -e "try { require('@libsql/client'); console.log('Native modules OK'); } catch(e) { if(e.code === 'ERR_DLOPEN_FAILED') { console.log('NEEDS_REINSTALL'); process.exit(1); } else { console.log('Native modules OK'); } }" 2>/dev/null; then
+    echo "🚨 Native module signing issue detected. Reinstalling dependencies..."
+    rm -rf node_modules package-lock.json
+    npm install
+  fi
+elif [ ! -d "node_modules" ]; then
+  echo "📦 Installing dependencies..."
+  npm install
+fi
+
 # Check if .env exists
 if [ ! -f .env ]; then
   echo "⚠️  No .env file found. Please copy .env.example to .env and set your API keys."
@@ -80,7 +100,7 @@ chmod +x ship/start.sh
 # Create README for shipping
 echo "📖 Creating shipping README..."
 cat > ship/README.md << 'EOF'
-# 🚀 Accelos Mastra Server
+# 🚀 Accelos Agents Server
 
 A standalone AI agent server with playground UI and REST API.
 
