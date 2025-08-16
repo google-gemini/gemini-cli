@@ -97,23 +97,31 @@ TypeScript's power lies in its ability to provide static type checking, catching
 
 - **Preferring `unknown` over `any`**: When you absolutely cannot determine the type of a value at compile time, and you're tempted to reach for any, consider using unknown instead. unknown is a type-safe counterpart to any. While a variable of type unknown can hold any value, you must perform type narrowing (e.g., using typeof or instanceof checks, or a type assertion) before you can perform any operations on it. This forces you to handle the unknown type explicitly, preventing accidental runtime errors.
 
-  ```
+  ```ts
   function processValue(value: unknown) {
-     if (typeof value === 'string') {
-        // value is now safely a string
-        console.log(value.toUpperCase());
-     } else if (typeof value === 'number') {
-        // value is now safely a number
-        console.log(value * 2);
-     }
-     // Without narrowing, you cannot access properties or methods on 'value'
-     // console.log(value.someProperty); // Error: Object is of type 'unknown'.
+    if (typeof value === 'string') {
+      // value is now safely a string
+      console.log(value.toUpperCase());
+    } else if (typeof value === 'number') {
+      // value is now safely a number
+      console.log(value * 2);
+    }
+    // Without narrowing, you cannot access properties or methods on 'value'
+    // console.log(value.someProperty); // Error: Object is of type 'unknown'.
   }
   ```
 
 - **Type Assertions (`as Type`) - Use with Caution**: Type assertions tell the TypeScript compiler, "Trust me, I know what I'm doing; this is definitely of this type." While there are legitimate use cases (e.g., when dealing with external libraries that don't have perfect type definitions, or when you have more information than the compiler), they should be used sparingly and with extreme caution.
   - **Bypassing Type Checking**: Like `any`, type assertions bypass TypeScript's safety checks. If your assertion is incorrect, you introduce a runtime error that TypeScript would not have warned you about.
   - **Code Smell in Testing**: A common scenario where `any` or type assertions might be tempting is when trying to test "private" implementation details (e.g., spying on or stubbing an unexported function within a module). This is a strong indication of a "code smell" in your testing strategy and potentially your code structure. Instead of trying to force access to private internals, consider whether those internal details should be refactored into a separate module with a well-defined public API. This makes them inherently testable without compromising encapsulation.
+
+### Type narrowing `switch` clauses
+
+Use the `checkExhaustive` helper in the default clause of a switch statement.
+This will ensure that all of the possible options within the value or
+enumeration are used.
+
+This helper method can be found in `packages/cli/src/utils/checks.ts`
 
 ### Embracing JavaScript's Array Operators
 
@@ -122,7 +130,7 @@ To further enhance code cleanliness and promote safe functional programming prac
 Using these operators:
 
 - Promotes Immutability: Most array operators return new arrays, leaving the original array untouched. This functional approach helps prevent unintended side effects and makes your code more predictable.
-- Improves Readability: Chaining array operators often leads to more concise and expressive code than traditional for loops or imperative logic. The intent of the operation is clear at a glance.
+- Improves Readability: Chaining array operators often lead to more concise and expressive code than traditional for loops or imperative logic. The intent of the operation is clear at a glance.
 - Facilitates Functional Programming: These operators are cornerstones of functional programming, encouraging the creation of pure functions that take inputs and produce outputs without causing side effects. This paradigm is highly beneficial for writing robust and testable code that pairs well with React.
 
 By consistently applying these principles, we can maintain a codebase that is not only efficient and performant but also a joy to work with, both now and in the future.
@@ -151,7 +159,7 @@ Use refs only when necessary: Avoid using useRef unless the task genuinely requi
 
 Prefer composition and small components: Break down UI into small, reusable components rather than writing large monolithic components. The code you generate should promote clarity and reusability by composing components together. Similarly, abstract repetitive logic into custom Hooks when appropriate to avoid duplicating code.
 
-Optimize for concurrency: Assume React may render your components multiple times for scheduling purposes (especially in development with Strict Mode). Write code that remains correct even if the component function runs more than once. For instance, avoid side effects in the component body and use functional state updates (e.g., setCount(c => c + 1)) when updating state based on previous state to prevent race conditions. Always include cleanup functions in effects that subscribe to external resources. Don't write useEffects for "do this when this changes" side-effects. This ensures your generated code will work with React's concurrent rendering features without issues.
+Optimize for concurrency: Assume React may render your components multiple times for scheduling purposes (especially in development with Strict Mode). Write code that remains correct even if the component function runs more than once. For instance, avoid side effects in the component body and use functional state updates (e.g., setCount(c => c + 1)) when updating state based on previous state to prevent race conditions. Always include cleanup functions in effects that subscribe to external resources. Don't write useEffects for "do this when this changes" side effects. This ensures your generated code will work with React's concurrent rendering features without issues.
 
 Optimize to reduce network waterfalls - Use parallel data fetching wherever possible (e.g., start multiple requests at once rather than one after another). Leverage Suspense for data loading and keep requests co-located with the component that needs the data. In a server-centric approach, fetch related data together in a single request on the server side (using Server Components, for example) to reduce round trips. Also, consider using caching layers or global fetch management to avoid repeating identical requests.
 
@@ -179,3 +187,7 @@ Design for a good user experience - Provide clear, minimal, and non-blocking UI 
 ## Comments policy
 
 Only write high-value comments if at all. Avoid talking to the user through comments.
+
+## General style requirements
+
+Use hyphens instead of underscores in flag names (e.g. `my-flag` instead of `my_flag`).

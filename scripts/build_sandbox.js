@@ -18,8 +18,9 @@
 // limitations under the License.
 
 import { execSync } from 'child_process';
-import { chmodSync, readFileSync, rmSync } from 'fs';
+import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import os from 'os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import cliPkgJson from '../packages/cli/package.json' with { type: 'json' };
@@ -40,6 +41,11 @@ const argv = yargs(hideBin(process.argv))
     alias: 'image',
     type: 'string',
     description: 'use <image> name for custom image',
+  })
+  .option('output-file', {
+    type: 'string',
+    description:
+      'Path to write the final image URI. Used for CI/CD pipeline integration.',
   }).argv;
 
 let sandboxCommand;
@@ -112,24 +118,66 @@ chmodSync(
 
 const buildStdout = process.env.VERBOSE ? 'inherit' : 'ignore';
 
+// Determine the appropriate shell based on OS
+const isWindows = os.platform() === 'win32';
+const shellToUse = isWindows ? 'powershell.exe' : '/bin/bash';
+
 function buildImage(imageName, dockerfile) {
   console.log(`building ${imageName} ... (can be slow first time)`);
-  const buildCommand =
-    sandboxCommand === 'podman'
-      ? `${sandboxCommand} build --authfile=<(echo '{}')`
-      : `${sandboxCommand} build`;
+
+  let buildCommandArgs = '';
+  let tempAuthFile = '';
+
+  if (sandboxCommand === 'podman') {
+    if (isWindows) {
+      // PowerShell doesn't support <() process substitution.
+      // Create a temporary auth file that we will clean up after.
+      tempAuthFile = join(os.tmpdir(), `gemini-auth-${Date.now()}.json`);
+      writeFileSync(tempAuthFile, '{}');
+      buildCommandArgs = `--authfile="${tempAuthFile}"`;
+    } else {
+      // Use bash-specific syntax for Linux/macOS
+      buildCommandArgs = `--authfile=<(echo '{}')`;
+    }
+  }
 
   const npmPackageVersion = JSON.parse(
     readFileSync(join(process.cwd(), 'package.json'), 'utf-8'),
   ).version;
 
-  execSync(
-    `${buildCommand} ${
-      process.env.BUILD_SANDBOX_FLAGS || ''
-    } --build-arg CLI_VERSION_ARG=${npmPackageVersion} -f "${dockerfile}" -t "${imageName}" .`,
-    { stdio: buildStdout, shell: '/bin/bash' },
-  );
-  console.log(`built ${imageName}`);
+  const imageTag =
+    process.env.GEMINI_SANDBOX_IMAGE_TAG || imageName.split(':')[1];
+  const finalImageName = `${imageName.split(':')[0]}:${imageTag}`;
+
+  try {
+    execSync(
+      `${sandboxCommand} build ${buildCommandArgs} ${
+        process.env.BUILD_SANDBOX_FLAGS || ''
+      } --build-arg CLI_VERSION_ARG=${npmPackageVersion} -f "${dockerfile}" -t "${imageName}" .`,
+      { stdio: buildStdout, shell: shellToUse },
+    );
+    console.log(`built ${finalImageName}`);
+
+    // If an output file path was provided via command-line, write the final image URI to it.
+    if (argv.outputFile) {
+      console.log(
+        `Writing final image URI for CI artifact to: ${argv.outputFile}`,
+      );
+      // The publish step only supports one image. If we build multiple, only the last one
+      // will be published. Throw an error to make this failure explicit if the file already exists.
+      if (existsSync(argv.outputFile)) {
+        throw new Error(
+          `CI artifact file ${argv.outputFile} already exists. Refusing to overwrite.`,
+        );
+      }
+      writeFileSync(argv.outputFile, finalImageName);
+    }
+  } finally {
+    // If we created a temp file, delete it now.
+    if (tempAuthFile) {
+      rmSync(tempAuthFile, { force: true });
+    }
+  }
 }
 
 if (baseImage && baseDockerfile) {

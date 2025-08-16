@@ -137,6 +137,97 @@ export enum EventMetadataKey {
 
   // Logs the end of a session.
   GEMINI_CLI_END_SESSION_ID = 34,
+
+  // ==========================================================================
+  // Shared Keys
+  // ===========================================================================
+
+  // Logs the Prompt Id
+  GEMINI_CLI_PROMPT_ID = 35,
+
+  // Logs the Auth type for the prompt, api responses and errors.
+  GEMINI_CLI_AUTH_TYPE = 36,
+
+  // Logs the total number of Google accounts ever used.
+  GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT = 37,
+
+  // Logs the Surface from where the Gemini CLI was invoked, eg: VSCode.
+  GEMINI_CLI_SURFACE = 39,
+
+  // Logs the session id
+  GEMINI_CLI_SESSION_ID = 40,
+
+  // Logs the Gemini CLI version
+  GEMINI_CLI_VERSION = 54,
+
+  // Logs the Gemini CLI Git commit hash
+  GEMINI_CLI_GIT_COMMIT_HASH = 55,
+
+  // ==========================================================================
+  // Loop Detected Event Keys
+  // ===========================================================================
+
+  // Logs the type of loop detected.
+  GEMINI_CLI_LOOP_DETECTED_TYPE = 38,
+
+  // ==========================================================================
+  // Slash Command Event Keys
+  // ===========================================================================
+
+  // Logs the name of the slash command.
+  GEMINI_CLI_SLASH_COMMAND_NAME = 41,
+
+  // Logs the subcommand of the slash command.
+  GEMINI_CLI_SLASH_COMMAND_SUBCOMMAND = 42,
+
+  // Logs the status of the slash command (e.g. 'success', 'error')
+  GEMINI_CLI_SLASH_COMMAND_STATUS = 51,
+
+  // ==========================================================================
+  // Next Speaker Check Event Keys
+  // ===========================================================================
+
+  // Logs the finish reason of the previous streamGenerateContent response
+  GEMINI_CLI_RESPONSE_FINISH_REASON = 43,
+
+  // Logs the result of the next speaker check
+  GEMINI_CLI_NEXT_SPEAKER_CHECK_RESULT = 44,
+
+  // ==========================================================================
+  // Malformed JSON Response Event Keys
+  // ==========================================================================
+
+  // Logs the model that produced the malformed JSON response.
+  GEMINI_CLI_MALFORMED_JSON_RESPONSE_MODEL = 45,
+
+  // ==========================================================================
+  // IDE Connection Event Keys
+  // ===========================================================================
+
+  // Logs the type of the IDE connection.
+  GEMINI_CLI_IDE_CONNECTION_TYPE = 46,
+
+  // Logs AI added lines in edit/write tool response.
+  GEMINI_CLI_AI_ADDED_LINES = 47,
+
+  // Logs AI removed lines in edit/write tool response.
+  GEMINI_CLI_AI_REMOVED_LINES = 48,
+
+  // Logs user added lines in edit/write tool response.
+  GEMINI_CLI_USER_ADDED_LINES = 49,
+
+  // Logs user removed lines in edit/write tool response.
+  GEMINI_CLI_USER_REMOVED_LINES = 50,
+
+  // ==========================================================================
+  // Kitty Sequence Overflow Event Keys
+  // ===========================================================================
+
+  // Logs the truncated kitty sequence.
+  GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
+
+  // Logs the length of the kitty sequence that overflowed.
+  GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,
 }
 
 export function getEventMetadataKey(

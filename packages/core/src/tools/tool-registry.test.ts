@@ -14,22 +14,16 @@ import {
   afterEach,
   Mocked,
 } from 'vitest';
+import { Config, ConfigParameters, ApprovalMode } from '../config/config.js';
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import {
-  Config,
-  ConfigParameters,
-  MCPServerConfig,
-  ApprovalMode,
-} from '../config/config.js';
-import { BaseTool, ToolResult } from './tools.js';
-import {
-  FunctionDeclaration,
-  CallableTool,
-  mcpToTool,
-  Type,
-} from '@google/genai';
-import { execSync } from 'node:child_process';
+import { FunctionDeclaration, CallableTool, mcpToTool } from '@google/genai';
+import { spawn } from 'node:child_process';
+
+import fs from 'node:fs';
+import { MockTool } from '../test-utils/tools.js';
+
+vi.mock('node:fs');
 
 // Use vi.hoisted to define the mock function so it can be used in the vi.mock factory
 const mockDiscoverMcpTools = vi.hoisted(() => vi.fn());
@@ -61,7 +55,6 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
     set onerror(handler: any) {
       mockMcpClientOnError(handler);
     },
-    // listTools and callTool are no longer directly used by ToolRegistry/discoverMcpTools
   }));
   return { Client: MockClient };
 });
@@ -90,7 +83,6 @@ vi.mock('@google/genai', async () => {
   return {
     ...actualGenai,
     mcpToTool: vi.fn().mockImplementation(() => ({
-      // Default mock implementation
       tool: vi.fn().mockResolvedValue({ functionDeclarations: [] }),
       callTool: vi.fn(),
     })),
@@ -104,24 +96,6 @@ const createMockCallableTool = (
   tool: vi.fn().mockResolvedValue({ functionDeclarations: toolDeclarations }),
   callTool: vi.fn(),
 });
-
-class MockTool extends BaseTool<{ param: string }, ToolResult> {
-  constructor(name = 'mock-tool', description = 'A mock tool') {
-    super(name, name, description, {
-      type: 'object',
-      properties: {
-        param: { type: 'string' },
-      },
-      required: ['param'],
-    });
-  }
-  async execute(params: { param: string }): Promise<ToolResult> {
-    return {
-      llmContent: `Executed with ${params.param}`,
-      returnDisplay: `Executed with ${params.param}`,
-    };
-  }
-}
 
 const baseConfigParams: ConfigParameters = {
   cwd: '/tmp',
@@ -139,8 +113,13 @@ const baseConfigParams: ConfigParameters = {
 describe('ToolRegistry', () => {
   let config: Config;
   let toolRegistry: ToolRegistry;
+  let mockConfigGetToolDiscoveryCommand: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.statSync).mockReturnValue({
+      isDirectory: () => true,
+    } as fs.Stats);
     config = new Config(baseConfigParams);
     toolRegistry = new ToolRegistry(config);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -148,13 +127,23 @@ describe('ToolRegistry', () => {
     vi.spyOn(console, 'debug').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    // Reset mocks for MCP parts
-    mockMcpClientConnect.mockReset().mockResolvedValue(undefined); // Default connect success
+    mockMcpClientConnect.mockReset().mockResolvedValue(undefined);
     mockStdioTransportClose.mockReset();
     mockSseTransportClose.mockReset();
     vi.mocked(mcpToTool).mockClear();
-    // Default mcpToTool to return a callable tool that returns no functions
     vi.mocked(mcpToTool).mockReturnValue(createMockCallableTool([]));
+
+    mockConfigGetToolDiscoveryCommand = vi.spyOn(
+      config,
+      'getToolDiscoveryCommand',
+    );
+    vi.spyOn(config, 'getMcpServers');
+    vi.spyOn(config, 'getMcpServerCommand');
+    vi.spyOn(config, 'getPromptRegistry').mockReturnValue({
+      clear: vi.fn(),
+      removePromptsByServer: vi.fn(),
+    } as any);
+    mockDiscoverMcpTools.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -167,171 +156,206 @@ describe('ToolRegistry', () => {
       toolRegistry.registerTool(tool);
       expect(toolRegistry.getTool('mock-tool')).toBe(tool);
     });
-    // ... other registerTool tests
+  });
+
+  describe('getAllTools', () => {
+    it('should return all registered tools sorted alphabetically by displayName', () => {
+      // Register tools with displayNames in non-alphabetical order
+      const toolC = new MockTool('c-tool', 'Tool C');
+      const toolA = new MockTool('a-tool', 'Tool A');
+      const toolB = new MockTool('b-tool', 'Tool B');
+
+      toolRegistry.registerTool(toolC);
+      toolRegistry.registerTool(toolA);
+      toolRegistry.registerTool(toolB);
+
+      const allTools = toolRegistry.getAllTools();
+      const displayNames = allTools.map((t) => t.displayName);
+
+      // Assert that the returned array is sorted by displayName
+      expect(displayNames).toEqual(['Tool A', 'Tool B', 'Tool C']);
+    });
   });
 
   describe('getToolsByServer', () => {
     it('should return an empty array if no tools match the server name', () => {
-      toolRegistry.registerTool(new MockTool()); // A non-MCP tool
+      toolRegistry.registerTool(new MockTool());
       expect(toolRegistry.getToolsByServer('any-mcp-server')).toEqual([]);
     });
 
-    it('should return only tools matching the server name', async () => {
+    it('should return only tools matching the server name, sorted by name', async () => {
       const server1Name = 'mcp-server-uno';
       const server2Name = 'mcp-server-dos';
-
-      // Manually register mock MCP tools for this test
-      const mockCallable = {} as CallableTool; // Minimal mock callable
-      const mcpTool1 = new DiscoveredMCPTool(
+      const mockCallable = {} as CallableTool;
+      const mcpTool1_c = new DiscoveredMCPTool(
         mockCallable,
         server1Name,
-        'server1Name__tool-on-server1',
+        'zebra-tool',
         'd1',
         {},
-        'tool-on-server1',
       );
+      const mcpTool1_a = new DiscoveredMCPTool(
+        mockCallable,
+        server1Name,
+        'apple-tool',
+        'd2',
+        {},
+      );
+      const mcpTool1_b = new DiscoveredMCPTool(
+        mockCallable,
+        server1Name,
+        'banana-tool',
+        'd3',
+        {},
+      );
+
       const mcpTool2 = new DiscoveredMCPTool(
         mockCallable,
         server2Name,
-        'server2Name__tool-on-server2',
-        'd2',
-        {},
         'tool-on-server2',
+        'd4',
+        {},
       );
       const nonMcpTool = new MockTool('regular-tool');
 
-      toolRegistry.registerTool(mcpTool1);
+      toolRegistry.registerTool(mcpTool1_c);
+      toolRegistry.registerTool(mcpTool1_a);
+      toolRegistry.registerTool(mcpTool1_b);
       toolRegistry.registerTool(mcpTool2);
       toolRegistry.registerTool(nonMcpTool);
 
       const toolsFromServer1 = toolRegistry.getToolsByServer(server1Name);
-      expect(toolsFromServer1).toHaveLength(1);
-      expect(toolsFromServer1[0].name).toBe(mcpTool1.name);
-      expect((toolsFromServer1[0] as DiscoveredMCPTool).serverName).toBe(
-        server1Name,
-      );
+      const toolNames = toolsFromServer1.map((t) => t.name);
 
+      // Assert that the array has the correct tools and is sorted by name
+      expect(toolsFromServer1).toHaveLength(3);
+      expect(toolNames).toEqual(['apple-tool', 'banana-tool', 'zebra-tool']);
+
+      // Assert that all returned tools are indeed from the correct server
+      for (const tool of toolsFromServer1) {
+        expect((tool as DiscoveredMCPTool).serverName).toBe(server1Name);
+      }
+
+      // Assert that the other server's tools are returned correctly
       const toolsFromServer2 = toolRegistry.getToolsByServer(server2Name);
       expect(toolsFromServer2).toHaveLength(1);
       expect(toolsFromServer2[0].name).toBe(mcpTool2.name);
-      expect((toolsFromServer2[0] as DiscoveredMCPTool).serverName).toBe(
-        server2Name,
-      );
-
-      expect(toolRegistry.getToolsByServer('non-existent-server')).toEqual([]);
     });
   });
 
   describe('discoverTools', () => {
-    let mockConfigGetToolDiscoveryCommand: ReturnType<typeof vi.spyOn>;
-    let mockConfigGetMcpServers: ReturnType<typeof vi.spyOn>;
-    let mockConfigGetMcpServerCommand: ReturnType<typeof vi.spyOn>;
-    let mockExecSync: ReturnType<typeof vi.mocked<typeof execSync>>;
-
-    beforeEach(() => {
-      mockConfigGetToolDiscoveryCommand = vi.spyOn(
-        config,
-        'getToolDiscoveryCommand',
-      );
-      mockConfigGetMcpServers = vi.spyOn(config, 'getMcpServers');
-      mockConfigGetMcpServerCommand = vi.spyOn(config, 'getMcpServerCommand');
-      mockExecSync = vi.mocked(execSync);
-      toolRegistry = new ToolRegistry(config); // Reset registry
-      // Reset the mock for discoverMcpTools before each test in this suite
-      mockDiscoverMcpTools.mockReset().mockResolvedValue(undefined);
-    });
-
-    it('should discover tools using discovery command', async () => {
-      // ... this test remains largely the same
+    it('should will preserve tool parametersJsonSchema during discovery from command', async () => {
       const discoveryCommand = 'my-discovery-command';
       mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
-      const mockToolDeclarations: FunctionDeclaration[] = [
-        {
-          name: 'discovered-tool-1',
-          description: 'A discovered tool',
-          parameters: { type: Type.OBJECT, properties: {} },
+
+      const unsanitizedToolDeclaration: FunctionDeclaration = {
+        name: 'tool-with-bad-format',
+        description: 'A tool with an invalid format property',
+        parametersJsonSchema: {
+          type: 'object',
+          properties: {
+            some_string: {
+              type: 'string',
+              format: 'uuid', // This is an unsupported format
+            },
+          },
         },
-      ];
-      mockExecSync.mockReturnValue(
-        Buffer.from(
-          JSON.stringify([{ function_declarations: mockToolDeclarations }]),
-        ),
-      );
-      await toolRegistry.discoverTools();
-      expect(execSync).toHaveBeenCalledWith(discoveryCommand);
-      const discoveredTool = toolRegistry.getTool('discovered-tool-1');
-      expect(discoveredTool).toBeInstanceOf(DiscoveredTool);
+      };
+
+      const mockSpawn = vi.mocked(spawn);
+      const mockChildProcess = {
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn(),
+      };
+      mockSpawn.mockReturnValue(mockChildProcess as any);
+
+      // Simulate stdout data
+      mockChildProcess.stdout.on.mockImplementation((event, callback) => {
+        if (event === 'data') {
+          callback(
+            Buffer.from(
+              JSON.stringify([
+                { function_declarations: [unsanitizedToolDeclaration] },
+              ]),
+            ),
+          );
+        }
+        return mockChildProcess as any;
+      });
+
+      // Simulate process close
+      mockChildProcess.on.mockImplementation((event, callback) => {
+        if (event === 'close') {
+          callback(0);
+        }
+        return mockChildProcess as any;
+      });
+
+      await toolRegistry.discoverAllTools();
+
+      const discoveredTool = toolRegistry.getTool('tool-with-bad-format');
+      expect(discoveredTool).toBeDefined();
+
+      const registeredParams = (discoveredTool as DiscoveredTool).schema
+        .parametersJsonSchema;
+      expect(registeredParams).toStrictEqual({
+        type: 'object',
+        properties: {
+          some_string: {
+            type: 'string',
+            format: 'uuid',
+          },
+        },
+      });
     });
 
     it('should discover tools using MCP servers defined in getMcpServers', async () => {
       mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
-      mockConfigGetMcpServerCommand.mockReturnValue(undefined);
+      vi.spyOn(config, 'getMcpServerCommand').mockReturnValue(undefined);
       const mcpServerConfigVal = {
         'my-mcp-server': {
           command: 'mcp-server-cmd',
           args: ['--port', '1234'],
           trust: true,
-        } as MCPServerConfig,
+        },
       };
-      mockConfigGetMcpServers.mockReturnValue(mcpServerConfigVal);
+      vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
 
-      await toolRegistry.discoverTools();
+      await toolRegistry.discoverAllTools();
 
       expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
         mcpServerConfigVal,
         undefined,
         toolRegistry,
-      );
-      // We no longer check these as discoverMcpTools is mocked
-      // expect(vi.mocked(mcpToTool)).toHaveBeenCalledTimes(1);
-      // expect(Client).toHaveBeenCalledTimes(1);
-      // expect(StdioClientTransport).toHaveBeenCalledWith({
-      //   command: 'mcp-server-cmd',
-      //   args: ['--port', '1234'],
-      //   env: expect.any(Object),
-      //   stderr: 'pipe',
-      // });
-      // expect(mockMcpClientConnect).toHaveBeenCalled();
-
-      // To verify that tools *would* have been registered, we'd need mockDiscoverMcpTools
-      // to call toolRegistry.registerTool, or we test that separately.
-      // For now, we just check that the delegation happened.
-    });
-
-    it('should discover tools using MCP server command from getMcpServerCommand', async () => {
-      mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
-      mockConfigGetMcpServers.mockReturnValue({});
-      mockConfigGetMcpServerCommand.mockReturnValue(
-        'mcp-server-start-command --param',
-      );
-
-      await toolRegistry.discoverTools();
-      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
-        {},
-        'mcp-server-start-command --param',
-        toolRegistry,
+        config.getPromptRegistry(),
+        false,
+        expect.any(Object),
       );
     });
 
-    it('should handle errors during MCP client connection gracefully and close transport', async () => {
+    it('should discover tools using MCP servers defined in getMcpServers', async () => {
       mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
-      mockConfigGetMcpServers.mockReturnValue({
-        'failing-mcp': { command: 'fail-cmd' } as MCPServerConfig,
-      });
-
-      mockMcpClientConnect.mockRejectedValue(new Error('Connection failed'));
-
-      await toolRegistry.discoverTools();
-      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
-        {
-          'failing-mcp': { command: 'fail-cmd' },
+      vi.spyOn(config, 'getMcpServerCommand').mockReturnValue(undefined);
+      const mcpServerConfigVal = {
+        'my-mcp-server': {
+          command: 'mcp-server-cmd',
+          args: ['--port', '1234'],
+          trust: true,
         },
+      };
+      vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
+
+      await toolRegistry.discoverAllTools();
+
+      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
+        mcpServerConfigVal,
         undefined,
         toolRegistry,
+        config.getPromptRegistry(),
+        false,
+        expect.any(Object),
       );
-      expect(toolRegistry.getAllTools()).toHaveLength(0);
     });
   });
-  // Other tests for DiscoveredTool and DiscoveredMCPTool can be simplified or removed
-  // if their core logic is now tested in their respective dedicated test files (mcp-tool.test.ts)
 });

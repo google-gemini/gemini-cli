@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Content, SchemaUnion, Type } from '@google/genai';
+import { Content } from '@google/genai';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { GeminiClient } from '../core/client.js';
 import { GeminiChat } from '../core/geminiChat.js';
 import { isFunctionResponse } from './messageInspectors.js';
@@ -13,38 +14,18 @@ const CHECK_PROMPT = `Analyze *only* the content and structure of your immediate
 **Decision Rules (apply in order):**
 1.  **Model Continues:** If your last response explicitly states an immediate next action *you* intend to take (e.g., "Next, I will...", "Now I'll process...", "Moving on to analyze...", indicates an intended tool call that didn't execute), OR if the response seems clearly incomplete (cut off mid-thought without a natural conclusion), then the **'model'** should speak next.
 2.  **Question to User:** If your last response ends with a direct question specifically addressed *to the user*, then the **'user'** should speak next.
-3.  **Waiting for User:** If your last response completed a thought, statement, or task *and* does not meet the criteria for Rule 1 (Model Continues) or Rule 2 (Question to User), it implies a pause expecting user input or reaction. In this case, the **'user'** should speak next.
-**Output Format:**
-Respond *only* in JSON format according to the following schema. Do not include any text outside the JSON structure.
-\`\`\`json
-{
-  "type": "object",
-  "properties": {
-    "reasoning": {
-        "type": "string",
-        "description": "Brief explanation justifying the 'next_speaker' choice based *strictly* on the applicable rule and the content/structure of the preceding turn."
-    },
-    "next_speaker": {
-      "type": "string",
-      "enum": ["user", "model"],
-      "description": "Who should speak next based *only* on the preceding turn and the decision rules."
-    }
-  },
-  "required": ["next_speaker", "reasoning"]
-}
-\`\`\`
-`;
+3.  **Waiting for User:** If your last response completed a thought, statement, or task *and* does not meet the criteria for Rule 1 (Model Continues) or Rule 2 (Question to User), it implies a pause expecting user input or reaction. In this case, the **'user'** should speak next.`;
 
-const RESPONSE_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const RESPONSE_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     reasoning: {
-      type: Type.STRING,
+      type: 'string',
       description:
         "Brief explanation justifying the 'next_speaker' choice based *strictly* on the applicable rule and the content/structure of the preceding turn.",
     },
     next_speaker: {
-      type: Type.STRING,
+      type: 'string',
       enum: ['user', 'model'],
       description:
         'Who should speak next based *only* on the preceding turn and the decision rules',
@@ -112,7 +93,7 @@ export async function checkNextSpeaker(
     };
   }
 
-  // Things checked out. Lets proceed to potentially making an LLM request.
+  // Things checked out. Let's proceed to potentially making an LLM request.
 
   const lastMessage = curatedHistory[curatedHistory.length - 1];
   if (!lastMessage || lastMessage.role !== 'model') {
@@ -131,6 +112,7 @@ export async function checkNextSpeaker(
       contents,
       RESPONSE_SCHEMA,
       abortSignal,
+      DEFAULT_GEMINI_FLASH_MODEL,
     )) as unknown as NextSpeakerResponse;
 
     if (

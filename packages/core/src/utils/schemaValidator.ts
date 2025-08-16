@@ -4,55 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import AjvPkg from 'ajv';
+// Ajv's ESM/CJS interop: use 'any' for compatibility as recommended by Ajv docs
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AjvClass = (AjvPkg as any).default || AjvPkg;
+const ajValidator = new AjvClass();
+
 /**
  * Simple utility to validate objects against JSON Schemas
  */
 export class SchemaValidator {
   /**
-   * Validates data against a JSON schema
-   * @param schema JSON Schema to validate against
-   * @param data Data to validate
-   * @returns True if valid, false otherwise
+   * Returns null if the data confroms to the schema described by schema (or if schema
+   *  is null). Otherwise, returns a string describing the error.
    */
-  static validate(schema: Record<string, unknown>, data: unknown): boolean {
-    // This is a simplified implementation
-    // In a real application, you would use a library like Ajv for proper validation
-
-    // Check for required fields
-    if (schema.required && Array.isArray(schema.required)) {
-      const required = schema.required as string[];
-      const dataObj = data as Record<string, unknown>;
-
-      for (const field of required) {
-        if (dataObj[field] === undefined) {
-          console.error(`Missing required field: ${field}`);
-          return false;
-        }
-      }
+  static validate(schema: unknown | undefined, data: unknown): string | null {
+    if (!schema) {
+      return null;
     }
-
-    // Check property types if properties are defined
-    if (schema.properties && typeof schema.properties === 'object') {
-      const properties = schema.properties as Record<string, { type?: string }>;
-      const dataObj = data as Record<string, unknown>;
-
-      for (const [key, prop] of Object.entries(properties)) {
-        if (dataObj[key] !== undefined && prop.type) {
-          const expectedType = prop.type;
-          const actualType = Array.isArray(dataObj[key])
-            ? 'array'
-            : typeof dataObj[key];
-
-          if (expectedType !== actualType) {
-            console.error(
-              `Type mismatch for property "${key}": expected ${expectedType}, got ${actualType}`,
-            );
-            return false;
-          }
-        }
-      }
+    if (typeof data !== 'object' || data === null) {
+      return 'Value of params must be an object';
     }
-
-    return true;
+    const validate = ajValidator.compile(schema);
+    const valid = validate(data);
+    if (!valid && validate.errors) {
+      return ajValidator.errorsText(validate.errors, { dataVar: 'params' });
+    }
+    return null;
   }
 }

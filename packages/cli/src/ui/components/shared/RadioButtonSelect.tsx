@@ -4,13 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Text, Box } from 'ink';
-import SelectInput, {
-  type ItemProps as InkSelectItemProps,
-  type IndicatorProps as InkSelectIndicatorProps,
-} from 'ink-select-input';
 import { Colors } from '../../colors.js';
+import { useKeypress } from '../../hooks/useKeypress.js';
 
 /**
  * Represents a single option for the RadioButtonSelect.
@@ -20,6 +17,8 @@ export interface RadioSelectItem<T> {
   label: string;
   value: T;
   disabled?: boolean;
+  themeNameDisplay?: string;
+  themeTypeDisplay?: string;
 }
 
 /**
@@ -28,115 +27,208 @@ export interface RadioSelectItem<T> {
  */
 export interface RadioButtonSelectProps<T> {
   /** An array of items to display as radio options. */
-  items: Array<
-    RadioSelectItem<T> & {
-      themeNameDisplay?: string;
-      themeTypeDisplay?: string;
-    }
-  >;
-
+  items: Array<RadioSelectItem<T>>;
   /** The initial index selected */
   initialIndex?: number;
-
   /** Function called when an item is selected. Receives the `value` of the selected item. */
   onSelect: (value: T) => void;
-
   /** Function called when an item is highlighted. Receives the `value` of the selected item. */
   onHighlight?: (value: T) => void;
-
   /** Whether this select input is currently focused and should respond to input. */
   isFocused?: boolean;
+  /** Whether to show the scroll arrows. */
+  showScrollArrows?: boolean;
+  /** The maximum number of items to show at once. */
+  maxItemsToShow?: number;
+  /** Whether to show numbers next to items. */
+  showNumbers?: boolean;
 }
 
 /**
- * A specialized SelectInput component styled to look like radio buttons.
- * It uses '◉' for selected and '○' for unselected items.
+ * A custom component that displays a list of items with radio buttons,
+ * supporting scrolling and keyboard navigation.
  *
  * @template T The type of the value associated with each radio item.
  */
 export function RadioButtonSelect<T>({
   items,
-  initialIndex,
+  initialIndex = 0,
   onSelect,
   onHighlight,
-  isFocused, // This prop indicates if the current RadioButtonSelect group is focused
+  isFocused = true,
+  showScrollArrows = false,
+  maxItemsToShow = 10,
+  showNumbers = true,
 }: RadioButtonSelectProps<T>): React.JSX.Element {
-  const handleSelect = (item: RadioSelectItem<T>) => {
-    onSelect(item.value);
-  };
-  const handleHighlight = (item: RadioSelectItem<T>) => {
-    if (onHighlight) {
-      onHighlight(item.value);
-    }
-  };
+  const [activeIndex, setActiveIndex] = useState(initialIndex);
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const [numberInput, setNumberInput] = useState('');
+  const numberInputTimer = useRef<NodeJS.Timeout | null>(null);
 
-  /**
-   * Custom indicator component displaying radio button style (◉/○).
-   * Color changes based on whether the item is selected and if its group is focused.
-   */
-  function DynamicRadioIndicator({
-    isSelected = false,
-  }: InkSelectIndicatorProps): React.JSX.Element {
-    return (
-      <Box minWidth={2} flexShrink={0}>
-        <Text color={isSelected ? Colors.AccentGreen : Colors.Foreground}>
-          {isSelected ? '●' : '○'}
-        </Text>
-      </Box>
+  useEffect(() => {
+    const newScrollOffset = Math.max(
+      0,
+      Math.min(activeIndex - maxItemsToShow + 1, items.length - maxItemsToShow),
     );
-  }
-
-  /**
-   * Custom item component for displaying the label.
-   * Color changes based on whether the item is selected and if its group is focused.
-   * Now also handles displaying theme type with custom color.
-   */
-  function CustomThemeItemComponent(
-    props: InkSelectItemProps,
-  ): React.JSX.Element {
-    const { isSelected = false, label } = props;
-    const itemWithThemeProps = props as typeof props & {
-      themeNameDisplay?: string;
-      themeTypeDisplay?: string;
-      disabled?: boolean;
-    };
-
-    let textColor = Colors.Foreground;
-    if (isSelected) {
-      textColor = Colors.AccentGreen;
-    } else if (itemWithThemeProps.disabled === true) {
-      textColor = Colors.Gray;
+    if (activeIndex < scrollOffset) {
+      setScrollOffset(activeIndex);
+    } else if (activeIndex >= scrollOffset + maxItemsToShow) {
+      setScrollOffset(newScrollOffset);
     }
+  }, [activeIndex, items.length, scrollOffset, maxItemsToShow]);
 
-    if (
-      itemWithThemeProps.themeNameDisplay &&
-      itemWithThemeProps.themeTypeDisplay
-    ) {
-      return (
-        <Text color={textColor} wrap="truncate">
-          {itemWithThemeProps.themeNameDisplay}{' '}
-          <Text color={Colors.Gray}>{itemWithThemeProps.themeTypeDisplay}</Text>
-        </Text>
-      );
-    }
+  useEffect(
+    () => () => {
+      if (numberInputTimer.current) {
+        clearTimeout(numberInputTimer.current);
+      }
+    },
+    [],
+  );
 
-    return (
-      <Text color={textColor} wrap="truncate">
-        {label}
-      </Text>
-    );
-  }
+  useKeypress(
+    (key) => {
+      const { sequence, name } = key;
+      const isNumeric = showNumbers && /^[0-9]$/.test(sequence);
 
-  initialIndex = initialIndex ?? 0;
+      // Any key press that is not a digit should clear the number input buffer.
+      if (!isNumeric && numberInputTimer.current) {
+        clearTimeout(numberInputTimer.current);
+        setNumberInput('');
+      }
+
+      if (name === 'k' || name === 'up') {
+        const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
+        setActiveIndex(newIndex);
+        onHighlight?.(items[newIndex]!.value);
+        return;
+      }
+
+      if (name === 'j' || name === 'down') {
+        const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
+        setActiveIndex(newIndex);
+        onHighlight?.(items[newIndex]!.value);
+        return;
+      }
+
+      if (name === 'return') {
+        onSelect(items[activeIndex]!.value);
+        return;
+      }
+
+      // Handle numeric input for selection.
+      if (isNumeric) {
+        if (numberInputTimer.current) {
+          clearTimeout(numberInputTimer.current);
+        }
+
+        const newNumberInput = numberInput + sequence;
+        setNumberInput(newNumberInput);
+
+        const targetIndex = Number.parseInt(newNumberInput, 10) - 1;
+
+        // A single '0' is not a valid selection since items are 1-indexed.
+        if (newNumberInput === '0') {
+          numberInputTimer.current = setTimeout(() => setNumberInput(''), 350);
+          return;
+        }
+
+        if (targetIndex >= 0 && targetIndex < items.length) {
+          const targetItem = items[targetIndex]!;
+          setActiveIndex(targetIndex);
+          onHighlight?.(targetItem.value);
+
+          // If the typed number can't be a prefix for another valid number,
+          // select it immediately. Otherwise, wait for more input.
+          const potentialNextNumber = Number.parseInt(newNumberInput + '0', 10);
+          if (potentialNextNumber > items.length) {
+            onSelect(targetItem.value);
+            setNumberInput('');
+          } else {
+            numberInputTimer.current = setTimeout(() => {
+              onSelect(targetItem.value);
+              setNumberInput('');
+            }, 350); // Debounce time for multi-digit input.
+          }
+        } else {
+          // The typed number is out of bounds, clear the buffer
+          setNumberInput('');
+        }
+      }
+    },
+    { isActive: !!(isFocused && items.length > 0) },
+  );
+
+  const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
+
   return (
-    <SelectInput
-      indicatorComponent={DynamicRadioIndicator}
-      itemComponent={CustomThemeItemComponent}
-      items={items}
-      initialIndex={initialIndex}
-      onSelect={handleSelect}
-      onHighlight={handleHighlight}
-      isFocused={isFocused}
-    />
+    <Box flexDirection="column">
+      {showScrollArrows && (
+        <Text color={scrollOffset > 0 ? Colors.Foreground : Colors.Gray}>
+          ▲
+        </Text>
+      )}
+      {visibleItems.map((item, index) => {
+        const itemIndex = scrollOffset + index;
+        const isSelected = activeIndex === itemIndex;
+
+        let textColor = Colors.Foreground;
+        let numberColor = Colors.Foreground;
+        if (isSelected) {
+          textColor = Colors.AccentGreen;
+          numberColor = Colors.AccentGreen;
+        } else if (item.disabled) {
+          textColor = Colors.Gray;
+          numberColor = Colors.Gray;
+        }
+
+        if (!showNumbers) {
+          numberColor = Colors.Gray;
+        }
+
+        const numberColumnWidth = String(items.length).length;
+        const itemNumberText = `${String(itemIndex + 1).padStart(
+          numberColumnWidth,
+        )}.`;
+
+        return (
+          <Box key={item.label} alignItems="center">
+            <Box minWidth={2} flexShrink={0}>
+              <Text color={isSelected ? Colors.AccentGreen : Colors.Foreground}>
+                {isSelected ? '●' : ' '}
+              </Text>
+            </Box>
+            <Box
+              marginRight={1}
+              flexShrink={0}
+              minWidth={itemNumberText.length}
+            >
+              <Text color={numberColor}>{itemNumberText}</Text>
+            </Box>
+            {item.themeNameDisplay && item.themeTypeDisplay ? (
+              <Text color={textColor} wrap="truncate">
+                {item.themeNameDisplay}{' '}
+                <Text color={Colors.Gray}>{item.themeTypeDisplay}</Text>
+              </Text>
+            ) : (
+              <Text color={textColor} wrap="truncate">
+                {item.label}
+              </Text>
+            )}
+          </Box>
+        );
+      })}
+      {showScrollArrows && (
+        <Text
+          color={
+            scrollOffset + maxItemsToShow < items.length
+              ? Colors.Foreground
+              : Colors.Gray
+          }
+        >
+          ▼
+        </Text>
+      )}
+    </Box>
   );
 }
