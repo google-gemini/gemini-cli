@@ -36,7 +36,7 @@ export interface ShellConfiguration {
  * @returns The ShellConfiguration for the current environment.
  */
 export function getShellConfiguration(): ShellConfiguration {
-  if (os.platform() === 'win32') {
+  if (isWindows()) {
     const comSpec = process.env.ComSpec || 'cmd.exe';
     const executable = comSpec.toLowerCase();
 
@@ -73,7 +73,7 @@ export function getShellConfiguration(): ShellConfiguration {
 /**
  * Export the platform detection constant for use in process management (e.g., killing processes).
  */
-export const isWindows = os.platform() === 'win32';
+export const isWindows = () => os.platform() === 'win32';
 
 /**
  * Escapes a string so that it can be safely used as a single argument
