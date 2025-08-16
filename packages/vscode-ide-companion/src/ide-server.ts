@@ -5,15 +5,18 @@
  */
 
 import * as vscode from 'vscode';
+import { IdeContextNotificationSchema } from '@google/gemini-cli-core';
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import express, { Request, Response } from 'express';
+import express, { type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import {
-  isInitializeRequest,
-  type JSONRPCNotification,
-} from '@modelcontextprotocol/sdk/types.js';
-import { Server as HTTPServer } from 'node:http';
+import { type Server as HTTPServer } from 'node:http';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import { z } from 'zod';
+import { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
@@ -26,11 +29,12 @@ function sendIdeContextUpdateNotification(
 ) {
   const ideContext = openFilesManager.state;
 
-  const notification: JSONRPCNotification = {
+  const notification = IdeContextNotificationSchema.parse({
     jsonrpc: '2.0',
     method: 'ide/contextUpdate',
     params: ideContext,
-  };
+  });
+
   log(
     `Sending IDE context update notification: ${JSON.stringify(
       notification,
@@ -45,20 +49,27 @@ export class IDEServer {
   private server: HTTPServer | undefined;
   private context: vscode.ExtensionContext | undefined;
   private log: (message: string) => void;
+  private portFile: string;
+  diffManager: DiffManager;
 
-  constructor(log: (message: string) => void) {
+  constructor(log: (message: string) => void, diffManager: DiffManager) {
     this.log = log;
+    this.diffManager = diffManager;
+    this.portFile = path.join(
+      os.tmpdir(),
+      `gemini-ide-server-${process.ppid}.json`,
+    );
   }
 
   async start(context: vscode.ExtensionContext) {
     this.context = context;
+    const sessionsWithInitialNotification = new Set<string>();
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } =
       {};
-    const sessionsWithInitialNotification = new Set<string>();
 
     const app = express();
     app.use(express.json());
-    const mcpServer = createMcpServer();
+    const mcpServer = createMcpServer(this.diffManager);
 
     const openFilesManager = new OpenFilesManager(context);
     const onDidChangeSubscription = openFilesManager.onDidChange(() => {
@@ -71,6 +82,14 @@ export class IDEServer {
       }
     });
     context.subscriptions.push(onDidChangeSubscription);
+    const onDidChangeDiffSubscription = this.diffManager.onDidChange(
+      (notification) => {
+        for (const transport of Object.values(transports)) {
+          transport.send(notification);
+        }
+      },
+    );
+    context.subscriptions.push(onDidChangeDiffSubscription);
 
     app.post('/mcp', async (req: Request, res: Response) => {
       const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
@@ -88,7 +107,6 @@ export class IDEServer {
             transports[newSessionId] = transport;
           },
         });
-
         const keepAlive = setInterval(() => {
           try {
             transport.send({ jsonrpc: '2.0', method: 'ping' });
@@ -187,6 +205,10 @@ export class IDEServer {
           port.toString(),
         );
         this.log(`IDE server listening on port ${port}`);
+        fs.writeFile(this.portFile, JSON.stringify({ port })).catch((err) => {
+          this.log(`Failed to write port to file: ${err}`);
+        });
+        this.log(this.portFile);
       }
     });
   }
@@ -209,16 +231,71 @@ export class IDEServer {
     if (this.context) {
       this.context.environmentVariableCollection.clear();
     }
+    try {
+      await fs.unlink(this.portFile);
+    } catch (_err) {
+      // Ignore errors if the file doesn't exist.
+    }
   }
 }
 
-const createMcpServer = () => {
+const createMcpServer = (diffManager: DiffManager) => {
   const server = new McpServer(
     {
       name: 'gemini-cli-companion-mcp-server',
       version: '1.0.0',
     },
     { capabilities: { logging: {} } },
+  );
+  server.registerTool(
+    'openDiff',
+    {
+      description:
+        '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejcted.',
+      inputSchema: z.object({
+        filePath: z.string(),
+        // TODO(chrstn): determine if this should be required or not.
+        newContent: z.string().optional(),
+      }).shape,
+    },
+    async ({
+      filePath,
+      newContent,
+    }: {
+      filePath: string;
+      newContent?: string;
+    }) => {
+      await diffManager.showDiff(filePath, newContent ?? '');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Showing diff for ${filePath}`,
+          },
+        ],
+      };
+    },
+  );
+  server.registerTool(
+    'closeDiff',
+    {
+      description: '(IDE Tool) Close an open diff view for a specific file.',
+      inputSchema: z.object({
+        filePath: z.string(),
+      }).shape,
+    },
+    async ({ filePath }: { filePath: string }) => {
+      const content = await diffManager.closeDiff(filePath);
+      const response = { content: content ?? undefined };
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(response),
+          },
+        ],
+      };
+    },
   );
   return server;
 };

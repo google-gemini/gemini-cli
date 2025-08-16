@@ -12,6 +12,7 @@ import {
   EVENT_API_REQUEST,
   EVENT_API_RESPONSE,
   EVENT_CLI_CONFIG,
+  EVENT_IDE_CONNECTION,
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
@@ -23,6 +24,7 @@ import {
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
+  IdeConnectionEvent,
   StartSessionEvent,
   ToolCallEvent,
   UserPromptEvent,
@@ -30,6 +32,7 @@ import {
   NextSpeakerCheckEvent,
   LoopDetectedEvent,
   SlashCommandEvent,
+  KittySequenceOverflowEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -351,6 +354,45 @@ export function logSlashCommand(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Slash command: ${event.command}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logIdeConnection(
+  config: Config,
+  event: IdeConnectionEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logIdeConnectionEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_IDE_CONNECTION,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Ide connection. Type: ${event.connection_type}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logKittySequenceOverflow(
+  config: Config,
+  event: KittySequenceOverflowEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logKittySequenceOverflowEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+  };
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Kitty sequence buffer overflow: ${event.sequence_length} bytes`,
     attributes,
   };
   logger.emit(logRecord);

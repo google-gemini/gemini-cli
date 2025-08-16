@@ -5,13 +5,18 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import {
+  getScopeItems,
+  getScopeMessageForSetting,
+} from '../../utils/dialogScopeUtils.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
@@ -76,11 +81,7 @@ export function ThemeDialog({
   // If not found, fall back to the first theme
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
 
-  const scopeItems = [
-    { label: 'User Settings', value: SettingScope.User },
-    { label: 'Workspace Settings', value: SettingScope.Workspace },
-    { label: 'System Settings', value: SettingScope.System },
-  ];
+  const scopeItems = getScopeItems();
 
   const handleThemeSelect = useCallback(
     (themeName: string) => {
@@ -111,31 +112,24 @@ export function ThemeDialog({
     'theme',
   );
 
-  useInput((input, key) => {
-    if (key.tab) {
-      setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
-    }
-    if (key.escape) {
-      onSelect(undefined, selectedScope);
-    }
-  });
-
-  const otherScopes = Object.values(SettingScope).filter(
-    (scope) => scope !== selectedScope,
+  useKeypress(
+    (key) => {
+      if (key.name === 'tab') {
+        setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
+      }
+      if (key.name === 'escape') {
+        onSelect(undefined, selectedScope);
+      }
+    },
+    { isActive: true },
   );
 
-  const modifiedInOtherScopes = otherScopes.filter(
-    (scope) => settings.forScope(scope).settings.theme !== undefined,
+  // Generate scope message for theme setting
+  const otherScopeModifiedMessage = getScopeMessageForSetting(
+    'theme',
+    selectedScope,
+    settings,
   );
-
-  let otherScopeModifiedMessage = '';
-  if (modifiedInOtherScopes.length > 0) {
-    const modifiedScopesStr = modifiedInOtherScopes.join(', ');
-    otherScopeModifiedMessage =
-      settings.forScope(selectedScope).settings.theme !== undefined
-        ? `(Also modified in ${modifiedScopesStr})`
-        : `(Modified in ${modifiedScopesStr})`;
-  }
 
   // Constants for calculating preview pane layout.
   // These values are based on the JSX structure below.

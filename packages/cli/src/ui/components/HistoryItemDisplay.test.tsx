@@ -35,6 +35,18 @@ describe('<HistoryItemDisplay />', () => {
     expect(lastFrame()).toContain('Hello');
   });
 
+  it('renders UserMessage for "user" type with slash command', () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: MessageType.USER,
+      text: '/theme',
+    };
+    const { lastFrame } = render(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    expect(lastFrame()).toContain('/theme');
+  });
+
   it('renders StatsDisplay for "stats" type', () => {
     const item: HistoryItem = {
       ...baseItem,
@@ -59,6 +71,7 @@ describe('<HistoryItemDisplay />', () => {
       modelVersion: 'test-model',
       selectedAuthType: 'test-auth',
       gcpProject: 'test-project',
+      ideClient: 'test-ide',
     };
     const { lastFrame } = render(
       <HistoryItemDisplay {...baseItem} item={item} />,

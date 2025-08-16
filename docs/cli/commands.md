@@ -27,6 +27,9 @@ Slash commands provide meta-level control over the CLI itself.
       - **Usage:** `/chat resume <tag>`
     - **`list`**
       - **Description:** Lists available tags for chat state resumption.
+    - **`delete`**
+      - **Description:** Deletes a saved conversation checkpoint.
+      - **Usage:** `/chat delete <tag>`
 
 - **`/clear`**
   - **Description:** Clear the terminal screen, including the visible session history and scrollback within the CLI. The underlying session data (for history recall) might be preserved depending on the exact implementation, but the visual display is cleared.
@@ -37,6 +40,17 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **`/copy`**
   - **Description:** Copies the last output produced by Gemini CLI to your clipboard, for easy sharing or reuse.
+
+- **`/directory`** (or **`/dir`**)
+  - **Description:** Manage workspace directories for multi-directory support.
+  - **Sub-commands:**
+    - **`add`**:
+      - **Description:** Add a directory to the workspace. The path can be absolute or relative to the current working directory. Moreover, the reference from home directory is supported as well.
+      - **Usage:** `/directory add <path1>,<path2>`
+      - **Note:** Disabled in restrictive sandbox profiles. If you're using that, use `--include-directories` when starting the session instead.
+    - **`show`**:
+      - **Description:** Display all directories added by `/directory add` and `--include-directories`.
+      - **Usage:** `/directory show`
 
 - **`/editor`**
   - **Description:** Open a dialog for selecting supported editors.
@@ -73,6 +87,11 @@ Slash commands provide meta-level control over the CLI itself.
   - **Description:** Restores the project files to the state they were in just before a tool was executed. This is particularly useful for undoing file edits made by a tool. If run without a tool call ID, it will list available checkpoints to restore from.
   - **Usage:** `/restore [tool_call_id]`
   - **Note:** Only available if the CLI is invoked with the `--checkpointing` option or configured via [settings](./configuration.md). See [Checkpointing documentation](../checkpointing.md) for more details.
+
+- **`/settings`**
+  - **Description:** Open the settings editor to view and modify Gemini CLI settings.
+  - **Details:** This command provides a user-friendly interface for changing settings that control the behavior and appearance of Gemini CLI. It is equivalent to manually editing the `.gemini/settings.json` file, but with validation and guidance to prevent errors.
+  - **Usage:** Simply run `/settings` and the editor will open. You can then browse or search for specific settings, view their current values, and modify them as desired. Changes to some settings are applied immediately, while others require a restart.
 
 - **`/stats`**
   - **Description:** Display detailed statistics for the current Gemini CLI session, including token usage, cached token savings (when available), and session duration. Note: Cached token information is only displayed when cached tokens are being used, which occurs with API key authentication but not with OAuth authentication at this time.
@@ -242,7 +261,7 @@ Please generate a Conventional Commit message based on the following git diff:
 
 ```diff
 !{git diff --staged}
-````
+```
 
 """
 
@@ -263,7 +282,7 @@ First, ensure the user commands directory exists, then create a `refactor` subdi
 ```bash
 mkdir -p ~/.gemini/commands/refactor
 touch ~/.gemini/commands/refactor/pure.toml
-````
+```
 
 **2. Add the content to the file:**
 

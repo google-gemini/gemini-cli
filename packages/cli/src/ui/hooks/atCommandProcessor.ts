@@ -8,6 +8,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PartListUnion, PartUnion } from '@google/genai';
 import {
+  AnyToolInvocation,
   Config,
   getErrorMessage,
   isNodeError,
@@ -87,9 +88,17 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
         inEscape = false;
       } else if (char === '\\') {
         inEscape = true;
-      } else if (/\s/.test(char)) {
-        // Path ends at first whitespace not escaped
+      } else if (/[,\s;!?()[\]{}]/.test(char)) {
+        // Path ends at first whitespace or punctuation not escaped
         break;
+      } else if (char === '.') {
+        // For . we need to be more careful - only terminate if followed by whitespace or end of string
+        // This allows file extensions like .txt, .js but terminates at sentence endings like "file.txt. Next sentence"
+        const nextChar =
+          pathEndIndex + 1 < query.length ? query[pathEndIndex + 1] : '';
+        if (nextChar === '' || /\s/.test(nextChar)) {
+          break;
+        }
       }
       pathEndIndex++;
     }
@@ -246,7 +255,7 @@ export async function handleAtCommand({
               `Path ${pathName} not found directly, attempting glob search.`,
             );
             try {
-              const globResult = await globTool.execute(
+              const globResult = await globTool.buildAndExecute(
                 {
                   pattern: `**/*${pathName}*`,
                   path: dir,
@@ -320,8 +329,7 @@ export async function handleAtCommand({
       if (
         i > 0 &&
         initialQueryText.length > 0 &&
-        !initialQueryText.endsWith(' ') &&
-        resolvedSpec
+        !initialQueryText.endsWith(' ')
       ) {
         // Add space if previous part was text and didn't end with space, or if previous was @path
         const prevPart = commandParts[i - 1];
@@ -404,12 +412,14 @@ export async function handleAtCommand({
   };
   let toolCallDisplay: IndividualToolCallDisplay;
 
+  let invocation: AnyToolInvocation | undefined = undefined;
   try {
-    const result = await readManyFilesTool.execute(toolArgs, signal);
+    invocation = readManyFilesTool.build(toolArgs);
+    const result = await invocation.execute(signal);
     toolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
-      description: readManyFilesTool.getDescription(toolArgs),
+      description: invocation.getDescription(),
       status: ToolCallStatus.Success,
       resultDisplay:
         result.returnDisplay ||
@@ -459,7 +469,9 @@ export async function handleAtCommand({
     toolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
-      description: readManyFilesTool.getDescription(toolArgs),
+      description:
+        invocation?.getDescription() ??
+        'Error attempting to execute tool to read files',
       status: ToolCallStatus.Error,
       resultDisplay: `Error reading files (${contentLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
       confirmationDetails: undefined,

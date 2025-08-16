@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import { getOauthClient } from './oauth2.js';
+import { getOauthClient, resetOauthClientForTesting } from './oauth2.js';
 import { getCachedGoogleAccount } from '../utils/user_account.js';
 import { OAuth2Client, Compute } from 'google-auth-library';
 import * as fs from 'fs';
@@ -56,6 +56,7 @@ describe('oauth2', () => {
   afterEach(() => {
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
     vi.clearAllMocks();
+    resetOauthClientForTesting();
     delete process.env.CLOUD_SHELL;
     delete process.env.GOOGLE_GENAI_USE_GCA;
     delete process.env.GOOGLE_CLOUD_ACCESS_TOKEN;

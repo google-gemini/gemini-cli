@@ -8,6 +8,7 @@ import {
   Config,
   executeToolCall,
   ToolRegistry,
+  ToolErrorType,
   shutdownTelemetry,
   GeminiEventType,
   ServerGeminiStreamEvent,
@@ -69,6 +70,7 @@ describe('runNonInteractive', () => {
       getIdeMode: vi.fn().mockReturnValue(false),
       getFullContext: vi.fn().mockReturnValue(false),
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
+      getDebugMode: vi.fn().mockReturnValue(false),
     } as unknown as Config;
   });
 
@@ -161,6 +163,7 @@ describe('runNonInteractive', () => {
     };
     mockCoreExecuteToolCall.mockResolvedValue({
       error: new Error('Tool execution failed badly'),
+      errorType: ToolErrorType.UNHANDLED_EXCEPTION,
     });
     mockGeminiClient.sendMessageStream.mockReturnValue(
       createStreamFromEvents([toolCallEvent]),

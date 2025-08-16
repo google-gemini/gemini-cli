@@ -89,9 +89,13 @@ export const memoryCommand: SlashCommand = {
             const { memoryContent, fileCount } =
               await loadServerHierarchicalMemory(
                 config.getWorkingDir(),
+                config.shouldLoadMemoryFromIncludeDirectories()
+                  ? config.getWorkspaceContext().getDirectories()
+                  : [],
                 config.getDebugMode(),
                 config.getFileService(),
                 config.getExtensionContextFilePaths(),
+                context.services.settings.merged.memoryImportFormat || 'tree', // Use setting or default to 'tree'
                 config.getFileFilteringOptions(),
                 context.services.settings.merged.memoryDiscoveryMaxDirs,
               );
