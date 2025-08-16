@@ -24,6 +24,7 @@ import {
   MCPServerConfig,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
+import { AcpFileSystemService } from './fileSystemService.js';
 import { Readable, Writable } from 'node:stream';
 import { Content, Part, FunctionCall, PartListUnion } from '@google/genai';
 import { LoadedSettings, SettingScope } from '../config/settings.js';
@@ -60,6 +61,7 @@ export async function runZedIntegration(
 
 class GeminiAgent {
   private sessions: Map<string, Session> = new Map();
+  private clientCapabilities: acp.ClientCapabilities | undefined;
 
   constructor(
     private config: Config,
@@ -70,8 +72,9 @@ class GeminiAgent {
   ) {}
 
   async initialize(
-    _args: acp.InitializeRequest,
+    args: acp.InitializeRequest,
   ): Promise<acp.InitializeResponse> {
+    this.clientCapabilities = args.clientCapabilities;
     const authMethods = [
       {
         id: AuthType.LOGIN_WITH_GOOGLE,
@@ -127,6 +130,16 @@ class GeminiAgent {
 
     if (!isAuthenticated) {
       throw acp.RequestError.authRequired();
+    }
+
+    if (this.clientCapabilities?.fs) {
+      const acpFileSystemService = new AcpFileSystemService(
+        this.client,
+        sessionId,
+        this.clientCapabilities.fs,
+        config.getFileSystemService(),
+      );
+      config.setFileSystemService(acpFileSystemService);
     }
 
     const geminiClient = config.getGeminiClient();
