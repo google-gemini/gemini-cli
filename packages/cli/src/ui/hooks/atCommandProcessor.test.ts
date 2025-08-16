@@ -61,6 +61,12 @@ describe('handleAtCommand', () => {
         isPathWithinWorkspace: () => true,
         getDirectories: () => [testRootDir],
       }),
+      getMcpServers: () => ({}),
+      getMcpServerCommand: () => undefined,
+      getPromptRegistry: () => ({
+        getPromptsByServer: () => [],
+      }),
+      getDebugMode: () => false,
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig);
