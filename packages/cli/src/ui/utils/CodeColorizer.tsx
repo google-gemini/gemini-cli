@@ -21,7 +21,6 @@ import {
   MINIMUM_MAX_HEIGHT,
 } from '../components/shared/MaxSizedBox.js';
 import { LoadedSettings } from '../../config/settings.js';
-import { theme as semanticTheme } from '../semantic-colors.js';
 
 // Configure theming and parsing utilities.
 const lowlight = createLowlight(common);
@@ -172,7 +171,7 @@ export function colorizeCode(
           return (
             <Box key={index}>
               {showLineNumbers && (
-                <Text color={semanticTheme.text.secondary}>
+                <Text color={activeTheme.colors.Gray}>
                   {`${String(index + 1 + hiddenLinesCount).padStart(
                     padWidth,
                     ' ',
@@ -209,7 +208,7 @@ export function colorizeCode(
                 {`${String(index + 1).padStart(padWidth, ' ')} `}
               </Text>
             )}
-            <Text color={semanticTheme.text.secondary}>{line}</Text>
+            <Text color={activeTheme.colors.Gray}>{line}</Text>
           </Box>
         ))}
       </MaxSizedBox>

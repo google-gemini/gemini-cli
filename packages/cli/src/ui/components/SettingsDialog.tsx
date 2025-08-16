@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
-import { theme } from '../semantic-colors.js';
+import { Colors } from '../colors.js';
 import {
   LoadedSettings,
   SettingScope,
@@ -366,18 +366,18 @@ export function SettingsDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={theme.border.default}
+      borderColor={Colors.Gray}
       flexDirection="row"
       padding={1}
       width="100%"
       height="100%"
     >
       <Box flexDirection="column" flexGrow={1}>
-        <Text bold color={theme.text.link}>
+        <Text bold color={Colors.AccentBlue}>
           Settings
         </Text>
         <Box height={1} />
-        {showScrollUp && <Text color={theme.text.secondary}>▲</Text>}
+        {showScrollUp && <Text color={Colors.Gray}>▲</Text>}
         {visibleItems.map((item, idx) => {
           const isActive =
             focusSection === 'settings' &&
@@ -405,21 +405,17 @@ export function SettingsDialog({
             <React.Fragment key={item.value}>
               <Box flexDirection="row" alignItems="center">
                 <Box minWidth={2} flexShrink={0}>
-                  <Text
-                    color={
-                      isActive ? theme.status.success : theme.text.secondary
-                    }
-                  >
+                  <Text color={isActive ? Colors.AccentGreen : Colors.Gray}>
                     {isActive ? '●' : ''}
                   </Text>
                 </Box>
                 <Box minWidth={50}>
                   <Text
-                    color={isActive ? theme.status.success : theme.text.primary}
+                    color={isActive ? Colors.AccentGreen : Colors.Foreground}
                   >
                     {item.label}
                     {scopeMessage && (
-                      <Text color={theme.text.secondary}> {scopeMessage}</Text>
+                      <Text color={Colors.Gray}> {scopeMessage}</Text>
                     )}
                   </Text>
                 </Box>
@@ -427,10 +423,10 @@ export function SettingsDialog({
                 <Text
                   color={
                     isActive
-                      ? theme.status.success
+                      ? Colors.AccentGreen
                       : shouldBeGreyedOut
-                        ? theme.text.secondary
-                        : theme.text.primary
+                        ? Colors.Gray
+                        : Colors.Foreground
                   }
                 >
                   {displayValue}
@@ -440,16 +436,12 @@ export function SettingsDialog({
             </React.Fragment>
           );
         })}
-        {showScrollDown && <Text color={theme.text.secondary}>▼</Text>}
+        {showScrollDown && <Text color={Colors.Gray}>▼</Text>}
 
         <Box height={1} />
 
         <Box marginTop={1} flexDirection="column">
-          <Text
-            bold={focusSection === 'scope'}
-            wrap="truncate"
-            color={theme.text.primary}
-          >
+          <Text bold={focusSection === 'scope'} wrap="truncate">
             {focusSection === 'scope' ? '> ' : '  '}Apply To
           </Text>
           <RadioButtonSelect
@@ -463,11 +455,11 @@ export function SettingsDialog({
         </Box>
 
         <Box height={1} />
-        <Text color={theme.text.secondary}>
+        <Text color={Colors.Gray}>
           (Use Enter to select, Tab to change focus)
         </Text>
         {showRestartPrompt && (
-          <Text color={theme.status.warning}>
+          <Text color={Colors.AccentYellow}>
             To see changes, Gemini CLI must be restarted. Press r to exit and
             apply changes now.
           </Text>
