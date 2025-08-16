@@ -13,6 +13,7 @@ import process from 'node:process';
 import path from 'node:path';
 import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
+import { type DisplaySettings } from '../../config/settings.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
 
@@ -31,6 +32,7 @@ interface FooterProps {
   showMemoryUsage?: boolean;
   promptTokenCount: number;
   nightly: boolean;
+  display: DisplaySettings;
   vimMode?: string;
   isTrustedFolder?: boolean;
 }
@@ -47,6 +49,7 @@ export const Footer: React.FC<FooterProps> = ({
   showMemoryUsage,
   promptTokenCount,
   nightly,
+  display,
   vimMode,
   isTrustedFolder,
 }) => {
@@ -59,6 +62,17 @@ export const Footer: React.FC<FooterProps> = ({
   const displayPath = isNarrow
     ? path.basename(tildeifyPath(targetDir))
     : shortenPath(tildeifyPath(targetDir), pathLength);
+
+  if (display.footer === false) {
+    if (errorCount > 0) {
+      return (
+        <Box marginTop={1} justifyContent="flex-end" width="100%">
+          <ConsoleSummaryDisplay errorCount={errorCount} />
+        </Box>
+      );
+    }
+    return null;
+  }
 
   return (
     <Box

@@ -1207,6 +1207,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             }
             promptTokenCount={sessionStats.lastPromptTokenCount}
             nightly={nightly}
+            display={settings.merged.display ?? {}}
             vimMode={vimModeEnabled ? vimMode : undefined}
             isTrustedFolder={isTrustedFolderState}
           />

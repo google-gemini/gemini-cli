@@ -41,6 +41,7 @@ const defaultProps = {
   showMemoryUsage: false,
   promptTokenCount: 100,
   nightly: false,
+  display: { footer: true },
 };
 
 const renderWithWidth = (width: number, props = defaultProps) => {
@@ -154,6 +155,33 @@ describe('<Footer />', () => {
       expect(lastFrame()).toContain('untrusted');
       expect(lastFrame()).not.toMatch(/test-sandbox/s);
       vi.unstubAllEnvs();
+    });
+  });
+
+  describe('display settings', () => {
+    it('should render nothing when display.footer is false and there are no errors', () => {
+      const { lastFrame } = renderWithWidth(120, {
+        ...defaultProps,
+        display: { footer: false },
+      });
+      expect(lastFrame()).toBe('');
+    });
+
+    it('should render only the error count when display.footer is false and there are errors', () => {
+      const { lastFrame } = renderWithWidth(120, {
+        ...defaultProps,
+        display: { footer: false },
+        errorCount: 5,
+      });
+      expect(lastFrame()).toContain('5 errors');
+    });
+
+    it('should render the full footer when display.footer is true', () => {
+      const { lastFrame } = renderWithWidth(120, {
+        ...defaultProps,
+        display: { footer: true },
+      });
+      expect(lastFrame()).toContain('gemini-pro');
     });
   });
 });
