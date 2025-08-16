@@ -15,9 +15,7 @@ import url from 'url';
 import crypto from 'crypto';
 import * as net from 'net';
 import open from 'open';
-import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import * as os from 'os';
 import { Config } from '../config/config.js';
 import { getErrorMessage } from '../utils/errors.js';
 import {
@@ -27,6 +25,7 @@ import {
 } from '../utils/user_account.js';
 import { AuthType } from '../core/contentGenerator.js';
 import readline from 'node:readline';
+import { OAuthCredentialStorage } from './oauth-credential-storage.js';
 
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
@@ -53,8 +52,9 @@ const SIGN_IN_SUCCESS_URL =
 const SIGN_IN_FAILURE_URL =
   'https://developers.google.com/gemini-code-assist/auth_failure_gemini';
 
-const GEMINI_DIR = '.gemini';
-const CREDENTIAL_FILENAME = 'oauth_creds.json';
+// These constants are now managed by OAuthCredentialStorage
+// const GEMINI_DIR = '.gemini';
+// const CREDENTIAL_FILENAME = 'oauth_creds.json';
 
 /**
  * An Authentication URL for updating the credentials of a Oauth2Client
@@ -92,7 +92,7 @@ async function initOauthClient(
   }
 
   client.on('tokens', async (tokens: Credentials) => {
-    await cacheCredentials(tokens);
+    await OAuthCredentialStorage.saveCredentials(tokens);
   });
 
   // If there are cached creds on disk, they always take precedence
@@ -352,11 +352,32 @@ export function getAvailablePort(): Promise<number> {
 
 async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
   try {
-    const keyFile =
-      process.env.GOOGLE_APPLICATION_CREDENTIALS || getCachedCredentialPath();
+    // First check for GOOGLE_APPLICATION_CREDENTIALS env var
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      const creds = await fs.readFile(
+        process.env.GOOGLE_APPLICATION_CREDENTIALS,
+        'utf-8',
+      );
+      client.setCredentials(JSON.parse(creds));
 
-    const creds = await fs.readFile(keyFile, 'utf-8');
-    client.setCredentials(JSON.parse(creds));
+      // This will verify locally that the credentials look good.
+      const { token } = await client.getAccessToken();
+      if (!token) {
+        return false;
+      }
+
+      // This will check with the server to see if it hasn't been revoked.
+      await client.getTokenInfo(token);
+      return true;
+    }
+
+    // Load from keychain/encrypted storage
+    const credentials = await OAuthCredentialStorage.loadCredentials();
+    if (!credentials) {
+      return false;
+    }
+
+    client.setCredentials(credentials);
 
     // This will verify locally that the credentials look good.
     const { token } = await client.getAccessToken();
@@ -373,21 +394,11 @@ async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
   }
 }
 
-async function cacheCredentials(credentials: Credentials) {
-  const filePath = getCachedCredentialPath();
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-
-  const credString = JSON.stringify(credentials, null, 2);
-  await fs.writeFile(filePath, credString, { mode: 0o600 });
-}
-
-function getCachedCredentialPath(): string {
-  return path.join(os.homedir(), GEMINI_DIR, CREDENTIAL_FILENAME);
-}
+// cacheCredentials and getCachedCredentialPath are no longer needed - handled by OAuthCredentialStorage
 
 export async function clearCachedCredentialFile() {
   try {
-    await fs.rm(getCachedCredentialPath(), { force: true });
+    await OAuthCredentialStorage.clearCredentials();
     // Clear the Google Account ID cache when credentials are cleared
     await clearCachedGoogleAccount();
   } catch (_) {

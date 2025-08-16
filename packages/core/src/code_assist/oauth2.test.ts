@@ -17,6 +17,7 @@ import * as os from 'os';
 import { AuthType } from '../core/contentGenerator.js';
 import { Config } from '../config/config.js';
 import readline from 'node:readline';
+import { OAuthCredentialStorage } from './oauth-credential-storage.js';
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();
@@ -33,6 +34,14 @@ vi.mock('crypto');
 vi.mock('node:readline');
 vi.mock('../utils/browser.js', () => ({
   shouldAttemptBrowserLaunch: () => true,
+}));
+
+vi.mock('./oauth-credential-storage.js', () => ({
+  OAuthCredentialStorage: {
+    loadCredentials: vi.fn(),
+    saveCredentials: vi.fn(),
+    clearCredentials: vi.fn(),
+  },
 }));
 
 const mockConfig = {
@@ -256,6 +265,9 @@ describe('oauth2', () => {
     let mockComputeClient: Compute;
 
     beforeEach(() => {
+      // For CLOUD_SHELL tests, ensure no cached credentials are found
+      vi.mocked(OAuthCredentialStorage.loadCredentials).mockResolvedValue(null);
+
       mockGetAccessToken.mockResolvedValue({ token: 'test-access-token' });
       mockComputeClient = {
         credentials: { refresh_token: 'test-refresh-token' },
@@ -267,9 +279,11 @@ describe('oauth2', () => {
 
     it('should attempt to load cached credentials first', async () => {
       const cachedCreds = { refresh_token: 'cached-token' };
-      const credsPath = path.join(tempHomeDir, '.gemini', 'oauth_creds.json');
-      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
-      await fs.promises.writeFile(credsPath, JSON.stringify(cachedCreds));
+
+      // Mock OAuthCredentialStorage to return cached credentials
+      vi.mocked(OAuthCredentialStorage.loadCredentials).mockResolvedValue(
+        cachedCreds,
+      );
 
       const mockClient = {
         setCredentials: vi.fn(),
@@ -285,6 +299,7 @@ describe('oauth2', () => {
 
       await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
 
+      expect(OAuthCredentialStorage.loadCredentials).toHaveBeenCalled();
       expect(mockClient.setCredentials).toHaveBeenCalledWith(cachedCreds);
       expect(mockClient.getAccessToken).toHaveBeenCalled();
       expect(mockClient.getTokenInfo).toHaveBeenCalled();
@@ -305,8 +320,8 @@ describe('oauth2', () => {
 
       await getOauthClient(AuthType.CLOUD_SHELL, mockConfig);
 
-      const credsPath = path.join(tempHomeDir, '.gemini', 'oauth_creds.json');
-      expect(fs.existsSync(credsPath)).toBe(false);
+      // Should not save credentials when using ADC
+      expect(OAuthCredentialStorage.saveCredentials).not.toHaveBeenCalled();
     });
 
     it('should return the Compute client on successful ADC authentication', async () => {
@@ -406,9 +421,9 @@ describe('oauth2', () => {
 
       // Make it fall through to cached credentials path
       const cachedCreds = { refresh_token: 'cached-token' };
-      const credsPath = path.join(tempHomeDir, '.gemini', 'oauth_creds.json');
-      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
-      await fs.promises.writeFile(credsPath, JSON.stringify(cachedCreds));
+      vi.mocked(OAuthCredentialStorage.loadCredentials).mockResolvedValue(
+        cachedCreds,
+      );
 
       await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
 
@@ -437,9 +452,9 @@ describe('oauth2', () => {
 
       // Make it fall through to cached credentials path
       const cachedCreds = { refresh_token: 'cached-token' };
-      const credsPath = path.join(tempHomeDir, '.gemini', 'oauth_creds.json');
-      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
-      await fs.promises.writeFile(credsPath, JSON.stringify(cachedCreds));
+      vi.mocked(OAuthCredentialStorage.loadCredentials).mockResolvedValue(
+        cachedCreds,
+      );
 
       await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
 
