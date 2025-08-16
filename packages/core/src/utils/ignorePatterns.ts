@@ -43,8 +43,7 @@ export const BINARY_FILE_PATTERNS: string[] = [
   '**/*.pptx',
   '**/*.odt',
   '**/*.ods',
-  '**/*.odp',
-  '**/*.pdf'
+  '**/*.odp'
 ];
 
 /**
