@@ -43,7 +43,7 @@ export const BINARY_FILE_PATTERNS: string[] = [
   '**/*.pptx',
   '**/*.odt',
   '**/*.ods',
-  '**/*.odp'
+  '**/*.odp',
 ];
 
 /**
@@ -213,14 +213,36 @@ export class FileExclusions {
 
 /**
  * Extracts file extensions from glob patterns.
- * Converts patterns like "**\/*.exe" to ".exe"
+ * Converts patterns like glob/*.exe to .exe
+ * Handles brace expansion like glob/*.{js,ts} to .js and .ts
  */
-function extractExtensionsFromPatterns(patterns: string[]): string[] {
-  return patterns
-    .filter((pattern) => pattern.includes('*.'))
-    .map((pattern) => pattern.substring(pattern.lastIndexOf('*') + 1))
-    .filter((ext) => ext && !ext.includes('/') && ext.startsWith('.'))
-    .sort();
+export function extractExtensionsFromPatterns(patterns: string[]): string[] {
+  const extensions = new Set(
+    patterns
+      .filter((pattern) => pattern.includes('*.'))
+      .flatMap((pattern) => {
+        const extPart = pattern.substring(pattern.lastIndexOf('*') + 1);
+        // Handle brace expansion e.g. `**/*.{jpg,png}`
+        if (extPart.startsWith('.{') && extPart.endsWith('}')) {
+          const inner = extPart.slice(2, -1); // get 'jpg,png'
+          return inner
+            .split(',')
+            .map((ext) => `.${ext.trim()}`)
+            .filter((ext) => ext !== '.');
+        }
+        // Handle simple extension e.g. `**/*.zip`
+        if (
+          extPart.startsWith('.') &&
+          !extPart.includes('/') &&
+          !extPart.includes('{') &&
+          !extPart.includes('}')
+        ) {
+          return [extPart];
+        }
+        return [];
+      }),
+  );
+  return Array.from(extensions).sort();
 }
 
 /**
