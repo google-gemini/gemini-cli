@@ -35,7 +35,7 @@ const claudeCodeOptionsSchema = z.object({
   rcaDirectory: z.string().optional().describe("RCA directory for Claude Code execution (defaults to RCA_DIRECTORY_PATH env var)"),
   customSystemPrompt: z.string().optional().describe("Custom system prompt for the Claude Code session"),
   appendSystemPrompt: z.string().optional().describe("Additional system prompt to append"),
-  maxTurns: z.number().int().positive().max(50).optional().describe("Maximum number of conversation turns (default: 20)"),
+  maxTurns: z.number().int().positive().max(200).optional().describe("Maximum number of conversation turns (default: 20)"),
   allowedTools: z.array(z.string()).optional().describe("List of specific tools to allow (e.g., ['bash', 'read', 'write'])"),
   permissionMode: permissionModeSchema.optional().describe("Permission mode for tool execution"),
   debug: z.boolean().optional().describe("Enable debug logging"),
