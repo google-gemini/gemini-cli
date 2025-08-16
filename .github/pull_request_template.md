@@ -1,3 +1,5 @@
+[查看中文版](../i18n/chinese/.github/pull_request_template.md)
+
 ## TLDR
 
 <!-- Add a brief description of what this pull request changes and why and any important things for reviewers to look at -->

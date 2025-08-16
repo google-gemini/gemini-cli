@@ -1,5 +1,9 @@
 # Uninstalling the CLI
 
+<p align="center">
+  <a href="../i18n/chinese/docs/Uninstall.md">🌐 简体中文</a> | English
+</p>
+
 Your uninstall method depends on how you ran the CLI. Follow the instructions for either npx or a global npm installation.
 
 ## Method 1: Using npx
@@ -27,7 +31,7 @@ rmdir /s /q "%LocalAppData%\npm-cache\_npx"
 _PowerShell_
 
 ```powershell
-# The path is typically $env:LocalAppData\npm-cache\_npx
+# The path is usually $env:LocalAppData\npm-cache\_npx
 Remove-Item -Path (Join-Path $env:LocalAppData "npm-cache\_npx") -Recurse -Force
 ```
 

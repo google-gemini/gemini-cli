@@ -1,5 +1,9 @@
 # Integration Tests
 
+<p align="center">
+  <a href="../i18n/chinese/docs/integration-tests.md">🌐 简体中文</a> | English
+</p>
+
 This document provides information about the integration testing framework used in this project.
 
 ## Overview

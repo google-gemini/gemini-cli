@@ -1,4 +1,8 @@
-# Gemini CLI Companion
+# Gemini VS Code IDE Companion
+
+<p align="center">
+  <a href="../../i18n/chinese/packages/vscode-ide-companion/README.md">🌐 简体中文</a> | English
+</p>
 
 The Gemini CLI Companion extension pairs with [Gemini CLI](https://github.com/google-gemini/gemini-cli). This extension is compatible with both VS Code and VS Code forks.
 

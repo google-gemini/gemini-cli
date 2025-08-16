@@ -1,5 +1,9 @@
 # Gemini CLI: Quotas and Pricing
 
+<p align="center">
+  <a href="../i18n/chinese/docs/quota-and-pricing.md">🌐 简体中文</a> | English
+</p>
+
 Gemini CLI offers a generous free tier that covers the use cases for many individual developers. For enterprise / professional usage, or if you need higher limits, there are multiple possible avenues depending on what type of account you use to authenticate.
 
 See [privacy and terms](./tos-privacy.md) for details on Privacy policy and Terms of Service.
