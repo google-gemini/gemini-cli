@@ -73,7 +73,7 @@ describe('mcpCommand', () => {
     vi.clearAllMocks();
 
     // Set up default mock environment
-    delete process.env.SANDBOX;
+    vi.unstubAllEnvs();
 
     // Default mock implementations
     vi.mocked(getMCPServerStatus).mockReturnValue(MCPServerStatus.CONNECTED);

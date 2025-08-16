@@ -56,9 +56,7 @@ describe('oauth2', () => {
   afterEach(() => {
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
     vi.clearAllMocks();
-    delete process.env.CLOUD_SHELL;
-    delete process.env.GOOGLE_GENAI_USE_GCA;
-    delete process.env.GOOGLE_CLOUD_ACCESS_TOKEN;
+    vi.unstubAllEnvs();
   });
 
   it('should perform a web login', async () => {
@@ -327,8 +325,8 @@ describe('oauth2', () => {
 
   describe('with GCP environment variables', () => {
     it('should use GOOGLE_CLOUD_ACCESS_TOKEN when GOOGLE_GENAI_USE_GCA is true', async () => {
-      process.env.GOOGLE_GENAI_USE_GCA = 'true';
-      process.env.GOOGLE_CLOUD_ACCESS_TOKEN = 'gcp-access-token';
+      vi.stubEnv('GOOGLE_GENAI_USE_GCA', 'true');
+      vi.stubEnv('GOOGLE_CLOUD_ACCESS_TOKEN', 'gcp-access-token');
 
       const mockSetCredentials = vi.fn();
       const mockGetAccessToken = vi
@@ -386,7 +384,7 @@ describe('oauth2', () => {
     });
 
     it('should not use GCP token if GOOGLE_CLOUD_ACCESS_TOKEN is not set', async () => {
-      process.env.GOOGLE_GENAI_USE_GCA = 'true';
+      vi.stubEnv('GOOGLE_GENAI_USE_GCA', 'true');
 
       const mockSetCredentials = vi.fn();
       const mockGetAccessToken = vi
@@ -417,7 +415,7 @@ describe('oauth2', () => {
     });
 
     it('should not use GCP token if GOOGLE_GENAI_USE_GCA is not set', async () => {
-      process.env.GOOGLE_CLOUD_ACCESS_TOKEN = 'gcp-access-token';
+      vi.stubEnv('GOOGLE_CLOUD_ACCESS_TOKEN', 'gcp-access-token');
 
       const mockSetCredentials = vi.fn();
       const mockGetAccessToken = vi

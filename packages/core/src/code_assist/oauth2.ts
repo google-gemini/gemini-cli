@@ -79,11 +79,11 @@ export async function getOauthClient(
   });
 
   if (
-    process.env.GOOGLE_GENAI_USE_GCA &&
-    process.env.GOOGLE_CLOUD_ACCESS_TOKEN
+    process.env['GOOGLE_GENAI_USE_GCA'] &&
+    process.env['GOOGLE_CLOUD_ACCESS_TOKEN']
   ) {
     client.setCredentials({
-      access_token: process.env.GOOGLE_CLOUD_ACCESS_TOKEN,
+      access_token: process.env['GOOGLE_CLOUD_ACCESS_TOKEN'],
     });
     await fetchAndCacheUserInfo(client);
     return client;
@@ -236,7 +236,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
 async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   const port = await getAvailablePort();
   // The hostname used for the HTTP server binding (e.g., '0.0.0.0' in Docker).
-  const host = process.env.OAUTH_CALLBACK_HOST || 'localhost';
+  const host = process.env['OAUTH_CALLBACK_HOST'] || 'localhost';
   // The `redirectUri` sent to Google's authorization server MUST use a loopback IP literal
   // (i.e., 'localhost' or '127.0.0.1'). This is a strict security policy for credentials of
   // type 'Desktop app' or 'Web application' (when using loopback flow) to mitigate
@@ -311,7 +311,7 @@ export function getAvailablePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     let port = 0;
     try {
-      const portStr = process.env.OAUTH_CALLBACK_PORT;
+      const portStr = process.env['OAUTH_CALLBACK_PORT'];
       if (portStr) {
         port = parseInt(portStr, 10);
         if (isNaN(port) || port <= 0 || port > 65535) {
@@ -341,7 +341,8 @@ export function getAvailablePort(): Promise<number> {
 async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
   try {
     const keyFile =
-      process.env.GOOGLE_APPLICATION_CREDENTIALS || getCachedCredentialPath();
+      process.env['GOOGLE_APPLICATION_CREDENTIALS'] ||
+      getCachedCredentialPath();
 
     const creds = await fs.readFile(keyFile, 'utf-8');
     client.setCredentials(JSON.parse(creds));

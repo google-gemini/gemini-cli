@@ -53,19 +53,17 @@ vi.mock('@google/gemini-cli-core', async () => {
 
 describe('Configuration Integration Tests', () => {
   let tempDir: string;
-  let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
     server.resetHandlers(http.post(CLEARCUT_URL, () => HttpResponse.text()));
 
     tempDir = fs.mkdtempSync(path.join(tmpdir(), 'gemini-cli-test-'));
-    originalEnv = { ...process.env };
-    process.env.GEMINI_API_KEY = 'test-api-key';
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    vi.unstubAllEnvs();
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true });
     }

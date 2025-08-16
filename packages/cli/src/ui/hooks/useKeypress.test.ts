@@ -116,7 +116,7 @@ describe('useKeypress', () => {
     });
 
     originalNodeVersion = process.versions.node;
-    delete process.env['PASTE_WORKAROUND'];
+    vi.unstubAllEnvs();
   });
 
   afterEach(() => {
@@ -197,7 +197,7 @@ describe('useKeypress', () => {
       description: 'Workaround Env Var',
       setup: () => {
         setNodeVersion('20.0.0');
-        process.env['PASTE_WORKAROUND'] = 'true';
+        vi.stubEnv('PASTE_WORKAROUND', 'true');
       },
       isLegacy: true,
     },
