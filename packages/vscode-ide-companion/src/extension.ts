@@ -5,6 +5,7 @@
  */
 
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { IDEServer } from './ide-server.js';
 import { DiffContentProvider, DiffManager } from './diff-manager.js';
 import { createLogger } from './utils/logger.js';
@@ -23,7 +24,7 @@ function updateWorkspacePath(context: vscode.ExtensionContext) {
   if (workspaceFolders && workspaceFolders.length > 0) {
     const workspacePaths = workspaceFolders
       .map((folder) => folder.uri.fsPath)
-      .join(':');
+      .join(path.delimiter);
     context.environmentVariableCollection.replace(
       IDE_WORKSPACE_PATH_ENV_VAR,
       workspacePaths,
