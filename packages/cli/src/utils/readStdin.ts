@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { clearTimeout } from 'node:timers';
+
 export async function readStdin(): Promise<string> {
   const MAX_STDIN_SIZE = 8 * 1024 * 1024; // 8MB
   return new Promise((resolve, reject) => {
@@ -11,9 +13,16 @@ export async function readStdin(): Promise<string> {
     let totalSize = 0;
     process.stdin.setEncoding('utf8');
 
+    const pipedInputShouldBeAvailableInMs = 100;
+    const pipedInputTimeout = setTimeout(() => {
+      // stop reading if input is not available yet
+      onEnd();
+    }, pipedInputShouldBeAvailableInMs);
+
     const onReadable = () => {
       let chunk;
       while ((chunk = process.stdin.read()) !== null) {
+        clearTimeout(pipedInputTimeout);
         if (totalSize + chunk.length > MAX_STDIN_SIZE) {
           const remainingSize = MAX_STDIN_SIZE - totalSize;
           data += chunk.slice(0, remainingSize);
@@ -39,6 +48,7 @@ export async function readStdin(): Promise<string> {
     };
 
     const cleanup = () => {
+      clearTimeout(pipedInputTimeout);
       process.stdin.removeListener('readable', onReadable);
       process.stdin.removeListener('end', onEnd);
       process.stdin.removeListener('error', onError);
