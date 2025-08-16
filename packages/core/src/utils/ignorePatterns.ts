@@ -14,6 +14,7 @@ import { getCurrentGeminiMdFilename } from '../tools/memoryTool.js';
 export const COMMON_IGNORE_PATTERNS: string[] = [
   '**/node_modules/**',
   '**/.git/**',
+  '**/bower_components/**',
 ];
 
 /**
