@@ -1,0 +1,479 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Gemini CLI Settings",
+  "description": "Configuration settings for the Gemini CLI. See https://github.com/google/gemini-cli/blob/main/docs/cli/configuration.md for more details.",
+  "type": "object",
+  "properties": {
+    "theme": {
+      "description": "The color theme for the UI.",
+      "title": "Theme",
+      "type": "string"
+    },
+    "customThemes": {
+      "description": "Custom theme definitions.",
+      "title": "Custom Themes",
+      "default": {},
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "The name of the custom theme.",
+            "title": "Name",
+            "default": "",
+            "type": "string"
+          },
+          "Background": {
+            "description": "The background color.",
+            "title": "Background",
+            "default": "",
+            "type": "string"
+          },
+          "Foreground": {
+            "description": "The foreground color.",
+            "title": "Foreground",
+            "default": "",
+            "type": "string"
+          },
+          "AccentRed": {
+            "description": "The red accent color.",
+            "title": "Accent Red",
+            "default": "",
+            "type": "string"
+          },
+          "AccentGreen": {
+            "description": "The green accent color.",
+            "title": "Accent Green",
+            "default": "",
+            "type": "string"
+          },
+          "AccentYellow": {
+            "description": "The yellow accent color.",
+            "title": "Accent Yellow",
+            "default": "",
+            "type": "string"
+          },
+          "AccentBlue": {
+            "description": "The blue accent color.",
+            "title": "Accent Blue",
+            "default": "",
+            "type": "string"
+          },
+          "AccentPurple": {
+            "description": "The purple accent color.",
+            "title": "Accent Purple",
+            "default": "",
+            "type": "string"
+          },
+          "AccentCyan": {
+            "description": "The cyan accent color.",
+            "title": "Accent Cyan",
+            "default": "",
+            "type": "string"
+          },
+          "DiffAdded": {
+            "description": "The color for added lines in a diff.",
+            "title": "Diff Added",
+            "default": "",
+            "type": "string"
+          },
+          "DiffRemoved": {
+            "description": "The color for removed lines in a diff.",
+            "title": "Diff Removed",
+            "default": "",
+            "type": "string"
+          },
+          "Comment": {
+            "description": "The color for comments.",
+            "title": "Comment",
+            "default": "",
+            "type": "string"
+          },
+          "Gray": {
+            "description": "The gray color.",
+            "title": "Gray",
+            "default": "",
+            "type": "string"
+          },
+          "GradientColors": {
+            "description": "The colors for gradients.",
+            "title": "Gradient Colors",
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "hideWindowTitle": {
+      "description": "Hide the window title bar",
+      "title": "Hide Window Title",
+      "default": false,
+      "type": "boolean"
+    },
+    "hideTips": {
+      "description": "Hide helpful tips in the UI",
+      "title": "Hide Tips",
+      "default": false,
+      "type": "boolean"
+    },
+    "hideBanner": {
+      "description": "Hide the application banner",
+      "title": "Hide Banner",
+      "default": false,
+      "type": "boolean"
+    },
+    "showMemoryUsage": {
+      "description": "Display memory usage information in the UI",
+      "title": "Show Memory Usage",
+      "default": false,
+      "type": "boolean"
+    },
+    "usageStatisticsEnabled": {
+      "description": "Enable collection of usage statistics",
+      "title": "Enable Usage Statistics",
+      "default": true,
+      "type": "boolean"
+    },
+    "autoConfigureMaxOldSpaceSize": {
+      "description": "Automatically configure Node.js memory limits",
+      "title": "Auto Configure Max Old Space Size",
+      "default": false,
+      "type": "boolean"
+    },
+    "preferredEditor": {
+      "description": "The preferred editor to open files in.",
+      "title": "Preferred Editor",
+      "type": "string"
+    },
+    "maxSessionTurns": {
+      "description": "Maximum number of user/model/tool turns to keep in a session.",
+      "title": "Max Session Turns",
+      "type": "number"
+    },
+    "memoryImportFormat": {
+      "description": "The format to use when importing memory.",
+      "title": "Memory Import Format",
+      "type": "string"
+    },
+    "memoryDiscoveryMaxDirs": {
+      "description": "Maximum number of directories to search for memory.",
+      "title": "Memory Discovery Max Dirs",
+      "type": "number"
+    },
+    "contextFileName": {
+      "description": "The name of the context file.",
+      "title": "Context File Name",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "vimMode": {
+      "description": "Enable Vim keybindings",
+      "title": "Vim Mode",
+      "default": false,
+      "type": "boolean"
+    },
+    "ideMode": {
+      "description": "Enable IDE integration mode",
+      "title": "IDE Mode",
+      "default": false,
+      "type": "boolean"
+    },
+    "accessibility": {
+      "description": "Accessibility settings.",
+      "title": "Accessibility",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "disableLoadingPhrases": {
+          "description": "Disable loading phrases for accessibility",
+          "title": "Disable Loading Phrases",
+          "default": false,
+          "type": "boolean"
+        }
+      }
+    },
+    "checkpointing": {
+      "description": "Session checkpointing settings.",
+      "title": "Checkpointing",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enable session checkpointing for recovery",
+          "title": "Enable Checkpointing",
+          "default": false,
+          "type": "boolean"
+        }
+      }
+    },
+    "fileFiltering": {
+      "description": "Settings for git-aware file filtering.",
+      "title": "File Filtering",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "respectGitIgnore": {
+          "description": "Respect .gitignore files when searching",
+          "title": "Respect .gitignore",
+          "default": true,
+          "type": "boolean"
+        },
+        "respectGeminiIgnore": {
+          "description": "Respect .geminiignore files when searching",
+          "title": "Respect .geminiignore",
+          "default": true,
+          "type": "boolean"
+        },
+        "enableRecursiveFileSearch": {
+          "description": "Enable recursive file search functionality",
+          "title": "Enable Recursive File Search",
+          "default": true,
+          "type": "boolean"
+        }
+      }
+    },
+    "disableAutoUpdate": {
+      "description": "Disable automatic updates",
+      "title": "Disable Auto Update",
+      "default": false,
+      "type": "boolean"
+    },
+    "selectedAuthType": {
+      "description": "The currently selected authentication type.",
+      "title": "Selected Auth Type",
+      "type": "string"
+    },
+    "useExternalAuth": {
+      "description": "Whether to use an external authentication flow.",
+      "title": "Use External Auth",
+      "type": "boolean"
+    },
+    "sandbox": {
+      "description": "Sandbox execution environment (can be a boolean or a path string).",
+      "title": "Sandbox",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "coreTools": {
+      "description": "Paths to core tool definitions.",
+      "title": "Core Tools",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "excludeTools": {
+      "description": "Tool names to exclude from discovery.",
+      "title": "Exclude Tools",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "toolDiscoveryCommand": {
+      "description": "Command to run for tool discovery.",
+      "title": "Tool Discovery Command",
+      "type": "string"
+    },
+    "toolCallCommand": {
+      "description": "Command to run for tool calls.",
+      "title": "Tool Call Command",
+      "type": "string"
+    },
+    "mcpServerCommand": {
+      "description": "Command to start an MCP server.",
+      "title": "MCP Server Command",
+      "type": "string"
+    },
+    "mcpServers": {
+      "description": "Configuration for MCP servers.",
+      "title": "MCP Servers",
+      "default": {},
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "description": "The command to start the MCP server.",
+            "title": "Command",
+            "type": "string"
+          },
+          "env": {
+            "description": "Environment variables to set for the MCP server.",
+            "title": "Environment Variables",
+            "default": {},
+            "type": "object",
+            "additionalProperties": true
+          },
+          "logLevel": {
+            "description": "Log level for the MCP server.",
+            "title": "Log Level",
+            "type": "string"
+          },
+          "toolPath": {
+            "description": "Path to the tool definition.",
+            "title": "Tool Path",
+            "type": "string"
+          },
+          "toolManifestPath": {
+            "description": "Path to the tool manifest.",
+            "title": "Tool Manifest Path",
+            "type": "string"
+          }
+        }
+      }
+    },
+    "allowMCPServers": {
+      "description": "A whitelist of MCP servers to allow.",
+      "title": "Allow MCP Servers",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "excludeMCPServers": {
+      "description": "A blacklist of MCP servers to exclude.",
+      "title": "Exclude MCP Servers",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "telemetry": {
+      "description": "Telemetry configuration.",
+      "title": "Telemetry",
+      "type": "object",
+      "properties": {
+        "gcpProjectId": {
+          "description": "Google Cloud Project ID for telemetry.",
+          "title": "GCP Project ID",
+          "type": "string"
+        },
+        "bigqueryDataset": {
+          "description": "BigQuery dataset for telemetry.",
+          "title": "BigQuery Dataset",
+          "type": "string"
+        },
+        "bigqueryTable": {
+          "description": "BigQuery table for telemetry.",
+          "title": "BigQuery Table",
+          "type": "string"
+        }
+      }
+    },
+    "bugCommand": {
+      "description": "Configuration for the bug report command.",
+      "title": "Bug Command",
+      "type": "object",
+      "properties": {
+        "command": {
+          "description": "The command to run to file a bug report.",
+          "title": "Command",
+          "type": "string"
+        },
+        "template": {
+          "description": "The template to use for the bug report.",
+          "title": "Template",
+          "type": "string"
+        }
+      }
+    },
+    "summarizeToolOutput": {
+      "description": "Settings for summarizing tool output.",
+      "title": "Summarize Tool Output",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "tokenBudget": {
+            "description": "The token budget for summarizing tool output.",
+            "title": "Token Budget",
+            "type": "number"
+          }
+        }
+      }
+    },
+    "dnsResolutionOrder": {
+      "description": "The DNS resolution order.",
+      "title": "DNS Resolution Order",
+      "type": "string"
+    },
+    "excludedProjectEnvVars": {
+      "description": "Environment variables to exclude from project context.",
+      "title": "Excluded Project Environment Variables",
+      "default": [
+        "DEBUG",
+        "DEBUG_MODE"
+      ],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "disableUpdateNag": {
+      "description": "Disable update notification prompts.",
+      "title": "Disable Update Nag",
+      "default": false,
+      "type": "boolean"
+    },
+    "includeDirectories": {
+      "description": "Additional directories to include in the workspace context.",
+      "title": "Include Directories",
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "loadMemoryFromIncludeDirectories": {
+      "description": "Whether to load memory files from include directories.",
+      "title": "Load Memory From Include Directories",
+      "default": false,
+      "type": "boolean"
+    },
+    "model": {
+      "description": "The Gemini model to use for conversations.",
+      "title": "Model",
+      "type": "string"
+    },
+    "hasSeenIdeIntegrationNudge": {
+      "description": "Whether the user has seen the IDE integration nudge.",
+      "title": "Has Seen IDE Integration Nudge",
+      "default": false,
+      "type": "boolean"
+    },
+    "folderTrustFeature": {
+      "description": "Enable folder trust feature for enhanced security.",
+      "title": "Folder Trust Feature",
+      "default": false,
+      "type": "boolean"
+    },
+    "folderTrust": {
+      "description": "Setting to track whether Folder trust is enabled.",
+      "title": "Folder Trust",
+      "default": false,
+      "type": "boolean"
+    },
+    "chatCompression": {
+      "description": "Chat compression settings.",
+      "title": "Chat Compression",
+      "type": "object",
+      "properties": {
+        "contextPercentageThreshold": {
+          "description": "The threshold at which to start compressing chat history.",
+          "title": "Context Percentage Threshold",
+          "type": "number"
+        }
+      }
+    },
+    "showLineNumbers": {
+      "description": "Show line numbers in the chat.",
+      "title": "Show Line Numbers",
+      "default": false,
+      "type": "boolean"
+    }
+  }
+}

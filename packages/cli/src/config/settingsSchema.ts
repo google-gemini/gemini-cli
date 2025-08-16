@@ -24,6 +24,7 @@ export interface SettingDefinition {
   childKey?: string;
   key?: string;
   properties?: SettingsSchema;
+  valueSchema?: SettingsSchema;
   showInDialog?: boolean;
 }
 
@@ -58,6 +59,120 @@ export const SETTINGS_SCHEMA = {
     default: {} as Record<string, CustomTheme>,
     description: 'Custom theme definitions.',
     showInDialog: false,
+    valueSchema: {
+      name: {
+        type: 'string',
+        label: 'Name',
+        category: 'UI',
+        requiresRestart: false,
+        default: '',
+        description: 'The name of the custom theme.',
+      },
+      Background: {
+        type: 'string',
+        label: 'Background',
+        category: 'UI',
+        requiresRestart: false,
+        default: '',
+        description: 'The background color.',
+      },
+      Foreground: {
+        type: 'string',
+        label: 'Foreground',
+        category: 'UI',
+        requiresRestart: false,
+        default: '',
+        description: 'The foreground color.',
+      },
+      AccentRed: {
+        type: 'string',
+        label: 'Accent Red',
+        category: 'UI',
+        requiresRestart: false,
+        default: '',
+        description: 'The red accent color.',
+      },
+      AccentGreen: {
+        type: 'string',
+        label: 'Accent Green',
+        category: 'UI',
+        requiresRestart: false,
+        default: '',
+        description: 'The green accent color.',
+      },
+      AccentYellow: {
+        type: 'string',
+        label: 'Accent Yellow',
+        category: 'UI',
+        requiresRestart: false,
+        default: '',
+        description: 'The yellow accent color.',
+      },
+      AccentBlue: {
+        type: 'string',
+        label: 'Accent Blue',
+        category: 'UI',
+        requiresRestart: false,
+        default: '',
+        description: 'The blue accent color.',
+      },
+      AccentPurple: {
+        type: 'string',
+        label: 'Accent Purple',
+        category: 'UI',
+        requiresRestart: false,
+        default: '',
+        description: 'The purple accent color.',
+      },
+      AccentCyan: {
+        type: 'string',
+        label: 'Accent Cyan',
+        category: 'UI',
+        requiresRestart: false,
+        default: '',
+        description: 'The cyan accent color.',
+      },
+      DiffAdded: {
+        type: 'string',
+        label: 'Diff Added',
+        category: 'UI',
+        requiresRestart: false,
+        default: '',
+        description: 'The color for added lines in a diff.',
+      },
+      DiffRemoved: {
+        type: 'string',
+        label: 'Diff Removed',
+        category: 'UI',
+        requiresRestart: false,
+        default: '',
+        description: 'The color for removed lines in a diff.',
+      },
+      Comment: {
+        type: 'string',
+        label: 'Comment',
+        category: 'UI',
+        requiresRestart: false,
+        default: '',
+        description: 'The color for comments.',
+      },
+      Gray: {
+        type: 'string',
+        label: 'Gray',
+        category: 'UI',
+        requiresRestart: false,
+        default: '',
+        description: 'The gray color.',
+      },
+      GradientColors: {
+        type: 'array',
+        label: 'Gradient Colors',
+        category: 'UI',
+        requiresRestart: false,
+        default: [] as string[],
+        description: 'The colors for gradients.',
+      },
+    },
   },
   hideWindowTitle: {
     type: 'boolean',
@@ -349,6 +464,48 @@ export const SETTINGS_SCHEMA = {
     default: {} as Record<string, MCPServerConfig>,
     description: 'Configuration for MCP servers.',
     showInDialog: false,
+    valueSchema: {
+      command: {
+        type: 'string',
+        label: 'Command',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description: 'The command to start the MCP server.',
+      },
+      env: {
+        type: 'object',
+        label: 'Environment Variables',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: {} as Record<string, string>,
+        description: 'Environment variables to set for the MCP server.',
+      },
+      logLevel: {
+        type: 'string',
+        label: 'Log Level',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | undefined,
+        description: 'Log level for the MCP server.',
+      },
+      toolPath: {
+        type: 'string',
+        label: 'Tool Path',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description: 'Path to the tool definition.',
+      },
+      toolManifestPath: {
+        type: 'string',
+        label: 'Tool Manifest Path',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description: 'Path to the tool manifest.',
+      },
+    },
   },
   allowMCPServers: {
     type: 'array',
@@ -376,6 +533,35 @@ export const SETTINGS_SCHEMA = {
     default: undefined as TelemetrySettings | undefined,
     description: 'Telemetry configuration.',
     showInDialog: false,
+    properties: {
+      gcpProjectId: {
+        type: 'string',
+        label: 'GCP Project ID',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description: 'Google Cloud Project ID for telemetry.',
+        showInDialog: false,
+      },
+      bigqueryDataset: {
+        type: 'string',
+        label: 'BigQuery Dataset',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description: 'BigQuery dataset for telemetry.',
+        showInDialog: false,
+      },
+      bigqueryTable: {
+        type: 'string',
+        label: 'BigQuery Table',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description: 'BigQuery table for telemetry.',
+        showInDialog: false,
+      },
+    },
   },
   bugCommand: {
     type: 'object',
@@ -385,6 +571,26 @@ export const SETTINGS_SCHEMA = {
     default: undefined as BugCommandSettings | undefined,
     description: 'Configuration for the bug report command.',
     showInDialog: false,
+    properties: {
+      command: {
+        type: 'string',
+        label: 'Command',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: undefined as string | undefined,
+        description: 'The command to run to file a bug report.',
+        showInDialog: false,
+      },
+      template: {
+        type: 'string',
+        label: 'Template',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: undefined as string | undefined,
+        description: 'The template to use for the bug report.',
+        showInDialog: false,
+      },
+    },
   },
   summarizeToolOutput: {
     type: 'object',
@@ -394,6 +600,16 @@ export const SETTINGS_SCHEMA = {
     default: undefined as Record<string, { tokenBudget?: number }> | undefined,
     description: 'Settings for summarizing tool output.',
     showInDialog: false,
+    valueSchema: {
+      tokenBudget: {
+        type: 'number',
+        label: 'Token Budget',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: undefined as number | undefined,
+        description: 'The token budget for summarizing tool output.',
+      },
+    },
   },
 
   dnsResolutionOrder: {
@@ -485,6 +701,18 @@ export const SETTINGS_SCHEMA = {
     default: undefined as ChatCompressionSettings | undefined,
     description: 'Chat compression settings.',
     showInDialog: false,
+    properties: {
+      contextPercentageThreshold: {
+        type: 'number',
+        label: 'Context Percentage Threshold',
+        category: 'General',
+        requiresRestart: false,
+        default: undefined as number | undefined,
+        description:
+          'The threshold at which to start compressing chat history.',
+        showInDialog: false,
+      },
+    },
   },
   showLineNumbers: {
     type: 'boolean',
@@ -499,7 +727,7 @@ export const SETTINGS_SCHEMA = {
 
 type InferSettings<T extends SettingsSchema> = {
   -readonly [K in keyof T]?: T[K] extends { properties: SettingsSchema }
-    ? InferSettings<T[K]['properties']>
+    ? InferSettings<T[K]['properties']> & T[K]['default']
     : T[K]['default'] extends boolean
       ? boolean
       : T[K]['default'];
