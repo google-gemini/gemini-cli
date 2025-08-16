@@ -225,6 +225,18 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
           <StatRow title="Success Rate:">
             <Text color={successColor}>{computed.successRate.toFixed(1)}%</Text>
           </StatRow>
+          {(computed.totalLinesAdded > 0 || computed.totalLinesRemoved > 0) && (
+            <StatRow title="Code Changes:">
+              <Text>
+                <Text color={theme.status.success}>
+                  +{computed.totalLinesAdded}
+                </Text>{' '}
+                <Text color={theme.status.error}>
+                  -{computed.totalLinesRemoved}
+                </Text>
+              </Text>
+            </StatRow>
+          )}
           {computed.totalDecisions > 0 && (
             <StatRow title="User Agreement:">
               <Text color={agreementColor}>

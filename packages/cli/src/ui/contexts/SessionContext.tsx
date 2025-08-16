@@ -44,6 +44,8 @@ export interface ComputedSessionStats {
   agreementRate: number;
   totalCachedTokens: number;
   totalPromptTokens: number;
+  totalLinesAdded: number;
+  totalLinesRemoved: number;
 }
 
 // Defines the final "value" of our context, including the state
