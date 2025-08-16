@@ -567,5 +567,30 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(paramsWithoutTelemetry);
       expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
     });
+
+    it('should return provided OTLP protocol', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true, otlpProtocol: 'http' },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryOtlpProtocol()).toBe('http');
+    });
+
+    it('should return default OTLP protocol if not provided', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
+    });
+
+    it('should return default OTLP protocol if telemetry object is not provided', () => {
+      const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
+      delete paramsWithoutTelemetry.telemetry;
+      const config = new Config(paramsWithoutTelemetry);
+      expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
+    });
   });
 });

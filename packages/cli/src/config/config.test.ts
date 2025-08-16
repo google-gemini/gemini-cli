@@ -536,6 +536,60 @@ describe('loadCliConfig telemetry', () => {
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getTelemetryLogPromptsEnabled()).toBe(true);
   });
+
+  it('should use telemetry OTLP protocol from settings if CLI flag is not present', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      telemetry: { otlpProtocol: 'http' },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getTelemetryOtlpProtocol()).toBe('http');
+  });
+
+  it('should prioritize --telemetry-otlp-protocol CLI flag over settings', async () => {
+    process.argv = ['node', 'script.js', '--telemetry-otlp-protocol', 'http'];
+    const argv = await parseArguments();
+    const settings: Settings = {
+      telemetry: { otlpProtocol: 'grpc' },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getTelemetryOtlpProtocol()).toBe('http');
+  });
+
+  it('should use default protocol if no OTLP protocol is provided via CLI or settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = { telemetry: { enabled: true } };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
+  });
+
+  it('should reject invalid --telemetry-otlp-protocol values', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--telemetry-otlp-protocol',
+      'invalid',
+    ];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments()).rejects.toThrow('process.exit called');
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid values:'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
 });
 
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
