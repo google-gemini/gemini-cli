@@ -398,9 +398,11 @@ class GrepToolInvocation extends BaseToolInvocation<
         const grepArgs = ['-r', '-n', '-H', '-E'];
         // Extract directory names from exclusion patterns for grep --exclude-dir
         const globExcludes = this.fileExclusions.getGlobExcludes();
-        const commonExcludes = globExcludes.map((pattern) =>
-          pattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, ''),
-        );
+        const commonExcludes = globExcludes
+          .filter((pattern) => !pattern.includes('*.'))
+          .map((pattern) =>
+            pattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, ''),
+          );
         commonExcludes.forEach((dir) => grepArgs.push(`--exclude-dir=${dir}`));
         if (include) {
           grepArgs.push(`--include=${include}`);

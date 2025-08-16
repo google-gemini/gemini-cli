@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import path from 'path';
 import { Config } from '../config/config.js';
 import { getCurrentGeminiMdFilename } from '../tools/memoryTool.js';
 
@@ -230,14 +231,20 @@ export function extractExtensionsFromPatterns(patterns: string[]): string[] {
             .map((ext) => `.${ext.trim()}`)
             .filter((ext) => ext !== '.');
         }
-        // Handle simple extension e.g. `**/*.zip`
+        // Handle simple/compound/dotfile extensions
         if (
           extPart.startsWith('.') &&
           !extPart.includes('/') &&
           !extPart.includes('{') &&
           !extPart.includes('}')
         ) {
-          return [extPart];
+          // Using path.extname on a dummy file handles various cases like
+          // '.tar.gz' -> '.gz' and '.profile' -> '.profile' correctly.
+          const extracted = path.extname(`dummy${extPart}`);
+          // If extname returns empty (e.g. for '.'), use the original part.
+          // Then filter out empty or '.' results.
+          const result = extracted || extPart;
+          return result && result !== '.' ? [result] : [];
         }
         return [];
       }),
