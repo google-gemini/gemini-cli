@@ -221,7 +221,7 @@ export function extractExtensionsFromPatterns(patterns: string[]): string[] {
     patterns
       .filter((pattern) => pattern.includes('*.'))
       .flatMap((pattern) => {
-        const extPart = pattern.substring(pattern.lastIndexOf('*') + 1);
+        const extPart = pattern.substring(pattern.lastIndexOf('*.') + 1);
         // Handle brace expansion e.g. `**/*.{jpg,png}`
         if (extPart.startsWith('.{') && extPart.endsWith('}')) {
           const inner = extPart.slice(2, -1); // get 'jpg,png'

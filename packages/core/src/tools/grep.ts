@@ -21,6 +21,7 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { Config } from '../config/config.js';
+import { FileExclusions } from '../utils/ignorePatterns.js';
 import { COMMON_IGNORE_PATTERNS } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
 
@@ -59,11 +60,14 @@ class GrepToolInvocation extends BaseToolInvocation<
   GrepToolParams,
   ToolResult
 > {
+  private readonly fileExclusions: FileExclusions;
+
   constructor(
     private readonly config: Config,
     params: GrepToolParams,
   ) {
     super(params);
+    this.fileExclusions = new FileExclusions(config);
   }
 
   /**
@@ -392,8 +396,9 @@ class GrepToolInvocation extends BaseToolInvocation<
       if (grepAvailable) {
         strategyUsed = 'system grep';
         const grepArgs = ['-r', '-n', '-H', '-E'];
-        // Extract directory names from glob patterns for grep --exclude-dir
-        const commonExcludes = COMMON_IGNORE_PATTERNS.map((pattern) =>
+        // Extract directory names from exclusion patterns for grep --exclude-dir
+        const globExcludes = this.fileExclusions.getGlobExcludes();
+        const commonExcludes = globExcludes.map((pattern) =>
           pattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, ''),
         );
         commonExcludes.forEach((dir) => grepArgs.push(`--exclude-dir=${dir}`));
@@ -478,7 +483,11 @@ class GrepToolInvocation extends BaseToolInvocation<
       );
       strategyUsed = 'javascript fallback';
       const globPattern = include ? include : '**/*';
-      const ignorePatterns = [...COMMON_IGNORE_PATTERNS, '.svn/**', '.hg/**']; // Use glob patterns for ignores here
+      const ignorePatterns = [
+        ...this.fileExclusions.getGlobExcludes(),
+        '.svn/**',
+        '.hg/**',
+      ]; // Use glob patterns for ignores here
 
       const filesStream = globStream(globPattern, {
         cwd: absolutePath,
