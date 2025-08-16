@@ -411,10 +411,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
             // Only consider patterns that are likely directories. This filters out file patterns.
             if (dir && !dir.includes('/') && !dir.includes('*')) {
-              // Only consider patterns that are likely directories. This filters out file patterns.
-              if (dir && !dir.includes('/') && !dir.includes('*')) {
-                return dir;
-              }
+              return dir;
             }
             return null;
           })
