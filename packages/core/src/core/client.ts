@@ -93,10 +93,7 @@ export class GeminiClient {
   private chat?: GeminiChat;
   private contentGenerator?: ContentGenerator;
   private embeddingModel: string;
-  private generateContentConfig: GenerateContentConfig = {
-    temperature: 0,
-    topP: 1,
-  };
+  private generateContentConfig: GenerateContentConfig;
   private sessionTurnCount = 0;
   private readonly MAX_TURNS = 100;
   /**
@@ -123,6 +120,16 @@ export class GeminiClient {
     this.embeddingModel = config.getEmbeddingModel();
     this.loopDetector = new LoopDetectionService(config);
     this.lastPromptId = this.config.getSessionId();
+
+    // Initialize generation config from Config or use defaults
+    const configGenerationConfig = config.getGenerationConfig();
+    this.generateContentConfig = {
+      temperature: configGenerationConfig?.temperature ?? 0,
+      topP: 1, // Keep default topP as 1
+      ...(configGenerationConfig?.topK !== undefined && {
+        topK: configGenerationConfig.topK,
+      }),
+    };
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
@@ -235,6 +242,7 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
+      const configGenerationConfig = this.config.getGenerationConfig();
       const generateContentConfigWithThinking = isThinkingSupported(
         this.config.getModel(),
       )
@@ -242,6 +250,9 @@ export class GeminiClient {
             ...this.generateContentConfig,
             thinkingConfig: {
               includeThoughts: true,
+              ...(configGenerationConfig?.thinking_budget !== undefined && {
+                thinkingBudget: configGenerationConfig.thinking_budget,
+              }),
             },
           }
         : this.generateContentConfig;

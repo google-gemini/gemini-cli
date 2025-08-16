@@ -199,6 +199,11 @@ export interface ConfigParameters {
   chatCompression?: ChatCompressionSettings;
   interactive?: boolean;
   trustedFolder?: boolean;
+  generationConfig?: {
+    temperature?: number;
+    topK?: number;
+    thinking_budget?: number;
+  };
 }
 
 export class Config {
@@ -264,6 +269,13 @@ export class Config {
   private readonly interactive: boolean;
   private readonly trustedFolder: boolean | undefined;
   private initialized: boolean = false;
+  private readonly generationConfig:
+    | {
+        temperature?: number;
+        topK?: number;
+        thinking_budget?: number;
+      }
+    | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -329,6 +341,7 @@ export class Config {
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
+    this.generationConfig = params.generationConfig;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -709,6 +722,16 @@ export class Config {
 
   isInteractive(): boolean {
     return this.interactive;
+  }
+
+  getGenerationConfig():
+    | {
+        temperature?: number;
+        topK?: number;
+        thinking_budget?: number;
+      }
+    | undefined {
+    return this.generationConfig;
   }
 
   async getGitService(): Promise<GitService> {

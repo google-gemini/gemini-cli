@@ -308,6 +308,79 @@ export async function loadHierarchicalGeminiMemory(
   );
 }
 
+/**
+ * Parse and validate generation config from environment variables
+ */
+function parseGenerationConfigFromEnv():
+  | {
+      temperature?: number;
+      topK?: number;
+      thinking_budget?: number;
+    }
+  | undefined {
+  const config: {
+    temperature?: number;
+    topK?: number;
+    thinking_budget?: number;
+  } = {};
+
+  // Parse temperature from env var
+  if (
+    process.env.GEMINI_TEMPERATURE !== undefined &&
+    process.env.GEMINI_TEMPERATURE !== ''
+  ) {
+    const temp = parseFloat(process.env.GEMINI_TEMPERATURE);
+    if (!isNaN(temp) && temp >= 0 && temp <= 2.0) {
+      config.temperature = temp;
+    } else {
+      logger.warn(
+        `Invalid GEMINI_TEMPERATURE value: ${process.env.GEMINI_TEMPERATURE}. Must be between 0.0 and 2.0`,
+      );
+    }
+  }
+
+  // Parse topK from env var
+  if (
+    process.env.GEMINI_TOP_K !== undefined &&
+    process.env.GEMINI_TOP_K !== ''
+  ) {
+    const topK = parseInt(process.env.GEMINI_TOP_K, 10);
+    if (!isNaN(topK) && topK > 0) {
+      config.topK = topK;
+    } else {
+      logger.warn(
+        `Invalid GEMINI_TOP_K value: ${process.env.GEMINI_TOP_K}. Must be a positive integer`,
+      );
+    }
+  }
+
+  // Parse thinking_budget from env var
+  if (
+    process.env.GEMINI_THINKING_BUDGET !== undefined &&
+    process.env.GEMINI_THINKING_BUDGET !== ''
+  ) {
+    const budget = parseInt(process.env.GEMINI_THINKING_BUDGET, 10);
+    if (!isNaN(budget) && budget >= 0) {
+      config.thinking_budget = budget;
+    } else {
+      logger.warn(
+        `Invalid GEMINI_THINKING_BUDGET value: ${process.env.GEMINI_THINKING_BUDGET}. Must be a non-negative integer`,
+      );
+    }
+  }
+
+  // Return undefined if no config values are set
+  if (
+    config.temperature === undefined &&
+    config.topK === undefined &&
+    config.thinking_budget === undefined
+  ) {
+    return undefined;
+  }
+
+  return config;
+}
+
 export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
@@ -463,6 +536,7 @@ export async function loadCliConfig(
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
+  const generationConfig = parseGenerationConfigFromEnv();
 
   return new Config({
     sessionId,
@@ -525,6 +599,7 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
     model: argv.model || settings.model || DEFAULT_GEMINI_MODEL,
+    ...(generationConfig && { generationConfig }),
     extensionContextFilePaths,
     maxSessionTurns: settings.maxSessionTurns ?? -1,
     experimentalZedIntegration: argv.experimentalAcp || false,
