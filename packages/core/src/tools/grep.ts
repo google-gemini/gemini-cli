@@ -281,7 +281,6 @@ class GrepToolInvocation extends BaseToolInvocation<
 
   /**
    * Gets a description of the grep operation
-   * @param params Parameters for the grep operation
    * @returns A string describing the grep
    */
   getDescription(): string {
@@ -394,7 +393,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         // Extract directory names from exclusion patterns for grep --exclude-dir
         const globExcludes = this.fileExclusions.getGlobExcludes();
         const commonExcludes = globExcludes
-          .filter((pattern) => !pattern.includes('*.'))
+          .filter((pattern) => pattern.endsWith('/**'))
           .map((pattern) =>
             pattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, ''),
           );
