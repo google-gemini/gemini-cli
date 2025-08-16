@@ -211,7 +211,10 @@ function extractExtensionsFromPatterns(patterns: string[]): string[] {
  * Additional extensions not covered by the patterns are included for completeness.
  */
 export const BINARY_EXTENSIONS: string[] = [
-  ...extractExtensionsFromPatterns(BINARY_FILE_PATTERNS),
+  ...extractExtensionsFromPatterns([
+    ...BINARY_FILE_PATTERNS,
+    ...PYTHON_EXCLUDES,
+  ]),
   // Additional binary extensions not in the main patterns
   '.dat',
   '.obj',
