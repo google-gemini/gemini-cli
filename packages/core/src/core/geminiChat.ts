@@ -16,7 +16,8 @@ import {
   Part,
   Tool,
 } from '@google/genai';
-import { retryWithBackoff } from '../utils/retry.js';
+import { retryWithBackoff, retryWithEnhancedBackoff } from '../utils/retry.js';
+import { ApiRetryClient } from '../utils/apiRetryClient.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { ContentGenerator, AuthType } from './contentGenerator.js';
 import { Config } from '../config/config.js';
@@ -244,7 +245,6 @@ export class GeminiChat {
         },
         onPersistent429: async (authType?: string, error?: unknown) =>
           await this.handleFlashFallback(authType, error),
-        authType: this.config.getContentGeneratorConfig()?.authType,
       });
 
       this.sendPromise = (async () => {
@@ -332,11 +332,13 @@ export class GeminiChat {
         );
       };
 
-      // Note: Retrying streams can be complex. If generateContentStream itself doesn't handle retries
-      // for transient issues internally before yielding the async generator, this retry will re-initiate
-      // the stream. For simple 429/500 errors on initial call, this is fine.
-      // If errors occur mid-stream, this setup won't resume the stream; it will restart it.
-      const streamResponse = await retryWithBackoff(apiCall, {
+      // Use enhanced retry logic for better error handling and consistent UX
+      const streamResponse = await retryWithEnhancedBackoff(apiCall, {
+        maxAttempts: 5,
+        initialDelayMs: 1000,
+        maxDelayMs: 30000,
+        operation: `STREAM_${this.config.getModel()}`,
+        authType: this.config.getContentGeneratorConfig()?.authType,
         shouldRetry: (error: unknown) => {
           // Check for known error messages and codes.
           if (error instanceof Error && error.message) {
@@ -348,7 +350,6 @@ export class GeminiChat {
         },
         onPersistent429: async (authType?: string, error?: unknown) =>
           await this.handleFlashFallback(authType, error),
-        authType: this.config.getContentGeneratorConfig()?.authType,
       });
 
       // Resolve the internal tracking of send completion promise - `sendPromise`
