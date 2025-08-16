@@ -429,6 +429,7 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
   }
 }
 
-export function resetOauthClient() {
+// Helper to ensure test isolation
+export function resetOauthClientForTesting() {
   oauthClientPromises.clear();
 }
