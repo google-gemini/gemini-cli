@@ -28,13 +28,49 @@ describe('OAuthUtils', () => {
   });
 
   describe('buildWellKnownUrls', () => {
-    it('should build correct well-known URLs', () => {
-      const urls = OAuthUtils.buildWellKnownUrls('https://example.com/path');
+    it('should build standard root-based URLs by default', () => {
+      const urls = OAuthUtils.buildWellKnownUrls('https://example.com/mcp');
       expect(urls.protectedResource).toBe(
         'https://example.com/.well-known/oauth-protected-resource',
       );
       expect(urls.authorizationServer).toBe(
         'https://example.com/.well-known/oauth-authorization-server',
+      );
+    });
+
+    it('should build path-based URLs when includePathSuffix is true', () => {
+      const urls = OAuthUtils.buildWellKnownUrls(
+        'https://example.com/mcp',
+        true,
+      );
+      expect(urls.protectedResource).toBe(
+        'https://example.com/.well-known/oauth-protected-resource/mcp',
+      );
+      expect(urls.authorizationServer).toBe(
+        'https://example.com/.well-known/oauth-authorization-server/mcp',
+      );
+    });
+
+    it('should handle root path correctly', () => {
+      const urls = OAuthUtils.buildWellKnownUrls('https://example.com', true);
+      expect(urls.protectedResource).toBe(
+        'https://example.com/.well-known/oauth-protected-resource',
+      );
+      expect(urls.authorizationServer).toBe(
+        'https://example.com/.well-known/oauth-authorization-server',
+      );
+    });
+
+    it('should handle trailing slash in path', () => {
+      const urls = OAuthUtils.buildWellKnownUrls(
+        'https://example.com/mcp/',
+        true,
+      );
+      expect(urls.protectedResource).toBe(
+        'https://example.com/.well-known/oauth-protected-resource/mcp',
+      );
+      expect(urls.authorizationServer).toBe(
+        'https://example.com/.well-known/oauth-authorization-server/mcp',
       );
     });
   });
@@ -140,7 +176,7 @@ describe('OAuthUtils', () => {
   describe('parseWWWAuthenticateHeader', () => {
     it('should parse resource metadata URI from WWW-Authenticate header', () => {
       const header =
-        'Bearer realm="example", resource_metadata_uri="https://example.com/.well-known/oauth-protected-resource"';
+        'Bearer realm="example", resource_metadata="https://example.com/.well-known/oauth-protected-resource"';
       const result = OAuthUtils.parseWWWAuthenticateHeader(header);
       expect(result).toBe(
         'https://example.com/.well-known/oauth-protected-resource',

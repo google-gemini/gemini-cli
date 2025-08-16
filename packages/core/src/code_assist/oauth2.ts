@@ -66,7 +66,9 @@ export interface OauthWebLogin {
   loginCompletePromise: Promise<void>;
 }
 
-export async function getOauthClient(
+const oauthClientPromises = new Map<AuthType, Promise<OAuth2Client>>();
+
+async function initOauthClient(
   authType: AuthType,
   config: Config,
 ): Promise<OAuth2Client> {
@@ -77,6 +79,17 @@ export async function getOauthClient(
       proxy: config.getProxy(),
     },
   });
+
+  if (
+    process.env.GOOGLE_GENAI_USE_GCA &&
+    process.env.GOOGLE_CLOUD_ACCESS_TOKEN
+  ) {
+    client.setCredentials({
+      access_token: process.env.GOOGLE_CLOUD_ACCESS_TOKEN,
+    });
+    await fetchAndCacheUserInfo(client);
+    return client;
+  }
 
   client.on('tokens', async (tokens: Credentials) => {
     await cacheCredentials(tokens);
@@ -174,6 +187,16 @@ export async function getOauthClient(
   }
 
   return client;
+}
+
+export async function getOauthClient(
+  authType: AuthType,
+  config: Config,
+): Promise<OAuth2Client> {
+  if (!oauthClientPromises.has(authType)) {
+    oauthClientPromises.set(authType, initOauthClient(authType, config));
+  }
+  return oauthClientPromises.get(authType)!;
 }
 
 async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
@@ -355,7 +378,7 @@ async function cacheCredentials(credentials: Credentials) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 
   const credString = JSON.stringify(credentials, null, 2);
-  await fs.writeFile(filePath, credString);
+  await fs.writeFile(filePath, credString, { mode: 0o600 });
 }
 
 function getCachedCredentialPath(): string {
@@ -404,4 +427,9 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
   } catch (error) {
     console.error('Error retrieving user info:', error);
   }
+}
+
+// Helper to ensure test isolation
+export function resetOauthClientForTesting() {
+  oauthClientPromises.clear();
 }
