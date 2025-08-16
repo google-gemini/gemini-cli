@@ -378,7 +378,7 @@ export class TestRig {
             ) {
               return true;
             }
-          } catch (e) {
+          } catch {
             // ignore
           }
         }
@@ -665,10 +665,7 @@ export class TestRig {
       } catch (e) {
         // Skip objects that aren't valid JSON
         if (env.VERBOSE === 'true') {
-          console.error(
-            'Failed to parse telemetry object:',
-            (e as Error).message,
-          );
+          console.error('Failed to parse telemetry object:', e);
         }
       }
     }
@@ -676,7 +673,7 @@ export class TestRig {
     return logs;
   }
 
-  readLastApiRequest(): any {
+  readLastApiRequest(): Record<string, unknown> | null {
     // Telemetry is always written to the test directory
     const logFilePath = join(this.testDir!, 'telemetry.log');
 
@@ -705,7 +702,7 @@ export class TestRig {
         ) {
           lastApiRequest = logData;
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     }

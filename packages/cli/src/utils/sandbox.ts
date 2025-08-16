@@ -114,7 +114,7 @@ function ports(): string[] {
     .map((p) => p.trim());
 }
 
-function entrypoint(workdir: string): string[] {
+function entrypoint(workdir: string, stdinData?: string): string[] {
   const isWindows = os.platform() === 'win32';
   const containerWorkdir = getContainerPath(workdir);
   const shellCmds = [];
@@ -166,7 +166,16 @@ function entrypoint(workdir: string): string[] {
     ),
   );
 
-  const cliArgs = process.argv.slice(2).map((arg) => quote([arg]));
+  const cliArgs = process.argv.slice(2);
+  if (stdinData) {
+    const promptIndex = cliArgs.findIndex(
+      (arg) => arg === '--prompt' || arg === '-p',
+    );
+    if (promptIndex > -1 && cliArgs.length > promptIndex + 1) {
+      cliArgs[promptIndex + 1] = `${stdinData}\n\n${cliArgs[promptIndex + 1]}`;
+    }
+  }
+  const quotedCliArgs = cliArgs.map((arg) => quote([arg]));
   const cliCmd =
     process.env.NODE_ENV === 'development'
       ? process.env.DEBUG
@@ -176,8 +185,7 @@ function entrypoint(workdir: string): string[] {
         ? `node --inspect-brk=0.0.0.0:${process.env.DEBUG_PORT || '9229'} $(which gemini)`
         : 'gemini';
 
-  const args = [...shellCmds, cliCmd, ...cliArgs];
-
+  const args = [...shellCmds, cliCmd, ...quotedCliArgs];
   return ['bash', '-c', args.join(' ')];
 }
 
@@ -185,6 +193,7 @@ export async function start_sandbox(
   config: SandboxConfig,
   nodeArgs: string[] = [],
   cliConfig?: Config,
+  stdinData?: string,
 ) {
   const patcher = new ConsolePatcher({
     debugMode: cliConfig?.getDebugMode() || !!process.env.DEBUG,
@@ -263,6 +272,17 @@ export async function start_sandbox(
         args.push('-D', `INCLUDE_DIR_${i}=${dirPath}`);
       }
 
+      const finalArgv = [...process.argv];
+      if (stdinData) {
+        const promptIndex = finalArgv.findIndex(
+          (arg) => arg === '--prompt' || arg === '-p',
+        );
+        if (promptIndex > -1 && finalArgv.length > promptIndex + 1) {
+          finalArgv[promptIndex + 1] =
+            `${stdinData}\n\n${finalArgv[promptIndex + 1]}`;
+        }
+      }
+
       args.push(
         '-f',
         profileFile,
@@ -271,7 +291,7 @@ export async function start_sandbox(
         [
           `SANDBOX=sandbox-exec`,
           `NODE_OPTIONS="${nodeOptions}"`,
-          ...process.argv.map((arg) => quote([arg])),
+          ...finalArgv.map((arg) => quote([arg])),
         ].join(' '),
       );
       // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
@@ -690,7 +710,7 @@ export async function start_sandbox(
     // Determine if the current user's UID/GID should be passed to the sandbox.
     // See shouldUseCurrentUserInSandbox for more details.
     let userFlag = '';
-    const finalEntrypoint = entrypoint(workdir);
+    const finalEntrypoint = entrypoint(workdir, stdinData);
 
     if (process.env.GEMINI_CLI_INTEGRATION_TEST === 'true') {
       args.push('--user', 'root');

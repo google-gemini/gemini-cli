@@ -231,10 +231,15 @@ export async function main() {
           process.exit(1);
         }
       }
-      await start_sandbox(sandboxConfig, memoryArgs, config);
-      process.exit(0);
-    } else {
-      // Not in a sandbox and not entering one, so relaunch with additional
+      let stdinData = '';
+      if (!process.stdin.isTTY) {
+        stdinData = await readStdin();
+      }
+        
+      await start_sandbox(sandboxConfig, memoryArgs, config, stdinData);
+        process.exit(0);
+      } else {
+        // Not in a sandbox and not entering one, so relaunch with additional
       // arguments to control memory usage if needed.
       if (memoryArgs.length > 0) {
         await relaunchWithAdditionalArgs(memoryArgs);
