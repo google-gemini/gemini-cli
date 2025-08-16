@@ -217,6 +217,13 @@ vi.mock('./hooks/useLogger', () => ({
   })),
 }));
 
+vi.mock('./hooks/useShellHistory', () => ({
+  useShellHistory: vi.fn(() => ({
+    history: [],
+    push: vi.fn(),
+  })),
+}));
+
 vi.mock('./hooks/useConsoleMessages.js', () => ({
   useConsoleMessages: vi.fn(() => ({
     consoleMessages: [],
