@@ -19,29 +19,61 @@ import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
 
+function resolvePathFromEnv(envVar?: string): { isSwitch: boolean, value: string | null } {
+  // Handle the case where the environment variable is not set at all.
+  if (!envVar) return { isSwitch: false, value: null };
+
+  const lowerEnvVar = envVar.toLowerCase();
+  // Check if the input is a common boolean-like string.
+  if (['0', 'false', '1', 'true'].includes(lowerEnvVar)) {
+    // If so, identify it as a "switch" and return its value.
+    return { isSwitch: true, value: lowerEnvVar };
+  }
+
+  // If it's not a switch, treat it as a potential file path.
+  let customPath = envVar;
+  // Expand the tilde (~) character to the user's home directory.
+  if (customPath.startsWith('~/') || customPath === '~') {
+    try {
+      const home = os.homedir();
+      if (customPath === '~') {
+        customPath = home;
+      } else {
+        customPath = path.join(home, customPath.slice(2));
+      }
+    } catch (e) {
+      throw new Error(`Could not resolve home directory for path: ${envVar}`, { cause: e });
+    }
+  }
+
+  // Return it as a non-switch with the fully resolved absolute path.
+  return { isSwitch: false, value: path.resolve(customPath) };
+}
+
 export function getCoreSystemPrompt(userMemory?: string): string {
-  // if GEMINI_SYSTEM_MD is set (and not 0|false), override system prompt from file
-  // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD
+  // A flag to indicate whether the system prompt override is active.
   let systemMdEnabled = false;
+  // The default path for the system prompt file. This can be overridden.
   let systemMdPath = path.resolve(path.join(GEMINI_CONFIG_DIR, 'system.md'));
-  const systemMdVar = process.env.GEMINI_SYSTEM_MD;
-  if (systemMdVar) {
-    const systemMdVarLower = systemMdVar.toLowerCase();
-    if (!['0', 'false'].includes(systemMdVarLower)) {
-      systemMdEnabled = true; // enable system prompt override
-      if (!['1', 'true'].includes(systemMdVarLower)) {
-        let customPath = systemMdVar;
-        if (customPath.startsWith('~/')) {
-          customPath = path.join(os.homedir(), customPath.slice(2));
-        } else if (customPath === '~') {
-          customPath = os.homedir();
-        }
-        systemMdPath = path.resolve(customPath); // use custom path from GEMINI_SYSTEM_MD
-      }
-      // require file to exist when override is enabled
-      if (!fs.existsSync(systemMdPath)) {
-        throw new Error(`missing system prompt file '${systemMdPath}'`);
-      }
+
+  // Resolve the environment variable to get either a path or a switch value.
+  const systemMdResolution = resolvePathFromEnv(process.env.GEMINI_SYSTEM_MD);
+
+  // Proceed only if the environment variable is set and is not a "disable" value ('0' or 'false').
+  if (systemMdResolution.value && !['0', 'false'].includes(systemMdResolution.value)) {
+    // Since the feature is enabled, set the flag to true.
+    systemMdEnabled = true;
+
+    // If 'isSwitch' is false, the user provided a custom path.
+    // We update systemMdPath to this new custom path.
+    if (!systemMdResolution.isSwitch) {
+      systemMdPath = systemMdResolution.value;
+    }
+
+    // CRITICAL: If the override feature is enabled, the specified file MUST exist.
+    // This prevents the application from failing silently if the path is wrong.
+    if (!fs.existsSync(systemMdPath)) {
+      throw new Error(`missing system prompt file '${systemMdPath}'`);
     }
   }
   const basePrompt = systemMdEnabled
@@ -266,25 +298,25 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
 `.trim();
 
   // if GEMINI_WRITE_SYSTEM_MD is set (and not 0|false), write base system prompt to file
-  const writeSystemMdVar = process.env.GEMINI_WRITE_SYSTEM_MD;
-  if (writeSystemMdVar) {
-    const writeSystemMdVarLower = writeSystemMdVar.toLowerCase();
-    if (!['0', 'false'].includes(writeSystemMdVarLower)) {
-      if (['1', 'true'].includes(writeSystemMdVarLower)) {
-        fs.mkdirSync(path.dirname(systemMdPath), { recursive: true });
-        fs.writeFileSync(systemMdPath, basePrompt); // write to default path, can be modified via GEMINI_SYSTEM_MD
-      } else {
-        let customPath = writeSystemMdVar;
-        if (customPath.startsWith('~/')) {
-          customPath = path.join(os.homedir(), customPath.slice(2));
-        } else if (customPath === '~') {
-          customPath = os.homedir();
-        }
-        const resolvedPath = path.resolve(customPath);
-        fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
-        fs.writeFileSync(resolvedPath, basePrompt); // write to custom path from GEMINI_WRITE_SYSTEM_MD
-      }
-    }
+  const writeSystemMdResolution = resolvePathFromEnv(process.env.GEMINI_WRITE_SYSTEM_MD);
+
+  // Check if the feature is enabled. This proceeds only if the environment
+  // variable is set and is not explicitly '0' or 'false'.
+  if (writeSystemMdResolution.value && !['0', 'false'].includes(writeSystemMdResolution.value)) {
+    // Determine the final path to write the file to.
+    // If 'isSwitch' is true, the user just enabled the feature (e.g., with '1'),
+    // so we use the default system path determined earlier.
+    // Otherwise, the user provided a specific custom path, which we use directly.
+    const writePath = writeSystemMdResolution.isSwitch
+      ? systemMdPath
+      : writeSystemMdResolution.value;
+
+    // Ensure the directory for the target file exists before writing.
+    // The { recursive: true } option prevents errors if the directory already exists.
+    fs.mkdirSync(path.dirname(writePath), { recursive: true });
+
+    // Write the generated base prompt content to the final resolved path.
+    fs.writeFileSync(writePath, basePrompt);
   }
 
   const memorySuffix =
