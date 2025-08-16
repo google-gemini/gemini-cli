@@ -560,6 +560,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
     cancelOngoingRequest,
+    instructionQueue,
+    hasQueuedInstructions,
   } = useGeminiStream(
     config.getGeminiClient(),
     history,
@@ -582,7 +584,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
       if (trimmedValue.length > 0) {
-        submitQuery(trimmedValue);
+        // Enable queuing for user input when system is busy
+        submitQuery(trimmedValue, {
+          isContinuation: false,
+          allowQueuing: true,
+        });
       }
     },
     [submitQuery],
@@ -760,8 +766,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     fetchUserMessages();
   }, [history, logger]);
 
+  // Allow input at all times to support queuing, except during permission confirmations
   const isInputActive =
-    streamingState === StreamingState.Idle && !initError && !isProcessing;
+    !initError &&
+    !isProcessing &&
+    streamingState !== StreamingState.WaitingForConfirmation;
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -882,7 +891,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
   const placeholder = vimModeEnabled
     ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
-    : '  Type your message or @path/to/file';
+    : streamingState === StreamingState.Responding
+      ? '  Type to queue next instruction...'
+      : '  Type your message or @path/to/file';
 
   return (
     <StreamingContext.Provider value={streamingState}>
@@ -1156,6 +1167,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   focus={isFocused}
                   vimHandleInput={vimHandleInput}
                   placeholder={placeholder}
+                  instructionQueue={instructionQueue}
+                  hasQueuedInstructions={hasQueuedInstructions}
                 />
               )}
             </>

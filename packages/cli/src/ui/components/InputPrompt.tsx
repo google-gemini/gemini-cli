@@ -25,6 +25,7 @@ import {
   saveClipboardImage,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
+import { InstructionQueue } from '../types.js';
 import * as path from 'path';
 
 export interface InputPromptProps {
@@ -43,6 +44,8 @@ export interface InputPromptProps {
   setShellModeActive: (value: boolean) => void;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
+  instructionQueue?: InstructionQueue;
+  hasQueuedInstructions?: boolean;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -61,6 +64,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
   onEscapePromptChange,
   vimHandleInput,
+  instructionQueue,
+  hasQueuedInstructions,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [escPressCount, setEscPressCount] = useState(0);
@@ -630,6 +635,67 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           />
         </Box>
       )}
+      {instructionQueue &&
+        (instructionQueue.pending.length > 0 ||
+          instructionQueue.processing) && (
+          <Box
+            marginTop={1}
+            paddingX={1}
+            borderStyle="single"
+            borderColor={theme.border.default}
+          >
+            <Box flexDirection="column" paddingY={1}>
+              <Box marginBottom={1}>
+                <Text color={theme.text.accent}>⏳ Instruction Queue</Text>
+                <Text color={theme.text.secondary}>
+                  {' '}
+                  ({instructionQueue.pending.length} pending
+                  {instructionQueue.processing && ', 1 processing'})
+                </Text>
+              </Box>
+
+              {/* Show current processing instruction */}
+              {instructionQueue.processing && (
+                <Box marginBottom={instructionQueue.pending.length > 0 ? 1 : 0}>
+                  <Text color={theme.status.success}>▶ </Text>
+                  <Text color={theme.text.primary}>
+                    {instructionQueue.processing.content.length > 60
+                      ? `${instructionQueue.processing.content.substring(0, 60)}...`
+                      : instructionQueue.processing.content}
+                  </Text>
+                </Box>
+              )}
+
+              {/* Show pending instructions */}
+              {instructionQueue.pending
+                .slice(0, 3)
+                .map((instruction, index) => (
+                  <Box
+                    key={instruction.id}
+                    marginBottom={
+                      index < Math.min(instructionQueue.pending.length - 1, 2)
+                        ? 0.5
+                        : 0
+                    }
+                  >
+                    <Text color={theme.text.secondary}>{index + 1}. </Text>
+                    <Text color={theme.text.secondary}>
+                      {instruction.content.length > 60
+                        ? `${instruction.content.substring(0, 60)}...`
+                        : instruction.content}
+                    </Text>
+                  </Box>
+                ))}
+
+              {/* Show "and X more" if there are more than 3 pending */}
+              {instructionQueue.pending.length > 3 && (
+                <Text color={theme.text.secondary}>
+                  ... and {instructionQueue.pending.length - 3} more
+                </Text>
+              )}
+            </Box>
+          </Box>
+        )}
     </>
   );
 };

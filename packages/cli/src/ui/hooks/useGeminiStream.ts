@@ -55,6 +55,7 @@ import {
 } from './useReactToolScheduler.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
+import { useInstructionQueue } from './useInstructionQueue.js';
 
 export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
   const resultParts: PartListUnion = [];
@@ -106,6 +107,8 @@ export const useGeminiStream = (
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const logger = useLogger();
+  const instructionQueue = useInstructionQueue();
+  const isProcessingQueueRef = useRef(false);
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
       return;
@@ -618,15 +621,22 @@ export const useGeminiStream = (
   const submitQuery = useCallback(
     async (
       query: PartListUnion,
-      options?: { isContinuation: boolean },
+      options?: { isContinuation: boolean; allowQueuing?: boolean },
       prompt_id?: string,
     ) => {
+      // If currently busy and not a continuation, queue the instruction
       if (
         (streamingState === StreamingState.Responding ||
           streamingState === StreamingState.WaitingForConfirmation) &&
         !options?.isContinuation
-      )
-        return;
+      ) {
+        // Queue the instruction if allowQueuing is enabled and it's a string query
+        if (options?.allowQueuing && typeof query === 'string') {
+          const instructionId = instructionQueue.addInstruction(query);
+          return instructionId;
+        }
+        return undefined;
+      }
 
       const userMessageTimestamp = Date.now();
 
@@ -707,7 +717,17 @@ export const useGeminiStream = (
         }
       } finally {
         setIsResponding(false);
+
+        // Mark current instruction as complete if it was from the queue
+        if (!options?.isContinuation && instructionQueue.queue.processing) {
+          instructionQueue.markInstructionComplete();
+        }
+
+        // Reset processing flag to allow queue processing
+        isProcessingQueueRef.current = false;
       }
+
+      return undefined;
     },
     [
       streamingState,
@@ -724,6 +744,7 @@ export const useGeminiStream = (
       startNewPrompt,
       getPromptCount,
       handleLoopDetectedEvent,
+      instructionQueue,
     ],
   );
 
@@ -859,6 +880,30 @@ export const useGeminiStream = (
     ],
   );
 
+  // Effect to process queued instructions when streaming becomes idle
+  useEffect(() => {
+    const processQueue = async () => {
+      if (
+        streamingState === StreamingState.Idle &&
+        !isProcessingQueueRef.current &&
+        !isResponding
+      ) {
+        const nextInstruction = instructionQueue.getNextInstruction();
+        if (nextInstruction) {
+          isProcessingQueueRef.current = true;
+          instructionQueue.markInstructionProcessing(nextInstruction);
+
+          // Process the queued instruction
+          setTimeout(() => {
+            submitQuery(nextInstruction.content, { isContinuation: false });
+          }, 50);
+        }
+      }
+    };
+
+    processQueue();
+  }, [streamingState, isResponding, instructionQueue, addItem, submitQuery]);
+
   const pendingHistoryItems = [
     pendingHistoryItemRef.current,
     pendingToolCallGroupDisplay,
@@ -971,5 +1016,9 @@ export const useGeminiStream = (
     pendingHistoryItems,
     thought,
     cancelOngoingRequest,
+    instructionQueue: instructionQueue.queue,
+    addInstruction: instructionQueue.addInstruction,
+    clearInstructionQueue: instructionQueue.clearQueue,
+    hasQueuedInstructions: instructionQueue.hasQueuedInstructions,
   };
 };

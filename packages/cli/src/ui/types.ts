@@ -16,6 +16,18 @@ export enum StreamingState {
   WaitingForConfirmation = 'waiting_for_confirmation',
 }
 
+// New types for concurrent instruction handling
+export interface QueuedInstruction {
+  id: string;
+  content: string;
+  timestamp: number;
+}
+
+export interface InstructionQueue {
+  pending: QueuedInstruction[];
+  processing: QueuedInstruction | null;
+}
+
 // Copied from server/src/core/turn.ts for CLI usage
 export enum GeminiEventType {
   Content = 'content',
