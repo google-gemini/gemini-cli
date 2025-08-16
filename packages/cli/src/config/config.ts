@@ -73,6 +73,7 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
+  shellInheritEnv: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -228,6 +229,10 @@ export async function parseArguments(): Promise<CliArgs> {
           coerce: (dirs: string[]) =>
             // Handle comma-separated values
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
+        })
+        .option('shell-inherit-env', {
+          type: 'boolean',
+          description: 'Inherit environment variables in the shell tool.',
         })
         .check((argv) => {
           if (argv.prompt && argv.promptInteractive) {
@@ -539,6 +544,9 @@ export async function loadCliConfig(
     folderTrust,
     interactive,
     trustedFolder,
+    shell: {
+      inheritEnv: argv.shellInheritEnv ?? settings.shell?.inheritEnv ?? true,
+    },
   });
 }
 
