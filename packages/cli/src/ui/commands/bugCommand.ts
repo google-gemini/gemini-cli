@@ -6,15 +6,21 @@
 
 import open from 'open';
 import process from 'node:process';
-import { type CommandContext, type SlashCommand } from './types.js';
+import {
+  type CommandContext,
+  type SlashCommand,
+  CommandKind,
+} from './types.js';
 import { MessageType } from '../types.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
+import { sessionId } from '@google/gemini-cli-core';
 
 export const bugCommand: SlashCommand = {
   name: 'bug',
   description: 'submit a bug report',
+  kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const bugDescription = (args || '').trim();
     const { config } = context.services;
@@ -35,6 +41,7 @@ export const bugCommand: SlashCommand = {
     const info = `
 * **CLI Version:** ${cliVersion}
 * **Git Commit:** ${GIT_COMMIT_INFO}
+* **Session ID:** ${sessionId}
 * **Operating System:** ${osVersion}
 * **Sandbox Environment:** ${sandboxEnv}
 * **Model Version:** ${modelVersion}

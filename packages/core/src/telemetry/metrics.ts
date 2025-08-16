@@ -23,6 +23,7 @@ import {
   METRIC_FILE_OPERATION_COUNT,
 } from './constants.js';
 import { Config } from '../config/config.js';
+import { DiffStat } from '../tools/tools.js';
 
 export enum FileOperation {
   CREATE = 'create',
@@ -100,7 +101,7 @@ export function recordToolCallMetrics(
   functionName: string,
   durationMs: number,
   success: boolean,
-  decision?: 'accept' | 'reject' | 'modify',
+  decision?: 'accept' | 'reject' | 'modify' | 'auto_accept',
 ): void {
   if (!toolCallCounter || !toolCallLatencyHistogram || !isMetricsInitialized)
     return;
@@ -189,6 +190,7 @@ export function recordFileOperationMetric(
   lines?: number,
   mimetype?: string,
   extension?: string,
+  diffStat?: DiffStat,
 ): void {
   if (!fileOperationCounter || !isMetricsInitialized) return;
   const attributes: Attributes = {
@@ -198,5 +200,11 @@ export function recordFileOperationMetric(
   if (lines !== undefined) attributes.lines = lines;
   if (mimetype !== undefined) attributes.mimetype = mimetype;
   if (extension !== undefined) attributes.extension = extension;
+  if (diffStat !== undefined) {
+    attributes.ai_added_lines = diffStat.ai_added_lines;
+    attributes.ai_removed_lines = diffStat.ai_removed_lines;
+    attributes.user_added_lines = diffStat.user_added_lines;
+    attributes.user_removed_lines = diffStat.user_removed_lines;
+  }
   fileOperationCounter.add(1, attributes);
 }

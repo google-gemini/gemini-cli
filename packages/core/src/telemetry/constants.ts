@@ -13,6 +13,9 @@ export const EVENT_API_ERROR = 'gemini_cli.api_error';
 export const EVENT_API_RESPONSE = 'gemini_cli.api_response';
 export const EVENT_CLI_CONFIG = 'gemini_cli.config';
 export const EVENT_FLASH_FALLBACK = 'gemini_cli.flash_fallback';
+export const EVENT_NEXT_SPEAKER_CHECK = 'gemini_cli.next_speaker_check';
+export const EVENT_SLASH_COMMAND = 'gemini_cli.slash_command';
+export const EVENT_IDE_CONNECTION = 'gemini_cli.ide_connection';
 
 export const METRIC_TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
 export const METRIC_TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
