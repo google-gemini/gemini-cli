@@ -288,6 +288,20 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "showLineNumbers": false
     ```
 
+- **`thinkingConfig`** (object):
+  - **Description:** Configures the thinking behavior of the Gemini model during conversations. This controls whether the model's internal thought process is included in responses and the token budget allocated for thinking.
+  - **Default:** `{"includeThoughts": true}` (when thinking is enabled)
+  - **Properties:**
+    - **`includeThoughts`** (boolean, optional): Whether to include the model's thinking process in responses. If true, thoughts are returned only if the model supports thinking and thoughts are available.
+    - **`thinkingBudget`** (number, optional): The thinking budget in tokens. Use `0` to disable thinking, `-1` for automatic budget allocation, or specify a positive number for a custom token limit. Default values and allowed ranges are model-dependent.
+  - **Example:**
+    ```json
+    "thinkingConfig": {
+      "includeThoughts": false,
+      "thinkingBudget": 1000
+    }
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -322,7 +336,11 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   },
   "excludedProjectEnvVars": ["DEBUG", "DEBUG_MODE", "NODE_ENV"],
   "includeDirectories": ["path/to/dir1", "~/path/to/dir2", "../path/to/dir3"],
-  "loadMemoryFromIncludeDirectories": true
+  "loadMemoryFromIncludeDirectories": true,
+  "thinkingConfig": {
+    "includeThoughts": false,
+    "thinkingBudget": 1000
+  }
 }
 ```
 
