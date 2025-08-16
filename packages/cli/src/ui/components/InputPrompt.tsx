@@ -170,6 +170,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
 
+  const handleSubmitAndClearRef = useRef(handleSubmitAndClear);
+  useEffect(() => {
+    handleSubmitAndClearRef.current = handleSubmitAndClear;
+  }, [handleSubmitAndClear]);
+
   const customSetTextAndResetCompletionSignal = useCallback(
     (newText: string) => {
       buffer.setText(newText);
@@ -479,7 +484,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             }
             imeTimeoutRef.current = setTimeout(() => {
               try {
-                handleSubmitAndClear(bufferRef.current.text);
+                handleSubmitAndClearRef.current(bufferRef.current.text);
               } finally {
                 imeTimeoutRef.current = null;
               }
