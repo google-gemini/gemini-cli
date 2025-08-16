@@ -235,7 +235,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       customTheme.background?.diff?.added ?? customTheme.DiffAdded ?? '',
     DiffRemoved:
       customTheme.background?.diff?.removed ?? customTheme.DiffRemoved ?? '',
-    Comment: customTheme.text?.secondary ?? customTheme.Comment ?? '',
+    Comment: customTheme.ui?.comment ?? customTheme.Comment ?? '',
     Gray: customTheme.text?.secondary ?? customTheme.Gray ?? '',
     GradientColors: customTheme.ui?.gradient ?? customTheme.GradientColors,
   };
@@ -397,6 +397,8 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       focused: colors.AccentBlue,
     },
     ui: {
+      comment: colors.Comment,
+      symbol: colors.Gray,
       gradient: colors.GradientColors,
     },
     status: {

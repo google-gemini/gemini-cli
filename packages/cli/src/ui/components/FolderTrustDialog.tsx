@@ -6,7 +6,7 @@
 
 import { Box, Text } from 'ink';
 import React from 'react';
-import { theme } from '../semantic-colors.js';
+import { Colors } from '../colors.js';
 import {
   RadioButtonSelect,
   RadioSelectItem,
@@ -54,16 +54,14 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor={theme.status.warning}
+      borderColor={Colors.AccentYellow}
       padding={1}
       width="100%"
       marginLeft={1}
     >
       <Box flexDirection="column" marginBottom={1}>
-        <Text bold color={theme.text.primary}>
-          Do you trust this folder?
-        </Text>
-        <Text color={theme.text.primary}>
+        <Text bold>Do you trust this folder?</Text>
+        <Text>
           Trusting a folder allows Gemini to execute commands it suggests. This
           is a security feature to prevent accidental execution in untrusted
           directories.

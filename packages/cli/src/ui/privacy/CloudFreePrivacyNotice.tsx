@@ -9,7 +9,7 @@ import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import { usePrivacySettings } from '../hooks/usePrivacySettings.js';
 import { CloudPaidPrivacyNotice } from './CloudPaidPrivacyNotice.js';
 import { Config } from '@google/gemini-cli-core';
-import { theme } from '../semantic-colors.js';
+import { Colors } from '../colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 
 interface CloudFreePrivacyNoticeProps {
@@ -34,16 +34,16 @@ export const CloudFreePrivacyNotice = ({
   );
 
   if (privacyState.isLoading) {
-    return <Text color={theme.text.secondary}>Loading...</Text>;
+    return <Text color={Colors.Gray}>Loading...</Text>;
   }
 
   if (privacyState.error) {
     return (
       <Box flexDirection="column" marginY={1}>
-        <Text color={theme.status.error}>
+        <Text color={Colors.AccentRed}>
           Error loading Opt-in settings: {privacyState.error}
         </Text>
-        <Text color={theme.text.secondary}>Press Esc to exit.</Text>
+        <Text color={Colors.Gray}>Press Esc to exit.</Text>
       </Box>
     );
   }
@@ -59,17 +59,17 @@ export const CloudFreePrivacyNotice = ({
 
   return (
     <Box flexDirection="column" marginY={1}>
-      <Text bold color={theme.text.accent}>
+      <Text bold color={Colors.AccentPurple}>
         Gemini Code Assist for Individuals Privacy Notice
       </Text>
       <Newline />
-      <Text color={theme.text.primary}>
+      <Text>
         This notice and our Privacy Policy
-        <Text color={theme.text.link}>[1]</Text> describe how Gemini Code Assist
-        handles your data. Please read them carefully.
+        <Text color={Colors.AccentBlue}>[1]</Text> describe how Gemini Code
+        Assist handles your data. Please read them carefully.
       </Text>
       <Newline />
-      <Text color={theme.text.primary}>
+      <Text>
         When you use Gemini Code Assist for individuals with Gemini CLI, Google
         collects your prompts, related code, generated output, code edits,
         related feature usage information, and your feedback to provide,
@@ -77,7 +77,7 @@ export const CloudFreePrivacyNotice = ({
         technologies.
       </Text>
       <Newline />
-      <Text color={theme.text.primary}>
+      <Text>
         To help with quality and improve our products (such as generative
         machine-learning models), human reviewers may read, annotate, and
         process the data collected above. We take steps to protect your privacy
@@ -90,7 +90,7 @@ export const CloudFreePrivacyNotice = ({
       </Text>
       <Newline />
       <Box flexDirection="column">
-        <Text color={theme.text.primary}>
+        <Text>
           Allow Google to use this data to develop and improve our products?
         </Text>
         <RadioButtonSelect
@@ -106,14 +106,12 @@ export const CloudFreePrivacyNotice = ({
         />
       </Box>
       <Newline />
-      <Text color={theme.text.primary}>
-        <Text color={theme.text.link}>[1]</Text>{' '}
+      <Text>
+        <Text color={Colors.AccentBlue}>[1]</Text>{' '}
         https://policies.google.com/privacy
       </Text>
       <Newline />
-      <Text color={theme.text.secondary}>
-        Press Enter to choose an option and exit.
-      </Text>
+      <Text color={Colors.Gray}>Press Enter to choose an option and exit.</Text>
     </Box>
   );
 };

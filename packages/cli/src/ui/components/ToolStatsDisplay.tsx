@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { theme } from '../semantic-colors.js';
+import { Colors } from '../colors.js';
 import { formatDuration } from '../utils/formatters.js';
 import {
   getStatusColor,
@@ -37,16 +37,16 @@ const StatRow: React.FC<{
   return (
     <Box>
       <Box width={TOOL_NAME_COL_WIDTH}>
-        <Text color={theme.text.link}>{name}</Text>
+        <Text color={Colors.LightBlue}>{name}</Text>
       </Box>
       <Box width={CALLS_COL_WIDTH} justifyContent="flex-end">
-        <Text color={theme.text.primary}>{stats.count}</Text>
+        <Text>{stats.count}</Text>
       </Box>
       <Box width={SUCCESS_RATE_COL_WIDTH} justifyContent="flex-end">
         <Text color={successColor}>{successRate.toFixed(1)}%</Text>
       </Box>
       <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
-        <Text color={theme.text.primary}>{formatDuration(avgDuration)}</Text>
+        <Text>{formatDuration(avgDuration)}</Text>
       </Box>
     </Box>
   );
@@ -63,13 +63,11 @@ export const ToolStatsDisplay: React.FC = () => {
     return (
       <Box
         borderStyle="round"
-        borderColor={theme.border.default}
+        borderColor={Colors.Gray}
         paddingY={1}
         paddingX={2}
       >
-        <Text color={theme.text.primary}>
-          No tool calls have been made in this session.
-        </Text>
+        <Text>No tool calls have been made in this session.</Text>
       </Box>
     );
   }
@@ -96,13 +94,13 @@ export const ToolStatsDisplay: React.FC = () => {
   return (
     <Box
       borderStyle="round"
-      borderColor={theme.border.default}
+      borderColor={Colors.Gray}
       flexDirection="column"
       paddingY={1}
       paddingX={2}
       width={70}
     >
-      <Text bold color={theme.text.accent}>
+      <Text bold color={Colors.AccentPurple}>
         Tool Stats For Nerds
       </Text>
       <Box height={1} />
@@ -110,24 +108,16 @@ export const ToolStatsDisplay: React.FC = () => {
       {/* Header */}
       <Box>
         <Box width={TOOL_NAME_COL_WIDTH}>
-          <Text bold color={theme.text.primary}>
-            Tool Name
-          </Text>
+          <Text bold>Tool Name</Text>
         </Box>
         <Box width={CALLS_COL_WIDTH} justifyContent="flex-end">
-          <Text bold color={theme.text.primary}>
-            Calls
-          </Text>
+          <Text bold>Calls</Text>
         </Box>
         <Box width={SUCCESS_RATE_COL_WIDTH} justifyContent="flex-end">
-          <Text bold color={theme.text.primary}>
-            Success Rate
-          </Text>
+          <Text bold>Success Rate</Text>
         </Box>
         <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
-          <Text bold color={theme.text.primary}>
-            Avg Duration
-          </Text>
+          <Text bold>Avg Duration</Text>
         </Box>
       </Box>
 
@@ -149,47 +139,45 @@ export const ToolStatsDisplay: React.FC = () => {
       <Box height={1} />
 
       {/* User Decision Summary */}
-      <Text bold color={theme.text.primary}>
-        User Decision Summary
-      </Text>
+      <Text bold>User Decision Summary</Text>
       <Box>
         <Box
           width={TOOL_NAME_COL_WIDTH + CALLS_COL_WIDTH + SUCCESS_RATE_COL_WIDTH}
         >
-          <Text color={theme.text.link}>Total Reviewed Suggestions:</Text>
+          <Text color={Colors.LightBlue}>Total Reviewed Suggestions:</Text>
         </Box>
         <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
-          <Text color={theme.text.primary}>{totalReviewed}</Text>
+          <Text>{totalReviewed}</Text>
         </Box>
       </Box>
       <Box>
         <Box
           width={TOOL_NAME_COL_WIDTH + CALLS_COL_WIDTH + SUCCESS_RATE_COL_WIDTH}
         >
-          <Text color={theme.text.primary}> » Accepted:</Text>
+          <Text> » Accepted:</Text>
         </Box>
         <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
-          <Text color={theme.status.success}>{totalDecisions.accept}</Text>
+          <Text color={Colors.AccentGreen}>{totalDecisions.accept}</Text>
         </Box>
       </Box>
       <Box>
         <Box
           width={TOOL_NAME_COL_WIDTH + CALLS_COL_WIDTH + SUCCESS_RATE_COL_WIDTH}
         >
-          <Text color={theme.text.primary}> » Rejected:</Text>
+          <Text> » Rejected:</Text>
         </Box>
         <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
-          <Text color={theme.status.error}>{totalDecisions.reject}</Text>
+          <Text color={Colors.AccentRed}>{totalDecisions.reject}</Text>
         </Box>
       </Box>
       <Box>
         <Box
           width={TOOL_NAME_COL_WIDTH + CALLS_COL_WIDTH + SUCCESS_RATE_COL_WIDTH}
         >
-          <Text color={theme.text.primary}> » Modified:</Text>
+          <Text> » Modified:</Text>
         </Box>
         <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
-          <Text color={theme.status.warning}>{totalDecisions.modify}</Text>
+          <Text color={Colors.AccentYellow}>{totalDecisions.modify}</Text>
         </Box>
       </Box>
 
@@ -207,13 +195,10 @@ export const ToolStatsDisplay: React.FC = () => {
         <Box
           width={TOOL_NAME_COL_WIDTH + CALLS_COL_WIDTH + SUCCESS_RATE_COL_WIDTH}
         >
-          <Text color={theme.text.primary}> Overall Agreement Rate:</Text>
+          <Text> Overall Agreement Rate:</Text>
         </Box>
         <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
-          <Text
-            bold
-            color={totalReviewed > 0 ? agreementColor : theme.text.primary}
-          >
+          <Text bold color={totalReviewed > 0 ? agreementColor : undefined}>
             {totalReviewed > 0 ? `${agreementRate.toFixed(1)}%` : '--'}
           </Text>
         </Box>

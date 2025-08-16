@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { theme } from '../semantic-colors.js';
+import { Colors } from '../colors.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
 
 interface AutoAcceptIndicatorProps {
@@ -22,12 +22,12 @@ export const AutoAcceptIndicator: React.FC<AutoAcceptIndicatorProps> = ({
 
   switch (approvalMode) {
     case ApprovalMode.AUTO_EDIT:
-      textColor = theme.status.success;
+      textColor = Colors.AccentGreen;
       textContent = 'accepting edits';
       subText = ' (shift + tab to toggle)';
       break;
     case ApprovalMode.YOLO:
-      textColor = theme.status.error;
+      textColor = Colors.AccentRed;
       textContent = 'YOLO mode';
       subText = ' (ctrl + y to toggle)';
       break;
@@ -40,7 +40,7 @@ export const AutoAcceptIndicator: React.FC<AutoAcceptIndicatorProps> = ({
     <Box>
       <Text color={textColor}>
         {textContent}
-        {subText && <Text color={theme.text.secondary}>{subText}</Text>}
+        {subText && <Text color={Colors.Gray}>{subText}</Text>}
       </Text>
     </Box>
   );
