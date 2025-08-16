@@ -27,18 +27,10 @@ import {
 } from '../telemetry/loggers.js';
 import { ContentGenerator } from './contentGenerator.js';
 import { toContents } from '../code_assist/converter.js';
+import { isStructuredError } from '../utils/quotaErrorDetection.js';
 
 interface StructuredError {
   status: number;
-}
-
-export function isStructuredError(error: unknown): error is StructuredError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'status' in error &&
-    typeof (error as StructuredError).status === 'number'
-  );
 }
 
 /**
@@ -49,6 +41,10 @@ export class LoggingContentGenerator implements ContentGenerator {
     private readonly wrapped: ContentGenerator,
     private readonly config: Config,
   ) {}
+
+  getWrapped(): ContentGenerator {
+    return this.wrapped;
+  }
 
   private logApiRequest(
     contents: Content[],
