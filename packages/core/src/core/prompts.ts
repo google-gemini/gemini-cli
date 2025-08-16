@@ -159,6 +159,7 @@ ${(function () {
 - After each commit, confirm that it was successful by running \`git status\`.
 - If a commit fails, never attempt to work around the issues without being asked to do so.
 - Never push changes to a remote repository without being asked explicitly by the user.
+- When issuing \`git commit -m 'My Message'\` use single quotes rather than double quotes, as double quotes interact poorly with backticks.
 `;
   }
   return '';
