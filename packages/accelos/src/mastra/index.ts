@@ -16,12 +16,12 @@ import {
   debugStoreTool,
   claudeCodeTool,
   ekgCrudTool,
-  prCreationWorkflowTool
+  prCreationWorkflowTool,
 } from '../tools/index.js';
 import {
   codeReviewWorkflow,
   simpleCodeReviewWorkflow,
-  reviewToPRStreamingWorkflow
+  reviewToPRStreamingWorkflow,
 } from '../workflows/index.js';
 import { defaultConfig, getCompatiblePaths } from '../config.js';
 import { GuardrailStore } from '../tools/shared-guardrail-store.js';
@@ -30,12 +30,18 @@ import * as dotenv from 'dotenv';
 import { githubTools } from '../mcp/github-mcp-client.js';
 import { productionReadinessPrompt } from '../prompts/production_readiness_prompt.js';
 import { guardrailAgentPrompt } from '../prompts/guardrail_agent_prompt.js';
-import { Memory } from "@mastra/memory";
-import { LibSQLStore } from "@mastra/libsql";
+import { Memory } from '@mastra/memory';
+import { LibSQLStore } from '@mastra/libsql';
 import { createStreamingSSEHandler } from '../api/streaming-sse.js';
 import { promises as fs, existsSync, readFileSync } from 'fs';
-import { createGuardrailsListHandler, createGuardrailByIdHandler } from '../api/guardrails.js';
-import { createReviewsListHandler, createReviewByIdHandler } from '../api/reviews.js';
+import {
+  createGuardrailsListHandler,
+  createGuardrailByIdHandler,
+} from '../api/guardrails.js';
+import {
+  createReviewsListHandler,
+  createReviewByIdHandler,
+} from '../api/reviews.js';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -48,10 +54,11 @@ dotenv.config();
 async function initializeDirectoryStructure() {
   try {
     console.log(`🔧 DEBUG: Mastra initializeDirectoryStructure() started`);
-    const dataDir = process.env.ACCELOS_DATA_DIRECTORY_PATH || './.accelos/data';
+    const dataDir =
+      process.env.ACCELOS_DATA_DIRECTORY_PATH || './.accelos/data';
     const reviewsDir = path.join(dataDir, 'reviews');
     const guardrailsFile = path.join(dataDir, 'guardrails.json');
-    
+
     // Create main data directory if it doesn't exist
     if (!existsSync(dataDir)) {
       await fs.mkdir(dataDir, { recursive: true });
@@ -59,7 +66,7 @@ async function initializeDirectoryStructure() {
     } else {
       console.log(`📁 Data directory already exists: ${dataDir}`);
     }
-    
+
     // Create reviews subdirectory if it doesn't exist
     if (!existsSync(reviewsDir)) {
       await fs.mkdir(reviewsDir, { recursive: true });
@@ -67,7 +74,7 @@ async function initializeDirectoryStructure() {
     } else {
       console.log(`📁 Reviews directory already exists: ${reviewsDir}`);
     }
-    
+
     // Create empty guardrails.json if it doesn't exist
     if (!existsSync(guardrailsFile)) {
       await fs.writeFile(guardrailsFile, JSON.stringify([], null, 2), 'utf-8');
@@ -75,13 +82,15 @@ async function initializeDirectoryStructure() {
     } else {
       console.log(`📄 Guardrails file already exists: ${guardrailsFile}`);
     }
-    
+
     console.log(`✅ Directory structure initialization completed`);
   } catch (error) {
     console.warn(
       `⚠️  Failed to initialize directory structure: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
-    console.warn('   Mastra will continue, but some features may not work properly.');
+    console.warn(
+      '   Mastra will continue, but some features may not work properly.',
+    );
   }
 }
 
@@ -151,7 +160,7 @@ async function initializeEkg() {
   try {
     // Initialize directory structure first (blocking)
     await initializeDirectoryStructure();
-    
+
     // Then initialize guardrails and EKG (non-blocking)
     initializeGuardrails().catch((error) => {
       console.warn(
@@ -214,9 +223,9 @@ const streamingTestRoute = registerApiRoute('/accelos/streaming-test.html', {
         path.join(__dirname, '..', '..', 'src', 'streaming-test.html'),
         path.resolve('src/streaming-test.html'),
       ];
-      
+
       let htmlContent = null;
-      
+
       for (const htmlPath of possiblePaths) {
         try {
           if (existsSync(htmlPath)) {
@@ -227,16 +236,22 @@ const streamingTestRoute = registerApiRoute('/accelos/streaming-test.html', {
           continue;
         }
       }
-      
+
       if (!htmlContent) {
-        return c.text(`Streaming test page not found. Tried paths:\n${possiblePaths.join('\n')}\nCurrent working directory: ${process.cwd()}`, 404);
+        return c.text(
+          `Streaming test page not found. Tried paths:\n${possiblePaths.join('\n')}\nCurrent working directory: ${process.cwd()}`,
+          404,
+        );
       }
-      
+
       c.header('Content-Type', 'text/html');
       c.header('Cache-Control', 'no-cache');
       return c.body(htmlContent);
     } catch (error) {
-      return c.text(`Error loading streaming test page: ${error instanceof Error ? error.message : String(error)}`, 500);
+      return c.text(
+        `Error loading streaming test page: ${error instanceof Error ? error.message : String(error)}`,
+        500,
+      );
     }
   },
 });
@@ -247,37 +262,44 @@ const reviewsApiRoute = registerApiRoute('/accelos/reviews', {
   handler: async (c) => {
     // Get the request origin
     const origin = c.req.header('origin');
-    
+
     // Allow any localhost origin (flexible for development)
     if (origin && origin.match(/^http:\/\/localhost:\d+$/)) {
       c.header('Access-Control-Allow-Origin', origin);
     }
-    
+
     // Set comprehensive CORS headers
     c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, x-mastra-client-type');
-    c.header('Access-Control-Expose-Headers', 'Content-Length, X-Requested-With');
+    c.header(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, Cache-Control, x-mastra-client-type',
+    );
+    c.header(
+      'Access-Control-Expose-Headers',
+      'Content-Length, X-Requested-With',
+    );
     c.header('Access-Control-Max-Age', '3600');
-    
+
     // Handle preflight OPTIONS request
     if (c.req.method === 'OPTIONS') {
       return new Response('', { status: 204 });
     }
-    
+
     // Handle GET request
     if (c.req.method === 'GET') {
       try {
-        const dataDir = process.env.ACCELOS_DATA_DIRECTORY_PATH || './.accelos/data';
+        const dataDir =
+          process.env.ACCELOS_DATA_DIRECTORY_PATH || './.accelos/data';
         const reviewsDir = path.join(dataDir, 'reviews');
-        
+
         // Read all files in the reviews directory
         const files = await fs.readdir(reviewsDir);
-        
+
         // Filter files that start with "REVIEW" and end with ".json"
-        const reviewFiles = files.filter(file => 
-          file.startsWith('REVIEW') && file.endsWith('.json')
+        const reviewFiles = files.filter(
+          (file) => file.startsWith('REVIEW') && file.endsWith('.json'),
         );
-        
+
         // Read and parse each review file
         const reviews = [];
         for (const file of reviewFiles) {
@@ -290,22 +312,25 @@ const reviewsApiRoute = registerApiRoute('/accelos/reviews', {
             console.warn(`Failed to parse review file ${file}:`, error);
           }
         }
-        
+
         return c.json({
           success: true,
           data: reviews,
-          count: reviews.length
+          count: reviews.length,
         });
       } catch (error) {
         console.error('Error fetching reviews:', error);
-        return c.json({
-          success: false,
-          error: 'Failed to fetch reviews',
-          message: error instanceof Error ? error.message : 'Unknown error'
-        }, 500);
+        return c.json(
+          {
+            success: false,
+            error: 'Failed to fetch reviews',
+            message: error instanceof Error ? error.message : 'Unknown error',
+          },
+          500,
+        );
       }
     }
-    
+
     // Method not allowed
     return c.text('Method Not Allowed', 405);
   },
@@ -364,23 +389,22 @@ const accelosAnthropicAgent = new Agent({
 });
 
 const productionReadinessAgent = new Agent({
-    name: 'production-readiness-agent',
-    instructions: productionReadinessPrompt,
-    model: anthropic('claude-3-7-sonnet-20250219'),
-    defaultGenerateOptions: {
-      maxSteps: 500,
-    },
-    tools: 
-    {
-      guardrailCrudTool,
-      reviewStorage: reviewStorageTool,
-      ekgCrud: ekgCrudTool,
-      reviewLoader: reviewLoaderTool,
-      prCreation: prCreationWorkflowTool,
-      ...githubTools,
-    },
-    memory,
-  });
+  name: 'production-readiness-agent',
+  instructions: productionReadinessPrompt,
+  model: anthropic('claude-3-7-sonnet-20250219'),
+  defaultGenerateOptions: {
+    maxSteps: 500,
+  },
+  tools: {
+    guardrailCrudTool,
+    reviewStorage: reviewStorageTool,
+    ekgCrud: ekgCrudTool,
+    reviewLoader: reviewLoaderTool,
+    prCreation: prCreationWorkflowTool,
+    ...githubTools,
+  },
+  memory,
+});
 
 const guardrailAgent = new Agent({
   name: 'guardrail-agent',
@@ -423,13 +447,18 @@ export const mastra = new Mastra({
     },
     cors: {
       origin: [
-        'http://localhost:3000',  // Dev server
-        'http://localhost:5173',  // Vite preview
-        'http://localhost:5273',  // CLI interface
-        /^http:\/\/localhost:\d+$/ // Allow any localhost port
+        'http://localhost:3000', // Dev server
+        'http://localhost:5173', // Vite preview
+        'http://localhost:5273', // CLI interface
+        /^http:\/\/localhost:\d+$/, // Allow any localhost port
       ],
       allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'x-mastra-client-type'],
+      allowHeaders: [
+        'Content-Type',
+        'Authorization',
+        'Cache-Control',
+        'x-mastra-client-type',
+      ],
       exposeHeaders: ['Content-Length', 'X-Requested-With'],
       maxAge: 3600,
       credentials: false,
