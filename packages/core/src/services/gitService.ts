@@ -101,7 +101,7 @@ export class GitService {
     try {
       userGitIgnoreContent = await fs.readFile(userGitIgnorePath, 'utf-8');
     } catch (error) {
-      if (isNodeError(error) && error.code !== 'ENOENT') {
+      if (!(isNodeError(error) && error.code === 'ENOENT')) {
         throw error;
       }
     }
