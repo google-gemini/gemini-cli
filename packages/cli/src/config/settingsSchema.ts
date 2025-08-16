@@ -314,6 +314,15 @@ export const SETTINGS_SCHEMA = {
     description: 'Tool names to exclude from discovery.',
     showInDialog: false,
   },
+  preapprovedShellCommandRegexes: {
+    type: 'array',
+    label: 'Preapproved Shell Command Regexes',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: undefined as string[] | undefined,
+    description: 'Regexes for shell commands to approve without confirmation.',
+    showInDialog: false,
+  },
   toolDiscoveryCommand: {
     type: 'string',
     label: 'Tool Discovery Command',

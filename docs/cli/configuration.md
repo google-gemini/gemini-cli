@@ -81,6 +81,12 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     `excludeTools` for `run_shell_command` are based on simple string matching and can be easily bypassed. This feature is **not a security mechanism** and should not be relied upon to safely execute untrusted code. It is recommended to use `coreTools` to explicitly select commands
     that can be executed.
 
+- **`preapprovedShellCommandRegexes`** (array of strings):
+  - **Description:** Provides a list of regular expressions as a fallback for allowing shell commands. If a command is not explicitly permitted by `coreTools` or other mechanisms, it is tested against these regular expressions. The regex is implicitly anchored to the start and end of the command string. If any expression matches the entire command, it is allowed.
+  - **Default**: `[]`
+  - **Example:** To allow any `git` command that starts with `status` (e.g., `git status -v`), but only the exact `npm install` command, you could use: `"preapprovedShellCommandRegexes": ["git status.*", "npm install"]`.
+  - **Security Note:** Be specific with your regular expressions. A broad pattern like `npm.*` could accidentally allow unintended and potentially dangerous commands.
+
 - **`allowMCPServers`** (array of strings):
   - **Description:** Allows you to specify a list of MCP server names that should be made available to the model. This can be used to restrict the set of MCP servers to connect to. Note that this will be ignored if `--allowed-mcp-server-names` is set.
   - **Default:** All MCP servers are available for use by the Gemini model.
@@ -320,6 +326,7 @@ In addition to a project settings file, a project's `.gemini` directory can cont
       "tokenBudget": 100
     }
   },
+  "preapprovedShellCommandRegexes": ["git status.*", "npm install"],
   "excludedProjectEnvVars": ["DEBUG", "DEBUG_MODE", "NODE_ENV"],
   "includeDirectories": ["path/to/dir1", "~/path/to/dir2", "../path/to/dir3"],
   "loadMemoryFromIncludeDirectories": true

@@ -113,6 +113,7 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        preapprovedShellCommandRegexes: [],
         chatCompression: {},
       });
       expect(settings.errors.length).toBe(0);
@@ -148,6 +149,7 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        preapprovedShellCommandRegexes: [],
         chatCompression: {},
       });
     });
@@ -183,6 +185,7 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        preapprovedShellCommandRegexes: [],
         chatCompression: {},
       });
     });
@@ -216,6 +219,7 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        preapprovedShellCommandRegexes: [],
         chatCompression: {},
       });
     });
@@ -255,6 +259,7 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        preapprovedShellCommandRegexes: [],
         chatCompression: {},
       });
     });
@@ -306,6 +311,7 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        preapprovedShellCommandRegexes: [],
         chatCompression: {},
       });
     });
@@ -828,6 +834,43 @@ describe('Settings Loading and Merging', () => {
       ]);
     });
 
+    it('should merge preapprovedShellCommandRegexes from all scopes', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const systemSettingsContent = {
+        preapprovedShellCommandRegexes: ['git log.*'],
+      };
+      const userSettingsContent = {
+        preapprovedShellCommandRegexes: [
+          'npm install',
+          'npm run test',
+        ],
+      };
+      const workspaceSettingsContent = {
+        preapprovedShellCommandRegexes: ['dist/binary'],
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.preapprovedShellCommandRegexes).toEqual([
+        'git log.*',
+        'npm install',
+        'npm run test',
+        'dist/binary',
+      ]);
+    });
+
     it('should handle JSON parsing errors gracefully', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true); // Both files "exist"
       const invalidJsonContent = 'invalid json';
@@ -867,6 +910,7 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        preapprovedShellCommandRegexes: [],
         chatCompression: {},
       });
 
@@ -1305,6 +1349,7 @@ describe('Settings Loading and Merging', () => {
           customThemes: {},
           mcpServers: {},
           includeDirectories: [],
+          preapprovedShellCommandRegexes: [],
           chatCompression: {},
         });
       });

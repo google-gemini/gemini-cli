@@ -51,6 +51,7 @@ describe('ShellTool', () => {
     mockConfig = {
       getCoreTools: vi.fn().mockReturnValue([]),
       getExcludeTools: vi.fn().mockReturnValue([]),
+      getPreapprovedShellCommandRegexes: vi.fn().mockReturnValue([]),
       getDebugMode: vi.fn().mockReturnValue(false),
       getTargetDir: vi.fn().mockReturnValue('/test/dir'),
       getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
@@ -385,6 +386,89 @@ describe('ShellTool', () => {
         new AbortController().signal,
       );
       expect(secondConfirmation).toBe(false);
+    });
+
+    it('should not request confirmation if the command is pre-approved by regex', async () => {
+      (mockConfig.getPreapprovedShellCommandRegexes as Mock).mockReturnValue([
+        /^(?:git status)$/,
+      ]);
+      const invocation = shellTool.build({ command: 'git status' });
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).toBe(false);
+    });
+
+    it('should not request confirmation for a command matching a wildcard regex', async () => {
+      (mockConfig.getPreapprovedShellCommandRegexes as Mock).mockReturnValue([
+        /^(?:git .*)$/,
+      ]);
+      const invocation = shellTool.build({ command: 'git push origin main' });
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).toBe(false);
+    });
+
+    it('should request confirmation if a command only partially matches a regex', async () => {
+      // Note: The config loader adds ^ and $ to the regexes automatically.
+      (mockConfig.getPreapprovedShellCommandRegexes as Mock).mockReturnValue([
+        /^(?:git status)$/,
+      ]);
+      const invocation = shellTool.build({ command: 'git status -v' });
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      expect(confirmation).toEqual(
+        expect.objectContaining({ rootCommand: 'git' }),
+      );
+    });
+
+    it('should not request confirmation for a chained command where all parts are pre-approved', async () => {
+      (mockConfig.getPreapprovedShellCommandRegexes as Mock).mockReturnValue([
+        /^(?:npm install)$/,
+        /^(?:npm test)$/,
+      ]);
+      const invocation = shellTool.build({
+        command: 'npm install && npm test',
+      });
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).toBe(false);
+    });
+
+    it('should request confirmation for the non-approved part of a chained command', async () => {
+      (mockConfig.getPreapprovedShellCommandRegexes as Mock).mockReturnValue([
+        /^(?:npm install)$/,
+      ]);
+      const invocation = shellTool.build({
+        command: 'npm install && git status',
+      });
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      expect(confirmation).toEqual(
+        expect.objectContaining({ rootCommand: 'git' }),
+      );
+    });
+
+    it('should request confirmation for all non-approved parts of a chained command', async () => {
+      (mockConfig.getPreapprovedShellCommandRegexes as Mock).mockReturnValue([
+        /^(?:echo ".*")$/,
+      ]);
+      const invocation = shellTool.build({
+        command: 'npm install && echo "hello" && git status',
+      });
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      expect(confirmation).toEqual(
+        expect.objectContaining({ rootCommand: 'npm, git' }),
+      );
     });
 
     it('should throw an error if validation fails', () => {

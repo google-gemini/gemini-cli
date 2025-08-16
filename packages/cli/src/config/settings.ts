@@ -123,6 +123,11 @@ export class LoadedSettings {
         ...(user.includeDirectories || []),
         ...(workspace.includeDirectories || []),
       ],
+      preapprovedShellCommandRegexes: [
+        ...(system.preapprovedShellCommandRegexes || []),
+        ...(user.preapprovedShellCommandRegexes || []),
+        ...(workspace.preapprovedShellCommandRegexes || []),
+      ],
       chatCompression: {
         ...(system.chatCompression || {}),
         ...(user.chatCompression || {}),

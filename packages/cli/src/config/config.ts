@@ -470,6 +470,7 @@ export async function loadCliConfig(
     fullContext: argv.allFiles || argv.all_files || false,
     coreTools: settings.coreTools || undefined,
     excludeTools,
+    preapprovedShellCommandRegexes: settings.preapprovedShellCommandRegexes,
     toolDiscoveryCommand: settings.toolDiscoveryCommand,
     toolCallCommand: settings.toolCallCommand,
     mcpServerCommand: settings.mcpServerCommand,
