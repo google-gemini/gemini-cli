@@ -258,8 +258,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
-      // If IME timeout is pending, ignore all keypresses.
+      // If an IME submission timeout is pending, only allow the Escape key
+      // to cancel it. Ignore all other keypresses to prevent race conditions.
       if (imeTimeoutRef.current) {
+        if (keyMatchers[Command.ESCAPE](key)) {
+          clearTimeout(imeTimeoutRef.current);
+          imeTimeoutRef.current = null;
+        }
         return;
       }
 
