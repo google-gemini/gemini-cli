@@ -544,14 +544,26 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     shellModeActive,
   });
 
+  // Simple message queue for handling input during streaming
+  const [messageQueue, setMessageQueue] = useState<string[]>([]);
+
   const [userMessages, setUserMessages] = useState<string[]>([]);
 
   const handleUserCancel = useCallback(() => {
     const lastUserMessage = userMessages.at(-1);
-    if (lastUserMessage) {
-      buffer.setText(lastUserMessage);
+    let textToSet = lastUserMessage || '';
+
+    // Append queued messages if any exist
+    if (messageQueue.length > 0) {
+      const queuedText = messageQueue.join('\n\n');
+      textToSet = textToSet ? `${textToSet}\n\n${queuedText}` : queuedText;
+      setMessageQueue([]);
     }
-  }, [buffer, userMessages]);
+
+    if (textToSet) {
+      buffer.setText(textToSet);
+    }
+  }, [buffer, userMessages, messageQueue]);
 
   const {
     streamingState,
@@ -577,16 +589,25 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     handleUserCancel,
   );
 
-  // Input handling
-  const handleFinalSubmit = useCallback(
-    (submittedValue: string) => {
-      const trimmedValue = submittedValue.trim();
-      if (trimmedValue.length > 0) {
-        submitQuery(trimmedValue);
-      }
-    },
-    [submitQuery],
-  );
+  // Input handling - queue messages for processing
+  const handleFinalSubmit = useCallback((submittedValue: string) => {
+    const trimmedValue = submittedValue.trim();
+    if (trimmedValue.length > 0) {
+      // queue for handling
+      setMessageQueue((prev) => [...prev, trimmedValue]);
+    }
+  }, []);
+
+  // Process queued messages when idle
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle && messageQueue.length > 0) {
+      // Combine all messages with double newlines for clarity
+      const combinedMessage = messageQueue.join('\n\n');
+      // Clear the queue and submit
+      setMessageQueue([]);
+      submitQuery(combinedMessage);
+    }
+  }, [streamingState, messageQueue, submitQuery]);
 
   const handleIdePromptComplete = useCallback(
     (result: IdeIntegrationNudgeResult) => {
@@ -761,7 +782,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, [history, logger]);
 
   const isInputActive =
-    streamingState === StreamingState.Idle && !initError && !isProcessing;
+    (streamingState === StreamingState.Idle ||
+      streamingState === StreamingState.Responding) &&
+    !initError &&
+    !isProcessing;
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -1080,6 +1104,17 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 }
                 elapsedTime={elapsedTime}
               />
+
+              {/* Display queued messages below loading indicator */}
+              {messageQueue.length > 0 && (
+                <Box flexDirection="column" marginTop={1}>
+                  {messageQueue.map((message, index) => (
+                    <Box key={index} paddingLeft={2}>
+                      <Text dimColor>▸ {message}</Text>
+                    </Box>
+                  ))}
+                </Box>
+              )}
 
               <Box
                 marginTop={1}
