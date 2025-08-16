@@ -8,7 +8,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
-import { theme } from '../../semantic-colors.js';
+import { Colors } from '../../colors.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
@@ -90,9 +90,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
             {typeof resultDisplay === 'string' && !renderOutputAsMarkdown && (
               <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
                 <Box>
-                  <Text wrap="wrap" color={theme.text.primary}>
-                    {resultDisplay}
-                  </Text>
+                  <Text wrap="wrap">{resultDisplay}</Text>
                 </Box>
               </MaxSizedBox>
             )}
@@ -120,7 +118,7 @@ const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
 }) => (
   <Box minWidth={STATUS_INDICATOR_WIDTH}>
     {status === ToolCallStatus.Pending && (
-      <Text color={theme.status.success}>o</Text>
+      <Text color={Colors.AccentGreen}>o</Text>
     )}
     {status === ToolCallStatus.Executing && (
       <GeminiRespondingSpinner
@@ -129,18 +127,18 @@ const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
       />
     )}
     {status === ToolCallStatus.Success && (
-      <Text color={theme.status.success}>✔</Text>
+      <Text color={Colors.AccentGreen}>✔</Text>
     )}
     {status === ToolCallStatus.Confirming && (
-      <Text color={theme.status.warning}>?</Text>
+      <Text color={Colors.AccentYellow}>?</Text>
     )}
     {status === ToolCallStatus.Canceled && (
-      <Text color={theme.status.warning} bold>
+      <Text color={Colors.AccentYellow} bold>
         -
       </Text>
     )}
     {status === ToolCallStatus.Error && (
-      <Text color={theme.status.error} bold>
+      <Text color={Colors.AccentRed} bold>
         x
       </Text>
     )}
@@ -162,11 +160,11 @@ const ToolInfo: React.FC<ToolInfo> = ({
   const nameColor = React.useMemo<string>(() => {
     switch (emphasis) {
       case 'high':
-        return theme.text.primary;
+        return Colors.Foreground;
       case 'medium':
-        return theme.text.primary;
+        return Colors.Foreground;
       case 'low':
-        return theme.text.secondary;
+        return Colors.Gray;
       default: {
         const exhaustiveCheck: never = emphasis;
         return exhaustiveCheck;
@@ -178,19 +176,18 @@ const ToolInfo: React.FC<ToolInfo> = ({
       <Text
         wrap="truncate-end"
         strikethrough={status === ToolCallStatus.Canceled}
-        color={theme.text.primary}
       >
         <Text color={nameColor} bold>
           {name}
         </Text>{' '}
-        <Text color={theme.text.secondary}>{description}</Text>
+        <Text color={Colors.Gray}>{description}</Text>
       </Text>
     </Box>
   );
 };
 
 const TrailingIndicator: React.FC = () => (
-  <Text color={theme.text.primary} wrap="truncate">
+  <Text color={Colors.Foreground} wrap="truncate">
     {' '}
     ←
   </Text>

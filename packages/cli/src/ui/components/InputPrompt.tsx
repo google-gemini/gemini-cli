@@ -559,7 +559,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         <Box flexGrow={1} flexDirection="column">
           {buffer.text.length === 0 && placeholder ? (
             focus ? (
-              <Text color={theme.text.primary}>
+              <Text>
                 {chalk.inverse(placeholder.slice(0, 1))}
                 <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
               </Text>
@@ -600,12 +600,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 }
               }
               return (
-                <Text
-                  key={`line-${visualIdxInRenderedSet}`}
-                  color={theme.text.primary}
-                >
-                  {display}
-                </Text>
+                <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
               );
             })
           )}

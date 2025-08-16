@@ -7,7 +7,7 @@
 import { ToolConfirmationOutcome } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
 import React from 'react';
-import { theme } from '../semantic-colors.js';
+import { Colors } from '../colors.js';
 import {
   RadioButtonSelect,
   RadioSelectItem,
@@ -69,27 +69,23 @@ export const ShellConfirmationDialog: React.FC<
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor={theme.status.warning}
+      borderColor={Colors.AccentYellow}
       padding={1}
       width="100%"
       marginLeft={1}
     >
       <Box flexDirection="column" marginBottom={1}>
-        <Text bold color={theme.text.primary}>
-          Shell Command Execution
-        </Text>
-        <Text color={theme.text.primary}>
-          A custom command wants to run the following shell commands:
-        </Text>
+        <Text bold>Shell Command Execution</Text>
+        <Text>A custom command wants to run the following shell commands:</Text>
         <Box
           flexDirection="column"
           borderStyle="round"
-          borderColor={theme.border.default}
+          borderColor={Colors.Gray}
           paddingX={1}
           marginTop={1}
         >
           {commands.map((cmd) => (
-            <Text key={cmd} color={theme.text.accent}>
+            <Text key={cmd} color={Colors.AccentCyan}>
               {cmd}
             </Text>
           ))}
@@ -97,7 +93,7 @@ export const ShellConfirmationDialog: React.FC<
       </Box>
 
       <Box marginBottom={1}>
-        <Text color={theme.text.primary}>Do you want to proceed?</Text>
+        <Text>Do you want to proceed?</Text>
       </Box>
 
       <RadioButtonSelect items={options} onSelect={handleSelect} isFocused />

@@ -6,7 +6,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Text, Box } from 'ink';
-import { theme } from '../../semantic-colors.js';
+import { Colors } from '../../colors.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 
 /**
@@ -164,9 +164,7 @@ export function RadioButtonSelect<T>({
   return (
     <Box flexDirection="column">
       {showScrollArrows && (
-        <Text
-          color={scrollOffset > 0 ? theme.text.primary : theme.text.secondary}
-        >
+        <Text color={scrollOffset > 0 ? Colors.Foreground : Colors.Gray}>
           ▲
         </Text>
       )}
@@ -174,18 +172,18 @@ export function RadioButtonSelect<T>({
         const itemIndex = scrollOffset + index;
         const isSelected = activeIndex === itemIndex;
 
-        let textColor = theme.text.primary;
-        let numberColor = theme.text.primary;
+        let textColor = Colors.Foreground;
+        let numberColor = Colors.Foreground;
         if (isSelected) {
-          textColor = theme.status.success;
-          numberColor = theme.status.success;
+          textColor = Colors.AccentGreen;
+          numberColor = Colors.AccentGreen;
         } else if (item.disabled) {
-          textColor = theme.text.secondary;
-          numberColor = theme.text.secondary;
+          textColor = Colors.Gray;
+          numberColor = Colors.Gray;
         }
 
         if (!showNumbers) {
-          numberColor = theme.text.secondary;
+          numberColor = Colors.Gray;
         }
 
         const numberColumnWidth = String(items.length).length;
@@ -196,9 +194,7 @@ export function RadioButtonSelect<T>({
         return (
           <Box key={item.label} alignItems="center">
             <Box minWidth={2} flexShrink={0}>
-              <Text
-                color={isSelected ? theme.status.success : theme.text.primary}
-              >
+              <Text color={isSelected ? Colors.AccentGreen : Colors.Foreground}>
                 {isSelected ? '●' : ' '}
               </Text>
             </Box>
@@ -212,9 +208,7 @@ export function RadioButtonSelect<T>({
             {item.themeNameDisplay && item.themeTypeDisplay ? (
               <Text color={textColor} wrap="truncate">
                 {item.themeNameDisplay}{' '}
-                <Text color={theme.text.secondary}>
-                  {item.themeTypeDisplay}
-                </Text>
+                <Text color={Colors.Gray}>{item.themeTypeDisplay}</Text>
               </Text>
             ) : (
               <Text color={textColor} wrap="truncate">
@@ -228,8 +222,8 @@ export function RadioButtonSelect<T>({
         <Text
           color={
             scrollOffset + maxItemsToShow < items.length
-              ? theme.text.primary
-              : theme.text.secondary
+              ? Colors.Foreground
+              : Colors.Gray
           }
         >
           ▼
