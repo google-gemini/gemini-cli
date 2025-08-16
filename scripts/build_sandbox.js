@@ -180,12 +180,10 @@ function buildImage(imageName, dockerfile) {
   }
 }
 
-if (baseImage && baseDockerfile) {
-  buildImage(baseImage, baseDockerfile);
-}
-
 if (customDockerfile && customImage) {
   buildImage(customImage, customDockerfile);
+} else if (baseImage && baseDockerfile) {
+  buildImage(baseImage, baseDockerfile);
 }
 
 execSync(`${sandboxCommand} image prune -f`, { stdio: 'ignore' });
