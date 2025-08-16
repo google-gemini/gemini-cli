@@ -26,7 +26,9 @@ describe('FileExclusions', () => {
       expect(patterns).toContain('**/node_modules/**');
       expect(patterns).toContain('**/.git/**');
       expect(patterns).toContain('**/bower_components/**');
-      expect(patterns).toHaveLength(3);
+      expect(patterns).toContain('**/.svn/**');
+      expect(patterns).toContain('**/.hg/**');
+      expect(patterns).toHaveLength(5);
     });
   });
 
@@ -126,9 +128,11 @@ describe('FileExclusions', () => {
       expect(patterns).toContain('**/node_modules/**');
       expect(patterns).toContain('**/.git/**');
       expect(patterns).toContain('**/bower_components/**');
+      expect(patterns).toContain('**/.svn/**');
+      expect(patterns).toContain('**/.hg/**');
 
       // Should not include comprehensive patterns by default
-      expect(patterns).toHaveLength(3);
+      expect(patterns).toHaveLength(5);
     });
 
     it('should include additional excludes', () => {

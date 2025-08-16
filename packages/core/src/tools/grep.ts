@@ -412,7 +412,10 @@ class GrepToolInvocation extends BaseToolInvocation<
             // Only consider patterns that are likely directories. This filters out file patterns.
             if (dir && !dir.includes('/') && !dir.includes('*')) {
               // Allow names without dots (e.g., 'dist') or dot-directories (e.g., '.git').
-              if (!dir.includes('.') || (dir.startsWith('.') && !dir.substring(1).includes('.'))) {
+              if (
+                !dir.includes('.') ||
+                (dir.startsWith('.') && !dir.substring(1).includes('.'))
+              ) {
                 return dir;
               }
             }
@@ -501,11 +504,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       );
       strategyUsed = 'javascript fallback';
       const globPattern = include ? include : '**/*';
-      const ignorePatterns = [
-        ...this.fileExclusions.getGlobExcludes(),
-        '.svn/**',
-        '.hg/**',
-      ]; // Use glob patterns for ignores here
+      const ignorePatterns = this.fileExclusions.getGlobExcludes();
 
       const filesStream = globStream(globPattern, {
         cwd: absolutePath,
