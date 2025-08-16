@@ -144,6 +144,13 @@ jobs:
           npm run build:packages
           npm run prepare:package
 
+      - name: 'Inject OAuth2 Secrets'
+        env:
+          OAUTH_CLIENT_ID: '${{ secrets.OAUTH_CLIENT_ID }}'
+          OAUTH_CLIENT_SECRET: '${{ secrets.OAUTH_CLIENT_SECRET }}'
+        run: |-
+          node scripts/release/inject_secrets.js
+
       - name: 'Configure npm for publishing'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
@@ -182,6 +189,10 @@ jobs:
             --dry-run="${IS_DRY_RUN}" \
             --workspace="@google/gemini-cli" \
             --tag="${NPM_TAG}"
+
+      - name: 'Revert OAuth2 Secrets'
+        run: |-
+          git checkout -- packages/core/src/code_assist/oauth2_secrets.ts
 
       - name: 'Get previous release tag'
         id: 'previous_release'
