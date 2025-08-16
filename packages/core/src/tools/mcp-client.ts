@@ -79,6 +79,7 @@ export class McpClient {
   private client: Client;
   private transport: Transport | undefined;
   private status: MCPServerStatus = MCPServerStatus.DISCONNECTED;
+  private isDisconnecting = false;
 
   constructor(
     private readonly serverName: string,
@@ -98,19 +99,47 @@ export class McpClient {
    * Connects to the MCP server.
    */
   async connect(): Promise<void> {
+    this.isDisconnecting = false;
     this.updateStatus(MCPServerStatus.CONNECTING);
     try {
       this.transport = await this.createTransport();
-      await this.client.connect(this.transport, {
-        timeout: this.serverConfig.timeout,
-      });
+
       this.client.onerror = (error) => {
+        if (this.isDisconnecting) {
+          return;
+        }
         console.error(`MCP ERROR (${this.serverName}):`, error.toString());
         this.updateStatus(MCPServerStatus.DISCONNECTED);
       };
+
+      this.client.registerCapabilities({
+        roots: {},
+      });
+
+      this.client.setRequestHandler(ListRootsRequestSchema, async () => {
+        const roots = [];
+        for (const dir of this.workspaceContext.getDirectories()) {
+          roots.push({
+            uri: pathToFileURL(dir).toString(),
+            name: basename(dir),
+          });
+        }
+        return {
+          roots,
+        };
+      });
+
+      await this.client.connect(this.transport, {
+        timeout: this.serverConfig.timeout,
+      });
+
       this.updateStatus(MCPServerStatus.CONNECTED);
     } catch (error) {
       this.updateStatus(MCPServerStatus.DISCONNECTED);
+      console.error(
+        `[DEBUG] MCP connection to ${this.serverName} failed. Full error object:`,
+        error,
+      );
       throw error;
     }
   }
@@ -139,6 +168,7 @@ export class McpClient {
    * Disconnects from the MCP server.
    */
   async disconnect(): Promise<void> {
+    this.isDisconnecting = true;
     if (this.transport) {
       await this.transport.close();
     }
@@ -1163,6 +1193,12 @@ export async function createTransport(
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
 ): Promise<Transport> {
+  if (debugMode) {
+    console.debug(
+      `[DEBUG] Creating transport for ${mcpServerName} with config:`,
+      mcpServerConfig,
+    );
+  }
   if (
     mcpServerConfig.authProviderType === AuthProviderType.GOOGLE_CREDENTIALS
   ) {

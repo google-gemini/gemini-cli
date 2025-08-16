@@ -41,6 +41,8 @@ describe('mcp-client', () => {
         discover: vi.fn(),
         disconnect: vi.fn(),
         getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
