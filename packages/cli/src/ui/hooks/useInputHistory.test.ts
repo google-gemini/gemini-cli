@@ -31,7 +31,8 @@ describe('useInputHistory', () => {
     // Internal state is not directly testable, but we can infer from behavior.
     // Attempting to navigate down should do nothing if historyIndex is -1.
     act(() => {
-      result.current.navigateDown();
+      const navigated = result.current.navigateDown();
+      expect(navigated).toBe(false);
     });
     expect(mockOnChange).not.toHaveBeenCalled();
   });
@@ -55,7 +56,8 @@ describe('useInputHistory', () => {
       expect(mockOnSubmit).toHaveBeenCalledWith('submit value');
       // Check if history is reset (e.g., by trying to navigate down)
       act(() => {
-        result.current.navigateDown();
+        const navigated = result.current.navigateDown();
+        expect(navigated).toBe(false);
       });
       expect(mockOnChange).not.toHaveBeenCalled();
     });
@@ -146,7 +148,7 @@ describe('useInputHistory', () => {
       );
 
       act(() => {
-        result.current.navigateUp(); // historyIndex becomes 0
+        result.current.navigateUp(); // historyIndex becomes 2
       });
       expect(mockOnChange).toHaveBeenCalledWith(userMessages[2]);
 
