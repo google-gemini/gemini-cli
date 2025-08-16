@@ -101,12 +101,14 @@ describe('getEnvironmentContext', () => {
   });
 
   it('should return basic environment context for a single directory', async () => {
+    const mockDateString = 'Tuesday, August 5, 2025';
+    const toLocaleDateStringSpy = vi.spyOn(Date.prototype, 'toLocaleDateString').mockReturnValue(mockDateString);
     const parts = await getEnvironmentContext(mockConfig as Config);
 
     expect(parts.length).toBe(1);
     const context = parts[0].text;
 
-    expect(context).toContain("Today's date is Tuesday, August 5, 2025");
+    expect(context).toContain(`Today's date is ${mockDateString}`);
     expect(context).toContain(`My operating system is: ${process.platform}`);
     expect(context).toContain(
       "I'm currently working in the directory: /test/dir",
@@ -117,6 +119,7 @@ describe('getEnvironmentContext', () => {
     expect(getFolderStructure).toHaveBeenCalledWith('/test/dir', {
       fileService: undefined,
     });
+    toLocaleDateStringSpy.mockRestore();
   });
 
   it('should return basic environment context for multiple directories', async () => {
