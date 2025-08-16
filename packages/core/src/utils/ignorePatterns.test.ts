@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { FileExclusions, BINARY_EXTENSIONS } from './ignorePatterns.js';
+import {
+  FileExclusions,
+  BINARY_EXTENSIONS,
+  extractExtensionsFromPatterns,
+} from './ignorePatterns.js';
 import { Config } from '../config/config.js';
 
 // Mock the memoryTool module
@@ -206,8 +210,82 @@ describe('BINARY_EXTENSIONS', () => {
     expect(BINARY_EXTENSIONS).toContain('.wasm');
   });
 
+  it('should include media file extensions', () => {
+    expect(BINARY_EXTENSIONS).toContain('.pdf');
+    expect(BINARY_EXTENSIONS).toContain('.png');
+    expect(BINARY_EXTENSIONS).toContain('.jpg');
+  });
+
   it('should be sorted', () => {
     const sortedExtensions = [...BINARY_EXTENSIONS].sort();
     expect(BINARY_EXTENSIONS).toEqual(sortedExtensions);
+  });
+
+  it('should not contain invalid extensions from brace patterns', () => {
+    // If brace expansion was not handled correctly, we would see invalid extensions like '.{jpg,png}'
+    const invalidExtensions = BINARY_EXTENSIONS.filter(
+      (ext) => ext.includes('{') || ext.includes('}'),
+    );
+    expect(invalidExtensions).toHaveLength(0);
+  });
+});
+
+describe('extractExtensionsFromPatterns', () => {
+  it('should extract simple extensions', () => {
+    const patterns = ['**/*.exe', '**/*.jar', '**/*.zip'];
+    const result = extractExtensionsFromPatterns(patterns);
+
+    expect(result).toEqual(['.exe', '.jar', '.zip']);
+  });
+
+  it('should handle brace expansion patterns', () => {
+    const patterns = ['**/*.{js,ts}', '**/*.{jpg,png}'];
+    const result = extractExtensionsFromPatterns(patterns);
+
+    expect(result).toContain('.js');
+    expect(result).toContain('.ts');
+    expect(result).toContain('.jpg');
+    expect(result).toContain('.png');
+    expect(result).not.toContain('.{js,ts}');
+    expect(result).not.toContain('.{jpg,png}');
+  });
+
+  it('should combine simple and brace expansion patterns', () => {
+    const patterns = ['**/*.exe', '**/*.{js,ts}', '**/*.pdf'];
+    const result = extractExtensionsFromPatterns(patterns);
+
+    expect(result).toContain('.exe');
+    expect(result).toContain('.js');
+    expect(result).toContain('.ts');
+    expect(result).toContain('.pdf');
+  });
+
+  it('should handle empty brace expansion', () => {
+    const patterns = ['**/*.{}', '**/*.{,}'];
+    const result = extractExtensionsFromPatterns(patterns);
+
+    // Empty extensions should be filtered out
+    expect(result).toHaveLength(0);
+  });
+
+  it('should ignore invalid patterns', () => {
+    const patterns = ['no-asterisk.exe', '**/*no-dot', '**/*.{unclosed'];
+    const result = extractExtensionsFromPatterns(patterns);
+
+    expect(result).toHaveLength(0);
+  });
+
+  it('should remove duplicates and sort results', () => {
+    const patterns = ['**/*.js', '**/*.{js,ts}', '**/*.ts'];
+    const result = extractExtensionsFromPatterns(patterns);
+
+    expect(result).toEqual(['.js', '.ts']);
+  });
+
+  it('should handle complex brace patterns with multiple extensions', () => {
+    const patterns = ['**/*.{html,css,js,jsx,ts,tsx}'];
+    const result = extractExtensionsFromPatterns(patterns);
+
+    expect(result).toEqual(['.css', '.html', '.js', '.jsx', '.ts', '.tsx']);
   });
 });
