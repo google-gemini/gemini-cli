@@ -122,7 +122,7 @@ export class GeminiChat {
   constructor(
     private readonly config: Config,
     private readonly contentGenerator: ContentGenerator,
-    private readonly generationConfig: GenerateContentConfig = {},
+    readonly generationConfig: GenerateContentConfig = {},
     private history: Content[] = [],
   ) {
     validateHistory(history);

@@ -12,12 +12,60 @@ import {
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   GeminiEventType,
-  ToolErrorType,
   parseAndFormatApiError,
 } from '@google/gemini-cli-core';
 import { Content, Part, FunctionCall } from '@google/genai';
 
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
+import fs from 'fs/promises';
+import path from 'path';
+
+const geminiTmpDir = '/tmp/gemini'
+
+async function saveConfig(prefix: string, config: Config) {
+  const savePath = `${prefix}-config.json`;
+  console.log(`\n\n!!! Saving config to: ${savePath}`)
+  await fs.mkdir(path.dirname(savePath), {recursive: true});
+
+  const chat = config?.getGeminiClient()?.getChat();
+  const generationConfig = chat?.generationConfig;
+  await fs.writeFile(savePath, JSON.stringify(generationConfig, null, 2), 'utf-8');
+}
+
+async function saveChatHistory(prefix: string, config: Config) {
+  const savePath = `${prefix}-history.json`;
+  console.log(`\n\n!!! Saving history to: ${savePath}`)
+  await fs.mkdir(path.dirname(savePath), {recursive: true});
+
+  const chat = config?.getGeminiClient()?.getChat();
+  const history = chat.getHistory();
+  const strippedHistory: Content[] = history.map(content => {
+    const parts = content?.parts?.map(part => ({...part}));
+    for (const part of parts ?? []) {
+      part.thoughtSignature = '<<omitted for debugging>>';
+    }
+    return {parts, role: content.role };
+  });
+  await fs.writeFile(savePath, JSON.stringify(strippedHistory, null, 2), 'utf-8');
+}
+
+async function saveDebug(input: string, config: Config) {
+  try {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const seconds = date.getSeconds();
+    const timestamp = `${month}-${day}-${year}-${hours}-${minutes}-${seconds}`;
+    const pathPrefix = path.join(geminiTmpDir, `chat--p-${input.substring(0, 10).split(/\s+/).join('-')}--ts-${timestamp}--uuid-${crypto.randomUUID()}`);
+    await saveConfig(pathPrefix, config);
+    await saveChatHistory(pathPrefix, config);
+  } catch (error) {
+    console.error(`Error saving: ${String(error)}`);
+  }
+}
 
 export async function runNonInteractive(
   config: Config,
@@ -56,6 +104,7 @@ export async function runNonInteractive(
         console.error(
           '\n Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
         );
+        await saveDebug(input, config);
         return;
       }
       const functionCalls: FunctionCall[] = [];
@@ -69,6 +118,7 @@ export async function runNonInteractive(
       for await (const event of responseStream) {
         if (abortController.signal.aborted) {
           console.error('Operation cancelled.');
+          await saveDebug(input, config);
           return;
         }
 
@@ -127,10 +177,12 @@ export async function runNonInteractive(
         currentMessages = [{ role: 'user', parts: toolResponseParts }];
       } else {
         process.stdout.write('\n'); // Ensure a final newline
+        await saveDebug(input, config);
         return;
       }
     }
   } catch (error) {
+    await saveDebug(input, config);
     console.error(
       parseAndFormatApiError(
         error,
