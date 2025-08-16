@@ -94,7 +94,7 @@ describe('ShellExecutionService programmatic integration tests', () => {
 
   it('should abort a running process', async () => {
     // A command that runs for a bit. 'sleep' on unix, 'timeout' on windows.
-    const command = process.platform === 'win32' ? 'timeout /t 5' : 'sleep 5';
+    const command = process.platform === 'win32' ? 'timeout /t 20' : 'sleep 20';
     const onOutputEvent = vi.fn();
     const abortController = new AbortController();
 
@@ -106,7 +106,7 @@ describe('ShellExecutionService programmatic integration tests', () => {
     );
 
     // Abort shortly after starting
-    setTimeout(() => abortController.abort(), 100);
+    setTimeout(() => abortController.abort(), 50);
 
     const result = await handle.result;
 
