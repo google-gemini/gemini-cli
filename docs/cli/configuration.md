@@ -435,6 +435,8 @@ Arguments passed directly when running the CLI can override other configurations
   - Sets the telemetry target. See [telemetry](../telemetry.md) for more information.
 - **`--telemetry-otlp-endpoint`**:
   - Sets the OTLP endpoint for telemetry. See [telemetry](../telemetry.md) for more information.
+- **`--telemetry-otlp-protocol`**:
+  - Sets the OTLP protocol for telemetry (`grpc` or `http`). Defaults to `grpc`. See [telemetry](../telemetry.md) for more information.
 - **`--telemetry-log-prompts`**:
   - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md) for more information.
 - **`--checkpointing`**:
