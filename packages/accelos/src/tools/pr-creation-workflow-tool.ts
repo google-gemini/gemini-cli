@@ -17,14 +17,12 @@ import { reviewToPRStreamingWorkflow } from '../workflows/review-to-pr-streaming
  */
 export const prCreationWorkflowTool = createTool({
   id: 'create-pr-from-review',
-  description: 'Create a pull request to address action items from a production review assessment. Analyzes review findings, generates code fixes using Claude Code, and creates a GitHub PR.',
+  description: 'Automatically implement code fixes and create pull request for production review findings. This tool uses Claude Code to analyze the codebase, make actual file changes to address review issues, create a git branch, commit changes, and create a GitHub PR. Use this tool whenever review findings require code modifications, security fixes, performance improvements, or configuration changes.',
   inputSchema: z.object({
     reviewAssessmentId: z.string().describe('ID of the review assessment to process (e.g., "REVIEW-2025-01-13-sample")'),
     dryRun: z.boolean().default(false).describe('Whether to run in dry-run mode (analysis only, no file changes or PR creation)'),
     autoCommit: z.boolean().default(true).describe('Whether to automatically commit changes to a new branch'),
     createPR: z.boolean().default(true).describe('Whether to create a GitHub pull request'),
-    categories: z.array(z.enum(['security', 'performance', 'testing', 'configuration'])).optional()
-      .describe('Specific categories of findings to address (if not specified, processes all findings)'),
     severity: z.enum(['low', 'medium', 'high', 'critical']).optional()
       .describe('Minimum severity level to process (if not specified, processes all severities)'),
   }),
@@ -49,16 +47,12 @@ export const prCreationWorkflowTool = createTool({
       dryRun, 
       autoCommit, 
       createPR, 
-      categories, 
       severity 
     } = context;
 
     console.log(`🚀 Starting PR creation workflow for review: ${reviewAssessmentId}`);
     console.log(`   Settings: dryRun=${dryRun}, autoCommit=${autoCommit}, createPR=${createPR}`);
     
-    if (categories) {
-      console.log(`   Categories filter: ${categories.join(', ')}`);
-    }
     if (severity) {
       console.log(`   Minimum severity: ${severity}`);
     }

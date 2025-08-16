@@ -9,7 +9,6 @@ import { z } from "zod";
 import { execSync } from "child_process";
 import { claudeCodeTool } from "../tools/claude-code.js";
 import { reviewLoaderTool } from "../tools/review-loader.js";
-import { githubTools } from "../mcp/github-mcp-client.js";
 
 /**
  * Streaming workflow that demonstrates real-time progress from Claude Code operations
@@ -381,23 +380,52 @@ const finalizeStep = createStep({
     if (!dryRun && fixesProposed.length > 0) {
       branchName = `fix/review-${reviewData.id}-${Date.now()}`;
       const workingDir = process.env.REPOSITORY_PATH || process.cwd();
-      console.log(`🌱 [${new Date().toLocaleTimeString()}] Creating branch: ${branchName} in ${workingDir}`);
+      
+      console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Git operations starting:`);
+      console.log(`   Working directory: ${workingDir}`);
+      console.log(`   Branch name: ${branchName}`);
+      console.log(`   Fixes proposed: ${fixesProposed.length}`);
       
       try {
+        // Check current git status before making changes
+        console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Checking current git status...`);
+        const initialStatus = execSync('git status --porcelain', { 
+          encoding: 'utf8',
+          stdio: 'pipe',
+          cwd: workingDir 
+        }).trim();
+        console.log(`   Initial git status: ${initialStatus || '(clean)'}`);
+        
+        // Check current branch
+        const currentBranch = execSync('git branch --show-current', { 
+          encoding: 'utf8',
+          stdio: 'pipe',
+          cwd: workingDir 
+        }).trim();
+        console.log(`   Current branch: ${currentBranch}`);
+        
         // Create git branch locally in the same directory where Claude Code ran
-        execSync(`git checkout -b ${branchName}`, { 
-          stdio: 'inherit',
+        console.log(`🌱 [${new Date().toLocaleTimeString()}] DEBUG: Creating git branch...`);
+        const branchResult = execSync(`git checkout -b ${branchName}`, { 
+          encoding: 'utf8',
+          stdio: 'pipe',
           cwd: workingDir 
         });
+        console.log(`   Git checkout result: ${branchResult.trim()}`);
         console.log(`✅ [${new Date().toLocaleTimeString()}] Git branch created successfully`);
         
         if (autoCommit) {
           // Check if there are any changes to commit
+          console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Checking for changes to commit...`);
           const statusResult = execSync('git status --porcelain', { 
             encoding: 'utf8',
             stdio: 'pipe',
             cwd: workingDir 
           }).trim();
+          console.log(`   Changes detected: ${statusResult ? 'YES' : 'NO'}`);
+          if (statusResult) {
+            console.log(`   Changed files:\n${statusResult.split('\n').map(line => `     ${line}`).join('\n')}`);
+          }
 
           if (!statusResult) {
             console.warn(`⚠️ [${new Date().toLocaleTimeString()}] No changes detected - Claude Code may not have made any modifications`);
@@ -407,23 +435,50 @@ const finalizeStep = createStep({
             
             // Stage only modified/new files (ignoring .gitignore entries)
             try {
-              // Add only tracked files that were modified
-              execSync('git add -u', { 
+              console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Staging tracked files (git add -u)...`);
+              const addUResult = execSync('git add -u', { 
+                encoding: 'utf8',
                 stdio: 'pipe',
                 cwd: workingDir 
               });
-              // Add any new files that aren't ignored
-              execSync('git add . --ignore-errors', { 
+              console.log(`   git add -u result: ${addUResult.trim() || '(no output)'}`);
+              
+              console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Staging new files (git add . --ignore-errors)...`);
+              const addAllResult = execSync('git add . --ignore-errors', { 
+                encoding: 'utf8',
                 stdio: 'pipe',
                 cwd: workingDir 
               });
+              console.log(`   git add . result: ${addAllResult.trim() || '(no output)'}`);
             } catch (addError) {
-              console.warn(`Staging attempt failed, trying alternative approach: ${addError instanceof Error ? addError.message : String(addError)}`);
-              // If that fails, try a more conservative approach - just add modified tracked files
-              execSync('git add -u', { 
-                stdio: 'pipe',
-                cwd: workingDir 
-              });
+              console.warn(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Staging attempt failed, trying alternative approach:`);
+              console.warn(`   Error: ${addError instanceof Error ? addError.message : String(addError)}`);
+              
+              try {
+                // If that fails, try a more conservative approach - just add modified tracked files
+                const fallbackResult = execSync('git add -u', { 
+                  encoding: 'utf8',
+                  stdio: 'pipe',
+                  cwd: workingDir 
+                });
+                console.log(`   Fallback git add -u result: ${fallbackResult.trim() || '(no output)'}`);
+              } catch (fallbackError) {
+                console.error(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Fallback staging also failed:`);
+                console.error(`   Error: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
+                throw fallbackError;
+              }
+            }
+            
+            // Check staged changes before committing
+            console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Checking staged changes...`);
+            const stagedStatus = execSync('git diff --cached --name-status', { 
+              encoding: 'utf8',
+              stdio: 'pipe',
+              cwd: workingDir 
+            }).trim();
+            console.log(`   Staged files: ${stagedStatus ? 'YES' : 'NO'}`);
+            if (stagedStatus) {
+              console.log(`   Staged changes:\n${stagedStatus.split('\n').map(line => `     ${line}`).join('\n')}`);
             }
             
             const fixList = fixesProposed.slice(0, 5).map(fix => `- ${fix}`).join('\n');
@@ -433,32 +488,68 @@ const finalizeStep = createStep({
 Addresses:
 ${fixList}${additionalFixes}`;
             
-            execSync(`git commit -m "${commitMessage}"`, { 
-              stdio: 'inherit',
+            console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Committing changes...`);
+            console.log(`   Commit message: ${commitMessage.split('\n')[0]}...`);
+            const commitResult = execSync(`git commit -m "${commitMessage}"`, { 
+              encoding: 'utf8',
+              stdio: 'pipe',
               cwd: workingDir 
             });
+            console.log(`   Commit result: ${commitResult.trim()}`);
             
             // Push branch to remote
-            execSync(`git push -u origin ${branchName}`, { 
-              stdio: 'inherit',
+            console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Pushing branch to remote...`);
+            console.log(`   Command: git push -u origin ${branchName}`);
+            const pushResult = execSync(`git push -u origin ${branchName}`, { 
+              encoding: 'utf8',
+              stdio: 'pipe',
               cwd: workingDir 
             });
+            console.log(`   Push result: ${pushResult.trim()}`);
             console.log(`💾 [${new Date().toLocaleTimeString()}] Changes committed and pushed`);
             
             if (createPR) {
               try {
+                // Add small delay to ensure branch is available on GitHub API
+                console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Waiting for branch to be available on GitHub...`);
+                await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+                
+                // Verify branch exists on remote
+                console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Verifying branch exists on remote...`);
+                try {
+                  const branchCheck = execSync(`gh api repos/:owner/:repo/branches/${branchName}`, {
+                    encoding: 'utf8',
+                    stdio: 'pipe',
+                    cwd: workingDir
+                  });
+                  console.log(`   ✅ Branch verification successful`);
+                } catch (branchError) {
+                  console.warn(`⚠️ [${new Date().toLocaleTimeString()}] DEBUG: Branch verification failed (but continuing):`);
+                  console.warn(`   Error: ${branchError instanceof Error ? branchError.message : String(branchError)}`);
+                }
+                
                 // Try GitHub CLI first as it's more reliable
+                console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: PR creation starting...`);
+                console.log(`   Branch name: ${branchName}`);
+                console.log(`   Working directory: ${workingDir}`);
+                console.log(`   Fixes count: ${fixesProposed.length}`);
                 console.log(`🔄 [${new Date().toLocaleTimeString()}] Creating pull request using GitHub CLI...`);
+                
                 prUrl = (await createPRWithGitHubCLI(branchName!, reviewData, fixesProposed, workingDir)) || undefined;
                 
+                console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: PR creation result: ${prUrl ? 'SUCCESS' : 'FAILED'}`);
                 if (prUrl) {
                   console.log(`✅ [${new Date().toLocaleTimeString()}] Pull request created: ${prUrl}`);
                 } else {
-                  errors.push('Failed to create PR with GitHub CLI');
+                  console.error(`❌ [${new Date().toLocaleTimeString()}] DEBUG: No PR URL returned from createPRWithGitHubCLI`);
+                  errors.push('Failed to create PR with GitHub CLI - no URL returned');
                 }
               } catch (prError) {
                 const errorMsg = `Failed to create PR: ${prError instanceof Error ? prError.message : String(prError)}`;
-                console.error(`❌ [${new Date().toLocaleTimeString()}] ${errorMsg}`);
+                console.error(`❌ [${new Date().toLocaleTimeString()}] DEBUG: PR creation exception: ${errorMsg}`);
+                if (prError instanceof Error && prError.stack) {
+                  console.error(`   Stack trace: ${prError.stack}`);
+                }
                 errors.push(errorMsg);
               }
             }
@@ -509,9 +600,93 @@ async function createPRWithGitHubCLI(
   workingDir: string
 ): Promise<string | null> {
   try {
+    console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: createPRWithGitHubCLI starting...`);
+    console.log(`   Branch: ${branchName}`);
+    console.log(`   Working dir: ${workingDir}`);
+    console.log(`   Review ID: ${reviewData.id}`);
+    console.log(`   Fixes count: ${fixesProposed.length}`);
+    
+    // Check if GitHub CLI is available
+    console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Checking GitHub CLI availability...`);
+    try {
+      const ghVersion = execSync('gh --version', {
+        encoding: 'utf8',
+        stdio: 'pipe',
+        cwd: workingDir
+      });
+      console.log(`   GitHub CLI version: ${ghVersion.split('\n')[0]}`);
+    } catch (ghCheckError) {
+      console.error(`❌ [${new Date().toLocaleTimeString()}] DEBUG: GitHub CLI not available:`);
+      console.error(`   Error: ${ghCheckError instanceof Error ? ghCheckError.message : String(ghCheckError)}`);
+      return null;
+    }
+    
+    // Check GitHub authentication
+    console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Checking GitHub authentication...`);
+    try {
+      const authStatus = execSync('gh auth status', {
+        encoding: 'utf8',
+        stdio: 'pipe',
+        cwd: workingDir
+      });
+      console.log(`   Auth status: OK`);
+      console.log(`   Auth details: ${authStatus.trim().split('\n')[0]}`);
+    } catch (authError) {
+      console.error(`❌ [${new Date().toLocaleTimeString()}] DEBUG: GitHub authentication failed:`);
+      console.error(`   Error: ${authError instanceof Error ? authError.message : String(authError)}`);
+      return null;
+    }
+    
+    // Verify repository context
+    console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Verifying repository context...`);
+    let repoInfo;
+    try {
+      repoInfo = execSync('gh repo view --json name,owner,defaultBranchRef', {
+        encoding: 'utf8',
+        stdio: 'pipe',
+        cwd: workingDir
+      });
+      const repo = JSON.parse(repoInfo);
+      console.log(`   Repository: ${repo.owner.login}/${repo.name}`);
+      console.log(`   Default branch: ${repo.defaultBranchRef.name}`);
+    } catch (repoError) {
+      console.error(`❌ [${new Date().toLocaleTimeString()}] DEBUG: Repository context detection failed:`);
+      console.error(`   Error: ${repoError instanceof Error ? repoError.message : String(repoError)}`);
+      console.error(`   This might cause PR creation to fail - trying to continue anyway`);
+    }
+    
+    // Detect the correct base branch dynamically
+    console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Detecting base branch...`);
+    let baseBranch = 'main'; // default fallback
+    try {
+      if (repoInfo) {
+        const repo = JSON.parse(repoInfo);
+        baseBranch = repo.defaultBranchRef.name;
+        console.log(`   Using repository default branch: ${baseBranch}`);
+      } else {
+        // Fallback: try to detect from git
+        try {
+          const gitDefault = execSync('git symbolic-ref refs/remotes/origin/HEAD', {
+            encoding: 'utf8',
+            stdio: 'pipe',
+            cwd: workingDir
+          }).trim().replace('refs/remotes/origin/', '');
+          baseBranch = gitDefault;
+          console.log(`   Using git detected default branch: ${baseBranch}`);
+        } catch (gitError) {
+          console.log(`   Using fallback branch: ${baseBranch}`);
+        }
+      }
+    } catch (branchError) {
+      console.warn(`⚠️ [${new Date().toLocaleTimeString()}] DEBUG: Base branch detection failed, using fallback: ${baseBranch}`);
+    }
+    
     const prTitle = `Fix issues from production review ${reviewData.id}`;
     const fixList = fixesProposed.slice(0, 5).map(fix => `- ${fix}`).join('\\n');
     const additionalFixes = fixesProposed.length > 5 ? `\\n... and ${fixesProposed.length - 5} more fixes` : '';
+    
+    console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Preparing PR content...`);
+    console.log(`   Title: ${prTitle}`);
     
     const prBody = `## Summary
 This PR addresses ${fixesProposed.length} issues identified in production review ${reviewData.id}:
@@ -528,23 +703,85 @@ Automated fixes applied by Claude Code based on review recommendations.
 
 🤖 Generated with Claude Code via Mastra workflow`;
 
+    console.log(`   Body preview: ${prBody.substring(0, 200)}...`);
+
     // Create PR using gh CLI
-    const prResult = execSync(
-      `gh pr create --title "${prTitle}" --body "${prBody.replace(/"/g, '\\"')}" --head "${branchName}" --base "main"`,
-      {
-        encoding: 'utf8',
-        stdio: 'pipe',
-        cwd: workingDir
+    console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Executing GitHub CLI PR creation...`);
+    const ghCommand = `gh pr create --title "${prTitle}" --body "${prBody.replace(/"/g, '\\"')}" --head "${branchName}" --base "${baseBranch}"`;
+    console.log(`   Command: ${ghCommand.substring(0, 150)}...`);
+    console.log(`   Using base branch: ${baseBranch}`);
+    
+    // Add retry logic for transient failures
+    let prResult;
+    let lastError;
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: PR creation attempt ${attempt}/${maxRetries}`);
+        
+        prResult = execSync(ghCommand, {
+            encoding: 'utf8',
+            stdio: 'pipe',
+            cwd: workingDir
+          }
+        ).trim();
+        
+        console.log(`✅ [${new Date().toLocaleTimeString()}] DEBUG: PR creation successful on attempt ${attempt}`);
+        break; // Success, exit retry loop
+        
+      } catch (error) {
+        lastError = error;
+        console.warn(`⚠️ [${new Date().toLocaleTimeString()}] DEBUG: PR creation attempt ${attempt} failed:`);
+        console.warn(`   Error: ${error instanceof Error ? error.message : String(error)}`);
+        
+        if (attempt < maxRetries) {
+          const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
+          console.log(`   Retrying in ${waitTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
       }
-    ).trim();
+    }
+    
+    if (!prResult) {
+      // All retries failed, throw the last error
+      throw lastError;
+    }
+
+    console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: GitHub CLI execution completed`);
+    console.log(`   Raw result: ${prResult}`);
 
     // Extract PR URL from gh CLI output
+    console.log(`🔧 [${new Date().toLocaleTimeString()}] DEBUG: Extracting PR URL from result...`);
     const prUrlRegex = /https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/;
     const prUrlMatch = prUrlRegex.exec(prResult);
-    return prUrlMatch ? prUrlMatch[0] : null;
+    
+    if (prUrlMatch) {
+      console.log(`   PR URL found: ${prUrlMatch[0]}`);
+      return prUrlMatch[0];
+    } else {
+      console.error(`❌ [${new Date().toLocaleTimeString()}] DEBUG: No PR URL found in GitHub CLI output`);
+      console.error(`   Full output: ${prResult}`);
+      console.error(`   Regex pattern: ${prUrlRegex.source}`);
+      return null;
+    }
 
   } catch (error) {
-    console.error(`GitHub CLI error: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`❌ [${new Date().toLocaleTimeString()}] DEBUG: GitHub CLI error:`);
+    console.error(`   Error type: ${error instanceof Error ? error.constructor.name : typeof error}`);
+    console.error(`   Error message: ${error instanceof Error ? error.message : String(error)}`);
+    if (error instanceof Error && error.stack) {
+      console.error(`   Stack trace: ${error.stack}`);
+    }
+    
+    // Try to extract additional context from exec errors
+    if (error && typeof error === 'object' && 'stderr' in error) {
+      console.error(`   Stderr: ${(error as any).stderr}`);
+    }
+    if (error && typeof error === 'object' && 'stdout' in error) {
+      console.error(`   Stdout: ${(error as any).stdout}`);
+    }
+    
     return null;
   }
 }

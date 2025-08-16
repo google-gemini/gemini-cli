@@ -388,23 +388,44 @@ const accelosAnthropicAgent = new Agent({
   },
 });
 
+// Filter GitHub MCP tools to only include readonly operations for production readiness reviews
+const readonlyGithubTools = Object.fromEntries(
+  Object.entries(githubTools).filter(([key]) => {
+    // Keep tools that start with readonly patterns
+    const readonlyPatterns = [
+      'get_', 'list_', 'search_', 'read_', 'fetch_', 'show_', 'describe_'
+    ];
+    // Remove tools that start with write operation patterns
+    const writePatterns = [
+      'create_', 'update_', 'merge_', 'delete_', 'fork_', 'close_', 'reopen_'
+    ];
+    
+    const hasReadonlyPattern = readonlyPatterns.some(pattern => key.includes(pattern));
+    const hasWritePattern = writePatterns.some(pattern => key.includes(pattern));
+    
+    // Include if it matches readonly patterns and doesn't match write patterns
+    return hasReadonlyPattern && !hasWritePattern;
+  })
+);
+
 const productionReadinessAgent = new Agent({
-  name: 'production-readiness-agent',
-  instructions: productionReadinessPrompt,
-  model: anthropic('claude-3-7-sonnet-20250219'),
-  defaultGenerateOptions: {
-    maxSteps: 500,
-  },
-  tools: {
-    guardrailCrudTool,
-    reviewStorage: reviewStorageTool,
-    ekgCrud: ekgCrudTool,
-    reviewLoader: reviewLoaderTool,
-    prCreation: prCreationWorkflowTool,
-    ...githubTools,
-  },
-  memory,
-});
+    name: 'production-readiness-agent',
+    instructions: productionReadinessPrompt,
+    model: anthropic('claude-3-7-sonnet-20250219'),
+    defaultGenerateOptions: {
+      maxSteps: 500,
+    },
+    tools: 
+    {
+      guardrailCrudTool,
+      reviewStorage: reviewStorageTool,
+      ekgCrud: ekgCrudTool,
+      reviewLoader: reviewLoaderTool,
+      prCreation: prCreationWorkflowTool,
+      ...readonlyGithubTools, // Only readonly GitHub operations
+    },
+    memory,
+  });
 
 const guardrailAgent = new Agent({
   name: 'guardrail-agent',
