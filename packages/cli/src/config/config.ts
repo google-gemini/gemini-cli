@@ -498,8 +498,10 @@ export async function loadCliConfig(
         argv.telemetryOtlpEndpoint ??
         process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
         settings.telemetry?.otlpEndpoint,
-      otlpProtocol: (argv.telemetryOtlpProtocol ??
-        settings.telemetry?.otlpProtocol) as 'grpc' | 'http' | undefined,
+      otlpProtocol: (['grpc', 'http'] as const).find(
+        (p) =>
+          p === (argv.telemetryOtlpProtocol ?? settings.telemetry?.otlpProtocol)
+      ),
       logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
       outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
     },
