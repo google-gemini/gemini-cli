@@ -399,13 +399,18 @@ class GrepToolInvocation extends BaseToolInvocation<
         const globExcludes = this.fileExclusions.getGlobExcludes();
         const commonExcludes = globExcludes
           .map((pattern) => {
-            if (pattern.endsWith('/**')) {
-              // Handles `**/dir/**` and `dir/**`
-              return pattern.slice(0, -3).replace(/^\*\*\//, '');
+            let dir = pattern;
+            if (dir.startsWith('**/')) {
+              dir = dir.substring(3);
             }
-            if (pattern.endsWith('/')) {
-              // Handles `dir/`
-              return pattern.slice(0, -1);
+            if (dir.endsWith('/**')) {
+              dir = dir.slice(0, -3);
+            } else if (dir.endsWith('/')) {
+              dir = dir.slice(0, -1);
+            }
+            // Use if it's a path without wildcards
+            if (dir && !dir.includes('*')) {
+              return dir;
             }
             return null;
           })
