@@ -21,6 +21,7 @@ import {
   METRIC_TOKEN_USAGE,
   METRIC_SESSION_COUNT,
   METRIC_FILE_OPERATION_COUNT,
+  EVENT_CHAT_COMPRESSION,
 } from './constants.js';
 import { Config } from '../config/config.js';
 import { DiffStat } from '../tools/tools.js';
@@ -38,6 +39,7 @@ let apiRequestCounter: Counter | undefined;
 let apiRequestLatencyHistogram: Histogram | undefined;
 let tokenUsageCounter: Counter | undefined;
 let fileOperationCounter: Counter | undefined;
+let chatCompressionCounter: Counter | undefined;
 let isMetricsInitialized = false;
 
 function getCommonAttributes(config: Config): Attributes {
@@ -88,12 +90,27 @@ export function initializeMetrics(config: Config): void {
     description: 'Counts file operations (create, read, update).',
     valueType: ValueType.INT,
   });
+  chatCompressionCounter = meter.createCounter(EVENT_CHAT_COMPRESSION, {
+    description: 'Counts chat compression events.',
+    valueType: ValueType.INT,
+  });
   const sessionCounter = meter.createCounter(METRIC_SESSION_COUNT, {
     description: 'Count of CLI sessions started.',
     valueType: ValueType.INT,
   });
   sessionCounter.add(1, getCommonAttributes(config));
   isMetricsInitialized = true;
+}
+
+export function recordChatCompressionMetrics(
+  config: Config,
+  args: { tokens_before: number; tokens_after: number },
+) {
+  if (!chatCompressionCounter || !isMetricsInitialized) return;
+  chatCompressionCounter.add(1, {
+    ...getCommonAttributes(config),
+    ...args,
+  });
 }
 
 export function recordToolCallMetrics(
