@@ -91,7 +91,10 @@ export function getRestartRequiredSettings(): string[] {
 /**
  * Recursively gets a value from a nested object using a key path array.
  */
-function getNestedValue(obj: Record<string, unknown>, path: string[]): unknown {
+export function getNestedValue(
+  obj: Record<string, unknown>,
+  path: string[],
+): unknown {
   const [first, ...rest] = path;
   if (!first || !(first in obj)) {
     return undefined;
@@ -333,6 +336,20 @@ export function setPendingSettingValue(
 }
 
 /**
+ * Generic setter: Set a setting value (boolean, number, string, etc.) in the pending settings
+ */
+export function setPendingSettingValueAny(
+  key: string,
+  value: unknown,
+  pendingSettings: Settings,
+): Settings {
+  const path = key.split('.');
+  const newSettings = JSON.parse(JSON.stringify(pendingSettings));
+  setNestedValue(newSettings, path, value);
+  return newSettings;
+}
+
+/**
  * Check if any modified settings require a restart
  */
 export function hasRestartRequiredSettings(
@@ -382,11 +399,9 @@ export function saveModifiedSettings(
       // We need to set the whole parent object.
       const [parentKey] = path;
       if (parentKey) {
-        // Ensure value is a boolean for setPendingSettingValue
-        const booleanValue = typeof value === 'boolean' ? value : false;
-        const newParentValue = setPendingSettingValue(
+        const newParentValue = setPendingSettingValueAny(
           settingKey,
-          booleanValue,
+          value,
           loadedSettings.forScope(scope).settings,
         )[parentKey as keyof Settings];
 
@@ -431,11 +446,9 @@ export function getDisplayValue(
   const isChangedFromDefault =
     typeof defaultValue === 'boolean' ? value !== defaultValue : value === true;
   const isInModifiedSettings = modifiedSettings.has(key);
-  const hasPendingChanges =
-    pendingSettings && settingExistsInScope(key, pendingSettings);
 
-  // Add * indicator when value differs from default, is in modified settings, or has pending changes
-  if (isChangedFromDefault || isInModifiedSettings || hasPendingChanges) {
+  // Only show * if value actually differs from default, not just if key exists
+  if (isChangedFromDefault || isInModifiedSettings) {
     return `${valueString}*`; // * indicates changed from default value
   }
 

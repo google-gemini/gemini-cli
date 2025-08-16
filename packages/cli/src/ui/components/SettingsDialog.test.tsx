@@ -296,8 +296,13 @@ describe('SettingsDialog', () => {
         expect(lastFrame()).toContain('  Apply To');
       });
 
-      // Should be back to settings focus
-      expect(lastFrame()).toContain('  Apply To');
+      // Wait a bit more to ensure React state has updated
+      await wait(100);
+
+      // Should be back to settings focus - check that it's NOT showing the > prefix
+      const output = lastFrame();
+      expect(output).toContain('Apply To');
+      expect(output).not.toContain('> Apply To');
 
       unmount();
     });
@@ -664,7 +669,9 @@ describe('SettingsDialog', () => {
       );
 
       // Start in settings section
-      expect(lastFrame()).toContain('  Apply To');
+      let output = lastFrame();
+      expect(output).toContain('Apply To');
+      expect(output).not.toContain('> Apply To');
 
       // Tab to scope section
       stdin.write('\t');
@@ -674,9 +681,11 @@ describe('SettingsDialog', () => {
 
       // Tab back to settings section
       stdin.write('\t');
+
       await waitFor(() => {
         expect(lastFrame()).toContain('  Apply To');
       });
+
 
       unmount();
     });
