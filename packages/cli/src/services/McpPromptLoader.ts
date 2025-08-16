@@ -9,6 +9,7 @@ import {
   getErrorMessage,
   getMCPServerPrompts,
 } from '@google/gemini-cli-core';
+import { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
 import {
   CommandContext,
   CommandKind,
@@ -16,7 +17,6 @@ import {
   SlashCommandActionReturn,
 } from '../ui/commands/types.js';
 import { ICommandLoader } from './types.js';
-import { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
 
 /**
  * Discovers and loads executable slash commands from prompts exposed by
@@ -176,15 +176,16 @@ export class McpPromptLoader implements ICommandLoader {
     const argValues: { [key: string]: string } = {};
     const promptInputs: Record<string, unknown> = {};
 
-    // arg parsing: --key="value" or --key=value
-    const namedArgRegex = /--([^=]+)=(?:"((?:\\.|[^"\\])*)"|([^ ]*))/g;
+    // arg parsing: --key="value", --key='value', or --key=value
+    const namedArgRegex =
+      /--([^=]+)=(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|([^ ]*))/g;
     let match;
     const remainingArgs: string[] = [];
     let lastIndex = 0;
 
     while ((match = namedArgRegex.exec(userArgs)) !== null) {
       const key = match[1];
-      const value = match[2] ?? match[3]; // Quoted or unquoted value
+      const value = match[2] ?? match[3] ?? match[4]; // Quoted or unquoted value
       argValues[key] = value;
       // Capture text between matches as potential positional args
       if (match.index > lastIndex) {
