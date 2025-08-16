@@ -19,6 +19,7 @@ import {
   SlashCommandEvent,
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
+  ConversationFinishedEvent,
   KittySequenceOverflowEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
@@ -46,6 +47,7 @@ const next_speaker_check_event_name = 'next_speaker_check';
 const slash_command_event_name = 'slash_command';
 const malformed_json_response_event_name = 'malformed_json_response';
 const ide_connection_event_name = 'ide_connection';
+const conversation_finished_event_name = 'conversation_finished';
 const kitty_sequence_overflow_event_name = 'kitty_sequence_overflow';
 
 export interface LogResponse {
@@ -686,6 +688,28 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(ide_connection_event_name, data));
+    this.flushIfNeeded();
+  }
+
+  logConversationFinishedEvent(event: ConversationFinishedEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CONVERSATION_TURN_COUNT,
+        value: JSON.stringify(event.turnCount),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE,
+        value: event.approvalMode,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(conversation_finished_event_name, data),
+    );
     this.flushIfNeeded();
   }
 

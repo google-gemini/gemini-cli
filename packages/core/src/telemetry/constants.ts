@@ -16,6 +16,7 @@ export const EVENT_FLASH_FALLBACK = 'gemini_cli.flash_fallback';
 export const EVENT_NEXT_SPEAKER_CHECK = 'gemini_cli.next_speaker_check';
 export const EVENT_SLASH_COMMAND = 'gemini_cli.slash_command';
 export const EVENT_IDE_CONNECTION = 'gemini_cli.ide_connection';
+export const EVENT_CONVERSATION_FINISHED = 'gemini_cli.conversation_finished';
 
 export const METRIC_TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
 export const METRIC_TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';

@@ -5,7 +5,7 @@
  */
 
 import { GenerateContentResponseUsageMetadata } from '@google/genai';
-import { Config } from '../config/config.js';
+import { ApprovalMode, Config } from '../config/config.js';
 import { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { FileDiff } from '../tools/tools.js';
 import { AuthType } from '../core/contentGenerator.js';
@@ -346,6 +346,20 @@ export class IdeConnectionEvent {
   }
 }
 
+export class ConversationFinishedEvent {
+  'event_name': 'conversation_finished';
+  'event.timestamp': string; // ISO 8601;
+  approvalMode: ApprovalMode;
+  turnCount: number;
+
+  constructor(approvalMode: ApprovalMode, turnCount: number) {
+    this['event_name'] = 'conversation_finished';
+    this['event.timestamp'] = new Date().toISOString();
+    this.approvalMode = approvalMode;
+    this.turnCount = turnCount;
+  }
+}
+
 export class KittySequenceOverflowEvent {
   'event.name': 'kitty_sequence_overflow';
   'event.timestamp': string; // ISO 8601
@@ -374,4 +388,5 @@ export type TelemetryEvent =
   | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
+  | ConversationFinishedEvent
   | SlashCommandEvent;
