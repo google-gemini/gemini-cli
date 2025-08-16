@@ -24,7 +24,7 @@ import { glob } from 'glob';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
-const bundleDir = join(root, 'bundle');
+const bundleDir = process.env.TEST_BUNDLE_DIR || join(root, 'bundle');
 
 // Create the bundle directory if it doesn't exist
 if (!existsSync(bundleDir)) {
@@ -34,7 +34,30 @@ if (!existsSync(bundleDir)) {
 // Find and copy all .sb files from packages to the root of the bundle directory
 const sbFiles = glob.sync('packages/**/*.sb', { cwd: root });
 for (const file of sbFiles) {
-  copyFileSync(join(root, file), join(bundleDir, basename(file)));
+  const destPath = join(bundleDir, basename(file));
+  copyFileSync(join(root, file), destPath);
+}
+
+// Create backwards compatibility symlinks for renamed seatbelt profiles
+// This fixes issue #850 where npx installs look for the old profile names
+const profileMappings = [
+  { old: 'sandbox-macos-minimal.sb', new: 'sandbox-macos-permissive-open.sb' },
+  {
+    old: 'sandbox-macos-strict.sb',
+    new: 'sandbox-macos-restrictive-closed.sb',
+  },
+];
+
+for (const mapping of profileMappings) {
+  const newPath = join(bundleDir, mapping.new);
+  const oldPath = join(bundleDir, mapping.old);
+
+  // Only create symlink if the new file exists and old doesn't
+  if (existsSync(newPath) && !existsSync(oldPath)) {
+    // Copy file instead of symlink for better compatibility with npm packaging
+    copyFileSync(newPath, oldPath);
+    console.log(`Created compatibility copy: ${mapping.old} -> ${mapping.new}`);
+  }
 }
 
 console.log('Assets copied to bundle/');
