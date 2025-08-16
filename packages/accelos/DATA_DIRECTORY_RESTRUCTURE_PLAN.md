@@ -17,12 +17,13 @@ This plan restructures the file path management system to consolidate RCAs, guar
 ## Proposed New Structure
 
 ```
-data/
-├── RCA/
-│   └── [existing RCA files]
-├── guardrails.json
-└── reviews/
-    └── [production-review agent assessments]
+.accelos/
+└── data/
+    ├── RCA/
+    │   └── [existing RCA files]
+    ├── guardrails.json
+    └── reviews/
+        └── [production-review agent assessments]
 ```
 
 ## Implementation Plan
@@ -35,13 +36,13 @@ data/
 **Changes**:
 - Replace `guardrailFilePath` and `rcaDirectoryPath` with single `dataDirectoryPath`
 - Update environment variable from separate paths to `ACCELOS_DATA_DIRECTORY_PATH`
-- Default to `./data`
+- Default to `./.accelos/data`
 
 **New Configuration**:
 ```typescript
 export const AccelosConfigSchema = z.object({
   // ... existing fields
-  dataDirectoryPath: z.string().default(process.env.ACCELOS_DATA_DIRECTORY_PATH || './data'),
+  dataDirectoryPath: z.string().default(process.env.ACCELOS_DATA_DIRECTORY_PATH || './.accelos/data'),
 });
 ```
 
@@ -85,7 +86,7 @@ export function getDataPaths(dataDir: string) {
 ### Phase 3: New Reviews Feature
 
 #### 3.1 Create Reviews Directory Structure
-- Create `data/reviews/` directory
+- Create `.accelos/data/reviews/` directory
 - Implement directory initialization if it doesn't exist
 
 #### 3.2 Create Review Storage Tool

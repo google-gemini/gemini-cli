@@ -44,6 +44,47 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config();
 
+// Initialize directory structure for Mastra
+async function initializeDirectoryStructure() {
+  try {
+    console.log(`🔧 DEBUG: Mastra initializeDirectoryStructure() started`);
+    const dataDir = process.env.ACCELOS_DATA_DIRECTORY_PATH || './.accelos/data';
+    const reviewsDir = path.join(dataDir, 'reviews');
+    const guardrailsFile = path.join(dataDir, 'guardrails.json');
+    
+    // Create main data directory if it doesn't exist
+    if (!existsSync(dataDir)) {
+      await fs.mkdir(dataDir, { recursive: true });
+      console.log(`📁 Created data directory: ${dataDir}`);
+    } else {
+      console.log(`📁 Data directory already exists: ${dataDir}`);
+    }
+    
+    // Create reviews subdirectory if it doesn't exist
+    if (!existsSync(reviewsDir)) {
+      await fs.mkdir(reviewsDir, { recursive: true });
+      console.log(`📁 Created reviews directory: ${reviewsDir}`);
+    } else {
+      console.log(`📁 Reviews directory already exists: ${reviewsDir}`);
+    }
+    
+    // Create empty guardrails.json if it doesn't exist
+    if (!existsSync(guardrailsFile)) {
+      await fs.writeFile(guardrailsFile, JSON.stringify([], null, 2), 'utf-8');
+      console.log(`📄 Created empty guardrails file: ${guardrailsFile}`);
+    } else {
+      console.log(`📄 Guardrails file already exists: ${guardrailsFile}`);
+    }
+    
+    console.log(`✅ Directory structure initialization completed`);
+  } catch (error) {
+    console.warn(
+      `⚠️  Failed to initialize directory structure: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+    console.warn('   Mastra will continue, but some features may not work properly.');
+  }
+}
+
 // Initialize guardrails at startup for Mastra
 async function initializeGuardrails() {
   try {
@@ -105,23 +146,99 @@ async function initializeEkg() {
   }
 }
 
-// Initialize guardrails and EKG database (non-blocking)
-initializeGuardrails().catch((error) => {
-  console.warn(
-    `⚠️  Failed to initialize guardrails: ${error instanceof Error ? error.message : 'Unknown error'}`,
-  );
-});
+// Initialize directory structure first, then guardrails and EKG database
+(async () => {
+  try {
+    // Initialize directory structure first (blocking)
+    await initializeDirectoryStructure();
+    
+    // Then initialize guardrails and EKG (non-blocking)
+    initializeGuardrails().catch((error) => {
+      console.warn(
+        `⚠️  Failed to initialize guardrails: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    });
 
-initializeEkg().catch((error) => {
-  console.warn(
-    `⚠️  Failed to initialize EKG database: ${error instanceof Error ? error.message : 'Unknown error'}`,
-  );
-});
+    initializeEkg().catch((error) => {
+      console.warn(
+        `⚠️  Failed to initialize EKG database: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    });
+  } catch (error) {
+    console.warn(
+      `⚠️  Failed to initialize directory structure: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+  }
+})();
 
 const memory = new Memory({
   storage: new LibSQLStore({
     url: 'file:../../memory.db',
   }),
+});
+
+// Create API routes using registerApiRoute pattern
+const streamingSSERoute = registerApiRoute('/accelos/streaming-sse', {
+  method: 'GET',
+  handler: await createStreamingSSEHandler(),
+});
+
+const guardrailsListRoute = registerApiRoute('/accelos/guardrails', {
+  method: 'GET',
+  handler: await createGuardrailsListHandler(),
+});
+
+const guardrailByIdRoute = registerApiRoute('/accelos/guardrails/:id', {
+  method: 'GET',
+  handler: await createGuardrailByIdHandler(),
+});
+
+const reviewsListRoute = registerApiRoute('/accelos/reviews-list', {
+  method: 'GET',
+  handler: await createReviewsListHandler(),
+});
+
+const reviewByIdRoute = registerApiRoute('/accelos/reviews/:id', {
+  method: 'GET',
+  handler: await createReviewByIdHandler(),
+});
+
+// Streaming test HTML route
+const streamingTestRoute = registerApiRoute('/accelos/streaming-test.html', {
+  method: 'GET',
+  handler: async (c) => {
+    try {
+      const possiblePaths = [
+        path.join(process.cwd(), 'src', 'streaming-test.html'),
+        path.join(__dirname, '..', 'streaming-test.html'),
+        path.join(__dirname, '..', '..', 'src', 'streaming-test.html'),
+        path.resolve('src/streaming-test.html'),
+      ];
+      
+      let htmlContent = null;
+      
+      for (const htmlPath of possiblePaths) {
+        try {
+          if (existsSync(htmlPath)) {
+            htmlContent = readFileSync(htmlPath, 'utf8');
+            break;
+          }
+        } catch (_err) {
+          continue;
+        }
+      }
+      
+      if (!htmlContent) {
+        return c.text(`Streaming test page not found. Tried paths:\n${possiblePaths.join('\n')}\nCurrent working directory: ${process.cwd()}`, 404);
+      }
+      
+      c.header('Content-Type', 'text/html');
+      c.header('Cache-Control', 'no-cache');
+      return c.body(htmlContent);
+    } catch (error) {
+      return c.text(`Error loading streaming test page: ${error instanceof Error ? error.message : String(error)}`, 500);
+    }
+  },
 });
 
 // Custom API route for reviews
@@ -150,7 +267,7 @@ const reviewsApiRoute = registerApiRoute('/accelos/reviews', {
     // Handle GET request
     if (c.req.method === 'GET') {
       try {
-        const dataDir = process.env.ACCELOS_DATA_DIRECTORY_PATH || './data';
+        const dataDir = process.env.ACCELOS_DATA_DIRECTORY_PATH || './.accelos/data';
         const reviewsDir = path.join(dataDir, 'reviews');
         
         // Read all files in the reviews directory
@@ -257,7 +374,7 @@ const productionReadinessAgent = new Agent({
     {
       guardrailCrudTool,
       reviewStorage: reviewStorageTool,
-      ekgCrud: ekgCrudTool,
+      //ekgCrud: ekgCrudTool,
       reviewLoader: reviewLoaderTool,
       prCreation: prCreationWorkflowTool,
       ...githubTools,
@@ -319,77 +436,12 @@ export const mastra = new Mastra({
     },
     apiRoutes: [
       reviewsApiRoute,
-      {
-        path: "/api/streaming-sse",
-        method: "GET",
-        createHandler: createStreamingSSEHandler,
-      },
-      {
-        path: "/api/guardrails",
-        method: "GET",
-        createHandler: createGuardrailsListHandler,
-      },
-      {
-        path: "/api/guardrails/:id",
-        method: "GET",
-        createHandler: createGuardrailByIdHandler,
-      },
-      {
-        path: "/api/reviews",
-        method: "GET",
-        createHandler: createReviewsListHandler,
-      },
-      {
-        path: "/api/reviews/:id",
-        method: "GET",
-        createHandler: createReviewByIdHandler,
-      },
-      {
-        path: "/streaming-test.html",
-        method: "GET",
-        createHandler: async () => {
-          return async (c: any) => {
-            try {
-              // Try multiple possible locations for the HTML file
-              const possiblePaths = [
-                path.join(process.cwd(), 'src', 'streaming-test.html'),
-                path.join(__dirname, '..', 'streaming-test.html'),
-                path.join(__dirname, '..', '..', 'src', 'streaming-test.html'),
-                path.resolve('src/streaming-test.html'),
-              ];
-              
-              let htmlContent = null;
-              let foundPath = null;
-              
-              for (const htmlPath of possiblePaths) {
-                try {
-                  if (existsSync(htmlPath)) {
-                    htmlContent = readFileSync(htmlPath, 'utf8');
-                    foundPath = htmlPath;
-                    break;
-                  }
-                } catch (err) {
-                  // Continue to next path
-                  continue;
-                }
-              }
-              
-              if (!htmlContent) {
-                // Debug: show what paths were tried
-                return c.text(`Streaming test page not found. Tried paths:\n${possiblePaths.join('\n')}\nCurrent working directory: ${process.cwd()}`, 404);
-              }
-              
-              // Use Hono context methods
-              c.header('Content-Type', 'text/html');
-              c.header('Cache-Control', 'no-cache');
-              return c.body(htmlContent);
-            } catch (error) {
-              // Return 404 using Hono pattern with debug info
-              return c.text(`Error loading streaming test page: ${error instanceof Error ? error.message : String(error)}`, 500);
-            }
-          };
-        },
-      }
+      streamingSSERoute,
+      guardrailsListRoute,
+      guardrailByIdRoute,
+      reviewsListRoute,
+      reviewByIdRoute,
+      streamingTestRoute,
     ],
   },
 });

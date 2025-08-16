@@ -8,7 +8,7 @@ export const AccelosConfigSchema = z.object({
   temperature: z.number().min(0).max(2).default(0.1),
   maxTokens: z.number().positive().default(1000),
   systemPrompt: z.string().default('You are Accelos, a helpful AI assistant.'),
-  dataDirectoryPath: z.string().default(process.env.ACCELOS_DATA_DIRECTORY_PATH || './data'),
+  dataDirectoryPath: z.string().default(process.env.ACCELOS_DATA_DIRECTORY_PATH || './.accelos/data'),
   // Legacy support - will be deprecated
   guardrailFilePath: z.string().optional(),
 });
@@ -35,7 +35,7 @@ export const defaultConfig: AccelosConfig = {
   temperature: 0.1,
   maxTokens: 1000,
   systemPrompt: 'You are Accelos, a helpful AI assistant that helps with various tasks including code analysis, document processing, and general assistance.',
-  dataDirectoryPath: process.env.ACCELOS_DATA_DIRECTORY_PATH || './data',
+  dataDirectoryPath: process.env.ACCELOS_DATA_DIRECTORY_PATH || './.accelos/data',
 };
 
 /**

@@ -18,7 +18,7 @@ fi
 # Copy all necessary files from Mastra build
 echo "📋 Copying Mastra build files..."
 cp .mastra/output/index.mjs ship/
-cp .mastra/output/mastra.mjs ship/
+[ -f .mastra/output/mastra.mjs ] && cp .mastra/output/mastra.mjs ship/
 cp .mastra/output/tools.mjs ship/
 cp .mastra/output/instrumentation.mjs ship/
 cp .mastra/output/telemetry-config.mjs ship/
