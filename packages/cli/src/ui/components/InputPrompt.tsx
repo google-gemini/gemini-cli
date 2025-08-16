@@ -148,15 +148,30 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
-      if (shellModeActive) {
-        shellHistory.addCommandToHistory(submittedValue);
+      // Prevent duplicate submissions by checking if already processing
+      if (isSubmittingRef.current) {
+        return;
       }
-      // Clear the buffer *before* calling onSubmit to prevent potential re-submission
-      // if onSubmit triggers a re-render while the buffer still holds the old value.
-      buffer.setText('');
-      resetCompletionState();
-      onSubmit(submittedValue);
-      resetReverseSearchCompletionState();
+      
+      isSubmittingRef.current = true;
+      
+      try {
+        // Handle shell mode logic
+        if (shellModeActive) {
+          shellHistory.addCommandToHistory(submittedValue);
+        }
+        
+        // Clear the buffer and reset completion states first
+        buffer.setText('');
+        resetCompletionState();
+        resetReverseSearchCompletionState();
+        
+        // Call onSubmit last to prevent potential re-submission issues
+        onSubmit(submittedValue);
+      } finally {
+        // Always reset the submission flag
+        isSubmittingRef.current = false;
+      }
     },
     [
       onSubmit,
