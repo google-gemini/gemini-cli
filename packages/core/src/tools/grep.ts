@@ -411,11 +411,8 @@ class GrepToolInvocation extends BaseToolInvocation<
 
             // Only consider patterns that are likely directories. This filters out file patterns.
             if (dir && !dir.includes('/') && !dir.includes('*')) {
-              // Allow names without dots (e.g., 'dist') or dot-directories (e.g., '.git').
-              if (
-                !dir.includes('.') ||
-                (dir.startsWith('.') && !dir.substring(1).includes('.'))
-              ) {
+              // Only consider patterns that are likely directories. This filters out file patterns.
+              if (dir && !dir.includes('/') && !dir.includes('*')) {
                 return dir;
               }
             }
