@@ -16,7 +16,7 @@ import {
   DEFAULT_ENCODING,
   getSpecificMimeType,
 } from '../utils/fileUtils.js';
-import { PartListUnion, Schema, Type } from '@google/genai';
+import { PartListUnion } from '@google/genai';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
 import {
   recordFileOperationMetric,
@@ -69,6 +69,27 @@ export interface ReadManyFilesParams {
     respect_gemini_ignore?: boolean;
   };
 }
+
+/**
+ * Result type for file processing operations
+ */
+type FileProcessingResult =
+  | {
+      success: true;
+      filePath: string;
+      relativePathForDisplay: string;
+      fileReadResult: NonNullable<
+        Awaited<ReturnType<typeof processSingleFileContent>>
+      >;
+      reason?: undefined;
+    }
+  | {
+      success: false;
+      filePath: string;
+      relativePathForDisplay: string;
+      fileReadResult?: undefined;
+      reason: string;
+    };
 
 /**
  * Default exclusion patterns for commonly ignored directories and binary file types.
@@ -129,47 +150,47 @@ export class ReadManyFilesTool extends BaseTool<
   static readonly Name: string = 'read_many_files';
 
   constructor(private config: Config) {
-    const parameterSchema: Schema = {
-      type: Type.OBJECT,
+    const parameterSchema = {
+      type: 'object',
       properties: {
         paths: {
-          type: Type.ARRAY,
+          type: 'array',
           items: {
-            type: Type.STRING,
-            minLength: '1',
+            type: 'string',
+            minLength: 1,
           },
-          minItems: '1',
+          minItems: 1,
           description:
             "Required. An array of glob patterns or paths relative to the tool's target directory. Examples: ['src/**/*.ts'], ['README.md', 'docs/']",
         },
         include: {
-          type: Type.ARRAY,
+          type: 'array',
           items: {
-            type: Type.STRING,
-            minLength: '1',
+            type: 'string',
+            minLength: 1,
           },
           description:
             'Optional. Additional glob patterns to include. These are merged with `paths`. Example: ["*.test.ts"] to specifically add test files if they were broadly excluded.',
           default: [],
         },
         exclude: {
-          type: Type.ARRAY,
+          type: 'array',
           items: {
-            type: Type.STRING,
-            minLength: '1',
+            type: 'string',
+            minLength: 1,
           },
           description:
             'Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: ["**/*.log", "temp/"]',
           default: [],
         },
         recursive: {
-          type: Type.BOOLEAN,
+          type: 'boolean',
           description:
             'Optional. Whether to search recursively (primarily controlled by `**` in glob patterns). Defaults to true.',
           default: true,
         },
         useDefaultExcludes: {
-          type: Type.BOOLEAN,
+          type: 'boolean',
           description:
             'Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.',
           default: true,
@@ -177,17 +198,17 @@ export class ReadManyFilesTool extends BaseTool<
         file_filtering_options: {
           description:
             'Whether to respect ignore patterns from .gitignore or .geminiignore',
-          type: Type.OBJECT,
+          type: 'object',
           properties: {
             respect_git_ignore: {
               description:
                 'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
-              type: Type.BOOLEAN,
+              type: 'boolean',
             },
             respect_gemini_ignore: {
               description:
                 'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
-              type: Type.BOOLEAN,
+              type: 'boolean',
             },
           },
         },
@@ -214,7 +235,10 @@ Use this tool when the user's query implies needing the content of several files
   }
 
   validateParams(params: ReadManyFilesParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
     if (errors) {
       return errors;
     }
@@ -413,66 +437,128 @@ Use this tool when the user's query implies needing the content of several files
 
     const sortedFiles = Array.from(filesToConsider).sort();
 
-    for (const filePath of sortedFiles) {
-      const relativePathForDisplay = path
-        .relative(this.config.getTargetDir(), filePath)
-        .replace(/\\/g, '/');
+    const fileProcessingPromises = sortedFiles.map(
+      async (filePath): Promise<FileProcessingResult> => {
+        try {
+          const relativePathForDisplay = path
+            .relative(this.config.getTargetDir(), filePath)
+            .replace(/\\/g, '/');
 
-      const fileType = await detectFileType(filePath);
+          const fileType = await detectFileType(filePath);
 
-      if (fileType === 'image' || fileType === 'pdf') {
-        const fileExtension = path.extname(filePath).toLowerCase();
-        const fileNameWithoutExtension = path.basename(filePath, fileExtension);
-        const requestedExplicitly = inputPatterns.some(
-          (pattern: string) =>
-            pattern.toLowerCase().includes(fileExtension) ||
-            pattern.includes(fileNameWithoutExtension),
-        );
+          if (fileType === 'image' || fileType === 'pdf') {
+            const fileExtension = path.extname(filePath).toLowerCase();
+            const fileNameWithoutExtension = path.basename(
+              filePath,
+              fileExtension,
+            );
+            const requestedExplicitly = inputPatterns.some(
+              (pattern: string) =>
+                pattern.toLowerCase().includes(fileExtension) ||
+                pattern.includes(fileNameWithoutExtension),
+            );
 
-        if (!requestedExplicitly) {
-          skippedFiles.push({
-            path: relativePathForDisplay,
-            reason:
-              'asset file (image/pdf) was not explicitly requested by name or extension',
-          });
-          continue;
-        }
-      }
+            if (!requestedExplicitly) {
+              return {
+                success: false,
+                filePath,
+                relativePathForDisplay,
+                reason:
+                  'asset file (image/pdf) was not explicitly requested by name or extension',
+              };
+            }
+          }
 
-      // Use processSingleFileContent for all file types now
-      const fileReadResult = await processSingleFileContent(
-        filePath,
-        this.config.getTargetDir(),
-      );
-
-      if (fileReadResult.error) {
-        skippedFiles.push({
-          path: relativePathForDisplay,
-          reason: `Read error: ${fileReadResult.error}`,
-        });
-      } else {
-        if (typeof fileReadResult.llmContent === 'string') {
-          const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
-            '{filePath}',
+          // Use processSingleFileContent for all file types now
+          const fileReadResult = await processSingleFileContent(
             filePath,
+            this.config.getTargetDir(),
           );
-          contentParts.push(`${separator}\n\n${fileReadResult.llmContent}\n\n`);
-        } else {
-          contentParts.push(fileReadResult.llmContent); // This is a Part for image/pdf
+
+          if (fileReadResult.error) {
+            return {
+              success: false,
+              filePath,
+              relativePathForDisplay,
+              reason: `Read error: ${fileReadResult.error}`,
+            };
+          }
+
+          return {
+            success: true,
+            filePath,
+            relativePathForDisplay,
+            fileReadResult,
+          };
+        } catch (error) {
+          const relativePathForDisplay = path
+            .relative(this.config.getTargetDir(), filePath)
+            .replace(/\\/g, '/');
+
+          return {
+            success: false,
+            filePath,
+            relativePathForDisplay,
+            reason: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+          };
         }
-        processedFilesRelativePaths.push(relativePathForDisplay);
-        const lines =
-          typeof fileReadResult.llmContent === 'string'
-            ? fileReadResult.llmContent.split('\n').length
-            : undefined;
-        const mimetype = getSpecificMimeType(filePath);
-        recordFileOperationMetric(
-          this.config,
-          FileOperation.READ,
-          lines,
-          mimetype,
-          path.extname(filePath),
-        );
+      },
+    );
+
+    const results = await Promise.allSettled(fileProcessingPromises);
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const fileResult = result.value;
+
+        if (!fileResult.success) {
+          // Handle skipped files (images/PDFs not requested or read errors)
+          skippedFiles.push({
+            path: fileResult.relativePathForDisplay,
+            reason: fileResult.reason,
+          });
+        } else {
+          // Handle successfully processed files
+          const { filePath, relativePathForDisplay, fileReadResult } =
+            fileResult;
+
+          if (typeof fileReadResult.llmContent === 'string') {
+            const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
+              '{filePath}',
+              filePath,
+            );
+            let fileContentForLlm = '';
+            if (fileReadResult.isTruncated) {
+              fileContentForLlm += `[WARNING: This file was truncated. To view the full content, use the 'read_file' tool on this specific file.]\n\n`;
+            }
+            fileContentForLlm += fileReadResult.llmContent;
+            contentParts.push(`${separator}\n\n${fileContentForLlm}\n\n`);
+          } else {
+            // This is a Part for image/pdf, which we don't add the separator to.
+            contentParts.push(fileReadResult.llmContent);
+          }
+
+          processedFilesRelativePaths.push(relativePathForDisplay);
+
+          const lines =
+            typeof fileReadResult.llmContent === 'string'
+              ? fileReadResult.llmContent.split('\n').length
+              : undefined;
+          const mimetype = getSpecificMimeType(filePath);
+          recordFileOperationMetric(
+            this.config,
+            FileOperation.READ,
+            lines,
+            mimetype,
+            path.extname(filePath),
+          );
+        }
+      } else {
+        // Handle Promise rejection (unexpected errors)
+        skippedFiles.push({
+          path: 'unknown',
+          reason: `Unexpected error: ${result.reason}`,
+        });
       }
     }
 

@@ -17,7 +17,6 @@ import {
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { retryWithBackoff } from './retry.js';
 import { AuthType } from '../core/contentGenerator.js';
-import { IdeClient } from '../ide/ide-client.js';
 
 vi.mock('node:fs');
 
@@ -34,8 +33,7 @@ describe('Flash Fallback Integration', () => {
       targetDir: '/test',
       debugMode: false,
       cwd: '/test',
-      model: 'gemini-2.5-pro-thinking',
-      ideClient: IdeClient.getInstance(false),
+      model: 'gemini-2.5-pro',
     });
 
     // Reset simulation state for each test
@@ -51,7 +49,7 @@ describe('Flash Fallback Integration', () => {
 
     // Call the handler directly to test
     const result = await config.flashFallbackHandler!(
-      'gemini-2.5-pro-thinking',
+      'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
 

@@ -22,7 +22,6 @@ import {
   Part,
   SafetySetting,
   PartUnion,
-  SchemaUnion,
   SpeechConfigUnion,
   ThinkingConfig,
   ToolListUnion,
@@ -32,6 +31,7 @@ import {
 export interface CAGenerateContentRequest {
   model: string;
   project?: string;
+  user_prompt_id?: string;
   request: VertexGenerateContentRequest;
 }
 
@@ -60,7 +60,7 @@ interface VertexGenerationConfig {
   frequencyPenalty?: number;
   seed?: number;
   responseMimeType?: string;
-  responseSchema?: SchemaUnion;
+  responseJsonSchema?: unknown;
   routingConfig?: GenerationConfigRoutingConfig;
   modelSelectionConfig?: ModelSelectionConfig;
   responseModalities?: string[];
@@ -115,12 +115,14 @@ export function fromCountTokenResponse(
 
 export function toGenerateContentRequest(
   req: GenerateContentParameters,
+  userPromptId: string,
   project?: string,
   sessionId?: string,
 ): CAGenerateContentRequest {
   return {
     model: req.model,
     project,
+    user_prompt_id: userPromptId,
     request: toVertexGenerateContentRequest(req, sessionId),
   };
 }
@@ -154,7 +156,7 @@ function toVertexGenerateContentRequest(
   };
 }
 
-function toContents(contents: ContentListUnion): Content[] {
+export function toContents(contents: ContentListUnion): Content[] {
   if (Array.isArray(contents)) {
     // it's a Content[] or a PartsUnion[]
     return contents.map(toContent);
@@ -227,7 +229,7 @@ function toVertexGenerationConfig(
     frequencyPenalty: config.frequencyPenalty,
     seed: config.seed,
     responseMimeType: config.responseMimeType,
-    responseSchema: config.responseSchema,
+    responseJsonSchema: config.responseJsonSchema,
     routingConfig: config.routingConfig,
     modelSelectionConfig: config.modelSelectionConfig,
     responseModalities: config.responseModalities,

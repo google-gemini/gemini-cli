@@ -4,12 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  Content,
-  GenerateContentConfig,
-  SchemaUnion,
-  Type,
-} from '@google/genai';
+import { Content, GenerateContentConfig } from '@google/genai';
 import { GeminiClient } from '../core/client.js';
 import { EditToolParams, EditTool } from '../tools/edit.js';
 import { WriteFileTool } from '../tools/write-file.js';
@@ -17,14 +12,14 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { GrepTool } from '../tools/grep.js';
 import { LruCache } from './LruCache.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../config/models.js';
 import {
   isFunctionResponse,
   isFunctionCall,
 } from '../utils/messageInspectors.js';
 import * as fs from 'fs';
 
-const EditModel = DEFAULT_GEMINI_FLASH_MODEL;
+const EditModel = DEFAULT_GEMINI_FLASH_LITE_MODEL;
 const EditConfig: GenerateContentConfig = {
   thinkingConfig: {
     thinkingBudget: 0,
@@ -364,11 +359,11 @@ export async function ensureCorrectFileContent(
 }
 
 // Define the expected JSON schema for the LLM response for old_string correction
-const OLD_STRING_CORRECTION_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const OLD_STRING_CORRECTION_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     corrected_target_snippet: {
-      type: Type.STRING,
+      type: 'string',
       description:
         'The corrected version of the target snippet that exactly and uniquely matches a segment within the provided file content.',
     },
@@ -438,11 +433,11 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
 }
 
 // Define the expected JSON schema for the new_string correction LLM response
-const NEW_STRING_CORRECTION_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const NEW_STRING_CORRECTION_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     corrected_new_string: {
-      type: Type.STRING,
+      type: 'string',
       description:
         'The original_new_string adjusted to be a suitable replacement for the corrected_old_string, while maintaining the original intent of the change.',
     },
@@ -521,11 +516,11 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   }
 }
 
-const CORRECT_NEW_STRING_ESCAPING_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const CORRECT_NEW_STRING_ESCAPING_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     corrected_new_string_escaping: {
-      type: Type.STRING,
+      type: 'string',
       description:
         'The new_string with corrected escaping, ensuring it is a proper replacement for the old_string, especially considering potential over-escaping issues from previous LLM generations.',
     },
@@ -593,11 +588,11 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   }
 }
 
-const CORRECT_STRING_ESCAPING_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const CORRECT_STRING_ESCAPING_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     corrected_string_escaping: {
-      type: Type.STRING,
+      type: 'string',
       description:
         'The string with corrected escaping, ensuring it is valid, specially considering potential over-escaping issues from previous LLM generations.',
     },

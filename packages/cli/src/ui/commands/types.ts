@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { type ReactNode } from 'react';
 import { Content } from '@google/genai';
 import { HistoryItemWithoutId } from '../types.js';
 import { Config, GitService, Logger } from '@google/gemini-cli-core';
@@ -59,6 +60,7 @@ export interface CommandContext {
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
     toggleVimEnabled: () => Promise<boolean>;
+    setGeminiMdFileCount: (count: number) => void;
   };
   // Session-specific data
   session: {
@@ -66,6 +68,8 @@ export interface CommandContext {
     /** A transient list of shell commands the user has approved for this session. */
     sessionShellAllowlist: Set<string>;
   };
+  // Flag to indicate if an overwrite has been confirmed
+  overwriteConfirmed?: boolean;
 }
 
 /**
@@ -98,7 +102,8 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy';
+
+  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy' | 'settings';
 }
 
 /**
@@ -134,6 +139,16 @@ export interface ConfirmShellCommandsActionReturn {
   };
 }
 
+export interface ConfirmActionReturn {
+  type: 'confirm_action';
+  /** The React node to display as the confirmation prompt. */
+  prompt: ReactNode;
+  /** The original invocation context to be re-run after confirmation. */
+  originalInvocation: {
+    raw: string;
+  };
+}
+
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
@@ -141,7 +156,8 @@ export type SlashCommandActionReturn =
   | OpenDialogActionReturn
   | LoadHistoryActionReturn
   | SubmitPromptActionReturn
-  | ConfirmShellCommandsActionReturn;
+  | ConfirmShellCommandsActionReturn
+  | ConfirmActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
