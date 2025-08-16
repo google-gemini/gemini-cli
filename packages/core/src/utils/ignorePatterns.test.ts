@@ -288,4 +288,28 @@ describe('extractExtensionsFromPatterns', () => {
 
     expect(result).toEqual(['.css', '.html', '.js', '.jsx', '.ts', '.tsx']);
   });
+
+  it('should handle compound extensions correctly using path.extname', () => {
+    const patterns = ['**/*.tar.gz', '**/*.min.js', '**/*.d.ts'];
+    const result = extractExtensionsFromPatterns(patterns);
+
+    // Should extract the final extension part only
+    expect(result).toEqual(['.gz', '.js', '.ts']);
+  });
+
+  it('should handle dotfiles correctly', () => {
+    const patterns = ['**/*.gitignore', '**/*.profile', '**/*.bashrc'];
+    const result = extractExtensionsFromPatterns(patterns);
+
+    // Dotfiles should be extracted properly
+    expect(result).toEqual(['.bashrc', '.gitignore', '.profile']);
+  });
+
+  it('should handle edge cases with path.extname', () => {
+    const patterns = ['**/*.hidden.', '**/*.config.json'];
+    const result = extractExtensionsFromPatterns(patterns);
+
+    // Should handle edge cases properly (trailing dots are filtered out)
+    expect(result).toEqual(['.json']);
+  });
 });
