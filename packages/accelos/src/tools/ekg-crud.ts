@@ -10,20 +10,15 @@ import {
 export const ekgCrudTool = createTool({
   id: 'ekg-database',
   description:
-    'Read the Engineering Knowledge Graph (EKG) stored in Neo4j. Use cypher query language to do schema inspection, read or and write. EKG contains entities and their relationships, created through pattern matching and semantic analysis of the code repo and cloud specs.\n\n**Key entities:** code repositories, artifacts (containers/binaries), services (frontend/backend apps), resources (databases, compute, storage etc), tools (lint, monitor, test, security etc), CI/CD pipelines, users/groups, and environments.\n\n**Key relationships:** Path-to-production flows (code→artifact→service→environment), service to service or resource dependencies, tool usage, and ownership patterns.\n\n**Core relationships:** Path-to-production flows (code→artifact→service→environment), service dependencies, tool usage, and ownership patterns.\n\n**Example questions you can ask:**\n\n- What services use the postgres database in production?\n- Show me all security tools used by our frontend services\n- What infrastructure resources does the payment service depend on?\n- Who owns the user authentication service?\n- Which CI/CD pipelines deploy to the staging environment?\n- What tools are configured for static code analysis?\n- Which services are deployed in the us-east region?\n- Show me the complete path from code to production for our API service\n- What third-party resources do we use across all environments?',
+    'Read the Engineering Knowledge Graph (EKG) stored in Neo4j. Use cypher query language to do schema inspection, read or and write. EKG contains entities and their relationships, created through pattern matching and semantic analysis of the code repo and cloud specs.\n\n**Key entities:** code repositories, artifacts (containers/binaries), services (frontend/backend apps), resources (databases, compute, storage etc), tools (lint, monitor, test, security etc), CI/CD pipelines, users/groups, and environments.\n\n**Key relationships:** Path-to-production flows (code→artifact→service→environment), service to service or resource dependencies, tool usage, and ownership patterns.\n\n**Core relationships:** Path-to-production flows (code→artifact→service→environment), service dependencies, tool usage, and ownership patterns.\n\n**Usage Examples:**\n\n1. Get schema: { "operation": "get_schema" }\n2. Read query: { "operation": "read_cypher", "query": "MATCH (n:Service) RETURN n.name LIMIT 5" }\n3. Write query: { "operation": "write_cypher", "query": "CREATE (s:Service {name: $name})", "params": { "name": "api-service" } }\n\nNote: Connection is automatic using NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD environment variables.\n\n**Example questions you can ask:**\n\n- What services use the postgres database in production?\n- Show me all security tools used by our frontend services\n- What infrastructure resources does the payment service depend on?\n- Who owns the user authentication service?\n- Which CI/CD pipelines deploy to the staging environment?\n- What tools are configured for static code analysis?\n- Which services are deployed in the us-east region?\n- Show me the complete path from code to production for our API service\n- What third-party resources do we use across all environments?',
   inputSchema: z.object({
     operation: z
       .enum([
-        'connect',
-        'disconnect',
         'get_schema',
         'read_cypher',
         'write_cypher',
       ])
       .describe('Operation to perform'),
-    config: Neo4jConfigSchema.optional().describe(
-      'Neo4j connection configuration (required for connect operation)',
-    ),
     query: z
       .string()
       .optional()
@@ -61,74 +56,36 @@ export const ekgCrudTool = createTool({
     }),
   }),
   execute: async ({ context }) => {
-    const { operation, config, query, params = {} } = context;
+    const { operation, query, params = {} } = context;
     const store = Neo4jStore.getInstance();
     const startTime = Date.now();
 
+    // Auto-connect using environment variables if not already connected
+    const connectionInfo = store.getConnectionInfo();
+    if (!connectionInfo.connected) {
+      const envUri = process.env.NEO4J_URI;
+      const envUsername = process.env.NEO4J_USERNAME;
+      const envPassword = process.env.NEO4J_PASSWORD;
+      const envDatabase = process.env.NEO4J_DATABASE;
+
+      if (envUri && envUsername && envPassword) {
+        const connectionConfig = {
+          uri: envUri,
+          username: envUsername,
+          password: envPassword,
+          database: envDatabase,
+        };
+        console.log('🔧 DEBUG: Auto-connecting to EKG using environment variables');
+        await store.connect(connectionConfig);
+      } else {
+        throw new Error(
+          'EKG database not connected. Set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD environment variables',
+        );
+      }
+    }
+
     try {
       switch (operation) {
-        case 'connect': {
-          // Use provided config or fallback to environment variables
-          let connectionConfig = config;
-
-          if (!connectionConfig) {
-            const envUri = process.env.NEO4J_URI;
-            const envUsername = process.env.NEO4J_USERNAME;
-            const envPassword = process.env.NEO4J_PASSWORD;
-            const envDatabase = process.env.NEO4J_DATABASE;
-
-            if (envUri && envUsername && envPassword) {
-              connectionConfig = {
-                uri: envUri,
-                username: envUsername,
-                password: envPassword,
-                database: envDatabase,
-              };
-              console.log(
-                '🔧 DEBUG: Using EKG config from environment variables',
-              );
-            } else {
-              throw new Error(
-                'config is required for connect operation or set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD environment variables',
-              );
-            }
-          }
-
-          await store.connect(connectionConfig);
-          const connectionInfo = store.getConnectionInfo();
-
-          const response = {
-            success: true,
-            operation: 'connect',
-            data: connectionInfo,
-            message: `Connected to EKG database at ${connectionConfig.uri}`,
-            metadata: {
-              queryTime: Date.now() - startTime,
-              connectionInfo,
-            },
-          };
-
-          console.log('🔧 DEBUG: EKG tool response:', response);
-          return response;
-        }
-
-        case 'disconnect': {
-          await store.disconnect();
-          const connectionInfo = store.getConnectionInfo();
-
-          const response = {
-            success: true,
-            operation: 'disconnect',
-            message: 'Disconnected from EKG database',
-            metadata: {
-              queryTime: Date.now() - startTime,
-              connectionInfo,
-            },
-          };
-
-          console.log('🔧 DEBUG: EKG tool response:', response);
-          return response;
-        }
 
         case 'get_schema': {
           const schema = await store.getSchema();
