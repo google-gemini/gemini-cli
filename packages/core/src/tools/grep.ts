@@ -408,13 +408,16 @@ class GrepToolInvocation extends BaseToolInvocation<
             } else if (dir.endsWith('/')) {
               dir = dir.slice(0, -1);
             }
-            // Use if it's a path without wildcards
-            if (dir && !dir.includes('*')) {
+
+            if (dir && !dir.includes('/')) {
+              if (dir.startsWith('*.')) {
+                return null;
+              }
               return dir;
             }
             return null;
           })
-          .filter((dir): dir is string => !!dir && !dir.includes('*'));
+          .filter((dir): dir is string => !!dir);
         commonExcludes.forEach((dir) => grepArgs.push(`--exclude-dir=${dir}`));
         if (include) {
           grepArgs.push(`--include=${include}`);
