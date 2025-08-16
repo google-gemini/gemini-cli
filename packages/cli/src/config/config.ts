@@ -480,6 +480,7 @@ export async function loadCliConfig(
     toolDiscoveryCommand: settings.toolDiscoveryCommand,
     toolCallCommand: settings.toolCallCommand,
     mcpServerCommand: settings.mcpServerCommand,
+    shellToolRcFile: settings.shellToolRcFile,
     mcpServers,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
