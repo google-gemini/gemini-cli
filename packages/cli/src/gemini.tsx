@@ -27,6 +27,7 @@ import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions } from './config/extension.js';
+import { selectModel } from './config/modelSelection.js';
 import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
 import {
@@ -152,6 +153,12 @@ export async function main() {
 
   const argv = await parseArguments();
   const extensions = loadExtensions(workspaceRoot);
+
+  const { model, logs, hadFailure } = selectModel(argv, settings.merged);
+  // Use validated model (CLI > settings > env > default); log only failures.
+  argv.model = model;
+  const showLogLines = hadFailure ? logs : [];
+
   const config = await loadCliConfig(
     settings.merged,
     extensions,
@@ -267,7 +274,20 @@ export async function main() {
   const startupWarnings = [
     ...(await getStartupWarnings()),
     ...(await getUserStartupWarnings(workspaceRoot)),
+    ...showLogLines,
   ];
+
+  const shouldBeInteractive =
+    !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0);
+
+  // Non-interactive mode has no UI; echo startup logs to console once
+  if (!shouldBeInteractive) {
+    // Non-interactive: print only relevant logs
+    const nonInteractiveLines = showLogLines;
+    for (const line of nonInteractiveLines) {
+      console.log(line);
+    }
+  }
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {
