@@ -425,6 +425,7 @@ export class IdeClient {
           logger.debug('Failed to close transport:', closeError);
         }
       }
+      logger.error(`Failed to connect: ${_error}`);
       return false;
     }
   }
