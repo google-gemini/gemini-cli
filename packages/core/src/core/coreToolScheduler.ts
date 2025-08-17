@@ -171,10 +171,10 @@ export function convertToFunctionResponse(
 
   // After this point, contentToProcess is a single Part object.
   if (contentToProcess.functionResponse) {
-    if (contentToProcess.functionResponse.response?.content) {
+    if (contentToProcess.functionResponse.response?.['content']) {
       const stringifiedOutput =
         getResponseTextFromParts(
-          contentToProcess.functionResponse.response.content as Part[],
+          contentToProcess.functionResponse.response['content'] as Part[],
         ) || '';
       return createFunctionResponsePart(callId, toolName, stringifiedOutput);
     }

@@ -197,14 +197,14 @@ export function recordFileOperationMetric(
     ...getCommonAttributes(config),
     operation,
   };
-  if (lines !== undefined) attributes.lines = lines;
-  if (mimetype !== undefined) attributes.mimetype = mimetype;
-  if (extension !== undefined) attributes.extension = extension;
+  if (lines !== undefined) attributes['lines'] = lines;
+  if (mimetype !== undefined) attributes['mimetype'] = mimetype;
+  if (extension !== undefined) attributes['extension'] = extension;
   if (diffStat !== undefined) {
-    attributes.ai_added_lines = diffStat.ai_added_lines;
-    attributes.ai_removed_lines = diffStat.ai_removed_lines;
-    attributes.user_added_lines = diffStat.user_added_lines;
-    attributes.user_removed_lines = diffStat.user_removed_lines;
+    attributes['ai_added_lines'] = diffStat.ai_added_lines;
+    attributes['ai_removed_lines'] = diffStat.ai_removed_lines;
+    attributes['user_added_lines'] = diffStat.user_added_lines;
+    attributes['user_removed_lines'] = diffStat.user_removed_lines;
   }
   fileOperationCounter.add(1, attributes);
 }

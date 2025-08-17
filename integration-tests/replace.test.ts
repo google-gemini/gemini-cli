@@ -56,7 +56,8 @@ describe('replace', () => {
     expect(newFileContent).toBe(expectedContent);
 
     // Log success info if verbose
-    if (process.env.VERBOSE === 'true') {
+    vi.stubEnv('VERBOSE', 'true');
+    if (process.env['VERBOSE'] === 'true') {
       console.log('File replaced successfully. New content:', newFileContent);
     }
   });

@@ -37,7 +37,7 @@ export interface ShellConfiguration {
  */
 export function getShellConfiguration(): ShellConfiguration {
   if (isWindows()) {
-    const comSpec = process.env.ComSpec || 'cmd.exe';
+    const comSpec = process.env['ComSpec'] || 'cmd.exe';
     const executable = comSpec.toLowerCase();
 
     if (

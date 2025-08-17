@@ -8,6 +8,7 @@
     "noImplicitReturns": true,
     "noImplicitThis": true,
     "forceConsistentCasingInFileNames": true,
+    "noPropertyAccessFromIndexSignature": true,
     "noUnusedLocals": true,
     "strictBindCallApply": true,
     "strictFunctionTypes": true,

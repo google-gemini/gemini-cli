@@ -59,7 +59,7 @@ async function findVsCodeCommand(): Promise<string | null> {
     // Windows
     locations.push(
       path.join(
-        process.env.ProgramFiles || 'C:\\Program Files',
+        process.env['ProgramFiles'] || 'C:\\Program Files',
         'Microsoft VS Code',
         'bin',
         'code.cmd',
