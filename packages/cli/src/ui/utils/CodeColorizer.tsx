@@ -38,7 +38,7 @@ function renderHastNode(
   // Handle Element Nodes: Determine color and pass it down, don't wrap
   if (node.type === 'element') {
     const nodeClasses: string[] =
-      (node.properties?.className as string[]) || [];
+      (node.properties?.['className'] as string[]) || [];
     let elementColor: string | undefined = undefined;
 
     // Find color defined specifically for this element's class

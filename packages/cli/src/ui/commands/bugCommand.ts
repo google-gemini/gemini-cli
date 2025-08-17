@@ -27,11 +27,11 @@ export const bugCommand: SlashCommand = {
 
     const osVersion = `${process.platform} ${process.version}`;
     let sandboxEnv = 'no sandbox';
-    if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-      sandboxEnv = process.env.SANDBOX.replace(/^gemini-(?:code-)?/, '');
-    } else if (process.env.SANDBOX === 'sandbox-exec') {
+    if (process.env['SANDBOX'] && process.env['SANDBOX'] !== 'sandbox-exec') {
+      sandboxEnv = process.env['SANDBOX'].replace(/^gemini-(?:code-)?/, '');
+    } else if (process.env['SANDBOX'] === 'sandbox-exec') {
       sandboxEnv = `sandbox-exec (${
-        process.env.SEATBELT_PROFILE || 'unknown'
+        process.env['SEATBELT_PROFILE'] || 'unknown'
       })`;
     }
     const modelVersion = config?.getModel() || 'Unknown';

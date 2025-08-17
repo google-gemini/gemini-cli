@@ -98,7 +98,7 @@ export function logUserPrompt(config: Config, event: UserPromptEvent): void {
   };
 
   if (shouldLogUserPrompts(config)) {
-    attributes.prompt = event.prompt;
+    attributes['prompt'] = event.prompt;
   }
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -247,7 +247,7 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
     'event.timestamp': new Date().toISOString(),
   };
   if (event.response_text) {
-    attributes.response_text = event.response_text;
+    attributes['response_text'] = event.response_text;
   }
   if (event.error) {
     attributes['error.message'] = event.error;

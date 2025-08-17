@@ -448,7 +448,7 @@ export function hasValidTypes(schema: unknown): boolean {
 
   const s = schema as Record<string, unknown>;
 
-  if (!s.type) {
+  if (!s['type']) {
     // These keywords contain an array of schemas that should be validated.
     //
     // If no top level type was given, then they must each have a type.
@@ -470,9 +470,9 @@ export function hasValidTypes(schema: unknown): boolean {
     if (!hasSubSchema) return false;
   }
 
-  if (s.type === 'object' && s.properties) {
-    if (typeof s.properties === 'object' && s.properties !== null) {
-      for (const prop of Object.values(s.properties)) {
+  if (s['type'] === 'object' && s['properties']) {
+    if (typeof s['properties'] === 'object' && s['properties'] !== null) {
+      for (const prop of Object.values(s['properties'])) {
         if (!hasValidTypes(prop)) {
           return false;
         }
@@ -480,8 +480,8 @@ export function hasValidTypes(schema: unknown): boolean {
     }
   }
 
-  if (s.type === 'array' && s.items) {
-    if (!hasValidTypes(s.items)) {
+  if (s['type'] === 'array' && s['items']) {
+    if (!hasValidTypes(s['items'])) {
       return false;
     }
   }
@@ -1046,7 +1046,7 @@ export async function connectToMcpServer(
         conciseError = `Connection failed for '${mcpServerName}': ${errorMessage}`;
       }
 
-      if (process.env.SANDBOX) {
+      if (process.env['SANDBOX']) {
         conciseError += ` (check sandbox availability)`;
       }
 

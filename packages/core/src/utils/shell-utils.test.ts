@@ -388,7 +388,7 @@ describe('getShellConfiguration', () => {
     });
 
     it('should return cmd.exe configuration by default', () => {
-      delete process.env.ComSpec;
+      delete process.env['ComSpec'];
       const config = getShellConfiguration();
       expect(config.executable).toBe('cmd.exe');
       expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
@@ -397,7 +397,7 @@ describe('getShellConfiguration', () => {
 
     it('should respect ComSpec for cmd.exe', () => {
       const cmdPath = 'C:\\WINDOWS\\system32\\cmd.exe';
-      process.env.ComSpec = cmdPath;
+      process.env['ComSpec'] = cmdPath;
       const config = getShellConfiguration();
       expect(config.executable).toBe(cmdPath);
       expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
@@ -407,7 +407,7 @@ describe('getShellConfiguration', () => {
     it('should return PowerShell configuration if ComSpec points to powershell.exe', () => {
       const psPath =
         'C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
-      process.env.ComSpec = psPath;
+      process.env['ComSpec'] = psPath;
       const config = getShellConfiguration();
       expect(config.executable).toBe(psPath);
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
@@ -416,7 +416,7 @@ describe('getShellConfiguration', () => {
 
     it('should return PowerShell configuration if ComSpec points to pwsh.exe', () => {
       const pwshPath = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe';
-      process.env.ComSpec = pwshPath;
+      process.env['ComSpec'] = pwshPath;
       const config = getShellConfiguration();
       expect(config.executable).toBe(pwshPath);
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
@@ -424,7 +424,7 @@ describe('getShellConfiguration', () => {
     });
 
     it('should be case-insensitive when checking ComSpec', () => {
-      process.env.ComSpec = 'C:\\Path\\To\\POWERSHELL.EXE';
+      process.env['ComSpec'] = 'C:\\Path\\To\\POWERSHELL.EXE';
       const config = getShellConfiguration();
       expect(config.executable).toBe('C:\\Path\\To\\POWERSHELL.EXE');
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);

@@ -25,8 +25,8 @@ export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
 export function getSystemSettingsPath(): string {
-  if (process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH) {
-    return process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
+  if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
+    return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
   }
   if (platform() === 'darwin') {
     return '/Library/Application Support/GeminiCli/settings.json';
@@ -236,16 +236,16 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   if (envFilePath && fs.existsSync(envFilePath)) {
     const envFileContent = fs.readFileSync(envFilePath);
     const parsedEnv = dotenv.parse(envFileContent);
-    if (parsedEnv.GOOGLE_CLOUD_PROJECT) {
+    if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
       // .env file takes precedence in Cloud Shell
-      process.env.GOOGLE_CLOUD_PROJECT = parsedEnv.GOOGLE_CLOUD_PROJECT;
+      process.env['GOOGLE_CLOUD_PROJECT'] = parsedEnv['GOOGLE_CLOUD_PROJECT'];
     } else {
       // If not in .env, set to default and override global
-      process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
+      process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
     }
   } else {
     // If no .env file, set to default and override global
-    process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
+    process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
   }
 }
 
@@ -253,7 +253,7 @@ export function loadEnvironment(settings?: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
   // Cloud Shell environment variable handling
-  if (process.env.CLOUD_SHELL === 'true') {
+  if (process.env['CLOUD_SHELL'] === 'true') {
     setUpCloudShellEnvironment(envFilePath);
   }
 

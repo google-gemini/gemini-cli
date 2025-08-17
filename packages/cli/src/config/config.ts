@@ -87,7 +87,7 @@ export async function parseArguments(): Promise<CliArgs> {
           alias: 'm',
           type: 'string',
           description: `Model`,
-          default: process.env.GEMINI_MODEL,
+          default: process.env['GEMINI_MODEL'],
         })
         .option('prompt', {
           alias: 'p',
@@ -230,12 +230,12 @@ export async function parseArguments(): Promise<CliArgs> {
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
         })
         .check((argv) => {
-          if (argv.prompt && argv.promptInteractive) {
+          if (argv.prompt && argv['promptInteractive']) {
             throw new Error(
               'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
             );
           }
-          if (argv.yolo && argv.approvalMode) {
+          if (argv.yolo && argv['approvalMode']) {
             throw new Error(
               'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
             );
@@ -317,7 +317,7 @@ export async function loadCliConfig(
 ): Promise<Config> {
   const debugMode =
     argv.debug ||
-    [process.env.DEBUG, process.env.DEBUG_MODE].some(
+    [process.env['DEBUG'], process.env['DEBUG_MODE']].some(
       (v) => v === 'true' || v === '1',
     ) ||
     false;
@@ -496,7 +496,7 @@ export async function loadCliConfig(
         settings.telemetry?.target) as TelemetryTarget,
       otlpEndpoint:
         argv.telemetryOtlpEndpoint ??
-        process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
+        process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ??
         settings.telemetry?.otlpEndpoint,
       otlpProtocol: (['grpc', 'http'] as const).find(
         (p) =>
@@ -517,10 +517,10 @@ export async function loadCliConfig(
     checkpointing: argv.checkpointing || settings.checkpointing?.enabled,
     proxy:
       argv.proxy ||
-      process.env.HTTPS_PROXY ||
-      process.env.https_proxy ||
-      process.env.HTTP_PROXY ||
-      process.env.http_proxy,
+      process.env['HTTPS_PROXY'] ||
+      process.env['https_proxy'] ||
+      process.env['HTTP_PROXY'] ||
+      process.env['http_proxy'],
     cwd,
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
@@ -531,7 +531,7 @@ export async function loadCliConfig(
     listExtensions: argv.listExtensions || false,
     extensions: allExtensions,
     blockedMcpServers,
-    noBrowser: !!process.env.NO_BROWSER,
+    noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
     chatCompression: settings.chatCompression,

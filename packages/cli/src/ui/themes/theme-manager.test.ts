@@ -5,8 +5,8 @@
  */
 
 // Patch: Unset NO_COLOR at the very top before any imports
-if (process.env.NO_COLOR !== undefined) {
-  delete process.env.NO_COLOR;
+if (process.env['NO_COLOR'] !== undefined) {
+  delete process.env['NO_COLOR'];
 }
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -87,13 +87,13 @@ describe('ThemeManager', () => {
   });
 
   it('should return NoColorTheme if NO_COLOR is set', () => {
-    const original = process.env.NO_COLOR;
-    process.env.NO_COLOR = '1';
+    const original = process.env['NO_COLOR'];
+    process.env['NO_COLOR'] = '1';
     expect(themeManager.getActiveTheme().name).toBe('NoColor');
     if (original === undefined) {
-      delete process.env.NO_COLOR;
+      delete process.env['NO_COLOR'];
     } else {
-      process.env.NO_COLOR = original;
+      process.env['NO_COLOR'] = original;
     }
   });
 });

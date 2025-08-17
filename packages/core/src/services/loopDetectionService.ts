@@ -367,10 +367,10 @@ Please analyze the conversation history to determine the possibility that the co
       return false;
     }
 
-    if (typeof result.confidence === 'number') {
-      if (result.confidence > 0.9) {
-        if (typeof result.reasoning === 'string' && result.reasoning) {
-          console.warn(result.reasoning);
+    if (typeof result['confidence'] === 'number') {
+      if (result['confidence'] > 0.9) {
+        if (typeof result['reasoning'] === 'string' && result['reasoning']) {
+          console.warn(result['reasoning']);
         }
         logLoopDetected(
           this.config,
@@ -381,7 +381,7 @@ Please analyze the conversation history to determine the possibility that the co
         this.llmCheckInterval = Math.round(
           MIN_LLM_CHECK_INTERVAL +
             (MAX_LLM_CHECK_INTERVAL - MIN_LLM_CHECK_INTERVAL) *
-              (1 - result.confidence),
+              (1 - result['confidence']),
         );
       }
     }

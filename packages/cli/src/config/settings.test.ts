@@ -892,7 +892,7 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should resolve environment variables in user settings', () => {
-      process.env.TEST_API_KEY = 'user_api_key_from_env';
+      process.env['TEST_API_KEY'] = 'user_api_key_from_env';
       const userSettingsContent = {
         apiKey: '$TEST_API_KEY',
         someUrl: 'https://test.com/${TEST_API_KEY}',
@@ -917,11 +917,11 @@ describe('Settings Loading and Merging', () => {
       );
       // @ts-expect-error: dynamic property for test
       expect(settings.merged.apiKey).toBe('user_api_key_from_env');
-      delete process.env.TEST_API_KEY;
+      delete process.env['TEST_API_KEY'];
     });
 
     it('should resolve environment variables in workspace settings', () => {
-      process.env.WORKSPACE_ENDPOINT = 'workspace_endpoint_from_env';
+      process.env['WORKSPACE_ENDPOINT'] = 'workspace_endpoint_from_env';
       const workspaceSettingsContent = {
         endpoint: '${WORKSPACE_ENDPOINT}/api',
         nested: { value: '$WORKSPACE_ENDPOINT' },
@@ -946,7 +946,7 @@ describe('Settings Loading and Merging', () => {
       );
       // @ts-expect-error: dynamic property for test
       expect(settings.merged.endpoint).toBe('workspace_endpoint_from_env/api');
-      delete process.env.WORKSPACE_ENDPOINT;
+      delete process.env['WORKSPACE_ENDPOINT'];
     });
 
     it('should prioritize user env variables over workspace env variables if keys clash after resolution', () => {
@@ -954,18 +954,18 @@ describe('Settings Loading and Merging', () => {
       const workspaceSettingsContent = { configValue: '$SHARED_VAR' };
 
       (mockFsExistsSync as Mock).mockReturnValue(true);
-      const originalSharedVar = process.env.SHARED_VAR;
+      const originalSharedVar = process.env['SHARED_VAR'];
       // Temporarily delete to ensure a clean slate for the test's specific manipulations
-      delete process.env.SHARED_VAR;
+      delete process.env['SHARED_VAR'];
 
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
           if (p === USER_SETTINGS_PATH) {
-            process.env.SHARED_VAR = 'user_value_for_user_read'; // Set for user settings read
+            process.env['SHARED_VAR'] = 'user_value_for_user_read'; // Set for user settings read
             return JSON.stringify(userSettingsContent);
           }
           if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
-            process.env.SHARED_VAR = 'workspace_value_for_workspace_read'; // Set for workspace settings read
+            process.env['SHARED_VAR'] = 'workspace_value_for_workspace_read'; // Set for workspace settings read
             return JSON.stringify(workspaceSettingsContent);
           }
           return '{}';
@@ -990,9 +990,9 @@ describe('Settings Loading and Merging', () => {
 
       // Restore original environment variable state
       if (originalSharedVar !== undefined) {
-        process.env.SHARED_VAR = originalSharedVar;
+        process.env['SHARED_VAR'] = originalSharedVar;
       } else {
-        delete process.env.SHARED_VAR; // Ensure it's deleted if it wasn't there before
+        delete process.env['SHARED_VAR']; // Ensure it's deleted if it wasn't there before
       }
     });
 
@@ -1001,18 +1001,18 @@ describe('Settings Loading and Merging', () => {
       const workspaceSettingsContent = { configValue: '$SHARED_VAR' };
 
       (mockFsExistsSync as Mock).mockReturnValue(true);
-      const originalSharedVar = process.env.SHARED_VAR;
+      const originalSharedVar = process.env['SHARED_VAR'];
       // Temporarily delete to ensure a clean slate for the test's specific manipulations
-      delete process.env.SHARED_VAR;
+      delete process.env['SHARED_VAR'];
 
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
           if (p === USER_SETTINGS_PATH) {
-            process.env.SHARED_VAR = 'user_value_for_user_read'; // Set for user settings read
+            process.env['SHARED_VAR'] = 'user_value_for_user_read'; // Set for user settings read
             return JSON.stringify(userSettingsContent);
           }
           if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
-            process.env.SHARED_VAR = 'workspace_value_for_workspace_read'; // Set for workspace settings read
+            process.env['SHARED_VAR'] = 'workspace_value_for_workspace_read'; // Set for workspace settings read
             return JSON.stringify(workspaceSettingsContent);
           }
           return '{}';
@@ -1034,9 +1034,9 @@ describe('Settings Loading and Merging', () => {
 
       // Restore original environment variable state
       if (originalSharedVar !== undefined) {
-        process.env.SHARED_VAR = originalSharedVar;
+        process.env['SHARED_VAR'] = originalSharedVar;
       } else {
-        delete process.env.SHARED_VAR; // Ensure it's deleted if it wasn't there before
+        delete process.env['SHARED_VAR']; // Ensure it's deleted if it wasn't there before
       }
     });
 
@@ -1045,18 +1045,18 @@ describe('Settings Loading and Merging', () => {
       const systemSettingsContent = { configValue: '$SHARED_VAR' };
 
       (mockFsExistsSync as Mock).mockReturnValue(true);
-      const originalSharedVar = process.env.SHARED_VAR;
+      const originalSharedVar = process.env['SHARED_VAR'];
       // Temporarily delete to ensure a clean slate for the test's specific manipulations
-      delete process.env.SHARED_VAR;
+      delete process.env['SHARED_VAR'];
 
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
           if (p === getSystemSettingsPath()) {
-            process.env.SHARED_VAR = 'system_value_for_system_read'; // Set for system settings read
+            process.env['SHARED_VAR'] = 'system_value_for_system_read'; // Set for system settings read
             return JSON.stringify(systemSettingsContent);
           }
           if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
-            process.env.SHARED_VAR = 'workspace_value_for_workspace_read'; // Set for workspace settings read
+            process.env['SHARED_VAR'] = 'workspace_value_for_workspace_read'; // Set for workspace settings read
             return JSON.stringify(workspaceSettingsContent);
           }
           return '{}';
@@ -1079,9 +1079,9 @@ describe('Settings Loading and Merging', () => {
 
       // Restore original environment variable state
       if (originalSharedVar !== undefined) {
-        process.env.SHARED_VAR = originalSharedVar;
+        process.env['SHARED_VAR'] = originalSharedVar;
       } else {
-        delete process.env.SHARED_VAR; // Ensure it's deleted if it wasn't there before
+        delete process.env['SHARED_VAR']; // Ensure it's deleted if it wasn't there before
       }
     });
 
@@ -1146,8 +1146,8 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should resolve multiple environment variables in a single string', () => {
-      process.env.VAR_A = 'valueA';
-      process.env.VAR_B = 'valueB';
+      process.env['VAR_A'] = 'valueA';
+      process.env['VAR_B'] = 'valueB';
       const userSettingsContent = { path: '/path/$VAR_A/${VAR_B}/end' };
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
@@ -1161,13 +1161,13 @@ describe('Settings Loading and Merging', () => {
       );
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.user.settings.path).toBe('/path/valueA/valueB/end');
-      delete process.env.VAR_A;
-      delete process.env.VAR_B;
+      delete process.env['VAR_A'];
+      delete process.env['VAR_B'];
     });
 
     it('should resolve environment variables in arrays', () => {
-      process.env.ITEM_1 = 'item1_env';
-      process.env.ITEM_2 = 'item2_env';
+      process.env['ITEM_1'] = 'item1_env';
+      process.env['ITEM_2'] = 'item2_env';
       const userSettingsContent = { list: ['$ITEM_1', '${ITEM_2}', 'literal'] };
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
@@ -1185,13 +1185,13 @@ describe('Settings Loading and Merging', () => {
         'item2_env',
         'literal',
       ]);
-      delete process.env.ITEM_1;
-      delete process.env.ITEM_2;
+      delete process.env['ITEM_1'];
+      delete process.env['ITEM_2'];
     });
 
     it('should correctly pass through null, boolean, and number types, and handle undefined properties', () => {
-      process.env.MY_ENV_STRING = 'env_string_value';
-      process.env.MY_ENV_STRING_NESTED = 'env_string_nested_value';
+      process.env['MY_ENV_STRING'] = 'env_string_value';
+      process.env['MY_ENV_STRING_NESTED'] = 'env_string_nested_value';
 
       const userSettingsContent = {
         nullVal: null,
@@ -1236,13 +1236,13 @@ describe('Settings Loading and Merging', () => {
         'env_string_nested_value',
       );
 
-      delete process.env.MY_ENV_STRING;
-      delete process.env.MY_ENV_STRING_NESTED;
+      delete process.env['MY_ENV_STRING'];
+      delete process.env['MY_ENV_STRING_NESTED'];
     });
 
     it('should resolve multiple concatenated environment variables in a single string value', () => {
-      process.env.TEST_HOST = 'myhost';
-      process.env.TEST_PORT = '9090';
+      process.env['TEST_HOST'] = 'myhost';
+      process.env['TEST_PORT'] = '9090';
       const userSettingsContent = {
         serverAddress: '${TEST_HOST}:${TEST_PORT}/api',
       };
@@ -1260,20 +1260,20 @@ describe('Settings Loading and Merging', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.user.settings.serverAddress).toBe('myhost:9090/api');
 
-      delete process.env.TEST_HOST;
-      delete process.env.TEST_PORT;
+      delete process.env['TEST_HOST'];
+      delete process.env['TEST_PORT'];
     });
 
     describe('when GEMINI_CLI_SYSTEM_SETTINGS_PATH is set', () => {
       const MOCK_ENV_SYSTEM_SETTINGS_PATH = '/mock/env/system/settings.json';
 
       beforeEach(() => {
-        process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH =
+        process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'] =
           MOCK_ENV_SYSTEM_SETTINGS_PATH;
       });
 
       afterEach(() => {
-        delete process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
+        delete process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
       });
 
       it('should load system settings from the path specified in the environment variable', () => {

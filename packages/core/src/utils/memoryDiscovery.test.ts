@@ -48,8 +48,8 @@ describe('loadServerHierarchicalMemory', () => {
 
     vi.resetAllMocks();
     // Set environment variables to indicate test environment
-    process.env.NODE_ENV = 'test';
-    process.env.VITEST = 'true';
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('VITEST', 'true');
 
     projectRoot = await createEmptyDir(path.join(testRootDir, 'project'));
     cwd = await createEmptyDir(path.join(projectRoot, 'src'));
@@ -58,6 +58,7 @@ describe('loadServerHierarchicalMemory', () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     // Some tests set this to a different value.
     setGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
     // Clean up the temporary directory to prevent resource leaks.

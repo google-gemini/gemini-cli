@@ -41,7 +41,7 @@ function getBestAvailableUpdate(
 export async function checkForUpdates(): Promise<UpdateObject | null> {
   try {
     // Skip update check when running from source (development mode)
-    if (process.env.DEV === 'true') {
+    if (process.env['DEV'] === 'true') {
       return null;
     }
     const packageJson = await getPackageJson();

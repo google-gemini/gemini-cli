@@ -86,7 +86,7 @@ describe('file-system', () => {
     ).toBeTruthy();
 
     // Log success info if verbose
-    if (process.env.VERBOSE === 'true') {
+    if (process.env['VERBOSE'] === 'true') {
       console.log('File written successfully with hello message.');
     }
   });
