@@ -1464,4 +1464,66 @@ describe('InputPrompt', () => {
       unmount();
     });
   });
+
+  describe('Ctrl+E keyboard shortcut', () => {
+    it.each([
+      {
+        description: 'multiline input, not end of buffer',
+        text: 'line 1\nline 2\nline 3',
+        cursor: [1, 2], // cursor at line 2, position 2
+      },
+      {
+        description: 'single line input',
+        text: 'single line text',
+        cursor: [0, 5], // cursor at position 5
+      },
+    ])('should move cursor to end of current line for $description', async ({ text, cursor }) => {
+      const bufferSetMock = vi.fn();
+      const moveMock = vi.fn();
+      const moveToOffsetMock = vi.fn();
+      
+      const lines = text.split('\n');
+      mockBuffer = {
+        text,
+        cursor,
+        lines,
+        setText: bufferSetMock,
+        move: moveMock,
+        moveToOffset: moveToOffsetMock,
+        replaceRangeByOffset: vi.fn(),
+        viewportVisualLines: lines,
+        allVisualLines: lines,
+        visualCursor: cursor,
+        visualScrollRow: 0,
+        handleInput: vi.fn(),
+        killLineRight: vi.fn(),
+        killLineLeft: vi.fn(),
+        openInExternalEditor: vi.fn(),
+        newline: vi.fn(),
+        backspace: vi.fn(),
+        preferredCol: null,
+        selectionAnchor: null,
+        insert: vi.fn(),
+        del: vi.fn(),
+        undo: vi.fn(),
+        redo: vi.fn(),
+        replaceRange: vi.fn(),
+        deleteWordLeft: vi.fn(),
+        deleteWordRight: vi.fn(),
+      } as unknown as TextBuffer;
+
+      props.buffer = mockBuffer;
+      
+      const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x05'); // Ctrl+E
+      await wait();
+
+      expect(moveMock).toHaveBeenCalledWith('end');
+      expect(moveToOffsetMock).not.toHaveBeenCalled();
+      
+      unmount();
+    });
+  });
 });
