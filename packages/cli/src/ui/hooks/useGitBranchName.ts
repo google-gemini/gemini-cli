@@ -15,9 +15,11 @@ interface FileSystemDeps {
   fsPromises: typeof fsPromises;
 }
 
+const defaultDeps: FileSystemDeps = { fs, fsPromises };
+
 export function useGitBranchName(
   cwd: string,
-  deps: FileSystemDeps = { fs, fsPromises }
+  deps: FileSystemDeps = defaultDeps
 ): string | undefined {
   const [branchName, setBranchName] = useState<string | undefined>(undefined);
 
