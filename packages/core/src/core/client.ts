@@ -286,7 +286,7 @@ export class GeminiClient {
       const contextData: Record<string, unknown> = {};
 
       if (activeFile) {
-        contextData.activeFile = {
+        contextData['activeFile'] = {
           path: activeFile.path,
           cursor: activeFile.cursor
             ? {
@@ -299,7 +299,7 @@ export class GeminiClient {
       }
 
       if (otherOpenFiles.length > 0) {
-        contextData.otherOpenFiles = otherOpenFiles;
+        contextData['otherOpenFiles'] = otherOpenFiles;
       }
 
       if (Object.keys(contextData).length === 0) {
@@ -345,7 +345,7 @@ export class GeminiClient {
         }
       }
       if (openedFiles.length > 0) {
-        changes.filesOpened = openedFiles;
+        changes['filesOpened'] = openedFiles;
       }
 
       const closedFiles: string[] = [];
@@ -355,7 +355,7 @@ export class GeminiClient {
         }
       }
       if (closedFiles.length > 0) {
-        changes.filesClosed = closedFiles;
+        changes['filesClosed'] = closedFiles;
       }
 
       const lastActiveFile = (
@@ -367,7 +367,7 @@ export class GeminiClient {
 
       if (currentActiveFile) {
         if (!lastActiveFile || lastActiveFile.path !== currentActiveFile.path) {
-          changes.activeFileChanged = {
+          changes['activeFileChanged'] = {
             path: currentActiveFile.path,
             cursor: currentActiveFile.cursor
               ? {
@@ -386,7 +386,7 @@ export class GeminiClient {
               lastCursor.line !== currentCursor.line ||
               lastCursor.character !== currentCursor.character)
           ) {
-            changes.cursorMoved = {
+            changes['cursorMoved'] = {
               path: currentActiveFile.path,
               cursor: {
                 line: currentCursor.line,
@@ -398,14 +398,14 @@ export class GeminiClient {
           const lastSelectedText = lastActiveFile.selectedText || '';
           const currentSelectedText = currentActiveFile.selectedText || '';
           if (lastSelectedText !== currentSelectedText) {
-            changes.selectionChanged = {
+            changes['selectionChanged'] = {
               path: currentActiveFile.path,
               selectedText: currentSelectedText,
             };
           }
         }
       } else if (lastActiveFile) {
-        changes.activeFileChanged = {
+        changes['activeFileChanged'] = {
           path: null,
           previousPath: lastActiveFile.path,
         };
@@ -415,7 +415,7 @@ export class GeminiClient {
         return { contextParts: [], newIdeContext: currentIdeContext };
       }
 
-      delta.changes = changes;
+      delta['changes'] = changes;
       const jsonString = JSON.stringify(delta, null, 2);
       const contextParts = [
         "Here is a summary of changes in the user's editor context, in JSON format. This is for your information only.",
