@@ -12,6 +12,7 @@ import {
   EXTENSIONS_CONFIG_FILENAME,
   EXTENSIONS_DIRECTORY_NAME,
   annotateActiveExtensions,
+  annotateActiveExtensionsFromDisabled,
   loadExtensions,
 } from './extension.js';
 
@@ -26,6 +27,7 @@ vi.mock('os', async (importOriginal) => {
 describe('loadExtensions', () => {
   let tempWorkspaceDir: string;
   let tempHomeDir: string;
+  let tempSystemDir: string;
 
   beforeEach(() => {
     tempWorkspaceDir = fs.mkdtempSync(
@@ -34,12 +36,18 @@ describe('loadExtensions', () => {
     tempHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
+    tempSystemDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-system-'),
+    );
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    process.env.GEMINI_CLI_SYSTEM_EXTENSIONS_PATH = tempSystemDir;
   });
 
   afterEach(() => {
     fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    fs.rmSync(tempSystemDir, { recursive: true, force: true });
+    delete process.env.GEMINI_CLI_SYSTEM_EXTENSIONS_PATH;
   });
 
   it('should include extension path in loaded extension', () => {
@@ -109,6 +117,13 @@ describe('loadExtensions', () => {
       path.join(workspaceExtensionsDir, 'ext1', 'my-context-file.md'),
     ]);
   });
+
+  it('should load extensions from the system directory', () => {
+    createExtension(tempSystemDir, 'system-ext', '1.0.0');
+    const extensions = loadExtensions(tempWorkspaceDir);
+    expect(extensions).toHaveLength(1);
+    expect(extensions[0].config.name).toBe('system-ext');
+  });
 });
 
 describe('annotateActiveExtensions', () => {
@@ -118,10 +133,10 @@ describe('annotateActiveExtensions', () => {
     { config: { name: 'ext3', version: '1.0.0' }, contextFiles: [] },
   ];
 
-  it('should mark all extensions as active if no enabled extensions are provided', () => {
+  it('should mark all extensions as inactive when an empty array is provided', () => {
     const activeExtensions = annotateActiveExtensions(extensions, []);
     expect(activeExtensions).toHaveLength(3);
-    expect(activeExtensions.every((e) => e.isActive)).toBe(true);
+    expect(activeExtensions.every((e) => !e.isActive)).toBe(true);
   });
 
   it('should mark only the enabled extensions as active', () => {
@@ -159,6 +174,49 @@ describe('annotateActiveExtensions', () => {
     annotateActiveExtensions(extensions, ['ext4']);
     expect(consoleSpy).toHaveBeenCalledWith('Extension not found: ext4');
     consoleSpy.mockRestore();
+  });
+});
+
+describe('annotateActiveExtensionsFromDisabled', () => {
+  const extensions = [
+    { config: { name: 'ext1', version: '1.0.0' }, contextFiles: [] },
+    { config: { name: 'ext2', version: '1.0.0' }, contextFiles: [] },
+    { config: { name: 'ext3', version: '1.0.0' }, contextFiles: [] },
+  ];
+
+  it('should mark all extensions as active if no disabled extensions are provided', () => {
+    const activeExtensions = annotateActiveExtensionsFromDisabled(
+      extensions,
+      [],
+    );
+    expect(activeExtensions).toHaveLength(3);
+    expect(activeExtensions.every((e) => e.isActive)).toBe(true);
+  });
+
+  it('should mark only the disabled extensions as inactive', () => {
+    const activeExtensions = annotateActiveExtensionsFromDisabled(extensions, [
+      'ext1',
+      'ext3',
+    ]);
+    expect(activeExtensions).toHaveLength(3);
+    expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
+      false,
+    );
+    expect(activeExtensions.find((e) => e.name === 'ext2')?.isActive).toBe(
+      true,
+    );
+    expect(activeExtensions.find((e) => e.name === 'ext3')?.isActive).toBe(
+      false,
+    );
+  });
+
+  it('should handle case-insensitivity', () => {
+    const activeExtensions = annotateActiveExtensionsFromDisabled(extensions, [
+      'EXT1',
+    ]);
+    expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
+      false,
+    );
   });
 });
 

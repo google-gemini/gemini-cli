@@ -11,6 +11,7 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
+import { extensionsCommand } from '../commands/extensions.js';
 import {
   Config,
   loadServerHierarchicalMemory,
@@ -30,7 +31,11 @@ import {
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
-import { Extension, annotateActiveExtensions } from './extension.js';
+import {
+  Extension,
+  annotateActiveExtensions,
+  annotateActiveExtensionsFromDisabled,
+} from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
@@ -245,6 +250,7 @@ export async function parseArguments(): Promise<CliArgs> {
     )
     // Register MCP subcommands
     .command(mcpCommand)
+    .command(extensionsCommand)
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -255,9 +261,12 @@ export async function parseArguments(): Promise<CliArgs> {
   yargsInstance.wrap(yargsInstance.terminalWidth());
   const result = await yargsInstance.parse();
 
-  // Handle case where MCP subcommands are executed - they should exit the process
+  // Handle case where MCP and extensions subcommands are executed - they should exit the process
   // and not return to main CLI logic
-  if (result._.length > 0 && result._[0] === 'mcp') {
+  if (
+    result._.length > 0 &&
+    (result._[0] === 'mcp' || result._[0] === 'extensions')
+  ) {
     // MCP commands handle their own execution and process exit
     process.exit(0);
   }
@@ -330,10 +339,14 @@ export async function loadCliConfig(
   const folderTrust = folderTrustFeature && folderTrustSetting;
   const trustedFolder = isWorkspaceTrusted(settings);
 
-  const allExtensions = annotateActiveExtensions(
-    extensions,
-    argv.extensions || [],
-  );
+  const allExtensions = argv.extensions
+    ? // If the CLI flag is used, it takes precedence.
+      annotateActiveExtensions(extensions, argv.extensions)
+    : // Otherwise, use the settings to determine the enabled list.
+      annotateActiveExtensionsFromDisabled(
+        extensions,
+        settings.extensions?.disabled || [],
+      );
 
   const activeExtensions = extensions.filter(
     (_, i) => allExtensions[i].isActive,

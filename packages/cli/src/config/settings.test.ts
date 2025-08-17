@@ -114,6 +114,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        extensions: {
+          disabled: [],
+        },
       });
       expect(settings.errors.length).toBe(0);
     });
@@ -149,6 +152,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        extensions: {
+          disabled: [],
+        },
       });
     });
 
@@ -184,6 +190,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        extensions: {
+          disabled: [],
+        },
       });
     });
 
@@ -217,6 +226,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        extensions: {
+          disabled: [],
+        },
       });
     });
 
@@ -256,6 +268,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        extensions: {
+          disabled: [],
+        },
       });
     });
 
@@ -307,6 +322,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        extensions: {
+          disabled: [],
+        },
       });
     });
 
@@ -828,6 +846,46 @@ describe('Settings Loading and Merging', () => {
       ]);
     });
 
+    it('should merge extensions.disabled from all scopes', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const systemSettingsContent = {
+        extensions: { disabled: ['system-ext'] },
+      };
+      const userSettingsContent = {
+        extensions: { disabled: ['user-ext', 'shared-ext'] },
+      };
+      const workspaceSettingsContent = {
+        extensions: { disabled: ['workspace-ext', 'shared-ext'] },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Use a Set to account for duplicates, then convert back to a sorted array for a stable assertion.
+      const expectedDisabled = [
+        'system-ext',
+        'user-ext',
+        'shared-ext',
+        'workspace-ext',
+      ];
+      const actualDisabled = [
+        ...new Set(settings.merged.extensions?.disabled || []),
+      ].sort();
+
+      expect(actualDisabled).toEqual(expectedDisabled.sort());
+    });
+
     it('should handle JSON parsing errors gracefully', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true); // Both files "exist"
       const invalidJsonContent = 'invalid json';
@@ -868,6 +926,9 @@ describe('Settings Loading and Merging', () => {
         mcpServers: {},
         includeDirectories: [],
         chatCompression: {},
+        extensions: {
+          disabled: [],
+        },
       });
 
       // Check that error objects are populated in settings.errors
@@ -1306,6 +1367,9 @@ describe('Settings Loading and Merging', () => {
           mcpServers: {},
           includeDirectories: [],
           chatCompression: {},
+          extensions: {
+            disabled: [],
+          },
         });
       });
     });
