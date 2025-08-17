@@ -18,8 +18,10 @@ import {
 import { getIdeProcessId } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import commandExists from 'command-exists';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -107,7 +109,15 @@ export class IdeClient {
 
     const portFromFile = await this.getPortFromFile();
     if (portFromFile) {
-      const connected = await this.establishConnection(portFromFile);
+      const connected = await this.establishHttpConnection(portFromFile);
+      if (connected) {
+        return;
+      }
+    }
+
+    const socketFromEnv = this.getSocketFromEnv();
+    if (socketFromEnv) {
+      const connected = await this.establishSocketConnection(socketFromEnv);
       if (connected) {
         return;
       }
@@ -115,7 +125,7 @@ export class IdeClient {
 
     const portFromEnv = this.getPortFromEnv();
     if (portFromEnv) {
-      const connected = await this.establishConnection(portFromEnv);
+      const connected = await this.establishHttpConnection(portFromEnv);
       if (connected) {
         return;
       }
@@ -298,6 +308,14 @@ export class IdeClient {
     return port;
   }
 
+  private getSocketFromEnv(): string | undefined {
+    const socket = process.env['GEMINI_CLI_IDE_SERVER_SOCKET'];
+    if (!socket) {
+      return undefined;
+    }
+    return socket;
+  }
+
   private async getPortFromFile(): Promise<string | undefined> {
     try {
       const ideProcessId = await getIdeProcessId();
@@ -367,9 +385,10 @@ export class IdeClient {
     );
   }
 
-  private async establishConnection(port: string): Promise<boolean> {
+  private async establishHttpConnection(port: string): Promise<boolean> {
     let transport: StreamableHTTPClientTransport | undefined;
     try {
+      logger.debug('Attempting to connect to IDE via HTTP SSE');
       this.client = new Client({
         name: 'streamable-http-client',
         // TODO(#3487): use the CLI version here.
@@ -378,6 +397,52 @@ export class IdeClient {
       transport = new StreamableHTTPClientTransport(
         new URL(`http://${getIdeServerHost()}:${port}/mcp`),
       );
+      await this.client.connect(transport);
+      this.registerClientHandlers();
+      this.setState(IDEConnectionStatus.Connected);
+      return true;
+    } catch (_error) {
+      if (transport) {
+        try {
+          await transport.close();
+        } catch (closeError) {
+          logger.debug('Failed to close transport:', closeError);
+        }
+      }
+      return false;
+    }
+  }
+
+  private async establishSocketConnection(socket: string): Promise<boolean> {
+    let transport: StdioClientTransport | undefined;
+    try {
+      logger.debug('Attempting to connect to IDE via UNIX socket');
+      const command = commandExists.sync('socat')
+        ? 'socat'
+        : commandExists.sync('netcat')
+          ? 'netcat'
+          : '';
+
+      if (!command) {
+        logger.error(
+          'Neither "socat" nor "netcat" command found. Cannot connect to IDE via UNIX socket.',
+        );
+        return false;
+      }
+
+      this.client = new Client({
+        name: 'stdio-client',
+        // TODO(#3487): use the CLI version here.
+        version: '1.0.0',
+      });
+
+      const args =
+        command === 'socat' ? ['-', `UNIX-CONNECT:${socket}`] : ['-U', socket];
+
+      transport = new StdioClientTransport({
+        command,
+        args,
+      });
       await this.client.connect(transport);
       this.registerClientHandlers();
       this.setState(IDEConnectionStatus.Connected);
