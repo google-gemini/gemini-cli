@@ -1890,7 +1890,7 @@ describe('environment variable generation config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const config = await loadCliConfig({}, [], 'test-session', argv);
-    expect(config.getGenerationConfig()).toEqual({
+    expect(config.getHyperparameters()).toEqual({
       temperature: 0.7,
     });
   });
@@ -1900,7 +1900,7 @@ describe('environment variable generation config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const config = await loadCliConfig({}, [], 'test-session', argv);
-    expect(config.getGenerationConfig()).toEqual({
+    expect(config.getHyperparameters()).toEqual({
       topK: 40,
     });
   });
@@ -1910,7 +1910,7 @@ describe('environment variable generation config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const config = await loadCliConfig({}, [], 'test-session', argv);
-    expect(config.getGenerationConfig()).toEqual({
+    expect(config.getHyperparameters()).toEqual({
       thinking_budget: 1024,
     });
   });
@@ -1922,7 +1922,7 @@ describe('environment variable generation config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const config = await loadCliConfig({}, [], 'test-session', argv);
-    expect(config.getGenerationConfig()).toEqual({
+    expect(config.getHyperparameters()).toEqual({
       temperature: 1.5,
       topK: 20,
       thinking_budget: 512,
@@ -1935,7 +1935,7 @@ describe('environment variable generation config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const config = await loadCliConfig({}, [], 'test-session', argv);
-    expect(config.getGenerationConfig()).toBeUndefined();
+    expect(config.getHyperparameters()).toEqual({});
     expect(consoleSpy).toHaveBeenCalledWith(
       '[WARN]',
       'Invalid GEMINI_TEMPERATURE value: 3.0. Must be between 0.0 and 2.0',
@@ -1949,7 +1949,7 @@ describe('environment variable generation config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const config = await loadCliConfig({}, [], 'test-session', argv);
-    expect(config.getGenerationConfig()).toBeUndefined();
+    expect(config.getHyperparameters()).toEqual({});
     expect(consoleSpy).toHaveBeenCalledWith(
       '[WARN]',
       'Invalid GEMINI_TOP_K value: -5. Must be a positive integer',
@@ -1963,7 +1963,7 @@ describe('environment variable generation config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const config = await loadCliConfig({}, [], 'test-session', argv);
-    expect(config.getGenerationConfig()).toBeUndefined();
+    expect(config.getHyperparameters()).toEqual({});
     expect(consoleSpy).toHaveBeenCalledWith(
       '[WARN]',
       'Invalid GEMINI_THINKING_BUDGET value: -100. Must be a non-negative integer',
@@ -1975,7 +1975,7 @@ describe('environment variable generation config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const config = await loadCliConfig({}, [], 'test-session', argv);
-    expect(config.getGenerationConfig()).toBeUndefined();
+    expect(config.getHyperparameters()).toEqual({});
   });
 
   it('should handle empty string environment variables', async () => {
@@ -1985,7 +1985,7 @@ describe('environment variable generation config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const config = await loadCliConfig({}, [], 'test-session', argv);
-    expect(config.getGenerationConfig()).toBeUndefined();
+    expect(config.getHyperparameters()).toEqual({});
   });
 
   it('should handle non-numeric environment variable values', async () => {
@@ -1996,7 +1996,7 @@ describe('environment variable generation config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const config = await loadCliConfig({}, [], 'test-session', argv);
-    expect(config.getGenerationConfig()).toBeUndefined();
+    expect(config.getHyperparameters()).toEqual({});
     expect(consoleSpy).toHaveBeenCalledTimes(3);
     consoleSpy.mockRestore();
   });
@@ -2006,7 +2006,7 @@ describe('environment variable generation config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const config = await loadCliConfig({}, [], 'test-session', argv);
-    expect(config.getGenerationConfig()).toEqual({
+    expect(config.getHyperparameters()).toEqual({
       temperature: 0,
     });
   });
@@ -2016,7 +2016,7 @@ describe('environment variable generation config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const config = await loadCliConfig({}, [], 'test-session', argv);
-    expect(config.getGenerationConfig()).toEqual({
+    expect(config.getHyperparameters()).toEqual({
       thinking_budget: 0,
     });
   });

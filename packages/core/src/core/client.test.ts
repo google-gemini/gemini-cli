@@ -208,7 +208,7 @@ describe('Gemini Client (client.ts)', () => {
       getGeminiClient: vi.fn(),
       setFallbackMode: vi.fn(),
       getChatCompression: vi.fn().mockReturnValue(undefined),
-      getGenerationConfig: vi.fn().mockReturnValue(undefined),
+      getHyperparameters: vi.fn().mockReturnValue({}),
     };
     const MockedConfig = vi.mocked(Config, true);
     MockedConfig.mockImplementation(
@@ -2021,7 +2021,7 @@ ${JSON.stringify(
             getProxy: vi.fn().mockReturnValue(undefined),
             getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
             getSessionId: vi.fn().mockReturnValue('test-session-id'),
-            getGenerationConfig: vi.fn().mockReturnValue(undefined),
+            getHyperparameters: vi.fn().mockReturnValue({}),
           } as unknown as Config;
 
           const client = new GeminiClient(mockConfig);
@@ -2040,7 +2040,7 @@ ${JSON.stringify(
             getProxy: vi.fn().mockReturnValue(undefined),
             getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
             getSessionId: vi.fn().mockReturnValue('test-session-id'),
-            getGenerationConfig: vi.fn().mockReturnValue({
+            getHyperparameters: vi.fn().mockReturnValue({
               temperature: 1.2,
               topK: 30,
               thinking_budget: 2048,
@@ -2064,7 +2064,7 @@ ${JSON.stringify(
             getProxy: vi.fn().mockReturnValue(undefined),
             getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
             getSessionId: vi.fn().mockReturnValue('test-session-id'),
-            getGenerationConfig: vi.fn().mockReturnValue({
+            getHyperparameters: vi.fn().mockReturnValue({
               temperature: 0.5,
             }),
           } as unknown as Config;
@@ -2083,7 +2083,7 @@ ${JSON.stringify(
             getProxy: vi.fn().mockReturnValue(undefined),
             getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
             getSessionId: vi.fn().mockReturnValue('test-session-id'),
-            getGenerationConfig: vi.fn().mockReturnValue({
+            getHyperparameters: vi.fn().mockReturnValue({
               topK: 15,
             }),
           } as unknown as Config;
@@ -2102,15 +2102,15 @@ ${JSON.stringify(
             getProxy: vi.fn().mockReturnValue(undefined),
             getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
             getSessionId: vi.fn().mockReturnValue('test-session-id'),
-            getGenerationConfig: vi.fn().mockReturnValue({
+            getHyperparameters: vi.fn().mockReturnValue({
               thinking_budget: 1024,
             }),
           } as unknown as Config;
 
           new GeminiClient(mockConfig);
 
-          // Check that getGenerationConfig returns the thinking_budget
-          expect(mockConfig.getGenerationConfig()).toEqual({
+          // Check that getHyperparameters returns the thinking_budget
+          expect(mockConfig.getHyperparameters()).toEqual({
             thinking_budget: 1024,
           });
         });
@@ -2120,7 +2120,7 @@ ${JSON.stringify(
             getProxy: vi.fn().mockReturnValue(undefined),
             getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
             getSessionId: vi.fn().mockReturnValue('test-session-id'),
-            getGenerationConfig: vi.fn().mockReturnValue({
+            getHyperparameters: vi.fn().mockReturnValue({
               temperature: 0,
               thinking_budget: 0,
             }),
@@ -2133,7 +2133,7 @@ ${JSON.stringify(
           expect(clientConfig.temperature).toBe(0);
 
           // Verify the config stores thinking_budget correctly
-          expect(mockConfig.getGenerationConfig()).toEqual({
+          expect(mockConfig.getHyperparameters()).toEqual({
             temperature: 0,
             thinking_budget: 0,
           });
@@ -2144,7 +2144,7 @@ ${JSON.stringify(
             getProxy: vi.fn().mockReturnValue(undefined),
             getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
             getSessionId: vi.fn().mockReturnValue('test-session-id'),
-            getGenerationConfig: vi.fn().mockReturnValue({
+            getHyperparameters: vi.fn().mockReturnValue({
               temperature: 0.8,
             }),
           } as unknown as Config;

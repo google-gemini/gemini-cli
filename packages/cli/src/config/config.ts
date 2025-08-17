@@ -536,7 +536,7 @@ export async function loadCliConfig(
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
-  const generationConfig = parseGenerationConfigFromEnv();
+  const hyperparameters = parseGenerationConfigFromEnv();
 
   return new Config({
     sessionId,
@@ -599,7 +599,7 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
     model: argv.model || settings.model || DEFAULT_GEMINI_MODEL,
-    ...(generationConfig && { generationConfig }),
+    ...(hyperparameters && { hyperparameters }),
     extensionContextFilePaths,
     maxSessionTurns: settings.maxSessionTurns ?? -1,
     experimentalZedIntegration: argv.experimentalAcp || false,

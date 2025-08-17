@@ -122,12 +122,12 @@ export class GeminiClient {
     this.lastPromptId = this.config.getSessionId();
 
     // Initialize generation config from Config or use defaults
-    const configGenerationConfig = config.getGenerationConfig();
+    const configHyperparameters = config.getHyperparameters();
     this.generateContentConfig = {
-      temperature: configGenerationConfig?.temperature ?? 0,
+      temperature: configHyperparameters.temperature ?? 0,
       topP: 1, // Keep default topP as 1
-      ...(configGenerationConfig?.topK !== undefined && {
-        topK: configGenerationConfig.topK,
+      ...(configHyperparameters.topK !== undefined && {
+        topK: configHyperparameters.topK,
       }),
     };
   }
@@ -242,7 +242,7 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
-      const configGenerationConfig = this.config.getGenerationConfig();
+      const configHyperparameters = this.config.getHyperparameters();
       const generateContentConfigWithThinking = isThinkingSupported(
         this.config.getModel(),
       )
@@ -250,8 +250,8 @@ export class GeminiClient {
             ...this.generateContentConfig,
             thinkingConfig: {
               includeThoughts: true,
-              ...(configGenerationConfig?.thinking_budget !== undefined && {
-                thinkingBudget: configGenerationConfig.thinking_budget,
+              ...(configHyperparameters.thinking_budget !== undefined && {
+                thinkingBudget: configHyperparameters.thinking_budget,
               }),
             },
           }

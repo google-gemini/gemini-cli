@@ -141,7 +141,7 @@ describe('subagent.ts', () => {
     });
 
     // Helper to safely access generationConfig from mock calls
-    const getGenerationConfigFromMock = (
+    const getHyperparametersFromMock = (
       callIndex = 0,
     ): GenerateContentConfig & { systemInstruction?: string | Content } => {
       const callArgs = vi.mocked(GeminiChat).mock.calls[callIndex];
@@ -307,7 +307,7 @@ describe('subagent.ts', () => {
         const callArgs = vi.mocked(GeminiChat).mock.calls[0];
 
         // Check Generation Config
-        const generationConfig = getGenerationConfigFromMock();
+        const generationConfig = getHyperparametersFromMock();
 
         // Check temperature override
         expect(generationConfig.temperature).toBe(defaultModelConfig.temp);
@@ -356,7 +356,7 @@ describe('subagent.ts', () => {
 
         await scope.runNonInteractive(context);
 
-        const generationConfig = getGenerationConfigFromMock();
+        const generationConfig = getHyperparametersFromMock();
         const systemInstruction = generationConfig.systemInstruction as string;
 
         expect(systemInstruction).toContain('Do the task.');
@@ -392,7 +392,7 @@ describe('subagent.ts', () => {
         await scope.runNonInteractive(context);
 
         const callArgs = vi.mocked(GeminiChat).mock.calls[0];
-        const generationConfig = getGenerationConfigFromMock();
+        const generationConfig = getHyperparametersFromMock();
         const history = callArgs[3];
 
         expect(generationConfig.systemInstruction).toBeUndefined();
