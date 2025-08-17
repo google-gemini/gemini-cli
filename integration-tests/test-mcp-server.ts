@@ -34,13 +34,16 @@ export class TestMcpServer {
       await transport.handleRequest(req, res, req.body);
     });
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       this.server = app.listen(0, () => {
         const address = this.server!.address();
         if (address && typeof address !== 'string') {
           resolve(address.port);
+        } else {
+          reject(new Error('Could not determine server port.'));
         }
       });
+      this.server.on('error', reject);
     });
   }
 
