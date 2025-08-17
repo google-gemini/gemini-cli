@@ -760,8 +760,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     fetchUserMessages();
   }, [history, logger]);
 
-  const isInputActive =
-    streamingState === StreamingState.Idle && !initError && !isProcessing;
+  const isInputActive = !initError && (isProcessing || !isProcessing);
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -1155,6 +1154,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   onEscapePromptChange={handleEscapePromptChange}
                   focus={isFocused}
                   vimHandleInput={vimHandleInput}
+                  streamingState={streamingState}
                   placeholder={placeholder}
                 />
               )}

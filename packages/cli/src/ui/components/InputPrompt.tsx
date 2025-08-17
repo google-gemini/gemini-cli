@@ -26,6 +26,7 @@ import {
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
 import * as path from 'path';
+import { StreamingState } from '../types.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -43,6 +44,7 @@ export interface InputPromptProps {
   setShellModeActive: (value: boolean) => void;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
+  streamingState: StreamingState;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -61,6 +63,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
   onEscapePromptChange,
   vimHandleInput,
+  streamingState,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [escPressCount, setEscPressCount] = useState(0);
@@ -131,6 +134,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
+      if (streamingState === StreamingState.Responding) {
+        return;
+      }
+      // Add command to shell history
       if (shellModeActive) {
         shellHistory.addCommandToHistory(submittedValue);
       }
@@ -142,6 +149,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       resetReverseSearchCompletionState();
     },
     [
+      streamingState,
       onSubmit,
       buffer,
       resetCompletionState,
