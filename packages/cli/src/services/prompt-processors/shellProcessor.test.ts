@@ -46,7 +46,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 const SUCCESS_RESULT = {
-  output: 'default shell output',
+  stdout: 'default shell output',
+  stderr: '',
   exitCode: 0,
   error: null,
   aborted: false,
@@ -118,7 +119,7 @@ describe('ShellProcessor', () => {
       disallowedCommands: [],
     });
     mockShellExecute.mockReturnValue({
-      result: Promise.resolve({ ...SUCCESS_RESULT, output: 'On branch main' }),
+      result: Promise.resolve({ ...SUCCESS_RESULT, stdout: 'On branch main' }),
     });
 
     const result = await processor.process(prompt, context);
@@ -149,11 +150,11 @@ describe('ShellProcessor', () => {
       .mockReturnValueOnce({
         result: Promise.resolve({
           ...SUCCESS_RESULT,
-          output: 'On branch main',
+          stdout: 'On branch main',
         }),
       })
       .mockReturnValueOnce({
-        result: Promise.resolve({ ...SUCCESS_RESULT, output: '/usr/home' }),
+        result: Promise.resolve({ ...SUCCESS_RESULT, stdout: '/usr/home' }),
       });
 
     const result = await processor.process(prompt, context);
@@ -277,10 +278,10 @@ describe('ShellProcessor', () => {
 
     mockShellExecute
       .mockReturnValueOnce({
-        result: Promise.resolve({ ...SUCCESS_RESULT, output: 'output1' }),
+        result: Promise.resolve({ ...SUCCESS_RESULT, stdout: 'output1' }),
       })
       .mockReturnValueOnce({
-        result: Promise.resolve({ ...SUCCESS_RESULT, output: 'output2' }),
+        result: Promise.resolve({ ...SUCCESS_RESULT, stdout: 'output2' }),
       });
 
     const result = await processor.process(prompt, context);
@@ -314,7 +315,7 @@ describe('ShellProcessor', () => {
       disallowedCommands: [],
     });
     mockShellExecute.mockReturnValue({
-      result: Promise.resolve({ ...SUCCESS_RESULT, output: 'total 0' }),
+      result: Promise.resolve({ ...SUCCESS_RESULT, stdout: 'total 0' }),
     });
 
     await processor.process(prompt, context);
@@ -351,7 +352,7 @@ describe('ShellProcessor', () => {
       const command = "awk '{print $1}' file.txt";
       const prompt = `Output: !{${command}}`;
       mockShellExecute.mockReturnValue({
-        result: Promise.resolve({ ...SUCCESS_RESULT, output: 'result' }),
+        result: Promise.resolve({ ...SUCCESS_RESULT, stdout: 'result' }),
       });
 
       const result = await processor.process(prompt, context);
@@ -375,7 +376,7 @@ describe('ShellProcessor', () => {
       const command = "echo '{{a},{b}}'";
       const prompt = `!{${command}}`;
       mockShellExecute.mockReturnValue({
-        result: Promise.resolve({ ...SUCCESS_RESULT, output: '{{a},{b}}' }),
+        result: Promise.resolve({ ...SUCCESS_RESULT, stdout: '{{a},{b}}' }),
       });
 
       const result = await processor.process(prompt, context);
@@ -408,13 +409,46 @@ describe('ShellProcessor', () => {
   });
 
   describe('Error Reporting', () => {
-    it('should append exit code information if the command fails (non-zero exit code)', async () => {
+    it('should append stderr information if the command produces it', async () => {
+      const processor = new ShellProcessor('test-command');
+      const prompt = '!{cmd}';
+      mockShellExecute.mockReturnValue({
+        result: Promise.resolve({
+          ...SUCCESS_RESULT,
+          stdout: 'some output',
+          stderr: 'some error',
+        }),
+      });
+
+      const result = await processor.process(prompt, context);
+
+      expect(result).toBe('some output\n--- STDERR ---\nsome error');
+    });
+
+    it('should handle stderr-only output correctly', async () => {
+      const processor = new ShellProcessor('test-command');
+      const prompt = '!{cmd}';
+      mockShellExecute.mockReturnValue({
+        result: Promise.resolve({
+          ...SUCCESS_RESULT,
+          stdout: '',
+          stderr: 'error only',
+        }),
+      });
+
+      const result = await processor.process(prompt, context);
+
+      expect(result).toBe('--- STDERR ---\nerror only');
+    });
+
+    it('should append exit code and command name if the command fails', async () => {
       const processor = new ShellProcessor('test-command');
       const prompt = 'Run a failing command: !{exit 1}';
       mockShellExecute.mockReturnValue({
         result: Promise.resolve({
           ...SUCCESS_RESULT,
-          output: 'some error output',
+          stdout: 'some error output',
+          stderr: '',
           exitCode: 1,
         }),
       });
@@ -422,17 +456,18 @@ describe('ShellProcessor', () => {
       const result = await processor.process(prompt, context);
 
       expect(result).toBe(
-        'Run a failing command: some error output\n[Shell command exited with code 1]',
+        "Run a failing command: some error output\n[Shell command 'exit 1' exited with code 1]",
       );
     });
 
-    it('should append signal information if the command is terminated by signal', async () => {
+    it('should append signal info and command name if terminated by signal', async () => {
       const processor = new ShellProcessor('test-command');
       const prompt = '!{cmd}';
       mockShellExecute.mockReturnValue({
         result: Promise.resolve({
           ...SUCCESS_RESULT,
-          output: 'output',
+          stdout: 'output',
+          stderr: '',
           exitCode: null,
           signal: 'SIGTERM',
         }),
@@ -441,18 +476,38 @@ describe('ShellProcessor', () => {
       const result = await processor.process(prompt, context);
 
       expect(result).toBe(
-        'output\n[Shell command terminated by signal SIGTERM]',
+        "output\n[Shell command 'cmd' terminated by signal SIGTERM]",
       );
     });
 
-    it('should throw an error if the shell fails to spawn (and was not aborted)', async () => {
+    it('should append stderr and exit code information correctly', async () => {
       const processor = new ShellProcessor('test-command');
-      const prompt = '!{command}';
+      const prompt = '!{cmd}';
+      mockShellExecute.mockReturnValue({
+        result: Promise.resolve({
+          ...SUCCESS_RESULT,
+          stdout: 'out',
+          stderr: 'err',
+          exitCode: 127,
+        }),
+      });
+
+      const result = await processor.process(prompt, context);
+
+      expect(result).toBe(
+        "out\n--- STDERR ---\nerr\n[Shell command 'cmd' exited with code 127]",
+      );
+    });
+
+    it('should throw a detailed error if the shell fails to spawn', async () => {
+      const processor = new ShellProcessor('test-command');
+      const prompt = '!{bad-command}';
       const spawnError = new Error('spawn EACCES');
       mockShellExecute.mockReturnValue({
         result: Promise.resolve({
           ...SUCCESS_RESULT,
-          output: '',
+          stdout: '',
+          stderr: '',
           exitCode: null,
           error: spawnError,
           aborted: false,
@@ -460,18 +515,19 @@ describe('ShellProcessor', () => {
       });
 
       await expect(processor.process(prompt, context)).rejects.toThrow(
-        /Failed to start shell command/,
+        "Failed to start shell command in 'test-command': spawn EACCES. Command: bad-command",
       );
     });
 
-    it('should not throw an error on spawn failure if it was aborted, but report abort status', async () => {
+    it('should report abort status with command name if aborted', async () => {
       const processor = new ShellProcessor('test-command');
-      const prompt = '!{command}';
+      const prompt = '!{long-running-command}';
       const spawnError = new Error('Aborted');
       mockShellExecute.mockReturnValue({
         result: Promise.resolve({
           ...SUCCESS_RESULT,
-          output: 'partial output',
+          stdout: 'partial output',
+          stderr: '',
           exitCode: null,
           error: spawnError,
           aborted: true, // Key difference
@@ -479,7 +535,9 @@ describe('ShellProcessor', () => {
       });
 
       const result = await processor.process(prompt, context);
-      expect(result).toBe('partial output\n[Shell command aborted]');
+      expect(result).toBe(
+        "partial output\n[Shell command 'long-running-command' aborted]",
+      );
     });
   });
 
@@ -505,7 +563,7 @@ describe('ShellProcessor', () => {
       const processor = new ShellProcessor('test-command');
       const prompt = 'Outside: {{args}}. Inside: !{echo "hello"}';
       mockShellExecute.mockReturnValue({
-        result: Promise.resolve({ ...SUCCESS_RESULT, output: 'hello' }),
+        result: Promise.resolve({ ...SUCCESS_RESULT, stdout: 'hello' }),
       });
 
       const result = await processor.process(prompt, context);
@@ -517,7 +575,7 @@ describe('ShellProcessor', () => {
       const processor = new ShellProcessor('test-command');
       const prompt = 'Command: !{grep {{args}} file.txt}';
       mockShellExecute.mockReturnValue({
-        result: Promise.resolve({ ...SUCCESS_RESULT, output: 'match found' }),
+        result: Promise.resolve({ ...SUCCESS_RESULT, stdout: 'match found' }),
       });
 
       const result = await processor.process(prompt, context);
@@ -539,7 +597,7 @@ describe('ShellProcessor', () => {
       const processor = new ShellProcessor('test-command');
       const prompt = 'User "({{args}})" requested search: !{search {{args}}}';
       mockShellExecute.mockReturnValue({
-        result: Promise.resolve({ ...SUCCESS_RESULT, output: 'results' }),
+        result: Promise.resolve({ ...SUCCESS_RESULT, stdout: 'results' }),
       });
 
       const result = await processor.process(prompt, context);

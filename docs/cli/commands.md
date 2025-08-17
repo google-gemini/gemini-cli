@@ -192,9 +192,9 @@ prompt = "Please provide a code fix for the issue described here: {{args}}."
 
 The model receives: `Please provide a code fix for the issue described here: "Button is misaligned".`
 
-**B. Shell-Safe Injection (Inside `!{...}` Blocks)**
+**B. Using Arguments in Shell Commands (Inside `!{...}` Blocks)**
 
-When `{{args}}` is used inside a shell injection block (`!{...}`), the arguments are automatically **shell-escaped** before replacement. This ensures the resulting command is syntactically correct and secure, preventing command injection vulnerabilities.
+When you use `{{args}}` inside a shell injection block (`!{...}`), the arguments are automatically **shell-escaped** before replacement. This allows you to safely pass arguments to shell commands, ensuring the resulting command is syntactically correct and secure while preventing command injection vulnerabilities.
 
 **Example (`/grep-code.toml`):**
 

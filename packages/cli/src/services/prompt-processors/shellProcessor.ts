@@ -148,17 +148,27 @@ export class ShellProcessor implements IPromptProcessor {
           );
         }
 
-        // Append the output and status.
-        processedPrompt += executionResult.output;
+        // Append the output, making stderr explicit for the model.
+        if (executionResult.stdout) {
+          processedPrompt += executionResult.stdout;
+        }
+        if (executionResult.stderr) {
+          if (executionResult.stdout) {
+            processedPrompt += '\n';
+          }
+          processedPrompt += `--- STDERR ---\n${executionResult.stderr}`;
+        }
+
+        // Append a status message if the command did not succeed.
         if (executionResult.aborted) {
-          processedPrompt += `\n[Shell command aborted]`;
+          processedPrompt += `\n[Shell command '${injection.resolvedCommand}' aborted]`;
         } else if (
           executionResult.exitCode !== 0 &&
           executionResult.exitCode !== null
         ) {
-          processedPrompt += `\n[Shell command exited with code ${executionResult.exitCode}]`;
+          processedPrompt += `\n[Shell command '${injection.resolvedCommand}' exited with code ${executionResult.exitCode}]`;
         } else if (executionResult.signal !== null) {
-          processedPrompt += `\n[Shell command terminated by signal ${executionResult.signal}]`;
+          processedPrompt += `\n[Shell command '${injection.resolvedCommand}' terminated by signal ${executionResult.signal}]`;
         }
       }
 
