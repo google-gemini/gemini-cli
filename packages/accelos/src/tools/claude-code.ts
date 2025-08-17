@@ -33,6 +33,7 @@ const claudeCodeOptionsSchema = z.object({
   mode: executionModeSchema.describe("Execution mode for the tool"),
   cwd: z.string().optional().describe("Working directory for Claude Code execution (defaults to REPOSITORY_PATH env var)"),
   rcaDirectory: z.string().optional().describe("RCA directory for Claude Code execution (defaults to RCA_DIRECTORY_PATH env var)"),
+  pathToClaudeCodeExecutable: z.string().optional().describe("Path to Claude Code executable (defaults to CLAUDE_CODE_EXECUTABLE_PATH env var)"),
   customSystemPrompt: z.string().optional().describe("Custom system prompt for the Claude Code session"),
   appendSystemPrompt: z.string().optional().describe("Additional system prompt to append"),
   maxTurns: z.number().int().positive().max(200).optional().describe("Maximum number of conversation turns (default: 20)"),
@@ -187,17 +188,22 @@ export const claudeCodeTool = createTool({
       const rcaDirectory = options.rcaDirectory || 
         process.env.RCA_DIRECTORY_PATH || 
         (process.env.ACCELOS_DATA_DIRECTORY_PATH ? `${process.env.ACCELOS_DATA_DIRECTORY_PATH}/RCA` : undefined);
+      
+      // Determine Claude Code executable path - use provided pathToClaudeCodeExecutable, or CLAUDE_CODE_EXECUTABLE_PATH env var
+      const claudeCodeExecutablePath = options.pathToClaudeCodeExecutable || process.env.CLAUDE_CODE_EXECUTABLE_PATH;
 
-      if (mode === "streaming") {
-        console.log(`📁 [${new Date().toLocaleTimeString()}] Claude Code: Working directory: ${workingDirectory}`);
-        if (rcaDirectory) {
-          console.log(`📁 [${new Date().toLocaleTimeString()}] Claude Code: RCA directory: ${rcaDirectory}`);
-        }
+      console.log(`📁 [${new Date().toLocaleTimeString()}] Claude Code: Working directory: ${workingDirectory}`);
+      if (rcaDirectory) {
+        console.log(`📁 [${new Date().toLocaleTimeString()}] Claude Code: RCA directory: ${rcaDirectory}`);
+      }
+      if (claudeCodeExecutablePath) {
+        console.log(`🔧 [${new Date().toLocaleTimeString()}] Claude Code: Executable path: ${claudeCodeExecutablePath}`);
       }
 
       // Prepare Claude Code options
       const claudeCodeOptions: Options = {
         cwd: workingDirectory,
+        pathToClaudeCodeExecutable: claudeCodeExecutablePath,
         customSystemPrompt: options.customSystemPrompt,
         appendSystemPrompt: options.appendSystemPrompt,
         maxTurns: options.maxTurns || 20,

@@ -57,6 +57,21 @@ describe('Claude Code Tool', () => {
     expect(result.success).toBe(true);
   });
 
+  it('should validate input schema with pathToClaudeCodeExecutable parameter', () => {
+    const validInputWithExecutablePath = {
+      prompt: 'Test prompt',
+      options: {
+        mode: 'basic',
+        pathToClaudeCodeExecutable: '/custom/path/to/claude-code',
+        customSystemPrompt: 'Test system prompt',
+        maxTurns: 10,
+      },
+    };
+
+    const result = claudeCodeTool.inputSchema.safeParse(validInputWithExecutablePath);
+    expect(result.success).toBe(true);
+  });
+
   it('should reject invalid input', () => {
     const invalidInput = {
       prompt: '', // Empty prompt should fail
@@ -352,6 +367,152 @@ describe('Claude Code Tool', () => {
       process.env.REPOSITORY_PATH = originalRepoPath;
     } else {
       delete process.env.REPOSITORY_PATH;
+    }
+  });
+
+  it('should use CLAUDE_CODE_EXECUTABLE_PATH as default pathToClaudeCodeExecutable when no pathToClaudeCodeExecutable provided', async () => {
+    const { query } = await import('@anthropic-ai/claude-code');
+    const mockQuery = vi.mocked(query);
+    
+    // Set CLAUDE_CODE_EXECUTABLE_PATH for the test
+    const originalExecutablePath = process.env.CLAUDE_CODE_EXECUTABLE_PATH;
+    process.env.CLAUDE_CODE_EXECUTABLE_PATH = '/test/claude-code/executable';
+    
+    let capturedOptions: any;
+    mockQuery.mockImplementation((params) => {
+      capturedOptions = params.options;
+      return {
+        async *[Symbol.asyncIterator]() {
+          yield {
+            type: 'result' as const,
+            subtype: 'success' as const,
+            result: 'Test result',
+            num_turns: 1,
+            session_id: 'test-session',
+            duration_ms: 1000,
+            duration_api_ms: 800,
+            is_error: false,
+            total_cost_usd: 0.01,
+            usage: { input_tokens: 10, output_tokens: 20, cache_creation_input_tokens: null, cache_read_input_tokens: null },
+            permission_denials: [],
+          };
+        }
+      } as unknown;
+    });
+
+    await claudeCodeTool.execute({
+      context: {
+        prompt: 'Test prompt',
+        options: {
+          mode: 'basic',
+        },
+      },
+    });
+
+    expect(capturedOptions.pathToClaudeCodeExecutable).toBe('/test/claude-code/executable');
+    
+    // Restore original value
+    if (originalExecutablePath) {
+      process.env.CLAUDE_CODE_EXECUTABLE_PATH = originalExecutablePath;
+    } else {
+      delete process.env.CLAUDE_CODE_EXECUTABLE_PATH;
+    }
+  });
+
+  it('should use provided pathToClaudeCodeExecutable over CLAUDE_CODE_EXECUTABLE_PATH', async () => {
+    const { query } = await import('@anthropic-ai/claude-code');
+    const mockQuery = vi.mocked(query);
+    
+    // Set CLAUDE_CODE_EXECUTABLE_PATH for the test
+    const originalExecutablePath = process.env.CLAUDE_CODE_EXECUTABLE_PATH;
+    process.env.CLAUDE_CODE_EXECUTABLE_PATH = '/default/claude-code/executable';
+    
+    let capturedOptions: any;
+    mockQuery.mockImplementation((params) => {
+      capturedOptions = params.options;
+      return {
+        async *[Symbol.asyncIterator]() {
+          yield {
+            type: 'result' as const,
+            subtype: 'success' as const,
+            result: 'Test result',
+            num_turns: 1,
+            session_id: 'test-session',
+            duration_ms: 1000,
+            duration_api_ms: 800,
+            is_error: false,
+            total_cost_usd: 0.01,
+            usage: { input_tokens: 10, output_tokens: 20, cache_creation_input_tokens: null, cache_read_input_tokens: null },
+            permission_denials: [],
+          };
+        }
+      } as unknown;
+    });
+
+    await claudeCodeTool.execute({
+      context: {
+        prompt: 'Test prompt',
+        options: {
+          mode: 'basic',
+          pathToClaudeCodeExecutable: '/custom/claude-code/executable',
+        },
+      },
+    });
+
+    expect(capturedOptions.pathToClaudeCodeExecutable).toBe('/custom/claude-code/executable');
+    
+    // Restore original value
+    if (originalExecutablePath) {
+      process.env.CLAUDE_CODE_EXECUTABLE_PATH = originalExecutablePath;
+    } else {
+      delete process.env.CLAUDE_CODE_EXECUTABLE_PATH;
+    }
+  });
+
+  it('should handle undefined pathToClaudeCodeExecutable when no env var or option provided', async () => {
+    const { query } = await import('@anthropic-ai/claude-code');
+    const mockQuery = vi.mocked(query);
+    
+    // Ensure CLAUDE_CODE_EXECUTABLE_PATH is not set for this test
+    const originalExecutablePath = process.env.CLAUDE_CODE_EXECUTABLE_PATH;
+    delete process.env.CLAUDE_CODE_EXECUTABLE_PATH;
+    
+    let capturedOptions: any;
+    mockQuery.mockImplementation((params) => {
+      capturedOptions = params.options;
+      return {
+        async *[Symbol.asyncIterator]() {
+          yield {
+            type: 'result' as const,
+            subtype: 'success' as const,
+            result: 'Test result',
+            num_turns: 1,
+            session_id: 'test-session',
+            duration_ms: 1000,
+            duration_api_ms: 800,
+            is_error: false,
+            total_cost_usd: 0.01,
+            usage: { input_tokens: 10, output_tokens: 20, cache_creation_input_tokens: null, cache_read_input_tokens: null },
+            permission_denials: [],
+          };
+        }
+      } as unknown;
+    });
+
+    await claudeCodeTool.execute({
+      context: {
+        prompt: 'Test prompt',
+        options: {
+          mode: 'basic',
+        },
+      },
+    });
+
+    expect(capturedOptions.pathToClaudeCodeExecutable).toBeUndefined();
+    
+    // Restore original value
+    if (originalExecutablePath) {
+      process.env.CLAUDE_CODE_EXECUTABLE_PATH = originalExecutablePath;
     }
   });
 });
