@@ -5,15 +5,16 @@
  */
 
 import * as vscode from 'vscode';
+import { IdeContextNotificationSchema } from '@google/gemini-cli-core';
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import express, { Request, Response } from 'express';
+import express, { type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import {
-  isInitializeRequest,
-  type JSONRPCNotification,
-} from '@modelcontextprotocol/sdk/types.js';
-import { Server as HTTPServer } from 'node:http';
+import { type Server as HTTPServer } from 'node:http';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import { z } from 'zod';
 import { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
@@ -28,11 +29,12 @@ function sendIdeContextUpdateNotification(
 ) {
   const ideContext = openFilesManager.state;
 
-  const notification: JSONRPCNotification = {
+  const notification = IdeContextNotificationSchema.parse({
     jsonrpc: '2.0',
     method: 'ide/contextUpdate',
     params: ideContext,
-  };
+  });
+
   log(
     `Sending IDE context update notification: ${JSON.stringify(
       notification,
@@ -47,11 +49,16 @@ export class IDEServer {
   private server: HTTPServer | undefined;
   private context: vscode.ExtensionContext | undefined;
   private log: (message: string) => void;
+  private portFile: string;
   diffManager: DiffManager;
 
   constructor(log: (message: string) => void, diffManager: DiffManager) {
     this.log = log;
     this.diffManager = diffManager;
+    this.portFile = path.join(
+      os.tmpdir(),
+      `gemini-ide-server-${process.ppid}.json`,
+    );
   }
 
   async start(context: vscode.ExtensionContext) {
@@ -76,7 +83,7 @@ export class IDEServer {
     });
     context.subscriptions.push(onDidChangeSubscription);
     const onDidChangeDiffSubscription = this.diffManager.onDidChange(
-      (notification: JSONRPCNotification) => {
+      (notification) => {
         for (const transport of Object.values(transports)) {
           transport.send(notification);
         }
@@ -198,6 +205,10 @@ export class IDEServer {
           port.toString(),
         );
         this.log(`IDE server listening on port ${port}`);
+        fs.writeFile(this.portFile, JSON.stringify({ port })).catch((err) => {
+          this.log(`Failed to write port to file: ${err}`);
+        });
+        this.log(this.portFile);
       }
     });
   }
@@ -219,6 +230,11 @@ export class IDEServer {
 
     if (this.context) {
       this.context.environmentVariableCollection.clear();
+    }
+    try {
+      await fs.unlink(this.portFile);
+    } catch (_err) {
+      // Ignore errors if the file doesn't exist.
     }
   }
 }
@@ -269,12 +285,13 @@ const createMcpServer = (diffManager: DiffManager) => {
       }).shape,
     },
     async ({ filePath }: { filePath: string }) => {
-      await diffManager.closeDiff(filePath);
+      const content = await diffManager.closeDiff(filePath);
+      const response = { content: content ?? undefined };
       return {
         content: [
           {
             type: 'text',
-            text: `Closed diff for ${filePath}`,
+            text: JSON.stringify(response),
           },
         ],
       };

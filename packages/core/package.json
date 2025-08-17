@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.1.17",
+  "version": "0.1.21",
   "description": "Gemini CLI Core",
   "repository": {
     "type": "git",
@@ -20,12 +20,15 @@
     "dist"
   ],
   "dependencies": {
-    "@google/genai": "1.9.0",
+    "@google/genai": "1.13.0",
     "@modelcontextprotocol/sdk": "^1.11.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "^0.52.0",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.52.0",
     "@opentelemetry/exporter-metrics-otlp-grpc": "^0.52.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.52.0",
     "@opentelemetry/exporter-trace-otlp-grpc": "^0.52.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.52.0",
     "@opentelemetry/instrumentation-http": "^0.52.0",
     "@opentelemetry/sdk-node": "^0.52.0",
     "@types/glob": "^8.1.0",
@@ -35,6 +38,7 @@
     "diff": "^7.0.0",
     "dotenv": "^17.1.0",
     "fdir": "^6.4.6",
+    "fzf": "^0.5.2",
     "glob": "^10.4.5",
     "google-auth-library": "^9.11.0",
     "html-to-text": "^9.0.5",
@@ -42,6 +46,7 @@
     "ignore": "^7.0.0",
     "marked": "^15.0.12",
     "micromatch": "^4.0.8",
+    "mnemonist": "^0.40.3",
     "open": "^10.1.2",
     "picomatch": "^4.0.1",
     "shell-quote": "^1.8.3",

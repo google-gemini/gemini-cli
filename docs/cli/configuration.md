@@ -268,6 +268,26 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "loadMemoryFromIncludeDirectories": true
     ```
 
+- **`chatCompression`** (object):
+  - **Description:** Controls the settings for chat history compression, both automatic and
+    when manually invoked through the /compress command.
+  - **Properties:**
+    - **`contextPercentageThreshold`** (number): A value between 0 and 1 that specifies the token threshold for compression as a percentage of the model's total token limit. For example, a value of `0.6` will trigger compression when the chat history exceeds 60% of the token limit.
+  - **Example:**
+    ```json
+    "chatCompression": {
+      "contextPercentageThreshold": 0.6
+    }
+    ```
+
+- **`showLineNumbers`** (boolean):
+  - **Description:** Controls whether line numbers are displayed in code blocks in the CLI output.
+  - **Default:** `true`
+  - **Example:**
+    ```json
+    "showLineNumbers": false
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -402,12 +422,21 @@ Arguments passed directly when running the CLI can override other configurations
   - Displays the current memory usage.
 - **`--yolo`**:
   - Enables YOLO mode, which automatically approves all tool calls.
+- **`--approval-mode <mode>`**:
+  - Sets the approval mode for tool calls. Available modes:
+    - `default`: Prompt for approval on each tool call (default behavior)
+    - `auto_edit`: Automatically approve edit tools (replace, write_file) while prompting for others
+    - `yolo`: Automatically approve all tool calls (equivalent to `--yolo`)
+  - Cannot be used together with `--yolo`. Use `--approval-mode=yolo` instead of `--yolo` for the new unified approach.
+  - Example: `gemini --approval-mode auto_edit`
 - **`--telemetry`**:
   - Enables [telemetry](../telemetry.md).
 - **`--telemetry-target`**:
   - Sets the telemetry target. See [telemetry](../telemetry.md) for more information.
 - **`--telemetry-otlp-endpoint`**:
   - Sets the OTLP endpoint for telemetry. See [telemetry](../telemetry.md) for more information.
+- **`--telemetry-otlp-protocol`**:
+  - Sets the OTLP protocol for telemetry (`grpc` or `http`). Defaults to `grpc`. See [telemetry](../telemetry.md) for more information.
 - **`--telemetry-log-prompts`**:
   - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md) for more information.
 - **`--checkpointing`**:
@@ -497,7 +526,7 @@ Sandboxing is disabled by default, but you can enable it in a few ways:
 
 - Using `--sandbox` or `-s` flag.
 - Setting `GEMINI_SANDBOX` environment variable.
-- Sandbox is enabled in `--yolo` mode by default.
+- Sandbox is enabled when using `--yolo` or `--approval-mode=yolo` by default.
 
 By default, it uses a pre-built `gemini-cli-sandbox` Docker image.
 

@@ -16,8 +16,9 @@ import {
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { Config } from '../config/config.js';
-import { getEffectiveModel } from './modelCheck.js';
+
 import { UserTierId } from '../code_assist/types.js';
+import { LoggingContentGenerator } from './loggingContentGenerator.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -59,10 +60,10 @@ export function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
 ): ContentGeneratorConfig {
-  const geminiApiKey = process.env.GEMINI_API_KEY || undefined;
-  const googleApiKey = process.env.GOOGLE_API_KEY || undefined;
-  const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT || undefined;
-  const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION || undefined;
+  const geminiApiKey = process.env['GEMINI_API_KEY'] || undefined;
+  const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
+  const googleCloudProject = process.env['GOOGLE_CLOUD_PROJECT'] || undefined;
+  const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
 
   // Use runtime model from config if available; otherwise, fall back to parameter or default
   const effectiveModel = config.getModel() || DEFAULT_GEMINI_MODEL;
@@ -84,11 +85,6 @@ export function createContentGeneratorConfig(
   if (authType === AuthType.USE_GEMINI && geminiApiKey) {
     contentGeneratorConfig.apiKey = geminiApiKey;
     contentGeneratorConfig.vertexai = false;
-    getEffectiveModel(
-      contentGeneratorConfig.apiKey,
-      contentGeneratorConfig.model,
-      contentGeneratorConfig.proxy,
-    );
 
     return contentGeneratorConfig;
   }
@@ -111,7 +107,7 @@ export async function createContentGenerator(
   gcConfig: Config,
   sessionId?: string,
 ): Promise<ContentGenerator> {
-  const version = process.env.CLI_VERSION || process.version;
+  const version = process.env['CLI_VERSION'] || process.version;
   const httpOptions = {
     headers: {
       'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
@@ -121,11 +117,14 @@ export async function createContentGenerator(
     config.authType === AuthType.LOGIN_WITH_GOOGLE ||
     config.authType === AuthType.CLOUD_SHELL
   ) {
-    return createCodeAssistContentGenerator(
-      httpOptions,
-      config.authType,
+    return new LoggingContentGenerator(
+      await createCodeAssistContentGenerator(
+        httpOptions,
+        config.authType,
+        gcConfig,
+        sessionId,
+      ),
       gcConfig,
-      sessionId,
     );
   }
 
@@ -138,10 +137,8 @@ export async function createContentGenerator(
       vertexai: config.vertexai,
       httpOptions,
     });
-
-    return googleGenAI.models;
+    return new LoggingContentGenerator(googleGenAI.models, gcConfig);
   }
-
   throw new Error(
     `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
   );

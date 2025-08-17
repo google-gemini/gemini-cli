@@ -13,10 +13,10 @@ import {
   isTelemetrySdkInitialized,
   GeminiEventType,
   ToolErrorType,
+  parseAndFormatApiError,
 } from '@google/gemini-cli-core';
 import { Content, Part, FunctionCall } from '@google/genai';
 
-import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 
 export async function runNonInteractive(
@@ -30,7 +30,6 @@ export async function runNonInteractive(
   });
 
   try {
-    await config.initialize();
     consolePatcher.patch();
     // Handle EPIPE errors when the output is piped to a command that closes early.
     process.stdout.on('error', (err: NodeJS.ErrnoException) => {
@@ -144,7 +143,7 @@ export async function runNonInteractive(
   } finally {
     consolePatcher.cleanup();
     if (isTelemetrySdkInitialized()) {
-      await shutdownTelemetry();
+      await shutdownTelemetry(config);
     }
   }
 }

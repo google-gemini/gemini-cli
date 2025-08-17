@@ -32,6 +32,7 @@ import {
   NextSpeakerCheckEvent,
   LoopDetectedEvent,
   SlashCommandEvent,
+  KittySequenceOverflowEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -97,7 +98,7 @@ export function logUserPrompt(config: Config, event: UserPromptEvent): void {
   };
 
   if (shouldLogUserPrompts(config)) {
-    attributes.prompt = event.prompt;
+    attributes['prompt'] = event.prompt;
   }
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -246,7 +247,7 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
     'event.timestamp': new Date().toISOString(),
   };
   if (event.response_text) {
-    attributes.response_text = event.response_text;
+    attributes['response_text'] = event.response_text;
   }
   if (event.error) {
     attributes['error.message'] = event.error;
@@ -374,6 +375,24 @@ export function logIdeConnection(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Ide connection. Type: ${event.connection_type}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logKittySequenceOverflow(
+  config: Config,
+  event: KittySequenceOverflowEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logKittySequenceOverflowEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+  };
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Kitty sequence buffer overflow: ${event.sequence_length} bytes`,
     attributes,
   };
   logger.emit(logRecord);

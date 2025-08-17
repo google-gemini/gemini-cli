@@ -9,17 +9,15 @@ import * as path from 'path';
 import { homedir, platform } from 'os';
 import * as dotenv from 'dotenv';
 import {
-  MCPServerConfig,
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
-  BugCommandSettings,
-  TelemetrySettings,
-  AuthType,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
-import { CustomTheme } from '../ui/themes/theme.js';
+import { Settings, MemoryImportFormat } from './settingsSchema.js';
+
+export type { Settings, MemoryImportFormat };
 
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
@@ -27,8 +25,8 @@ export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
 export function getSystemSettingsPath(): string {
-  if (process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH) {
-    return process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
+  if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
+    return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
   }
   if (platform() === 'darwin') {
     return '/Library/Application Support/GeminiCli/settings.json';
@@ -43,7 +41,7 @@ export function getWorkspaceSettingsPath(workspaceDir: string): string {
   return path.join(workspaceDir, SETTINGS_DIRECTORY_NAME, 'settings.json');
 }
 
-export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
+export type { DnsResolutionOrder } from './settingsSchema.js';
 
 export enum SettingScope {
   User = 'User',
@@ -61,75 +59,6 @@ export interface SummarizeToolOutputSettings {
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
-}
-
-export interface Settings {
-  theme?: string;
-  customThemes?: Record<string, CustomTheme>;
-  selectedAuthType?: AuthType;
-  useExternalAuth?: boolean;
-  sandbox?: boolean | string;
-  coreTools?: string[];
-  excludeTools?: string[];
-  toolDiscoveryCommand?: string;
-  toolCallCommand?: string;
-  mcpServerCommand?: string;
-  mcpServers?: Record<string, MCPServerConfig>;
-  allowMCPServers?: string[];
-  excludeMCPServers?: string[];
-  showMemoryUsage?: boolean;
-  contextFileName?: string | string[];
-  accessibility?: AccessibilitySettings;
-  telemetry?: TelemetrySettings;
-  usageStatisticsEnabled?: boolean;
-  preferredEditor?: string;
-  bugCommand?: BugCommandSettings;
-  checkpointing?: CheckpointingSettings;
-  autoConfigureMaxOldSpaceSize?: boolean;
-  /** The model name to use (e.g 'gemini-9.0-pro') */
-  model?: string;
-
-  // Git-aware file filtering settings
-  fileFiltering?: {
-    respectGitIgnore?: boolean;
-    respectGeminiIgnore?: boolean;
-    enableRecursiveFileSearch?: boolean;
-  };
-
-  hideWindowTitle?: boolean;
-
-  hideTips?: boolean;
-  hideBanner?: boolean;
-
-  // Setting for setting maximum number of user/model/tool turns in a session.
-  maxSessionTurns?: number;
-
-  // A map of tool names to their summarization settings.
-  summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
-
-  vimMode?: boolean;
-  memoryImportFormat?: 'tree' | 'flat';
-
-  // Flag to be removed post-launch.
-  ideModeFeature?: boolean;
-  /// IDE mode setting configured via slash command toggle.
-  ideMode?: boolean;
-
-  // Setting for disabling auto-update.
-  disableAutoUpdate?: boolean;
-
-  // Setting for disabling the update nag message.
-  disableUpdateNag?: boolean;
-
-  memoryDiscoveryMaxDirs?: number;
-
-  // Environment variables to exclude from project .env files
-  excludedProjectEnvVars?: string[];
-  dnsResolutionOrder?: DnsResolutionOrder;
-
-  includeDirectories?: string[];
-
-  loadMemoryFromIncludeDirectories?: boolean;
 }
 
 export interface SettingsError {
@@ -171,9 +100,13 @@ export class LoadedSettings {
     const user = this.user.settings;
     const workspace = this.workspace.settings;
 
+    // folderTrust is not supported at workspace level.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { folderTrust, ...workspaceWithoutFolderTrust } = workspace;
+
     return {
       ...user,
-      ...workspace,
+      ...workspaceWithoutFolderTrust,
       ...system,
       customThemes: {
         ...(user.customThemes || {}),
@@ -190,6 +123,11 @@ export class LoadedSettings {
         ...(user.includeDirectories || []),
         ...(workspace.includeDirectories || []),
       ],
+      chatCompression: {
+        ...(system.chatCompression || {}),
+        ...(user.chatCompression || {}),
+        ...(workspace.chatCompression || {}),
+      },
     };
   }
 
@@ -298,16 +236,16 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   if (envFilePath && fs.existsSync(envFilePath)) {
     const envFileContent = fs.readFileSync(envFilePath);
     const parsedEnv = dotenv.parse(envFileContent);
-    if (parsedEnv.GOOGLE_CLOUD_PROJECT) {
+    if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
       // .env file takes precedence in Cloud Shell
-      process.env.GOOGLE_CLOUD_PROJECT = parsedEnv.GOOGLE_CLOUD_PROJECT;
+      process.env['GOOGLE_CLOUD_PROJECT'] = parsedEnv['GOOGLE_CLOUD_PROJECT'];
     } else {
       // If not in .env, set to default and override global
-      process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
+      process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
     }
   } else {
     // If no .env file, set to default and override global
-    process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
+    process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
   }
 }
 
@@ -315,7 +253,7 @@ export function loadEnvironment(settings?: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
   // Cloud Shell environment variable handling
-  if (process.env.CLOUD_SHELL === 'true') {
+  if (process.env['CLOUD_SHELL'] === 'true') {
     setUpCloudShellEnvironment(envFilePath);
   }
 
@@ -477,6 +415,19 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     },
     settingsErrors,
   );
+
+  // Validate chatCompression settings
+  const chatCompression = loadedSettings.merged.chatCompression;
+  const threshold = chatCompression?.contextPercentageThreshold;
+  if (
+    threshold != null &&
+    (typeof threshold !== 'number' || threshold < 0 || threshold > 1)
+  ) {
+    console.warn(
+      `Invalid value for chatCompression.contextPercentageThreshold: "${threshold}". Please use a value between 0 and 1. Using default compression settings.`,
+    );
+    delete loadedSettings.merged.chatCompression;
+  }
 
   // Load environment with merged settings
   loadEnvironment(loadedSettings.merged);
