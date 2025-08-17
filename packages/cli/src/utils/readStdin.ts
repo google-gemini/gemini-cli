@@ -15,9 +15,9 @@ export async function readStdin(): Promise<string> {
 
     const pipedInputShouldBeAvailableInMs = 500;
     const pipedInputTimeout = setTimeout(() => {
-      // stop reading if input is not available yet
-      // this is needed in terminals where stdin is never TTY
-      // which causes the program to get stuck expecting data from stdin 
+      // stop reading if input is not available yet, this is needed
+      // in terminals where stdin is never TTY and nothing's piped
+      // which causes the program to get stuck expecting data from stdin
       onEnd();
     }, pipedInputShouldBeAvailableInMs);
 
