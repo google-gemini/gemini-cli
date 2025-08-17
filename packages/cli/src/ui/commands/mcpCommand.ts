@@ -497,7 +497,7 @@ const refreshCommand: SlashCommand = {
     context.ui.addItem(
       {
         type: 'info',
-        text: 'Restarting MCP servers and refreshing tools...',
+        text: 'Restarting MCP servers...',
       },
       Date.now(),
     );
