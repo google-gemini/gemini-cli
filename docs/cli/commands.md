@@ -169,23 +169,52 @@ Your command definition files must be written in the TOML format and use the `.t
 
 #### Handling Arguments
 
-Custom commands support two powerful, low-friction methods for handling arguments. The CLI automatically chooses the correct method based on the content of your command's `prompt`.
+Custom commands support two powerful methods for handling arguments. The CLI automatically chooses the correct method based on the content of your command's `prompt`.
 
-##### 1. Shorthand Injection with `{{args}}`
+##### 1. Context-Aware Injection with `{{args}}`
 
-If your `prompt` contains the special placeholder `{{args}}`, the CLI will replace that exact placeholder with all the text the user typed after the command name. This is perfect for simple, deterministic commands where you need to inject user input into a specific place in a larger prompt template.
+If your `prompt` contains the special placeholder `{{args}}`, the CLI will replace that placeholder with the text the user typed after the command name.
+
+The behavior of this injection depends on where it is used:
+
+**A. Raw Injection (Outside Shell Commands)**
+
+When used in the main body of the prompt, the arguments are injected exactly as the user typed them.
 
 **Example (`git/fix.toml`):**
 
 ```toml
-# In: ~/.gemini/commands/git/fix.toml
-# Invoked via: /git:fix "Button is misaligned on mobile"
+# Invoked via: /git:fix "Button is misaligned"
 
-description = "Generates a fix for a given GitHub issue."
-prompt = "Please analyze the staged git changes and provide a code fix for the issue described here: {{args}}."
+description = "Generates a fix for a given issue."
+prompt = "Please provide a code fix for the issue described here: {{args}}."
 ```
 
-The model will receive the final prompt: `Please analyze the staged git changes and provide a code fix for the issue described here: "Button is misaligned on mobile".`
+The model receives: `Please provide a code fix for the issue described here: "Button is misaligned".`
+
+**B. Using Arguments in Shell Commands (Inside `!{...}` Blocks)**
+
+When you use `{{args}}` inside a shell injection block (`!{...}`), the arguments are automatically **shell-escaped** before replacement. This allows you to safely pass arguments to shell commands, ensuring the resulting command is syntactically correct and secure while preventing command injection vulnerabilities.
+
+**Example (`/grep-code.toml`):**
+
+```toml
+prompt = """
+Please summarize the findings for the pattern `{{args}}`.
+
+Search Results:
+!{grep -r {{args}} .}
+"""
+```
+
+When you run `/grep-code It's complicated`:
+
+1. The CLI sees `{{args}}` used both outside and inside `!{...}`.
+2. Outside: The first `{{args}}` is replaced raw with `It's complicated`.
+3. Inside: The second `{{args}}` is replaced with the escaped version (e.g., on Linux: `"It's complicated"`).
+4. The command executed is `grep -r "It's complicated" .`.
+5. The CLI prompts you to confirm this exact, secure command before execution.
+6. The final prompt is sent.
 
 ##### 2. Default Argument Handling
 
@@ -236,14 +265,11 @@ When a custom command attempts to execute a shell command, Gemini CLI will now p
 
 **How It Works:**
 
-1.  **Inject Commands:** Use the `!{...}` syntax in your `prompt` to specify where the command should be run and its output injected.
-2.  **Confirm Execution:** When you run the command, a dialog will appear listing the shell commands the prompt wants to execute.
-3.  **Grant Permission:** You can choose to:
-    - **Allow once:** The command(s) will run this one time.
-    - **Allow always for this session:** The command(s) will be added to a temporary allowlist for the current CLI session and will not require confirmation again.
-    - **No:** Cancel the execution of the shell command(s).
-
-The CLI still respects the global `excludeTools` and `coreTools` settings. A command will be blocked without a confirmation prompt if it is explicitly disallowed in your configuration.
+1.  **Inject Commands:** Use the `!{...}` syntax.
+2.  **Argument Substitution:** If `{{args}}` is present inside the block, it is automatically shell-escaped (see [Context-Aware Injection](#1-context-aware-injection-with-args) above).
+3.  **Robust Parsing:** The parser correctly handles complex shell commands that include nested braces, such as JSON payloads.
+4.  **Security Check and Confirmation:** The CLI performs a security check on the final, resolved command (after arguments are escaped and substituted). A dialog will appear showing the exact command(s) to be executed.
+5.  **Execution and Error Reporting:** The command is executed. If the command fails, the output injected into the prompt will include the error messages (stderr) followed by a status line, e.g., `[Shell command exited with code 1]`. This helps the model understand the context of the failure.
 
 **Example (`git/commit.toml`):**
 
