@@ -136,10 +136,6 @@ export class McpClient {
       this.updateStatus(MCPServerStatus.CONNECTED);
     } catch (error) {
       this.updateStatus(MCPServerStatus.DISCONNECTED);
-      console.error(
-        `[DEBUG] MCP connection to ${this.serverName} failed. Full error object:`,
-        error,
-      );
       throw error;
     }
   }
@@ -1193,12 +1189,6 @@ export async function createTransport(
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
 ): Promise<Transport> {
-  if (debugMode) {
-    console.debug(
-      `[DEBUG] Creating transport for ${mcpServerName} with config:`,
-      mcpServerConfig,
-    );
-  }
   if (
     mcpServerConfig.authProviderType === AuthProviderType.GOOGLE_CREDENTIALS
   ) {
