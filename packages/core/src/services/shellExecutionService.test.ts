@@ -10,6 +10,16 @@ vi.mock('child_process', () => ({
   spawn: mockSpawn,
 }));
 
+const mockGetShellConfiguration = vi.hoisted(() => vi.fn());
+let mockIsWindows = false;
+
+vi.mock('../utils/shell-utils.js', () => ({
+  getShellConfiguration: mockGetShellConfiguration,
+  get isWindows() {
+    return mockIsWindows;
+  },
+}));
+
 import EventEmitter from 'events';
 import { Readable } from 'stream';
 import { type ChildProcess } from 'child_process';
@@ -43,18 +53,21 @@ describe('ShellExecutionService', () => {
     vi.clearAllMocks();
 
     mockIsBinary.mockReturnValue(false);
-    mockPlatform.mockReturnValue('linux');
+
+    mockGetShellConfiguration.mockReturnValue({
+      executable: 'bash',
+      argsPrefix: ['-c'],
+    });
+    mockIsWindows = false;
 
     onOutputEventMock = vi.fn();
 
     mockChildProcess = new EventEmitter() as EventEmitter &
       Partial<ChildProcess>;
-    // FIX: Cast simple EventEmitters to the expected stream type.
     mockChildProcess.stdout = new EventEmitter() as Readable;
     mockChildProcess.stderr = new EventEmitter() as Readable;
     mockChildProcess.kill = vi.fn();
 
-    // FIX: Use Object.defineProperty to set the readonly 'pid' property.
     Object.defineProperty(mockChildProcess, 'pid', {
       value: 12345,
       configurable: true,

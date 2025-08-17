@@ -197,30 +197,31 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
       {renderTitle()}
       <Box height={1} />
 
-      {tools.totalCalls > 0 && (
-        <Section title="Interaction Summary">
-          <StatRow title="Tool Calls:">
-            <Text>
-              {tools.totalCalls} ({' '}
-              <Text color={Colors.AccentGreen}>✔ {tools.totalSuccess}</Text>{' '}
-              <Text color={Colors.AccentRed}>✖ {tools.totalFail}</Text> )
+      <Section title="Interaction Summary">
+        <StatRow title="Session ID:">
+          <Text>{stats.sessionId}</Text>
+        </StatRow>
+        <StatRow title="Tool Calls:">
+          <Text>
+            {tools.totalCalls} ({' '}
+            <Text color={Colors.AccentGreen}>✔ {tools.totalSuccess}</Text>{' '}
+            <Text color={Colors.AccentRed}>✖ {tools.totalFail}</Text> )
+          </Text>
+        </StatRow>
+        <StatRow title="Success Rate:">
+          <Text color={successColor}>{computed.successRate.toFixed(1)}%</Text>
+        </StatRow>
+        {computed.totalDecisions > 0 && (
+          <StatRow title="User Agreement:">
+            <Text color={agreementColor}>
+              {computed.agreementRate.toFixed(1)}%{' '}
+              <Text color={Colors.Gray}>
+                ({computed.totalDecisions} reviewed)
+              </Text>
             </Text>
           </StatRow>
-          <StatRow title="Success Rate:">
-            <Text color={successColor}>{computed.successRate.toFixed(1)}%</Text>
-          </StatRow>
-          {computed.totalDecisions > 0 && (
-            <StatRow title="User Agreement:">
-              <Text color={agreementColor}>
-                {computed.agreementRate.toFixed(1)}%{' '}
-                <Text color={Colors.Gray}>
-                  ({computed.totalDecisions} reviewed)
-                </Text>
-              </Text>
-            </StatRow>
-          )}
-        </Section>
-      )}
+        )}
+      </Section>
 
       <Section title="Performance">
         <StatRow title="Wall Time:">

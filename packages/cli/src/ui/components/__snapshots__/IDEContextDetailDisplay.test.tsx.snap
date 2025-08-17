@@ -3,7 +3,7 @@
 exports[`IDEContextDetailDisplay > handles duplicate basenames by showing path hints 1`] = `
 "
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ VS Code Context (ctrl+e to toggle)                                                               │
+│ VS Code Context (ctrl+g to toggle)                                                               │
 │                                                                                                  │
 │ Open files:                                                                                      │
 │ - bar.txt (/foo) (active)                                                                        │
@@ -15,7 +15,7 @@ exports[`IDEContextDetailDisplay > handles duplicate basenames by showing path h
 exports[`IDEContextDetailDisplay > renders a list of open files with active status 1`] = `
 "
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ VS Code Context (ctrl+e to toggle)                                                               │
+│ VS Code Context (ctrl+g to toggle)                                                               │
 │                                                                                                  │
 │ Open files:                                                                                      │
 │ - bar.txt (active)                                                                               │

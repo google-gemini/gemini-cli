@@ -40,7 +40,6 @@ describe('ideCommand', () => {
     } as unknown as CommandContext;
 
     mockConfig = {
-      getIdeModeFeature: vi.fn(),
       getIdeMode: vi.fn(),
       getIdeClient: vi.fn(() => ({
         reconnect: vi.fn(),
@@ -60,18 +59,19 @@ describe('ideCommand', () => {
     vi.restoreAllMocks();
   });
 
-  it('should return null if ideModeFeature is not enabled', () => {
-    vi.mocked(mockConfig.getIdeModeFeature).mockReturnValue(false);
-    const command = ideCommand(mockConfig);
+  it('should return null if config is not provided', () => {
+    const command = ideCommand(null);
     expect(command).toBeNull();
   });
 
-  it('should return the ide command if ideModeFeature is enabled', () => {
-    vi.mocked(mockConfig.getIdeModeFeature).mockReturnValue(true);
+  it('should return the ide command', () => {
     vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
     vi.mocked(mockConfig.getIdeClient).mockReturnValue({
       getCurrentIde: () => DetectedIde.VSCode,
       getDetectedIdeDisplayName: () => 'VS Code',
+      getConnectionStatus: () => ({
+        status: core.IDEConnectionStatus.Connected,
+      }),
     } as ReturnType<Config['getIdeClient']>);
     const command = ideCommand(mockConfig);
     expect(command).not.toBeNull();
@@ -85,7 +85,6 @@ describe('ideCommand', () => {
   describe('status subcommand', () => {
     const mockGetConnectionStatus = vi.fn();
     beforeEach(() => {
-      vi.mocked(mockConfig.getIdeModeFeature).mockReturnValue(true);
       vi.mocked(mockConfig.getIdeClient).mockReturnValue({
         getConnectionStatus: mockGetConnectionStatus,
         getCurrentIde: () => DetectedIde.VSCode,
@@ -162,11 +161,12 @@ describe('ideCommand', () => {
   describe('install subcommand', () => {
     const mockInstall = vi.fn();
     beforeEach(() => {
-      vi.mocked(mockConfig.getIdeModeFeature).mockReturnValue(true);
       vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
       vi.mocked(mockConfig.getIdeClient).mockReturnValue({
         getCurrentIde: () => DetectedIde.VSCode,
-        getConnectionStatus: vi.fn(),
+        getConnectionStatus: () => ({
+          status: core.IDEConnectionStatus.Disconnected,
+        }),
         getDetectedIdeDisplayName: () => 'VS Code',
       } as unknown as ReturnType<Config['getIdeClient']>);
       vi.mocked(core.getIdeInstaller).mockReturnValue({

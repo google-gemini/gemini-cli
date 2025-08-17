@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Text, useInput } from 'ink';
+import { Text } from 'ink';
 import { useEffect, useRef, useState } from 'react';
 import { Colors } from '../colors.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 export const DebugProfiler = () => {
   const numRenders = useRef(0);
@@ -16,11 +17,14 @@ export const DebugProfiler = () => {
     numRenders.current++;
   });
 
-  useInput((input, key) => {
-    if (key.ctrl && input === 'b') {
-      setShowNumRenders((prev) => !prev);
-    }
-  });
+  useKeypress(
+    (key) => {
+      if (key.ctrl && key.name === 'b') {
+        setShowNumRenders((prev) => !prev);
+      }
+    },
+    { isActive: true },
+  );
 
   if (!showNumRenders) {
     return null;
