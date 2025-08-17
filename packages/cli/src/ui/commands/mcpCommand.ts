@@ -471,7 +471,7 @@ const listCommand: SlashCommand = {
 
 const refreshCommand: SlashCommand = {
   name: 'refresh',
-  description: 'Restarts MCP servers and refreshes the list of tools.',
+  description: 'Restarts MCP servers.',
   kind: CommandKind.BUILT_IN,
   action: async (
     context: CommandContext,
