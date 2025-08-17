@@ -10,7 +10,15 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 
-export function useGitBranchName(cwd: string): string | undefined {
+interface FileSystemDeps {
+  fs: typeof fs;
+  fsPromises: typeof fsPromises;
+}
+
+export function useGitBranchName(
+  cwd: string,
+  deps: FileSystemDeps = { fs, fsPromises }
+): string | undefined {
   const [branchName, setBranchName] = useState<string | undefined>(undefined);
 
   const fetchBranchName = useCallback(
@@ -53,8 +61,8 @@ export function useGitBranchName(cwd: string): string | undefined {
     const setupWatcher = async () => {
       try {
         // Check if .git/logs/HEAD exists, as it might not in a new repo or orphaned head
-        await fsPromises.access(gitLogsHeadPath, fs.constants.F_OK);
-        watcher = fs.watch(gitLogsHeadPath, (eventType: string) => {
+        await deps.fsPromises.access(gitLogsHeadPath, deps.fs.constants.F_OK);
+        watcher = deps.fs.watch(gitLogsHeadPath, (eventType: string) => {
           // Changes to .git/logs/HEAD (appends) indicate HEAD has likely changed
           if (eventType === 'change' || eventType === 'rename') {
             // Handle rename just in case
@@ -73,7 +81,7 @@ export function useGitBranchName(cwd: string): string | undefined {
     return () => {
       watcher?.close();
     };
-  }, [cwd, fetchBranchName]);
+  }, [cwd, fetchBranchName, deps]);
 
   return branchName;
 }
