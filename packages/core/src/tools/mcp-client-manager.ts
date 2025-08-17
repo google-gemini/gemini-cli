@@ -22,12 +22,12 @@ import { WorkspaceContext } from '../utils/workspaceContext.js';
  */
 export class McpClientManager {
   private clients: Map<string, McpClient> = new Map();
-  private mcpServers: Record<string, MCPServerConfig>;
-  private mcpServerCommand: string | undefined;
-  private toolRegistry: ToolRegistry;
-  private promptRegistry: PromptRegistry;
-  private debugMode: boolean;
-  private workspaceContext: WorkspaceContext;
+  private readonly mcpServers: Record<string, MCPServerConfig>;
+  private readonly mcpServerCommand: string | undefined;
+  private readonly toolRegistry: ToolRegistry;
+  private readonly promptRegistry: PromptRegistry;
+  private readonly debugMode: boolean;
+  private readonly workspaceContext: WorkspaceContext;
   private discoveryState: MCPDiscoveryState = MCPDiscoveryState.NOT_STARTED;
 
   constructor(
