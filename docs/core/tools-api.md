@@ -1,6 +1,6 @@
 # Gemini CLI Core: Tools API
 
-The Gemini CLI core (`packages/core`) features a robust system for defining, registering, and executing tools. These tools extend the capabilities of the Gemini model, allowing it to interact with the local environment, fetch web content, and perform various actions beyond simple text generation.
+The Gemini CLI core (`packages/core`) features a robust system for defining, registering, and executing tools. These tools extend the capabilities of the Gemini model, allowing it to interact with the local environment and perform various actions beyond simple text generation.
 
 ## Core Concepts
 
@@ -42,9 +42,6 @@ The core comes with a suite of pre-defined tools, typically found in `packages/c
   - `ReadManyFilesTool` (`read-many-files.ts`): Reads and concatenates content from multiple files or glob patterns (used by the `@` command in CLI).
 - **Execution Tools:**
   - `ShellTool` (`shell.ts`): Executes arbitrary shell commands (requires careful sandboxing and user confirmation).
-- **Web Tools:**
-  - `WebFetchTool` (`web-fetch.ts`): Fetches content from a URL.
-  - `WebSearchTool` (`web-search.ts`): Performs a web search.
 - **Memory Tools:**
   - `MemoryTool` (`memoryTool.ts`): Interacts with the AI's memory.
 

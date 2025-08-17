@@ -12,7 +12,7 @@ Gemini CLI is an open-source AI agent that brings the power of Gemini directly i
 
 - **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google account
 - **🧠 Powerful Gemini 2.5 Pro**: Access to 1M token context window
-- **🔧 Built-in tools**: Google Search grounding, file operations, shell commands, web fetching
+- **🔧 Built-in tools**: File operations, shell commands, memory management
 - **🔌 Extensible**: MCP (Model Context Protocol) support for custom integrations
 - **💻 Terminal-first**: Designed for developers who live in the command line
 - **🛡️ Open source**: Apache 2.0 licensed
@@ -61,7 +61,6 @@ brew install gemini-cli
 
 ### Advanced Capabilities
 
-- Ground your queries with built-in [Google Search](https://ai.google.dev/gemini-api/docs/grounding) for real-time information
 - Conversation checkpointing to save and resume complex sessions
 - Custom context files (GEMINI.md) to tailor behavior for your projects
 
@@ -204,7 +203,6 @@ gemini
 - [**Built-in Tools Overview**](./docs/tools/index.md)
   - [File System Operations](./docs/tools/file-system.md)
   - [Shell Commands](./docs/tools/shell.md)
-  - [Web Fetch & Search](./docs/tools/web-fetch.md)
   - [Multi-file Operations](./docs/tools/multi-file.md)
 - [**MCP Server Integration**](./docs/tools/mcp-server.md) - Extend with custom tools
 - [**Custom Extensions**](./docs/extension.md) - Build your own commands

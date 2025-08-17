@@ -13,7 +13,7 @@ describe('ToolConfirmationMessage', () => {
   it('should not display urls if prompt and url are the same', () => {
     const confirmationDetails: ToolCallConfirmationDetails = {
       type: 'info',
-      title: 'Confirm Web Fetch',
+      title: 'Confirm File Operation',
       prompt: 'https://example.com',
       urls: ['https://example.com'],
       onConfirm: vi.fn(),
@@ -33,7 +33,7 @@ describe('ToolConfirmationMessage', () => {
   it('should display urls if prompt and url are different', () => {
     const confirmationDetails: ToolCallConfirmationDetails = {
       type: 'info',
-      title: 'Confirm Web Fetch',
+      title: 'Confirm File Operation',
       prompt:
         'fetch https://github.com/google/gemini-react/blob/main/README.md',
       urls: [

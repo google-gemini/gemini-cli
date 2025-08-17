@@ -4,7 +4,7 @@ This documentation provides a comprehensive guide to installing, using, and deve
 
 ## Overview
 
-Gemini CLI brings the capabilities of Gemini models to your terminal in an interactive Read-Eval-Print Loop (REPL) environment. Gemini CLI consists of a client-side application (`packages/cli`) that communicates with a local server (`packages/core`), which in turn manages requests to the Gemini API and its AI models. Gemini CLI also contains a variety of tools for tasks such as performing file system operations, running shells, and web fetching, which are managed by `packages/core`.
+Gemini CLI brings the capabilities of Gemini models to your terminal in an interactive Read-Eval-Print Loop (REPL) environment. Gemini CLI consists of a client-side application (`packages/cli`) that communicates with a local server (`packages/core`), which in turn manages requests to the Gemini API and its AI models. Gemini CLI also contains a variety of tools for tasks such as performing file system operations, running shells, and memory management, which are managed by `packages/core`.
 
 ## Navigating the documentation
 
@@ -28,8 +28,6 @@ This documentation is organized into the following sections:
   - **[File System Tools](./tools/file-system.md):** Documentation for the `read_file` and `write_file` tools.
   - **[Multi-File Read Tool](./tools/multi-file.md):** Documentation for the `read_many_files` tool.
   - **[Shell Tool](./tools/shell.md):** Documentation for the `run_shell_command` tool.
-  - **[Web Fetch Tool](./tools/web-fetch.md):** Documentation for the `web_fetch` tool.
-  - **[Web Search Tool](./tools/web-search.md):** Documentation for the `google_web_search` tool.
   - **[Memory Tool](./tools/memory.md):** Documentation for the `save_memory` tool.
 - **[Contributing & Development Guide](../CONTRIBUTING.md):** Information for contributors and developers, including setup, building, testing, and coding conventions.
 - **[NPM Workspaces and Publishing](./npm.md):** Details on how the project's packages are managed and published.

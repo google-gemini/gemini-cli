@@ -214,7 +214,7 @@ jobs:
               - I am calling a tool and the tool is not performing as expected.
               - i am expecting a tool to be called and it is not getting called ,
               - Including experience when using
-              - built-in tools (e.g., web search, code interpreter, read file, writefile, etc..),
+              - built-in tools (e.g., file operations, shell commands, memory management, etc..),
               - Function calling issues should be under this area
               - i am getting responses from the model that are malformed.
               - Issues concerning Gemini quality of response and inference,
