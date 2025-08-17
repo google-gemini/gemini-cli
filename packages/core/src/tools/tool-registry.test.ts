@@ -108,6 +108,7 @@ const baseConfigParams: ConfigParameters = {
   geminiMdFileCount: 0,
   approvalMode: ApprovalMode.DEFAULT,
   sessionId: 'test-session-id',
+  version: '0.1.0-test',
 };
 
 describe('ToolRegistry', () => {
@@ -354,6 +355,32 @@ describe('ToolRegistry', () => {
         toolRegistry,
         config.getPromptRegistry(),
         false,
+        '0.1.0-test',
+        expect.any(Object),
+      );
+    });
+
+    it('should discover tools using MCP servers defined in getMcpServers', async () => {
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
+      vi.spyOn(config, 'getMcpServerCommand').mockReturnValue(undefined);
+      const mcpServerConfigVal = {
+        'my-mcp-server': {
+          command: 'mcp-server-cmd',
+          args: ['--port', '1234'],
+          trust: true,
+        },
+      };
+      vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
+
+      await toolRegistry.discoverAllTools();
+
+      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
+        mcpServerConfigVal,
+        undefined,
+        toolRegistry,
+        config.getPromptRegistry(),
+        false,
+        '0.1.0-test',
         expect.any(Object),
       );
     });

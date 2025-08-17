@@ -121,6 +121,7 @@ describe('Server Config (config.ts)', () => {
     userMemory: USER_MEMORY,
     telemetry: TELEMETRY_SETTINGS,
     sessionId: SESSION_ID,
+    version: '0.1.0-test',
     model: MODEL,
     usageStatisticsEnabled: false,
   };
@@ -386,6 +387,17 @@ describe('Server Config (config.ts)', () => {
     const config = new Config(paramsWithoutMemory);
 
     expect(config.getUserMemory()).toBe('');
+  });
+
+  it('Config getVersion should return the correct version', () => {
+    const testVersion = '1.2.3-test';
+    const paramsWithVersion: ConfigParameters = {
+      ...baseParams,
+      version: testVersion,
+    };
+    const config = new Config(paramsWithVersion);
+
+    expect(config.getVersion()).toBe(testVersion);
   });
 
   it('Config constructor should call setGeminiMdFilename with contextFileName if provided', () => {

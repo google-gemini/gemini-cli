@@ -226,6 +226,7 @@ export class ToolRegistry {
       this,
       this.config.getPromptRegistry(),
       this.config.getDebugMode(),
+      this.config.getVersion(),
       this.config.getWorkspaceContext(),
     );
   }
@@ -248,6 +249,7 @@ export class ToolRegistry {
       this,
       this.config.getPromptRegistry(),
       this.config.getDebugMode(),
+      this.config.getVersion(),
       this.config.getWorkspaceContext(),
     );
   }
