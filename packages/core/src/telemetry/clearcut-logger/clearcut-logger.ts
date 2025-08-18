@@ -34,6 +34,7 @@ import { getInstallationId } from '../../utils/user_id.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { DetectedIde, detectIde } from '../../ide/detect-ide.js';
+import { truncateFeedbackContent } from '../constants.js';
 
 const start_session_event_name = 'start_session';
 const new_prompt_event_name = 'new_prompt';
@@ -771,10 +772,9 @@ export class ClearcutLogger {
 
     // Add feedback_content if available
     if (event.feedback_content) {
-      const MAX_FEEDBACK_LENGTH = 4096; // A reasonable limit for feedback length.
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT,
-        value: JSON.stringify(Array.from(event.feedback_content).slice(0, MAX_FEEDBACK_LENGTH).join('')),
+        value: JSON.stringify(truncateFeedbackContent(event.feedback_content)),
       });
     }
 

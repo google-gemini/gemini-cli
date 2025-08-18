@@ -26,6 +26,7 @@ import {
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
+  FEEDBACK_CONTENT_MAX_LENGTH,
 } from './constants.js';
 import {
   logApiRequest,
@@ -775,7 +776,7 @@ describe('loggers', () => {
       } as Config;
       
       // Test string with an emoji at the truncation boundary
-      const feedbackBase = 'A'.repeat(4095) + '👍'; // This string is exactly 4096 characters long
+      const feedbackBase = 'A'.repeat(FEEDBACK_CONTENT_MAX_LENGTH - 1) + '👍'; // This string is exactly FEEDBACK_CONTENT_MAX_LENGTH characters long
       const feedbackToTruncate = feedbackBase + 'extra content'; // This string will be truncated
       
       const event = new ResearchFeedbackEvent(
@@ -801,7 +802,7 @@ describe('loggers', () => {
       });
       
       // Additional verification that Unicode characters are preserved correctly after truncation
-      expect(Array.from(feedbackBase).length).toBe(4096);
+      expect(Array.from(feedbackBase).length).toBe(FEEDBACK_CONTENT_MAX_LENGTH);
       expect(feedbackBase.endsWith('👍')).toBe(true);
     });
   });

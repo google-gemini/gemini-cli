@@ -26,3 +26,19 @@ export const METRIC_API_REQUEST_LATENCY = 'gemini_cli.api.request.latency';
 export const METRIC_TOKEN_USAGE = 'gemini_cli.token.usage';
 export const METRIC_SESSION_COUNT = 'gemini_cli.session.count';
 export const METRIC_FILE_OPERATION_COUNT = 'gemini_cli.file.operation.count';
+
+export const FEEDBACK_CONTENT_MAX_LENGTH = 4096;
+
+/**
+ * Truncates feedback content to a safe length for telemetry logging.
+ * Uses Unicode-aware truncation to avoid splitting multi-byte characters.
+ * 
+ * @param content The feedback content to truncate
+ * @returns The truncated content or undefined if input is undefined
+ */
+export function truncateFeedbackContent(content: string | undefined): string | undefined {
+  if (!content) {
+    return undefined;
+  }
+  return Array.from(content).slice(0, FEEDBACK_CONTENT_MAX_LENGTH).join('');
+}
