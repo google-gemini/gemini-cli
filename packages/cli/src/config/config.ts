@@ -364,7 +364,7 @@ export async function loadCliConfig(
   const includeDirectories = (settings.includeDirectories || [])
     .reduce(
       (
-        acc: Array<(string | { path: string; optional?: boolean })>,
+        acc: Array<string | { path: string; optional?: boolean }>,
         p: string | { path: string; optional?: boolean } | null | undefined,
       ) => {
         if (typeof p === 'string') {
