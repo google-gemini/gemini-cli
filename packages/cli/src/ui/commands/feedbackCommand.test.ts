@@ -104,7 +104,7 @@ describe('feedbackCommand', () => {
     expect(eventArg.feedback_type).toBe('conversational');
   });
 
-  it('should not log telemetry when telemetry is disabled', async () => {
+  it('should always log research feedback when config exists', async () => {
     const mockConfig: Partial<Config> = { getTelemetryEnabled: () => false };
     const context = createMockContext({ 
       researchOptIn: true,
@@ -113,8 +113,9 @@ describe('feedbackCommand', () => {
 
     await feedbackCommand.action!(context, 'Test feedback');
 
-    // Verify telemetry logging was NOT called when disabled
-    expect(vi.mocked(logResearchFeedback)).not.toHaveBeenCalled();
+    // Verify research feedback logging was called regardless of telemetry setting
+    // The logResearchFeedback function handles internal routing based on different settings
+    expect(vi.mocked(logResearchFeedback)).toHaveBeenCalled();
   });
 
   it('should have correct command metadata', () => {
