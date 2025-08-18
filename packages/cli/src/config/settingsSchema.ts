@@ -495,6 +495,24 @@ export const SETTINGS_SCHEMA = {
     description: 'Show line numbers in the chat.',
     showInDialog: true,
   },
+  researchOptIn: {
+    type: 'boolean',
+    label: 'Research Participation',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Opt-in to participate in UX research studies to help improve Gemini CLI',
+    showInDialog: true,
+  },
+  researchContact: {
+    type: 'string',
+    label: 'Research Contact Email',
+    category: 'General',
+    requiresRestart: false,
+    default: undefined as string | undefined,
+    description: 'Email address for research study invitations (optional)',
+    showInDialog: true,
+  },
 } as const;
 
 type InferSettings<T extends SettingsSchema> = {

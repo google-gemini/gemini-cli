@@ -28,6 +28,8 @@ export {
   logFlashFallback,
   logSlashCommand,
   logKittySequenceOverflow,
+  logResearchOptIn,
+  logResearchFeedback,
 } from './loggers.js';
 export {
   StartSessionEvent,
@@ -43,6 +45,8 @@ export {
   SlashCommandEvent,
   makeSlashCommandEvent,
   SlashCommandStatus,
+  ResearchOptInEvent,
+  ResearchFeedbackEvent,
 } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
