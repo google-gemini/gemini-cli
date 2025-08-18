@@ -1,4 +1,3 @@
-// ...existing code...
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -8,7 +7,7 @@
 import { GitIgnoreParser, GitIgnoreFilter } from '../utils/gitIgnoreParser.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import * as path from 'path';
-import ignore, { type Ignore } from 'ignore';
+import ignore, { type Ignore } from 'igngore';
 
 const GEMINI_IGNORE_FILE_NAME = '.geminiignore';
 
@@ -45,15 +44,23 @@ export class FileDiscoveryService {
       // ignore file not found
     }
     this.geminiIgnoreFilter = gParser;
-    // Ensure all negative patterns from .geminiignore are appended last
-    const geminiNegatives = (
-      this.geminiIgnoreFilter?.getPatterns() ?? []
-    ).filter((p) => p.startsWith('!'));
-    if (geminiNegatives.length > 0) {
-      patterns.push(...geminiNegatives);
-    }
+    // The ignore library processes patterns in order, so negative patterns in .geminiignore will override .gitignore
     this.unifiedIgnore = ignore();
     this.unifiedIgnore.add(patterns);
+  }
+
+  /**
+   * Helper to check if a file should be ignored by the unified ignore (both .gitignore and .geminiignore)
+   */
+  private isUnifiedIgnored(filePath: string): boolean {
+    if (!this.unifiedIgnore) return false;
+    const resolved = path.resolve(this.projectRoot, filePath);
+    const relativePath = path.relative(this.projectRoot, resolved);
+    if (relativePath === '' || relativePath.startsWith('..')) {
+      return false;
+    }
+    const normalizedPath = relativePath.replace(/\\/g, '/');
+    return this.unifiedIgnore.ignores(normalizedPath);
   }
 
   /**
@@ -67,29 +74,19 @@ export class FileDiscoveryService {
     },
   ): string[] {
     if (!this.unifiedIgnore) return filePaths;
-    // If both are respected, use unified ignore
     if (options.respectGitIgnore && options.respectGeminiIgnore) {
-      return filePaths.filter((filePath) => {
-        const resolved = path.resolve(this.projectRoot, filePath);
-        const relativePath = path
-          .relative(this.projectRoot, resolved)
-          .replace(/\\/g, '/');
-        return !this.unifiedIgnore!.ignores(relativePath);
-      });
+      return filePaths.filter((filePath) => !this.isUnifiedIgnored(filePath));
     }
-    // If only gitignore is respected
     if (options.respectGitIgnore && !options.respectGeminiIgnore) {
       return filePaths.filter(
         (filePath) => !this.shouldGitIgnoreFile(filePath),
       );
     }
-    // If only geminiignore is respected
     if (!options.respectGitIgnore && options.respectGeminiIgnore) {
       return filePaths.filter(
         (filePath) => !this.shouldGeminiIgnoreFile(filePath),
       );
     }
-    // If neither is respected
     return filePaths;
   }
 
@@ -116,12 +113,7 @@ export class FileDiscoveryService {
   ): boolean {
     const { respectGitIgnore = true, respectGeminiIgnore = true } = options;
     if (respectGitIgnore && respectGeminiIgnore) {
-      if (!this.unifiedIgnore) return false;
-      const resolved = path.resolve(this.projectRoot, filePath);
-      const relativePath = path
-        .relative(this.projectRoot, resolved)
-        .replace(/\\/g, '/');
-      return this.unifiedIgnore.ignores(relativePath);
+      return this.isUnifiedIgnored(filePath);
     }
     if (respectGitIgnore && !respectGeminiIgnore) {
       return this.shouldGitIgnoreFile(filePath);
