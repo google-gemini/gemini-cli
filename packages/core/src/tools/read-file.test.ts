@@ -13,6 +13,7 @@ import fs from 'fs';
 import fsp from 'fs/promises';
 import { Config } from '../config/config.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { ToolInvocation, ToolResult } from './tools.js';
 
@@ -29,6 +30,7 @@ describe('ReadFileTool', () => {
 
     const mockConfigInstance = {
       getFileService: () => new FileDiscoveryService(tempRootDir),
+      getFileSystemService: () => new StandardFileSystemService(),
       getTargetDir: () => tempRootDir,
       getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
     } as unknown as Config;

@@ -14,6 +14,7 @@ import fs from 'fs'; // Actual fs for setup
 import os from 'os';
 import { Config } from '../config/config.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { StandardFileSystemService } from '../services/fileSystemService.js';
 
 vi.mock('mime-types', () => {
   const lookup = (filename: string) => {
@@ -59,6 +60,7 @@ describe('ReadManyFilesTool', () => {
     const fileService = new FileDiscoveryService(tempRootDir);
     const mockConfig = {
       getFileService: () => fileService,
+      getFileSystemService: () => new StandardFileSystemService(),
 
       getFileFilteringOptions: () => ({
         respectGitIgnore: true,
@@ -456,6 +458,7 @@ describe('ReadManyFilesTool', () => {
       const fileService = new FileDiscoveryService(tempDir1);
       const mockConfig = {
         getFileService: () => fileService,
+        getFileSystemService: () => new StandardFileSystemService(),
         getFileFilteringOptions: () => ({
           respectGitIgnore: true,
           respectGeminiIgnore: true,
