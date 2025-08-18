@@ -73,11 +73,21 @@ describe('DiscoveredMCPTool', () => {
     required: ['param'],
   };
 
+  let tool: DiscoveredMCPTool;
+
   beforeEach(() => {
     mockCallTool.mockClear();
     mockToolMethod.mockClear();
+    tool = new DiscoveredMCPTool(
+      mockCallableToolInstance,
+      serverName,
+      serverToolName,
+      baseDescription,
+      inputSchema,
+    );
     // Clear allowlist before each relevant test, especially for shouldConfirmExecute
-    (DiscoveredMCPTool as any).allowlist.clear();
+    const invocation = tool.build({}) as any;
+    invocation.constructor.allowlist.clear();
   });
 
   afterEach(() => {
@@ -86,14 +96,6 @@ describe('DiscoveredMCPTool', () => {
 
   describe('constructor', () => {
     it('should set properties correctly', () => {
-      const tool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-      );
-
       expect(tool.name).toBe(serverToolName);
       expect(tool.schema.name).toBe(serverToolName);
       expect(tool.schema.description).toBe(baseDescription);
@@ -105,7 +107,7 @@ describe('DiscoveredMCPTool', () => {
 
     it('should accept and store a custom timeout', () => {
       const customTimeout = 5000;
-      const tool = new DiscoveredMCPTool(
+      const toolWithTimeout = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
         serverToolName,
@@ -113,26 +115,22 @@ describe('DiscoveredMCPTool', () => {
         inputSchema,
         customTimeout,
       );
-      expect(tool.timeout).toBe(customTimeout);
+      expect(toolWithTimeout.timeout).toBe(customTimeout);
     });
   });
 
   describe('execute', () => {
     it('should call mcpTool.callTool with correct parameters and format display output', async () => {
-      const tool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-      );
       const params = { param: 'testValue' };
       const mockToolSuccessResultObject = {
         success: true,
         details: 'executed',
       };
-      const mockFunctionResponseContent: Part[] = [
-        { text: JSON.stringify(mockToolSuccessResultObject) },
+      const mockFunctionResponseContent = [
+        {
+          type: 'text',
+          text: JSON.stringify(mockToolSuccessResultObject),
+        },
       ];
       const mockMcpToolResponseParts: Part[] = [
         {
@@ -144,55 +142,452 @@ describe('DiscoveredMCPTool', () => {
       ];
       mockCallTool.mockResolvedValue(mockMcpToolResponseParts);
 
-      const toolResult: ToolResult = await tool.execute(params);
+      const invocation = tool.build(params);
+      const toolResult: ToolResult = await invocation.execute(
+        new AbortController().signal,
+      );
 
       expect(mockCallTool).toHaveBeenCalledWith([
         { name: serverToolName, args: params },
       ]);
-      expect(toolResult.llmContent).toEqual(mockMcpToolResponseParts);
 
       const stringifiedResponseContent = JSON.stringify(
         mockToolSuccessResultObject,
       );
+      expect(toolResult.llmContent).toEqual([
+        { text: stringifiedResponseContent },
+      ]);
       expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
     });
 
     it('should handle empty result from getStringifiedResultForDisplay', async () => {
-      const tool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-      );
       const params = { param: 'testValue' };
       const mockMcpToolResponsePartsEmpty: Part[] = [];
       mockCallTool.mockResolvedValue(mockMcpToolResponsePartsEmpty);
-      const toolResult: ToolResult = await tool.execute(params);
+      const invocation = tool.build(params);
+      const toolResult: ToolResult = await invocation.execute(
+        new AbortController().signal,
+      );
       expect(toolResult.returnDisplay).toBe('```json\n[]\n```');
+      expect(toolResult.llmContent).toEqual([
+        { text: '[Error: Could not parse tool response]' },
+      ]);
     });
 
     it('should propagate rejection if mcpTool.callTool rejects', async () => {
-      const tool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-      );
       const params = { param: 'failCase' };
       const expectedError = new Error('MCP call failed');
       mockCallTool.mockRejectedValue(expectedError);
 
-      await expect(tool.execute(params)).rejects.toThrow(expectedError);
+      const invocation = tool.build(params);
+      await expect(
+        invocation.execute(new AbortController().signal),
+      ).rejects.toThrow(expectedError);
+    });
+
+    it.each([
+      { isErrorValue: true, description: 'true (bool)' },
+      { isErrorValue: 'true', description: '"true" (str)' },
+    ])(
+      'should consider a ToolResult with isError $description to be a failure',
+      async ({ isErrorValue }) => {
+        const tool = new DiscoveredMCPTool(
+          mockCallableToolInstance,
+          serverName,
+          serverToolName,
+          baseDescription,
+          inputSchema,
+        );
+        const params = { param: 'isErrorTrueCase' };
+
+        const errorResponse = { isError: isErrorValue };
+        const mockMcpToolResponseParts: Part[] = [
+          {
+            functionResponse: {
+              name: serverToolName,
+              response: { error: errorResponse },
+            },
+          },
+        ];
+        mockCallTool.mockResolvedValue(mockMcpToolResponseParts);
+        const expectedError = new Error(
+          `MCP tool '${serverToolName}' reported tool error with response: ${JSON.stringify(
+            mockMcpToolResponseParts,
+          )}`,
+        );
+
+        const invocation = tool.build(params);
+        await expect(
+          invocation.execute(new AbortController().signal),
+        ).rejects.toThrow(expectedError);
+      },
+    );
+
+    it.each([
+      { isErrorValue: false, description: 'false (bool)' },
+      { isErrorValue: 'false', description: '"false" (str)' },
+    ])(
+      'should consider a ToolResult with isError ${description} to be a success',
+      async ({ isErrorValue }) => {
+        const tool = new DiscoveredMCPTool(
+          mockCallableToolInstance,
+          serverName,
+          serverToolName,
+          baseDescription,
+          inputSchema,
+        );
+        const params = { param: 'isErrorFalseCase' };
+        const mockToolSuccessResultObject = {
+          success: true,
+          details: 'executed',
+        };
+        const mockFunctionResponseContent = [
+          {
+            type: 'text',
+            text: JSON.stringify(mockToolSuccessResultObject),
+          },
+        ];
+
+        const errorResponse = { isError: isErrorValue };
+        const mockMcpToolResponseParts: Part[] = [
+          {
+            functionResponse: {
+              name: serverToolName,
+              response: {
+                error: errorResponse,
+                content: mockFunctionResponseContent,
+              },
+            },
+          },
+        ];
+        mockCallTool.mockResolvedValue(mockMcpToolResponseParts);
+
+        const invocation = tool.build(params);
+        const toolResult = await invocation.execute(
+          new AbortController().signal,
+        );
+
+        const stringifiedResponseContent = JSON.stringify(
+          mockToolSuccessResultObject,
+        );
+        expect(toolResult.llmContent).toEqual([
+          { text: stringifiedResponseContent },
+        ]);
+        expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
+      },
+    );
+
+    it('should handle a simple text response correctly', async () => {
+      const params = { query: 'test' };
+      const successMessage = 'This is a success message.';
+
+      // Simulate the response from the GenAI SDK, which wraps the MCP
+      // response in a functionResponse Part.
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              // The `content` array contains MCP ContentBlocks.
+              content: [{ type: 'text', text: successMessage }],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute(new AbortController().signal);
+
+      // 1. Assert that the llmContent sent to the scheduler is a clean Part array.
+      expect(toolResult.llmContent).toEqual([{ text: successMessage }]);
+
+      // 2. Assert that the display output is the simple text message.
+      expect(toolResult.returnDisplay).toBe(successMessage);
+
+      // 3. Verify that the underlying callTool was made correctly.
+      expect(mockCallTool).toHaveBeenCalledWith([
+        { name: serverToolName, args: params },
+      ]);
+    });
+
+    it('should handle an AudioBlock response', async () => {
+      const params = { action: 'play' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                {
+                  type: 'audio',
+                  data: 'BASE64_AUDIO_DATA',
+                  mimeType: 'audio/mp3',
+                },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute(new AbortController().signal);
+
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: `[Tool '${serverToolName}' provided the following audio data with mime-type: audio/mp3]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'audio/mp3',
+            data: 'BASE64_AUDIO_DATA',
+          },
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe('[Audio: audio/mp3]');
+    });
+
+    it('should handle a ResourceLinkBlock response', async () => {
+      const params = { resource: 'get' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                {
+                  type: 'resource_link',
+                  uri: 'file:///path/to/thing',
+                  name: 'resource-name',
+                  title: 'My Resource',
+                },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute(new AbortController().signal);
+
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: 'Resource Link: My Resource at file:///path/to/thing',
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe(
+        '[Link to My Resource: file:///path/to/thing]',
+      );
+    });
+
+    it('should handle an embedded text ResourceBlock response', async () => {
+      const params = { resource: 'get' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                {
+                  type: 'resource',
+                  resource: {
+                    uri: 'file:///path/to/text.txt',
+                    text: 'This is the text content.',
+                    mimeType: 'text/plain',
+                  },
+                },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute(new AbortController().signal);
+
+      expect(toolResult.llmContent).toEqual([
+        { text: 'This is the text content.' },
+      ]);
+      expect(toolResult.returnDisplay).toBe('This is the text content.');
+    });
+
+    it('should handle an embedded binary ResourceBlock response', async () => {
+      const params = { resource: 'get' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                {
+                  type: 'resource',
+                  resource: {
+                    uri: 'file:///path/to/data.bin',
+                    blob: 'BASE64_BINARY_DATA',
+                    mimeType: 'application/octet-stream',
+                  },
+                },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute(new AbortController().signal);
+
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: `[Tool '${serverToolName}' provided the following embedded resource with mime-type: application/octet-stream]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'application/octet-stream',
+            data: 'BASE64_BINARY_DATA',
+          },
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe(
+        '[Embedded Resource: application/octet-stream]',
+      );
+    });
+
+    it('should handle a mix of content block types', async () => {
+      const params = { action: 'complex' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                { type: 'text', text: 'First part.' },
+                {
+                  type: 'image',
+                  data: 'BASE64_IMAGE_DATA',
+                  mimeType: 'image/jpeg',
+                },
+                { type: 'text', text: 'Second part.' },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute(new AbortController().signal);
+
+      expect(toolResult.llmContent).toEqual([
+        { text: 'First part.' },
+        {
+          text: `[Tool '${serverToolName}' provided the following image data with mime-type: image/jpeg]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: 'BASE64_IMAGE_DATA',
+          },
+        },
+        { text: 'Second part.' },
+      ]);
+      expect(toolResult.returnDisplay).toBe(
+        'First part.\n[Image: image/jpeg]\nSecond part.',
+      );
+    });
+
+    it('should ignore unknown content block types', async () => {
+      const params = { action: 'test' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                { type: 'text', text: 'Valid part.' },
+                { type: 'future_block', data: 'some-data' },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute(new AbortController().signal);
+
+      expect(toolResult.llmContent).toEqual([{ text: 'Valid part.' }]);
+      expect(toolResult.returnDisplay).toBe(
+        'Valid part.\n[Unknown content type: future_block]',
+      );
+    });
+
+    it('should handle a complex mix of content block types', async () => {
+      const params = { action: 'super-complex' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                { type: 'text', text: 'Here is a resource.' },
+                {
+                  type: 'resource_link',
+                  uri: 'file:///path/to/resource',
+                  name: 'resource-name',
+                  title: 'My Resource',
+                },
+                {
+                  type: 'resource',
+                  resource: {
+                    uri: 'file:///path/to/text.txt',
+                    text: 'Embedded text content.',
+                    mimeType: 'text/plain',
+                  },
+                },
+                {
+                  type: 'image',
+                  data: 'BASE64_IMAGE_DATA',
+                  mimeType: 'image/jpeg',
+                },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute(new AbortController().signal);
+
+      expect(toolResult.llmContent).toEqual([
+        { text: 'Here is a resource.' },
+        {
+          text: 'Resource Link: My Resource at file:///path/to/resource',
+        },
+        { text: 'Embedded text content.' },
+        {
+          text: `[Tool '${serverToolName}' provided the following image data with mime-type: image/jpeg]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: 'BASE64_IMAGE_DATA',
+          },
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe(
+        'Here is a resource.\n[Link to My Resource: file:///path/to/resource]\nEmbedded text content.\n[Image: image/jpeg]',
+      );
     });
   });
 
   describe('shouldConfirmExecute', () => {
-    // beforeEach is already clearing allowlist
-
     it('should return false if trust is true', async () => {
-      const tool = new DiscoveredMCPTool(
+      const trustedTool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
         serverToolName,
@@ -201,50 +596,32 @@ describe('DiscoveredMCPTool', () => {
         undefined,
         true,
       );
+      const invocation = trustedTool.build({});
       expect(
-        await tool.shouldConfirmExecute({}, new AbortController().signal),
+        await invocation.shouldConfirmExecute(new AbortController().signal),
       ).toBe(false);
     });
 
     it('should return false if server is allowlisted', async () => {
-      (DiscoveredMCPTool as any).allowlist.add(serverName);
-      const tool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-      );
+      const invocation = tool.build({}) as any;
+      invocation.constructor.allowlist.add(serverName);
       expect(
-        await tool.shouldConfirmExecute({}, new AbortController().signal),
+        await invocation.shouldConfirmExecute(new AbortController().signal),
       ).toBe(false);
     });
 
     it('should return false if tool is allowlisted', async () => {
       const toolAllowlistKey = `${serverName}.${serverToolName}`;
-      (DiscoveredMCPTool as any).allowlist.add(toolAllowlistKey);
-      const tool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-      );
+      const invocation = tool.build({}) as any;
+      invocation.constructor.allowlist.add(toolAllowlistKey);
       expect(
-        await tool.shouldConfirmExecute({}, new AbortController().signal),
+        await invocation.shouldConfirmExecute(new AbortController().signal),
       ).toBe(false);
     });
 
     it('should return confirmation details if not trusted and not allowlisted', async () => {
-      const tool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-      );
-      const confirmation = await tool.shouldConfirmExecute(
-        {},
+      const invocation = tool.build({});
+      const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
       expect(confirmation).not.toBe(false);
@@ -266,15 +643,8 @@ describe('DiscoveredMCPTool', () => {
     });
 
     it('should add server to allowlist on ProceedAlwaysServer', async () => {
-      const tool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-      );
-      const confirmation = await tool.shouldConfirmExecute(
-        {},
+      const invocation = tool.build({}) as any;
+      const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
       expect(confirmation).not.toBe(false);
@@ -287,7 +657,7 @@ describe('DiscoveredMCPTool', () => {
         await confirmation.onConfirm(
           ToolConfirmationOutcome.ProceedAlwaysServer,
         );
-        expect((DiscoveredMCPTool as any).allowlist.has(serverName)).toBe(true);
+        expect(invocation.constructor.allowlist.has(serverName)).toBe(true);
       } else {
         throw new Error(
           'Confirmation details or onConfirm not in expected format',
@@ -296,16 +666,9 @@ describe('DiscoveredMCPTool', () => {
     });
 
     it('should add tool to allowlist on ProceedAlwaysTool', async () => {
-      const tool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-      );
       const toolAllowlistKey = `${serverName}.${serverToolName}`;
-      const confirmation = await tool.shouldConfirmExecute(
-        {},
+      const invocation = tool.build({}) as any;
+      const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
       expect(confirmation).not.toBe(false);
@@ -316,7 +679,7 @@ describe('DiscoveredMCPTool', () => {
         typeof confirmation.onConfirm === 'function'
       ) {
         await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlwaysTool);
-        expect((DiscoveredMCPTool as any).allowlist.has(toolAllowlistKey)).toBe(
+        expect(invocation.constructor.allowlist.has(toolAllowlistKey)).toBe(
           true,
         );
       } else {
@@ -327,15 +690,8 @@ describe('DiscoveredMCPTool', () => {
     });
 
     it('should handle Cancel confirmation outcome', async () => {
-      const tool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-      );
-      const confirmation = await tool.shouldConfirmExecute(
-        {},
+      const invocation = tool.build({}) as any;
+      const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
       expect(confirmation).not.toBe(false);
@@ -347,11 +703,9 @@ describe('DiscoveredMCPTool', () => {
       ) {
         // Cancel should not add anything to allowlist
         await confirmation.onConfirm(ToolConfirmationOutcome.Cancel);
-        expect((DiscoveredMCPTool as any).allowlist.has(serverName)).toBe(
-          false,
-        );
+        expect(invocation.constructor.allowlist.has(serverName)).toBe(false);
         expect(
-          (DiscoveredMCPTool as any).allowlist.has(
+          invocation.constructor.allowlist.has(
             `${serverName}.${serverToolName}`,
           ),
         ).toBe(false);
@@ -363,15 +717,8 @@ describe('DiscoveredMCPTool', () => {
     });
 
     it('should handle ProceedOnce confirmation outcome', async () => {
-      const tool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-      );
-      const confirmation = await tool.shouldConfirmExecute(
-        {},
+      const invocation = tool.build({}) as any;
+      const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
       expect(confirmation).not.toBe(false);
@@ -383,11 +730,9 @@ describe('DiscoveredMCPTool', () => {
       ) {
         // ProceedOnce should not add anything to allowlist
         await confirmation.onConfirm(ToolConfirmationOutcome.ProceedOnce);
-        expect((DiscoveredMCPTool as any).allowlist.has(serverName)).toBe(
-          false,
-        );
+        expect(invocation.constructor.allowlist.has(serverName)).toBe(false);
         expect(
-          (DiscoveredMCPTool as any).allowlist.has(
+          invocation.constructor.allowlist.has(
             `${serverName}.${serverToolName}`,
           ),
         ).toBe(false);

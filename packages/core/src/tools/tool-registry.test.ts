@@ -15,23 +15,13 @@ import {
   Mocked,
 } from 'vitest';
 import { Config, ConfigParameters, ApprovalMode } from '../config/config.js';
-import {
-  ToolRegistry,
-  DiscoveredTool,
-  sanitizeParameters,
-} from './tool-registry.js';
+import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { BaseTool, Icon, ToolResult } from './tools.js';
-import {
-  FunctionDeclaration,
-  CallableTool,
-  mcpToTool,
-  Type,
-  Schema,
-} from '@google/genai';
+import { FunctionDeclaration, CallableTool, mcpToTool } from '@google/genai';
 import { spawn } from 'node:child_process';
-import { IdeClient } from '../ide/ide-client.js';
+
 import fs from 'node:fs';
+import { MockTool } from '../test-utils/tools.js';
 
 vi.mock('node:fs');
 
@@ -107,28 +97,6 @@ const createMockCallableTool = (
   callTool: vi.fn(),
 });
 
-class MockTool extends BaseTool<{ param: string }, ToolResult> {
-  constructor(
-    name = 'mock-tool',
-    displayName = 'A mock tool',
-    description = 'A mock tool description',
-  ) {
-    super(name, displayName, description, Icon.Hammer, {
-      type: Type.OBJECT,
-      properties: {
-        param: { type: Type.STRING },
-      },
-      required: ['param'],
-    });
-  }
-  async execute(params: { param: string }): Promise<ToolResult> {
-    return {
-      llmContent: `Executed with ${params.param}`,
-      returnDisplay: `Executed with ${params.param}`,
-    };
-  }
-}
-
 const baseConfigParams: ConfigParameters = {
   cwd: '/tmp',
   model: 'test-model',
@@ -140,7 +108,6 @@ const baseConfigParams: ConfigParameters = {
   geminiMdFileCount: 0,
   approvalMode: ApprovalMode.DEFAULT,
   sessionId: 'test-session-id',
-  ideClient: IdeClient.getInstance(false),
 };
 
 describe('ToolRegistry', () => {
@@ -172,6 +139,10 @@ describe('ToolRegistry', () => {
     );
     vi.spyOn(config, 'getMcpServers');
     vi.spyOn(config, 'getMcpServerCommand');
+    vi.spyOn(config, 'getPromptRegistry').mockReturnValue({
+      clear: vi.fn(),
+      removePromptsByServer: vi.fn(),
+    } as any);
     mockDiscoverMcpTools.mockReset().mockResolvedValue(undefined);
   });
 
@@ -273,18 +244,18 @@ describe('ToolRegistry', () => {
   });
 
   describe('discoverTools', () => {
-    it('should sanitize tool parameters during discovery from command', async () => {
+    it('should will preserve tool parametersJsonSchema during discovery from command', async () => {
       const discoveryCommand = 'my-discovery-command';
       mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
 
       const unsanitizedToolDeclaration: FunctionDeclaration = {
         name: 'tool-with-bad-format',
         description: 'A tool with an invalid format property',
-        parameters: {
-          type: Type.OBJECT,
+        parametersJsonSchema: {
+          type: 'object',
           properties: {
             some_string: {
-              type: Type.STRING,
+              type: 'string',
               format: 'uuid', // This is an unsupported format
             },
           },
@@ -327,11 +298,39 @@ describe('ToolRegistry', () => {
       expect(discoveredTool).toBeDefined();
 
       const registeredParams = (discoveredTool as DiscoveredTool).schema
-        .parameters as Schema;
-      expect(registeredParams.properties?.['some_string']).toBeDefined();
-      expect(registeredParams.properties?.['some_string']).toHaveProperty(
-        'format',
+        .parametersJsonSchema;
+      expect(registeredParams).toStrictEqual({
+        type: 'object',
+        properties: {
+          some_string: {
+            type: 'string',
+            format: 'uuid',
+          },
+        },
+      });
+    });
+
+    it('should discover tools using MCP servers defined in getMcpServers', async () => {
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
+      vi.spyOn(config, 'getMcpServerCommand').mockReturnValue(undefined);
+      const mcpServerConfigVal = {
+        'my-mcp-server': {
+          command: 'mcp-server-cmd',
+          args: ['--port', '1234'],
+          trust: true,
+        },
+      };
+      vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
+
+      await toolRegistry.discoverAllTools();
+
+      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
+        mcpServerConfigVal,
         undefined,
+        toolRegistry,
+        config.getPromptRegistry(),
+        false,
+        expect.any(Object),
       );
     });
 
@@ -353,216 +352,10 @@ describe('ToolRegistry', () => {
         mcpServerConfigVal,
         undefined,
         toolRegistry,
-        undefined,
+        config.getPromptRegistry(),
         false,
+        expect.any(Object),
       );
     });
-
-    it('should discover tools using MCP servers defined in getMcpServers', async () => {
-      mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
-      vi.spyOn(config, 'getMcpServerCommand').mockReturnValue(undefined);
-      const mcpServerConfigVal = {
-        'my-mcp-server': {
-          command: 'mcp-server-cmd',
-          args: ['--port', '1234'],
-          trust: true,
-        },
-      };
-      vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
-
-      await toolRegistry.discoverAllTools();
-
-      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
-        mcpServerConfigVal,
-        undefined,
-        toolRegistry,
-        undefined,
-        false,
-      );
-    });
-  });
-});
-
-describe('sanitizeParameters', () => {
-  it('should remove default when anyOf is present', () => {
-    const schema: Schema = {
-      anyOf: [{ type: Type.STRING }, { type: Type.NUMBER }],
-      default: 'hello',
-    };
-    sanitizeParameters(schema);
-    expect(schema.default).toBeUndefined();
-  });
-
-  it('should recursively sanitize items in anyOf', () => {
-    const schema: Schema = {
-      anyOf: [
-        {
-          anyOf: [{ type: Type.STRING }],
-          default: 'world',
-        },
-        { type: Type.NUMBER },
-      ],
-    };
-    sanitizeParameters(schema);
-    expect(schema.anyOf![0].default).toBeUndefined();
-  });
-
-  it('should recursively sanitize items in items', () => {
-    const schema: Schema = {
-      items: {
-        anyOf: [{ type: Type.STRING }],
-        default: 'world',
-      },
-    };
-    sanitizeParameters(schema);
-    expect(schema.items!.default).toBeUndefined();
-  });
-
-  it('should recursively sanitize items in properties', () => {
-    const schema: Schema = {
-      properties: {
-        prop1: {
-          anyOf: [{ type: Type.STRING }],
-          default: 'world',
-        },
-      },
-    };
-    sanitizeParameters(schema);
-    expect(schema.properties!.prop1.default).toBeUndefined();
-  });
-
-  it('should handle complex nested schemas', () => {
-    const schema: Schema = {
-      properties: {
-        prop1: {
-          items: {
-            anyOf: [{ type: Type.STRING }],
-            default: 'world',
-          },
-        },
-        prop2: {
-          anyOf: [
-            {
-              properties: {
-                nestedProp: {
-                  anyOf: [{ type: Type.NUMBER }],
-                  default: 123,
-                },
-              },
-            },
-          ],
-        },
-      },
-    };
-    sanitizeParameters(schema);
-    expect(schema.properties!.prop1.items!.default).toBeUndefined();
-    const nestedProp =
-      schema.properties!.prop2.anyOf![0].properties!.nestedProp;
-    expect(nestedProp?.default).toBeUndefined();
-  });
-
-  it('should remove unsupported format from a simple string property', () => {
-    const schema: Schema = {
-      type: Type.OBJECT,
-      properties: {
-        name: { type: Type.STRING },
-        id: { type: Type.STRING, format: 'uuid' },
-      },
-    };
-    sanitizeParameters(schema);
-    expect(schema.properties?.['id']).toHaveProperty('format', undefined);
-    expect(schema.properties?.['name']).not.toHaveProperty('format');
-  });
-
-  it('should NOT remove supported format values', () => {
-    const schema: Schema = {
-      type: Type.OBJECT,
-      properties: {
-        date: { type: Type.STRING, format: 'date-time' },
-        role: {
-          type: Type.STRING,
-          format: 'enum',
-          enum: ['admin', 'user'],
-        },
-      },
-    };
-    const originalSchema = JSON.parse(JSON.stringify(schema));
-    sanitizeParameters(schema);
-    expect(schema).toEqual(originalSchema);
-  });
-
-  it('should handle arrays of objects', () => {
-    const schema: Schema = {
-      type: Type.OBJECT,
-      properties: {
-        items: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              itemId: { type: Type.STRING, format: 'uuid' },
-            },
-          },
-        },
-      },
-    };
-    sanitizeParameters(schema);
-    expect(
-      (schema.properties?.['items']?.items as Schema)?.properties?.['itemId'],
-    ).toHaveProperty('format', undefined);
-  });
-
-  it('should handle schemas with no properties to sanitize', () => {
-    const schema: Schema = {
-      type: Type.OBJECT,
-      properties: {
-        count: { type: Type.NUMBER },
-        isActive: { type: Type.BOOLEAN },
-      },
-    };
-    const originalSchema = JSON.parse(JSON.stringify(schema));
-    sanitizeParameters(schema);
-    expect(schema).toEqual(originalSchema);
-  });
-
-  it('should not crash on an empty or undefined schema', () => {
-    expect(() => sanitizeParameters({})).not.toThrow();
-    expect(() => sanitizeParameters(undefined)).not.toThrow();
-  });
-
-  it('should handle complex nested schemas with cycles', () => {
-    const userNode: any = {
-      type: Type.OBJECT,
-      properties: {
-        id: { type: Type.STRING, format: 'uuid' },
-        name: { type: Type.STRING },
-        manager: {
-          type: Type.OBJECT,
-          properties: {
-            id: { type: Type.STRING, format: 'uuid' },
-          },
-        },
-      },
-    };
-    userNode.properties.reports = {
-      type: Type.ARRAY,
-      items: userNode,
-    };
-
-    const schema: Schema = {
-      type: Type.OBJECT,
-      properties: {
-        ceo: userNode,
-      },
-    };
-
-    expect(() => sanitizeParameters(schema)).not.toThrow();
-    expect(schema.properties?.['ceo']?.properties?.['id']).toHaveProperty(
-      'format',
-      undefined,
-    );
-    expect(
-      schema.properties?.['ceo']?.properties?.['manager']?.properties?.['id'],
-    ).toHaveProperty('format', undefined);
   });
 });

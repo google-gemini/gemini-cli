@@ -72,7 +72,7 @@ export function checkHasEditorType(editor: EditorType): boolean {
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
-  const notUsingSandbox = !process.env.SANDBOX;
+  const notUsingSandbox = !process.env['SANDBOX'];
   if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
     return notUsingSandbox;
   }
@@ -164,6 +164,7 @@ export async function openDiff(
   oldPath: string,
   newPath: string,
   editor: EditorType,
+  onEditorClose: () => void,
 ): Promise<void> {
   const diffCommand = getDiffCommand(oldPath, newPath, editor);
   if (!diffCommand) {
@@ -206,10 +207,16 @@ export async function openDiff(
           process.platform === 'win32'
             ? `${diffCommand.command} ${diffCommand.args.join(' ')}`
             : `${diffCommand.command} ${diffCommand.args.map((arg) => `"${arg}"`).join(' ')}`;
-        execSync(command, {
-          stdio: 'inherit',
-          encoding: 'utf8',
-        });
+        try {
+          execSync(command, {
+            stdio: 'inherit',
+            encoding: 'utf8',
+          });
+        } catch (e) {
+          console.error('Error in onEditorClose callback:', e);
+        } finally {
+          onEditorClose();
+        }
         break;
       }
 
