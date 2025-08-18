@@ -23,10 +23,7 @@ Gemini CLI 提供了一套全面的工具，用于与本地文件系统进行交
   - 返回文件和目录名称的列表。
   - 指示每个条目是否为目录。
   - 首先按目录对条目进行排序，然后按字母顺序排序。
-- **输出 (`llmContent`)：** 类似于以下的字符串：`Directory listing for /path/to/your/folder:
-[DIR] subfolder1
-file1.txt
-file2.png`
+- **输出 (`llmContent`)：** 类似于以下的字符串：`Directory listing for /path/to/your/folder:\n[DIR] subfolder1\nfile1.txt\nfile2.png`
 - **确认：** 否。
 
 ## 2. `read_file` (ReadFile)
@@ -83,9 +80,7 @@ Actual file content...`）。
   - 在指定目录中搜索与 glob 模式匹配的文件。
   - 返回绝对路径列表，按最近修改的文件优先排序。
   - 默认情况下忽略常见的干扰目录，如 `node_modules` 和 `.git`。
-- **输出 (`llmContent`)：** 类似于以下的消息：`Found 5 file(s) matching "*.ts" within src, sorted by modification time (newest first):
-src/file1.ts
-src/subdir/file2.ts...`
+- **输出 (`llmContent`)：** 类似于以下的消息：`Found 5 file(s) matching "*.ts" within src, sorted by modification time (newest first):\nsrc/file1.ts\nsrc/subdir/file2.ts...`
 - **确认：** 否。
 
 ## 5. `search_file_content` (SearchText)
@@ -96,7 +91,7 @@ src/subdir/file2.ts...`
 - **显示名称：** SearchText
 - **文件：** `grep.ts`
 - **参数：**
-  - `pattern` (string, required)：要搜索的正则表达式 (regex)（例如 `"function\s+myFunction"`）。
+  - `pattern` (string, required)：要搜索的正则表达式 (regex)（例如 `"function\\s+myFunction"`）。
   - `path` (string, optional)：要在其中搜索的目录的绝对路径。默认为当前工作目录。
   - `include` (string, optional)：用于筛选要搜索的文件的 glob 模式（例如 `"*.js"`、`"src/**/*.{ts,tsx}"`）。如果省略，则搜索大多数文件（遵循常见忽略）。
 - **行为：**
@@ -104,8 +99,7 @@ src/subdir/file2.ts...`
   - 返回匹配行列表，每行都以其文件路径（相对于搜索目录）和行号为前缀。
 - **输出 (`llmContent`)：** 格式化的匹配字符串，例如：
   ```
-  Found 3 matches for pattern "myFunction" in path "." (filter: "*.ts"):
-  ---
+  Found 3 matches for pattern "myFunction" in path "." (filter: "*.ts"):\n  ---
   File: src/utils.ts
   L15: export function myFunction() {
   L22:   myFunction.call();

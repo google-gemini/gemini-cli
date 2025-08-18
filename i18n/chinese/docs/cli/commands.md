@@ -327,15 +327,15 @@ At 命令用于将文件或目录的内容作为 Gemini 提示的一部分包含
 - 如果在 `@` 之后指定的路径未找到或无效，将显示一条错误消息，并且查询可能不会发送到 Gemini 模型，或者将在没有文件内容的情况下发送。
 - 如果 `read_many_files` 工具遇到错误（例如权限问题），也将报告此错误。
 
-## Shell 模式和直通命令 (`!`)
+## Shell 模式和直通命令 (`!`) 
 
 `!` 前缀可让您直接从 Gemini CLI 内部与系统的 shell 进行交互。
 
 - **`!<shell_command>`**
   - **说明：** 使用 Linux/macOS 上的 `bash` 或 Windows 上的 `cmd.exe` 执行给定的 `<shell_command>`。命令的任何输出或错误都显示在终端中。
   - **示例：**
-    - `!ls -la`（执行 `ls -la` 并返回到 Gemini CLI）
-    - `!git status`（执行 `git status` 并返回到 Gemini CLI）
+    - `!ls -la`（执行 `ls -la` 并返回到 Gemini CLI`）
+    - `!git status`（执行 `git status` 并返回到 Gemini CLI`）
 
 - **`!` (切换 shell 模式)**
   - **说明：** 单独键入 `!` 可切换 shell 模式。

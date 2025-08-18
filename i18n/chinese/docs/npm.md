@@ -151,8 +151,8 @@ npm_package_version=9.9.9 SANDBOX_IMAGE_REGISTRY="registry" SANDBOX_IMAGE_NAME="
 
 - 会发生什么：packages/core/src 和 packages/cli/src 中的 TypeScript 源代码被编译成 JavaScript。
 - 文件移动：
-  - packages/core/src/\*\*/\*.ts -> 编译为 -> packages/core/dist/
-  - packages/cli/src/\*\*/\*.ts -> 编译为 -> packages/cli/dist/
+  - packages/core/src/**/*.ts -> 编译为 -> packages/core/dist/
+  - packages/cli/src/**/*.ts -> 编译为 -> packages/cli/dist/
 - 为什么：在开发过程中编写的 TypeScript 代码需要转换为可以由 Node.js 运行的普通 JavaScript。核心软件包首先构建，因为 cli 软件包依赖于它。
 
 阶段 3：组装最终的可发布软件包
@@ -177,7 +177,7 @@ npm_package_version=9.9.9 SANDBOX_IMAGE_REGISTRY="registry" SANDBOX_IMAGE_NAME="
     - 文件移动：
       - README.md -> `bundle`/README.md
       - LICENSE -> `bundle`/LICENSE
-      - packages/cli/src/utils/\*.sb (沙盒配置文件) -> `bundle`/
+      - packages/cli/src/utils/*.sb (沙盒配置文件) -> `bundle`/
     - 为什么：
       - README.md 和 LICENSE 是应包含在任何 NPM 软件包中的标准文件。
       - 沙盒配置文件 (.sb 文件) 是 CLI 沙盒功能正常运行所需的关键运行时资产。它们必须位于最终可执行文件旁边。

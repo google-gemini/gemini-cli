@@ -24,15 +24,15 @@ rm -rf "$(npm config get cache)/_npx"
 _命令提示符_
 
 ```cmd
-:: 路径通常是 %LocalAppData%\npm-cache\_npx
-rmdir /s /q "%LocalAppData%\npm-cache\_npx"
+:: 路径通常是 %LocalAppData%\\npm-cache\\_npx
+rmdir /s /q "%LocalAppData%\\npm-cache\\_npx"
 ```
 
 _PowerShell_
 
 ```powershell
-# 路径通常是 $env:LocalAppData\npm-cache\_npx
-Remove-Item -Path (Join-Path $env:LocalAppData "npm-cache\_npx") -Recurse -Force
+# 路径通常是 $env:LocalAppData\\npm-cache\\_npx
+Remove-Item -Path (Join-Path $env:LocalAppData "npm-cache\\_npx") -Recurse -Force
 ```
 
 ## 方法 2：使用 npm（全局安装）
