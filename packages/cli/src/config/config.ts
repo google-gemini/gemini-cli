@@ -362,11 +362,14 @@ export async function loadCliConfig(
   };
 
   const includeDirectories = (settings.includeDirectories || [])
-    .map((p) =>
-      typeof p === 'string'
-        ? resolvePath(p)
-        : { ...p, path: resolvePath(p.path) },
-    )
+    .reduce((acc: (string | { path: string; optional?: boolean })[], p: string | { path: string; optional?: boolean } | null | undefined) => {
+      if (typeof p === 'string') {
+        acc.push(resolvePath(p));
+      } else if (p?.path && typeof p.path === 'string') {
+        acc.push({ ...p, path: resolvePath(p.path) });
+      }
+      return acc;
+    }, [])
     .concat((argv.includeDirectories || []).map(resolvePath));
 
   const includeDirectoriesForMemory = includeDirectories.map((p) =>
