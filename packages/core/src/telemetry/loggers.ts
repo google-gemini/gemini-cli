@@ -19,6 +19,7 @@ import {
   EVENT_NEXT_SPEAKER_CHECK,
   SERVICE_NAME,
   EVENT_SLASH_COMMAND,
+  EVENT_CHAT_COMPRESSION,
 } from './constants.js';
 import {
   ApiErrorEvent,
@@ -33,12 +34,14 @@ import {
   LoopDetectedEvent,
   SlashCommandEvent,
   KittySequenceOverflowEvent,
+  ChatCompressionEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
   recordTokenUsageMetrics,
   recordApiResponseMetrics,
   recordToolCallMetrics,
+  recordChatCompressionMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import { uiTelemetryService, UiEvent } from './uiTelemetry.js';
@@ -378,6 +381,31 @@ export function logIdeConnection(
     attributes,
   };
   logger.emit(logRecord);
+}
+
+export function logChatCompression(
+  config: Config,
+  event: ChatCompressionEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logChatCompressionEvent(event);
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_CHAT_COMPRESSION,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Chat compression (Saved ${event.tokens_before - event.tokens_after} tokens)`,
+    attributes,
+  };
+  logger.emit(logRecord);
+
+  recordChatCompressionMetrics(config, {
+    tokens_before: event.tokens_before,
+    tokens_after: event.tokens_after,
+  });
 }
 
 export function logKittySequenceOverflow(

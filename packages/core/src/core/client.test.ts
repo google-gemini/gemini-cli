@@ -24,6 +24,7 @@ import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { tokenLimit } from './tokenLimits.js';
 import { ideContext } from '../ide/ideContext.js';
+import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
@@ -530,6 +531,45 @@ describe('Gemini Client (client.ts)', () => {
       expect(tokenLimit).toHaveBeenCalled();
       expect(result).toBeNull();
       expect(newChat).toBe(initialChat);
+    });
+
+    it('logs a telemetry event when compressing', async () => {
+      vi.spyOn(ClearcutLogger.prototype, 'logChatCompressionEvent');
+
+      const MOCKED_TOKEN_LIMIT = 1000;
+      const MOCKED_CONTEXT_PERCENTAGE_THRESHOLD = 0.5;
+      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+      vi.spyOn(client['config'], 'getChatCompression').mockReturnValue({
+        contextPercentageThreshold: MOCKED_CONTEXT_PERCENTAGE_THRESHOLD,
+      });
+      mockGetHistory.mockReturnValue([
+        { role: 'user', parts: [{ text: '...history...' }] },
+      ]);
+
+      const originalTokenCount =
+        MOCKED_TOKEN_LIMIT * MOCKED_CONTEXT_PERCENTAGE_THRESHOLD;
+      const newTokenCount = 100;
+
+      mockCountTokens
+        .mockResolvedValueOnce({ totalTokens: originalTokenCount }) // First call for the check
+        .mockResolvedValueOnce({ totalTokens: newTokenCount }); // Second call for the new history
+
+      // Mock the summary response from the chat
+      mockSendMessage.mockResolvedValue({
+        role: 'model',
+        parts: [{ text: 'This is a summary.' }],
+      });
+
+      await client.tryCompressChat('prompt-id-3');
+
+      expect(
+        ClearcutLogger.prototype.logChatCompressionEvent,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tokens_before: originalTokenCount,
+          tokens_after: newTokenCount,
+        }),
+      );
     });
 
     it('should trigger summarization if token count is at threshold with contextPercentageThreshold setting', async () => {
