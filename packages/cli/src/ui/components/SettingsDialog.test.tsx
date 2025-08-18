@@ -68,9 +68,11 @@ interface Key {
 // let isKeypressActive = false;
 
 vi.mock('../hooks/useKeypress.js', () => ({
-  useKeypress: vi.fn((_handler: (key: Key) => void, _options: { isActive: boolean }) => {
-    // Mock implementation - simplified for test stability
-  }),
+  useKeypress: vi.fn(
+    (_handler: (key: Key) => void, _options: { isActive: boolean }) => {
+      // Mock implementation - simplified for test stability
+    },
+  ),
 }));
 
 // Helper function to simulate key presses (commented out for now)
@@ -351,7 +353,7 @@ describe('SettingsDialog', () => {
       const { unmount } = render(
         <SettingsDialog
           settings={settings}
-          onSelect={() => { }}
+          onSelect={() => {}}
           onRestartRequest={onRestartRequest}
         />,
       );
@@ -370,7 +372,7 @@ describe('SettingsDialog', () => {
       const { stdin, unmount } = render(
         <SettingsDialog
           settings={settings}
-          onSelect={() => { }}
+          onSelect={() => {}}
           onRestartRequest={onRestartRequest}
         />,
       );
@@ -775,7 +777,9 @@ describe('SettingsDialog', () => {
       expect(lastFrame()).toContain('● Hide Window Title'); // Active setting
       expect(lastFrame()).toContain('Apply To'); // Scope section
       expect(lastFrame()).toContain('1. User Settings'); // Scope options
-      expect(lastFrame()).toContain('(Use Enter to select, Tab to change focus)'); // Help text
+      expect(lastFrame()).toContain(
+        '(Use Enter to select, Tab to change focus)',
+      ); // Help text
 
       // This test validates the complete UI structure is available for user workflow
       // Individual interactions are tested in focused unit tests
@@ -843,7 +847,7 @@ describe('SettingsDialog', () => {
       const { stdin, unmount } = render(
         <SettingsDialog
           settings={settings}
-          onSelect={() => { }}
+          onSelect={() => {}}
           onRestartRequest={onRestartRequest}
         />,
       );

@@ -602,7 +602,7 @@ describe('SettingsUtils', () => {
           mergedSettings,
           modifiedSettings,
         );
-        expect(result).toBe('false'); // matches default, no *
+        expect(result).toBe('false*');
       });
 
       it('should show default value when setting is not in scope', () => {

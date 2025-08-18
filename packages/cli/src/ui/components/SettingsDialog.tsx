@@ -515,10 +515,10 @@ export function SettingsDialog({
               const immediateSettingsObject =
                 toSaveValue !== undefined
                   ? setPendingSettingValueAny(
-                    currentSetting.value,
-                    toSaveValue,
-                    {} as Settings,
-                  )
+                      currentSetting.value,
+                      toSaveValue,
+                      {} as Settings,
+                    )
                   : ({} as Settings);
 
               saveModifiedSettings(
@@ -622,9 +622,14 @@ export function SettingsDialog({
             if (cursorVisible && editCursorPos < cpLen(editBuffer)) {
               // Cursor is in the middle or at start of text
               const beforeCursor = cpSlice(editBuffer, 0, editCursorPos);
-              const atCursor = cpSlice(editBuffer, editCursorPos, editCursorPos + 1);
+              const atCursor = cpSlice(
+                editBuffer,
+                editCursorPos,
+                editCursorPos + 1,
+              );
               const afterCursor = cpSlice(editBuffer, editCursorPos + 1);
-              displayValue = beforeCursor + chalk.inverse(atCursor) + afterCursor;
+              displayValue =
+                beforeCursor + chalk.inverse(atCursor) + afterCursor;
             } else if (cursorVisible && editCursorPos >= cpLen(editBuffer)) {
               // Cursor is at the end - show inverted space
               displayValue = editBuffer + chalk.inverse(' ');
