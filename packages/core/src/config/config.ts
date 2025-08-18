@@ -43,12 +43,11 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
-import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
 import type { Content } from '@google/genai';
-import { logIdeConnection } from '../telemetry/loggers.js';
+import { logCliConfiguration, logIdeConnection } from '../telemetry/loggers.js';
 import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 
 // Re-export OAuth config type
@@ -338,11 +337,9 @@ export class Config {
       initializeTelemetry(this);
     }
 
+    logCliConfiguration(this, new StartSessionEvent(this));
+
     if (this.getUsageStatisticsEnabled()) {
-      ClearcutLogger.getInstance(this)?.logStartSessionEvent(
-        new StartSessionEvent(this),
-      );
-    } else {
       console.log('Data collection is disabled.');
     }
   }
