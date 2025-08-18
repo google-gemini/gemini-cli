@@ -111,6 +111,25 @@ describe('user_account', () => {
         old: [],
       });
     });
+
+    it('should handle valid JSON with incorrect schema by starting fresh', async () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(
+        accountsFile(),
+        JSON.stringify({ active: 'test1@google.com', old: 'not-an-array' }),
+      );
+      const consoleDebugSpy = vi
+        .spyOn(console, 'debug')
+        .mockImplementation(() => {});
+
+      await cacheGoogleAccount('test2@google.com');
+
+      expect(consoleDebugSpy).toHaveBeenCalled();
+      expect(JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'))).toEqual({
+        active: 'test2@google.com',
+        old: [],
+      });
+    });
   });
 
   describe('getCachedGoogleAccount', () => {
@@ -148,6 +167,13 @@ describe('user_account', () => {
       expect(account).toBeNull();
       expect(consoleDebugSpy).toHaveBeenCalled();
     });
+
+    it('should return null if active key is missing', () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(accountsFile(), JSON.stringify({ old: [] }));
+      const account = getCachedGoogleAccount();
+      expect(account).toBeNull();
+    });
   });
 
   describe('clearCachedGoogleAccount', () => {
@@ -176,6 +202,56 @@ describe('user_account', () => {
       const stored = JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'));
       expect(stored.active).toBeNull();
       expect(stored.old).toEqual([]);
+    });
+
+    it('should handle corrupted JSON by creating a fresh file', async () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(accountsFile(), 'not valid json');
+      const consoleDebugSpy = vi
+        .spyOn(console, 'debug')
+        .mockImplementation(() => {});
+
+      await clearCachedGoogleAccount();
+
+      expect(consoleDebugSpy).toHaveBeenCalled();
+      const stored = JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'));
+      expect(stored.active).toBeNull();
+      expect(stored.old).toEqual([]);
+    });
+
+    it('should be idempotent if active account is already null', async () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(
+        accountsFile(),
+        JSON.stringify({ active: null, old: ['old1@google.com'] }, null, 2),
+      );
+
+      await clearCachedGoogleAccount();
+
+      const stored = JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'));
+      expect(stored.active).toBeNull();
+      expect(stored.old).toEqual(['old1@google.com']);
+    });
+
+    it('should not add a duplicate to the old list', async () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(
+        accountsFile(),
+        JSON.stringify(
+          {
+            active: 'active@google.com',
+            old: ['active@google.com'],
+          },
+          null,
+          2,
+        ),
+      );
+
+      await clearCachedGoogleAccount();
+
+      const stored = JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'));
+      expect(stored.active).toBeNull();
+      expect(stored.old).toEqual(['active@google.com']);
     });
   });
 
@@ -232,6 +308,32 @@ describe('user_account', () => {
         }),
       );
       expect(getLifetimeGoogleAccounts()).toBe(3);
+    });
+
+    it('should handle valid JSON with incorrect schema by returning 0', () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(
+        accountsFile(),
+        JSON.stringify({ active: null, old: 1 }),
+      );
+      const consoleDebugSpy = vi
+        .spyOn(console, 'debug')
+        .mockImplementation(() => {});
+
+      expect(getLifetimeGoogleAccounts()).toBe(0);
+      expect(consoleDebugSpy).toHaveBeenCalled();
+    });
+
+    it('should not double count if active account is also in old list', () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(
+        accountsFile(),
+        JSON.stringify({
+          active: 'test1@google.com',
+          old: ['test1@google.com', 'test2@google.com'],
+        }),
+      );
+      expect(getLifetimeGoogleAccounts()).toBe(2);
     });
   });
 });
