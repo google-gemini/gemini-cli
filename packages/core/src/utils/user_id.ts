@@ -49,9 +49,10 @@ export function getInstallationId(): string | undefined {
 
     return installationId;
   } catch (error) {
-    // Silently fail if the installation ID cannot be accessed or created.
-    // This can happen in restricted environments, and the application can
-    // function without it. Logging an error here would be noisy for the user.
+    console.error(
+      'Error accessing installation ID file:',
+      error,
+    );
     return undefined;
   }
 }
