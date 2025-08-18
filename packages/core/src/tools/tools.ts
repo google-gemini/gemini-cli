@@ -206,7 +206,9 @@ export abstract class DeclarativeTool<
    * @param params The raw, untrusted parameters from the model.
    * @returns A `ToolInvocation` instance.
    */
-  silentBuild(params: TParams): ToolInvocation<TParams, TResult> | Error {
+  private silentBuild(
+    params: TParams,
+  ): ToolInvocation<TParams, TResult> | Error {
     try {
       return this.build(params);
     } catch (e) {
@@ -228,19 +230,20 @@ export abstract class DeclarativeTool<
     params: TParams,
     abortSignal: AbortSignal,
   ): Promise<ToolResult> {
+    const invocationOrError = this.silentBuild(params);
+    if (invocationOrError instanceof Error) {
+      const errorMessage = invocationOrError.message;
+      return {
+        llmContent: `Error: Invalid parameters provided. Reason: ${errorMessage}`,
+        returnDisplay: errorMessage,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
+      };
+    }
+
     try {
-      const invocationOrError = this.silentBuild(params);
-      if (invocationOrError instanceof Error) {
-        const errorMessage = invocationOrError.message;
-        return {
-          llmContent: `Error: Invalid parameters provided. Reason: ${errorMessage}`,
-          returnDisplay: errorMessage,
-          error: {
-            message: errorMessage,
-            type: ToolErrorType.INVALID_TOOL_PARAMS,
-          },
-        };
-      }
       return await invocationOrError.execute(abortSignal);
     } catch (error) {
       const errorMessage =
