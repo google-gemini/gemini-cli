@@ -515,10 +515,10 @@ export function SettingsDialog({
               const immediateSettingsObject =
                 toSaveValue !== undefined
                   ? setPendingSettingValueAny(
-                      currentSetting.value,
-                      toSaveValue,
-                      {} as Settings,
-                    )
+                    currentSetting.value,
+                    toSaveValue,
+                    {} as Settings,
+                  )
                   : ({} as Settings);
 
               saveModifiedSettings(

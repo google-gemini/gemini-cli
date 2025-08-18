@@ -401,7 +401,7 @@ describe('SettingsDialog', () => {
       // Verify the dialog is rendered properly
       expect(lastFrame()).toContain('Settings');
       expect(lastFrame()).toContain('Apply To');
-      
+
       // This test validates rendering - escape key behavior depends on complex
       // keypress handling that's difficult to test reliably in this environment
 
@@ -717,7 +717,7 @@ describe('SettingsDialog', () => {
       // Verify initial state: settings section active, scope section inactive
       expect(lastFrame()).toContain('● Hide Window Title'); // Settings section active
       expect(lastFrame()).toContain('  Apply To'); // Scope section inactive
-      
+
       // This test validates the rendered UI structure for tab navigation
       // Actual tab behavior testing is complex due to keypress handling
 
@@ -776,7 +776,7 @@ describe('SettingsDialog', () => {
       expect(lastFrame()).toContain('Apply To'); // Scope section
       expect(lastFrame()).toContain('1. User Settings'); // Scope options
       expect(lastFrame()).toContain('(Use Enter to select, Tab to change focus)'); // Help text
-      
+
       // This test validates the complete UI structure is available for user workflow
       // Individual interactions are tested in focused unit tests
 
