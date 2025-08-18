@@ -412,7 +412,7 @@ export const useSlashCommandProcessor = (
                     content: result.content,
                   };
                 case 'confirm_shell_commands': {
-                  const { outcome, approvedCommands } = await new Promise<{ 
+                  const { outcome, approvedCommands } = await new Promise<{
                     outcome: ToolConfirmationOutcome;
                     approvedCommands?: string[];
                   }>((resolve) => {
@@ -452,7 +452,7 @@ export const useSlashCommandProcessor = (
                   );
                 }
                 case 'confirm_action': {
-                  const { confirmed } = await new Promise<{ 
+                  const { confirmed } = await new Promise<{
                     confirmed: boolean;
                   }>((resolve) => {
                     setConfirmationRequest({
