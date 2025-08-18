@@ -135,6 +135,21 @@ describe('feedbackCommand', () => {
     expect(vi.mocked(logResearchFeedback)).not.toHaveBeenCalled();
   });
 
+  it('should handle multi-byte characters (emoji) correctly in feedback', async () => {
+    const context = createMockContext({ 
+      researchOptIn: true,
+    });
+    const feedbackWithEmoji = 'This CLI is great! 👍🎉 Love the new features 💯';
+
+    await feedbackCommand.action!(context, feedbackWithEmoji);
+
+    // Verify the feedback event was created with the original multi-byte content
+    expect(vi.mocked(logResearchFeedback)).toHaveBeenCalled();
+    const eventArg = vi.mocked(logResearchFeedback).mock.calls[0][1];
+    expect(eventArg.feedback_content).toBe(feedbackWithEmoji);
+    expect(eventArg.feedback_type).toBe('conversational');
+  });
+
   it('should have correct command metadata', () => {
     expect(feedbackCommand.name).toBe('feedback');
     expect(feedbackCommand.altNames).toContain('research');

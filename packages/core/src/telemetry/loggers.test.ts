@@ -34,6 +34,7 @@ import {
   logUserPrompt,
   logToolCall,
   logFlashFallback,
+  logResearchFeedback,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -43,6 +44,7 @@ import {
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  ResearchFeedbackEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
 import * as sdk from './sdk.js';
@@ -759,6 +761,51 @@ describe('loggers', () => {
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
       });
+    });
+  });
+
+  describe('logResearchFeedback', () => {
+    it('should handle multi-byte character truncation correctly', () => {
+      // Clear any previous mock calls
+      mockLogger.emit.mockClear();
+      
+      const mockConfig = {
+        getSessionId: () => 'test-session-id',
+        getUsageStatisticsEnabled: () => false, // Disable ClearcutLogger to focus on OpenTelemetry
+      } as Config;
+      
+      // Test string with emoji (multi-byte characters) that would be corrupted by substring
+      const longFeedbackWithEmoji = 'A'.repeat(4090) + '👍🎉💯🚀✨'; // 4095 chars, last 5 are emoji
+      
+      const event = new ResearchFeedbackEvent(
+        'conversational',
+        longFeedbackWithEmoji,
+        undefined,
+        'user@example.com',
+      );
+
+      logResearchFeedback(mockConfig, event);
+
+      // Calculate expected truncated content
+      const expectedTruncated = Array.from(longFeedbackWithEmoji).slice(0, 4096).join('');
+      
+      // Verify the logger was called with properly truncated content
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Research feedback: conversational',
+        attributes: {
+          'session.id': 'test-session-id',
+          feedback_type: 'conversational',
+          feedback_content: expectedTruncated,
+          user_id: 'user@example.com',
+          'event.name': 'gemini_cli.research_feedback',
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+        },
+      });
+      
+      // Additional verification that Unicode characters are preserved correctly
+      // Our test string is 4095 chars total, so no truncation should occur
+      expect(Array.from(expectedTruncated).length).toBe(4095);
+      expect(expectedTruncated).toMatch(/✨$/); // Should end with complete emoji
     });
   });
 });
