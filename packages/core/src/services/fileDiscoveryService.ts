@@ -1,3 +1,4 @@
+// ...existing code...
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -7,6 +8,7 @@
 import { GitIgnoreParser, GitIgnoreFilter } from '../utils/gitIgnoreParser.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import * as path from 'path';
+import ignore, { type Ignore } from 'ignore';
 
 const GEMINI_IGNORE_FILE_NAME = '.geminiignore';
 
@@ -18,26 +20,38 @@ export interface FilterFilesOptions {
 export class FileDiscoveryService {
   private gitIgnoreFilter: GitIgnoreFilter | null = null;
   private geminiIgnoreFilter: GitIgnoreFilter | null = null;
+  private unifiedIgnore: Ignore | null = null;
   private projectRoot: string;
 
   constructor(projectRoot: string) {
     this.projectRoot = path.resolve(projectRoot);
+    // Merge patterns from both .gitignore and .geminiignore
+    const patterns: string[] = [];
     if (isGitRepository(this.projectRoot)) {
       const parser = new GitIgnoreParser(this.projectRoot);
       try {
         parser.loadGitRepoPatterns();
+        patterns.push(...parser.getPatterns());
       } catch (_error) {
         // ignore file not found
       }
       this.gitIgnoreFilter = parser;
     }
-    const gParser = new GitIgnoreParser(this.projectRoot);
+    const gParserLegacy = new GitIgnoreParser(this.projectRoot);
     try {
-      gParser.loadPatterns(GEMINI_IGNORE_FILE_NAME);
+      gParserLegacy.loadPatterns(GEMINI_IGNORE_FILE_NAME);
+      patterns.push(...gParserLegacy.getPatterns());
     } catch (_error) {
       // ignore file not found
     }
-    this.geminiIgnoreFilter = gParser;
+    this.geminiIgnoreFilter = gParserLegacy;
+    // Ensure all negative patterns from .geminiignore are appended last
+    const geminiNegatives = (this.geminiIgnoreFilter?.getPatterns() ?? []).filter(p => p.startsWith('!'));
+    if (geminiNegatives.length > 0) {
+      patterns.push(...geminiNegatives);
+    }
+    this.unifiedIgnore = ignore();
+    this.unifiedIgnore.add(patterns);
   }
 
   /**
@@ -50,18 +64,25 @@ export class FileDiscoveryService {
       respectGeminiIgnore: true,
     },
   ): string[] {
-    return filePaths.filter((filePath) => {
-      if (options.respectGitIgnore && this.shouldGitIgnoreFile(filePath)) {
-        return false;
-      }
-      if (
-        options.respectGeminiIgnore &&
-        this.shouldGeminiIgnoreFile(filePath)
-      ) {
-        return false;
-      }
-      return true;
-    });
+    if (!this.unifiedIgnore) return filePaths;
+    // If both are respected, use unified ignore
+    if (options.respectGitIgnore && options.respectGeminiIgnore) {
+      return filePaths.filter((filePath) => {
+        const resolved = path.resolve(this.projectRoot, filePath);
+        const relativePath = path.relative(this.projectRoot, resolved).replace(/\\/g, '/');
+        return !this.unifiedIgnore!.ignores(relativePath);
+      });
+    }
+    // If only gitignore is respected
+    if (options.respectGitIgnore && !options.respectGeminiIgnore) {
+      return filePaths.filter((filePath) => !this.shouldGitIgnoreFile(filePath));
+    }
+    // If only geminiignore is respected
+    if (!options.respectGitIgnore && options.respectGeminiIgnore) {
+      return filePaths.filter((filePath) => !this.shouldGeminiIgnoreFile(filePath));
+    }
+    // If neither is respected
+    return filePaths;
   }
 
   /**
@@ -74,9 +95,6 @@ export class FileDiscoveryService {
     return false;
   }
 
-  /**
-   * Checks if a single file should be gemini-ignored
-   */
   shouldGeminiIgnoreFile(filePath: string): boolean {
     if (this.geminiIgnoreFilter) {
       return this.geminiIgnoreFilter.isIgnored(filePath);
@@ -84,20 +102,22 @@ export class FileDiscoveryService {
     return false;
   }
 
-  /**
-   * Unified method to check if a file should be ignored based on filtering options
-   */
   shouldIgnoreFile(
     filePath: string,
     options: FilterFilesOptions = {},
   ): boolean {
     const { respectGitIgnore = true, respectGeminiIgnore = true } = options;
-
-    if (respectGitIgnore && this.shouldGitIgnoreFile(filePath)) {
-      return true;
+    if (respectGitIgnore && respectGeminiIgnore) {
+      if (!this.unifiedIgnore) return false;
+      const resolved = path.resolve(this.projectRoot, filePath);
+      const relativePath = path.relative(this.projectRoot, resolved).replace(/\\/g, '/');
+      return this.unifiedIgnore.ignores(relativePath);
     }
-    if (respectGeminiIgnore && this.shouldGeminiIgnoreFile(filePath)) {
-      return true;
+    if (respectGitIgnore && !respectGeminiIgnore) {
+      return this.shouldGitIgnoreFile(filePath);
+    }
+    if (!respectGitIgnore && respectGeminiIgnore) {
+      return this.shouldGeminiIgnoreFile(filePath);
     }
     return false;
   }

@@ -12,9 +12,33 @@ import { isGitRepository } from './gitUtils.js';
 export interface GitIgnoreFilter {
   isIgnored(filePath: string): boolean;
   getPatterns(): string[];
+  matchesNegativePattern(filePath: string): boolean;
 }
 
 export class GitIgnoreParser implements GitIgnoreFilter {
+  /**
+   * Checks if a file matches any negative pattern (e.g. !important.log)
+   */
+  matchesNegativePattern(filePath: string): boolean {
+    const resolved = path.resolve(this.projectRoot, filePath);
+    const relativePath = path.relative(this.projectRoot, resolved);
+    if (relativePath === '' || relativePath.startsWith('..')) {
+      return false;
+    }
+    const normalizedPath = relativePath.replace(/\\/g, '/');
+    const basename = path.basename(normalizedPath);
+    for (const pattern of this.patterns) {
+      if (pattern.startsWith('!')) {
+        const negPattern = pattern.slice(1);
+        const testIg = ignore();
+        testIg.add(negPattern);
+        if (testIg.ignores(normalizedPath) || testIg.ignores(basename)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
   private projectRoot: string;
   private ig: Ignore = ignore();
   private patterns: string[] = [];
