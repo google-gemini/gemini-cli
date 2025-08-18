@@ -418,7 +418,11 @@ describe('build', () => {
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     // Simulate only /root/test exists
-    vi.mocked(fs.existsSync).mockImplementation((p) => p === '/root/test');
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const normalizedPath =
+        typeof p === 'string' ? p.split(path.sep).join('/') : p;
+      return normalizedPath === '/root/test';
+    });
     const invocation = shellTool.build({
       command: 'ls',
       directory: 'test',
@@ -437,9 +441,13 @@ describe('build', () => {
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     // Simulate both /root/test and /users/test/test exist
-    vi.mocked(fs.existsSync).mockImplementation(
-      (p) => p === '/root/test' || p === '/users/test/test',
-    );
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const normalizedPath =
+        typeof p === 'string' ? p.split(path.sep).join('/') : p;
+      return (
+        normalizedPath === '/root/test' || normalizedPath === '/users/test/test'
+      );
+    });
     const result = shellTool.validateToolParams({
       command: 'ls',
       directory: 'test',
@@ -479,9 +487,11 @@ describe('build', () => {
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     // Only /users/test/subdir exists
-    vi.mocked(fs.existsSync).mockImplementation(
-      (p) => p === '/users/test/subdir',
-    );
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const normalizedPath =
+        typeof p === 'string' ? p.split(path.sep).join('/') : p;
+      return normalizedPath === '/users/test/subdir';
+    });
     const result = shellTool.validateToolParams({
       command: 'ls',
       directory: 'subdir',
@@ -517,15 +527,21 @@ describe('build', () => {
           '/users/test',
         ]);
         // Mock isPathWithinWorkspace to return false for /users/test/dir (simulating it's outside workspace)
-        mockContext.isPathWithinWorkspace = vi
-          .fn()
-          .mockImplementation((p) => p !== '/users/test/dir');
+        mockContext.isPathWithinWorkspace = vi.fn().mockImplementation((p) => {
+          const normalizedPath =
+            typeof p === 'string' ? p.split(path.sep).join('/') : p;
+          return normalizedPath !== '/users/test/dir';
+        });
         return mockContext;
       },
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     // Directory exists at /users/test/dir but isPathWithinWorkspace returns false for it
-    vi.mocked(fs.existsSync).mockImplementation((p) => p === '/users/test/dir');
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const normalizedPath =
+        typeof p === 'string' ? p.split(path.sep).join('/') : p;
+      return normalizedPath === '/users/test/dir';
+    });
     const result = shellTool.validateToolParams({
       command: 'ls',
       directory: 'dir',
@@ -544,7 +560,11 @@ describe('build', () => {
     } as unknown as Config;
     const shellTool = new ShellTool(config);
     // Only /root/foo exists, not /root/foobar
-    vi.mocked(fs.existsSync).mockImplementation((p) => p === '/root/foo');
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const normalizedPath =
+        typeof p === 'string' ? p.split(path.sep).join('/') : p;
+      return normalizedPath === '/root/foo';
+    });
     const result = shellTool.validateToolParams({
       command: 'ls',
       directory: 'foo',
@@ -588,9 +608,11 @@ describe('build', () => {
     const shellTool = new ShellTool(config);
 
     // Only /users/test/subdir exists
-    vi.mocked(fs.existsSync).mockImplementation(
-      (p) => p === '/users/test/subdir',
-    );
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const normalizedPath =
+        typeof p === 'string' ? p.split(path.sep).join('/') : p;
+      return normalizedPath === '/users/test/subdir';
+    });
 
     const mockAbortSignal = new AbortController().signal;
 
@@ -617,6 +639,10 @@ describe('build', () => {
     const invocation = shellTool.build({ command: 'pwd', directory: 'subdir' });
     await invocation.execute(mockAbortSignal);
 
-    expect(capturedCwd).toBe('/users/test/subdir');
+    // Normalize the captured cwd for comparison on Windows
+    const normalizedCapturedCwd = capturedCwd
+      ? capturedCwd.split(path.sep).join('/')
+      : capturedCwd;
+    expect(normalizedCapturedCwd).toBe('/users/test/subdir');
   });
 });
