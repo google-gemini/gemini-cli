@@ -1182,7 +1182,7 @@ describe('App UI', () => {
         thought: null,
       });
 
-      const { unmount } = render(
+      const { unmount } = renderWithProviders(
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
@@ -1207,7 +1207,7 @@ describe('App UI', () => {
         thought: null,
       });
 
-      const { unmount, rerender } = render(
+      const { unmount, rerender } = renderWithProviders(
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
@@ -1254,7 +1254,7 @@ describe('App UI', () => {
         thought: 'Processing...',
       });
 
-      const { unmount, lastFrame } = render(
+      const { unmount, lastFrame } = renderWithProviders(
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
@@ -1281,7 +1281,7 @@ describe('App UI', () => {
         thought: null,
       });
 
-      const { unmount, lastFrame } = render(
+      const { unmount, lastFrame } = renderWithProviders(
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
@@ -1310,7 +1310,7 @@ describe('App UI', () => {
         thought: null,
       });
 
-      const { unmount } = render(
+      const { unmount } = renderWithProviders(
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}
@@ -1338,7 +1338,7 @@ describe('App UI', () => {
         thought: null,
       });
 
-      const { unmount, lastFrame } = render(
+      const { unmount, lastFrame } = renderWithProviders(
         <App
           config={mockConfig as unknown as ServerConfig}
           settings={mockSettings}

@@ -24,6 +24,7 @@ import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
+import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { Header } from './components/Header.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
@@ -544,26 +545,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     shellModeActive,
   });
 
-  // Simple message queue for handling input during streaming
-  const [messageQueue, setMessageQueue] = useState<string[]>([]);
+  // Message queue managed by dedicated hook
 
   const [userMessages, setUserMessages] = useState<string[]>([]);
 
-  const handleUserCancel = useCallback(() => {
-    const lastUserMessage = userMessages.at(-1);
-    let textToSet = lastUserMessage || '';
-
-    // Append queued messages if any exist
-    if (messageQueue.length > 0) {
-      const queuedText = messageQueue.join('\n\n');
-      textToSet = textToSet ? `${textToSet}\n\n${queuedText}` : queuedText;
-      setMessageQueue([]);
-    }
-
-    if (textToSet) {
-      buffer.setText(textToSet);
-    }
-  }, [buffer, userMessages, messageQueue]);
+  // Stable reference for cancel handler to avoid circular dependency
+  const cancelHandlerRef = useRef<() => void>(() => {});
 
   const {
     streamingState,
@@ -586,28 +573,40 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
     refreshStatic,
-    handleUserCancel,
+    () => cancelHandlerRef.current(),
   );
 
-  // Input handling - queue messages for processing
-  const handleFinalSubmit = useCallback((submittedValue: string) => {
-    const trimmedValue = submittedValue.trim();
-    if (trimmedValue.length > 0) {
-      // queue for handling
-      setMessageQueue((prev) => [...prev, trimmedValue]);
-    }
-  }, []);
+  // Message queue for handling input during streaming
+  const { messageQueue, addMessage, clearQueue, getQueuedMessagesText } =
+    useMessageQueue({
+      streamingState,
+      submitQuery,
+    });
 
-  // Process queued messages when idle
-  useEffect(() => {
-    if (streamingState === StreamingState.Idle && messageQueue.length > 0) {
-      // Combine all messages with double newlines for clarity
-      const combinedMessage = messageQueue.join('\n\n');
-      // Clear the queue and submit
-      setMessageQueue([]);
-      submitQuery(combinedMessage);
+  // Update the cancel handler with message queue support
+  cancelHandlerRef.current = useCallback(() => {
+    const lastUserMessage = userMessages.at(-1);
+    let textToSet = lastUserMessage || '';
+
+    // Append queued messages if any exist
+    const queuedText = getQueuedMessagesText();
+    if (queuedText) {
+      textToSet = textToSet ? `${textToSet}\n\n${queuedText}` : queuedText;
+      clearQueue();
     }
-  }, [streamingState, messageQueue, submitQuery]);
+
+    if (textToSet) {
+      buffer.setText(textToSet);
+    }
+  }, [buffer, userMessages, getQueuedMessagesText, clearQueue]);
+
+  // Input handling - queue messages for processing
+  const handleFinalSubmit = useCallback(
+    (submittedValue: string) => {
+      addMessage(submittedValue);
+    },
+    [addMessage],
+  );
 
   const handleIdePromptComplete = useCallback(
     (result: IdeIntegrationNudgeResult) => {
@@ -646,7 +645,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     (
       pressedOnce: boolean,
       setPressedOnce: (value: boolean) => void,
-      timerRef: React.MutableRefObject<NodeJS.Timeout | null>,
+      timerRef: ReturnType<typeof useRef<NodeJS.Timeout | null>>,
     ) => {
       if (pressedOnce) {
         if (timerRef.current) {
