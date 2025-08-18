@@ -136,9 +136,11 @@ describe('feedbackCommand', () => {
   });
 
   it('should handle multi-byte characters (emoji) correctly in feedback', async () => {
+    const mockConfig: Partial<Config> = { getTelemetryEnabled: () => true };
     const context = createMockContext({ 
       researchOptIn: true,
     });
+    context.services.config = mockConfig as Config;
     const feedbackWithEmoji = 'This CLI is great! 👍🎉 Love the new features 💯';
 
     await feedbackCommand.action!(context, feedbackWithEmoji);

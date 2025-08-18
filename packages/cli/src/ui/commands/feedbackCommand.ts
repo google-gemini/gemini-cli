@@ -51,15 +51,6 @@ Your feedback helps make Gemini CLI better for everyone!`,
       };
     }
 
-    // Log the feedback event
-    const userId = getUserId(services);
-    const feedbackEvent = new ResearchFeedbackEvent(
-      'conversational',
-      feedback,
-      undefined,
-      userId,
-    );
-    
     // Check for config availability first
     if (!services.config) {
       return {
@@ -68,6 +59,15 @@ Your feedback helps make Gemini CLI better for everyone!`,
         content: 'Unable to send feedback due to an internal configuration error. Please try again later.',
       };
     }
+
+    // Log the feedback event
+    const userId = getUserId(services);
+    const feedbackEvent = new ResearchFeedbackEvent(
+      'conversational',
+      feedback,
+      undefined,
+      userId,
+    );
 
     // Log the research feedback event
     logResearchFeedback(services.config, feedbackEvent);
