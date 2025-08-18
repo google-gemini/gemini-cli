@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   TestRig,
   createToolCallErrorMessage,
@@ -58,7 +58,8 @@ describe('write_file', () => {
     expect(newFileContent).not.toBe('');
 
     // Log success info if verbose
-    if (process.env.VERBOSE === 'true') {
+    vi.stubEnv('VERBOSE', 'true');
+    if (process.env['VERBOSE'] === 'true') {
       console.log(
         'File created successfully with content:',
         newFileContent.substring(0, 100) + '...',

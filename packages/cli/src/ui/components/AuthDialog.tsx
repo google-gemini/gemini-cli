@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
-import { theme } from '../semantic-colors.js';
+import { Colors } from '../colors.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
@@ -42,18 +42,18 @@ export function AuthDialog({
     }
 
     const defaultAuthType = parseDefaultAuthType(
-      process.env.GEMINI_DEFAULT_AUTH_TYPE,
+      process.env['GEMINI_DEFAULT_AUTH_TYPE'],
     );
 
-    if (process.env.GEMINI_DEFAULT_AUTH_TYPE && defaultAuthType === null) {
+    if (process.env['GEMINI_DEFAULT_AUTH_TYPE'] && defaultAuthType === null) {
       return (
-        `Invalid value for GEMINI_DEFAULT_AUTH_TYPE: "${process.env.GEMINI_DEFAULT_AUTH_TYPE}". ` +
+        `Invalid value for GEMINI_DEFAULT_AUTH_TYPE: "${process.env['GEMINI_DEFAULT_AUTH_TYPE']}". ` +
         `Valid values are: ${Object.values(AuthType).join(', ')}.`
       );
     }
 
     if (
-      process.env.GEMINI_API_KEY &&
+      process.env['GEMINI_API_KEY'] &&
       (!defaultAuthType || defaultAuthType === AuthType.USE_GEMINI)
     ) {
       return 'Existing API key detected (GEMINI_API_KEY). Select "Gemini API Key" option to use it.';
@@ -65,7 +65,7 @@ export function AuthDialog({
       label: 'Login with Google',
       value: AuthType.LOGIN_WITH_GOOGLE,
     },
-    ...(process.env.CLOUD_SHELL === 'true'
+    ...(process.env['CLOUD_SHELL'] === 'true'
       ? [
           {
             label: 'Use Cloud Shell user credentials',
@@ -86,13 +86,13 @@ export function AuthDialog({
     }
 
     const defaultAuthType = parseDefaultAuthType(
-      process.env.GEMINI_DEFAULT_AUTH_TYPE,
+      process.env['GEMINI_DEFAULT_AUTH_TYPE'],
     );
     if (defaultAuthType) {
       return item.value === defaultAuthType;
     }
 
-    if (process.env.GEMINI_API_KEY) {
+    if (process.env['GEMINI_API_KEY']) {
       return item.value === AuthType.USE_GEMINI;
     }
 
@@ -133,18 +133,14 @@ export function AuthDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={theme.border.default}
+      borderColor={Colors.Gray}
       flexDirection="column"
       padding={1}
       width="100%"
     >
-      <Text bold color={theme.text.primary}>
-        Get started
-      </Text>
+      <Text bold>Get started</Text>
       <Box marginTop={1}>
-        <Text color={theme.text.primary}>
-          How would you like to authenticate for this project?
-        </Text>
+        <Text>How would you like to authenticate for this project?</Text>
       </Box>
       <Box marginTop={1}>
         <RadioButtonSelect
@@ -155,19 +151,17 @@ export function AuthDialog({
       </Box>
       {errorMessage && (
         <Box marginTop={1}>
-          <Text color={theme.status.error}>{errorMessage}</Text>
+          <Text color={Colors.AccentRed}>{errorMessage}</Text>
         </Box>
       )}
       <Box marginTop={1}>
-        <Text color={theme.text.secondary}>(Use Enter to select)</Text>
+        <Text color={Colors.Gray}>(Use Enter to select)</Text>
       </Box>
       <Box marginTop={1}>
-        <Text color={theme.text.primary}>
-          Terms of Services and Privacy Notice for Gemini CLI
-        </Text>
+        <Text>Terms of Services and Privacy Notice for Gemini CLI</Text>
       </Box>
       <Box marginTop={1}>
-        <Text color={theme.text.link}>
+        <Text color={Colors.AccentBlue}>
           {
             'https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md'
           }
