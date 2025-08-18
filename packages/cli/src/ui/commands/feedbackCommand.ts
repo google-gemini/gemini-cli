@@ -93,9 +93,9 @@ function getUserId(services: CommandContext['services']): string | undefined {
   // Fall back to installation ID as a stable but privacy-preserving identifier.
   const installationId = getInstallationId();
 
-  // getInstallationId() returns a hardcoded string on error, which is not a unique identifier.
-  if (installationId === '123456789') {
-    console.debug('Invalid installation ID detected, not sending user identifier.');
+  // getInstallationId() returns undefined on error.
+  if (!installationId) {
+    console.debug('Invalid or missing installation ID, not sending user identifier.');
     return undefined;
   }
   return installationId;

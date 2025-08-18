@@ -35,9 +35,9 @@ function writeInstallationIdToFile(installationId: string) {
 /**
  * Retrieves the installation ID from a file, creating it if it doesn't exist.
  * This ID is used for unique user installation tracking.
- * @returns A UUID string for the user.
+ * @returns A UUID string for the user, or undefined if unable to access/create the ID.
  */
-export function getInstallationId(): string {
+export function getInstallationId(): string | undefined {
   try {
     ensureGeminiDirExists();
     let installationId = readInstallationIdFromFile();
@@ -50,9 +50,9 @@ export function getInstallationId(): string {
     return installationId;
   } catch (error) {
     console.error(
-      'Error accessing installation ID file, generating ephemeral ID:',
+      'Error accessing installation ID file:',
       error,
     );
-    return '123456789';
+    return undefined;
   }
 }

@@ -9,16 +9,21 @@ import { getInstallationId } from './user_id.js';
 
 describe('user_id', () => {
   describe('getInstallationId', () => {
-    it('should return a valid UUID format string', () => {
+    it('should return a valid UUID format string or undefined', () => {
       const installationId = getInstallationId();
 
-      expect(installationId).toBeDefined();
-      expect(typeof installationId).toBe('string');
-      expect(installationId.length).toBeGreaterThan(0);
+      if (installationId !== undefined) {
+        expect(typeof installationId).toBe('string');
+        expect(installationId.length).toBeGreaterThan(0);
 
-      // Should return the same ID on subsequent calls (consistent)
-      const secondCall = getInstallationId();
-      expect(secondCall).toBe(installationId);
+        // Should return the same ID on subsequent calls (consistent)
+        const secondCall = getInstallationId();
+        expect(secondCall).toBe(installationId);
+      } else {
+        // If undefined, subsequent calls should also be undefined (consistent)
+        const secondCall = getInstallationId();
+        expect(secondCall).toBeUndefined();
+      }
     });
   });
 });

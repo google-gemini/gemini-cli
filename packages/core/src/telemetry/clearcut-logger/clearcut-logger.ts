@@ -20,6 +20,8 @@ import {
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
   KittySequenceOverflowEvent,
+  ResearchOptInEvent,
+  ResearchFeedbackEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
@@ -47,6 +49,8 @@ const slash_command_event_name = 'slash_command';
 const malformed_json_response_event_name = 'malformed_json_response';
 const ide_connection_event_name = 'ide_connection';
 const kitty_sequence_overflow_event_name = 'kitty_sequence_overflow';
+const research_opt_in_event_name = 'research_opt_in';
+const research_feedback_event_name = 'research_feedback';
 
 export interface LogResponse {
   nextRequestWaitMs?: number;
@@ -212,7 +216,11 @@ export class ClearcutLogger {
     if (email) {
       logEvent.client_email = email;
     } else {
-      logEvent.client_install_id = getInstallationId();
+      const installId = getInstallationId();
+      if (installId) {
+        logEvent.client_install_id = installId;
+      }
+      // If installId is undefined, we don't set any identifier
     }
 
     return logEvent;
@@ -703,6 +711,90 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(kitty_sequence_overflow_event_name, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logResearchOptInEvent(event: ResearchOptInEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+    ];
+
+    // Add opt_in_status if available
+    if (event.opt_in_status !== undefined) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_OPT_IN_STATUS,
+        value: event.opt_in_status.toString(),
+      });
+    }
+
+    // Add contact_email if available
+    if (event.contact_email) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_CONTACT_EMAIL,
+        value: event.contact_email,
+      });
+    }
+
+    // Add user_id if available
+    if (event.user_id) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_USER_ID,
+        value: event.user_id,
+      });
+    }
+
+    this.enqueueLogEvent(
+      this.createLogEvent(research_opt_in_event_name, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logResearchFeedbackEvent(event: ResearchFeedbackEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+    ];
+
+    // Add feedback_type if available
+    if (event.feedback_type) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_FEEDBACK_TYPE,
+        value: event.feedback_type,
+      });
+    }
+
+    // Add feedback_content if available
+    if (event.feedback_content) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT,
+        value: event.feedback_content,
+      });
+    }
+
+    // Add user_id if available
+    if (event.user_id) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_USER_ID,
+        value: event.user_id,
+      });
+    }
+
+    // Add survey_responses if available
+    if (event.survey_responses) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_SURVEY_RESPONSES,
+        value: safeJsonStringify(event.survey_responses),
+      });
+    }
+
+    this.enqueueLogEvent(
+      this.createLogEvent(research_feedback_event_name, data),
     );
     this.flushIfNeeded();
   }

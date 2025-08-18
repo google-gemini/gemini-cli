@@ -406,7 +406,7 @@ export function logResearchOptIn(
   config: Config,
   event: ResearchOptInEvent,
 ): void {
-  // Note: ClearcutLogger support for research events can be added later
+  ClearcutLogger.getInstance(config)?.logResearchOptInEvent(event);
   if (!isTelemetrySdkInitialized()) return;
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
@@ -428,7 +428,7 @@ export function logResearchFeedback(
   config: Config,
   event: ResearchFeedbackEvent,
 ): void {
-  // Note: ClearcutLogger support for research events can be added later
+  ClearcutLogger.getInstance(config)?.logResearchFeedbackEvent(event);
   if (!isTelemetrySdkInitialized()) return;
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
