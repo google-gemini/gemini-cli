@@ -277,6 +277,26 @@ export const SETTINGS_SCHEMA = {
     description: 'The currently selected authentication type.',
     showInDialog: false,
   },
+  shell: {
+    type: 'object',
+    label: 'Shell',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: {},
+    description: 'Shell tool settings.',
+    showInDialog: false,
+    properties: {
+      inheritEnv: {
+        type: 'boolean',
+        label: 'Inherit Environment Variables',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: true,
+        description: 'Inherit environment variables in the shell tool.',
+        showInDialog: false,
+      },
+    },
+  },
   useExternalAuth: {
     type: 'boolean',
     label: 'Use External Auth',
