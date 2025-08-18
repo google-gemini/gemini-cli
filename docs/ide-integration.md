@@ -1,5 +1,9 @@
 # IDE Integration
 
+<p align="center">
+  <a href="../../i18n/chinese/docs/ide-integration.md">🌐 简体中文</a> | English
+</p>
+
 Gemini CLI can integrate with your IDE to provide a more seamless and context-aware experience. This integration allows the CLI to understand your workspace better and enables powerful features like native in-editor diffing.
 
 Currently, the only supported IDE is [Visual Studio Code](https://code.visualstudio.com/) and other editors that support VS Code extensions.
