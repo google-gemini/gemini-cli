@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, it, describe, vi, beforeEach, afterEach } from 'vitest';
+import {
+  expect,
+  it,
+  describe,
+  vi,
+  beforeEach,
+  afterEach,
+  MockInstance,
+} from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -25,6 +33,9 @@ describe('ChatRecordingService', () => {
   let chatRecordingService: ChatRecordingService;
   let mockConfig: Config;
 
+  let mkdirSyncSpy: MockInstance<typeof fs.mkdirSync>;
+  let writeFileSyncSpy: MockInstance<typeof fs.writeFileSync>;
+
   beforeEach(() => {
     mockConfig = {
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
@@ -41,6 +52,14 @@ describe('ChatRecordingService', () => {
     vi.mocked(path.join).mockImplementation((...args) => args.join('/'));
 
     chatRecordingService = new ChatRecordingService(mockConfig);
+
+    mkdirSyncSpy = vi
+      .spyOn(fs, 'mkdirSync')
+      .mockImplementation(() => undefined);
+
+    writeFileSyncSpy = vi
+      .spyOn(fs, 'writeFileSync')
+      .mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -49,13 +68,6 @@ describe('ChatRecordingService', () => {
 
   describe('initialize', () => {
     it('should create a new session if none is provided', () => {
-      const mkdirSyncSpy = vi
-        .spyOn(fs, 'mkdirSync')
-        .mockImplementation(() => undefined);
-      const writeFileSyncSpy = vi
-        .spyOn(fs, 'writeFileSync')
-        .mockImplementation(() => undefined);
-
       chatRecordingService.initialize();
 
       expect(mkdirSyncSpy).toHaveBeenCalledWith(
@@ -84,6 +96,7 @@ describe('ChatRecordingService', () => {
         } as ConversationRecord,
       });
 
+      expect(mkdirSyncSpy).not.toHaveBeenCalled();
       expect(readFileSyncSpy).toHaveBeenCalled();
       expect(writeFileSyncSpy).not.toHaveBeenCalled();
     });
@@ -106,6 +119,7 @@ describe('ChatRecordingService', () => {
         .spyOn(fs, 'writeFileSync')
         .mockImplementation(() => undefined);
       chatRecordingService.recordMessage({ type: 'user', content: 'Hello' });
+      expect(mkdirSyncSpy).toHaveBeenCalled();
       expect(writeFileSyncSpy).toHaveBeenCalled();
       const conversation = JSON.parse(
         writeFileSyncSpy.mock.calls[0][1] as string,
@@ -141,6 +155,7 @@ describe('ChatRecordingService', () => {
         append: true,
       });
 
+      expect(mkdirSyncSpy).toHaveBeenCalled();
       expect(writeFileSyncSpy).toHaveBeenCalled();
       const conversation = JSON.parse(
         writeFileSyncSpy.mock.calls[0][1] as string,
@@ -200,6 +215,7 @@ describe('ChatRecordingService', () => {
         cached: 0,
       });
 
+      expect(mkdirSyncSpy).toHaveBeenCalled();
       expect(writeFileSyncSpy).toHaveBeenCalled();
       const conversation = JSON.parse(
         writeFileSyncSpy.mock.calls[0][1] as string,
@@ -279,6 +295,7 @@ describe('ChatRecordingService', () => {
       };
       chatRecordingService.recordToolCalls([toolCall]);
 
+      expect(mkdirSyncSpy).toHaveBeenCalled();
       expect(writeFileSyncSpy).toHaveBeenCalled();
       const conversation = JSON.parse(
         writeFileSyncSpy.mock.calls[0][1] as string,
@@ -318,6 +335,7 @@ describe('ChatRecordingService', () => {
       };
       chatRecordingService.recordToolCalls([toolCall]);
 
+      expect(mkdirSyncSpy).toHaveBeenCalled();
       expect(writeFileSyncSpy).toHaveBeenCalled();
       const conversation = JSON.parse(
         writeFileSyncSpy.mock.calls[0][1] as string,
