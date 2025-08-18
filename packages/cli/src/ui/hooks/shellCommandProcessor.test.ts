@@ -232,9 +232,11 @@ describe('useShellCommandProcessor', () => {
       // Advance time and send another event to trigger the throttled update
       await act(async () => {
         await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
+      });
+      act(() => {
         mockShellOutputCallback({
           type: 'data',
-          chunk: 'hello world',
+          chunk: ' world',
         });
       });
 

@@ -160,7 +160,7 @@ export class ShellExecutionService {
         const MAX_SNIFF_SIZE = 4096;
         let sniffedBytes = 0;
 
-        const handleOutput = (data: Buffer) => {
+        const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
           if (!stdoutDecoder || !stderrDecoder) {
             const encoding = getCachedEncodingForBuffer(data);
             try {
@@ -184,9 +184,15 @@ export class ShellExecutionService {
             }
           }
 
-          const decodedChunk = stdoutDecoder.decode(data, { stream: true });
+          const decoder = stream === 'stdout' ? stdoutDecoder : stderrDecoder;
+          const decodedChunk = decoder.decode(data, { stream: true });
           const strippedChunk = stripAnsi(decodedChunk);
-          stdout += strippedChunk;
+
+          if (stream === 'stdout') {
+            stdout += strippedChunk;
+          } else {
+            stderr += strippedChunk;
+          }
 
           if (isStreamingRawContent) {
             onOutputEvent({ type: 'data', chunk: strippedChunk });
@@ -202,21 +208,33 @@ export class ShellExecutionService {
           }
         };
 
-        child.stdout.on('data', (data) => handleOutput(data));
-        child.stderr.on('data', (data) => handleOutput(data));
-        child.on('error', (err) => {
-          const { stdout, finalBuffer } = cleanup();
-          error = err;
+        const handleExit = (
+          code: number | null,
+          signal: NodeJS.Signals | null,
+        ) => {
+          const { finalBuffer } = cleanup();
+          // Ensure we don't add an extra newline if stdout already ends with one.
+          const separator = stdout.endsWith('\n') ? '' : '\n';
+          const combinedOutput =
+            stdout + (stderr ? (stdout ? separator : '') + stderr : '');
+
           resolve({
-            error,
             rawOutput: finalBuffer,
-            output: stdout,
-            exitCode: 1,
-            signal: null,
-            aborted: false,
+            output: combinedOutput.trim(),
+            exitCode: code,
+            signal: signal ? os.constants.signals[signal] : null,
+            error,
+            aborted: abortSignal.aborted,
             pid: child.pid,
             executionMethod: 'child_process',
           });
+        };
+
+        child.stdout.on('data', (data) => handleOutput(data, 'stdout'));
+        child.stderr.on('data', (data) => handleOutput(data, 'stderr'));
+        child.on('error', (err) => {
+          error = err;
+          handleExit(1, null);
         });
 
         const abortHandler = async () => {
@@ -240,28 +258,23 @@ export class ShellExecutionService {
         abortSignal.addEventListener('abort', abortHandler, { once: true });
 
         child.on('exit', (code, signal) => {
-          const { stdout, finalBuffer } = cleanup();
-
-          resolve({
-            rawOutput: finalBuffer,
-            output: stdout,
-            exitCode: code,
-            signal: signal ? os.constants.signals[signal] : null,
-            error,
-            aborted: abortSignal.aborted,
-            pid: child.pid,
-            executionMethod: 'child_process',
-          });
+          handleExit(code, signal);
         });
 
         function cleanup() {
           exited = true;
           abortSignal.removeEventListener('abort', abortHandler);
           if (stdoutDecoder) {
-            stdout += stripAnsi(stdoutDecoder.decode());
+            const remaining = stdoutDecoder.decode();
+            if (remaining) {
+              stdout += stripAnsi(remaining);
+            }
           }
           if (stderrDecoder) {
-            stderr += stripAnsi(stderrDecoder.decode());
+            const remaining = stderrDecoder.decode();
+            if (remaining) {
+              stderr += stripAnsi(remaining);
+            }
           }
 
           const finalBuffer = Buffer.concat(outputChunks);

@@ -143,7 +143,7 @@ export const useShellCommandProcessor = (
                 case 'data':
                   // Do not process text data if we've already switched to binary mode.
                   if (isBinaryStream) break;
-                  cumulativeStdout = event.chunk;
+                  cumulativeStdout += event.chunk;
                   break;
                 case 'binary_detected':
                   isBinaryStream = true;
