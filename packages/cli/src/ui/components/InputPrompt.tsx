@@ -67,6 +67,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [isDragCollecting, setIsDragCollecting] = useState(false);
+  const [dragBuffer, setDragBuffer] = useState('');
+  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isDragCollectingRef = useRef(false);
+
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
   );
@@ -124,6 +129,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     () => () => {
       if (escapeTimerRef.current) {
         clearTimeout(escapeTimerRef.current);
+      }
+      if (dragTimeoutRef.current) {
+        clearTimeout(dragTimeoutRef.current);
       }
     },
     [],
@@ -234,6 +242,84 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      // Handle normal paste operations first - these should never be interfered with
+      if (key.paste) {
+        // Reset any drag collection state since this is a real paste
+        if (isDragCollectingRef.current) {
+          setIsDragCollecting(false);
+          isDragCollectingRef.current = false;
+          setDragBuffer('');
+          if (dragTimeoutRef.current) {
+            clearTimeout(dragTimeoutRef.current);
+          }
+        }
+        // Continue with normal paste handling
+      }
+
+      // Detect focus event that might start a drag operation (only if NOT a paste)
+      if (key.sequence === '\u001b[I' && !key.paste && !shellModeActive) {
+        setIsDragCollecting(true);
+        isDragCollectingRef.current = true;
+        setDragBuffer('');
+
+        if (dragTimeoutRef.current) {
+          clearTimeout(dragTimeoutRef.current);
+        }
+        dragTimeoutRef.current = setTimeout(() => {
+          setIsDragCollecting(false);
+          isDragCollectingRef.current = false;
+          setDragBuffer('');
+        }, 500);
+
+        return;
+      }
+
+      // Collect individual characters during drag operation
+      if (
+        isDragCollectingRef.current &&
+        key.sequence &&
+        key.sequence.length === 1 &&
+        !key.paste
+      ) {
+        setDragBuffer((prev) => {
+          const newBuffer = prev + key.sequence;
+
+          // Reset collection timeout for each character
+          if (dragTimeoutRef.current) {
+            clearTimeout(dragTimeoutRef.current);
+          }
+
+          // Set completion timeout - longer delay for long paths
+          dragTimeoutRef.current = setTimeout(() => {
+            const trimmedPath = newBuffer.trim();
+            if (trimmedPath) {
+              // Insert as paste to trigger path processing in text-buffer
+              buffer.insert(trimmedPath, { paste: true });
+            }
+            setIsDragCollecting(false);
+            isDragCollectingRef.current = false;
+            setDragBuffer('');
+          }, 200); // Increased from 100ms to 200ms for longer paths
+
+          return newBuffer;
+        });
+
+        return;
+      }
+
+      // Any non-character key during drag collection cancels it
+      if (
+        isDragCollectingRef.current &&
+        (!key.sequence || key.sequence.length !== 1)
+      ) {
+        setIsDragCollecting(false);
+        isDragCollectingRef.current = false;
+        setDragBuffer('');
+        if (dragTimeoutRef.current) {
+          clearTimeout(dragTimeoutRef.current);
+        }
+      }
+
       /// We want to handle paste even when not focused to support drag and drop.
       if (!focus && !key.paste) {
         return;
@@ -522,6 +608,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,
+      isDragCollecting,
+      dragBuffer,
     ],
   );
 
