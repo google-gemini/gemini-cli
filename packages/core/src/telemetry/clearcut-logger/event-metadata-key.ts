@@ -228,6 +228,9 @@ export enum EventMetadataKey {
 
   // Logs the length of the kitty sequence that overflowed.
   GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,
+
+  // Logs tool type whether it is mcp or native.
+  GEMINI_CLI_TOOL_TYPE = 62,
 }
 
 export function getEventMetadataKey(

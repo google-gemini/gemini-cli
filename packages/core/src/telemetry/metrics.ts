@@ -102,6 +102,7 @@ export function recordToolCallMetrics(
   durationMs: number,
   success: boolean,
   decision?: 'accept' | 'reject' | 'modify' | 'auto_accept',
+  tool_type?: 'native' | 'mcp',
 ): void {
   if (!toolCallCounter || !toolCallLatencyHistogram || !isMetricsInitialized)
     return;
@@ -111,6 +112,7 @@ export function recordToolCallMetrics(
     function_name: functionName,
     success,
     decision,
+    tool_type,
   };
   toolCallCounter.add(1, metricAttributes);
   toolCallLatencyHistogram.record(durationMs, {
