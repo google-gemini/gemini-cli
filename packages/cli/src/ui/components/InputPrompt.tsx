@@ -242,16 +242,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
-      // Handle normal paste operations first - these should never be interfered with
+      // Helper function to reset drag collection state
+      const resetDragState = () => {
+        if (dragTimeoutRef.current) {
+          clearTimeout(dragTimeoutRef.current);
+          dragTimeoutRef.current = null;
+        }
+        setIsDragCollecting(false);
+        isDragCollectingRef.current = false;
+        setDragBuffer('');
+      };
+
+      // Handle normal paste operations first
       if (key.paste) {
-        // Reset any drag collection state since this is a real paste
         if (isDragCollectingRef.current) {
-          setIsDragCollecting(false);
-          isDragCollectingRef.current = false;
-          setDragBuffer('');
-          if (dragTimeoutRef.current) {
-            clearTimeout(dragTimeoutRef.current);
-          }
+          resetDragState();
         }
         // Continue with normal paste handling
       }
@@ -270,9 +275,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           clearTimeout(dragTimeoutRef.current);
         }
         dragTimeoutRef.current = setTimeout(() => {
-          setIsDragCollecting(false);
-          isDragCollectingRef.current = false;
-          setDragBuffer('');
+          resetDragState();
         }, 500);
 
         return;
@@ -300,9 +303,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               // Insert as paste to trigger path processing in text-buffer
               buffer.insert(trimmedPath, { paste: true });
             }
-            setIsDragCollecting(false);
-            isDragCollectingRef.current = false;
-            setDragBuffer('');
+            resetDragState();
           }, 200); // Increased from 100ms to 200ms for longer paths
 
           return newBuffer;
@@ -316,12 +317,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         isDragCollectingRef.current &&
         (!key.sequence || key.sequence.length !== 1)
       ) {
-        setIsDragCollecting(false);
-        isDragCollectingRef.current = false;
-        setDragBuffer('');
-        if (dragTimeoutRef.current) {
-          clearTimeout(dragTimeoutRef.current);
-        }
+        resetDragState();
       }
 
       /// We want to handle paste even when not focused to support drag and drop.
