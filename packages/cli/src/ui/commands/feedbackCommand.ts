@@ -48,40 +48,32 @@ Your feedback helps make Gemini CLI better for everyone!`,
     }
 
     // Log the feedback event
-    try {
-      const userId = getUserId(services);
-      const feedbackEvent = new ResearchFeedbackEvent(
-        'conversational',
-        feedback,
-        undefined,
-        userId,
-      );
-      
-      // Log the telemetry event
-      if (services.config?.getTelemetryEnabled()) {
-        logResearchFeedback(services.config, feedbackEvent);
-      }
+    const userId = getUserId(services);
+    const feedbackEvent = new ResearchFeedbackEvent(
+      'conversational',
+      feedback,
+      undefined,
+      userId,
+    );
+    
+    // Log the telemetry event
+    if (services.config?.getTelemetryEnabled()) {
+      logResearchFeedback(services.config, feedbackEvent);
+    }
 
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: `Thank you for your feedback! 
-        
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `Thank you for your feedback! 
+      
 Your input: "${feedback}"
 
 Your feedback has been recorded and will help improve Gemini CLI. ${
-          settings.researchContact
-            ? 'We may reach out to your provided email for follow-up research studies.'
-            : 'Consider adding a contact email in settings for research study invitations.'
-        }`,
-      };
-    } catch (error) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: `Failed to submit feedback: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      };
-    }
+        settings.researchContact
+          ? 'We may reach out to your provided email for follow-up research studies.'
+          : 'Consider adding a contact email in settings for research study invitations.'
+      }`,
+    };
   },
 };
 

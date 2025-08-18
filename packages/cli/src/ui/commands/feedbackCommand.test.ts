@@ -19,7 +19,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-import { logResearchFeedback, ResearchFeedbackEvent } from '@google/gemini-cli-core';
+import { logResearchFeedback, ResearchFeedbackEvent, Config } from '@google/gemini-cli-core';
 
 // Create a mock context for testing
 function createMockContext(settings: Partial<Settings>): CommandContext {
@@ -28,11 +28,24 @@ function createMockContext(settings: Partial<Settings>): CommandContext {
       config: null,
       settings: {
         merged: settings as Settings,
-      } as any,
+        system: { settings: {}, path: '' },
+        user: { settings: {}, path: '' },
+        workspace: { settings: {}, path: '' },
+        errors: [],
+        forScope: vi.fn(),
+        setValue: vi.fn(),
+      },
       git: undefined,
       logger: {
-        logEvent: vi.fn(),
-      } as any,
+        // Use actual Logger interface methods, not logEvent
+        initialize: vi.fn(),
+        logMessage: vi.fn(),
+        saveCheckpoint: vi.fn(),
+        loadCheckpoint: vi.fn(),
+        deleteCheckpoint: vi.fn(),
+        checkpointExists: vi.fn(),
+        close: vi.fn(),
+      },
     },
   });
 }
@@ -65,12 +78,12 @@ describe('feedbackCommand', () => {
   });
 
   it('should accept feedback and log telemetry event when opted in with args', async () => {
-    const mockConfig = { getTelemetryEnabled: () => true };
+    const mockConfig: Partial<Config> = { getTelemetryEnabled: () => true };
     const context = createMockContext({ 
       researchOptIn: true,
       researchContact: 'user@example.com',
     });
-    context.services.config = mockConfig as any;
+    context.services.config = mockConfig as Config;
 
     const feedbackText = 'This is great feedback';
     const result = await feedbackCommand.action!(context, feedbackText);
@@ -91,11 +104,11 @@ describe('feedbackCommand', () => {
   });
 
   it('should not log telemetry when telemetry is disabled', async () => {
-    const mockConfig = { getTelemetryEnabled: () => false };
+    const mockConfig: Partial<Config> = { getTelemetryEnabled: () => false };
     const context = createMockContext({ 
       researchOptIn: true,
     });
-    context.services.config = mockConfig as any;
+    context.services.config = mockConfig as Config;
 
     await feedbackCommand.action!(context, 'Test feedback');
 
