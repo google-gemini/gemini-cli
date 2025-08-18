@@ -369,10 +369,16 @@ export async function loadCliConfig(
     )
     .concat((argv.includeDirectories || []).map(resolvePath));
 
+  const includeDirectoriesForMemory = includeDirectories.map((p) =>
+    typeof p === 'string' ? p : p.path,
+  );
+
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
     cwd,
-    settings.loadMemoryFromIncludeDirectories ? includeDirectories : [],
+    settings.loadMemoryFromIncludeDirectories
+      ? includeDirectoriesForMemory
+      : [],
     debugMode,
     fileService,
     settings,

@@ -181,7 +181,7 @@ export interface ConfigParameters {
   proxy?: string;
   cwd: string;
   fileDiscoveryService?: FileDiscoveryService;
-  includeDirectories?: string[];
+  includeDirectories?: Array<string | { path: string; optional?: boolean }>;
   bugCommand?: BugCommandSettings;
   model: string;
   extensionContextFilePaths?: string[];
