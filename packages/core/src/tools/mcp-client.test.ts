@@ -350,7 +350,9 @@ describe('mcp-client', () => {
       );
 
       expect(mockedClient.registerCapabilities).toHaveBeenCalledWith({
-        roots: {},
+        roots: {
+          listChanged: true,
+        },
       });
       expect(mockedClient.setRequestHandler).toHaveBeenCalledOnce();
       const handler = mockedClient.setRequestHandler.mock.calls[0][1];

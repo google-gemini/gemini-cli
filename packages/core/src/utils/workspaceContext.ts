@@ -18,7 +18,7 @@ export type Unsubscribe = () => void;
 export class WorkspaceContext {
   private directories = new Set<string>();
   private initialDirectories: Set<string>;
-  private onDirectoriesChangedListeners: Array<() => void> = [];
+  private onDirectoriesChangedListeners = new Set<() => void>();
 
   /**
    * Creates a new WorkspaceContext with the given initial directory and optional additional directories.
@@ -40,17 +40,15 @@ export class WorkspaceContext {
    * @returns A function to unsubscribe the listener.
    */
   onDirectoriesChanged(listener: () => void): Unsubscribe {
-    this.onDirectoriesChangedListeners.push(listener);
+    this.onDirectoriesChangedListeners.add(listener);
     return () => {
-      const index = this.onDirectoriesChangedListeners.indexOf(listener);
-      if (index > -1) {
-        this.onDirectoriesChangedListeners.splice(index, 1);
-      }
+      this.onDirectoriesChangedListeners.delete(listener);
     };
   }
 
   private notifyDirectoriesChanged() {
-    for (const listener of this.onDirectoriesChangedListeners) {
+    // Iterate over a copy of the set in case a listener unsubscribes itself or others.
+    for (const listener of [...this.onDirectoriesChangedListeners]) {
       try {
         listener();
       } catch (e) {
