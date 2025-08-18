@@ -36,7 +36,7 @@ import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { Unsubscribe, WorkspaceContext } from '../utils/workspaceContext.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -695,11 +695,31 @@ export async function connectToMcpServer(
     };
   });
 
-  workspaceContext.onDirectoriesChanged(async () => {
-    await mcpClient.notification({
-      method: 'notifications/roots/list_changed',
+  let unlistenDirectories: Unsubscribe | undefined =
+    workspaceContext.onDirectoriesChanged(async () => {
+      try {
+        await mcpClient.notification({
+          method: 'notifications/roots/list_changed',
+        });
+      } catch (_) {
+        // If this fails, its almost certainly because the connection was closed
+        // and we should just stop listening for future directory changes.
+        unlistenDirectories?.();
+        unlistenDirectories = undefined;
+      }
     });
-  });
+
+  // Attempt to pro-actively unsubscribe if the mcp client closes. This API is
+  // very brittle though so we don't have any guarantees, hence the try/catch
+  // above as well.
+  //
+  // Be a good steward and don't just bash over onclose.
+  const oldOnClose = mcpClient.onclose;
+  mcpClient.onclose = () => {
+    oldOnClose?.();
+    unlistenDirectories?.();
+    unlistenDirectories = undefined;
+  };
 
   // patch Client.callTool to use request timeout as genai McpCallTool.callTool does not do it
   // TODO: remove this hack once GenAI SDK does callTool with request options
