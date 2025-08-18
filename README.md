@@ -174,6 +174,7 @@ gemini -p "Explain the architecture of this codebase"
 cd new-project/
 gemini
 > Write me a Discord bot that answers questions using a FAQ.md file I will provide
+````
 
 #### Analyze existing code
 ```bash
