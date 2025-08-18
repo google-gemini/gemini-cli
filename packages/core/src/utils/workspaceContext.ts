@@ -74,7 +74,6 @@ export class WorkspaceContext {
       this.directories.add(this.resolveAndValidateDir(directory, basePath));
     } catch (err) {
       if (optional) {
-        // eslint-disable-next-line no-console
         console.warn(
           `[WARN] Skipping optional unreadable directory: ${directory} (${err instanceof Error ? err.message : String(err)})`,
         );
