@@ -83,19 +83,20 @@ Your feedback has been recorded and will help improve Gemini CLI. ${
 };
 
 // Helper function to get user ID from various auth sources
-function getUserId(_services: CommandContext['services']): string | undefined {
-  // Follow the same pattern as ClearCut logger for consistent user identification
-  // First try to get the cached Google account email
-  const googleAccount = getCachedGoogleAccount();
-  if (googleAccount) {
-    return googleAccount;
+function getUserId(services: CommandContext['services']): string | undefined {
+  // Use the explicitly provided contact email if available for research.
+  const researchContactEmail = services.settings.merged.researchContact;
+  if (researchContactEmail) {
+    return researchContactEmail;
   }
-  
-  // Fall back to installation ID as a stable but privacy-preserving identifier
-  try {
-    return getInstallationId();
-  } catch (error) {
-    console.debug('Error getting installation ID for user identification:', error);
+
+  // Fall back to installation ID as a stable but privacy-preserving identifier.
+  const installationId = getInstallationId();
+
+  // getInstallationId() returns a hardcoded string on error, which is not a unique identifier.
+  if (installationId === '123456789') {
+    console.debug('Invalid installation ID detected, not sending user identifier.');
     return undefined;
   }
+  return installationId;
 }
