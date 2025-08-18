@@ -727,7 +727,7 @@ export class ClearcutLogger {
     if (event.opt_in_status !== undefined) {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_OPT_IN_STATUS,
-        value: event.opt_in_status.toString(),
+        value: JSON.stringify(event.opt_in_status),
       });
     }
 
@@ -735,7 +735,7 @@ export class ClearcutLogger {
     if (event.contact_email) {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_CONTACT_EMAIL,
-        value: event.contact_email,
+        value: JSON.stringify(event.contact_email),
       });
     }
 
@@ -743,7 +743,7 @@ export class ClearcutLogger {
     if (event.user_id) {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_USER_ID,
-        value: event.user_id,
+        value: JSON.stringify(event.user_id),
       });
     }
 
@@ -765,7 +765,7 @@ export class ClearcutLogger {
     if (event.feedback_type) {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_FEEDBACK_TYPE,
-        value: event.feedback_type,
+        value: JSON.stringify(event.feedback_type),
       });
     }
 
@@ -774,7 +774,7 @@ export class ClearcutLogger {
       const MAX_FEEDBACK_LENGTH = 4096; // A reasonable limit for feedback length.
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT,
-        value: event.feedback_content.substring(0, MAX_FEEDBACK_LENGTH),
+        value: JSON.stringify(event.feedback_content.substring(0, MAX_FEEDBACK_LENGTH)),
       });
     }
 
@@ -782,7 +782,7 @@ export class ClearcutLogger {
     if (event.user_id) {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_USER_ID,
-        value: event.user_id,
+        value: JSON.stringify(event.user_id),
       });
     }
 
