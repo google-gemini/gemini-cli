@@ -132,9 +132,41 @@ describe('ClearcutLogger', () => {
 
       const event = logger?.createLogEvent('abc', []);
 
-      expect(event?.event_metadata[0][0]).toEqual({
+      expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
         value: '9001',
+      });
+    });
+
+    it('logs default metadata', () => {
+      const google_accounts = 123;
+      const session_id = 'my-session-id';
+      const surface = 'ide-1234';
+
+      const { logger } = setup({
+        lifetimeGoogleAccounts: google_accounts,
+        config: {
+          sessionId: session_id,
+        },
+      });
+
+      vi.stubEnv('SURFACE', surface);
+
+      const event = logger?.createLogEvent('abc', []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
+        value: `${google_accounts}`,
+      });
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: session_id,
+      });
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
       });
     });
 
@@ -145,7 +177,7 @@ describe('ClearcutLogger', () => {
 
       const event = logger?.createLogEvent('abc', []);
 
-      expect(event?.event_metadata[0][1]).toEqual({
+      expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
         value: 'GitHub',
       });
@@ -159,7 +191,7 @@ describe('ClearcutLogger', () => {
 
       const event = logger?.createLogEvent('abc', []);
 
-      expect(event?.event_metadata[0][1]).toEqual({
+      expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
         value: 'ide-1234',
       });
@@ -210,7 +242,7 @@ describe('ClearcutLogger', () => {
         }
         vi.stubEnv('TERM_PROGRAM', 'vscode');
         const event = logger?.createLogEvent('abc', []);
-        expect(event?.event_metadata[0][1]).toEqual({
+        expect(event?.event_metadata[0]).toContainEqual({
           gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
           value: expectedValue,
         });

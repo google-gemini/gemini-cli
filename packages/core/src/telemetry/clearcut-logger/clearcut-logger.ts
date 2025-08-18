@@ -7,7 +7,6 @@
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import {
   StartSessionEvent,
-  EndSessionEvent,
   UserPromptEvent,
   ToolCallEvent,
   ApiRequestEvent,
@@ -153,6 +152,30 @@ export class ClearcutLogger {
     this.events = new FixedDeque<LogEventEntry[]>(Array, MAX_EVENTS);
   }
 
+  /**
+   * Adds default fields to data, and returns a new data array.  This fields
+   * should exist on all log events.
+   */
+  private addDefaultFields(data: EventValue[]): EventValue[] {
+    const totalAccounts = getLifetimeGoogleAccounts();
+    const surface = determineSurface();
+    const defaultLogMetadata: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
+        value: `${totalAccounts}`,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
+    ];
+    return [...data, ...defaultLogMetadata];
+  }
+
   static getInstance(config?: Config): ClearcutLogger | undefined {
     if (config === undefined || !config?.getUsageStatisticsEnabled())
       return undefined;
@@ -199,7 +222,7 @@ export class ClearcutLogger {
   createLogEvent(name: string, data: EventValue[]): LogEvent {
     const email = getCachedGoogleAccount();
 
-    data = addDefaultFields(data);
+    data = this.addDefaultFields(data);
 
     const logEvent: LogEvent = {
       console_type: 'GEMINI_CLI',
@@ -316,10 +339,6 @@ export class ClearcutLogger {
         value: event.model,
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId() ?? '',
-      },
-      {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_EMBEDDING_MODEL,
         value: event.embedding_model,
@@ -397,10 +416,6 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_PROMPT_LENGTH,
         value: JSON.stringify(event.prompt_length),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId() ?? '',
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
@@ -582,10 +597,6 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
         value: JSON.stringify(event.auth_type),
       },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId() ?? '',
-      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(flash_fallback_event_name, data));
@@ -623,10 +634,6 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_NEXT_SPEAKER_CHECK_RESULT,
         value: JSON.stringify(event.result),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId() ?? '',
       },
     ];
 
@@ -707,13 +714,8 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
-  logEndSessionEvent(event: EndSessionEvent): void {
-    const data: EventValue[] = [
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: event?.session_id?.toString() ?? '',
-      },
-    ];
+  logEndSessionEvent(): void {
+    const data: EventValue[] = [];
 
     // Flush immediately on session end.
     this.enqueueLogEvent(this.createLogEvent(end_session_event_name, data));
@@ -735,8 +737,7 @@ export class ClearcutLogger {
   }
 
   shutdown() {
-    const event = new EndSessionEvent(this.config);
-    this.logEndSessionEvent(event);
+    this.logEndSessionEvent();
   }
 
   private requeueFailedEvents(eventsToSend: LogEventEntry[][]): void {
@@ -788,26 +789,6 @@ export class ClearcutLogger {
       );
     }
   }
-}
-
-/**
- * Adds default fields to data, and returns a new data array.  This fields
- * should exist on all log events.
- */
-function addDefaultFields(data: EventValue[]): EventValue[] {
-  const totalAccounts = getLifetimeGoogleAccounts();
-  const surface = determineSurface();
-  const defaultLogMetadata: EventValue[] = [
-    {
-      gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
-      value: `${totalAccounts}`,
-    },
-    {
-      gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-      value: surface,
-    },
-  ];
-  return [...data, ...defaultLogMetadata];
 }
 
 export const TEST_ONLY = {

@@ -31,7 +31,6 @@ export {
 } from './loggers.js';
 export {
   StartSessionEvent,
-  EndSessionEvent,
   UserPromptEvent,
   ToolCallEvent,
   ApiRequestEvent,

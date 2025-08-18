@@ -68,18 +68,6 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   }
 }
 
-export class EndSessionEvent implements BaseTelemetryEvent {
-  'event.name': 'end_session';
-  'event.timestamp': string;
-  session_id?: string;
-
-  constructor(config?: Config) {
-    this['event.name'] = 'end_session';
-    this['event.timestamp'] = new Date().toISOString();
-    this.session_id = config?.getSessionId();
-  }
-}
-
 export class UserPromptEvent implements BaseTelemetryEvent {
   'event.name': 'user_prompt';
   'event.timestamp': string;
@@ -362,7 +350,6 @@ export class KittySequenceOverflowEvent {
 
 export type TelemetryEvent =
   | StartSessionEvent
-  | EndSessionEvent
   | UserPromptEvent
   | ToolCallEvent
   | ApiRequestEvent
