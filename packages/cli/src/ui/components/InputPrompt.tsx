@@ -67,6 +67,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const DRAG_START_TIMEOUT_MS = 500;
+  const DRAG_COMPLETION_TIMEOUT_MS = 200;
+
   const [isDragCollecting, setIsDragCollecting] = useState(false);
   const [dragBuffer, setDragBuffer] = useState('');
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -242,6 +245,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      // Terminal drag-and-drop focus event sequences
+      const FOCUS_EVENT_IN_EDITOR = '\u001b[I'; // When editor has focus
+      const FOCUS_EVENT_OUT_OF_EDITOR = "'"; // When editor does NOT have focus (macOS Finder.app)
+
       // Helper function to reset drag collection state
       const resetDragState = () => {
         if (dragTimeoutRef.current) {
@@ -253,6 +260,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         setDragBuffer('');
       };
 
+      // Check if this is a drag-and-drop focus event from any terminal
+      const isDragFocusEvent = (sequence: string) => {
+        return (
+          sequence === FOCUS_EVENT_IN_EDITOR ||
+          sequence === FOCUS_EVENT_OUT_OF_EDITOR
+        );
+      };
+
       // Handle normal paste operations first
       if (key.paste) {
         if (isDragCollectingRef.current) {
@@ -262,11 +277,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Detect focus event that might start a drag operation (only if NOT a paste)
-      if (
-        (key.sequence === '\u001b[I' || key.sequence === "'") &&
-        !key.paste &&
-        !shellModeActive
-      ) {
+      if (isDragFocusEvent(key.sequence) && !key.paste && !shellModeActive) {
         setIsDragCollecting(true);
         isDragCollectingRef.current = true;
         setDragBuffer('');
@@ -276,7 +287,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
         dragTimeoutRef.current = setTimeout(() => {
           resetDragState();
-        }, 500);
+        }, DRAG_START_TIMEOUT_MS);
 
         return;
       }
@@ -304,7 +315,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               buffer.insert(trimmedPath, { paste: true });
             }
             resetDragState();
-          }, 200); // Increased from 100ms to 200ms for longer paths
+          }, DRAG_COMPLETION_TIMEOUT_MS);
 
           return newBuffer;
         });
