@@ -9,6 +9,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as process from 'process';
 
+export type Unsubscribe = () => void;
+
 /**
  * WorkspaceContext manages multiple workspace directories and validates paths
  * against them. This allows the CLI to operate on files from multiple directories
@@ -17,6 +19,7 @@ import * as process from 'process';
 export class WorkspaceContext {
   private directories = new Set<string>();
   private initialDirectories: Set<string>;
+  private onDirectoriesChangedListeners = new Set<() => void>();
 
   /**
    * Creates a new WorkspaceContext with the given initial directory and optional additional directories.
@@ -55,6 +58,31 @@ export class WorkspaceContext {
   }
 
   /**
+   * Registers a listener that is called when the workspace directories change.
+   * @param listener The listener to call.
+   * @returns A function to unsubscribe the listener.
+   */
+  onDirectoriesChanged(listener: () => void): Unsubscribe {
+    this.onDirectoriesChangedListeners.add(listener);
+    return () => {
+      this.onDirectoriesChangedListeners.delete(listener);
+    };
+  }
+
+  private notifyDirectoriesChanged() {
+    // Iterate over a copy of the set in case a listener unsubscribes itself or others.
+    for (const listener of [...this.onDirectoriesChangedListeners]) {
+      try {
+        listener();
+      } catch (e) {
+        // Don't let one listener break others.
+        console.error('Error in WorkspaceContext listener:', e);
+      }
+    }
+  }
+
+
+  /**
    * Adds a directory to the workspace.
    * @param directory The directory path to add (can be relative or absolute)
    * @param basePath Optional base path for resolving relative paths (defaults to cwd)
@@ -71,7 +99,12 @@ export class WorkspaceContext {
     optional: boolean = false,
   ): void {
     try {
-      this.directories.add(this.resolveAndValidateDir(directory, basePath));
+      const resolved = this.resolveAndValidateDir(directory, basePath);
+      if (this.directories.has(resolved)) {
+        return;
+      }
+      this.directories.add(resolved);
+      this.notifyDirectoriesChanged();
     } catch (err) {
       if (optional) {
         console.warn(
@@ -115,9 +148,17 @@ export class WorkspaceContext {
   }
 
   setDirectories(directories: readonly string[]): void {
-    this.directories.clear();
+    const newDirectories = new Set<string>();
     for (const dir of directories) {
-      this.addDirectory(dir);
+      newDirectories.add(this.resolveAndValidateDir(dir));
+    }
+
+    if (
+      newDirectories.size !== this.directories.size ||
+      ![...newDirectories].every((d) => this.directories.has(d))
+    ) {
+      this.directories = newDirectories;
+      this.notifyDirectoriesChanged();
     }
   }
 

@@ -294,6 +294,88 @@ describe('WorkspaceContext with real filesystem', () => {
     });
   });
 
+  describe('onDirectoriesChanged', () => {
+    it('should call listener when adding a directory', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      workspaceContext.addDirectory(otherDir);
+
+      expect(listener).toHaveBeenCalledOnce();
+    });
+
+    it('should not call listener when adding a duplicate directory', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      workspaceContext.addDirectory(otherDir);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      workspaceContext.addDirectory(otherDir);
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('should call listener when setting different directories', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      workspaceContext.setDirectories([otherDir]);
+
+      expect(listener).toHaveBeenCalledOnce();
+    });
+
+    it('should not call listener when setting same directories', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      workspaceContext.setDirectories([cwd]);
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('should support multiple listeners', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener1 = vi.fn();
+      const listener2 = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener1);
+      workspaceContext.onDirectoriesChanged(listener2);
+
+      workspaceContext.addDirectory(otherDir);
+
+      expect(listener1).toHaveBeenCalledOnce();
+      expect(listener2).toHaveBeenCalledOnce();
+    });
+
+    it('should allow unsubscribing a listener', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      const unsubscribe = workspaceContext.onDirectoriesChanged(listener);
+
+      unsubscribe();
+      workspaceContext.addDirectory(otherDir);
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('should not fail if a listener throws an error', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const errorListener = () => {
+        throw new Error('test error');
+      };
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(errorListener);
+      workspaceContext.onDirectoriesChanged(listener);
+
+      expect(() => {
+        workspaceContext.addDirectory(otherDir);
+      }).not.toThrow();
+      expect(listener).toHaveBeenCalledOnce();
+    });
+  });
+
   describe('getDirectories', () => {
     it('should return a copy of directories array', () => {
       const workspaceContext = new WorkspaceContext(cwd);

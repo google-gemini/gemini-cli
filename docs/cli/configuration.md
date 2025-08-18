@@ -336,7 +336,7 @@ The CLI keeps a history of shell commands you run. To avoid conflicts between di
 
 ## Environment Variables & `.env` Files
 
-Environment variables are a common way to configure applications, especially for sensitive information like API keys or for settings that might change between environments.
+Environment variables are a common way to configure applications, especially for sensitive information like API keys or for settings that might change between environments. For authentication setup, see the [Authentication documentation](./authentication.md) which covers all available authentication methods.
 
 The CLI automatically loads environment variables from an `.env` file. The loading order is:
 
@@ -346,9 +346,9 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 
 **Environment Variable Exclusion:** Some environment variables (like `DEBUG` and `DEBUG_MODE`) are automatically excluded from being loaded from project `.env` files to prevent interference with gemini-cli behavior. Variables from `.gemini/.env` files are never excluded. You can customize this behavior using the `excludedProjectEnvVars` setting in your `settings.json` file.
 
-- **`GEMINI_API_KEY`** (Required):
+- **`GEMINI_API_KEY`**:
   - Your API key for the Gemini API.
-  - **Crucial for operation.** The CLI will not function without it.
+  - One of several available [authentication methods](./authentication.md).
   - Set this in your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or an `.env` file.
 - **`GEMINI_MODEL`**:
   - Specifies the default Gemini model to use.
