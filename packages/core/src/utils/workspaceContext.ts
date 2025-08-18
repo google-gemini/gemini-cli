@@ -7,6 +7,7 @@
 import { isNodeError } from '../utils/errors.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as process from 'process';
 
 /**
  * WorkspaceContext manages multiple workspace directories and validates paths
@@ -22,12 +23,34 @@ export class WorkspaceContext {
    * @param directory The initial working directory (usually cwd)
    * @param additionalDirectories Optional array of additional directories to include
    */
-  constructor(directory: string, additionalDirectories: string[] = []) {
+  /**
+   * Creates a new WorkspaceContext with the given initial directory and optional additional directories.
+   * @param directory The initial working directory (usually cwd)
+   * @param additionalDirectories Optional array of additional directories to include
+   *        Each entry can be a string or { path: string, optional?: boolean }
+   */
+  constructor(
+    directory: string,
+    additionalDirectories: Array<
+      string | { path: string; optional?: boolean }
+    > = [],
+  ) {
     this.addDirectory(directory);
     for (const additionalDirectory of additionalDirectories) {
-      this.addDirectory(additionalDirectory);
+      if (typeof additionalDirectory === 'string') {
+        this.addDirectory(additionalDirectory);
+      } else if (
+        additionalDirectory &&
+        typeof additionalDirectory === 'object' &&
+        'path' in additionalDirectory
+      ) {
+        this.addDirectory(
+          additionalDirectory.path,
+          process.cwd(),
+          additionalDirectory.optional === true,
+        );
+      }
     }
-
     this.initialDirectories = new Set(this.directories);
   }
 
@@ -36,8 +59,29 @@ export class WorkspaceContext {
    * @param directory The directory path to add (can be relative or absolute)
    * @param basePath Optional base path for resolving relative paths (defaults to cwd)
    */
-  addDirectory(directory: string, basePath: string = process.cwd()): void {
-    this.directories.add(this.resolveAndValidateDir(directory, basePath));
+  /**
+   * Adds a directory to the workspace.
+   * @param directory The directory path to add (can be relative or absolute)
+   * @param basePath Optional base path for resolving relative paths (defaults to cwd)
+   * @param optional If true, missing directories are warned and skipped
+   */
+  addDirectory(
+    directory: string,
+    basePath: string = process.cwd(),
+    optional: boolean = false,
+  ): void {
+    try {
+      this.directories.add(this.resolveAndValidateDir(directory, basePath));
+    } catch (err) {
+      if (optional) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[WARN] Skipping optional unreadable directory: ${directory} (${err instanceof Error ? err.message : String(err)})`,
+        );
+      } else {
+        throw err;
+      }
+    }
   }
 
   private resolveAndValidateDir(

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -303,5 +303,84 @@ describe('WorkspaceContext with real filesystem', () => {
       expect(dirs1).not.toBe(dirs2);
       expect(dirs1).toEqual(dirs2);
     });
+  });
+});
+
+describe('WorkspaceContext with optional directories', () => {
+  let tempDir: string;
+  let cwd: string;
+  let existingDir1: string;
+  let existingDir2: string;
+  let nonExistentDir: string;
+
+  beforeEach(() => {
+    tempDir = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-context-optional-')),
+    );
+    cwd = path.join(tempDir, 'project');
+    existingDir1 = path.join(tempDir, 'existing-dir-1');
+    existingDir2 = path.join(tempDir, 'existing-dir-2');
+    nonExistentDir = path.join(tempDir, 'non-existent-dir');
+
+    fs.mkdirSync(cwd, { recursive: true });
+    fs.mkdirSync(existingDir1, { recursive: true });
+    fs.mkdirSync(existingDir2, { recursive: true });
+
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('should handle a mix of string and object directories', () => {
+    const workspaceContext = new WorkspaceContext(cwd, [
+      existingDir1,
+      { path: existingDir2 },
+    ]);
+    const directories = workspaceContext.getDirectories();
+    expect(directories).toEqual([cwd, existingDir1, existingDir2]);
+  });
+
+  it('should throw an error for a missing non-optional directory (as object)', () => {
+    expect(() => {
+      new WorkspaceContext(cwd, [{ path: nonExistentDir }]);
+    }).toThrow(`Directory does not exist: ${nonExistentDir}`);
+  });
+
+  it('should throw an error for a missing non-optional directory (implicit)', () => {
+    expect(() => {
+      new WorkspaceContext(cwd, [{ path: nonExistentDir, optional: false }]);
+    }).toThrow(`Directory does not exist: ${nonExistentDir}`);
+  });
+
+  it('should skip a missing optional directory and log a warning', () => {
+    const workspaceContext = new WorkspaceContext(cwd, [
+      { path: nonExistentDir, optional: true },
+      existingDir1,
+    ]);
+    const directories = workspaceContext.getDirectories();
+    expect(directories).toEqual([cwd, existingDir1]);
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    expect(console.warn).toHaveBeenCalledWith(
+      `[WARN] Skipping optional unreadable directory: ${nonExistentDir} (Directory does not exist: ${nonExistentDir})`,
+    );
+  });
+
+  it('should include an existing optional directory', () => {
+    const workspaceContext = new WorkspaceContext(cwd, [
+      { path: existingDir1, optional: true },
+    ]);
+    const directories = workspaceContext.getDirectories();
+    expect(directories).toEqual([cwd, existingDir1]);
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it('should handle invalid input gracefully', () => {
+    // @ts-expect-error testing invalid input
+    const workspaceContext = new WorkspaceContext(cwd, [null, undefined, {}]);
+    const directories = workspaceContext.getDirectories();
+    expect(directories).toEqual([cwd]);
   });
 });

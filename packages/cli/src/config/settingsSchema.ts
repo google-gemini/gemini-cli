@@ -428,8 +428,10 @@ export const SETTINGS_SCHEMA = {
     label: 'Include Directories',
     category: 'General',
     requiresRestart: false,
-    default: [] as string[],
-    description: 'Additional directories to include in the workspace context.',
+    // Now supports array of { path: string, optional?: boolean } or string
+    default: [] as Array<string | { path: string; optional?: boolean }>,
+    description:
+      'Additional directories to include in the workspace context. Each entry can be a string or an object { path, optional }.',
     showInDialog: false,
   },
   loadMemoryFromIncludeDirectories: {

@@ -362,7 +362,11 @@ export async function loadCliConfig(
   };
 
   const includeDirectories = (settings.includeDirectories || [])
-    .map(resolvePath)
+    .map((p) =>
+      typeof p === 'string'
+        ? resolvePath(p)
+        : { ...p, path: resolvePath(p.path) },
+    )
     .concat((argv.includeDirectories || []).map(resolvePath));
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
