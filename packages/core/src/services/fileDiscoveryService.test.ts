@@ -176,6 +176,20 @@ describe('FileDiscoveryService', () => {
         service.shouldGeminiIgnoreFile(path.join(projectRoot, 'src/index.ts')),
       ).toBe(false);
     });
+    it('should respect negative patterns in .geminiignore', async () => {
+      // Overwrite .geminiignore with a negation pattern
+      // Gemini negation patterns should also override .gitignore patterns
+      await createTestFile('.gitignore', '.*log');
+      await createTestFile('.geminiignore', '*.log\n!important.log');
+      const service = new FileDiscoveryService(projectRoot);
+      // Should ignore debug.log but NOT important.log
+      expect(
+        service.shouldGeminiIgnoreFile(path.join(projectRoot, 'debug.log')),
+      ).toBe(true);
+      expect(
+        service.shouldGeminiIgnoreFile(path.join(projectRoot, 'important.log')),
+      ).toBe(false);
+    });
   });
 
   describe('edge cases', () => {
