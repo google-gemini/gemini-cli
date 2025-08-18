@@ -580,12 +580,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   // Input handling
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
+      // Guard against submission if the AI is streaming OR a slash command is processing.
+      if (streamingState !== StreamingState.Idle || isProcessing) {
+        return;
+      }
       const trimmedValue = submittedValue.trim();
       if (trimmedValue.length > 0) {
         submitQuery(trimmedValue);
       }
     },
-    [submitQuery],
+    [submitQuery, streamingState, isProcessing],
   );
 
   const handleIdePromptComplete = useCallback(
@@ -760,8 +764,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     fetchUserMessages();
   }, [history, logger]);
 
-  const isInputActive =
-    streamingState === StreamingState.Idle && !initError && !isProcessing;
+  const isBusy =
+    streamingState !== StreamingState.Idle || isProcessing || !!initError;
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -1139,25 +1143,23 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 </OverflowProvider>
               )}
 
-              {isInputActive && (
-                <InputPrompt
-                  buffer={buffer}
-                  inputWidth={inputWidth}
-                  suggestionsWidth={suggestionsWidth}
-                  onSubmit={handleFinalSubmit}
-                  userMessages={userMessages}
-                  onClearScreen={handleClearScreen}
-                  config={config}
-                  slashCommands={slashCommands}
-                  commandContext={commandContext}
-                  shellModeActive={shellModeActive}
-                  setShellModeActive={setShellModeActive}
-                  onEscapePromptChange={handleEscapePromptChange}
-                  focus={isFocused}
-                  vimHandleInput={vimHandleInput}
-                  placeholder={placeholder}
-                />
-              )}
+              <InputPrompt
+                buffer={buffer}
+                inputWidth={inputWidth}
+                suggestionsWidth={suggestionsWidth}
+                onSubmit={handleFinalSubmit}
+                userMessages={userMessages}
+                onClearScreen={handleClearScreen}
+                config={config}
+                slashCommands={slashCommands}
+                commandContext={commandContext}
+                shellModeActive={shellModeActive}
+                setShellModeActive={setShellModeActive}
+                onEscapePromptChange={handleEscapePromptChange}
+                focus={isFocused && !isBusy}
+                vimHandleInput={vimHandleInput}
+                placeholder={placeholder}
+              />
             </>
           )}
 
