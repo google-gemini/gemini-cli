@@ -81,12 +81,6 @@ export class WorkspaceContext {
     }
   }
 
-
-  /**
-   * Adds a directory to the workspace.
-   * @param directory The directory path to add (can be relative or absolute)
-   * @param basePath Optional base path for resolving relative paths (defaults to cwd)
-   */
   /**
    * Adds a directory to the workspace.
    * @param directory The directory path to add (can be relative or absolute)
