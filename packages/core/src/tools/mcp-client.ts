@@ -693,6 +693,20 @@ export async function connectToMcpServer(
     };
   });
 
+  workspaceContext.onDirectoriesChanged(async () => {
+    const roots = [];
+    for (const dir of workspaceContext.getDirectories()) {
+      roots.push({
+        uri: pathToFileURL(dir).toString(),
+        name: basename(dir),
+      });
+    }
+    await mcpClient.notification({
+      method: 'notifications/roots/list_changed',
+      params: { roots },
+    });
+  });
+
   // patch Client.callTool to use request timeout as genai McpCallTool.callTool does not do it
   // TODO: remove this hack once GenAI SDK does callTool with request options
   if ('callTool' in mcpClient) {

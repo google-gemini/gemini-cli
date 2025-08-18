@@ -297,6 +297,7 @@ describe('mcp-client', () => {
         getDirectories: vi
           .fn()
           .mockReturnValue(['/test/dir', '/another/project']),
+        onDirectoriesChanged: vi.fn(),
       } as unknown as WorkspaceContext;
 
       await connectToMcpServer(
