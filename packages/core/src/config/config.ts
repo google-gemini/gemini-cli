@@ -337,9 +337,9 @@ export class Config {
       initializeTelemetry(this);
     }
 
+    logCliConfiguration(this, new StartSessionEvent(this));
+
     if (this.getUsageStatisticsEnabled()) {
-      logCliConfiguration(this, new StartSessionEvent(this));
-    } else {
       console.log('Data collection is disabled.');
     }
   }
