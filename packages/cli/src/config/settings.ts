@@ -70,6 +70,42 @@ export interface SettingsFile {
   settings: Settings;
   path: string;
 }
+function mergeSettings(
+  system: Settings,
+  user: Settings,
+  workspace: Settings,
+): Settings {
+  // folderTrust is not supported at workspace level.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { folderTrust, ...workspaceWithoutFolderTrust } = workspace;
+
+  return {
+    ...user,
+    ...workspaceWithoutFolderTrust,
+    ...system,
+    customThemes: {
+      ...(user.customThemes || {}),
+      ...(workspace.customThemes || {}),
+      ...(system.customThemes || {}),
+    },
+    mcpServers: {
+      ...(user.mcpServers || {}),
+      ...(workspace.mcpServers || {}),
+      ...(system.mcpServers || {}),
+    },
+    includeDirectories: [
+      ...(system.includeDirectories || []),
+      ...(user.includeDirectories || []),
+      ...(workspace.includeDirectories || []),
+    ],
+    chatCompression: {
+      ...(system.chatCompression || {}),
+      ...(user.chatCompression || {}),
+      ...(workspace.chatCompression || {}),
+    },
+  };
+}
+
 export class LoadedSettings {
   constructor(
     system: SettingsFile,
@@ -96,39 +132,11 @@ export class LoadedSettings {
   }
 
   private computeMergedSettings(): Settings {
-    const system = this.system.settings;
-    const user = this.user.settings;
-    const workspace = this.workspace.settings;
-
-    // folderTrust is not supported at workspace level.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { folderTrust, ...workspaceWithoutFolderTrust } = workspace;
-
-    return {
-      ...user,
-      ...workspaceWithoutFolderTrust,
-      ...system,
-      customThemes: {
-        ...(user.customThemes || {}),
-        ...(workspace.customThemes || {}),
-        ...(system.customThemes || {}),
-      },
-      mcpServers: {
-        ...(user.mcpServers || {}),
-        ...(workspace.mcpServers || {}),
-        ...(system.mcpServers || {}),
-      },
-      includeDirectories: [
-        ...(system.includeDirectories || []),
-        ...(user.includeDirectories || []),
-        ...(workspace.includeDirectories || []),
-      ],
-      chatCompression: {
-        ...(system.chatCompression || {}),
-        ...(user.chatCompression || {}),
-        ...(workspace.chatCompression || {}),
-      },
-    };
+    return mergeSettings(
+      this.system.settings,
+      this.user.settings,
+      this.workspace.settings,
+    );
   }
 
   forScope(scope: SettingScope): SettingsFile {
@@ -393,11 +401,11 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   }
 
   // Create a temporary merged settings object to pass to loadEnvironment.
-  const tempMergedSettings = {
-    ...userSettings,
-    ...workspaceSettings,
-    ...systemSettings,
-  };
+  const tempMergedSettings = mergeSettings(
+    systemSettings,
+    userSettings,
+    workspaceSettings,
+  );
 
   // Load environment with merged settings so that variables are available for
   // resolution.
