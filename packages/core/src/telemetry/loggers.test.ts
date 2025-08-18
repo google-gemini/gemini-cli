@@ -774,38 +774,35 @@ describe('loggers', () => {
         getUsageStatisticsEnabled: () => false, // Disable ClearcutLogger to focus on OpenTelemetry
       } as Config;
       
-      // Test string with emoji (multi-byte characters) that would be corrupted by substring
-      const longFeedbackWithEmoji = 'A'.repeat(4090) + '👍🎉💯🚀✨'; // 4095 chars, last 5 are emoji
+      // Test string with an emoji at the truncation boundary
+      const feedbackBase = 'A'.repeat(4095) + '👍'; // This string is exactly 4096 characters long
+      const feedbackToTruncate = feedbackBase + 'extra content'; // This string will be truncated
       
       const event = new ResearchFeedbackEvent(
         'conversational',
-        longFeedbackWithEmoji,
+        feedbackToTruncate,
         undefined,
         'user@example.com',
       );
 
       logResearchFeedback(mockConfig, event);
 
-      // Calculate expected truncated content
-      const expectedTruncated = Array.from(longFeedbackWithEmoji).slice(0, 4096).join('');
-      
       // Verify the logger was called with properly truncated content
       expect(mockLogger.emit).toHaveBeenCalledWith({
         body: 'Research feedback: conversational',
         attributes: {
           'session.id': 'test-session-id',
           feedback_type: 'conversational',
-          feedback_content: expectedTruncated,
+          feedback_content: feedbackBase,
           user_id: 'user@example.com',
           'event.name': 'gemini_cli.research_feedback',
           'event.timestamp': '2025-01-01T00:00:00.000Z',
         },
       });
       
-      // Additional verification that Unicode characters are preserved correctly
-      // Our test string is 4095 chars total, so no truncation should occur
-      expect(Array.from(expectedTruncated).length).toBe(4095);
-      expect(expectedTruncated).toMatch(/✨$/); // Should end with complete emoji
+      // Additional verification that Unicode characters are preserved correctly after truncation
+      expect(Array.from(feedbackBase).length).toBe(4096);
+      expect(feedbackBase.endsWith('👍')).toBe(true);
     });
   });
 });
