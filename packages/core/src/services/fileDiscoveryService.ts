@@ -46,7 +46,9 @@ export class FileDiscoveryService {
     }
     this.geminiIgnoreFilter = gParserLegacy;
     // Ensure all negative patterns from .geminiignore are appended last
-    const geminiNegatives = (this.geminiIgnoreFilter?.getPatterns() ?? []).filter(p => p.startsWith('!'));
+    const geminiNegatives = (
+      this.geminiIgnoreFilter?.getPatterns() ?? []
+    ).filter((p) => p.startsWith('!'));
     if (geminiNegatives.length > 0) {
       patterns.push(...geminiNegatives);
     }
@@ -69,17 +71,23 @@ export class FileDiscoveryService {
     if (options.respectGitIgnore && options.respectGeminiIgnore) {
       return filePaths.filter((filePath) => {
         const resolved = path.resolve(this.projectRoot, filePath);
-        const relativePath = path.relative(this.projectRoot, resolved).replace(/\\/g, '/');
+        const relativePath = path
+          .relative(this.projectRoot, resolved)
+          .replace(/\\/g, '/');
         return !this.unifiedIgnore!.ignores(relativePath);
       });
     }
     // If only gitignore is respected
     if (options.respectGitIgnore && !options.respectGeminiIgnore) {
-      return filePaths.filter((filePath) => !this.shouldGitIgnoreFile(filePath));
+      return filePaths.filter(
+        (filePath) => !this.shouldGitIgnoreFile(filePath),
+      );
     }
     // If only geminiignore is respected
     if (!options.respectGitIgnore && options.respectGeminiIgnore) {
-      return filePaths.filter((filePath) => !this.shouldGeminiIgnoreFile(filePath));
+      return filePaths.filter(
+        (filePath) => !this.shouldGeminiIgnoreFile(filePath),
+      );
     }
     // If neither is respected
     return filePaths;
@@ -110,7 +118,9 @@ export class FileDiscoveryService {
     if (respectGitIgnore && respectGeminiIgnore) {
       if (!this.unifiedIgnore) return false;
       const resolved = path.resolve(this.projectRoot, filePath);
-      const relativePath = path.relative(this.projectRoot, resolved).replace(/\\/g, '/');
+      const relativePath = path
+        .relative(this.projectRoot, resolved)
+        .replace(/\\/g, '/');
       return this.unifiedIgnore.ignores(relativePath);
     }
     if (respectGitIgnore && !respectGeminiIgnore) {

@@ -176,38 +176,36 @@ describe('FileDiscoveryService', () => {
         service.shouldGeminiIgnoreFile(path.join(projectRoot, 'src/index.ts')),
       ).toBe(false);
     });
-    it('.geminiignore negation should override .gitignore', async () => {  
-      // This test verifies the current behavior where .gitignore rules take precedence.  
-      await createTestFile('.gitignore', '*.log');  
-      await createTestFile('.geminiignore', '!important.log');  
-      const service = new FileDiscoveryService(projectRoot);  
+    it('.geminiignore negation should override .gitignore', async () => {
+      // This test verifies the current behavior where .gitignore rules take precedence.
+      await createTestFile('.gitignore', '*.log');
+      await createTestFile('.geminiignore', '!important.log');
+      const service = new FileDiscoveryService(projectRoot);
 
-      const files = [  
-      path.join(projectRoot, 'debug.log'),  
-      path.join(projectRoot, 'important.log'),  
-      path.join(projectRoot, 'src/index.ts'),  
-      ];  
+      const files = [
+        path.join(projectRoot, 'debug.log'),
+        path.join(projectRoot, 'important.log'),
+        path.join(projectRoot, 'src/index.ts'),
+      ];
 
       // Both debug.log should be filtered out due to .gitignore, but not important.log
-      expect(service.filterFiles(files)).toEqual([  
-      path.join(projectRoot, 'important.log'),  
-      path.join(projectRoot, 'src/index.ts'),  
-      ]);  
-    });  
+      expect(service.filterFiles(files)).toEqual([
+        path.join(projectRoot, 'important.log'),
+        path.join(projectRoot, 'src/index.ts'),
+      ]);
+    });
 
-    it('should respect negative patterns in .geminiignore', async () => {  
-      await createTestFile('.geminiignore', '*.log\n!important.log');  
-      const service = new FileDiscoveryService(projectRoot);  
-      // Should ignore debug.log but NOT important.log  
-      expect(  
-      service.shouldGeminiIgnoreFile(path.join(projectRoot, 'debug.log')),  
-      ).toBe(true);  
-      expect(  
-      service.shouldGeminiIgnoreFile(  
-        path.join(projectRoot, 'important.log'),  
-      ),  
-      ).toBe(false);  
-    });  
+    it('should respect negative patterns in .geminiignore', async () => {
+      await createTestFile('.geminiignore', '*.log\n!important.log');
+      const service = new FileDiscoveryService(projectRoot);
+      // Should ignore debug.log but NOT important.log
+      expect(
+        service.shouldGeminiIgnoreFile(path.join(projectRoot, 'debug.log')),
+      ).toBe(true);
+      expect(
+        service.shouldGeminiIgnoreFile(path.join(projectRoot, 'important.log')),
+      ).toBe(false);
+    });
   });
 
   describe('edge cases', () => {
