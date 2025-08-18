@@ -4,27 +4,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as net from 'node:net';
+import * as child_process from 'node:child_process';
 import { IdeClient } from '../packages/core/src/ide/ide-client.js';
-import { getIdeProcessId } from '../packages/core/src/ide/process-utils.js';
-import { spawn, ChildProcess } from 'child_process';
+
+import { TestMcpServer } from './test-mcp-server.js';
 
 describe('IdeClient', () => {
   it('reads port from file and connects', async () => {
-    const port = 12345;
-    const pid = await getIdeProcessId();
+    const server = new TestMcpServer();
+    const port = await server.start();
+    const pid = process.pid;
     const portFile = path.join(os.tmpdir(), `gemini-ide-server-${pid}.json`);
     fs.writeFileSync(portFile, JSON.stringify({ port }));
+    process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = process.cwd();
+    process.env['TERM_PROGRAM'] = 'vscode';
 
     const ideClient = IdeClient.getInstance();
     await ideClient.connect();
 
-    expect(ideClient.getConnectionStatus().status).not.toBe('disconnected');
+    expect(ideClient.getConnectionStatus()).toEqual({
+      status: 'connected',
+      details: undefined,
+    });
 
     fs.unlinkSync(portFile);
+    await server.stop();
+    delete process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+    // Reset instance
+    IdeClient.instance = undefined;
   });
 });
 
@@ -43,24 +55,25 @@ const getFreePort = (): Promise<number> => {
 };
 
 describe('IdeClient fallback connection logic', () => {
-  let server: net.Server;
+  let server: TestMcpServer;
   let envPort: number;
   let pid: number;
   let portFile: string;
 
   beforeEach(async () => {
-    pid = await getIdeProcessId();
+    pid = process.pid;
     portFile = path.join(os.tmpdir(), `gemini-ide-server-${pid}.json`);
-    envPort = await getFreePort();
-    server = net.createServer().listen(envPort);
+    server = new TestMcpServer();
+    envPort = await server.start();
     process.env['GEMINI_CLI_IDE_SERVER_PORT'] = String(envPort);
+    process.env['TERM_PROGRAM'] = 'vscode';
     process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = process.cwd();
     // Reset instance
     IdeClient.instance = undefined;
   });
 
-  afterEach(() => {
-    server.close();
+  afterEach(async () => {
+    await server.stop();
     delete process.env['GEMINI_CLI_IDE_SERVER_PORT'];
     delete process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
     if (fs.existsSync(portFile)) {
@@ -77,7 +90,10 @@ describe('IdeClient fallback connection logic', () => {
     const ideClient = IdeClient.getInstance();
     await ideClient.connect();
 
-    expect(ideClient.getConnectionStatus().status).toBe('connected');
+    expect(ideClient.getConnectionStatus()).toEqual({
+      status: 'connected',
+      details: undefined,
+    });
   });
 
   it('falls back to env var when connection with port from file fails', async () => {
@@ -88,7 +104,10 @@ describe('IdeClient fallback connection logic', () => {
     const ideClient = IdeClient.getInstance();
     await ideClient.connect();
 
-    expect(ideClient.getConnectionStatus().status).toBe('connected');
+    expect(ideClient.getConnectionStatus()).toEqual({
+      status: 'connected',
+      details: undefined,
+    });
   });
 });
 
@@ -106,7 +125,7 @@ describe('getIdeProcessId', () => {
     // so that we can check that getIdeProcessId returns the pid of the parent
     const parentPid = process.pid;
     const output = await new Promise<string>((resolve, reject) => {
-      child = spawn(
+      child = child_process.spawn(
         'node',
         [
           '-e',
