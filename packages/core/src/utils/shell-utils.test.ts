@@ -9,6 +9,7 @@ import {
   checkCommandPermissions,
   getCommandRoots,
   isCommandAllowed,
+  splitCommands,
   stripShellWrapper,
 } from './shell-utils.js';
 import { Config } from '../config/config.js';
@@ -275,5 +276,69 @@ describe('stripShellWrapper', () => {
 
   it('should not strip anything if no wrapper is present', () => {
     expect(stripShellWrapper('ls -l')).toEqual('ls -l');
+  });
+});
+
+describe('splitCommands', () => {
+  it('should handle a single command', () => {
+    expect(splitCommands('ls -l /tmp')).toEqual(['ls -l /tmp']);
+  });
+
+  it('should split commands by &&', () => {
+    expect(splitCommands('cmd1 && cmd2')).toEqual(['cmd1', 'cmd2']);
+  });
+
+  it('should split commands by ||', () => {
+    expect(splitCommands('cmd1 || cmd2')).toEqual(['cmd1', 'cmd2']);
+  });
+
+  it('should split commands by ;', () => {
+    expect(splitCommands('cmd1; cmd2')).toEqual(['cmd1', 'cmd2']);
+  });
+
+  it('should handle a mix of operators', () => {
+    const result = splitCommands('a;b|c&&d||e&f');
+    expect(result).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
+  });
+
+  it('should respect single quotes', () => {
+    const cmd = "echo 'hello && world'";
+    expect(splitCommands(cmd)).toEqual([cmd]);
+  });
+
+  it('should respect double quotes', () => {
+    const cmd = 'echo "hello && world"';
+    expect(splitCommands(cmd)).toEqual([cmd]);
+  });
+
+  it('should handle mixed quotes', () => {
+    const cmd = `git commit -m 'feat: "add new feature"' && npm test`;
+    expect(splitCommands(cmd)).toEqual([
+      `git commit -m 'feat: "add new feature"'`,
+      'npm test',
+    ]);
+  });
+
+  it('should handle escaped quotes', () => {
+    const cmd = 'echo "hello \\" world" && echo "foo"';
+    expect(splitCommands(cmd)).toEqual(['echo "hello \\" world"', 'echo "foo"']);
+  });
+
+  it('should not treat single-quoted backslash as an escape', () => {
+    const cmd = `echo 'hello \\' && echo 'world\\'`;
+    expect(splitCommands(cmd)).toEqual([`echo 'hello \\'`, `echo 'world\\'`]);
+  });
+
+  it('should handle empty and whitespace-only input', () => {
+    expect(splitCommands('')).toEqual([]);
+    expect(splitCommands('   ')).toEqual([]);
+  });
+
+  it('should trim whitespace from commands', () => {
+    expect(splitCommands('  cmd1  &&  cmd2  ')).toEqual(['cmd1', 'cmd2']);
+  });
+
+  it('should handle commands ending with a separator', () => {
+    expect(splitCommands('cmd1 && cmd2;')).toEqual(['cmd1', 'cmd2']);
   });
 });

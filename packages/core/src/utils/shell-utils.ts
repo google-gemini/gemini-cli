@@ -23,7 +23,7 @@ export function splitCommands(command: string): string[] {
     const char = command[i];
     const nextChar = command[i + 1];
 
-    if (char === '\\' && i < command.length - 1) {
+    if (!inSingleQuotes && char === '\\' && i < command.length - 1) {
       currentCommand += char + command[i + 1];
       i += 2;
       continue;
