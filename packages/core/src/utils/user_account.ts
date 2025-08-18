@@ -33,7 +33,7 @@ function parseAndValidateAccounts(content: string): UserAccounts {
 
   // Inlined validation logic
   if (typeof parsed !== 'object' || parsed === null) {
-    console.debug('Invalid accounts file schema, starting fresh.');
+    console.log('Invalid accounts file schema, starting fresh.');
     return defaultState;
   }
   const { active, old } = parsed as Partial<UserAccounts>;
@@ -43,7 +43,7 @@ function parseAndValidateAccounts(content: string): UserAccounts {
       (Array.isArray(old) && old.every((i) => typeof i === 'string')));
 
   if (!isValid) {
-    console.debug('Invalid accounts file schema, starting fresh.');
+    console.log('Invalid accounts file schema, starting fresh.');
     return defaultState;
   }
 
@@ -62,7 +62,7 @@ function readAccountsSync(filePath: string): UserAccounts {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
       return defaultState;
     }
-    console.debug('Error during sync read of accounts, starting fresh.', error);
+    console.log('Error during sync read of accounts, starting fresh.', error);
     return defaultState;
   }
 }
@@ -76,7 +76,7 @@ async function readAccounts(filePath: string): Promise<UserAccounts> {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
       return defaultState;
     }
-    console.debug('Could not parse accounts file, starting fresh.', error);
+    console.log('Could not parse accounts file, starting fresh.', error);
     return defaultState;
   }
 }

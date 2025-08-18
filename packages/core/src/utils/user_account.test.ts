@@ -99,13 +99,13 @@ describe('user_account', () => {
     it('should handle corrupted JSON by starting fresh', async () => {
       fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
       fs.writeFileSync(accountsFile(), 'not valid json');
-      const consoleDebugSpy = vi
-        .spyOn(console, 'debug')
+      const consoleLogSpy = vi
+        .spyOn(console, 'log')
         .mockImplementation(() => {});
 
       await cacheGoogleAccount('test1@google.com');
 
-      expect(consoleDebugSpy).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
       expect(JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'))).toEqual({
         active: 'test1@google.com',
         old: [],
@@ -118,13 +118,13 @@ describe('user_account', () => {
         accountsFile(),
         JSON.stringify({ active: 'test1@google.com', old: 'not-an-array' }),
       );
-      const consoleDebugSpy = vi
-        .spyOn(console, 'debug')
+      const consoleLogSpy = vi
+        .spyOn(console, 'log')
         .mockImplementation(() => {});
 
       await cacheGoogleAccount('test2@google.com');
 
-      expect(consoleDebugSpy).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
       expect(JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'))).toEqual({
         active: 'test2@google.com',
         old: [],
@@ -158,14 +158,14 @@ describe('user_account', () => {
     it('should return null and log if file is corrupted', () => {
       fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
       fs.writeFileSync(accountsFile(), '{ "active": "test@google.com"'); // Invalid JSON
-      const consoleDebugSpy = vi
-        .spyOn(console, 'debug')
+      const consoleLogSpy = vi
+        .spyOn(console, 'log')
         .mockImplementation(() => {});
 
       const account = getCachedGoogleAccount();
 
       expect(account).toBeNull();
-      expect(consoleDebugSpy).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
     });
 
     it('should return null if active key is missing', () => {
@@ -207,13 +207,13 @@ describe('user_account', () => {
     it('should handle corrupted JSON by creating a fresh file', async () => {
       fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
       fs.writeFileSync(accountsFile(), 'not valid json');
-      const consoleDebugSpy = vi
-        .spyOn(console, 'debug')
+      const consoleLogSpy = vi
+        .spyOn(console, 'log')
         .mockImplementation(() => {});
 
       await clearCachedGoogleAccount();
 
-      expect(consoleDebugSpy).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
       const stored = JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'));
       expect(stored.active).toBeNull();
       expect(stored.old).toEqual([]);
@@ -269,12 +269,12 @@ describe('user_account', () => {
     it('should return 0 if the file is corrupted', () => {
       fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
       fs.writeFileSync(accountsFile(), 'invalid json');
-      const consoleDebugSpy = vi
-        .spyOn(console, 'debug')
+      const consoleLogSpy = vi
+        .spyOn(console, 'log')
         .mockImplementation(() => {});
 
       expect(getLifetimeGoogleAccounts()).toBe(0);
-      expect(consoleDebugSpy).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
     });
 
     it('should return 1 if there is only an active account', () => {
@@ -316,12 +316,12 @@ describe('user_account', () => {
         accountsFile(),
         JSON.stringify({ active: null, old: 1 }),
       );
-      const consoleDebugSpy = vi
-        .spyOn(console, 'debug')
+      const consoleLogSpy = vi
+        .spyOn(console, 'log')
         .mockImplementation(() => {});
 
       expect(getLifetimeGoogleAccounts()).toBe(0);
-      expect(consoleDebugSpy).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
     });
 
     it('should not double count if active account is also in old list', () => {
