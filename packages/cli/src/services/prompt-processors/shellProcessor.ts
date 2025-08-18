@@ -5,6 +5,7 @@
  */
 
 import {
+  ApprovalMode,
   checkCommandPermissions,
   escapeShellArg,
   getShellConfiguration,
@@ -107,7 +108,11 @@ export class ShellProcessor implements IPromptProcessor {
             `${this.commandName} cannot be run. Blocked command: "${command}". Reason: ${blockReason || 'Blocked by configuration.'}`,
           );
         }
-        disallowedCommands.forEach((uc) => commandsToConfirm.add(uc));
+
+        // If not a hard denial, respect YOLO mode and auto-approve.
+        if (config.getApprovalMode() !== ApprovalMode.YOLO) {
+          disallowedCommands.forEach((uc) => commandsToConfirm.add(uc));
+        }
       }
     }
 
