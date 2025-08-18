@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { feedbackCommand } from './feedbackCommand.js';
-import { CommandContext } from './types.js';
+import { CommandContext, MessageActionReturn } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { Settings } from '../../config/settings.js';
 
@@ -116,6 +116,23 @@ describe('feedbackCommand', () => {
     // Verify research feedback logging was called regardless of telemetry setting
     // The logResearchFeedback function handles internal routing based on different settings
     expect(vi.mocked(logResearchFeedback)).toHaveBeenCalled();
+  });
+
+  it('should return error when services.config is missing', async () => {
+    const context = createMockContext({ 
+      researchOptIn: true,
+    });
+    context.services.config = null; // Simulate missing config
+
+    const result = await feedbackCommand.action!(context, 'Test feedback') as MessageActionReturn;
+
+    expect(result).toBeDefined();
+    expect(result.type).toBe('message');
+    expect(result.messageType).toBe('error');
+    expect(result.content).toBe('Unable to send feedback due to an internal configuration error. Please try again later.');
+    
+    // Verify logging was NOT called when config is missing
+    expect(vi.mocked(logResearchFeedback)).not.toHaveBeenCalled();
   });
 
   it('should have correct command metadata', () => {

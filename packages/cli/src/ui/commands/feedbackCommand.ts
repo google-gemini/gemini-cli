@@ -60,10 +60,17 @@ Your feedback helps make Gemini CLI better for everyone!`,
       userId,
     );
     
-    // Log the research feedback event
-    if (services.config) {
-      logResearchFeedback(services.config, feedbackEvent);
+    // Check for config availability first
+    if (!services.config) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Unable to send feedback due to an internal configuration error. Please try again later.',
+      };
     }
+
+    // Log the research feedback event
+    logResearchFeedback(services.config, feedbackEvent);
 
     return {
       type: 'message',
