@@ -15,7 +15,7 @@ import {
   ToolCallDecision,
 } from './tool-call-decision.js';
 
-interface BaseTelemetryEvent {
+export interface BaseTelemetryEvent {
   'event.name': string;
   /** Current timestamp in ISO 8601 format */
   'event.timestamp': string;
@@ -295,7 +295,7 @@ export class NextSpeakerCheckEvent implements BaseTelemetryEvent {
 
 export interface SlashCommandEvent extends BaseTelemetryEvent {
   'event.name': 'slash_command';
-  'event.timestamp': string; // ISO 8106
+  'event.timestamp': string;
   command: string;
   subcommand?: string;
   status?: SlashCommandStatus;
@@ -318,6 +318,25 @@ export function makeSlashCommandEvent({
 export enum SlashCommandStatus {
   SUCCESS = 'success',
   ERROR = 'error',
+}
+
+export interface ChatCompressionEvent extends BaseTelemetryEvent {
+  'event.name': 'chat_compression';
+  'event.timestamp': string;
+  tokens_before: number;
+  tokens_after: number;
+}
+
+export function makeChatCompressionEvent({
+  tokens_before,
+  tokens_after,
+}: Omit<ChatCompressionEvent, CommonFields>): ChatCompressionEvent {
+  return {
+    'event.name': 'chat_compression',
+    'event.timestamp': new Date().toISOString(),
+    tokens_before,
+    tokens_after,
+  };
 }
 
 export class MalformedJsonResponseEvent implements BaseTelemetryEvent {
