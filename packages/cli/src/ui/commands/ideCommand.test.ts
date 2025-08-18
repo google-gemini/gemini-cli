@@ -82,7 +82,6 @@ describe('ideCommand', () => {
     expect(command?.subCommands?.[2].name).toBe('install');
   });
 
-  
   it('should show disable command when connected', () => {
     vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
     vi.mocked(mockConfig.getIdeClient).mockReturnValue({
