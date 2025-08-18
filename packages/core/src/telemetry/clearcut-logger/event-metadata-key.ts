@@ -252,15 +252,9 @@ export enum EventMetadataKey {
   GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 61,
 }
 
-export function getEventMetadataKey(
-  keyName: string,
-): EventMetadataKey | undefined {
-  // Access the enum member by its string name
-  const key = EventMetadataKey[keyName as keyof typeof EventMetadataKey];
+  // Logs the number of tokens before context window compression.
+  GEMINI_CLI_COMPRESSION_TOKENS_BEFORE = 60,
 
-  // Check if the result is a valid enum member (not undefined and is a number)
-  if (typeof key === 'number') {
-    return key;
-  }
-  return undefined;
+  // Logs the number of tokens after context window compression.
+  GEMINI_CLI_COMPRESSION_TOKENS_AFTER = 61,
 }

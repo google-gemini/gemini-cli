@@ -30,6 +30,7 @@ export {
   logKittySequenceOverflow,
   logResearchOptIn,
   logResearchFeedback,
+  logChatCompression,
 } from './loggers.js';
 export {
   StartSessionEvent,
@@ -47,6 +48,8 @@ export {
   SlashCommandStatus,
   ResearchOptInEvent,
   ResearchFeedbackEvent,
+  ChatCompressionEvent,
+  makeChatCompressionEvent,
 } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
