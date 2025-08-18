@@ -260,6 +260,15 @@ describe('parseArguments', () => {
   });
 
   it('should reject invalid --approval-mode values', async () => {
+    // Set yargs to use English (en_US) locale
+    const originalLang = process.env.LANG;
+    const originalLcAll = process.env.LC_ALL;
+    const originalLcMessages = process.env.LC_MESSAGES;
+
+    process.env.LANG = 'en_US.UTF-8';
+    process.env.LC_ALL = 'en_US.UTF-8';
+    process.env.LC_MESSAGES = 'en_US.UTF-8';
+
     process.argv = ['node', 'script.js', '--approval-mode', 'invalid'];
 
     const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
@@ -278,6 +287,23 @@ describe('parseArguments', () => {
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+
+    // Restore original environment variables
+    if (originalLang !== undefined) {
+      process.env.LANG = originalLang;
+    } else {
+      delete process.env.LANG;
+    }
+    if (originalLcAll !== undefined) {
+      process.env.LC_ALL = originalLcAll;
+    } else {
+      delete process.env.LC_ALL;
+    }
+    if (originalLcMessages !== undefined) {
+      process.env.LC_MESSAGES = originalLcMessages;
+    } else {
+      delete process.env.LC_MESSAGES;
+    }
   });
 });
 
@@ -595,6 +621,15 @@ describe('loadCliConfig telemetry', () => {
   });
 
   it('should reject invalid --telemetry-otlp-protocol values', async () => {
+    // Set yargs to use English (en_US) locale
+    const originalLang = process.env.LANG;
+    const originalLcAll = process.env.LC_ALL;
+    const originalLcMessages = process.env.LC_MESSAGES;
+
+    process.env.LANG = 'en_US.UTF-8';
+    process.env.LC_ALL = 'en_US.UTF-8';
+    process.env.LC_MESSAGES = 'en_US.UTF-8';
+
     process.argv = [
       'node',
       'script.js',
@@ -616,6 +651,22 @@ describe('loadCliConfig telemetry', () => {
       expect.stringContaining('Invalid values:'),
     );
 
+    // Restore original environment variables
+    if (originalLang !== undefined) {
+      process.env.LANG = originalLang;
+    } else {
+      delete process.env.LANG;
+    }
+    if (originalLcAll !== undefined) {
+      process.env.LC_ALL = originalLcAll;
+    } else {
+      delete process.env.LC_ALL;
+    }
+    if (originalLcMessages !== undefined) {
+      process.env.LC_MESSAGES = originalLcMessages;
+    } else {
+      delete process.env.LC_MESSAGES;
+    }
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
   });
