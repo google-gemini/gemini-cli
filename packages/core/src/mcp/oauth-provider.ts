@@ -798,14 +798,10 @@ export class MCPOAuthProvider {
       );
       console.log('Authentication successful! Token saved.');
 
-      // Verify token was saved
+      // Verify token was saved (without logging sensitive data)
       const savedToken = await MCPOAuthTokenStorage.getToken(serverName);
       if (savedToken && savedToken.token && savedToken.token.accessToken) {
-        const tokenPreview =
-          savedToken.token.accessToken.length > 20
-            ? `${savedToken.token.accessToken.substring(0, 20)}...`
-            : '[token]';
-        console.log(`Token verification successful: ${tokenPreview}`);
+        console.log('Token verification successful');
       } else {
         console.error(
           'Token verification failed: token not found or invalid after save',
