@@ -696,6 +696,10 @@ export class CoreToolScheduler {
       await originalOnConfirm(outcome);
     }
 
+    if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+      await this.autoApproveCompatiblePendingTools(signal);
+    }
+
     this.setToolCallOutcome(callId, outcome);
 
     if (outcome === ToolConfirmationOutcome.Cancel || signal.aborted) {
@@ -928,5 +932,33 @@ export class CoreToolScheduler {
         outcome,
       };
     });
+  }
+
+  private async autoApproveCompatiblePendingTools(
+    signal: AbortSignal,
+  ): Promise<void> {
+    const pendingTools = this.toolCalls.filter(
+      (call) => call.status === 'awaiting_approval',
+    ) as WaitingToolCall[];
+
+    for (const pendingTool of pendingTools) {
+      try {
+        const stillNeedsConfirmation =
+          await pendingTool.invocation.shouldConfirmExecute(signal);
+
+        if (!stillNeedsConfirmation) {
+          this.setToolCallOutcome(
+            pendingTool.request.callId,
+            ToolConfirmationOutcome.ProceedAlways,
+          );
+          this.setStatusInternal(pendingTool.request.callId, 'scheduled');
+        }
+      } catch (error) {
+        console.warn(
+          `Error checking confirmation for tool ${pendingTool.request.callId}:`,
+          error,
+        );
+      }
+    }
   }
 }
