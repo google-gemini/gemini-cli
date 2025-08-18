@@ -149,7 +149,7 @@ Gemini CLI 使用 `settings.json` 文件进行持久配置。这些文件有三�
         "args": ["mcp_server.py", "--port", "8080"],
         "cwd": "./mcp_tools/python",
         "timeout": 5000,
-        "includeTools": ["safe_tool", "file_reader"],
+        "includeTools": ["safe_tool", "file_reader"]
       },
       "myNodeServer": {
         "command": "node",

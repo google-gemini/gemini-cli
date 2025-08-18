@@ -246,11 +246,11 @@ Please generate a Conventional Commit message based on the following git diff:
 
 ```diff
 !{git diff --staged}
-````
+```
 
 """
 
-````
+```
 
 当您运行 `/git:commit` 时，CLI 首先执行 `git diff --staged`，然后在将最终的完整提示发送到模型之前，将 `!{git diff --staged}` 替换为该命令的输出。
 
