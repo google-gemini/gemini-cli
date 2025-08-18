@@ -66,7 +66,7 @@ function formatFileList(openFiles: File[]): string {
       const isDuplicate = (basenameCounts.get(basename) || 0) > 1;
       const parentDir = path.basename(path.dirname(file.path));
       const displayName = isDuplicate
-        ? `${basename} (/${parentDir})`
+        ? `${basename} (/${parentDir})` 
         : basename;
 
       return `  - ${displayName}${file.isActive ? ' (active)' : ''}`;
@@ -171,7 +171,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         context.ui.addItem(
           {
             type: 'error',
-            text: `No installer is available for ${ideClient.getDetectedIdeDisplayName()}. Please install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the marketplace.`,
+            text: `No installer is available for ${ideClient.getDetectedIdeDisplayName()}. Please install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the marketplace.`, 
           },
           Date.now(),
         );
@@ -237,13 +237,11 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
     },
   };
 
-  const ideModeEnabled = config.getIdeMode();
-  if (ideModeEnabled) {
-    ideSlashCommand.subCommands = [
-      disableCommand,
-      statusCommand,
-      installCommand,
-    ];
+  const { status } = ideClient.getConnectionStatus();
+  const isConnected = status === IDEConnectionStatus.Connected;
+
+  if (isConnected) {
+    ideSlashCommand.subCommands = [statusCommand, disableCommand];
   } else {
     ideSlashCommand.subCommands = [
       enableCommand,

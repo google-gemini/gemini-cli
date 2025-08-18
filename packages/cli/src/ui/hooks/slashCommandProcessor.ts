@@ -206,7 +206,22 @@ export const useSlashCommandProcessor = (
     ],
   );
 
-  const ideMode = config?.getIdeMode();
+  useEffect(() => {
+    if (!config) {
+      return;
+    }
+
+    const ideClient = config.getIdeClient();
+    const listener = () => {
+      reloadCommands();
+    };
+
+    ideClient.addStatusChangeListener(listener);
+
+    return () => {
+      ideClient.removeStatusChangeListener(listener);
+    };
+  }, [config, reloadCommands]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -228,7 +243,7 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config, ideMode, reloadTrigger]);
+  }, [config, reloadTrigger]);
 
   const handleSlashCommand = useCallback(
     async (
@@ -397,7 +412,7 @@ export const useSlashCommandProcessor = (
                     content: result.content,
                   };
                 case 'confirm_shell_commands': {
-                  const { outcome, approvedCommands } = await new Promise<{
+                  const { outcome, approvedCommands } = await new Promise<{ 
                     outcome: ToolConfirmationOutcome;
                     approvedCommands?: string[];
                   }>((resolve) => {
@@ -437,7 +452,7 @@ export const useSlashCommandProcessor = (
                   );
                 }
                 case 'confirm_action': {
-                  const { confirmed } = await new Promise<{
+                  const { confirmed } = await new Promise<{ 
                     confirmed: boolean;
                   }>((resolve) => {
                     setConfirmationRequest({
