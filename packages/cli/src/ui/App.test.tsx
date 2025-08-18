@@ -324,7 +324,13 @@ describe('App UI', () => {
     mockConfig.getShowMemoryUsage.mockReturnValue(false); // Default for most tests
 
     // Ensure a theme is set so the theme dialog does not appear.
-    mockSettings = createMockSettings({ workspace: { theme: 'Default' } });
+    // Explicitly set hideFooter to false to ensure footer renders in tests.
+    mockSettings = createMockSettings({
+      workspace: {
+        theme: 'Default',
+        hideFooter: false,
+      },
+    });
 
     // Ensure getWorkspaceContext is available if not added by the constructor
     if (!mockConfig.getWorkspaceContext) {
@@ -859,6 +865,58 @@ describe('App UI', () => {
     currentUnmount = unmount;
     await Promise.resolve();
     expect(vi.mocked(Header)).not.toHaveBeenCalled();
+  });
+
+  it('should display Footer component by default', async () => {
+    const { lastFrame, unmount } = renderWithProviders(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    // Footer should render - look for target directory which is always shown
+    expect(lastFrame()).toContain('/test/dir');
+  });
+
+  it('should not display Footer component when hideFooter is true', async () => {
+    mockSettings = createMockSettings({
+      user: { hideFooter: true },
+    });
+
+    const { lastFrame, unmount } = renderWithProviders(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    // Footer should not render - target directory should not appear
+    expect(lastFrame()).not.toContain('/test/dir');
+  });
+
+  it('should show footer if system says show, but workspace and user settings say hide', async () => {
+    mockSettings = createMockSettings({
+      system: { hideFooter: false },
+      user: { hideFooter: true },
+      workspace: { hideFooter: true },
+    });
+
+    const { lastFrame, unmount } = renderWithProviders(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    // Footer should render because system overrides - look for target directory
+    expect(lastFrame()).toContain('/test/dir');
   });
 
   it('should show tips if system says show, but workspace and user settings say hide', async () => {
