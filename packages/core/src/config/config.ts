@@ -455,7 +455,7 @@ export class Config {
 
   isRestrictiveSandbox(): boolean {
     const sandboxConfig = this.getSandbox();
-    const seatbeltProfile = process.env.SEATBELT_PROFILE;
+    const seatbeltProfile = process.env['SEATBELT_PROFILE'];
     return (
       !!sandboxConfig &&
       sandboxConfig.command === 'sandbox-exec' &&
