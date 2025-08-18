@@ -344,7 +344,7 @@ export function setPendingSettingValueAny(
   pendingSettings: Settings,
 ): Settings {
   const path = key.split('.');
-  const newSettings = JSON.parse(JSON.stringify(pendingSettings));
+  const newSettings = structuredClone(pendingSettings);
   setNestedValue(newSettings, path, value);
   return newSettings;
 }
@@ -447,7 +447,10 @@ export function getDisplayValue(
     typeof defaultValue === 'boolean' ? value !== defaultValue : value === true;
   const isInModifiedSettings = modifiedSettings.has(key);
 
-  // Only show * if value actually differs from default, not just if key exists
+  // Mark as modified if setting exists in current scope OR is in modified settings
+  if (settingExistsInScope(key, settings) || isInModifiedSettings) {
+    return `${valueString}*`; // * indicates setting is set in current scope
+  }
   if (isChangedFromDefault || isInModifiedSettings) {
     return `${valueString}*`; // * indicates changed from default value
   }
