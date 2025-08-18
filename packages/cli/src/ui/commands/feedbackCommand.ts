@@ -8,7 +8,6 @@ import { CommandKind, SlashCommand, MessageActionReturn, CommandContext } from '
 import { 
   ResearchFeedbackEvent, 
   logResearchFeedback, 
-  getCachedGoogleAccount, 
   getInstallationId 
 } from '@google/gemini-cli-core';
 
