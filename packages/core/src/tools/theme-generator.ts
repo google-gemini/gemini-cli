@@ -24,119 +24,115 @@ export async function generateThemeWithAI(themeName: string, signal: AbortSignal
       console.warn('❌ No Gemini client available for AI theme generation, falling back to default theme');
       return createDefaultTheme(themeName);
     }
-    
-    console.log(`🤖 Starting AI chat for theme generation...`);
+    // 1) Determine theme type using JSON mode
+    console.log(`🤖 Determining theme type for "${themeName}" using JSON mode...`);
+    const THEME_TYPE_SCHEMA: Record<string, unknown> = {
+      type: 'object',
+      properties: {
+        themeType: { type: 'string', enum: ['light', 'dark'] },
+        reasoning: { type: 'string' },
+      },
+      required: ['themeType'],
+      additionalProperties: false,
+    };
 
-    const chat = await gemini.startChat();
-    
-    // First determine the theme type using AI
-    console.log(`🤖 Analyzing theme type for "${themeName}"...`);
-    const themeTypeResponse = await chat.sendMessage(
-      {
-        message: `Analyze this theme name: "${themeName}"
+    const themeTypePrompt = `Analyze this theme name: "${themeName}"
 Should this be a light or dark theme? Consider:
 - Direct words like 'dark', 'light', 'night', 'day'
 - Theme context (e.g. 'midnight', 'solar', 'dawn')
 - Common associations (e.g. 'forest' -> dark, 'beach' -> light)
+Return a JSON object with { "themeType": "light" | "dark" }.`;
 
-Respond with just one word: "dark" or "light"`,
-        config: { abortSignal: signal }
-      },
-      'analyze-theme-type'
-    );
-
-    const themeType = (themeTypeResponse?.text || '').trim().toLowerCase() === 'light' ? 'light' : 'dark';
+    let themeType: 'light' | 'dark' = 'dark';
+    try {
+      const themeTypeResult = (await gemini.generateJson(
+        [{ role: 'user', parts: [{ text: themeTypePrompt }] }],
+        THEME_TYPE_SCHEMA,
+        signal,
+      )) as unknown as { themeType?: 'light' | 'dark' };
+      themeType = themeTypeResult?.themeType === 'light' ? 'light' : 'dark';
+    } catch (e) {
+      console.warn('⚠️ Failed to get theme type from LLM, defaulting to dark.', e);
+      themeType = 'dark';
+    }
     console.log(`🤖 Determined theme type: ${themeType}`);
 
-    // Now generate a color palette using AI
-    console.log(`🤖 Generating color palette for ${themeType} theme "${themeName}"...`);
-    const paletteResponse = await chat.sendMessage(
-      {
-        message: `Create a color palette for a VS Code theme named "${themeName}" (${themeType} theme).
+    // 2) Generate palette using JSON mode
+    console.log(`🤖 Generating color palette for ${themeType} theme "${themeName}" using JSON mode...`);
 
-IMPORTANT: This theme name might be from a popular VS Code theme. If you recognize it, use the ACTUAL colors from that theme:
-
-POPULAR THEMES WITH EXACT COLORS:
-- "nord": background #2e3440, foreground #d8dee9, accent #5e81ac, keyword #81a1c1, string #a3be8c, comment #616e88
-- "dracula": background #282a36, foreground #f8f8f2, accent #bd93f9, keyword #8be9fd, string #f1fa8c, comment #6272a4  
-- "tokyo-night": background #1a1b26, foreground #a9b1d6, accent #7aa2f7, keyword #bb9af7, string #9ece6a, comment #565f89
-- "monokai": background #272822, foreground #f8f8f2, accent #f92672, keyword #66d9ef, string #a6e22e, comment #75715e
-- "one-dark": background #282c34, foreground #abb2bf, accent #e06c75, keyword #61afef, string #98c379, comment #5c6370
-- "gruvbox": background #282828, foreground #ebdbb2, accent #fb4934, keyword #83a598, string #b8bb26, comment #928374
-- "solarized-dark": background #002b36, foreground #839496, accent #268bd2, keyword #859900, string #2aa198, comment #586e75
-- "github": background #ffffff, foreground #24292e, accent #0366d6, keyword #d73a49, string #032f62, comment #6a737d
-- "ayu": background #0a0e14, foreground #b3b1ad, accent #e6b450, keyword #39bae6, string #c2d94c, comment #5c6773
-- "palenight": background #292d3e, foreground #a6accd, accent #c792ea, keyword #82aaff, string #c3e88d, comment #676e95
-
-If the theme name "${themeName}" matches or contains any of these popular themes, use their actual color scheme.
-If it's not a known theme, create colors that match the theme name's meaning and character.
-
-Provide only a JSON object with these exact color properties (all values must be valid hex colors):
-{
-  "background": "#...",
-  "foreground": "#...",
-  "accent": "#...",
-  "highlight": "#...",
-  "surface": "#...",
-  "success": "#...",
-  "warning": "#...",
-  "error": "#...",
-  "muted": "#...",
-  "keyword": "#...",
-  "string": "#...",
-  "comment": "#...",
-  "number": "#...",
-  "class": "#...",
-  "type": "#..."
-}
-
-Ensure all colors have good contrast and work well together for code readability.
-For ${themeType} themes, follow these guidelines:
-- dark theme: darker background (#1e-3e range), lighter foreground (>=#d0)
-- light theme: lighter background (>=#f0), darker foreground (<=#2e)
-- accent/token colors: must have good contrast with the background
-
-CRITICAL: Return ONLY the JSON object with no markdown, no code blocks, no explanation, no extra text. Just the raw JSON starting with { and ending with }.`,
-        config: { abortSignal: signal }
+    const HEX = '^#[0-9a-fA-F]{6}$';
+    const PALETTE_SCHEMA: Record<string, unknown> = {
+      type: 'object',
+      properties: {
+        background: { type: 'string', pattern: HEX },
+        foreground: { type: 'string', pattern: HEX },
+        accent: { type: 'string', pattern: HEX },
+        highlight: { type: 'string', pattern: HEX },
+        surface: { type: 'string', pattern: HEX },
+        success: { type: 'string', pattern: HEX },
+        warning: { type: 'string', pattern: HEX },
+        error: { type: 'string', pattern: HEX },
+        muted: { type: 'string', pattern: HEX },
+        keyword: { type: 'string', pattern: HEX },
+        string: { type: 'string', pattern: HEX },
+        comment: { type: 'string', pattern: HEX },
+        number: { type: 'string', pattern: HEX },
+        class: { type: 'string', pattern: HEX },
+        type: { type: 'string', pattern: HEX },
       },
-      'generate-color-palette'
-    );
+      required: [
+        'background',
+        'foreground',
+        'accent',
+        'highlight',
+        'surface',
+        'success',
+        'warning',
+        'error',
+        'muted',
+        'keyword',
+        'string',
+        'comment',
+        'number',
+        'class',
+        'type',
+      ],
+      additionalProperties: false,
+    };
 
-    const paletteText = paletteResponse?.text;
-    if (!paletteText) {
-      console.warn('❌ No response from AI for color palette generation');
+    const palettePrompt = `Create a color palette for a VS Code theme named "${themeName}" (${themeType} theme).
+
+If the name matches a popular VS Code theme, prefer its actual colors when known:
+- nord, dracula, tokyo-night, monokai, one-dark, gruvbox, solarized-dark, github, ayu, palenight
+
+Guidelines:
+- Ensure excellent readability and contrast.
+- ${themeType} theme specifics:
+  - dark: background roughly between #1e1e1e and #3e3e3e, foreground >= #d0d0d0
+  - light: background >= #f0f0f0, foreground <= #2e2e2e
+- Token colors must contrast well against background.
+
+Return a JSON object matching the provided schema with exactly these keys.`;
+
+    let palette: ColorPalette | null = null;
+    try {
+      const result = (await gemini.generateJson(
+        [{ role: 'user', parts: [{ text: palettePrompt }] }],
+        PALETTE_SCHEMA,
+        signal,
+      )) as unknown as ColorPalette;
+      palette = result;
+    } catch (e) {
+      console.warn('❌ Failed to get palette from LLM using JSON mode.', e);
       return createDefaultTheme(themeName);
     }
 
-    console.log(`🤖 AI response received, parsing color palette...`);
-    console.log(`🤖 Raw AI response: ${paletteText.substring(0, 200)}...`);
-    
-    // Extract JSON from the response (AI might return markdown or extra text)
-    let jsonText = paletteText.trim();
-    
-    // Remove markdown code blocks if present
-    if (jsonText.includes('```')) {
-      const codeBlockMatch = jsonText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-      if (codeBlockMatch) {
-        jsonText = codeBlockMatch[1];
-        console.log(`🤖 Extracted JSON from code block`);
-      }
+    if (!palette) {
+      console.warn('❌ LLM returned empty palette object');
+      return createDefaultTheme(themeName);
     }
-    
-    // Try to find JSON object in the response
-    if (!jsonText.startsWith('{')) {
-      const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        jsonText = jsonMatch[0];
-        console.log(`🤖 Extracted JSON from text`);
-      }
-    }
-    
-    console.log(`🤖 Final JSON to parse: ${jsonText.substring(0, 200)}...`);
-    
-    try {
-      const palette = JSON.parse(jsonText) as ColorPalette;
-      console.log(`🎨 Successfully parsed AI-generated palette with ${Object.keys(palette).length} colors`);
+
+    console.log(`🎨 Received AI-generated palette with ${Object.keys(palette).length} colors`);
 
       // Validate all colors are hex format
       const isValidHex = (color: string) => /^#[\da-f]{6}$/i.test(color);
@@ -196,10 +192,6 @@ CRITICAL: Return ONLY the JSON object with no markdown, no code blocks, no expla
       console.log(`🎨 AI theme has ${Object.keys(aiTheme.colors).length} colors and ${aiTheme.tokenColors.length} token colors`);
       
       return aiTheme;
-    } catch (error) {
-      console.error('Failed to parse AI-generated color palette:', error);
-      return createDefaultTheme(themeName);
-    }
   } catch (error) {
     console.error('Failed to generate theme with AI:', error);
     return createDefaultTheme(themeName);
