@@ -11,7 +11,6 @@ import { randomUUID } from 'node:crypto';
 import {
   ChatRecordingService,
   ConversationRecord,
-  MessageRecord,
   ToolCallRecord,
 } from './chatRecordingService.js';
 import { Config } from '../config/config.js';
