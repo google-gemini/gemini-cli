@@ -23,6 +23,10 @@ export interface CrawlOptions {
   cacheTtl: number;
 }
 
+function toPosixPath(p: string) {
+  return p.split(path.sep).join(path.posix.sep);
+}
+
 export async function crawl(options: CrawlOptions): Promise<string[]> {
   if (options.cache) {
     const cacheKey = cache.getCacheKey(
@@ -37,6 +41,9 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
     }
   }
 
+  const posixCwd = toPosixPath(options.cwd);
+  const posixCrawlDirectory = toPosixPath(options.crawlDirectory);
+
   let results: string[];
   try {
     const dirFilter = options.ignore.getDirectoryFilter();
@@ -45,7 +52,7 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
       .withDirs()
       .withPathSeparator('/') // Always use unix style paths
       .exclude((_, dirPath) => {
-        const relativePath = path.relative(options.crawlDirectory, dirPath);
+        const relativePath = path.posix.relative(posixCrawlDirectory, dirPath);
         return dirFilter(`${relativePath}/`);
       });
 
@@ -59,13 +66,11 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
     return [];
   }
 
-  const relativeToCwdResults = results.map((p) => {
-    const relativeToCrawlDir = path.relative(
-      options.cwd,
-      options.crawlDirectory,
-    );
-    return path.join(relativeToCrawlDir, p);
-  });
+  const relativeToCrawlDir = path.posix.relative(posixCwd, posixCrawlDirectory);
+
+  const relativeToCwdResults = results.map((p) =>
+    path.posix.join(relativeToCrawlDir, p),
+  );
 
   if (options.cache) {
     const cacheKey = cache.getCacheKey(
