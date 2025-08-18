@@ -324,13 +324,7 @@ describe('App UI', () => {
     mockConfig.getShowMemoryUsage.mockReturnValue(false); // Default for most tests
 
     // Ensure a theme is set so the theme dialog does not appear.
-    // Explicitly set hideFooter to false to ensure footer renders in tests.
-    mockSettings = createMockSettings({
-      workspace: {
-        theme: 'Default',
-        hideFooter: false,
-      },
-    });
+    mockSettings = createMockSettings({ workspace: { theme: 'Default' } });
 
     // Ensure getWorkspaceContext is available if not added by the constructor
     if (!mockConfig.getWorkspaceContext) {
