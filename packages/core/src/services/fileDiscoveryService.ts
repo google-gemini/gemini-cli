@@ -37,14 +37,14 @@ export class FileDiscoveryService {
       }
       this.gitIgnoreFilter = parser;
     }
-    const gParserLegacy = new GitIgnoreParser(this.projectRoot);
+    const gParser = new GitIgnoreParser(this.projectRoot);
     try {
-      gParserLegacy.loadPatterns(GEMINI_IGNORE_FILE_NAME);
-      patterns.push(...gParserLegacy.getPatterns());
+      gParser.loadPatterns(GEMINI_IGNORE_FILE_NAME);
+      patterns.push(...gParser.getPatterns());
     } catch (_error) {
       // ignore file not found
     }
-    this.geminiIgnoreFilter = gParserLegacy;
+    this.geminiIgnoreFilter = gParser;
     // Ensure all negative patterns from .geminiignore are appended last
     const geminiNegatives = (
       this.geminiIgnoreFilter?.getPatterns() ?? []
