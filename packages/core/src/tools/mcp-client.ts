@@ -694,16 +694,8 @@ export async function connectToMcpServer(
   });
 
   workspaceContext.onDirectoriesChanged(async () => {
-    const roots = [];
-    for (const dir of workspaceContext.getDirectories()) {
-      roots.push({
-        uri: pathToFileURL(dir).toString(),
-        name: basename(dir),
-      });
-    }
     await mcpClient.notification({
       method: 'notifications/roots/list_changed',
-      params: { roots },
     });
   });
 

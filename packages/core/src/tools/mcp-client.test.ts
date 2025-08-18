@@ -280,6 +280,46 @@ describe('mcp-client', () => {
   });
 
   describe('connectToMcpServer', () => {
+    it('should send a notification when directories change', async () => {
+      const mockedClient = {
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        notification: vi.fn(),
+        callTool: vi.fn(),
+        connect: vi.fn(),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      let onDirectoriesChangedCallback: () => void = () => {};
+      const mockWorkspaceContext = {
+        getDirectories: vi
+          .fn()
+          .mockReturnValue(['/test/dir', '/another/project']),
+        onDirectoriesChanged: vi.fn().mockImplementation((callback) => {
+          onDirectoriesChangedCallback = callback;
+        }),
+      } as unknown as WorkspaceContext;
+
+      await connectToMcpServer(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        false,
+        mockWorkspaceContext,
+      );
+
+      onDirectoriesChangedCallback();
+
+      expect(mockedClient.notification).toHaveBeenCalledWith({
+        method: 'notifications/roots/list_changed',
+      });
+    });
+
     it('should register a roots/list handler', async () => {
       const mockedClient = {
         registerCapabilities: vi.fn(),
