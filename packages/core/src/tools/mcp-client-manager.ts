@@ -52,6 +52,7 @@ export class McpClientManager {
    * them with the `ToolRegistry`.
    */
   async discoverAllMcpTools(): Promise<void> {
+    await this.stop();
     this.discoveryState = MCPDiscoveryState.IN_PROGRESS;
     const servers = populateMcpServerCommand(
       this.mcpServers,
@@ -92,16 +93,20 @@ export class McpClientManager {
    * This is the cleanup method to be called on application exit.
    */
   async stop(): Promise<void> {
-    for (const [name, client] of this.clients.entries()) {
-      try {
-        await client.disconnect();
-        this.clients.delete(name);
-      } catch (error) {
-        console.error(
-          `Error stopping client '${name}': ${getErrorMessage(error)}`,
-        );
-      }
-    }
+    const disconnectionPromises = Array.from(this.clients.entries()).map(
+      async ([name, client]) => {
+        try {
+          await client.disconnect();
+        } catch (error) {
+          console.error(
+            `Error stopping client '${name}': ${getErrorMessage(error)}`,
+          );
+        }
+      },
+    );
+
+    await Promise.all(disconnectionPromises);
+    this.clients.clear();
   }
 
   getDiscoveryState(): MCPDiscoveryState {

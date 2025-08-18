@@ -76,6 +76,117 @@ describe('mcp-client', () => {
       await client.discover();
       expect(mockedMcpToTool).toHaveBeenCalledOnce();
     });
+
+    it('should skip tools if a parameter is missing a type', async () => {
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        tool: vi.fn(),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'validTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: { type: 'string' },
+                  },
+                },
+              },
+              {
+                name: 'invalidTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: { description: 'a param with no type' },
+                  },
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+      } as unknown as ToolRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        {} as PromptRegistry,
+        {} as WorkspaceContext,
+        false,
+      );
+      await client.connect();
+      await client.discover();
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+      expect(consoleWarnSpy).toHaveBeenCalledOnce();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
+          `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
+      );
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should handle errors when discovering prompts', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
+        request: vi.fn().mockRejectedValue(new Error('Test error')),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () => Promise.resolve({ functionDeclarations: [] }),
+      } as unknown as GenAiLib.CallableTool);
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        {} as ToolRegistry,
+        {} as PromptRegistry,
+        {} as WorkspaceContext,
+        false,
+      );
+      await client.connect();
+      await expect(client.discover()).rejects.toThrow(
+        'No prompts or tools found on the server.',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        `Error discovering prompts from test-server: Test error`,
+      );
+      consoleErrorSpy.mockRestore();
+    });
   });
   describe('appendMcpServerCommand', () => {
     it('should do nothing if no MCP servers or command are configured', () => {
