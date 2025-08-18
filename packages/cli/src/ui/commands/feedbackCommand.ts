@@ -94,7 +94,6 @@ function getUserId(services: CommandContext['services']): string | undefined {
 
   // getInstallationId() returns undefined on error.
   if (!installationId) {
-    services.logger.logMessage('debug', 'Invalid or missing installation ID, not sending user identifier.');
     return undefined;
   }
   return installationId;
