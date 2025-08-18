@@ -1005,7 +1005,7 @@ describe('mcpCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         {
           type: 'info',
-          text: 'Restarting MCP servers and refreshing tools...',
+          text: 'Restarting MCP servers...',
         },
         expect.any(Number),
       );
