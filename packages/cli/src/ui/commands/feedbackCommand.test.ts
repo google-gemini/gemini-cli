@@ -16,6 +16,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     logResearchFeedback: vi.fn(),
+    getInstallationId: vi.fn().mockReturnValue('mock-installation-id'),
   };
 });
 
