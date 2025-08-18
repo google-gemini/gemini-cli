@@ -115,6 +115,56 @@ export async function saveClipboardImage(
 }
 
 /**
+ * Captures a screenshot and saves it to a temporary file (macOS only for now)
+ * @param targetDir The target directory to create temp files within
+ * @returns The path to the saved screenshot file, or null if cancelled or error
+ */
+export async function captureScreenshot(
+  targetDir?: string,
+): Promise<string | null> {
+  if (process.platform !== 'darwin') {
+    return null;
+  }
+
+  try {
+    // Create a temporary directory for screenshots within the target directory
+    // This avoids security restrictions on paths outside the target directory
+    const baseDir = targetDir || process.cwd();
+    const tempDir = path.join(baseDir, '.gemini-clipboard');
+    await fs.mkdir(tempDir, { recursive: true });
+
+    // Generate a unique filename with timestamp
+    const timestamp = new Date().getTime();
+    const screenshotPath = path.join(tempDir, `screenshot-${timestamp}.png`);
+
+    // Use screencapture with interactive mode for user selection
+    await execAsync(`screencapture -i "${screenshotPath}"`);
+    
+    // Verify the file was created and has content
+    try {
+      const stats = await fs.stat(screenshotPath);
+      if (stats.size > 0) {
+        return screenshotPath;
+      }
+    } catch {
+      // File doesn't exist, user likely cancelled
+    }
+
+    // Clean up empty file if it exists
+    try {
+      await fs.unlink(screenshotPath);
+    } catch {
+      // Ignore cleanup errors
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error capturing screenshot:', error);
+    return null;
+  }
+}
+
+/**
  * Cleans up old temporary clipboard image files
  * Removes files older than 1 hour
  * @param targetDir The target directory where temp files are stored
