@@ -771,9 +771,10 @@ export class ClearcutLogger {
 
     // Add feedback_content if available
     if (event.feedback_content) {
+      const MAX_FEEDBACK_LENGTH = 4096; // A reasonable limit for feedback length.
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT,
-        value: event.feedback_content,
+        value: event.feedback_content.substring(0, MAX_FEEDBACK_LENGTH),
       });
     }
 
