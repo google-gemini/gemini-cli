@@ -5,7 +5,12 @@
  */
 
 import { CommandKind, SlashCommand, MessageActionReturn, CommandContext } from './types.js';
-import { ResearchFeedbackEvent, logResearchFeedback } from '@google/gemini-cli-core';
+import { 
+  ResearchFeedbackEvent, 
+  logResearchFeedback, 
+  getCachedGoogleAccount, 
+  getInstallationId 
+} from '@google/gemini-cli-core';
 
 export const feedbackCommand: SlashCommand = {
   name: 'feedback',
@@ -78,17 +83,19 @@ Your feedback has been recorded and will help improve Gemini CLI. ${
 };
 
 // Helper function to get user ID from various auth sources
-function getUserId(services: CommandContext['services']): string | undefined {
-  // Try to get user ID from authentication context
-  // This is a simplified implementation - in reality we'd check various auth sources
-  const config = services.config;
-  if (!config) return undefined;
-
+function getUserId(_services: CommandContext['services']): string | undefined {
+  // Follow the same pattern as ClearCut logger for consistent user identification
+  // First try to get the cached Google account email
+  const googleAccount = getCachedGoogleAccount();
+  if (googleAccount) {
+    return googleAccount;
+  }
+  
+  // Fall back to installation ID as a stable but privacy-preserving identifier
   try {
-    // This would depend on the actual auth implementation
-    // For now, we'll return undefined and let telemetry handle it
-    return undefined;
-  } catch {
+    return getInstallationId();
+  } catch (error) {
+    console.debug('Error getting installation ID for user identification:', error);
     return undefined;
   }
 }
