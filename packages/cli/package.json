@@ -32,6 +32,7 @@
     "@google/genai": "1.13.0",
     "@iarna/toml": "^2.2.5",
     "@modelcontextprotocol/sdk": "^1.15.1",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.203.0",
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
@@ -46,6 +47,7 @@
     "ink-spinner": "^5.0.0",
     "lowlight": "^3.3.0",
     "mime-types": "^3.0.1",
+    "mnemonist": "^0.40.3",
     "open": "^10.1.2",
     "react": "^19.1.0",
     "read-package-up": "^11.0.0",
@@ -60,6 +62,7 @@
   },
   "devDependencies": {
     "@babel/runtime": "^7.27.6",
+    "@google/gemini-cli-test-utils": "file:../test-utils",
     "@testing-library/react": "^16.3.0",
     "@types/command-exists": "^1.2.3",
     "@types/diff": "^7.0.2",
@@ -75,8 +78,7 @@
     "pretty-format": "^30.0.2",
     "react-dom": "^19.1.0",
     "typescript": "^5.3.3",
-    "vitest": "^3.1.1",
-    "@google/gemini-cli-test-utils": "file:../test-utils"
+    "vitest": "^3.1.1"
   },
   "engines": {
     "node": ">=20"
