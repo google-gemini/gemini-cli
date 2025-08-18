@@ -172,7 +172,11 @@ function entrypoint(workdir: string, stdinData?: string): string[] {
       (arg) => arg === '--prompt' || arg === '-p',
     );
     if (promptIndex > -1 && cliArgs.length > promptIndex + 1) {
+      // If there's a prompt argument, prepend stdin to it
       cliArgs[promptIndex + 1] = `${stdinData}\n\n${cliArgs[promptIndex + 1]}`;
+    } else {
+      // If there's no prompt argument, add stdin as the prompt
+      cliArgs.push('--prompt', stdinData);
     }
   }
   const quotedCliArgs = cliArgs.map((arg) => quote([arg]));
@@ -278,8 +282,12 @@ export async function start_sandbox(
           (arg) => arg === '--prompt' || arg === '-p',
         );
         if (promptIndex > -1 && finalArgv.length > promptIndex + 1) {
+          // If there's a prompt argument, prepend stdin to it
           finalArgv[promptIndex + 1] =
             `${stdinData}\n\n${finalArgv[promptIndex + 1]}`;
+        } else {
+          // If there's no prompt argument, add stdin as the prompt
+          finalArgv.push('--prompt', stdinData);
         }
       }
 
