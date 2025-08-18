@@ -221,8 +221,8 @@ export class TestRig {
     // Handle stdin if provided
     if (execOptions.input) {
       child.stdin!.write(execOptions.input);
-      child.stdin!.end();
     }
+    child.stdin!.end();
 
     child.stdout!.on('data', (data: Buffer) => {
       stdout += data;
