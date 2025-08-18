@@ -293,18 +293,8 @@ class ShellToolInvocation extends BaseToolInvocation<
   }
 }
 
-export class ShellTool extends BaseDeclarativeTool<
-  ShellToolParams,
-  ToolResult
-> {
-  static Name: string = 'run_shell_command';
-  private allowlist: Set<string> = new Set();
-
-  constructor(private readonly config: Config) {
-    super(
-      ShellTool.Name,
-      'Shell',
-      `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
+function getShellToolDescription(): string {
+  const returnedInfo = `
 
       The following information is returned:
 
@@ -316,14 +306,42 @@ export class ShellTool extends BaseDeclarativeTool<
       Exit Code: Exit code or \`(none)\` if terminated by signal.
       Signal: Signal number or \`(none)\` if no signal was received.
       Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\``,
+      Process Group PGID: Process group started or \`(none)\``;
+
+  if (os.platform() === 'win32') {
+    return `This tool executes a given shell command as \`cmd.exe /c <command>\`. Command can start background processes using \`start /b\`.${returnedInfo}`;
+  } else {
+    return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
+  }
+}
+
+function getCommandDescription(): string {
+  if (os.platform() === 'win32') {
+    return 'Exact command to execute as `cmd.exe /c <command>`';
+  } else {
+    return 'Exact bash command to execute as `bash -c <command>`';
+  }
+}
+
+export class ShellTool extends BaseDeclarativeTool<
+  ShellToolParams,
+  ToolResult
+> {
+  static Name: string = 'run_shell_command';
+  private allowlist: Set<string> = new Set();
+
+  constructor(private readonly config: Config) {
+    super(
+      ShellTool.Name,
+      'Shell',
+      getShellToolDescription(),
       Kind.Execute,
       {
         type: 'object',
         properties: {
           command: {
             type: 'string',
-            description: 'Exact bash command to execute as `bash -c <command>`',
+            description: getCommandDescription(),
           },
           description: {
             type: 'string',
