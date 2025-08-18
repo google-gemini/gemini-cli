@@ -62,7 +62,7 @@ Your feedback helps make Gemini CLI better for everyone!`,
     );
     
     // Log the telemetry event
-    if (services.config?.getTelemetryEnabled()) {
+    if (services.config && services.config.getTelemetryEnabled()) {
       logResearchFeedback(services.config, feedbackEvent);
     }
 
