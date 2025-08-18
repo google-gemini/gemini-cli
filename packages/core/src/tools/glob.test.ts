@@ -150,6 +150,34 @@ describe('GlobTool', () => {
       expect(result.returnDisplay).toBe('No files found');
     });
 
+    it('should find files with special characters in the name', async () => {
+      await fs.writeFile(path.join(tempRootDir, 'file[1].txt'), 'content');
+      const params: GlobToolParams = { pattern: 'file[1].txt' };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain('Found 1 file(s)');
+      expect(result.llmContent).toContain(
+        path.join(tempRootDir, 'file[1].txt'),
+      );
+    });
+
+    it('should find files with special characters like [] and () in the path', async () => {
+      const filePath = path.join(
+        tempRootDir,
+        'src/app/[test]/(dashboard)/testing/components/code.tsx',
+      );
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
+      await fs.writeFile(filePath, 'content');
+
+      const params: GlobToolParams = {
+        pattern: 'src/app/[test]/(dashboard)/testing/components/code.tsx',
+      };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain('Found 1 file(s)');
+      expect(result.llmContent).toContain(filePath);
+    });
+
     it('should correctly sort files by modification time (newest first)', async () => {
       const params: GlobToolParams = { pattern: '*.sortme' };
       const invocation = globTool.build(params);

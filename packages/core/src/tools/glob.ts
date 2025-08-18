@@ -6,7 +6,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { glob } from 'glob';
+import { glob, escape } from 'glob';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import {
   BaseDeclarativeTool,
@@ -137,7 +137,13 @@ class GlobToolInvocation extends BaseToolInvocation<
       let allEntries: GlobPath[] = [];
 
       for (const searchDir of searchDirectories) {
-        const entries = (await glob(this.params.pattern, {
+        let pattern = this.params.pattern;
+        const fullPath = path.join(searchDir, pattern);
+        if (fs.existsSync(fullPath)) {
+          pattern = escape(pattern);
+        }
+
+        const entries = (await glob(pattern, {
           cwd: searchDir,
           withFileTypes: true,
           nodir: true,
