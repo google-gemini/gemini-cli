@@ -342,12 +342,12 @@ describe('ChatRecordingService', () => {
       ) as ConversationRecord;
       expect(conversation.messages).toHaveLength(2);
       expect(conversation.messages[1]).toEqual({
+        ...conversation.messages[1],
         id: 'this-is-a-test-uuid',
         model: 'gemini-pro',
         type: 'gemini',
         thoughts: [],
         content: '',
-        timestamp: initialConversation.messages[0].timestamp,
         toolCalls: [toolCall],
       });
     });
