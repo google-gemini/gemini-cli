@@ -338,7 +338,6 @@ export class Config {
     }
 
     logCliConfiguration(this, new StartSessionEvent(this));
-
   }
 
   /**
