@@ -257,7 +257,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Detect focus event that might start a drag operation (only if NOT a paste)
-      if (key.sequence === '\u001b[I' && !key.paste && !shellModeActive) {
+      if (
+        (key.sequence === '\u001b[I' || key.sequence === "'") &&
+        !key.paste &&
+        !shellModeActive
+      ) {
         setIsDragCollecting(true);
         isDragCollectingRef.current = true;
         setDragBuffer('');
@@ -321,7 +325,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       /// We want to handle paste even when not focused to support drag and drop.
-      if (!focus && !key.paste) {
+      /// Also allow drag character collection when not focused.
+      if (!focus && !key.paste && !isDragCollectingRef.current) {
         return;
       }
 
