@@ -8,6 +8,7 @@ import { ToolConfirmationOutcome } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
 import React from 'react';
 import { Colors } from '../colors.js';
+import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
 import {
   RadioButtonSelect,
   RadioSelectItem,
@@ -86,7 +87,7 @@ export const ShellConfirmationDialog: React.FC<
         >
           {commands.map((cmd) => (
             <Text key={cmd} color={Colors.AccentCyan}>
-              {cmd}
+              <RenderInline text={cmd} />
             </Text>
           ))}
         </Box>

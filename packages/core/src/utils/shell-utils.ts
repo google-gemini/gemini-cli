@@ -5,6 +5,102 @@
  */
 
 import { Config } from '../config/config.js';
+import os from 'os';
+import { quote } from 'shell-quote';
+
+/**
+ * An identifier for the shell type.
+ */
+export type ShellType = 'cmd' | 'powershell' | 'bash';
+
+/**
+ * Defines the configuration required to execute a command string within a specific shell.
+ */
+export interface ShellConfiguration {
+  /** The path or name of the shell executable (e.g., 'bash', 'cmd.exe'). */
+  executable: string;
+  /**
+   * The arguments required by the shell to execute a subsequent string argument.
+   */
+  argsPrefix: string[];
+  /** An identifier for the shell type. */
+  shell: ShellType;
+}
+
+/**
+ * Determines the appropriate shell configuration for the current platform.
+ *
+ * This ensures we can execute command strings predictably and securely across platforms
+ * using the `spawn(executable, [...argsPrefix, commandString], { shell: false })` pattern.
+ *
+ * @returns The ShellConfiguration for the current environment.
+ */
+export function getShellConfiguration(): ShellConfiguration {
+  if (isWindows()) {
+    const comSpec = process.env['ComSpec'] || 'cmd.exe';
+    const executable = comSpec.toLowerCase();
+
+    if (
+      executable.endsWith('powershell.exe') ||
+      executable.endsWith('pwsh.exe')
+    ) {
+      // For PowerShell, the arguments are different.
+      // -NoProfile: Speeds up startup.
+      // -Command: Executes the following command.
+      return {
+        executable: comSpec,
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
+    }
+
+    // Default to cmd.exe for anything else on Windows.
+    // Flags for CMD:
+    // /d: Skip execution of AutoRun commands.
+    // /s: Modifies the treatment of the command string (important for quoting).
+    // /c: Carries out the command specified by the string and then terminates.
+    return {
+      executable: comSpec,
+      argsPrefix: ['/d', '/s', '/c'],
+      shell: 'cmd',
+    };
+  }
+
+  // Unix-like systems (Linux, macOS)
+  return { executable: 'bash', argsPrefix: ['-c'], shell: 'bash' };
+}
+
+/**
+ * Export the platform detection constant for use in process management (e.g., killing processes).
+ */
+export const isWindows = () => os.platform() === 'win32';
+
+/**
+ * Escapes a string so that it can be safely used as a single argument
+ * in a shell command, preventing command injection.
+ *
+ * @param arg The argument string to escape.
+ * @param shell The type of shell the argument is for.
+ * @returns The shell-escaped string.
+ */
+export function escapeShellArg(arg: string, shell: ShellType): string {
+  if (!arg) {
+    return '';
+  }
+
+  switch (shell) {
+    case 'powershell':
+      // For PowerShell, wrap in single quotes and escape internal single quotes by doubling them.
+      return `'${arg.replace(/'/g, "''")}'`;
+    case 'cmd':
+      // Simple Windows escaping for cmd.exe: wrap in double quotes and escape inner double quotes.
+      return `"${arg.replace(/"/g, '""')}"`;
+    case 'bash':
+    default:
+      // POSIX shell escaping using shell-quote.
+      return quote([arg]);
+  }
+}
 
 /**
  * Splits a shell command into a list of individual commands, respecting quotes.
@@ -301,7 +397,9 @@ export function checkCommandPermissions(
       return {
         allAllowed: false,
         disallowedCommands,
-        blockReason: `Command(s) not on the global or session allowlist.`,
+        blockReason: `Command(s) not on the global or session allowlist. Disallowed commands: ${disallowedCommands
+          .map((c) => JSON.stringify(c))
+          .join(', ')}`,
         isHardDenial: false, // This is a soft denial; confirmation is possible.
       };
     }
@@ -322,7 +420,7 @@ export function checkCommandPermissions(
         return {
           allAllowed: false,
           disallowedCommands,
-          blockReason: `Command(s) not in the allowed commands list.`,
+          blockReason: `Command(s) not in the allowed commands list. Disallowed commands: ${disallowedCommands.map((c) => JSON.stringify(c)).join(', ')}`,
           isHardDenial: false, // This is a soft denial.
         };
       }
