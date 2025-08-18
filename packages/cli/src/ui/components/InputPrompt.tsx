@@ -261,37 +261,42 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Collect characters in drag mode
-      if (isDragModeRef.current && key.sequence && key.sequence.length === 1) {
-        setDragBuffer((prevBuffer) => {
-          const newDragBuffer = prevBuffer + key.sequence;
+      if (isDragModeRef.current) {
+        // Collect characters in drag mode
+        if (key.sequence && key.sequence.length === 1) {
+          setDragBuffer((prevBuffer) => {
+            const newDragBuffer = prevBuffer + key.sequence;
 
-          // Reset timeout for each new character
+            // Reset timeout for each new character
+            if (dragTimeoutRef.current) {
+              clearTimeout(dragTimeoutRef.current);
+            }
+            dragTimeoutRef.current = setTimeout(() => {
+              // Process complete path when character collection is done
+              if (newDragBuffer.trim()) {
+                buffer.insert(newDragBuffer.trim(), { paste: true });
+              }
+              setIsDragMode(false);
+              isDragModeRef.current = false;
+              setDragBuffer('');
+            }, 100);
+
+            return newDragBuffer;
+          });
+        } else {
           if (dragTimeoutRef.current) {
             clearTimeout(dragTimeoutRef.current);
+            dragTimeoutRef.current = null;
           }
-          dragTimeoutRef.current = setTimeout(() => {
-            // Process complete path when character collection is done
-            if (newDragBuffer.trim()) {
-              buffer.insert(newDragBuffer.trim(), { paste: true });
-            }
-            setIsDragMode(false);
-            isDragModeRef.current = false;
-            setDragBuffer('');
-          }, 100);
-
-          return newDragBuffer;
-        });
-
+          setIsDragMode(false);
+          isDragModeRef.current = false;
+          setDragBuffer('');
+        }
         return;
       }
 
-      const isDragDrop = key.paste;
-      const isFocusEvent = key.sequence === '\u001b[I';
-
       /// We want to handle paste even when not focused to support drag and drop.
-      /// Also handle focus events which indicate drag & drop operations.
-      if (!focus && !key.paste && !isDragDrop && !isFocusEvent) {
+      if (!focus && !key.paste) {
         return;
       }
 
