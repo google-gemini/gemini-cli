@@ -6,12 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UiTelemetryService } from './uiTelemetry.js';
-import {
-  ApiErrorEvent,
-  ApiResponseEvent,
-  ToolCallEvent,
-  ToolCallDecision,
-} from './types.js';
+import { ToolCallDecision } from './tool-call-decision.js';
+import { ApiErrorEvent, ApiResponseEvent, ToolCallEvent } from './types.js';
 import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
@@ -22,7 +18,9 @@ import {
   ErroredToolCall,
   SuccessfulToolCall,
 } from '../core/coreToolScheduler.js';
-import { Tool, ToolConfirmationOutcome } from '../tools/tools.js';
+import { ToolErrorType } from '../tools/tool-error.js';
+import { ToolConfirmationOutcome } from '../tools/tools.js';
+import { MockTool } from '../test-utils/tools.js';
 
 const createFakeCompletedToolCall = (
   name: string,
@@ -38,12 +36,14 @@ const createFakeCompletedToolCall = (
     isClientInitiated: false,
     prompt_id: 'prompt-id-1',
   };
+  const tool = new MockTool(name);
 
   if (success) {
     return {
       status: 'success',
       request,
-      tool: { name } as Tool, // Mock tool
+      tool,
+      invocation: tool.build({}),
       response: {
         callId: request.callId,
         responseParts: {
@@ -54,6 +54,7 @@ const createFakeCompletedToolCall = (
           },
         },
         error: undefined,
+        errorType: undefined,
         resultDisplay: 'Success!',
       },
       durationMs: duration,
@@ -63,6 +64,7 @@ const createFakeCompletedToolCall = (
     return {
       status: 'error',
       request,
+      tool,
       response: {
         callId: request.callId,
         responseParts: {
@@ -73,6 +75,7 @@ const createFakeCompletedToolCall = (
           },
         },
         error: error || new Error('Tool failed'),
+        errorType: ToolErrorType.UNKNOWN,
         resultDisplay: 'Failure!',
       },
       durationMs: duration,
@@ -101,6 +104,7 @@ describe('UiTelemetryService', () => {
           [ToolCallDecision.ACCEPT]: 0,
           [ToolCallDecision.REJECT]: 0,
           [ToolCallDecision.MODIFY]: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
         },
         byName: {},
       },
@@ -359,6 +363,7 @@ describe('UiTelemetryService', () => {
           [ToolCallDecision.ACCEPT]: 1,
           [ToolCallDecision.REJECT]: 0,
           [ToolCallDecision.MODIFY]: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
         },
       });
     });
@@ -392,6 +397,7 @@ describe('UiTelemetryService', () => {
           [ToolCallDecision.ACCEPT]: 0,
           [ToolCallDecision.REJECT]: 1,
           [ToolCallDecision.MODIFY]: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
         },
       });
     });
@@ -431,11 +437,13 @@ describe('UiTelemetryService', () => {
         [ToolCallDecision.ACCEPT]: 0,
         [ToolCallDecision.REJECT]: 0,
         [ToolCallDecision.MODIFY]: 0,
+        [ToolCallDecision.AUTO_ACCEPT]: 0,
       });
       expect(tools.byName['test_tool'].decisions).toEqual({
         [ToolCallDecision.ACCEPT]: 0,
         [ToolCallDecision.REJECT]: 0,
         [ToolCallDecision.MODIFY]: 0,
+        [ToolCallDecision.AUTO_ACCEPT]: 0,
       });
     });
 
@@ -480,6 +488,7 @@ describe('UiTelemetryService', () => {
           [ToolCallDecision.ACCEPT]: 1,
           [ToolCallDecision.REJECT]: 1,
           [ToolCallDecision.MODIFY]: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
         },
       });
     });
@@ -506,6 +515,118 @@ describe('UiTelemetryService', () => {
       expect(tools.byName['tool_B']).toBeDefined();
       expect(tools.byName['tool_A'].count).toBe(1);
       expect(tools.byName['tool_B'].count).toBe(1);
+    });
+  });
+
+  describe('resetLastPromptTokenCount', () => {
+    it('should reset the last prompt token count to 0', () => {
+      // First, set up some initial token count
+      const event = {
+        'event.name': EVENT_API_RESPONSE,
+        model: 'gemini-2.5-pro',
+        duration_ms: 500,
+        input_token_count: 100,
+        output_token_count: 200,
+        total_token_count: 300,
+        cached_content_token_count: 50,
+        thoughts_token_count: 20,
+        tool_token_count: 30,
+      } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
+
+      service.addEvent(event);
+      expect(service.getLastPromptTokenCount()).toBe(100);
+
+      // Now reset the token count
+      service.resetLastPromptTokenCount();
+      expect(service.getLastPromptTokenCount()).toBe(0);
+    });
+
+    it('should emit an update event when resetLastPromptTokenCount is called', () => {
+      const spy = vi.fn();
+      service.on('update', spy);
+
+      // Set up initial token count
+      const event = {
+        'event.name': EVENT_API_RESPONSE,
+        model: 'gemini-2.5-pro',
+        duration_ms: 500,
+        input_token_count: 100,
+        output_token_count: 200,
+        total_token_count: 300,
+        cached_content_token_count: 50,
+        thoughts_token_count: 20,
+        tool_token_count: 30,
+      } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
+
+      service.addEvent(event);
+      spy.mockClear(); // Clear the spy to focus on the reset call
+
+      service.resetLastPromptTokenCount();
+
+      expect(spy).toHaveBeenCalledOnce();
+      const { metrics, lastPromptTokenCount } = spy.mock.calls[0][0];
+      expect(metrics).toBeDefined();
+      expect(lastPromptTokenCount).toBe(0);
+    });
+
+    it('should not affect other metrics when resetLastPromptTokenCount is called', () => {
+      // Set up initial state with some metrics
+      const event = {
+        'event.name': EVENT_API_RESPONSE,
+        model: 'gemini-2.5-pro',
+        duration_ms: 500,
+        input_token_count: 100,
+        output_token_count: 200,
+        total_token_count: 300,
+        cached_content_token_count: 50,
+        thoughts_token_count: 20,
+        tool_token_count: 30,
+      } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
+
+      service.addEvent(event);
+
+      const metricsBefore = service.getMetrics();
+
+      service.resetLastPromptTokenCount();
+
+      const metricsAfter = service.getMetrics();
+
+      // Metrics should be unchanged
+      expect(metricsAfter).toEqual(metricsBefore);
+
+      // Only the last prompt token count should be reset
+      expect(service.getLastPromptTokenCount()).toBe(0);
+    });
+
+    it('should work correctly when called multiple times', () => {
+      const spy = vi.fn();
+      service.on('update', spy);
+
+      // Set up initial token count
+      const event = {
+        'event.name': EVENT_API_RESPONSE,
+        model: 'gemini-2.5-pro',
+        duration_ms: 500,
+        input_token_count: 100,
+        output_token_count: 200,
+        total_token_count: 300,
+        cached_content_token_count: 50,
+        thoughts_token_count: 20,
+        tool_token_count: 30,
+      } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
+
+      service.addEvent(event);
+      expect(service.getLastPromptTokenCount()).toBe(100);
+
+      // Reset once
+      service.resetLastPromptTokenCount();
+      expect(service.getLastPromptTokenCount()).toBe(0);
+
+      // Reset again - should still be 0 and still emit event
+      spy.mockClear();
+      service.resetLastPromptTokenCount();
+      expect(service.getLastPromptTokenCount()).toBe(0);
+      expect(spy).toHaveBeenCalledOnce();
     });
   });
 });

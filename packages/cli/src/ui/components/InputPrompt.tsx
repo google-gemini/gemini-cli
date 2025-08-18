@@ -4,19 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import { TextBuffer } from './shared/text-buffer.js';
+import { TextBuffer, logicalPosToOffset } from './shared/text-buffer.js';
 import { cpSlice, cpLen } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
-import { useCompletion } from '../hooks/useCompletion.js';
+import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
+import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
-import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
 import {
@@ -32,7 +33,7 @@ export interface InputPromptProps {
   userMessages: readonly string[];
   onClearScreen: () => void;
   config: Config;
-  slashCommands: SlashCommand[];
+  slashCommands: readonly SlashCommand[];
   commandContext: CommandContext;
   placeholder?: string;
   focus?: boolean;
@@ -40,6 +41,8 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  onEscapePromptChange?: (showPrompt: boolean) => void;
+  vimHandleInput?: (key: Key) => boolean;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -56,19 +59,75 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  onEscapePromptChange,
+  vimHandleInput,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
-  const completion = useCompletion(
-    buffer.text,
+  const [escPressCount, setEscPressCount] = useState(0);
+  const [showEscapePrompt, setShowEscapePrompt] = useState(false);
+  const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [dirs, setDirs] = useState<readonly string[]>(
+    config.getWorkspaceContext().getDirectories(),
+  );
+  const dirsChanged = config.getWorkspaceContext().getDirectories();
+  useEffect(() => {
+    if (dirs.length !== dirsChanged.length) {
+      setDirs(dirsChanged);
+    }
+  }, [dirs.length, dirsChanged]);
+  const [reverseSearchActive, setReverseSearchActive] = useState(false);
+  const [textBeforeReverseSearch, setTextBeforeReverseSearch] = useState('');
+  const [cursorPosition, setCursorPosition] = useState<[number, number]>([
+    0, 0,
+  ]);
+  const shellHistory = useShellHistory(config.getProjectRoot());
+  const historyData = shellHistory.history;
+
+  const completion = useCommandCompletion(
+    buffer,
+    dirs,
     config.getTargetDir(),
-    isAtCommand(buffer.text) || isSlashCommand(buffer.text),
     slashCommands,
     commandContext,
+    reverseSearchActive,
     config,
   );
 
+  const reverseSearchCompletion = useReverseSearchCompletion(
+    buffer,
+    historyData,
+    reverseSearchActive,
+  );
   const resetCompletionState = completion.resetCompletionState;
-  const shellHistory = useShellHistory(config.getProjectRoot());
+  const resetReverseSearchCompletionState =
+    reverseSearchCompletion.resetCompletionState;
+
+  const resetEscapeState = useCallback(() => {
+    if (escapeTimerRef.current) {
+      clearTimeout(escapeTimerRef.current);
+      escapeTimerRef.current = null;
+    }
+    setEscPressCount(0);
+    setShowEscapePrompt(false);
+  }, []);
+
+  // Notify parent component about escape prompt state changes
+  useEffect(() => {
+    if (onEscapePromptChange) {
+      onEscapePromptChange(showEscapePrompt);
+    }
+  }, [showEscapePrompt, onEscapePromptChange]);
+
+  // Clear escape prompt timer on unmount
+  useEffect(
+    () => () => {
+      if (escapeTimerRef.current) {
+        clearTimeout(escapeTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
@@ -80,8 +139,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       buffer.setText('');
       onSubmit(submittedValue);
       resetCompletionState();
+      resetReverseSearchCompletionState();
     },
-    [onSubmit, buffer, resetCompletionState, shellModeActive, shellHistory],
+    [
+      onSubmit,
+      buffer,
+      resetCompletionState,
+      shellModeActive,
+      shellHistory,
+      resetReverseSearchCompletionState,
+    ],
   );
 
   const customSetTextAndResetCompletionSignal = useCallback(
@@ -95,7 +162,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const inputHistory = useInputHistory({
     userMessages,
     onSubmit: handleSubmitAndClear,
-    isActive: !completion.showSuggestions && !shellModeActive,
+    isActive:
+      (!completion.showSuggestions || completion.suggestions.length === 1) &&
+      !shellModeActive,
     currentQuery: buffer.text,
     onChange: customSetTextAndResetCompletionSignal,
   });
@@ -104,6 +173,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   useEffect(() => {
     if (justNavigatedHistory) {
       resetCompletionState();
+      resetReverseSearchCompletionState();
       setJustNavigatedHistory(false);
     }
   }, [
@@ -111,77 +181,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     buffer.text,
     resetCompletionState,
     setJustNavigatedHistory,
+    resetReverseSearchCompletionState,
   ]);
-
-  const completionSuggestions = completion.suggestions;
-  const handleAutocomplete = useCallback(
-    (indexToUse: number) => {
-      if (indexToUse < 0 || indexToUse >= completionSuggestions.length) {
-        return;
-      }
-      const query = buffer.text;
-      const suggestion = completionSuggestions[indexToUse].value;
-
-      if (query.trimStart().startsWith('/')) {
-        const hasTrailingSpace = query.endsWith(' ');
-        const parts = query
-          .trimStart()
-          .substring(1)
-          .split(/\s+/)
-          .filter(Boolean);
-
-        let isParentPath = false;
-        // If there's no trailing space, we need to check if the current query
-        // is already a complete path to a parent command.
-        if (!hasTrailingSpace) {
-          let currentLevel: SlashCommand[] | undefined = slashCommands;
-          for (let i = 0; i < parts.length; i++) {
-            const part = parts[i];
-            const found: SlashCommand | undefined = currentLevel?.find(
-              (cmd) => cmd.name === part || cmd.altName === part,
-            );
-
-            if (found) {
-              if (i === parts.length - 1 && found.subCommands) {
-                isParentPath = true;
-              }
-              currentLevel = found.subCommands;
-            } else {
-              // Path is invalid, so it can't be a parent path.
-              currentLevel = undefined;
-              break;
-            }
-          }
-        }
-
-        // Determine the base path of the command.
-        // - If there's a trailing space, the whole command is the base.
-        // - If it's a known parent path, the whole command is the base.
-        // - Otherwise, the base is everything EXCEPT the last partial part.
-        const basePath =
-          hasTrailingSpace || isParentPath ? parts : parts.slice(0, -1);
-        const newValue = `/${[...basePath, suggestion].join(' ')} `;
-
-        buffer.setText(newValue);
-      } else {
-        const atIndex = query.lastIndexOf('@');
-        if (atIndex === -1) return;
-        const pathPart = query.substring(atIndex + 1);
-        const lastSlashIndexInPath = pathPart.lastIndexOf('/');
-        let autoCompleteStartIndex = atIndex + 1;
-        if (lastSlashIndexInPath !== -1) {
-          autoCompleteStartIndex += lastSlashIndexInPath + 1;
-        }
-        buffer.replaceRangeByOffset(
-          autoCompleteStartIndex,
-          buffer.text.length,
-          suggestion,
-        );
-      }
-      resetCompletionState();
-    },
-    [resetCompletionState, buffer, completionSuggestions, slashCommands],
-  );
 
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
@@ -233,8 +234,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
-      if (!focus) {
+      /// We want to handle paste even when not focused to support drag and drop.
+      if (!focus && !key.paste) {
         return;
+      }
+
+      if (vimHandleInput && vimHandleInput(key)) {
+        return;
+      }
+
+      // Reset ESC count and hide prompt on any non-ESC key
+      if (key.name !== 'escape') {
+        if (escPressCount > 0 || showEscapePrompt) {
+          resetEscapeState();
+        }
       }
 
       if (
@@ -247,152 +260,246 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      if (key.name === 'escape') {
+      if (keyMatchers[Command.ESCAPE](key)) {
+        if (reverseSearchActive) {
+          setReverseSearchActive(false);
+          reverseSearchCompletion.resetCompletionState();
+          buffer.setText(textBeforeReverseSearch);
+          const offset = logicalPosToOffset(
+            buffer.lines,
+            cursorPosition[0],
+            cursorPosition[1],
+          );
+          buffer.moveToOffset(offset);
+          return;
+        }
         if (shellModeActive) {
           setShellModeActive(false);
+          resetEscapeState();
           return;
         }
 
         if (completion.showSuggestions) {
           completion.resetCompletionState();
+          resetEscapeState();
           return;
         }
+
+        // Handle double ESC for clearing input
+        if (escPressCount === 0) {
+          if (buffer.text === '') {
+            return;
+          }
+          setEscPressCount(1);
+          setShowEscapePrompt(true);
+          if (escapeTimerRef.current) {
+            clearTimeout(escapeTimerRef.current);
+          }
+          escapeTimerRef.current = setTimeout(() => {
+            resetEscapeState();
+          }, 500);
+        } else {
+          // clear input and immediately reset state
+          buffer.setText('');
+          resetCompletionState();
+          resetEscapeState();
+        }
+        return;
       }
 
-      if (key.ctrl && key.name === 'l') {
+      if (shellModeActive && keyMatchers[Command.REVERSE_SEARCH](key)) {
+        setReverseSearchActive(true);
+        setTextBeforeReverseSearch(buffer.text);
+        setCursorPosition(buffer.cursor);
+        return;
+      }
+
+      if (keyMatchers[Command.CLEAR_SCREEN](key)) {
         onClearScreen();
         return;
       }
 
-      if (completion.showSuggestions) {
-        if (key.name === 'up') {
-          completion.navigateUp();
-          return;
+      if (reverseSearchActive) {
+        const {
+          activeSuggestionIndex,
+          navigateUp,
+          navigateDown,
+          showSuggestions,
+          suggestions,
+        } = reverseSearchCompletion;
+
+        if (showSuggestions) {
+          if (keyMatchers[Command.NAVIGATION_UP](key)) {
+            navigateUp();
+            return;
+          }
+          if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
+            navigateDown();
+            return;
+          }
+          if (keyMatchers[Command.ACCEPT_SUGGESTION_REVERSE_SEARCH](key)) {
+            reverseSearchCompletion.handleAutocomplete(activeSuggestionIndex);
+            reverseSearchCompletion.resetCompletionState();
+            setReverseSearchActive(false);
+            return;
+          }
         }
-        if (key.name === 'down') {
-          completion.navigateDown();
+
+        if (keyMatchers[Command.SUBMIT_REVERSE_SEARCH](key)) {
+          const textToSubmit =
+            showSuggestions && activeSuggestionIndex > -1
+              ? suggestions[activeSuggestionIndex].value
+              : buffer.text;
+          handleSubmitAndClear(textToSubmit);
+          reverseSearchCompletion.resetCompletionState();
+          setReverseSearchActive(false);
           return;
         }
 
-        if (key.name === 'tab' || (key.name === 'return' && !key.ctrl)) {
+        // Prevent up/down from falling through to regular history navigation
+        if (
+          keyMatchers[Command.NAVIGATION_UP](key) ||
+          keyMatchers[Command.NAVIGATION_DOWN](key)
+        ) {
+          return;
+        }
+      }
+
+      // If the command is a perfect match, pressing enter should execute it.
+      if (completion.isPerfectMatch && keyMatchers[Command.RETURN](key)) {
+        handleSubmitAndClear(buffer.text);
+        return;
+      }
+
+      if (completion.showSuggestions) {
+        if (completion.suggestions.length > 1) {
+          if (keyMatchers[Command.COMPLETION_UP](key)) {
+            completion.navigateUp();
+            return;
+          }
+          if (keyMatchers[Command.COMPLETION_DOWN](key)) {
+            completion.navigateDown();
+            return;
+          }
+        }
+
+        if (keyMatchers[Command.ACCEPT_SUGGESTION](key)) {
           if (completion.suggestions.length > 0) {
             const targetIndex =
               completion.activeSuggestionIndex === -1
                 ? 0 // Default to the first if none is active
                 : completion.activeSuggestionIndex;
             if (targetIndex < completion.suggestions.length) {
-              handleAutocomplete(targetIndex);
-            }
-          }
-          return;
-        }
-      } else {
-        if (!shellModeActive) {
-          if (key.ctrl && key.name === 'p') {
-            inputHistory.navigateUp();
-            return;
-          }
-          if (key.ctrl && key.name === 'n') {
-            inputHistory.navigateDown();
-            return;
-          }
-          // Handle arrow-up/down for history on single-line or at edges
-          if (
-            key.name === 'up' &&
-            (buffer.allVisualLines.length === 1 ||
-              (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
-          ) {
-            inputHistory.navigateUp();
-            return;
-          }
-          if (
-            key.name === 'down' &&
-            (buffer.allVisualLines.length === 1 ||
-              buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
-          ) {
-            inputHistory.navigateDown();
-            return;
-          }
-        } else {
-          // Shell History Navigation
-          if (key.name === 'up') {
-            const prevCommand = shellHistory.getPreviousCommand();
-            if (prevCommand !== null) buffer.setText(prevCommand);
-            return;
-          }
-          if (key.name === 'down') {
-            const nextCommand = shellHistory.getNextCommand();
-            if (nextCommand !== null) buffer.setText(nextCommand);
-            return;
-          }
-        }
-
-        if (key.name === 'return' && !key.ctrl && !key.meta && !key.paste) {
-          if (buffer.text.trim()) {
-            const [row, col] = buffer.cursor;
-            const line = buffer.lines[row];
-            const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
-            if (charBefore === '\\') {
-              buffer.backspace();
-              buffer.newline();
-            } else {
-              handleSubmitAndClear(buffer.text);
+              completion.handleAutocomplete(targetIndex);
             }
           }
           return;
         }
       }
 
+      if (!shellModeActive) {
+        if (keyMatchers[Command.HISTORY_UP](key)) {
+          inputHistory.navigateUp();
+          return;
+        }
+        if (keyMatchers[Command.HISTORY_DOWN](key)) {
+          inputHistory.navigateDown();
+          return;
+        }
+        // Handle arrow-up/down for history on single-line or at edges
+        if (
+          keyMatchers[Command.NAVIGATION_UP](key) &&
+          (buffer.allVisualLines.length === 1 ||
+            (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
+        ) {
+          inputHistory.navigateUp();
+          return;
+        }
+        if (
+          keyMatchers[Command.NAVIGATION_DOWN](key) &&
+          (buffer.allVisualLines.length === 1 ||
+            buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
+        ) {
+          inputHistory.navigateDown();
+          return;
+        }
+      } else {
+        // Shell History Navigation
+        if (keyMatchers[Command.NAVIGATION_UP](key)) {
+          const prevCommand = shellHistory.getPreviousCommand();
+          if (prevCommand !== null) buffer.setText(prevCommand);
+          return;
+        }
+        if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
+          const nextCommand = shellHistory.getNextCommand();
+          if (nextCommand !== null) buffer.setText(nextCommand);
+          return;
+        }
+      }
+
+      if (keyMatchers[Command.SUBMIT](key)) {
+        if (buffer.text.trim()) {
+          const [row, col] = buffer.cursor;
+          const line = buffer.lines[row];
+          const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
+          if (charBefore === '\\') {
+            buffer.backspace();
+            buffer.newline();
+          } else {
+            handleSubmitAndClear(buffer.text);
+          }
+        }
+        return;
+      }
+
       // Newline insertion
-      if (key.name === 'return' && (key.ctrl || key.meta || key.paste)) {
+      if (keyMatchers[Command.NEWLINE](key)) {
         buffer.newline();
         return;
       }
 
       // Ctrl+A (Home) / Ctrl+E (End)
-      if (key.ctrl && key.name === 'a') {
+      if (keyMatchers[Command.HOME](key)) {
         buffer.move('home');
         return;
       }
-      if (key.ctrl && key.name === 'e') {
+      if (keyMatchers[Command.END](key)) {
         buffer.move('end');
         buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
       // Ctrl+C (Clear input)
-      if (key.ctrl && key.name === 'c') {
+      if (keyMatchers[Command.CLEAR_INPUT](key)) {
         if (buffer.text.length > 0) {
           buffer.setText('');
           resetCompletionState();
-          return;
         }
         return;
       }
 
       // Kill line commands
-      if (key.ctrl && key.name === 'k') {
+      if (keyMatchers[Command.KILL_LINE_RIGHT](key)) {
         buffer.killLineRight();
         return;
       }
-      if (key.ctrl && key.name === 'u') {
+      if (keyMatchers[Command.KILL_LINE_LEFT](key)) {
         buffer.killLineLeft();
         return;
       }
 
       // External editor
-      const isCtrlX = key.ctrl && (key.name === 'x' || key.sequence === '\x18');
-      if (isCtrlX) {
+      if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
         buffer.openInExternalEditor();
         return;
       }
 
       // Ctrl+V for clipboard image paste
-      if (key.ctrl && key.name === 'v') {
+      if (keyMatchers[Command.PASTE_CLIPBOARD_IMAGE](key)) {
         handleClipboardImage();
         return;
       }
 
-      // Fallback to the text buffer's default input handling for all other keys
+      // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
     },
     [
@@ -403,15 +510,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       setShellModeActive,
       onClearScreen,
       inputHistory,
-      handleAutocomplete,
       handleSubmitAndClear,
       shellHistory,
+      reverseSearchCompletion,
       handleClipboardImage,
       resetCompletionState,
+      escPressCount,
+      showEscapePrompt,
+      resetEscapeState,
+      vimHandleInput,
+      reverseSearchActive,
+      textBeforeReverseSearch,
+      cursorPosition,
     ],
   );
 
-  useKeypress(handleInput, { isActive: focus });
+  useKeypress(handleInput, {
+    isActive: true,
+  });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
@@ -422,23 +538,33 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     <>
       <Box
         borderStyle="round"
-        borderColor={shellModeActive ? Colors.AccentYellow : Colors.AccentBlue}
+        borderColor={
+          shellModeActive ? theme.status.warning : theme.border.focused
+        }
         paddingX={1}
       >
         <Text
-          color={shellModeActive ? Colors.AccentYellow : Colors.AccentPurple}
+          color={shellModeActive ? theme.status.warning : theme.text.accent}
         >
-          {shellModeActive ? '! ' : '> '}
+          {shellModeActive ? (
+            reverseSearchActive ? (
+              <Text color={theme.text.link}>(r:) </Text>
+            ) : (
+              '! '
+            )
+          ) : (
+            '> '
+          )}
         </Text>
         <Box flexGrow={1} flexDirection="column">
           {buffer.text.length === 0 && placeholder ? (
             focus ? (
               <Text>
                 {chalk.inverse(placeholder.slice(0, 1))}
-                <Text color={Colors.Gray}>{placeholder.slice(1)}</Text>
+                <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
               </Text>
             ) : (
-              <Text color={Colors.Gray}>{placeholder}</Text>
+              <Text color={theme.text.secondary}>{placeholder}</Text>
             )
           ) : (
             linesToRender.map((lineText, visualIdxInRenderedSet) => {
@@ -449,7 +575,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 display = display + ' '.repeat(inputWidth - currentVisualWidth);
               }
 
-              if (visualIdxInRenderedSet === cursorVisualRow) {
+              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
                 const relativeVisualColForHighlight = cursorVisualColAbsolute;
 
                 if (relativeVisualColForHighlight >= 0) {
@@ -481,13 +607,25 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         </Box>
       </Box>
       {completion.showSuggestions && (
-        <Box>
+        <Box paddingRight={2}>
           <SuggestionsDisplay
             suggestions={completion.suggestions}
             activeIndex={completion.activeSuggestionIndex}
             isLoading={completion.isLoadingSuggestions}
             width={suggestionsWidth}
             scrollOffset={completion.visibleStartIndex}
+            userInput={buffer.text}
+          />
+        </Box>
+      )}
+      {reverseSearchActive && (
+        <Box paddingRight={2}>
+          <SuggestionsDisplay
+            suggestions={reverseSearchCompletion.suggestions}
+            activeIndex={reverseSearchCompletion.activeSuggestionIndex}
+            isLoading={reverseSearchCompletion.isLoadingSuggestions}
+            width={suggestionsWidth}
+            scrollOffset={reverseSearchCompletion.visibleStartIndex}
             userInput={buffer.text}
           />
         </Box>

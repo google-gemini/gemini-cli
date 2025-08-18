@@ -13,13 +13,17 @@ describe('WebFetchTool', () => {
   const mockConfig = {
     getApprovalMode: vi.fn(),
     setApprovalMode: vi.fn(),
+    getProxy: vi.fn(),
   } as unknown as Config;
 
   describe('shouldConfirmExecute', () => {
     it('should return confirmation details with the correct prompt and urls', async () => {
       const tool = new WebFetchTool(mockConfig);
       const params = { prompt: 'fetch https://example.com' };
-      const confirmationDetails = await tool.shouldConfirmExecute(params);
+      const invocation = tool.build(params);
+      const confirmationDetails = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
 
       expect(confirmationDetails).toEqual({
         type: 'info',
@@ -36,7 +40,10 @@ describe('WebFetchTool', () => {
         prompt:
           'fetch https://github.com/google/gemini-react/blob/main/README.md',
       };
-      const confirmationDetails = await tool.shouldConfirmExecute(params);
+      const invocation = tool.build(params);
+      const confirmationDetails = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
 
       expect(confirmationDetails).toEqual({
         type: 'info',
@@ -56,7 +63,10 @@ describe('WebFetchTool', () => {
         getApprovalMode: () => ApprovalMode.AUTO_EDIT,
       } as unknown as Config);
       const params = { prompt: 'fetch https://example.com' };
-      const confirmationDetails = await tool.shouldConfirmExecute(params);
+      const invocation = tool.build(params);
+      const confirmationDetails = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
 
       expect(confirmationDetails).toBe(false);
     });
@@ -68,7 +78,10 @@ describe('WebFetchTool', () => {
         setApprovalMode,
       } as unknown as Config);
       const params = { prompt: 'fetch https://example.com' };
-      const confirmationDetails = await tool.shouldConfirmExecute(params);
+      const invocation = tool.build(params);
+      const confirmationDetails = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
 
       if (
         confirmationDetails &&

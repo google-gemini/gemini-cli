@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BaseTool, ToolResult } from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  ToolInvocation,
+  ToolResult,
+} from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as path from 'path';
@@ -16,8 +22,8 @@ import {
   DEFAULT_ENCODING,
   getSpecificMimeType,
 } from '../utils/fileUtils.js';
-import { PartListUnion, Schema, Type } from '@google/genai';
-import { Config } from '../config/config.js';
+import { PartListUnion } from '@google/genai';
+import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
 import {
   recordFileOperationMetric,
   FileOperation,
@@ -62,10 +68,34 @@ export interface ReadManyFilesParams {
   useDefaultExcludes?: boolean;
 
   /**
-   * Optional. Whether to respect .gitignore patterns. Defaults to true.
+   * Whether to respect .gitignore and .geminiignore patterns (optional, defaults to true)
    */
-  respect_git_ignore?: boolean;
+  file_filtering_options?: {
+    respect_git_ignore?: boolean;
+    respect_gemini_ignore?: boolean;
+  };
 }
+
+/**
+ * Result type for file processing operations
+ */
+type FileProcessingResult =
+  | {
+      success: true;
+      filePath: string;
+      relativePathForDisplay: string;
+      fileReadResult: NonNullable<
+        Awaited<ReturnType<typeof processSingleFileContent>>
+      >;
+      reason?: undefined;
+    }
+  | {
+      success: false;
+      filePath: string;
+      relativePathForDisplay: string;
+      fileReadResult?: undefined;
+      reason: string;
+    };
 
 /**
  * Default exclusion patterns for commonly ignored directories and binary file types.
@@ -114,121 +144,50 @@ const DEFAULT_EXCLUDES: string[] = [
 
 const DEFAULT_OUTPUT_SEPARATOR_FORMAT = '--- {filePath} ---';
 
-/**
- * Tool implementation for finding and reading multiple text files from the local filesystem
- * within a specified target directory. The content is concatenated.
- * It is intended to run in an environment with access to the local file system (e.g., a Node.js backend).
- */
-export class ReadManyFilesTool extends BaseTool<
+class ReadManyFilesToolInvocation extends BaseToolInvocation<
   ReadManyFilesParams,
   ToolResult
 > {
-  static readonly Name: string = 'read_many_files';
-
-  private readonly geminiIgnorePatterns: string[] = [];
-
-  constructor(private config: Config) {
-    const parameterSchema: Schema = {
-      type: Type.OBJECT,
-      properties: {
-        paths: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.STRING,
-            minLength: '1',
-          },
-          minItems: '1',
-          description:
-            "Required. An array of glob patterns or paths relative to the tool's target directory. Examples: ['src/**/*.ts'], ['README.md', 'docs/']",
-        },
-        include: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.STRING,
-            minLength: '1',
-          },
-          description:
-            'Optional. Additional glob patterns to include. These are merged with `paths`. Example: ["*.test.ts"] to specifically add test files if they were broadly excluded.',
-          default: [],
-        },
-        exclude: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.STRING,
-            minLength: '1',
-          },
-          description:
-            'Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: ["**/*.log", "temp/"]',
-          default: [],
-        },
-        recursive: {
-          type: Type.BOOLEAN,
-          description:
-            'Optional. Whether to search recursively (primarily controlled by `**` in glob patterns). Defaults to true.',
-          default: true,
-        },
-        useDefaultExcludes: {
-          type: Type.BOOLEAN,
-          description:
-            'Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.',
-          default: true,
-        },
-        respect_git_ignore: {
-          type: Type.BOOLEAN,
-          description:
-            'Optional. Whether to respect .gitignore patterns when discovering files. Only available in git repositories. Defaults to true.',
-          default: true,
-        },
-      },
-      required: ['paths'],
-    };
-
-    super(
-      ReadManyFilesTool.Name,
-      'ReadManyFiles',
-      `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg) and PDF (.pdf) files if their file names or extensions are explicitly included in the 'paths' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded).
-
-This tool is useful when you need to understand or analyze a collection of files, such as:
-- Getting an overview of a codebase or parts of it (e.g., all TypeScript files in the 'src' directory).
-- Finding where specific functionality is implemented if the user asks broad questions about code.
-- Reviewing documentation files (e.g., all Markdown files in the 'docs' directory).
-- Gathering context from multiple configuration files.
-- When the user asks to "read all files in X directory" or "show me the content of all Y files".
-
-Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. Ensure paths are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
-      parameterSchema,
-    );
-    this.geminiIgnorePatterns = config
-      .getFileService()
-      .getGeminiIgnorePatterns();
+  constructor(
+    private readonly config: Config,
+    params: ReadManyFilesParams,
+  ) {
+    super(params);
   }
 
-  validateParams(params: ReadManyFilesParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
-    if (errors) {
-      return errors;
-    }
-    return null;
-  }
-
-  getDescription(params: ReadManyFilesParams): string {
-    const allPatterns = [...params.paths, ...(params.include || [])];
-    const pathDesc = `using patterns: \`${allPatterns.join('`, `')}\` (within target directory: \`${this.config.getTargetDir()}\`)`;
+  getDescription(): string {
+    const allPatterns = [...this.params.paths, ...(this.params.include || [])];
+    const pathDesc = `using patterns: 
+${allPatterns.join('`, `')}
+ (within target directory: 
+${this.config.getTargetDir()}
+) `;
 
     // Determine the final list of exclusion patterns exactly as in execute method
-    const paramExcludes = params.exclude || [];
-    const paramUseDefaultExcludes = params.useDefaultExcludes !== false;
-
+    const paramExcludes = this.params.exclude || [];
+    const paramUseDefaultExcludes = this.params.useDefaultExcludes !== false;
+    const geminiIgnorePatterns = this.config
+      .getFileService()
+      .getGeminiIgnorePatterns();
     const finalExclusionPatternsForDescription: string[] =
       paramUseDefaultExcludes
-        ? [...DEFAULT_EXCLUDES, ...paramExcludes, ...this.geminiIgnorePatterns]
-        : [...paramExcludes, ...this.geminiIgnorePatterns];
+        ? [...DEFAULT_EXCLUDES, ...paramExcludes, ...geminiIgnorePatterns]
+        : [...paramExcludes, ...geminiIgnorePatterns];
 
-    let excludeDesc = `Excluding: ${finalExclusionPatternsForDescription.length > 0 ? `patterns like \`${finalExclusionPatternsForDescription.slice(0, 2).join('`, `')}${finalExclusionPatternsForDescription.length > 2 ? '...`' : '`'}` : 'none specified'}`;
+    let excludeDesc = `Excluding: ${
+      finalExclusionPatternsForDescription.length > 0
+        ? `patterns like 
+${finalExclusionPatternsForDescription
+  .slice(0, 2)
+  .join(
+    '`, `',
+  )}${finalExclusionPatternsForDescription.length > 2 ? '...`' : '`'}`
+        : 'none specified'
+    }`;
 
     // Add a note if .geminiignore patterns contributed to the final list of exclusions
-    if (this.geminiIgnorePatterns.length > 0) {
-      const geminiPatternsInEffect = this.geminiIgnorePatterns.filter((p) =>
+    if (geminiIgnorePatterns.length > 0) {
+      const geminiPatternsInEffect = geminiIgnorePatterns.filter((p) =>
         finalExclusionPatternsForDescription.includes(p),
       ).length;
       if (geminiPatternsInEffect > 0) {
@@ -236,32 +195,31 @@ Use this tool when the user's query implies needing the content of several files
       }
     }
 
-    return `Will attempt to read and concatenate files ${pathDesc}. ${excludeDesc}. File encoding: ${DEFAULT_ENCODING}. Separator: "${DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace('{filePath}', 'path/to/file.ext')}".`;
+    return `Will attempt to read and concatenate files ${pathDesc}. ${excludeDesc}. File encoding: ${DEFAULT_ENCODING}. Separator: "${DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
+      '{filePath}',
+      'path/to/file.ext',
+    )}".`;
   }
 
-  async execute(
-    params: ReadManyFilesParams,
-    signal: AbortSignal,
-  ): Promise<ToolResult> {
-    const validationError = this.validateParams(params);
-    if (validationError) {
-      return {
-        llmContent: `Error: Invalid parameters for ${this.displayName}. Reason: ${validationError}`,
-        returnDisplay: `## Parameter Error\n\n${validationError}`,
-      };
-    }
-
+  async execute(signal: AbortSignal): Promise<ToolResult> {
     const {
       paths: inputPatterns,
       include = [],
       exclude = [],
       useDefaultExcludes = true,
-      respect_git_ignore = true,
-    } = params;
+    } = this.params;
 
-    const respectGitIgnore =
-      respect_git_ignore ?? this.config.getFileFilteringRespectGitIgnore();
+    const defaultFileIgnores =
+      this.config.getFileFilteringOptions() ?? DEFAULT_FILE_FILTERING_OPTIONS;
 
+    const fileFilteringOptions = {
+      respectGitIgnore:
+        this.params.file_filtering_options?.respect_git_ignore ??
+        defaultFileIgnores.respectGitIgnore, // Use the property from the returned object
+      respectGeminiIgnore:
+        this.params.file_filtering_options?.respect_gemini_ignore ??
+        defaultFileIgnores.respectGeminiIgnore, // Use the property from the returned object
+    };
     // Get centralized file discovery service
     const fileDiscovery = this.config.getFileService();
 
@@ -271,8 +229,8 @@ Use this tool when the user's query implies needing the content of several files
     const contentParts: PartListUnion = [];
 
     const effectiveExcludes = useDefaultExcludes
-      ? [...DEFAULT_EXCLUDES, ...exclude, ...this.geminiIgnorePatterns]
-      : [...exclude, ...this.geminiIgnorePatterns];
+      ? [...DEFAULT_EXCLUDES, ...exclude]
+      : [...exclude];
 
     const searchPatterns = [...inputPatterns, ...include];
     if (searchPatterns.length === 0) {
@@ -283,41 +241,87 @@ Use this tool when the user's query implies needing the content of several files
     }
 
     try {
-      const entries = await glob(searchPatterns, {
-        cwd: this.config.getTargetDir(),
-        ignore: effectiveExcludes,
-        nodir: true,
-        dot: true,
-        absolute: true,
-        nocase: true,
-        signal,
-      });
+      const allEntries = new Set<string>();
+      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
 
-      const filteredEntries = respectGitIgnore
+      for (const dir of workspaceDirs) {
+        const entriesInDir = await glob(
+          searchPatterns.map((p) => p.replace(/\\/g, '/')),
+          {
+            cwd: dir,
+            ignore: effectiveExcludes,
+            nodir: true,
+            dot: true,
+            absolute: true,
+            nocase: true,
+            signal,
+          },
+        );
+        for (const entry of entriesInDir) {
+          allEntries.add(entry);
+        }
+      }
+      const entries = Array.from(allEntries);
+
+      const gitFilteredEntries = fileFilteringOptions.respectGitIgnore
         ? fileDiscovery
             .filterFiles(
               entries.map((p) => path.relative(this.config.getTargetDir(), p)),
               {
-                respectGitIgnore,
+                respectGitIgnore: true,
+                respectGeminiIgnore: false,
               },
             )
             .map((p) => path.resolve(this.config.getTargetDir(), p))
         : entries;
 
+      // Apply gemini ignore filtering if enabled
+      const finalFilteredEntries = fileFilteringOptions.respectGeminiIgnore
+        ? fileDiscovery
+            .filterFiles(
+              gitFilteredEntries.map((p) =>
+                path.relative(this.config.getTargetDir(), p),
+              ),
+              {
+                respectGitIgnore: false,
+                respectGeminiIgnore: true,
+              },
+            )
+            .map((p) => path.resolve(this.config.getTargetDir(), p))
+        : gitFilteredEntries;
+
       let gitIgnoredCount = 0;
+      let geminiIgnoredCount = 0;
+
       for (const absoluteFilePath of entries) {
-        // Security check: ensure the glob library didn't return something outside targetDir.
-        if (!absoluteFilePath.startsWith(this.config.getTargetDir())) {
+        // Security check: ensure the glob library didn't return something outside the workspace.
+        if (
+          !this.config
+            .getWorkspaceContext()
+            .isPathWithinWorkspace(absoluteFilePath)
+        ) {
           skippedFiles.push({
             path: absoluteFilePath,
-            reason: `Security: Glob library returned path outside target directory. Base: ${this.config.getTargetDir()}, Path: ${absoluteFilePath}`,
+            reason: `Security: Glob library returned path outside workspace. Path: ${absoluteFilePath}`,
           });
           continue;
         }
 
         // Check if this file was filtered out by git ignore
-        if (respectGitIgnore && !filteredEntries.includes(absoluteFilePath)) {
+        if (
+          fileFilteringOptions.respectGitIgnore &&
+          !gitFilteredEntries.includes(absoluteFilePath)
+        ) {
           gitIgnoredCount++;
+          continue;
+        }
+
+        // Check if this file was filtered out by gemini ignore
+        if (
+          fileFilteringOptions.respectGeminiIgnore &&
+          !finalFilteredEntries.includes(absoluteFilePath)
+        ) {
+          geminiIgnoredCount++;
           continue;
         }
 
@@ -328,7 +332,15 @@ Use this tool when the user's query implies needing the content of several files
       if (gitIgnoredCount > 0) {
         skippedFiles.push({
           path: `${gitIgnoredCount} file(s)`,
-          reason: 'ignored',
+          reason: 'git ignored',
+        });
+      }
+
+      // Add info about gemini-ignored files if any were filtered
+      if (geminiIgnoredCount > 0) {
+        skippedFiles.push({
+          path: `${geminiIgnoredCount} file(s)`,
+          reason: 'gemini ignored',
         });
       }
     } catch (error) {
@@ -340,66 +352,128 @@ Use this tool when the user's query implies needing the content of several files
 
     const sortedFiles = Array.from(filesToConsider).sort();
 
-    for (const filePath of sortedFiles) {
-      const relativePathForDisplay = path
-        .relative(this.config.getTargetDir(), filePath)
-        .replace(/\\/g, '/');
+    const fileProcessingPromises = sortedFiles.map(
+      async (filePath): Promise<FileProcessingResult> => {
+        try {
+          const relativePathForDisplay = path
+            .relative(this.config.getTargetDir(), filePath)
+            .replace(/\\/g, '/');
 
-      const fileType = detectFileType(filePath);
+          const fileType = await detectFileType(filePath);
 
-      if (fileType === 'image' || fileType === 'pdf') {
-        const fileExtension = path.extname(filePath).toLowerCase();
-        const fileNameWithoutExtension = path.basename(filePath, fileExtension);
-        const requestedExplicitly = inputPatterns.some(
-          (pattern: string) =>
-            pattern.toLowerCase().includes(fileExtension) ||
-            pattern.includes(fileNameWithoutExtension),
-        );
+          if (fileType === 'image' || fileType === 'pdf') {
+            const fileExtension = path.extname(filePath).toLowerCase();
+            const fileNameWithoutExtension = path.basename(
+              filePath,
+              fileExtension,
+            );
+            const requestedExplicitly = inputPatterns.some(
+              (pattern: string) =>
+                pattern.toLowerCase().includes(fileExtension) ||
+                pattern.includes(fileNameWithoutExtension),
+            );
 
-        if (!requestedExplicitly) {
-          skippedFiles.push({
-            path: relativePathForDisplay,
-            reason:
-              'asset file (image/pdf) was not explicitly requested by name or extension',
-          });
-          continue;
-        }
-      }
+            if (!requestedExplicitly) {
+              return {
+                success: false,
+                filePath,
+                relativePathForDisplay,
+                reason:
+                  'asset file (image/pdf) was not explicitly requested by name or extension',
+              };
+            }
+          }
 
-      // Use processSingleFileContent for all file types now
-      const fileReadResult = await processSingleFileContent(
-        filePath,
-        this.config.getTargetDir(),
-      );
-
-      if (fileReadResult.error) {
-        skippedFiles.push({
-          path: relativePathForDisplay,
-          reason: `Read error: ${fileReadResult.error}`,
-        });
-      } else {
-        if (typeof fileReadResult.llmContent === 'string') {
-          const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
-            '{filePath}',
+          // Use processSingleFileContent for all file types now
+          const fileReadResult = await processSingleFileContent(
             filePath,
+            this.config.getTargetDir(),
           );
-          contentParts.push(`${separator}\n\n${fileReadResult.llmContent}\n\n`);
-        } else {
-          contentParts.push(fileReadResult.llmContent); // This is a Part for image/pdf
+
+          if (fileReadResult.error) {
+            return {
+              success: false,
+              filePath,
+              relativePathForDisplay,
+              reason: `Read error: ${fileReadResult.error}`,
+            };
+          }
+
+          return {
+            success: true,
+            filePath,
+            relativePathForDisplay,
+            fileReadResult,
+          };
+        } catch (error) {
+          const relativePathForDisplay = path
+            .relative(this.config.getTargetDir(), filePath)
+            .replace(/\\/g, '/');
+
+          return {
+            success: false,
+            filePath,
+            relativePathForDisplay,
+            reason: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+          };
         }
-        processedFilesRelativePaths.push(relativePathForDisplay);
-        const lines =
-          typeof fileReadResult.llmContent === 'string'
-            ? fileReadResult.llmContent.split('\n').length
-            : undefined;
-        const mimetype = getSpecificMimeType(filePath);
-        recordFileOperationMetric(
-          this.config,
-          FileOperation.READ,
-          lines,
-          mimetype,
-          path.extname(filePath),
-        );
+      },
+    );
+
+    const results = await Promise.allSettled(fileProcessingPromises);
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const fileResult = result.value;
+
+        if (!fileResult.success) {
+          // Handle skipped files (images/PDFs not requested or read errors)
+          skippedFiles.push({
+            path: fileResult.relativePathForDisplay,
+            reason: fileResult.reason,
+          });
+        } else {
+          // Handle successfully processed files
+          const { filePath, relativePathForDisplay, fileReadResult } =
+            fileResult;
+
+          if (typeof fileReadResult.llmContent === 'string') {
+            const separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
+              '{filePath}',
+              filePath,
+            );
+            let fileContentForLlm = '';
+            if (fileReadResult.isTruncated) {
+              fileContentForLlm += `[WARNING: This file was truncated. To view the full content, use the 'read_file' tool on this specific file.]\n\n`;
+            }
+            fileContentForLlm += fileReadResult.llmContent;
+            contentParts.push(`${separator}\n\n${fileContentForLlm}\n\n`);
+          } else {
+            // This is a Part for image/pdf, which we don't add the separator to.
+            contentParts.push(fileReadResult.llmContent);
+          }
+
+          processedFilesRelativePaths.push(relativePathForDisplay);
+
+          const lines =
+            typeof fileReadResult.llmContent === 'string'
+              ? fileReadResult.llmContent.split('\n').length
+              : undefined;
+          const mimetype = getSpecificMimeType(filePath);
+          recordFileOperationMetric(
+            this.config,
+            FileOperation.READ,
+            lines,
+            mimetype,
+            path.extname(filePath),
+          );
+        }
+      } else {
+        // Handle Promise rejection (unexpected errors)
+        skippedFiles.push({
+          path: 'unknown',
+          reason: `Unexpected error: ${result.reason}`,
+        });
       }
     }
 
@@ -453,5 +527,121 @@ Use this tool when the user's query implies needing the content of several files
       llmContent: contentParts,
       returnDisplay: displayMessage.trim(),
     };
+  }
+}
+
+/**
+ * Tool implementation for finding and reading multiple text files from the local filesystem
+ * within a specified target directory. The content is concatenated.
+ * It is intended to run in an environment with access to the local file system (e.g., a Node.js backend).
+ */
+export class ReadManyFilesTool extends BaseDeclarativeTool<
+  ReadManyFilesParams,
+  ToolResult
+> {
+  static readonly Name: string = 'read_many_files';
+
+  constructor(private config: Config) {
+    const parameterSchema = {
+      type: 'object',
+      properties: {
+        paths: {
+          type: 'array',
+          items: {
+            type: 'string',
+            minLength: 1,
+          },
+          minItems: 1,
+          description:
+            "Required. An array of glob patterns or paths relative to the tool's target directory. Examples: ['src/**/*.ts'], ['README.md', 'docs/']",
+        },
+        include: {
+          type: 'array',
+          items: {
+            type: 'string',
+            minLength: 1,
+          },
+          description:
+            'Optional. Additional glob patterns to include. These are merged with `paths`. Example: "*.test.ts" to specifically add test files if they were broadly excluded.',
+          default: [],
+        },
+        exclude: {
+          type: 'array',
+          items: {
+            type: 'string',
+            minLength: 1,
+          },
+          description:
+            'Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: "**/*.log", "temp/"',
+          default: [],
+        },
+        recursive: {
+          type: 'boolean',
+          description:
+            'Optional. Whether to search recursively (primarily controlled by `**` in glob patterns). Defaults to true.',
+          default: true,
+        },
+        useDefaultExcludes: {
+          type: 'boolean',
+          description:
+            'Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.',
+          default: true,
+        },
+        file_filtering_options: {
+          description:
+            'Whether to respect ignore patterns from .gitignore or .geminiignore',
+          type: 'object',
+          properties: {
+            respect_git_ignore: {
+              description:
+                'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
+              type: 'boolean',
+            },
+            respect_gemini_ignore: {
+              description:
+                'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
+              type: 'boolean',
+            },
+          },
+        },
+      },
+      required: ['paths'],
+    };
+
+    super(
+      ReadManyFilesTool.Name,
+      'ReadManyFiles',
+      `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg) and PDF (.pdf) files if their file names or extensions are explicitly included in the 'paths' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded).
+
+This tool is useful when you need to understand or analyze a collection of files, such as:
+- Getting an overview of a codebase or parts of it (e.g., all TypeScript files in the 'src' directory).
+- Finding where specific functionality is implemented if the user asks broad questions about code.
+- Reviewing documentation files (e.g., all Markdown files in the 'docs' directory).
+- Gathering context from multiple configuration files.
+- When the user asks to "read all files in X directory" or "show me the content of all Y files".
+
+Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. Ensure paths are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
+      Kind.Read,
+      parameterSchema,
+    );
+  }
+
+  protected override validateToolParams(
+    params: ReadManyFilesParams,
+  ): string | null {
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
+    if (errors) {
+      return errors;
+    }
+    return null;
+  }
+
+  protected createInvocation(
+    params: ReadManyFilesParams,
+  ): ToolInvocation<ReadManyFilesParams, ToolResult> {
+    return new ReadManyFilesToolInvocation(this.config, params);
   }
 }

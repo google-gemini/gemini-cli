@@ -5,6 +5,7 @@
  */
 
 import { Theme, ColorsTheme } from './theme.js';
+import { SemanticColors } from './semantic-tokens.js';
 
 const noColorColorsTheme: ColorsTheme = {
   type: 'ansi',
@@ -17,12 +18,44 @@ const noColorColorsTheme: ColorsTheme = {
   AccentGreen: '',
   AccentYellow: '',
   AccentRed: '',
+  DiffAdded: '',
+  DiffRemoved: '',
   Comment: '',
   Gray: '',
 };
 
+const noColorSemanticColors: SemanticColors = {
+  text: {
+    primary: '',
+    secondary: '',
+    link: '',
+    accent: '',
+  },
+  background: {
+    primary: '',
+    diff: {
+      added: '',
+      removed: '',
+    },
+  },
+  border: {
+    default: '',
+    focused: '',
+  },
+  ui: {
+    comment: '',
+    symbol: '',
+    gradient: [],
+  },
+  status: {
+    error: '',
+    success: '',
+    warning: '',
+  },
+};
+
 export const NoColorTheme: Theme = new Theme(
-  'No Color',
+  'NoColor',
   'dark',
   {
     hljs: {
@@ -88,4 +121,5 @@ export const NoColorTheme: Theme = new Theme(
     },
   },
   noColorColorsTheme,
+  noColorSemanticColors,
 );
