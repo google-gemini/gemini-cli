@@ -34,6 +34,8 @@ import {
 } from '../../utils/settingsUtils.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import chalk from 'chalk';
+import { cpSlice, cpLen } from '../utils/textUtils.js';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -193,6 +195,7 @@ export function SettingsDialog({
   // Number edit state
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editBuffer, setEditBuffer] = useState<string>('');
+  const [editCursorPos, setEditCursorPos] = useState<number>(0); // Cursor position within edit buffer
   const [cursorVisible, setCursorVisible] = useState<boolean>(true);
 
   useEffect(() => {
@@ -206,7 +209,9 @@ export function SettingsDialog({
 
   const startEditingNumber = (key: string, initial?: string) => {
     setEditingKey(key);
-    setEditBuffer(initial ?? '');
+    const initialValue = initial ?? '';
+    setEditBuffer(initialValue);
+    setEditCursorPos(cpLen(initialValue)); // Position cursor at end of initial value
   };
 
   const commitNumberEdit = (key: string) => {
@@ -214,6 +219,7 @@ export function SettingsDialog({
       // Nothing entered; cancel edit
       setEditingKey(null);
       setEditBuffer('');
+      setEditCursorPos(0);
       return;
     }
     const parsed = Number(editBuffer.trim());
@@ -221,6 +227,7 @@ export function SettingsDialog({
       // Invalid number; cancel edit
       setEditingKey(null);
       setEditBuffer('');
+      setEditCursorPos(0);
       return;
     }
 
@@ -269,6 +276,7 @@ export function SettingsDialog({
 
     setEditingKey(null);
     setEditBuffer('');
+    setEditCursorPos(0);
   };
 
   // Scope selector items
@@ -300,11 +308,32 @@ export function SettingsDialog({
         if (editingKey) {
           if (key.paste && key.sequence) {
             const pasted = key.sequence.replace(/[^0-9\-+.]/g, '');
-            if (pasted) setEditBuffer((b) => b + pasted);
+            if (pasted) {
+              setEditBuffer((b) => {
+                const before = cpSlice(b, 0, editCursorPos);
+                const after = cpSlice(b, editCursorPos);
+                return before + pasted + after;
+              });
+              setEditCursorPos((pos) => pos + cpLen(pasted));
+            }
             return;
           }
           if (name === 'backspace' || name === 'delete') {
-            setEditBuffer((b) => b.slice(0, -1));
+            if (name === 'backspace' && editCursorPos > 0) {
+              setEditBuffer((b) => {
+                const before = cpSlice(b, 0, editCursorPos - 1);
+                const after = cpSlice(b, editCursorPos);
+                return before + after;
+              });
+              setEditCursorPos((pos) => pos - 1);
+            } else if (name === 'delete' && editCursorPos < cpLen(editBuffer)) {
+              setEditBuffer((b) => {
+                const before = cpSlice(b, 0, editCursorPos);
+                const after = cpSlice(b, editCursorPos + 1);
+                return before + after;
+              });
+              // Cursor position stays the same for delete
+            }
             return;
           }
           if (name === 'escape') {
@@ -318,7 +347,30 @@ export function SettingsDialog({
           // Allow digits, minus, plus, and dot
           const ch = key.sequence;
           if (/[0-9\-+.]/.test(ch)) {
-            setEditBuffer((b) => b + ch);
+            setEditBuffer((currentBuffer) => {
+              const beforeCursor = cpSlice(currentBuffer, 0, editCursorPos);
+              const afterCursor = cpSlice(currentBuffer, editCursorPos);
+              return beforeCursor + ch + afterCursor;
+            });
+            setEditCursorPos((pos) => pos + 1);
+            return;
+          }
+          // Arrow key navigation
+          if (name === 'left') {
+            setEditCursorPos((pos) => Math.max(0, pos - 1));
+            return;
+          }
+          if (name === 'right') {
+            setEditCursorPos((pos) => Math.min(cpLen(editBuffer), pos + 1));
+            return;
+          }
+          // Home and End keys
+          if (name === 'home') {
+            setEditCursorPos(0);
+            return;
+          }
+          if (name === 'end') {
+            setEditCursorPos(cpLen(editBuffer));
             return;
           }
           // Block other keys while editing
@@ -491,9 +543,20 @@ export function SettingsDialog({
 
           let displayValue: string;
           if (editingKey === item.value) {
-            // Show edit buffer with cursor
-            const cursorChar = cursorVisible ? '▌' : ' ';
-            displayValue = `${editBuffer}${cursorChar}`;
+            // Show edit buffer with advanced cursor highlighting
+            if (cursorVisible && editCursorPos < cpLen(editBuffer)) {
+              // Cursor is in the middle or at start of text
+              const beforeCursor = cpSlice(editBuffer, 0, editCursorPos);
+              const atCursor = cpSlice(editBuffer, editCursorPos, editCursorPos + 1);
+              const afterCursor = cpSlice(editBuffer, editCursorPos + 1);
+              displayValue = beforeCursor + chalk.inverse(atCursor) + afterCursor;
+            } else if (cursorVisible && editCursorPos >= cpLen(editBuffer)) {
+              // Cursor is at the end - show inverted space
+              displayValue = editBuffer + chalk.inverse(' ');
+            } else {
+              // Cursor not visible
+              displayValue = editBuffer;
+            }
           } else if (item.type === 'number') {
             // For numbers, get the actual current value from pending settings
             const path = item.value.split('.');
