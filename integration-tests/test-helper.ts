@@ -209,10 +209,11 @@ export class TestRig {
 
     const commandArgs = parse(command);
     const node = commandArgs.shift() as string;
-
+    console.log(env);
     const child = spawn(node, commandArgs as string[], {
       cwd: this.testDir!,
       stdio: 'pipe',
+      env: env,
     });
 
     let stdout = '';

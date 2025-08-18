@@ -75,7 +75,7 @@ describe('run_shell_command', () => {
     process.env['GEMINI_CLI_TEST_VAR'] = 'test-value';
 
     try {
-      const prompt = `Please run the command "echo $GEMINI_CLI_TEST_VAR" and show me the output`;
+      const prompt = `Please run the command "echo var=$GEMINI_CLI_TEST_VAR" and show me the output`;
 
       const result = await rig.run(prompt);
 
