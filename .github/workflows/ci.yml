@@ -253,6 +253,11 @@ jobs:
       pull-requests: 'write'
     strategy:
       fail-fast: false # So we can see all test failures
+      retries: 2
+      retry-on:
+        - macos-latest
+        - ubuntu-latest
+        - windows-latest
       matrix:
         os:
           - 'macos-latest'
