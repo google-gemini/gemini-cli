@@ -9,25 +9,48 @@ import { captureScreenshot } from '../utils/clipboardUtils.js';
 
 export const screenshotCommand: SlashCommand = {
   name: 'screenshot',
-  description: 'capture a screenshot for AI analysis (auto-analyze by default, or use "only" to capture only)',
+  description: 'capture a screenshot for AI analysis (modes: fullscreen, window, area [default], or "only" to capture without analysis)',
   kind: CommandKind.BUILT_IN,
   action: async (_context, args) => {
     try {
-      const screenshotPath = await captureScreenshot();
+      const argStr = args.trim().toLowerCase();
+      let captureMode: 'interactive' | 'fullscreen' | 'window' = 'interactive';
+      let shouldAnalyze = true;
+
+      // Parse arguments to determine capture mode and analysis preference
+      if (argStr === 'only') {
+        shouldAnalyze = false;
+      } else if (argStr === 'fullscreen') {
+        captureMode = 'fullscreen';
+      } else if (argStr === 'window') {
+        captureMode = 'window';
+      } else if (argStr === 'area' || argStr === '') {
+        captureMode = 'interactive';
+      } else if (argStr.includes('only')) {
+        // Handle cases like "fullscreen only", "window only"
+        shouldAnalyze = false;
+        if (argStr.includes('fullscreen')) {
+          captureMode = 'fullscreen';
+        } else if (argStr.includes('window')) {
+          captureMode = 'window';
+        }
+      }
+
+      const screenshotPath = await captureScreenshot(captureMode);
       
       if (screenshotPath) {
-        // If "only" argument provided, just capture and show path
-        if (args.trim() === 'only') {
-          return {
-            type: 'message',
-            messageType: 'info',
-            content: `Screenshot captured successfully!\nPath: ${screenshotPath}\n\nNow you can ask Gemini to analyze the image!`
-          };
-        } else {
+        if (shouldAnalyze) {
           // Default behavior: automatically analyze the screenshot
           return {
             type: 'submit_prompt',
             content: `${screenshotPath}\n\nPlease analyze this screenshot and describe what you see.`
+          };
+        } else {
+          // Just capture and show path
+          return {
+            type: 'message',
+            messageType: 'info',
+            content: `Screenshot captured successfully!\nPath: ${screenshotPath}\n\nNow you can ask Gemini to analyze the image!`
           };
         }
       } else {

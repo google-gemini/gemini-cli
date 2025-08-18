@@ -117,10 +117,12 @@ export async function saveClipboardImage(
 /**
  * Captures a screenshot and saves it to a temporary file (macOS only for now)
  * @param targetDir The target directory to create temp files within
+ * @param mode The capture mode: 'interactive' (default), 'fullscreen', 'window'
  * @returns The path to the saved screenshot file, or null if cancelled or error
  */
 export async function captureScreenshot(
-  targetDir?: string,
+  mode: 'interactive' | 'fullscreen' | 'window' = 'interactive',
+  targetDir?: string
 ): Promise<string | null> {
   if (process.platform !== 'darwin') {
     return null;
@@ -137,8 +139,25 @@ export async function captureScreenshot(
     const timestamp = new Date().getTime();
     const screenshotPath = path.join(tempDir, `screenshot-${timestamp}.png`);
 
-    // Use screencapture with interactive mode for user selection
-    await execAsync(`screencapture -i "${screenshotPath}"`);
+    // Build screencapture command based on mode
+    let command: string;
+    switch (mode) {
+      case 'fullscreen':
+        // Capture entire screen without user interaction
+        command = `screencapture "${screenshotPath}"`;
+        break;
+      case 'window':
+        // Let user select a window to capture
+        command = `screencapture -w "${screenshotPath}"`;
+        break;
+      case 'interactive':
+      default:
+        // Interactive mode for user selection (default)
+        command = `screencapture -i "${screenshotPath}"`;
+        break;
+    }
+
+    await execAsync(command);
     
     // Verify the file was created and has content
     try {
