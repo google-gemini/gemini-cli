@@ -677,7 +677,9 @@ export async function connectToMcpServer(
   });
 
   mcpClient.registerCapabilities({
-    roots: {},
+    roots: {
+      listChanged: true,
+    },
   });
 
   mcpClient.setRequestHandler(ListRootsRequestSchema, async () => {
