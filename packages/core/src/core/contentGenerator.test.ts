@@ -41,6 +41,44 @@ describe('createContentGenerator', () => {
   });
 
   it('should create a GoogleGenAI content generator', async () => {
+    const mockConfig = {
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    const generator = await createContentGenerator(
+      {
+        model: 'test-model',
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: undefined,
+      httpOptions: {
+        headers: {
+          'User-Agent': expect.any(String),
+          'x-gemini-api-privileged-user-id': expect.any(String),
+        },
+      },
+    });
+    expect(generator).toEqual(
+      new LoggingContentGenerator(
+        (mockGenerator as GoogleGenAI).models,
+        mockConfig,
+      ),
+    );
+  });
+
+  it('should create a GoogleGenAI content generator with client install id logging disabled', async () => {
+    const mockConfig = {
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
     const mockGenerator = {
       models: {},
     } as unknown as GoogleGenAI;
