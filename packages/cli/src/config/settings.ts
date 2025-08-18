@@ -339,10 +339,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   try {
     if (fs.existsSync(systemSettingsPath)) {
       const systemContent = fs.readFileSync(systemSettingsPath, 'utf-8');
-      const parsedSystemSettings = JSON.parse(
-        stripJsonComments(systemContent),
-      ) as Settings;
-      systemSettings = resolveEnvVarsInObject(parsedSystemSettings);
+      systemSettings = JSON.parse(stripJsonComments(systemContent)) as Settings;
     }
   } catch (error: unknown) {
     settingsErrors.push({
@@ -355,10 +352,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   try {
     if (fs.existsSync(USER_SETTINGS_PATH)) {
       const userContent = fs.readFileSync(USER_SETTINGS_PATH, 'utf-8');
-      const parsedUserSettings = JSON.parse(
-        stripJsonComments(userContent),
-      ) as Settings;
-      userSettings = resolveEnvVarsInObject(parsedUserSettings);
+      userSettings = JSON.parse(stripJsonComments(userContent)) as Settings;
       // Support legacy theme names
       if (userSettings.theme && userSettings.theme === 'VS') {
         userSettings.theme = DefaultLight.name;
@@ -378,10 +372,9 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     try {
       if (fs.existsSync(workspaceSettingsPath)) {
         const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
-        const parsedWorkspaceSettings = JSON.parse(
+        workspaceSettings = JSON.parse(
           stripJsonComments(projectContent),
         ) as Settings;
-        workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
         if (workspaceSettings.theme && workspaceSettings.theme === 'VS') {
           workspaceSettings.theme = DefaultLight.name;
         } else if (
@@ -398,6 +391,22 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
       });
     }
   }
+
+  // Create a temporary merged settings object to pass to loadEnvironment.
+  const tempMergedSettings = {
+    ...userSettings,
+    ...workspaceSettings,
+    ...systemSettings,
+  };
+
+  // Load environment with merged settings so that variables are available for
+  // resolution.
+  loadEnvironment(tempMergedSettings);
+
+  // Now that the environment is loaded, resolve variables in the settings.
+  systemSettings = resolveEnvVarsInObject(systemSettings);
+  userSettings = resolveEnvVarsInObject(userSettings);
+  workspaceSettings = resolveEnvVarsInObject(workspaceSettings);
 
   // Create LoadedSettings first
   const loadedSettings = new LoadedSettings(
@@ -428,9 +437,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     );
     delete loadedSettings.merged.chatCompression;
   }
-
-  // Load environment with merged settings
-  loadEnvironment(loadedSettings.merged);
 
   return loadedSettings;
 }
