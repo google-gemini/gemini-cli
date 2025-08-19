@@ -272,7 +272,7 @@ export class IdeClient {
       };
     }
 
-    const ideWorkspacePaths = ideWorkspacePath.split(':');
+    const ideWorkspacePaths = ideWorkspacePath.split(path.delimiter);
     const realCwd = getRealPath(cwd);
     const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) => {
       const idePath = getRealPath(workspacePath);
@@ -390,6 +390,7 @@ export class IdeClient {
           logger.debug('Failed to close transport:', closeError);
         }
       }
+      logger.error(`Failed to connect: ${_error}`);
       return false;
     }
   }
