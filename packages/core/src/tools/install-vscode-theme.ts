@@ -12,7 +12,7 @@ import {  Type } from '@google/genai';
 
 import type { InstallVSCodeThemeToolParams, VSCodeTheme } from './theme-types.js';
 import { convertVSCodeThemeToCustomTheme } from './theme-converter.js';
-import { generateThemeWithAI, createDefaultTheme } from './theme-generator.js';
+import { createDefaultTheme } from './theme-generator.js';
 import { extractExtensionId, downloadVsix, extractThemeFromVsix } from './theme-extractor.js';
 import { saveThemeToFile } from './theme-storage.js';
 import { createSimpleColorPreview } from './theme-display.js';
@@ -113,26 +113,18 @@ Do you want to proceed?`,
         extractionMethod = 'VSIX Extraction';
         console.log(`✅ Successfully extracted theme from VSIX: ${themeData.name}`);
       } else {
-        console.log(`⚠️ VSIX extraction failed, trying AI generation...`);
-        // Try 2: Generate with AI based on extension name
-        themeData = await generateThemeWithAI(extensionId.name, signal, this.config);
-        if (themeData) {
-          extractionMethod = 'AI Generation';
-          console.log(`✅ Successfully generated theme with AI: ${themeData.name}`);
-        } else {
-          console.log(`⚠️ AI generation failed, using default theme...`);
-          // Try 3: Use default theme
-          themeData = createDefaultTheme(extensionId.name);
-          extractionMethod = 'Default Theme';
-          console.log(`📦 Using default theme: ${themeData.name}`);
-        }
+        console.log(`⚠️ VSIX extraction failed, using default theme...`);
+        // Try 2: Use default theme (no AI generation)
+        themeData = createDefaultTheme(extensionId.name);
+        extractionMethod = 'Default Theme';
+        console.log(`📦 Using default theme: ${themeData.name}`);
       }
 
       // Step 4: Convert VS Code theme to Gemini CLI theme
       if (!themeData) {
         return {
-          llmContent: 'Error: Could not extract or generate theme data',
-          returnDisplay: '❌ **Error**: Could not extract or generate theme data. All fallback methods failed.',
+          llmContent: 'Error: Could not extract theme data',
+          returnDisplay: '❌ **Error**: Could not extract theme data. VSIX extraction failed and no fallback theme could be created.',
         };
       }
       

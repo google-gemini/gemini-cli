@@ -73,7 +73,9 @@ https://marketplace.visualstudio.com/items?itemName=publisher.extension-name`,
         type: 'submit_prompt',
         content: `The extension name "${itemName}" doesn't follow the expected format (publisher.extension-name).
 
-Please provide a valid VS Code marketplace URL with a properly formatted extension name.`,
+Please provide a valid VS Code marketplace URL with a properly formatted extension name.
+
+Example: https://marketplace.visualstudio.com/items?itemName=arcticicestudio.nord-visual-studio-code`,
       };
     }
 
