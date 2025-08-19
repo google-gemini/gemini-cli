@@ -10,6 +10,7 @@ import {
   main,
   setupUnhandledRejectionHandler,
   validateDnsResolutionOrder,
+  startInteractiveUI,
 } from './gemini.js';
 import {
   LoadedSettings,
@@ -248,5 +249,81 @@ describe('validateDnsResolutionOrder', () => {
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       'Invalid value for dnsResolutionOrder in settings: "invalid-value". Using default "ipv4first".',
     );
+  });
+});
+
+describe('startInteractiveUI', () => {
+  // Mock dependencies
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mockConfig = { getProjectRoot: () => '/root' } as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mockSettings = {} as any;
+  const mockStartupWarnings = ['warning1'];
+  const mockWorkspaceRoot = '/root';
+  const mockVersion = '1.0.0';
+
+  vi.mock('./utils/version.js', () => ({
+    getCliVersion: vi.fn(() => Promise.resolve(mockVersion)),
+  }));
+
+  vi.mock('./ui/utils/kittyProtocolDetector.js', () => ({
+    detectAndEnableKittyProtocol: vi.fn(() => Promise.resolve()),
+  }));
+
+  vi.mock('./ui/utils/updateCheck.js', () => ({
+    checkForUpdates: vi.fn(() => Promise.resolve(null)),
+  }));
+
+  vi.mock('./utils/cleanup.js', () => ({
+    registerCleanup: vi.fn(),
+  }));
+
+  const renderSpy = vi.fn();
+  vi.mock('ink', () => ({
+    render: renderSpy,
+  }));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should render the AppWrapper with correct props', async () => {
+    await startInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+    );
+
+    expect(renderSpy).toHaveBeenCalled();
+    const renderCall = renderSpy.mock.calls[0][0];
+    expect(renderCall.type.name).toBe('StrictMode');
+    const appWrapper = renderCall.props.children.props.children;
+    expect(appWrapper.type.name).toBe('AppWrapper');
+    expect(appWrapper.props.config).toBe(mockConfig);
+    expect(appWrapper.props.settings).toBe(mockSettings);
+    expect(appWrapper.props.startupWarnings).toBe(mockStartupWarnings);
+    expect(appWrapper.props.version).toBe(mockVersion);
+  });
+
+  it('should perform startup tasks', async () => {
+    const { getCliVersion } = await import('./utils/version.js');
+    const { detectAndEnableKittyProtocol } = await import(
+      './ui/utils/kittyProtocolDetector.js'
+    );
+    const { checkForUpdates } = await import('./ui/utils/updateCheck.js');
+    const { registerCleanup } = await import('./utils/cleanup.js');
+
+    await startInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+    );
+
+    expect(getCliVersion).toHaveBeenCalled();
+    expect(detectAndEnableKittyProtocol).toHaveBeenCalled();
+    expect(checkForUpdates).toHaveBeenCalled();
+    expect(registerCleanup).toHaveBeenCalled();
   });
 });
