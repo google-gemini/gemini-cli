@@ -17,6 +17,9 @@ import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
 import { Settings, MemoryImportFormat } from './settingsSchema.js';
 
+const SCHEMA_URL =
+  'https://raw.githubusercontent.com/google/gemini-cli/main/packages/cli/settings.schema.json';
+
 export type { Settings, MemoryImportFormat };
 
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
@@ -341,8 +344,11 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
       const systemContent = fs.readFileSync(systemSettingsPath, 'utf-8');
       const parsedSystemSettings = JSON.parse(
         stripJsonComments(systemContent),
-      ) as Settings;
-      systemSettings = resolveEnvVarsInObject(parsedSystemSettings);
+      ) as Record<string, unknown>;
+      const { $schema: _, ...settingsWithoutSchema } = parsedSystemSettings;
+      systemSettings = resolveEnvVarsInObject(
+        settingsWithoutSchema as Settings,
+      );
     }
   } catch (error: unknown) {
     settingsErrors.push({
@@ -357,8 +363,9 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
       const userContent = fs.readFileSync(USER_SETTINGS_PATH, 'utf-8');
       const parsedUserSettings = JSON.parse(
         stripJsonComments(userContent),
-      ) as Settings;
-      userSettings = resolveEnvVarsInObject(parsedUserSettings);
+      ) as Record<string, unknown>;
+      const { $schema: _, ...settingsWithoutSchema } = parsedUserSettings;
+      userSettings = resolveEnvVarsInObject(settingsWithoutSchema as Settings);
       // Support legacy theme names
       if (userSettings.theme && userSettings.theme === 'VS') {
         userSettings.theme = DefaultLight.name;
@@ -380,8 +387,12 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
         const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
         const parsedWorkspaceSettings = JSON.parse(
           stripJsonComments(projectContent),
-        ) as Settings;
-        workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
+        ) as Record<string, unknown>;
+        const { $schema: _, ...settingsWithoutSchema } =
+          parsedWorkspaceSettings;
+        workspaceSettings = resolveEnvVarsInObject(
+          settingsWithoutSchema as Settings,
+        );
         if (workspaceSettings.theme && workspaceSettings.theme === 'VS') {
           workspaceSettings.theme = DefaultLight.name;
         } else if (
@@ -443,9 +454,14 @@ export function saveSettings(settingsFile: SettingsFile): void {
       fs.mkdirSync(dirPath, { recursive: true });
     }
 
+    const settingsWithSchema = {
+      $schema: SCHEMA_URL,
+      ...settingsFile.settings,
+    };
+
     fs.writeFileSync(
       settingsFile.path,
-      JSON.stringify(settingsFile.settings, null, 2),
+      JSON.stringify(settingsWithSchema, null, 2),
       'utf-8',
     );
   } catch (error) {
