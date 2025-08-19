@@ -479,7 +479,7 @@ describe('ClearcutLogger', () => {
         programming_language: 'TypeScript',
         prompt_id: 'prompt-id-1',
         decision: ToolCallDecision.AUTO_ACCEPT,
-        tool_type: 'native'
+        tool_type: 'native',
       };
 
       logger!.logToolCallEvent(toolCallEvent);
@@ -507,7 +507,7 @@ describe('ClearcutLogger', () => {
         success: true,
         prompt_id: 'prompt-id-2',
         decision: ToolCallDecision.AUTO_ACCEPT,
-        tool_type: 'native'
+        tool_type: 'native',
       };
 
       logger!.logToolCallEvent(toolCallEvent);

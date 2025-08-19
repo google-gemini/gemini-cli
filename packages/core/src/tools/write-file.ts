@@ -316,9 +316,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       const lines = fileContent.split('\n').length;
       const mimetype = getSpecificMimeType(file_path);
       const extension = path.extname(file_path); // Get extension
-      const programming_language = getProgrammingLanguage({
-        file_path: file_path,
-      });
+      const programming_language = getProgrammingLanguage({ file_path });
       if (isNewFile) {
         recordFileOperationMetric(
           this.config,

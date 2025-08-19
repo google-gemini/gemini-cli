@@ -220,7 +220,7 @@ export enum EventMetadataKey {
   GEMINI_CLI_USER_REMOVED_LINES = 50,
 
   // Logs the programming language of the project.
-  GEMINI_CLI_PROGRAMMING_LANGUAGE = 51,
+  GEMINI_CLI_PROGRAMMING_LANGUAGE = 56,
 
   // ==========================================================================
   // Kitty Sequence Overflow Event Keys

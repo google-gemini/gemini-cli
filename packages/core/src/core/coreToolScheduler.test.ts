@@ -777,7 +777,7 @@ describe('CoreToolScheduler programming_language logging', () => {
       getToolByName: () => declarativeTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
-      discovery: {} as any,
+      discovery: {} as Record<string, unknown>,
       registerTool: () => {},
       getToolByDisplayName: () => declarativeTool,
       getTools: () => [],
@@ -796,7 +796,7 @@ describe('CoreToolScheduler programming_language logging', () => {
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as any),
+      toolRegistry: Promise.resolve(toolRegistry as unknown as ToolRegistry),
       onAllToolCallsComplete,
       onToolCallsUpdate: () => {},
       getPreferredEditor: () => 'vscode',
@@ -848,9 +848,9 @@ describe('CoreToolScheduler programming_language logging', () => {
 
     expect(logToolCall).toHaveBeenCalledTimes(4);
 
-    const loggedEvents = (logToolCall as any).mock.calls.map(
-      (call: [unknown, ToolCallEvent]) => call[1],
-    );
+    const loggedEvents = vi
+      .mocked(logToolCall)
+      .mock.calls.map((call: [unknown, ToolCallEvent]) => call[1]);
 
     const writeFileEvent = loggedEvents.find(
       (e: ToolCallEvent) => e.function_name === 'write_file',
