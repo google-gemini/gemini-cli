@@ -237,13 +237,11 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
     },
   };
 
-  const ideModeEnabled = config.getIdeMode();
-  if (ideModeEnabled) {
-    ideSlashCommand.subCommands = [
-      disableCommand,
-      statusCommand,
-      installCommand,
-    ];
+  const { status } = ideClient.getConnectionStatus();
+  const isConnected = status === IDEConnectionStatus.Connected;
+
+  if (isConnected) {
+    ideSlashCommand.subCommands = [statusCommand, disableCommand];
   } else {
     ideSlashCommand.subCommands = [
       enableCommand,
