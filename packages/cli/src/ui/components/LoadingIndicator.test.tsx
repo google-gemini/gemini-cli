@@ -258,7 +258,7 @@ describe('<LoadingIndicator />', () => {
           rightContent={<Text>Right</Text>}
         />,
         StreamingState.Responding,
-        79,
+        69,
       );
       const output = lastFrame();
       const lines = output?.split('\n');
@@ -275,20 +275,20 @@ describe('<LoadingIndicator />', () => {
       }
     });
 
-    it('should use wide layout at 80 columns', () => {
+    it('should use wide layout at 70 columns', () => {
       const { lastFrame } = renderWithContext(
         <LoadingIndicator {...defaultProps} />,
         StreamingState.Responding,
-        80,
+        70,
       );
       expect(lastFrame()?.includes('\n')).toBe(false);
     });
 
-    it('should use narrow layout at 79 columns', () => {
+    it('should use narrow layout at 69 columns', () => {
       const { lastFrame } = renderWithContext(
         <LoadingIndicator {...defaultProps} />,
         StreamingState.Responding,
-        79,
+        69,
       );
       expect(lastFrame()?.includes('\n')).toBe(true);
     });
