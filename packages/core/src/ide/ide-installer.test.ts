@@ -16,6 +16,14 @@ vi.mock('fs');
 vi.mock('os');
 
 describe('ide-installer', () => {
+  beforeEach(() => {
+    vi.spyOn(os, 'homedir').mockReturnValue('/home/user');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('getIdeInstaller', () => {
     it('should return a VsCodeInstaller for "vscode"', () => {
       const installer = getIdeInstaller(DetectedIde.VSCode);
@@ -33,11 +41,6 @@ describe('ide-installer', () => {
       installer = getIdeInstaller(DetectedIde.VSCode)!;
       vi.spyOn(child_process, 'execSync').mockImplementation(() => '');
       vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(os, 'homedir').mockReturnValue('/home/user');
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
     });
 
     describe('install', () => {

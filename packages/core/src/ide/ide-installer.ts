@@ -26,13 +26,22 @@ export interface InstallResult {
 async function findVsCodeCommand(): Promise<string | null> {
   // 1. Check PATH first.
   try {
-    child_process.execSync(
-      process.platform === 'win32'
-        ? `where.exe ${VSCODE_COMMAND}`
-        : `command -v ${VSCODE_COMMAND}`,
-      { stdio: 'ignore' },
-    );
-    return VSCODE_COMMAND;
+    if (process.platform === 'win32') {
+      const result = child_process
+        .execSync(`where.exe ${VSCODE_COMMAND}`)
+        .toString()
+        .trim();
+      // `where.exe` can return multiple paths. Return the first one.
+      const firstPath = result.split(/\r?\n/)[0];
+      if (firstPath) {
+        return firstPath;
+      }
+    } else {
+      child_process.execSync(`command -v ${VSCODE_COMMAND}`, {
+        stdio: 'ignore',
+      });
+      return VSCODE_COMMAND;
+    }
   } catch {
     // Not in PATH, continue to check common locations.
   }
