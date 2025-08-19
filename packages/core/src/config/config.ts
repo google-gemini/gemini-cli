@@ -344,10 +344,6 @@ export class Config {
     }
 
     logCliConfiguration(this, new StartSessionEvent(this));
-
-    if (this.getUsageStatisticsEnabled()) {
-      console.log('Data collection is disabled.');
-    }
   }
 
   /**
@@ -486,8 +482,8 @@ export class Config {
     return this.workspaceContext;
   }
 
-  getToolRegistry(): Promise<ToolRegistry> {
-    return Promise.resolve(this.toolRegistry);
+  getToolRegistry(): ToolRegistry {
+    return this.toolRegistry;
   }
 
   getPromptRegistry(): PromptRegistry {

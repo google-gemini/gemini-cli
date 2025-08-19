@@ -175,7 +175,7 @@ export function logFlashFallback(
   config: Config,
   event: FlashFallbackEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logFlashFallbackEvent(event);
+  ClearcutLogger.getInstance(config)?.logFlashFallbackEvent();
   if (!isTelemetrySdkInitialized()) return;
 
   const attributes: LogAttributes = {
