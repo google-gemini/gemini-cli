@@ -402,8 +402,8 @@ export async function clearCachedCredentialFile() {
     await clearCachedGoogleAccount();
     // Clear the in-memory OAuth client cache to force re-authentication
     clearOauthClientCache();
-  } catch (_) {
-    /* empty */
+  } catch (e) {
+    console.error('Failed to clear cached credentials:', e);
   }
 }
 
