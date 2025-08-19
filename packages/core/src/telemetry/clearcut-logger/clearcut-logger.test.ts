@@ -192,14 +192,13 @@ describe('ClearcutLogger', () => {
 
       vi.stubEnv('GITHUB_SHA', '8675309');
 
-      const event = logger?.createLogEvent('abc', []);
+      const event = logger?.createLogEvent(EventNames.CHAT_COMPRESSION, []);
 
       expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
         value: 'GitHub',
       });
     });
-
 
     it('logs the current surface', () => {
       const { logger } = setup({});
@@ -260,7 +259,7 @@ describe('ClearcutLogger', () => {
         }
         vi.stubEnv('TERM_PROGRAM', 'vscode');
         const event = logger?.createLogEvent(EventNames.API_ERROR, []);
-        expect(event?.event_metadata[0][1]).toEqual({
+        expect(event?.event_metadata[0][3]).toEqual({
           gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
           value: expectedValue,
         });

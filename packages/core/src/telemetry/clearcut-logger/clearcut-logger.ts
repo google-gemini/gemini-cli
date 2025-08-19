@@ -204,7 +204,7 @@ export class ClearcutLogger {
   createLogEvent(eventName: EventNames, data: EventValue[] = []): LogEvent {
     const email = getCachedGoogleAccount();
 
-    if (name !== start_session_event_name) {
+    if (eventName !== EventNames.START_SESSION) {
       data.push(...this.sessionData);
     }
     data = this.addDefaultFields(data);
@@ -558,7 +558,7 @@ export class ClearcutLogger {
       this.createLogEvent(EventNames.CHAT_COMPRESSION, data),
     );
   }
-  
+
   logFlashFallbackEvent(): void {
     this.enqueueLogEvent(this.createLogEvent(EventNames.FLASH_FALLBACK, []));
     this.flushToClearcut().catch((error) => {
@@ -669,7 +669,7 @@ export class ClearcutLogger {
 
   logEndSessionEvent(): void {
     // Flush immediately on session end.
-    this.enqueueLogEvent(this.createLogEvent(EventNames.END_SESSION, data));
+    this.enqueueLogEvent(this.createLogEvent(EventNames.END_SESSION, []));
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
