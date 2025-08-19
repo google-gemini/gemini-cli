@@ -37,6 +37,9 @@ export const bugCommand: SlashCommand = {
     const modelVersion = config?.getModel() || 'Unknown';
     const cliVersion = await getCliVersion();
     const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
+    const ideClient =
+      context.services.config?.getIdeClient()?.getDetectedIdeDisplayName() ||
+      '';
 
     const info = `
 * **CLI Version:** ${cliVersion}
@@ -46,6 +49,7 @@ export const bugCommand: SlashCommand = {
 * **Sandbox Environment:** ${sandboxEnv}
 * **Model Version:** ${modelVersion}
 * **Memory Usage:** ${memoryUsage}
+* **IDE Client:** ${ideClient}
 `;
 
     let bugReportUrl =

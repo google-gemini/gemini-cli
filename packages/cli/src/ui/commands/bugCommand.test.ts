@@ -48,6 +48,9 @@ describe('bugCommand', () => {
         config: {
           getModel: () => 'gemini-pro',
           getBugCommand: () => undefined,
+          getIdeClient: () => ({
+            getDetectedIdeDisplayName: () => 'VSCode',
+          }),
         },
       },
     });
@@ -63,6 +66,7 @@ describe('bugCommand', () => {
 * **Sandbox Environment:** test
 * **Model Version:** gemini-pro
 * **Memory Usage:** 100 MB
+* **IDE Client:** VSCode
 `;
     const expectedUrl =
       'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title=A%20test%20bug&info=' +
@@ -79,6 +83,9 @@ describe('bugCommand', () => {
         config: {
           getModel: () => 'gemini-pro',
           getBugCommand: () => ({ urlTemplate: customTemplate }),
+          getIdeClient: () => ({
+            getDetectedIdeDisplayName: () => 'VSCode',
+          }),
         },
       },
     });
@@ -94,6 +101,7 @@ describe('bugCommand', () => {
 * **Sandbox Environment:** test
 * **Model Version:** gemini-pro
 * **Memory Usage:** 100 MB
+* **IDE Client:** VSCode
 `;
     const expectedUrl = customTemplate
       .replace('{title}', encodeURIComponent('A custom bug'))
