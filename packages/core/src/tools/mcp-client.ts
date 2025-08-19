@@ -600,10 +600,11 @@ export function getRefDefinition(
 
 /**
  * Recursively validates that a JSON schema and all its nested properties and
- * items have a `type` defined. Handles $ref references by treating them as valid.
+ * items have a `type` defined.
  *
  * @param schema The JSON schema to validate.
  * @param rootSchema The root schema containing definitions (optional). use schema as default rootSchema.
+ * @param visitedRefs A set of visited $ref paths to avoid circular references (optional).
  * @returns `true` if the schema is valid, `false` otherwise.
  *
  * @visiblefortesting
@@ -611,6 +612,7 @@ export function getRefDefinition(
 export function hasValidTypes(
   schema: unknown,
   rootSchema: unknown = schema,
+  visitedRefs: Set<string> = new Set(),
 ): boolean {
   if (typeof schema !== 'object' || schema === null) {
     // Not a schema object we can validate, or not a schema at all.
@@ -624,13 +626,22 @@ export function hasValidTypes(
   if (s['$ref']) {
     const refPath = s['$ref'] as string;
 
+    // Check for circular reference
+    if (visitedRefs.has(refPath)) {
+      // Circular reference detected, treat as valid to avoid infinite recursion
+      return true;
+    }
+
     const definition = getRefDefinition(refPath, rootSchema);
 
     // invalid ref
     if (!definition) {
       return false;
     }
-    return hasValidTypes(definition, rootSchema);
+
+    visitedRefs.add(refPath);
+
+    return hasValidTypes(definition, rootSchema, visitedRefs);
   }
 
   if (!s['type']) {
@@ -644,7 +655,7 @@ export function hasValidTypes(
       if (Array.isArray(subSchemas)) {
         hasSubSchema = true;
         for (const subSchema of subSchemas) {
-          if (!hasValidTypes(subSchema, rootSchema)) {
+          if (!hasValidTypes(subSchema, rootSchema, visitedRefs)) {
             return false;
           }
         }
@@ -658,7 +669,7 @@ export function hasValidTypes(
   if (s['type'] === 'object' && s['properties']) {
     if (typeof s['properties'] === 'object' && s['properties'] !== null) {
       for (const prop of Object.values(s['properties'])) {
-        if (!hasValidTypes(prop, rootSchema)) {
+        if (!hasValidTypes(prop, rootSchema, visitedRefs)) {
           return false;
         }
       }
@@ -666,7 +677,7 @@ export function hasValidTypes(
   }
 
   if (s['type'] === 'array' && s['items']) {
-    if (!hasValidTypes(s['items'], rootSchema)) {
+    if (!hasValidTypes(s['items'], rootSchema, visitedRefs)) {
       return false;
     }
   }
@@ -706,12 +717,7 @@ export async function discoverTools(
           continue;
         }
 
-        // Pass the full schema context for $ref resolution
-        const rootSchema = funcDecl.parametersJsonSchema as Record<
-          string,
-          unknown
-        >;
-        if (!hasValidTypes(funcDecl.parametersJsonSchema, rootSchema)) {
+        if (!hasValidTypes(funcDecl.parametersJsonSchema)) {
           console.warn(
             `Skipping tool '${funcDecl.name}' from MCP server '${mcpServerName}' ` +
               `because it has missing types in its parameter schema. Please file an ` +
@@ -862,7 +868,7 @@ export async function connectToMcpServer(
   workspaceContext: WorkspaceContext,
 ): Promise<Client> {
   const mcpClient = new Client({
-    name: 'codebuddy-cli-mcp-client',
+    name: 'gemini-cli-mcp-client',
     version: '0.0.1',
   });
 

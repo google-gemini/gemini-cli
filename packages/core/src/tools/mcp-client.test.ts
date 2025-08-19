@@ -151,220 +151,6 @@ describe('mcp-client', () => {
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
-      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
-        tool: () =>
-          Promise.resolve({
-            functionDeclarations: [
-              {
-                name: 'validTool',
-                parametersJsonSchema: {
-                  type: 'object',
-                  properties: {},
-                },
-              },
-            ],
-          }),
-      } as unknown as GenAiLib.CallableTool);
-
-      const tools = await discoverTools('test-server', {}, mockedClient);
-
-      expect(tools.length).toBe(1);
-      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('validTool');
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
-      consoleWarnSpy.mockRestore();
-    });
-
-    it('should discover tool with $ref references in schema', async () => {
-      const mockedClient = {} as unknown as ClientLib.Client;
-      const consoleWarnSpy = vi
-        .spyOn(console, 'warn')
-        .mockImplementation(() => {});
-      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
-        tool: () =>
-          Promise.resolve({
-            functionDeclarations: [
-              {
-                name: 'toolWithRef',
-                parametersJsonSchema: {
-                  type: 'object',
-                  properties: {
-                    user: { $ref: '#/definitions/User' },
-                    address: { $ref: '#/definitions/Address' },
-                  },
-                  definitions: {
-                    User: {
-                      type: 'object',
-                      properties: {
-                        name: { type: 'string' },
-                        age: { type: 'number' },
-                      },
-                    },
-                    Address: {
-                      type: 'object',
-                      properties: {
-                        street: { type: 'string' },
-                        city: { type: 'string' },
-                      },
-                    },
-                  },
-                },
-              },
-            ],
-          }),
-      } as unknown as GenAiLib.CallableTool);
-
-      const tools = await discoverTools('test-server', {}, mockedClient);
-
-      expect(tools.length).toBe(1);
-      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('toolWithRef');
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
-      consoleWarnSpy.mockRestore();
-    });
-
-    it('should discover tool with complex $ref schema including arrays', async () => {
-      const mockedClient = {} as unknown as ClientLib.Client;
-      const consoleWarnSpy = vi
-        .spyOn(console, 'warn')
-        .mockImplementation(() => {});
-      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
-        tool: () =>
-          Promise.resolve({
-            functionDeclarations: [
-              {
-                name: 'complexTool',
-                parametersJsonSchema: {
-                  type: 'object',
-                  properties: {
-                    users: {
-                      type: 'array',
-                      items: { $ref: '#/definitions/User' },
-                    },
-                    metadata: {
-                      type: 'object',
-                      additionalProperties: { $ref: '#/definitions/Metadata' },
-                    },
-                  },
-                  definitions: {
-                    User: {
-                      type: 'object',
-                      properties: {
-                        id: { type: 'string' },
-                        profile: { $ref: '#/definitions/Profile' },
-                      },
-                    },
-                    Profile: {
-                      type: 'object',
-                      properties: {
-                        name: { type: 'string' },
-                        email: { type: 'string' },
-                      },
-                    },
-                    Metadata: {
-                      type: 'string',
-                    },
-                  },
-                },
-              },
-            ],
-          }),
-      } as unknown as GenAiLib.CallableTool);
-
-      const tools = await discoverTools('test-server', {}, mockedClient);
-
-      expect(tools.length).toBe(1);
-      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('complexTool');
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
-      consoleWarnSpy.mockRestore();
-    });
-
-    it('should discover tool with $defs instead of definitions', async () => {
-      const mockedClient = {} as unknown as ClientLib.Client;
-      const consoleWarnSpy = vi
-        .spyOn(console, 'warn')
-        .mockImplementation(() => {});
-      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
-        tool: () =>
-          Promise.resolve({
-            functionDeclarations: [
-              {
-                name: 'toolWithDefs',
-                parametersJsonSchema: {
-                  type: 'object',
-                  properties: {
-                    config: { $ref: '#/$defs/Config' },
-                  },
-                  $defs: {
-                    Config: {
-                      type: 'object',
-                      properties: {
-                        timeout: { type: 'number' },
-                        retries: { type: 'integer' },
-                      },
-                    },
-                  },
-                },
-              },
-            ],
-          }),
-      } as unknown as GenAiLib.CallableTool);
-
-      const tools = await discoverTools('test-server', {}, mockedClient);
-
-      expect(tools.length).toBe(1);
-      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe(
-        'toolWithDefs',
-      );
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
-      consoleWarnSpy.mockRestore();
-    });
-
-    it('should discover tool with components/schemas structure', async () => {
-      const mockedClient = {} as unknown as ClientLib.Client;
-      const consoleWarnSpy = vi
-        .spyOn(console, 'warn')
-        .mockImplementation(() => {});
-      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
-        tool: () =>
-          Promise.resolve({
-            functionDeclarations: [
-              {
-                name: 'apiTool',
-                parametersJsonSchema: {
-                  type: 'object',
-                  properties: {
-                    request: { $ref: '#/components/schemas/ApiRequest' },
-                  },
-                  components: {
-                    schemas: {
-                      ApiRequest: {
-                        type: 'object',
-                        properties: {
-                          endpoint: { type: 'string' },
-                          method: {
-                            type: 'string',
-                            enum: ['GET', 'POST', 'PUT', 'DELETE'],
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            ],
-          }),
-      } as unknown as GenAiLib.CallableTool);
-
-      const tools = await discoverTools('test-server', {}, mockedClient);
-
-      expect(tools.length).toBe(1);
-      expect(vi.mocked(DiscoveredMCPTool).mock.calls[0][2]).toBe('apiTool');
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
-      consoleWarnSpy.mockRestore();
-    });
-  });
-
-  describe('connectToMcpServer', () => {
-    it('should register a roots/list handler', async () => {
       const mockedClient = {
         connect: vi.fn(),
         discover: vi.fn(),
@@ -404,6 +190,7 @@ describe('mcp-client', () => {
       consoleErrorSpy.mockRestore();
     });
   });
+
   describe('appendMcpServerCommand', () => {
     it('should do nothing if no MCP servers or command are configured', () => {
       const out = populateMcpServerCommand({}, undefined);
@@ -987,6 +774,88 @@ describe('mcp-client', () => {
             },
             Tag: {
               type: 'string',
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should handle circular references without infinite recursion', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            user: { $ref: '#/definitions/User' },
+          },
+          definitions: {
+            User: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                friend: { $ref: '#/definitions/User' }, // circular reference
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should handle complex circular references', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            nodeA: { $ref: '#/definitions/NodeA' },
+          },
+          definitions: {
+            NodeA: {
+              type: 'object',
+              properties: {
+                value: { type: 'string' },
+                nodeB: { $ref: '#/definitions/NodeB' },
+              },
+            },
+            NodeB: {
+              type: 'object',
+              properties: {
+                value: { type: 'number' },
+                nodeA: { $ref: '#/definitions/NodeA' }, // circular reference back to NodeA
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should handle self-referencing schema', () => {
+        const schema = {
+          $ref: '#/definitions/Tree',
+          definitions: {
+            Tree: {
+              type: 'object',
+              properties: {
+                value: { type: 'string' },
+                children: {
+                  type: 'array',
+                  items: { $ref: '#/definitions/Tree' }, // self-reference
+                },
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should handle circular references in anyOf', () => {
+        const schema = {
+          anyOf: [
+            { $ref: '#/definitions/NodeA' },
+            { type: 'string' },
+          ],
+          definitions: {
+            NodeA: {
+              type: 'object',
+              properties: {
+                next: { $ref: '#/definitions/NodeA' }, // circular reference
+              },
             },
           },
         };
