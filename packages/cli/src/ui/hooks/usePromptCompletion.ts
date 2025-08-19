@@ -31,27 +31,6 @@ export interface UsePromptCompletionOptions {
   enabled: boolean;
 }
 
-const useDebounce = (
-  callback: () => void,
-  delay: number,
-  deps: React.DependencyList,
-) => {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    timeoutRef.current = setTimeout(callback, delay);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, deps);
-};
-
 export function usePromptCompletion({
   buffer,
   config,
@@ -174,7 +153,6 @@ export function usePromptCompletion({
         console.error('prompt completion error:', error);
         // Clear the last requested text to allow retry only on real errors
         lastRequestedTextRef.current = '';
-      } else {
       }
       clearGhostText();
     } finally {
@@ -214,16 +192,21 @@ export function usePromptCompletion({
 
     generatePromptSuggestions();
   }, [
+    buffer.text,
     generatePromptSuggestions,
     justSelectedSuggestion,
     isCursorAtEnd,
     clearGhostText,
   ]);
 
-  useDebounce(handlePromptCompletion, PROMPT_COMPLETION_DEBOUNCE_MS, [
-    buffer.text,
-    buffer.cursor,
-  ]);
+  // Debounce prompt completion
+  useEffect(() => {
+    const timeoutId = setTimeout(
+      handlePromptCompletion,
+      PROMPT_COMPLETION_DEBOUNCE_MS,
+    );
+    return () => clearTimeout(timeoutId);
+  }, [buffer.text, buffer.cursor, handlePromptCompletion]);
 
   // Ghost text validation - clear if it doesn't match current text or cursor not at end
   useEffect(() => {

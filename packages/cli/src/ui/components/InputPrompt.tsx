@@ -584,56 +584,82 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     const usedWidth = stringWidth(textBeforeCursor);
     const remainingWidth = Math.max(0, inputWidth - usedWidth);
 
+    const ghostTextLinesRaw = ghostSuffix.split('\n');
+    const firstLineRaw = ghostTextLinesRaw.shift() || '';
+
     let inlineGhost = '';
-    const ghostCodePoints = toCodePoints(ghostSuffix);
-    let ghostUsedWidth = 0;
-    let inlineEndIndex = 0;
+    let remainingFirstLine = '';
 
-    for (let i = 0; i < ghostCodePoints.length; i++) {
-      const char = ghostCodePoints[i];
-      if (char === '\n') {
-        break;
+    if (stringWidth(firstLineRaw) <= remainingWidth) {
+      inlineGhost = firstLineRaw;
+    } else {
+      const words = firstLineRaw.split(' ');
+      let currentLine = '';
+      let wordIdx = 0;
+      for (const word of words) {
+        const prospectiveLine = currentLine ? `${currentLine} ${word}` : word;
+        if (stringWidth(prospectiveLine) > remainingWidth) {
+          break;
+        }
+        currentLine = prospectiveLine;
+        wordIdx++;
       }
-
-      const charWidth = stringWidth(char);
-      if (ghostUsedWidth + charWidth > remainingWidth) {
-        break;
+      inlineGhost = currentLine;
+      if (words.length > wordIdx) {
+        remainingFirstLine = words.slice(wordIdx).join(' ');
       }
-
-      inlineGhost += char;
-      ghostUsedWidth += charWidth;
-      inlineEndIndex = i + 1;
     }
 
-    const remainingGhostText = ghostCodePoints.slice(inlineEndIndex).join('');
+    const linesToWrap = [];
+    if (remainingFirstLine) {
+      linesToWrap.push(remainingFirstLine);
+    }
+    linesToWrap.push(...ghostTextLinesRaw);
+    const remainingGhostText = linesToWrap.join('\n');
 
-    const additionalLines = [];
+    const additionalLines: string[] = [];
     if (remainingGhostText) {
-      const remainingCodePoints = toCodePoints(remainingGhostText);
-      let currentLine = '';
-      let currentWidth = 0;
+      const textLines = remainingGhostText.split('\n');
+      for (const textLine of textLines) {
+        const words = textLine.split(' ');
+        let currentLine = '';
 
-      for (const char of remainingCodePoints) {
-        if (char === '\n') {
-          if (currentLine) additionalLines.push(currentLine);
-          currentLine = '';
-          currentWidth = 0;
-          continue;
+        for (const word of words) {
+          const prospectiveLine = currentLine ? `${currentLine} ${word}` : word;
+          const prospectiveWidth = stringWidth(prospectiveLine);
+
+          if (prospectiveWidth > inputWidth) {
+            if (currentLine) {
+              additionalLines.push(currentLine);
+            }
+
+            let wordToProcess = word;
+            while (stringWidth(wordToProcess) > inputWidth) {
+              let part = '';
+              const wordCP = toCodePoints(wordToProcess);
+              let partWidth = 0;
+              let splitIndex = 0;
+              for (let i = 0; i < wordCP.length; i++) {
+                const char = wordCP[i];
+                const charWidth = stringWidth(char);
+                if (partWidth + charWidth > inputWidth) {
+                  break;
+                }
+                part += char;
+                partWidth += charWidth;
+                splitIndex = i + 1;
+              }
+              additionalLines.push(part);
+              wordToProcess = cpSlice(wordToProcess, splitIndex);
+            }
+            currentLine = wordToProcess;
+          } else {
+            currentLine = prospectiveLine;
+          }
         }
-
-        const charWidth = stringWidth(char);
-        if (currentWidth + charWidth > inputWidth) {
-          if (currentLine) additionalLines.push(currentLine);
-          currentLine = char;
-          currentWidth = charWidth;
-        } else {
-          currentLine += char;
-          currentWidth += charWidth;
+        if (currentLine) {
+          additionalLines.push(currentLine);
         }
-      }
-
-      if (currentLine) {
-        additionalLines.push(currentLine);
       }
     }
 
@@ -723,6 +749,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   focus &&
                   visualIdxInRenderedSet === cursorVisualRow &&
                   cursorVisualColAbsolute ===
+                    // eslint-disable-next-line no-control-regex
                     cpLen(display.replace(/\x1b\[[0-9;]*m/g, '')) &&
                   currentLineGhost;
 
