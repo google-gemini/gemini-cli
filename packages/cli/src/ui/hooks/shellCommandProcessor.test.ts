@@ -65,7 +65,10 @@ describe('useShellCommandProcessor', () => {
     setPendingHistoryItemMock = vi.fn();
     onExecMock = vi.fn();
     onDebugMessageMock = vi.fn();
-    mockConfig = { getTargetDir: () => '/test/dir' } as Config;
+    mockConfig = {
+      getTargetDir: () => '/test/dir',
+      getShouldUseNodePtyShell: () => false,
+    } as Config;
     mockGeminiClient = { addHistory: vi.fn() } as unknown as GeminiClient;
 
     vi.mocked(os.platform).mockReturnValue('linux');
@@ -140,6 +143,7 @@ describe('useShellCommandProcessor', () => {
       '/test/dir',
       expect.any(Function),
       expect.any(Object),
+      false,
     );
     expect(onExecMock).toHaveBeenCalledWith(expect.any(Promise));
   });
@@ -316,6 +320,7 @@ describe('useShellCommandProcessor', () => {
       '/test/dir',
       expect.any(Function),
       expect.any(Object),
+      false,
     );
   });
 

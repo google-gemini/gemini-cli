@@ -97,23 +97,26 @@ export class ShellExecutionService {
     cwd: string,
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
+    shouldUseNodePty: boolean,
     terminalColumns?: number,
     terminalRows?: number,
   ): Promise<ShellExecutionHandle> {
-    const ptyInfo = await getPty();
-    if (ptyInfo) {
-      try {
-        return this.executeWithPty(
-          commandToExecute,
-          cwd,
-          onOutputEvent,
-          abortSignal,
-          terminalColumns,
-          terminalRows,
-          ptyInfo,
-        );
-      } catch (_e) {
-        // Fallback to child_process
+    if (shouldUseNodePty) {
+      const ptyInfo = await getPty();
+      if (ptyInfo) {
+        try {
+          return this.executeWithPty(
+            commandToExecute,
+            cwd,
+            onOutputEvent,
+            abortSignal,
+            terminalColumns,
+            terminalRows,
+            ptyInfo,
+          );
+        } catch (_e) {
+          // Fallback to child_process
+        }
       }
     }
 
@@ -143,6 +146,7 @@ export class ShellExecutionService {
           ...process.env,
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
+          PAGER: 'cat',
         },
       });
 
@@ -329,6 +333,7 @@ export class ShellExecutionService {
           ...process.env,
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
+          PAGER: 'cat',
         },
         handleFlowControl: true,
       });

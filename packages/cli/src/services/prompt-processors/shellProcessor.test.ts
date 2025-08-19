@@ -63,6 +63,7 @@ describe('ShellProcessor', () => {
     mockConfig = {
       getTargetDir: vi.fn().mockReturnValue('/test/dir'),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
     };
 
     context = createMockCommandContext({
@@ -134,6 +135,7 @@ describe('ShellProcessor', () => {
       expect.any(String),
       expect.any(Function),
       expect.any(Object),
+      false,
     );
     expect(result).toBe('The current status is: On branch main');
   });
@@ -198,6 +200,7 @@ describe('ShellProcessor', () => {
       expect.any(String),
       expect.any(Function),
       expect.any(Object),
+      false,
     );
     expect(result).toBe('Do something dangerous: deleted');
   });
@@ -375,6 +378,7 @@ describe('ShellProcessor', () => {
       expect.any(String),
       expect.any(Function),
       expect.any(Object),
+      false,
     );
   });
 
@@ -412,6 +416,7 @@ describe('ShellProcessor', () => {
         expect.any(String),
         expect.any(Function),
         expect.any(Object),
+        false,
       );
       expect(result).toBe('Output: result');
     });
@@ -430,6 +435,7 @@ describe('ShellProcessor', () => {
         expect.any(String),
         expect.any(Function),
         expect.any(Object),
+        false,
       );
       expect(result).toBe('{{a},{b}}');
     });
@@ -582,6 +588,7 @@ describe('ShellProcessor', () => {
         expect.any(String),
         expect.any(Function),
         expect.any(Object),
+        false,
       );
 
       expect(result).toBe('Command: match found');
@@ -603,6 +610,7 @@ describe('ShellProcessor', () => {
         expect.any(String),
         expect.any(Function),
         expect.any(Object),
+        false,
       );
 
       expect(result).toBe(`User "(${rawArgs})" requested search: results`);
@@ -666,6 +674,7 @@ describe('ShellProcessor', () => {
         expect.any(String),
         expect.any(Function),
         expect.any(Object),
+        false,
       );
     });
 
@@ -693,6 +702,7 @@ describe('ShellProcessor', () => {
         expect.any(String),
         expect.any(Function),
         expect.any(Object),
+        false,
       );
     });
   });

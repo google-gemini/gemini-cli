@@ -105,6 +105,7 @@ describe('ShellExecutionService', () => {
       '/test/dir',
       onOutputEventMock,
       abortController.signal,
+      true,
     );
 
     await new Promise((resolve) => setImmediate(resolve));
@@ -204,6 +205,7 @@ describe('ShellExecutionService', () => {
         '/test/dir',
         onOutputEventMock,
         new AbortController().signal,
+        true,
       );
       const result = await handle.result;
 
@@ -348,6 +350,7 @@ describe('ShellExecutionService child_process fallback', () => {
       '/test/dir',
       onOutputEventMock,
       abortController.signal,
+      true,
     );
 
     await new Promise((resolve) => setImmediate(resolve));
@@ -522,6 +525,7 @@ describe('ShellExecutionService child_process fallback', () => {
         '/test/dir',
         onOutputEventMock,
         abortController.signal,
+        true,
       );
 
       abortController.abort();
@@ -635,5 +639,112 @@ describe('ShellExecutionService child_process fallback', () => {
         }),
       );
     });
+  });
+});
+
+describe('ShellExecutionService execution method selection', () => {
+  let onOutputEventMock: Mock<(event: ShellOutputEvent) => void>;
+  let mockPtyProcess: EventEmitter & {
+    pid: number;
+    kill: Mock;
+    onData: Mock;
+    onExit: Mock;
+  };
+  let mockChildProcess: EventEmitter & Partial<ChildProcess>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    onOutputEventMock = vi.fn();
+
+    // Mock for pty
+    mockPtyProcess = new EventEmitter() as EventEmitter & {
+      pid: number;
+      kill: Mock;
+      onData: Mock;
+      onExit: Mock;
+    };
+    mockPtyProcess.pid = 12345;
+    mockPtyProcess.kill = vi.fn();
+    mockPtyProcess.onData = vi.fn();
+    mockPtyProcess.onExit = vi.fn();
+    mockPtySpawn.mockReturnValue(mockPtyProcess);
+    mockGetPty.mockResolvedValue({
+      module: { spawn: mockPtySpawn },
+      name: 'mock-pty',
+    });
+
+    // Mock for child_process
+    mockChildProcess = new EventEmitter() as EventEmitter &
+      Partial<ChildProcess>;
+    mockChildProcess.stdout = new EventEmitter() as Readable;
+    mockChildProcess.stderr = new EventEmitter() as Readable;
+    mockChildProcess.kill = vi.fn();
+    Object.defineProperty(mockChildProcess, 'pid', {
+      value: 54321,
+      configurable: true,
+    });
+    mockCpSpawn.mockReturnValue(mockChildProcess);
+  });
+
+  it('should use node-pty when shouldUseNodePty is true and pty is available', async () => {
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'test command',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true, // shouldUseNodePty
+    );
+
+    // Simulate exit to allow promise to resolve
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+    const result = await handle.result;
+
+    expect(mockGetPty).toHaveBeenCalled();
+    expect(mockPtySpawn).toHaveBeenCalled();
+    expect(mockCpSpawn).not.toHaveBeenCalled();
+    expect(result.executionMethod).toBe('mock-pty');
+  });
+
+  it('should use child_process when shouldUseNodePty is false', async () => {
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'test command',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      false, // shouldUseNodePty
+    );
+
+    // Simulate exit to allow promise to resolve
+    mockChildProcess.emit('exit', 0, null);
+    const result = await handle.result;
+
+    expect(mockGetPty).not.toHaveBeenCalled();
+    expect(mockPtySpawn).not.toHaveBeenCalled();
+    expect(mockCpSpawn).toHaveBeenCalled();
+    expect(result.executionMethod).toBe('child_process');
+  });
+
+  it('should fall back to child_process if pty is not available even if shouldUseNodePty is true', async () => {
+    mockGetPty.mockResolvedValue(null);
+
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'test command',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true, // shouldUseNodePty
+    );
+
+    // Simulate exit to allow promise to resolve
+    mockChildProcess.emit('exit', 0, null);
+    const result = await handle.result;
+
+    expect(mockGetPty).toHaveBeenCalled();
+    expect(mockPtySpawn).not.toHaveBeenCalled();
+    expect(mockCpSpawn).toHaveBeenCalled();
+    expect(result.executionMethod).toBe('child_process');
   });
 });

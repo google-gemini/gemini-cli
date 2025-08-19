@@ -181,6 +181,7 @@ class ShellToolInvocation extends BaseToolInvocation<
           }
         },
         signal,
+        this.config.getShouldUseNodePtyShell(),
         terminalColumns,
         terminalRows,
       );

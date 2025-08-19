@@ -56,6 +56,7 @@ describe('ShellTool', () => {
       getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
       getWorkspaceContext: () => createMockWorkspaceContext('.'),
       getGeminiClient: vi.fn(),
+      getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     shellTool = new ShellTool(mockConfig);
@@ -151,6 +152,7 @@ describe('ShellTool', () => {
         expect.any(String),
         expect.any(Function),
         mockAbortSignal,
+        false,
         undefined,
         undefined,
       );
@@ -178,6 +180,7 @@ describe('ShellTool', () => {
         expect.any(String),
         expect.any(Function),
         mockAbortSignal,
+        false,
         undefined,
         undefined,
       );
