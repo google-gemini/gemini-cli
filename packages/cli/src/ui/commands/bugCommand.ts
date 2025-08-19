@@ -49,7 +49,8 @@ export const bugCommand: SlashCommand = {
 * **Operating System:** ${osVersion}
 * **Sandbox Environment:** ${sandboxEnv}
 * **Model Version:** ${modelVersion}
-* **Memory Usage:** ${memoryUsage}${ideClient ? `\n* **IDE Client:** ${ideClient}` : ''}
+* **Memory Usage:** ${memoryUsage}
+${ideClient ? `* **IDE Client:** ${ideClient}` : ''}
 `;
 
     let bugReportUrl =
