@@ -72,7 +72,7 @@ export async function getIdeProcessId(): Promise<number> {
 
     if (isShell) {
       let idePid = parentPid;
-      if (os.platform() === 'linux') {
+      if (os.platform() !== 'win32') {
         try {
           const { stdout: cmdOut } = await execAsync(
             `ps -o command= -p ${idePid}`,
