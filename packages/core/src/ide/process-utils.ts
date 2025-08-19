@@ -91,7 +91,6 @@ export async function getIdeProcessId(): Promise<number> {
           // Ignore if ps fails, we'll just use the parent pid.
         }
       }
-      console.log(idePid)
       return idePid;
     }
 
