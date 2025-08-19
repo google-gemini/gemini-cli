@@ -525,7 +525,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
 
-  useKeypress(handleInput, { isActive: true });
+  useKeypress(handleInput, {
+    isActive: true,
+  });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =

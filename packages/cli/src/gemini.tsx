@@ -24,6 +24,7 @@ import {
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
+import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions } from './config/extension.js';
 import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
@@ -41,6 +42,7 @@ import {
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
+import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
@@ -78,7 +80,7 @@ function getNodeMemoryArgs(config: Config): string[] {
     );
   }
 
-  if (process.env.GEMINI_CLI_NO_RELAUNCH) {
+  if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
     return [];
   }
 
@@ -106,7 +108,7 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   await new Promise((resolve) => child.on('close', resolve));
   process.exit(0);
 }
-import { runAcpPeer } from './acp/acpPeer.js';
+import { runZedIntegration } from './zed-integration/zedIntegration.js';
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
@@ -139,7 +141,7 @@ export async function main() {
   if (settings.errors.length > 0) {
     for (const error of settings.errors) {
       let errorMessage = `Error in ${error.path}: ${error.message}`;
-      if (!process.env.NO_COLOR) {
+      if (!process.env['NO_COLOR']) {
         errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
       }
       console.error(errorMessage);
@@ -156,6 +158,13 @@ export async function main() {
     sessionId,
     argv,
   );
+
+  const consolePatcher = new ConsolePatcher({
+    stderr: true,
+    debugMode: config.getDebugMode(),
+  });
+  consolePatcher.patch();
+  registerCleanup(consolePatcher.cleanup);
 
   dns.setDefaultResultOrder(
     validateDnsResolutionOrder(settings.merged.dnsResolutionOrder),
@@ -178,7 +187,7 @@ export async function main() {
 
   // Set a default auth type if one isn't set.
   if (!settings.merged.selectedAuthType) {
-    if (process.env.CLOUD_SHELL === 'true') {
+    if (process.env['CLOUD_SHELL'] === 'true') {
       settings.setValue(
         SettingScope.User,
         'selectedAuthType',
@@ -208,7 +217,7 @@ export async function main() {
   }
 
   // hop into sandbox if we are outside and sandboxing is enabled
-  if (!process.env.SANDBOX) {
+  if (!process.env['SANDBOX']) {
     const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
       ? getNodeMemoryArgs(config)
       : [];
@@ -250,8 +259,8 @@ export async function main() {
     await getOauthClient(settings.merged.selectedAuthType, config);
   }
 
-  if (config.getExperimentalAcp()) {
-    return runAcpPeer(config, settings);
+  if (config.getExperimentalZedIntegration()) {
+    return runZedIntegration(config, settings, extensions, argv);
   }
 
   let input = config.getQuestion();
@@ -263,6 +272,8 @@ export async function main() {
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {
     const version = await getCliVersion();
+    // Detect and enable Kitty keyboard protocol once at startup
+    await detectAndEnableKittyProtocol();
     setWindowTitle(basename(workspaceRoot), settings);
     const instance = render(
       <React.StrictMode>
@@ -294,8 +305,11 @@ export async function main() {
   }
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
-  if (!process.stdin.isTTY && !input) {
-    input += await readStdin();
+  if (!process.stdin.isTTY) {
+    const stdinData = await readStdin();
+    if (stdinData) {
+      input = `${stdinData}\n\n${input}`;
+    }
   }
   if (!input) {
     console.error('No input provided via stdin.');
@@ -324,7 +338,9 @@ export async function main() {
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.hideWindowTitle) {
-    const windowTitle = (process.env.CLI_TITLE || `Gemini - ${title}`).replace(
+    const windowTitle = (
+      process.env['CLI_TITLE'] || `Gemini - ${title}`
+    ).replace(
       // eslint-disable-next-line no-control-regex
       /[\x00-\x1F\x7F]/g,
       '',

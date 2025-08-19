@@ -80,6 +80,8 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useVimMode, VimModeProvider } from './contexts/VimModeContext.js';
 import { useVim } from './hooks/vim.js';
 import { useKeypress, Key } from './hooks/useKeypress.js';
+import { KeypressProvider } from './contexts/KeypressContext.js';
+import { useKittyKeyboardProtocol } from './hooks/useKittyKeyboardProtocol.js';
 import { keyMatchers, Command } from './keyMatchers.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
@@ -108,13 +110,21 @@ interface AppProps {
   version: string;
 }
 
-export const AppWrapper = (props: AppProps) => (
-  <SessionStatsProvider>
-    <VimModeProvider settings={props.settings}>
-      <App {...props} />
-    </VimModeProvider>
-  </SessionStatsProvider>
-);
+export const AppWrapper = (props: AppProps) => {
+  const kittyProtocolStatus = useKittyKeyboardProtocol();
+  return (
+    <KeypressProvider
+      kittyProtocolEnabled={kittyProtocolStatus.enabled}
+      config={props.config}
+    >
+      <SessionStatsProvider>
+        <VimModeProvider settings={props.settings}>
+          <App {...props} />
+        </VimModeProvider>
+      </SessionStatsProvider>
+    </KeypressProvider>
+  );
+};
 
 const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const isFocused = useFocus();
@@ -170,6 +180,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [editorError, setEditorError] = useState<string | null>(null);
   const [footerHeight, setFooterHeight] = useState<number>(0);
   const [corgiMode, setCorgiMode] = useState(false);
+  const [isTrustedFolderState, setIsTrustedFolder] = useState(
+    config.isTrustedFolder(),
+  );
   const [currentModel, setCurrentModel] = useState(config.getModel());
   const [shellModeActive, setShellModeActive] = useState(false);
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
@@ -251,8 +264,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
 
-  const { isFolderTrustDialogOpen, handleFolderTrustSelect } =
-    useFolderTrust(settings);
+  const { isFolderTrustDialogOpen, handleFolderTrustSelect } = useFolderTrust(
+    settings,
+    setIsTrustedFolder,
+  );
 
   const {
     isAuthDialogOpen,
@@ -697,7 +712,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     ],
   );
 
-  useKeypress(handleGlobalKeypress, { isActive: true });
+  useKeypress(handleGlobalKeypress, {
+    isActive: true,
+  });
 
   useEffect(() => {
     if (config) {
@@ -959,6 +976,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               {confirmationRequest.prompt}
               <Box paddingY={1}>
                 <RadioButtonSelect
+                  isFocused={!!confirmationRequest}
                   items={[
                     { label: 'Yes', value: true },
                     { label: 'No', value: false },
@@ -1071,7 +1089,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 alignItems={isNarrow ? 'flex-start' : 'center'}
               >
                 <Box>
-                  {process.env.GEMINI_SYSTEM_MD && (
+                  {process.env['GEMINI_SYSTEM_MD'] && (
                     <Text color={Colors.AccentRed}>|⌐■_■| </Text>
                   )}
                   {ctrlCPressedOnce ? (
@@ -1190,6 +1208,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             promptTokenCount={sessionStats.lastPromptTokenCount}
             nightly={nightly}
             vimMode={vimModeEnabled ? vimMode : undefined}
+            isTrustedFolder={isTrustedFolderState}
           />
         </Box>
       </Box>

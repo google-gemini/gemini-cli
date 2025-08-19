@@ -12,11 +12,10 @@ import {
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   GeminiEventType,
-  ToolErrorType,
+  parseAndFormatApiError,
 } from '@google/gemini-cli-core';
 import { Content, Part, FunctionCall } from '@google/genai';
 
-import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 
 export async function runNonInteractive(
@@ -109,8 +108,6 @@ export async function runNonInteractive(
             console.error(
               `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
             );
-            if (toolResponse.errorType === ToolErrorType.UNHANDLED_EXCEPTION)
-              process.exit(1);
           }
 
           if (toolResponse.responseParts) {

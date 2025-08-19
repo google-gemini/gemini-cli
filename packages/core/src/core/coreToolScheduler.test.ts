@@ -4,33 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   CoreToolScheduler,
   ToolCall,
-  ValidatingToolCall,
   convertToFunctionResponse,
 } from './coreToolScheduler.js';
 import {
-  BaseTool,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolConfirmationPayload,
+  ToolInvocation,
   ToolResult,
   Config,
-  Icon,
+  Kind,
   ApprovalMode,
   logToolCall,
   ToolCallEvent,
+  ToolRegistry,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
-
-import {
-  ModifiableDeclarativeTool,
-  ModifyContext,
-} from '../tools/modifiable-tool.js';
-import { MockTool } from '../test-utils/tools.js';
+import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
 
 vi.mock('../index.js', async () => {
   const actual = await vi.importActual('../index.js');
@@ -39,47 +35,6 @@ vi.mock('../index.js', async () => {
     logToolCall: vi.fn(),
   };
 });
-
-class MockModifiableTool
-  extends MockTool
-  implements ModifiableDeclarativeTool<Record<string, unknown>>
-{
-  constructor(name = 'mockModifiableTool') {
-    super(name);
-    this.shouldConfirm = true;
-  }
-
-  getModifyContext(
-    _abortSignal: AbortSignal,
-  ): ModifyContext<Record<string, unknown>> {
-    return {
-      getFilePath: () => 'test.txt',
-      getCurrentContent: async () => 'old content',
-      getProposedContent: async () => 'new content',
-      createUpdatedParams: (
-        _oldContent: string,
-        modifiedProposedContent: string,
-        _originalParams: Record<string, unknown>,
-      ) => ({ newContent: modifiedProposedContent }),
-    };
-  }
-
-  async shouldConfirmExecute(): Promise<ToolCallConfirmationDetails | false> {
-    if (this.shouldConfirm) {
-      return {
-        type: 'edit',
-        title: 'Confirm Mock Tool',
-        fileName: 'test.txt',
-        filePath: 'test.txt',
-        fileDiff: 'diff',
-        originalContent: 'originalContent',
-        newContent: 'newContent',
-        onConfirm: async () => {},
-      };
-    }
-    return false;
-  }
-}
 
 describe('CoreToolScheduler', () => {
   beforeEach(() => {
@@ -94,7 +49,7 @@ describe('CoreToolScheduler', () => {
       getTool: () => declarativeTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
-      discovery: {} as any,
+      discovery: {},
       registerTool: () => {},
       getToolByName: () => declarativeTool,
       getToolByDisplayName: () => declarativeTool,
@@ -116,7 +71,7 @@ describe('CoreToolScheduler', () => {
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as any),
+      toolRegistry: Promise.resolve(toolRegistry as unknown as ToolRegistry),
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -134,21 +89,6 @@ describe('CoreToolScheduler', () => {
 
     abortController.abort();
     await scheduler.schedule([request], abortController.signal);
-
-    const _waitingCall = onToolCallsUpdate.mock
-      .calls[1][0][0] as ValidatingToolCall;
-    const confirmationDetails = await mockTool.shouldConfirmExecute(
-      {},
-      abortController.signal,
-    );
-    if (confirmationDetails) {
-      await scheduler.handleConfirmationResponse(
-        '1',
-        confirmationDetails.onConfirm,
-        ToolConfirmationOutcome.ProceedOnce,
-        abortController.signal,
-      );
-    }
 
     expect(onAllToolCallsComplete).toHaveBeenCalled();
     const completedCalls = onAllToolCallsComplete.mock
@@ -169,7 +109,7 @@ describe('CoreToolScheduler with payload', () => {
       getTool: () => declarativeTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
-      discovery: {} as any,
+      discovery: {},
       registerTool: () => {},
       getToolByName: () => declarativeTool,
       getToolByDisplayName: () => declarativeTool,
@@ -191,7 +131,7 @@ describe('CoreToolScheduler with payload', () => {
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as any),
+      toolRegistry: Promise.resolve(toolRegistry as unknown as ToolRegistry),
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -209,15 +149,22 @@ describe('CoreToolScheduler with payload', () => {
 
     await scheduler.schedule([request], abortController.signal);
 
-    const confirmationDetails = await mockTool.shouldConfirmExecute();
+    await vi.waitFor(() => {
+      const awaitingCall = onToolCallsUpdate.mock.calls.find(
+        (call) => call[0][0].status === 'awaiting_approval',
+      )?.[0][0];
+      expect(awaitingCall).toBeDefined();
+    });
+
+    const awaitingCall = onToolCallsUpdate.mock.calls.find(
+      (call) => call[0][0].status === 'awaiting_approval',
+    )?.[0][0];
+    const confirmationDetails = awaitingCall.confirmationDetails;
 
     if (confirmationDetails) {
       const payload: ToolConfirmationPayload = { newContent: 'final version' };
-      await scheduler.handleConfirmationResponse(
-        '1',
-        confirmationDetails.onConfirm,
+      await confirmationDetails.onConfirm(
         ToolConfirmationOutcome.ProceedOnce,
-        abortController.signal,
         payload,
       );
     }
@@ -399,58 +346,66 @@ describe('convertToFunctionResponse', () => {
   });
 });
 
+class MockEditToolInvocation extends BaseToolInvocation<
+  Record<string, unknown>,
+  ToolResult
+> {
+  constructor(params: Record<string, unknown>) {
+    super(params);
+  }
+
+  getDescription(): string {
+    return 'A mock edit tool invocation';
+  }
+
+  override async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    return {
+      type: 'edit',
+      title: 'Confirm Edit',
+      fileName: 'test.txt',
+      filePath: 'test.txt',
+      fileDiff:
+        '--- test.txt\n+++ test.txt\n@@ -1,1 +1,1 @@\n-old content\n+new content',
+      originalContent: 'old content',
+      newContent: 'new content',
+      onConfirm: async () => {},
+    };
+  }
+
+  async execute(_abortSignal: AbortSignal): Promise<ToolResult> {
+    return {
+      llmContent: 'Edited successfully',
+      returnDisplay: 'Edited successfully',
+    };
+  }
+}
+
+class MockEditTool extends BaseDeclarativeTool<
+  Record<string, unknown>,
+  ToolResult
+> {
+  constructor() {
+    super('mockEditTool', 'mockEditTool', 'A mock edit tool', Kind.Edit, {});
+  }
+
+  protected createInvocation(
+    params: Record<string, unknown>,
+  ): ToolInvocation<Record<string, unknown>, ToolResult> {
+    return new MockEditToolInvocation(params);
+  }
+}
+
 describe('CoreToolScheduler edit cancellation', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should preserve diff when an edit is cancelled', async () => {
-    class MockEditTool extends BaseTool<Record<string, unknown>, ToolResult> {
-      constructor() {
-        super(
-          'mockEditTool',
-          'mockEditTool',
-          'A mock edit tool',
-          Icon.Pencil,
-          {},
-        );
-      }
-
-      async shouldConfirmExecute(
-        _params: Record<string, unknown>,
-        _abortSignal: AbortSignal,
-      ): Promise<ToolCallConfirmationDetails | false> {
-        return {
-          type: 'edit',
-          title: 'Confirm Edit',
-          fileName: 'test.txt',
-          filePath: 'test.txt',
-          fileDiff:
-            '--- test.txt\n+++ test.txt\n@@ -1,1 +1,1 @@\n-old content\n+new content',
-          originalContent: 'old content',
-          newContent: 'new content',
-          onConfirm: async () => {},
-        };
-      }
-
-      async execute(
-        _params: Record<string, unknown>,
-        _abortSignal: AbortSignal,
-      ): Promise<ToolResult> {
-        return {
-          llmContent: 'Edited successfully',
-          returnDisplay: 'Edited successfully',
-        };
-      }
-    }
-
     const mockEditTool = new MockEditTool();
     const declarativeTool = mockEditTool;
     const toolRegistry = {
       getTool: () => declarativeTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
-      discovery: {} as any,
+      discovery: {},
       registerTool: () => {},
       getToolByName: () => declarativeTool,
       getToolByDisplayName: () => declarativeTool,
@@ -472,7 +427,7 @@ describe('CoreToolScheduler edit cancellation', () => {
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as any),
+      toolRegistry: Promise.resolve(toolRegistry as unknown as ToolRegistry),
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -498,17 +453,9 @@ describe('CoreToolScheduler edit cancellation', () => {
     expect(awaitingCall).toBeDefined();
 
     // Cancel the edit
-    const confirmationDetails = await mockEditTool.shouldConfirmExecute(
-      {},
-      abortController.signal,
-    );
+    const confirmationDetails = awaitingCall.confirmationDetails;
     if (confirmationDetails) {
-      await scheduler.handleConfirmationResponse(
-        '1',
-        confirmationDetails.onConfirm,
-        ToolConfirmationOutcome.Cancel,
-        abortController.signal,
-      );
+      await confirmationDetails.onConfirm(ToolConfirmationOutcome.Cancel);
     }
 
     expect(onAllToolCallsComplete).toHaveBeenCalled();
@@ -518,6 +465,7 @@ describe('CoreToolScheduler edit cancellation', () => {
     expect(completedCalls[0].status).toBe('cancelled');
 
     // Check that the diff is preserved
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cancelledCall = completedCalls[0] as any;
     expect(cancelledCall.response.resultDisplay).toBeDefined();
     expect(cancelledCall.response.resultDisplay.fileDiff).toBe(
@@ -549,7 +497,7 @@ describe('CoreToolScheduler YOLO mode', () => {
       // Other properties are not needed for this test but are included for type consistency.
       getFunctionDeclarations: () => [],
       tools: new Map(),
-      discovery: {} as any,
+      discovery: {},
       registerTool: () => {},
       getToolByDisplayName: () => declarativeTool,
       getTools: () => [],
@@ -571,7 +519,7 @@ describe('CoreToolScheduler YOLO mode', () => {
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as any),
+      toolRegistry: Promise.resolve(toolRegistry as unknown as ToolRegistry),
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -639,7 +587,7 @@ describe('CoreToolScheduler request queueing', () => {
       getToolByName: () => declarativeTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
-      discovery: {} as any,
+      discovery: {},
       registerTool: () => {},
       getToolByDisplayName: () => declarativeTool,
       getTools: () => [],
@@ -660,7 +608,7 @@ describe('CoreToolScheduler request queueing', () => {
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as any),
+      toolRegistry: Promise.resolve(toolRegistry as unknown as ToolRegistry),
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -748,7 +696,7 @@ describe('CoreToolScheduler request queueing', () => {
       getToolByName: () => declarativeTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
-      discovery: {} as any,
+      discovery: {},
       registerTool: () => {},
       getToolByDisplayName: () => declarativeTool,
       getTools: () => [],
@@ -769,7 +717,7 @@ describe('CoreToolScheduler request queueing', () => {
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as any),
+      toolRegistry: Promise.resolve(toolRegistry as unknown as ToolRegistry),
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
