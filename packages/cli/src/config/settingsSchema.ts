@@ -277,6 +277,17 @@ export const SETTINGS_SCHEMA = {
     showInDialog: true,
   },
 
+  shouldUseNodePtyShell: {
+    type: 'boolean',
+    label: 'Use node-pty for Shell Execution',
+    category: 'Shell',
+    requiresRestart: true,
+    default: false,
+    description:
+      'Use node-pty for shell command execution. Fallback to child_process still applies.',
+    showInDialog: true,
+  },
+
   selectedAuthType: {
     type: 'string',
     label: 'Selected Auth Type',
