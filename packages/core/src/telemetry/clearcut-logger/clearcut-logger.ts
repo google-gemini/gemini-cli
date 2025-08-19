@@ -450,6 +450,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_ERROR_TYPE,
         value: JSON.stringify(event.error_type),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_TYPE,
+        value: JSON.stringify(event.tool_type),
+      },
     ];
 
     if (event.metadata) {

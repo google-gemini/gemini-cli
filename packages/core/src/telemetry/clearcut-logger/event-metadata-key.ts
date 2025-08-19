@@ -234,4 +234,7 @@ export enum EventMetadataKey {
 
   // Logs the number of tokens after context window compression.
   GEMINI_CLI_COMPRESSION_TOKENS_AFTER = 61,
+
+  // Logs tool type whether it is mcp or native.
+  GEMINI_CLI_TOOL_TYPE = 62,
 }

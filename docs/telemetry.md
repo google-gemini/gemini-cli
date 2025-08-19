@@ -240,6 +240,7 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `function_name`
     - `success` (boolean)
     - `decision` (string: "accept", "reject", or "modify", if applicable)
+    - `tool_type` (string: "mcp", or "native", if applicable)
 
 - `gemini_cli.tool.call.latency` (Histogram, ms): Measures tool call latency.
   - **Attributes**:
