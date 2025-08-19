@@ -5,7 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
-import { lightSemanticColors } from './semantic-tokens.js';
+import { createSemanticColors } from './semantic-tokens.js';
 
 const ayuLightColors: ColorsTheme = {
   type: 'light',
@@ -135,5 +135,5 @@ export const AyuLight: Theme = new Theme(
     },
   },
   ayuLightColors,
-  lightSemanticColors,
+  createSemanticColors(ayuLightColors),
 );

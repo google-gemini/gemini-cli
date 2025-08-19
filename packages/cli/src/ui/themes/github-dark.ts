@@ -5,7 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
-import { darkSemanticColors } from './semantic-tokens.js';
+import { createSemanticColors } from './semantic-tokens.js';
 
 const githubDarkColors: ColorsTheme = {
   type: 'dark',
@@ -112,36 +112,21 @@ export const GitHubDark: Theme = new Theme(
       color: githubDarkColors.AccentCyan,
     },
     'hljs-symbol': {
-      color: githubDarkColors.AccentPurple,
+      color: githubDarkColors.AccentCyan,
     },
     'hljs-bullet': {
-      color: githubDarkColors.AccentPurple,
+      color: githubDarkColors.AccentCyan,
     },
     'hljs-built_in': {
-      color: githubDarkColors.LightBlue,
-    },
-    'hljs-builtin-name': {
-      color: githubDarkColors.LightBlue,
-    },
-    'hljs-meta': {
-      color: githubDarkColors.LightBlue,
-      fontWeight: 'bold',
-    },
-    'hljs-deletion': {
-      background: '#86181D',
-      color: githubDarkColors.AccentRed,
+      color: githubDarkColors.AccentCyan,
     },
     'hljs-addition': {
-      background: '#144620',
       color: githubDarkColors.AccentGreen,
     },
-    'hljs-emphasis': {
-      fontStyle: 'italic',
-    },
-    'hljs-strong': {
-      fontWeight: 'bold',
+    'hljs-deletion': {
+      color: githubDarkColors.AccentRed,
     },
   },
   githubDarkColors,
-  darkSemanticColors,
+  createSemanticColors(githubDarkColors),
 );

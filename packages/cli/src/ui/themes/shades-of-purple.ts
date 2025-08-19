@@ -9,7 +9,7 @@
  * @author Ahmad Awais <https://twitter.com/mrahmadawais/>
  */
 import { type ColorsTheme, Theme } from './theme.js';
-import { darkSemanticColors } from './semantic-tokens.js';
+import { createSemanticColors } from './semantic-tokens.js';
 
 const shadesOfPurpleColors: ColorsTheme = {
   type: 'dark',
@@ -348,5 +348,5 @@ export const ShadesOfPurple = new Theme(
     },
   },
   shadesOfPurpleColors,
-  darkSemanticColors,
+  createSemanticColors(shadesOfPurpleColors),
 );
