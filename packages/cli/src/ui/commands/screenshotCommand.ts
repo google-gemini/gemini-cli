@@ -65,7 +65,7 @@ export const screenshotCommand: SlashCommand = {
         return {
           type: 'message',
           messageType: 'info',
-          content: `Screenshot capture was cancelled.\n\n💡 If you see only background/wallpaper:\n   Enable Screen Recording permission for your terminal in\n   System Preferences > Security & Privacy > Privacy`
+          content: `Screenshot capture was cancelled.`
         };
       }
     } catch (error) {
