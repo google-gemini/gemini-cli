@@ -51,6 +51,7 @@ describe('bugCommand', () => {
           getIdeClient: () => ({
             getDetectedIdeDisplayName: () => 'VSCode',
           }),
+          getIdeMode: () => true,
         },
       },
     });
@@ -86,6 +87,7 @@ describe('bugCommand', () => {
           getIdeClient: () => ({
             getDetectedIdeDisplayName: () => 'VSCode',
           }),
+          getIdeMode: () => true,
         },
       },
     });

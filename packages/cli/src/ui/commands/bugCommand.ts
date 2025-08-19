@@ -38,7 +38,8 @@ export const bugCommand: SlashCommand = {
     const cliVersion = await getCliVersion();
     const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
     const ideClient =
-      context.services.config?.getIdeClient()?.getDetectedIdeDisplayName() ||
+      (context.services.config?.getIdeMode() &&
+        context.services.config?.getIdeClient()?.getDetectedIdeDisplayName()) ||
       '';
 
     const info = `
@@ -48,8 +49,7 @@ export const bugCommand: SlashCommand = {
 * **Operating System:** ${osVersion}
 * **Sandbox Environment:** ${sandboxEnv}
 * **Model Version:** ${modelVersion}
-* **Memory Usage:** ${memoryUsage}
-* **IDE Client:** ${ideClient}
+* **Memory Usage:** ${memoryUsage}${ideClient ? `\n* **IDE Client:** ${ideClient}` : ''}
 `;
 
     let bugReportUrl =
