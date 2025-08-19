@@ -21,6 +21,10 @@ import {
   EventNames,
   TEST_ONLY,
 } from './clearcut-logger.js';
+import {
+  AuthType,
+  ContentGeneratorConfig,
+} from '../../core/contentGenerator.js';
 import { ConfigParameters } from '../../config/config.js';
 import * as userAccount from '../../utils/user_account.js';
 import * as userId from '../../utils/user_id.js';
@@ -28,7 +32,8 @@ import { EventMetadataKey } from './event-metadata-key.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../mocks/msw.js';
-import { makeChatCompressionEvent } from '../types.js';
+import { UserPromptEvent, makeChatCompressionEvent } from '../types.js';
+import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 
 interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
@@ -198,6 +203,65 @@ describe('ClearcutLogger', () => {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
         value: 'GitHub',
       });
+    });
+
+    it('logs default metadata', () => {
+      // Define expected values
+      const session_id = 'my-session-id';
+      const auth_type = AuthType.USE_GEMINI;
+      const google_accounts = 123;
+      const surface = 'ide-1234';
+      const cli_version = CLI_VERSION;
+      const git_commit_hash = GIT_COMMIT_INFO;
+      const prompt_id = 'my-prompt-123';
+
+      // Setup logger with expected values
+      const { logger, loggerConfig } = setup({
+        lifetimeGoogleAccounts: google_accounts,
+        config: { sessionId: session_id },
+      });
+      vi.spyOn(loggerConfig, 'getContentGeneratorConfig').mockReturnValue({
+        authType: auth_type,
+      } as ContentGeneratorConfig);
+      logger?.logNewPromptEvent(new UserPromptEvent(1, prompt_id)); // prompt_id == session_id before this
+      vi.stubEnv('SURFACE', surface);
+
+      // Create log event
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      // Ensure expected values exist
+      expect(event?.event_metadata[0]).toEqual(
+        expect.arrayContaining([
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+            value: session_id,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
+            value: JSON.stringify(auth_type),
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
+            value: `${google_accounts}`,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+            value: surface,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
+            value: cli_version,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
+            value: git_commit_hash,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+            value: prompt_id,
+          },
+        ]),
+      );
     });
 
     it('logs the current surface', () => {
