@@ -84,7 +84,7 @@ Choose the authentication method that best fits your needs:
 
 **Benefits:**
 
-- **Free tier**: 60 requests/min and 1,000 requests/day
+- **Free tier**: 60 requests/min and 20 requests/day
 - **Gemini 2.5 Pro** with 1M token context window
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
