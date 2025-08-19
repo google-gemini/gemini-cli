@@ -564,8 +564,8 @@ export async function connectAndDiscover(
  * This function takes a JSON Schema reference path (e.g., "#/definitions/MyType")
  * and traverses the root schema to find and return the referenced definition.
  *
- * @param path - The JSON Schema reference path starting with "#/" (e.g., "#/definitions/MyType")
- * @param rootSchema - The root schema object to search within (optional)
+ * @param path - The JSON Schema reference path  (e.g., "#/definitions/MyType")
+ * @param rootSchema - The root schema object to search within
  * @returns The referenced schema definition, or null if the path cannot be resolved
  *
  * @example
@@ -580,9 +580,10 @@ export async function connectAndDiscover(
  * ```
  */
 export function getRefDefinition(
-  path: `#/${string}`,
-  rootSchema?: Record<string, unknown>,
+  path: string,
+  rootSchema: unknown,
 ): unknown {
+  // only support internal references
   if (!path.startsWith('#/')) {
     return null;
   }
@@ -602,14 +603,14 @@ export function getRefDefinition(
  * items have a `type` defined. Handles $ref references by treating them as valid.
  *
  * @param schema The JSON schema to validate.
- * @param rootSchema The root schema containing definitions (optional).
+ * @param rootSchema The root schema containing definitions (optional). use schema as default rootSchema.
  * @returns `true` if the schema is valid, `false` otherwise.
  *
  * @visiblefortesting
  */
 export function hasValidTypes(
   schema: unknown,
-  rootSchema?: Record<string, unknown>,
+  rootSchema: unknown = schema,
 ): boolean {
   if (typeof schema !== 'object' || schema === null) {
     // Not a schema object we can validate, or not a schema at all.
@@ -623,14 +624,13 @@ export function hasValidTypes(
   if (s['$ref']) {
     const refPath = s['$ref'] as string;
 
-    // Local reference within the schema
-    if (refPath.startsWith('#/')) {
-      const definition = getRefDefinition(refPath as `#/${string}`, rootSchema);
-      return hasValidTypes(definition, rootSchema);
-    }
+    const definition = getRefDefinition(refPath, rootSchema);
 
-    // External references are also treated as valid for now
-    return true;
+    // invalid ref
+    if (!definition) {
+      return false;
+    }
+    return hasValidTypes(definition, rootSchema);
   }
 
   if (!s['type']) {

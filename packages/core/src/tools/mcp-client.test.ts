@@ -629,14 +629,14 @@ describe('mcp-client', () => {
       const schema = {
         anyOf: [{ type: 'string' }, { type: 'number' }],
       };
-      expect(hasValidTypes(schema, schema)).toBe(true);
+      expect(hasValidTypes(schema)).toBe(true);
     });
 
     it('should return false for an invalid schema with anyOf', () => {
       const schema = {
         anyOf: [{ type: 'string' }, { description: 'no type' }],
       };
-      expect(hasValidTypes(schema, schema)).toBe(false);
+      expect(hasValidTypes(schema)).toBe(false);
     });
 
     it('should return true for a valid schema with allOf', () => {
@@ -646,28 +646,28 @@ describe('mcp-client', () => {
           { type: 'object', properties: { foo: { type: 'string' } } },
         ],
       };
-      expect(hasValidTypes(schema, schema)).toBe(true);
+      expect(hasValidTypes(schema)).toBe(true);
     });
 
     it('should return false for an invalid schema with allOf', () => {
       const schema = {
         allOf: [{ type: 'string' }, { description: 'no type' }],
       };
-      expect(hasValidTypes(schema, schema)).toBe(false);
+      expect(hasValidTypes(schema)).toBe(false);
     });
 
     it('should return true for a valid schema with oneOf', () => {
       const schema = {
         oneOf: [{ type: 'string' }, { type: 'number' }],
       };
-      expect(hasValidTypes(schema, schema)).toBe(true);
+      expect(hasValidTypes(schema)).toBe(true);
     });
 
     it('should return false for an invalid schema with oneOf', () => {
       const schema = {
         oneOf: [{ type: 'string' }, { description: 'no type' }],
       };
-      expect(hasValidTypes(schema, schema)).toBe(false);
+      expect(hasValidTypes(schema)).toBe(false);
     });
 
     it('should return true for a valid schema with nested subschemas', () => {
@@ -682,7 +682,7 @@ describe('mcp-client', () => {
           },
         ],
       };
-      expect(hasValidTypes(schema, schema)).toBe(true);
+      expect(hasValidTypes(schema)).toBe(true);
     });
 
     it('should return false for an invalid schema with nested subschemas', () => {
@@ -697,7 +697,7 @@ describe('mcp-client', () => {
           },
         ],
       };
-      expect(hasValidTypes(schema, schema)).toBe(false);
+      expect(hasValidTypes(schema)).toBe(false);
     });
 
     it('should return true for a schema with a type and subschemas', () => {
@@ -705,14 +705,14 @@ describe('mcp-client', () => {
         type: 'string',
         anyOf: [{ minLength: 1 }, { maxLength: 5 }],
       };
-      expect(hasValidTypes(schema, schema)).toBe(true);
+      expect(hasValidTypes(schema)).toBe(true);
     });
 
     it('should return false for a schema with no type and no subschemas', () => {
       const schema = {
         description: 'a schema with no type',
       };
-      expect(hasValidTypes(schema, schema)).toBe(false);
+      expect(hasValidTypes(schema)).toBe(false);
     });
 
     it('should return true for a valid schema', () => {
@@ -722,7 +722,7 @@ describe('mcp-client', () => {
           param1: { type: 'string' },
         },
       };
-      expect(hasValidTypes(schema, schema)).toBe(true);
+      expect(hasValidTypes(schema)).toBe(true);
     });
 
     it('should return false if a parameter is missing a type', () => {
@@ -732,7 +732,7 @@ describe('mcp-client', () => {
           param1: { description: 'a param with no type' },
         },
       };
-      expect(hasValidTypes(schema, schema)).toBe(false);
+      expect(hasValidTypes(schema)).toBe(false);
     });
 
     it('should return false if a nested parameter is missing a type', () => {
@@ -749,7 +749,7 @@ describe('mcp-client', () => {
           },
         },
       };
-      expect(hasValidTypes(schema, schema)).toBe(false);
+      expect(hasValidTypes(schema)).toBe(false);
     });
 
     it('should return false if an array item is missing a type', () => {
@@ -764,14 +764,14 @@ describe('mcp-client', () => {
           },
         },
       };
-      expect(hasValidTypes(schema, schema)).toBe(false);
+      expect(hasValidTypes(schema)).toBe(false);
     });
 
     it('should return true for a schema with no properties', () => {
       const schema = {
         type: 'object',
       };
-      expect(hasValidTypes(schema, schema)).toBe(true);
+      expect(hasValidTypes(schema)).toBe(true);
     });
 
     it('should return true for a schema with an empty properties object', () => {
@@ -779,15 +779,34 @@ describe('mcp-client', () => {
         type: 'object',
         properties: {},
       };
-      expect(hasValidTypes(schema, schema)).toBe(true);
+      expect(hasValidTypes(schema)).toBe(true);
     });
 
     describe('$ref handling', () => {
-      it('should return true for a schema with local $ref reference', () => {
+      it('should return true for a schema with definitions containing types', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            user: { $ref: '#/definitions/User' },
+          },
+          definitions: {
+            User: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                age: { type: 'number' },
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should return false for a schema with invalid reference', () => {
         const schema = {
           $ref: '#/definitions/User',
         };
-        expect(hasValidTypes(schema, schema)).toBe(true);
+        expect(hasValidTypes(schema)).toBe(false);
       });
 
       it('should return false for a schema with local $ref reference has no type', () => {
@@ -803,14 +822,14 @@ describe('mcp-client', () => {
             },
           },
         };
-        expect(hasValidTypes(schema, schema)).toBe(false);
+        expect(hasValidTypes(schema)).toBe(false);
       });
 
-      it('should return true for a schema with external $ref reference', () => {
+      it('should return false for a schema with external $ref reference', () => {
         const schema = {
           $ref: 'https://example.com/schema.json#/definitions/User',
         };
-        expect(hasValidTypes(schema, schema)).toBe(true);
+        expect(hasValidTypes(schema)).toBe(false);
       });
 
       it('should return true for a schema with nested $ref in properties', () => {
@@ -820,16 +839,23 @@ describe('mcp-client', () => {
             user: { $ref: '#/definitions/User' },
             address: { $ref: '#/definitions/Address' },
           },
+          definitions: {
+            User: { type: 'object' },
+            Address: { type: 'object' },
+          },
         };
-        expect(hasValidTypes(schema, schema)).toBe(true);
+        expect(hasValidTypes(schema)).toBe(true);
       });
 
       it('should return true for a schema with $ref in array items', () => {
         const schema = {
           type: 'array',
           items: { $ref: '#/definitions/User' },
+          definitions: {
+            User: { type: 'object' },
+          },
         };
-        expect(hasValidTypes(schema, schema)).toBe(true);
+        expect(hasValidTypes(schema)).toBe(true);
       });
 
       it('should return true for a schema with $ref in anyOf', () => {
@@ -838,8 +864,12 @@ describe('mcp-client', () => {
             { $ref: '#/definitions/StringType' },
             { $ref: '#/definitions/NumberType' },
           ],
+          definitions: {
+            StringType: { type: 'string' },
+            NumberType: { type: 'number' },
+          },
         };
-        expect(hasValidTypes(schema, schema)).toBe(true);
+        expect(hasValidTypes(schema)).toBe(true);
       });
 
       it('should return true for a schema with $ref in allOf', () => {
@@ -848,8 +878,12 @@ describe('mcp-client', () => {
             { $ref: '#/definitions/BaseUser' },
             { $ref: '#/definitions/ExtendedUser' },
           ],
+          definitions: {
+            BaseUser: { type: 'object' },
+            ExtendedUser: { type: 'object' },
+          },
         };
-        expect(hasValidTypes(schema, schema)).toBe(true);
+        expect(hasValidTypes(schema)).toBe(true);
       });
 
       it('should return true for a schema with $ref in oneOf', () => {
@@ -858,8 +892,12 @@ describe('mcp-client', () => {
             { $ref: '#/definitions/Admin' },
             { $ref: '#/definitions/User' },
           ],
+          definitions: {
+            Admin: { type: 'object' },
+            User: { type: 'object' },
+          },
         };
-        expect(hasValidTypes(schema, schema)).toBe(true);
+        expect(hasValidTypes(schema)).toBe(true);
       });
 
       it('should return true for a schema with definitions containing types', () => {
@@ -878,7 +916,7 @@ describe('mcp-client', () => {
             },
           },
         };
-        expect(hasValidTypes(schema, schema)).toBe(true);
+        expect(hasValidTypes(schema)).toBe(true);
       });
 
       it('should return true for a schema with $defs containing types', () => {
@@ -897,7 +935,7 @@ describe('mcp-client', () => {
             },
           },
         };
-        expect(hasValidTypes(schema, schema)).toBe(true);
+        expect(hasValidTypes(schema)).toBe(true);
       });
 
       it('should return true for a schema with components containing types', () => {
@@ -918,7 +956,7 @@ describe('mcp-client', () => {
             },
           },
         };
-        expect(hasValidTypes(schema, schema)).toBe(true);
+        expect(hasValidTypes(schema)).toBe(true);
       });
 
       it('should return true for a complex schema with mixed $ref and inline types', () => {
@@ -952,7 +990,7 @@ describe('mcp-client', () => {
             },
           },
         };
-        expect(hasValidTypes(schema, schema)).toBe(true);
+        expect(hasValidTypes(schema)).toBe(true);
       });
     });
   });
@@ -1007,6 +1045,21 @@ describe('mcp-client', () => {
       });
     });
 
+    it('should return null for external reference path', () => {
+      const schema = {
+        definitions: {
+          User: {
+            type: 'object',
+          },
+        },
+      };
+      const result = getRefDefinition(
+        'https://example.com/profile#/definitions/User',
+        schema,
+      );
+      expect(result).toBeNull();
+    });
+
     it('should return null for non-existent path', () => {
       const schema = {
         definitions: {
@@ -1027,7 +1080,7 @@ describe('mcp-client', () => {
           },
         },
       };
-      const result = getRefDefinition('#/invalid/path', schema);
+      const result = getRefDefinition('invalid/path', schema);
       expect(result).toBeNull();
     });
 
