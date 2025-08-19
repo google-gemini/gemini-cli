@@ -94,6 +94,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "@pollyjs/adapter-fetch": "^6.0.7",
     "node-fetch": "^3.3.2"
   }
 }

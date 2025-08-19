@@ -13,9 +13,9 @@ import { env } from 'process';
 import fs from 'fs';
 import { Polly } from '@pollyjs/core';
 import FSPersister from '@pollyjs/persister-fs';
-import NodeHttpAdapter from '@pollyjs/adapter-node-http';
+import FetchAdapter from '@pollyjs/adapter-fetch';
 
-Polly.register(NodeHttpAdapter);
+Polly.register(FetchAdapter);
 Polly.register(FSPersister);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -144,7 +144,7 @@ export class TestRig {
     mkdirSync(this.testDir, { recursive: true });
 
     this.polly = new Polly(sanitizedName, {
-      adapters: ['node-http'],
+      adapters: ['fetch'],
       persister: 'fs',
       recordIfMissing: true,
       matchRequestsBy: {
