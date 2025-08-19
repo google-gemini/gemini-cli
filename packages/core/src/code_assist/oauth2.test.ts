@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import { getOauthClient } from './oauth2.js';
+import { getOauthClient, resetOauthClientForTesting } from './oauth2.js';
 import { getCachedGoogleAccount } from '../utils/user_account.js';
 import { OAuth2Client, Compute } from 'google-auth-library';
 import * as fs from 'fs';
@@ -56,9 +56,8 @@ describe('oauth2', () => {
   afterEach(() => {
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
     vi.clearAllMocks();
-    delete process.env.CLOUD_SHELL;
-    delete process.env.GOOGLE_GENAI_USE_GCA;
-    delete process.env.GOOGLE_CLOUD_ACCESS_TOKEN;
+    resetOauthClientForTesting();
+    vi.unstubAllEnvs();
   });
 
   it('should perform a web login', async () => {
@@ -325,10 +324,74 @@ describe('oauth2', () => {
     });
   });
 
+  describe('credential loading order', () => {
+    it('should prioritize default cached credentials over GOOGLE_APPLICATION_CREDENTIALS', async () => {
+      // Setup default cached credentials
+      const defaultCreds = { refresh_token: 'default-cached-token' };
+      const defaultCredsPath = path.join(
+        tempHomeDir,
+        '.gemini',
+        'oauth_creds.json',
+      );
+      await fs.promises.mkdir(path.dirname(defaultCredsPath), {
+        recursive: true,
+      });
+      await fs.promises.writeFile(
+        defaultCredsPath,
+        JSON.stringify(defaultCreds),
+      );
+
+      // Setup credentials via environment variable
+      const envCreds = { refresh_token: 'env-var-token' };
+      const envCredsPath = path.join(tempHomeDir, 'env_creds.json');
+      await fs.promises.writeFile(envCredsPath, JSON.stringify(envCreds));
+      vi.stubEnv('GOOGLE_APPLICATION_CREDENTIALS', envCredsPath);
+
+      const mockClient = {
+        setCredentials: vi.fn(),
+        getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+        getTokenInfo: vi.fn().mockResolvedValue({}),
+        on: vi.fn(),
+      };
+      (OAuth2Client as unknown as Mock).mockImplementation(
+        () => mockClient as unknown as OAuth2Client,
+      );
+
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+
+      // Assert the correct credentials were used
+      expect(mockClient.setCredentials).toHaveBeenCalledWith(defaultCreds);
+      expect(mockClient.setCredentials).not.toHaveBeenCalledWith(envCreds);
+    });
+
+    it('should fall back to GOOGLE_APPLICATION_CREDENTIALS if default cache is missing', async () => {
+      // Setup credentials via environment variable
+      const envCreds = { refresh_token: 'env-var-token' };
+      const envCredsPath = path.join(tempHomeDir, 'env_creds.json');
+      await fs.promises.writeFile(envCredsPath, JSON.stringify(envCreds));
+      vi.stubEnv('GOOGLE_APPLICATION_CREDENTIALS', envCredsPath);
+
+      const mockClient = {
+        setCredentials: vi.fn(),
+        getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+        getTokenInfo: vi.fn().mockResolvedValue({}),
+        on: vi.fn(),
+      };
+      (OAuth2Client as unknown as Mock).mockImplementation(
+        () => mockClient as unknown as OAuth2Client,
+      );
+
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+
+      // Assert the correct credentials were used
+      expect(mockClient.setCredentials).toHaveBeenCalledWith(envCreds);
+    });
+  });
+
   describe('with GCP environment variables', () => {
     it('should use GOOGLE_CLOUD_ACCESS_TOKEN when GOOGLE_GENAI_USE_GCA is true', async () => {
-      process.env.GOOGLE_GENAI_USE_GCA = 'true';
-      process.env.GOOGLE_CLOUD_ACCESS_TOKEN = 'gcp-access-token';
+      vi.stubEnv('GOOGLE_GENAI_USE_GCA', 'true');
+      vi.stubEnv('GOOGLE_CLOUD_ACCESS_TOKEN', 'gcp-access-token');
 
       const mockSetCredentials = vi.fn();
       const mockGetAccessToken = vi
@@ -386,7 +449,7 @@ describe('oauth2', () => {
     });
 
     it('should not use GCP token if GOOGLE_CLOUD_ACCESS_TOKEN is not set', async () => {
-      process.env.GOOGLE_GENAI_USE_GCA = 'true';
+      vi.stubEnv('GOOGLE_GENAI_USE_GCA', 'true');
 
       const mockSetCredentials = vi.fn();
       const mockGetAccessToken = vi
@@ -417,7 +480,7 @@ describe('oauth2', () => {
     });
 
     it('should not use GCP token if GOOGLE_GENAI_USE_GCA is not set', async () => {
-      process.env.GOOGLE_CLOUD_ACCESS_TOKEN = 'gcp-access-token';
+      vi.stubEnv('GOOGLE_CLOUD_ACCESS_TOKEN', 'gcp-access-token');
 
       const mockSetCredentials = vi.fn();
       const mockGetAccessToken = vi
