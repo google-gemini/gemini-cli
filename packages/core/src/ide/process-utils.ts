@@ -9,6 +9,11 @@ import { promisify } from 'util';
 import os from 'os';
 import path from 'path';
 
+const logger = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  error: (...args: any[]) => console.error('[ERROR] [ProcessUtils]', ...args),
+};
+
 const execAsync = promisify(exec);
 
 /**
@@ -96,7 +101,6 @@ export async function getIdeProcessId(): Promise<number> {
 
     // Define the root PID for the current OS
     const rootPid = platform === 'win32' ? 0 : 1;
-
     // If the parent is the root process or invalid, we've found our target.
     if (parentPid === rootPid || parentPid <= 0) {
       break;
@@ -104,5 +108,8 @@ export async function getIdeProcessId(): Promise<number> {
     // Move one level up the tree for the next iteration.
     currentPid = parentPid;
   }
+  logger.error(
+    'Failed to find shell process in the process tree. Falling back to top-level process, which may be inaccurate. If you see this, please file a bug via /bug.',
+  );
   return currentPid;
 }
