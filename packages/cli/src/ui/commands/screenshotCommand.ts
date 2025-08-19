@@ -40,7 +40,7 @@ export const screenshotCommand: SlashCommand = {
         return {
           type: 'message',
           messageType: 'error',
-          content: `Invalid capture mode: "${mode}". Valid modes: fullscreen, window, area, only.`
+          content: `Invalid capture mode: "${mode}". Valid modes: fullscreen, window, area.`
         };
       }
 
