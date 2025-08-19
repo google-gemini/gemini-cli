@@ -43,7 +43,7 @@ const createFakeCompletedToolCall = (
       status: 'success',
       request,
       tool,
-      invocation: tool.build({}),
+      invocation: tool.build({ param: 'test' }),
       response: {
         callId: request.callId,
         responseParts: {
