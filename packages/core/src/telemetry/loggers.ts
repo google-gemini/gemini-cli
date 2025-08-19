@@ -440,8 +440,8 @@ export function logResearchOptIn(
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     opt_in_status: event.opt_in_status,
-    contact_email: event.contact_email,
-    user_id: event.user_id,
+    ...(event.contact_email && { contact_email: event.contact_email }),
+    ...(event.user_id && { user_id: event.user_id }),
     'event.name': EVENT_RESEARCH_OPT_IN,
     'event.timestamp': event['event.timestamp'],
   };
@@ -462,8 +462,8 @@ export function logResearchFeedback(
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     feedback_type: event.feedback_type,
-    feedback_content: truncateFeedbackContent(event.feedback_content),
-    user_id: event.user_id,
+    ...(event.feedback_content && { feedback_content: truncateFeedbackContent(event.feedback_content) }),
+    ...(event.user_id && { user_id: event.user_id }),
     'event.name': EVENT_RESEARCH_FEEDBACK,
     'event.timestamp': event['event.timestamp'],
     // Convert survey_responses to string to comply with LogAttributes type
