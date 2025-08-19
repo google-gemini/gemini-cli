@@ -131,10 +131,13 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Default:** Empty
   - **Properties:**
     - **`<SERVER_NAME>`** (object): The server parameters for the named server.
-      - `command` (string, required): The command to execute to start the MCP server.
+      - `command` (string, optional): The command to execute to start the MCP server via standard I/O.
       - `args` (array of strings, optional): Arguments to pass to the command.
       - `env` (object, optional): Environment variables to set for the server process.
       - `cwd` (string, optional): The working directory in which to start the server.
+      - `url` (string, optional): The URL of an MCP server that uses Server-Sent Events (SSE) for communication.
+      - `httpUrl` (string, optional): The URL of an MCP server that uses streamable HTTP for communication.
+      - `headers` (object, optional): A map of HTTP headers to send with requests to `url` or `httpUrl`.
       - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
       - `trust` (boolean, optional): Trust this server and bypass all tool call confirmations.
       - `includeTools` (array of strings, optional): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (whitelist behavior). If not specified, all tools from the server are enabled by default.
@@ -161,6 +164,20 @@ In addition to a project settings file, a project's `.gemini` directory can cont
         "env": {
           "API_KEY": "$MY_API_TOKEN"
         }
+      },
+      "mySseServer": {
+        "url": "http://localhost:8081/events",
+        "headers": {
+          "Authorization": "Bearer $MY_SSE_TOKEN"
+        },
+        "description": "An example SSE-based MCP server."
+      },
+      "myStreamableHttpServer": {
+        "httpUrl": "http://localhost:8082/stream",
+        "headers": {
+          "X-API-Key": "$MY_HTTP_API_KEY"
+        },
+        "description": "An example Streamable HTTP-based MCP server."
       }
     }
     ```
