@@ -70,6 +70,7 @@ export interface SettingsFile {
   settings: Settings;
   path: string;
 }
+
 function mergeSettings(
   system: Settings,
   user: Settings,
@@ -407,8 +408,8 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     workspaceSettings,
   );
 
-  // Load environment with merged settings so that variables are available for
-  // resolution.
+  // loadEnviroment depends on settings so we have to create a temp version of
+  // the settings to avoid a cycle
   loadEnvironment(tempMergedSettings);
 
   // Now that the environment is loaded, resolve variables in the settings.
