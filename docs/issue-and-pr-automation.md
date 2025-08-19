@@ -1,5 +1,9 @@
 # Automation and Triage Processes
 
+<p align="center">
+  <a href="../../i18n/chinese/docs/issue-and-pr-automation.md">🌐 简体中文</a> | English
+</p>
+
 This document provides a detailed overview of the automated processes we use to manage and triage issues and pull requests. Our goal is to provide prompt feedback and ensure that contributions are reviewed and integrated efficiently. Understanding this automation will help you as a contributor know what to expect and how to best interact with our repository bots.
 
 ## Guiding Principle: Issues and Pull Requests

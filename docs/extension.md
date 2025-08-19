@@ -1,5 +1,9 @@
 # Gemini CLI Extensions
 
+<p align="center">
+  <a href="../i18n/chinese/docs/extension.md">🌐 简体中文</a> | English
+</p>
+
 Gemini CLI supports extensions that can be used to configure and extend its functionality.
 
 ## How it works

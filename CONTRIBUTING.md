@@ -1,5 +1,9 @@
 # How to Contribute
 
+<p align="center">
+  <a href="./i18n/chinese/CONTRIBUTING.md">🌐 简体中文</a> | English
+</p>
+
 We would love to accept your patches and contributions to this project.
 
 ## Before you begin

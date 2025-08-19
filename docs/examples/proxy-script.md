@@ -1,5 +1,9 @@
 # Example Proxy Script
 
+<p align="center">
+  <a href="../../i18n/chinese/docs/examples/proxy-script.md">🌐 简体中文</a> | English
+</p>
+
 The following is an example of a proxy script that can be used with the `GEMINI_SANDBOX_PROXY_COMMAND` environment variable. This script only allows `HTTPS` connections to `example.com:443` and declines all other requests.
 
 ```javascript

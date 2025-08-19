@@ -1,5 +1,9 @@
 # Gemini CLI
 
+<p align="center">
+  <a href="../../i18n/chinese/docs/cli/index.md">🌐 简体中文</a> | English
+</p>
+
 Within Gemini CLI, `packages/cli` is the frontend for users to send and receive prompts with the Gemini AI model and its associated tools. For a general overview of Gemini CLI, see the [main documentation page](../index.md).
 
 ## Navigating this section

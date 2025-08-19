@@ -1,4 +1,8 @@
-# Gemini CLI Keyboard Shortcuts
+# Keyboard Shortcuts
+
+<p align="center">
+  <a href="../i18n/chinese/docs/keyboard-shortcuts.md">🌐 简体中文</a> | English
+</p>
 
 This document lists the available keyboard shortcuts in the Gemini CLI.
 

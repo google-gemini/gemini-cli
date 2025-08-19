@@ -1,5 +1,9 @@
 # Welcome to Gemini CLI documentation
 
+<p align="center">
+  <a href="../i18n/chinese/docs/index.md">🌐 简体中文</a> | English
+</p>
+
 This documentation provides a comprehensive guide to installing, using, and developing Gemini CLI. This tool lets you interact with Gemini models through a command-line interface.
 
 ## Overview

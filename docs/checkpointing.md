@@ -1,5 +1,9 @@
 # Checkpointing
 
+<p align="center">
+  <a href="../i18n/chinese/docs/checkpointing.md">🌐 简体中文</a> | English
+</p>
+
 The Gemini CLI includes a Checkpointing feature that automatically saves a snapshot of your project's state before any file modifications are made by AI-powered tools. This allows you to safely experiment with and apply code changes, knowing you can instantly revert back to the state before the tool was run.
 
 ## How It Works

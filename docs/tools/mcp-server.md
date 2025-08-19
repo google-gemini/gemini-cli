@@ -1,5 +1,9 @@
 # MCP servers with the Gemini CLI
 
+<p align="center">
+  <a href="../../i18n/chinese/docs/tools/mcp-server.md">🌐 简体中文</a> | English
+</p>
+
 This document provides a guide to configuring and using Model Context Protocol (MCP) servers with the Gemini CLI.
 
 ## What is an MCP server?
