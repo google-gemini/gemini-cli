@@ -23,15 +23,17 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { MockTool } from '../test-utils/tools.js';
 
+import { McpClientManager } from './mcp-client-manager.js';
+
 vi.mock('node:fs');
 
-// Use vi.hoisted to define the mock function so it can be used in the vi.mock factory
-const mockDiscoverMcpTools = vi.hoisted(() => vi.fn());
-
 // Mock ./mcp-client.js to control its behavior within tool-registry tests
-vi.mock('./mcp-client.js', () => ({
-  discoverMcpTools: mockDiscoverMcpTools,
-}));
+vi.mock('./mcp-client.js', async () => {
+  const originalModule = await vi.importActual('./mcp-client.js');
+  return {
+    ...originalModule,
+  };
+});
 
 // Mock node:child_process
 vi.mock('node:child_process', async () => {
@@ -143,7 +145,6 @@ describe('ToolRegistry', () => {
       clear: vi.fn(),
       removePromptsByServer: vi.fn(),
     } as any);
-    mockDiscoverMcpTools.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -311,6 +312,10 @@ describe('ToolRegistry', () => {
     });
 
     it('should discover tools using MCP servers defined in getMcpServers', async () => {
+      const discoverSpy = vi.spyOn(
+        McpClientManager.prototype,
+        'discoverAllMcpTools',
+      );
       mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
       vi.spyOn(config, 'getMcpServerCommand').mockReturnValue(undefined);
       const mcpServerConfigVal = {
@@ -324,38 +329,7 @@ describe('ToolRegistry', () => {
 
       await toolRegistry.discoverAllTools();
 
-      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
-        mcpServerConfigVal,
-        undefined,
-        toolRegistry,
-        config.getPromptRegistry(),
-        false,
-        expect.any(Object),
-      );
-    });
-
-    it('should discover tools using MCP servers defined in getMcpServers', async () => {
-      mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
-      vi.spyOn(config, 'getMcpServerCommand').mockReturnValue(undefined);
-      const mcpServerConfigVal = {
-        'my-mcp-server': {
-          command: 'mcp-server-cmd',
-          args: ['--port', '1234'],
-          trust: true,
-        },
-      };
-      vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
-
-      await toolRegistry.discoverAllTools();
-
-      expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
-        mcpServerConfigVal,
-        undefined,
-        toolRegistry,
-        config.getPromptRegistry(),
-        false,
-        expect.any(Object),
-      );
+      expect(discoverSpy).toHaveBeenCalled();
     });
   });
 });
