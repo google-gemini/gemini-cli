@@ -26,6 +26,7 @@ vi.mock('os', async (importOriginal) => {
 describe('loadExtensions', () => {
   let tempWorkspaceDir: string;
   let tempHomeDir: string;
+  let tempSystemDir: string;
 
   beforeEach(() => {
     tempWorkspaceDir = fs.mkdtempSync(
@@ -34,12 +35,18 @@ describe('loadExtensions', () => {
     tempHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
+    tempSystemDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-system-'),
+    );
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    process.env.GEMINI_CLI_SYSTEM_EXTENSIONS_PATH = tempSystemDir;
   });
 
   afterEach(() => {
     fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    fs.rmSync(tempSystemDir, { recursive: true, force: true });
+    delete process.env.GEMINI_CLI_SYSTEM_EXTENSIONS_PATH;
   });
 
   it('should include extension path in loaded extension', () => {
@@ -108,6 +115,13 @@ describe('loadExtensions', () => {
     expect(ext1?.contextFiles).toEqual([
       path.join(workspaceExtensionsDir, 'ext1', 'my-context-file.md'),
     ]);
+  });
+
+  it('should load extensions from the system directory', () => {
+    createExtension(tempSystemDir, 'system-ext', '1.0.0');
+    const extensions = loadExtensions(tempWorkspaceDir);
+    expect(extensions).toHaveLength(1);
+    expect(extensions[0].config.name).toBe('system-ext');
   });
 });
 
