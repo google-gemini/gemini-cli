@@ -180,14 +180,14 @@ describe('SettingsSchema', () => {
 
     it('should have showInDialog property configured', () => {
       // Check that user-facing settings are marked for dialog display
-      expect(SETTINGS_SCHEMA.showMemoryUsage.showInDialog).toBe(false);
+      expect(SETTINGS_SCHEMA.showMemoryUsage.showInDialog).toBe(true);
       expect(SETTINGS_SCHEMA.vimMode.showInDialog).toBe(true);
       expect(SETTINGS_SCHEMA.ideMode.showInDialog).toBe(true);
       expect(SETTINGS_SCHEMA.disableAutoUpdate.showInDialog).toBe(true);
       expect(SETTINGS_SCHEMA.hideWindowTitle.showInDialog).toBe(true);
       expect(SETTINGS_SCHEMA.hideTips.showInDialog).toBe(true);
       expect(SETTINGS_SCHEMA.hideBanner.showInDialog).toBe(true);
-      expect(SETTINGS_SCHEMA.usageStatisticsEnabled.showInDialog).toBe(true);
+      expect(SETTINGS_SCHEMA.usageStatisticsEnabled.showInDialog).toBe(false);
 
       // Check that advanced settings are hidden from dialog
       expect(SETTINGS_SCHEMA.selectedAuthType.showInDialog).toBe(false);
