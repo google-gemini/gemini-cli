@@ -7,7 +7,7 @@
 import React, { Fragment, useEffect, useId } from 'react';
 import { Box, Text } from 'ink';
 import stringWidth from 'string-width';
-import { theme } from '../../semantic-colors.js';
+import { Colors } from '../../colors.js';
 import { toCodePoints } from '../../utils/textUtils.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
 
@@ -173,7 +173,6 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
     <Box key={index}>
       {line.length > 0 ? (
         line.map((segment, segIndex) => (
-          // Avoid adding color styles to this <Text> element, breaks code colorization
           <Text key={segIndex} {...segment.props}>
             {segment.text}
           </Text>
@@ -187,14 +186,14 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   return (
     <Box flexDirection="column" width={maxWidth} flexShrink={0}>
       {totalHiddenLines > 0 && overflowDirection === 'top' && (
-        <Text color={theme.text.secondary} wrap="truncate">
+        <Text color={Colors.Gray} wrap="truncate">
           ... first {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
           hidden ...
         </Text>
       )}
       {visibleLines}
       {totalHiddenLines > 0 && overflowDirection === 'bottom' && (
-        <Text color={theme.text.secondary} wrap="truncate">
+        <Text color={Colors.Gray} wrap="truncate">
           ... last {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
           hidden ...
         </Text>
@@ -322,7 +321,7 @@ function visitBoxRow(element: React.ReactNode): Row {
       const segment: StyledText = { text, props: parentProps ?? {} };
 
       // Check the 'wrap' property from the merged props to decide the segment type.
-      if (parentProps === undefined || parentProps.wrap === 'wrap') {
+      if (parentProps === undefined || parentProps['wrap'] === 'wrap') {
         hasSeenWrapped = true;
         row.segments.push(segment);
       } else {

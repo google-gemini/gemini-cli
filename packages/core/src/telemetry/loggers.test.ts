@@ -34,6 +34,7 @@ import {
   logUserPrompt,
   logToolCall,
   logFlashFallback,
+  logChatCompression,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -43,12 +44,15 @@ import {
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  makeChatCompressionEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect } from 'vitest';
 import { GenerateContentResponseUsageMetadata } from '@google/genai';
 import * as uiTelemetry from './uiTelemetry.js';
+import { makeFakeConfig } from '../test-utils/config.js';
+import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 
 describe('loggers', () => {
   const mockLogger = {
@@ -66,6 +70,45 @@ describe('loggers', () => {
     );
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T00:00:00.000Z'));
+  });
+
+  describe('logChatCompression', () => {
+    beforeEach(() => {
+      vi.spyOn(metrics, 'recordChatCompressionMetrics');
+      vi.spyOn(ClearcutLogger.prototype, 'logChatCompressionEvent');
+    });
+
+    it('logs the chat compression event to Clearcut', () => {
+      const mockConfig = makeFakeConfig();
+
+      const event = makeChatCompressionEvent({
+        tokens_before: 9001,
+        tokens_after: 9000,
+      });
+
+      logChatCompression(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logChatCompressionEvent,
+      ).toHaveBeenCalledWith(event);
+    });
+
+    it('records the chat compression event to OTEL', () => {
+      const mockConfig = makeFakeConfig();
+
+      logChatCompression(
+        mockConfig,
+        makeChatCompressionEvent({
+          tokens_before: 9001,
+          tokens_after: 9000,
+        }),
+      );
+
+      expect(metrics.recordChatCompressionMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        { tokens_before: 9001, tokens_after: 9000 },
+      );
+    });
   });
 
   describe('logCliConfiguration', () => {
@@ -481,6 +524,7 @@ describe('loggers', () => {
           success: true,
           decision: ToolCallDecision.ACCEPT,
           prompt_id: 'prompt-id-1',
+          tool_type: 'native',
         },
       });
 
@@ -490,6 +534,7 @@ describe('loggers', () => {
         100,
         true,
         ToolCallDecision.ACCEPT,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -544,6 +589,7 @@ describe('loggers', () => {
           success: false,
           decision: ToolCallDecision.REJECT,
           prompt_id: 'prompt-id-2',
+          tool_type: 'native',
         },
       });
 
@@ -553,6 +599,7 @@ describe('loggers', () => {
         100,
         false,
         ToolCallDecision.REJECT,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -610,6 +657,7 @@ describe('loggers', () => {
           success: true,
           decision: ToolCallDecision.MODIFY,
           prompt_id: 'prompt-id-3',
+          tool_type: 'native',
         },
       });
 
@@ -619,6 +667,7 @@ describe('loggers', () => {
         100,
         true,
         ToolCallDecision.MODIFY,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -674,6 +723,7 @@ describe('loggers', () => {
           duration_ms: 100,
           success: true,
           prompt_id: 'prompt-id-4',
+          tool_type: 'native',
         },
       });
 
@@ -683,6 +733,7 @@ describe('loggers', () => {
         100,
         true,
         undefined,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -743,6 +794,7 @@ describe('loggers', () => {
           error_type: ToolErrorType.UNKNOWN,
           'error.type': ToolErrorType.UNKNOWN,
           prompt_id: 'prompt-id-5',
+          tool_type: 'native',
         },
       });
 
@@ -752,6 +804,7 @@ describe('loggers', () => {
         100,
         false,
         undefined,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
