@@ -1100,6 +1100,34 @@ describe('App UI', () => {
     });
   });
 
+  describe('NO_COLOR smoke test', () => {
+    let originalNoColor: string | undefined;
+
+    beforeEach(() => {
+      originalNoColor = process.env.NO_COLOR;
+    });
+
+    afterEach(() => {
+      process.env.NO_COLOR = originalNoColor;
+    });
+
+    it('should render without errors when NO_COLOR is set', async () => {
+      process.env.NO_COLOR = 'true';
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      expect(lastFrame()).toBeTruthy();
+      expect(lastFrame()).toContain('Type your message or @path/to/file');
+    });
+  });
+
   describe('FolderTrustDialog', () => {
     it('should display the folder trust dialog when isFolderTrustDialogOpen is true', async () => {
       const { useFolderTrust } = await import('./hooks/useFolderTrust.js');
