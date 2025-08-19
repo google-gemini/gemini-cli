@@ -39,18 +39,33 @@ steps:
         echo "Determined image tag: $$FINAL_TAG"
         echo "$$FINAL_TAG" > /workspace/image_tag.txt
 
-  # Step 5: Build sandbox container image
+  # Step 5: Inject OAuth2 Secrets
+  - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
+    id: 'Inject OAuth2 Secrets'
+    entrypoint: 'node'
+    args: ['scripts/release/inject_secrets.js']
+    env:
+      - 'OAUTH_CLIENT_ID=$_OAUTH_CLIENT_ID'
+      - 'OAUTH_CLIENT_SECRET=$_OAUTH_CLIENT_SECRET'
+
+  # Step 6: Build sandbox container image
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
     id: 'Build sandbox Docker image'
     entrypoint: 'bash'
     args:
       - '-c'
       - |-
-        export GEMINI_SANDBOX_IMAGE_TAG=$$(cat /workspace/image_tag.txt)
-        echo "Using Docker image tag for build: $$GEMINI_SANDBOX_IMAGE_TAG"
+        export GEMINI_SANDBOX_IMAGE_TAG=$(cat /workspace/image_tag.txt)
+        echo "Using Docker image tag for build: $GEMINI_SANDBOX_IMAGE_TAG"
         npm run build:sandbox -- --output-file /workspace/final_image_uri.txt
     env:
       - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
+
+  # Step 7: Revert OAuth2 Secrets
+  - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
+    id: 'Revert OAuth2 Secrets'
+    entrypoint: 'git'
+    args: ['checkout', '--', 'packages/core/src/code_assist/oauth2_secrets.ts']
 
   # Step 8: Publish sandbox container image
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
@@ -73,3 +88,5 @@ options:
 
 substitutions:
   _CONTAINER_TOOL: 'docker'
+  _OAUTH_CLIENT_ID: ''
+  _OAUTH_CLIENT_SECRET: ''
