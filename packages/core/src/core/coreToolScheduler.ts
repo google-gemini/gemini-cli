@@ -697,7 +697,7 @@ export class CoreToolScheduler {
     }
 
     if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-      await this.autoApproveCompatiblePendingTools(signal);
+      await this.autoApproveCompatiblePendingTools(signal, callId);
     }
 
     this.setToolCallOutcome(callId, outcome);
@@ -936,9 +936,12 @@ export class CoreToolScheduler {
 
   private async autoApproveCompatiblePendingTools(
     signal: AbortSignal,
+    triggeringCallId: string,
   ): Promise<void> {
     const pendingTools = this.toolCalls.filter(
-      (call) => call.status === 'awaiting_approval',
+      (call) =>
+        call.status === 'awaiting_approval' &&
+        call.request.callId !== triggeringCallId,
     ) as WaitingToolCall[];
 
     for (const pendingTool of pendingTools) {
