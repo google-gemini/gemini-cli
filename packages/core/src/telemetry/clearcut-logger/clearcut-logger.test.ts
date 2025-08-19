@@ -479,13 +479,14 @@ describe('ClearcutLogger', () => {
         programming_language: 'TypeScript',
         prompt_id: 'prompt-id-1',
         decision: ToolCallDecision.AUTO_ACCEPT,
+        tool_type: 'native'
       };
 
       logger!.logToolCallEvent(toolCallEvent);
 
       expect(createLogEventSpy).toHaveBeenCalled();
       const eventData = createLogEventSpy.mock.calls[0][1];
-      const programmingLanguageEntry = eventData.find(
+      const programmingLanguageEntry = eventData?.find(
         (entry) =>
           entry.gemini_cli_key ===
           EventMetadataKey.GEMINI_CLI_PROGRAMMING_LANGUAGE,
@@ -506,13 +507,14 @@ describe('ClearcutLogger', () => {
         success: true,
         prompt_id: 'prompt-id-2',
         decision: ToolCallDecision.AUTO_ACCEPT,
+        tool_type: 'native'
       };
 
       logger!.logToolCallEvent(toolCallEvent);
 
       expect(createLogEventSpy).toHaveBeenCalled();
       const eventData = createLogEventSpy.mock.calls[0][1];
-      const programmingLanguageEntry = eventData.find(
+      const programmingLanguageEntry = eventData?.find(
         (entry) =>
           entry.gemini_cli_key ===
           EventMetadataKey.GEMINI_CLI_PROGRAMMING_LANGUAGE,

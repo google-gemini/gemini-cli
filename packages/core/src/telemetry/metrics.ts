@@ -227,7 +227,7 @@ export function recordFileOperationMetric(
     attributes['user_removed_lines'] = diffStat.user_removed_lines;
   }
   if (programming_language !== undefined) {
-    attributes.programming_language = programming_language;
+    attributes['programming_language'] = programming_language;
   }
   fileOperationCounter.add(1, attributes);
 }
