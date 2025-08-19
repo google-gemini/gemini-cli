@@ -515,6 +515,15 @@ export const SETTINGS_SCHEMA = {
     description: 'Show line numbers in the chat.',
     showInDialog: true,
   },
+  skipNextSpeakerCheck: {
+    type: 'boolean',
+    label: 'Skip Next Speaker Check',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Skip the next speaker check.',
+    showInDialog: true,
+  },
 } as const;
 
 type InferSettings<T extends SettingsSchema> = {
