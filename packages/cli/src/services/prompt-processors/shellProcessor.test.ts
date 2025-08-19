@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { ConfirmationRequiredError, ShellProcessor } from './shellProcessor.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { CommandContext } from '../../ui/commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import { ApprovalMode, Config } from '@google/gemini-cli-core';
 import os from 'os';
 import { quote } from 'shell-quote';
 
@@ -17,7 +17,7 @@ import { quote } from 'shell-quote';
 // our tests robust and platform-agnostic.
 function getExpectedEscapedArgForPlatform(arg: string): string {
   if (os.platform() === 'win32') {
-    const comSpec = (process.env.ComSpec || 'cmd.exe').toLowerCase();
+    const comSpec = (process.env['ComSpec'] || 'cmd.exe').toLowerCase();
     const isPowerShell =
       comSpec.endsWith('powershell.exe') || comSpec.endsWith('pwsh.exe');
 
@@ -63,6 +63,7 @@ describe('ShellProcessor', () => {
 
     mockConfig = {
       getTargetDir: vi.fn().mockReturnValue('/test/dir'),
+      getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     };
 
     context = createMockCommandContext({
@@ -164,7 +165,7 @@ describe('ShellProcessor', () => {
     expect(result).toBe('On branch main in /usr/home');
   });
 
-  it('should throw ConfirmationRequiredError if a command is not allowed', async () => {
+  it('should throw ConfirmationRequiredError if a command is not allowed in default mode', async () => {
     const processor = new ShellProcessor('test-command');
     const prompt = 'Do something dangerous: !{rm -rf /}';
     mockCheckCommandPermissions.mockReturnValue({
@@ -175,6 +176,51 @@ describe('ShellProcessor', () => {
     await expect(processor.process(prompt, context)).rejects.toThrow(
       ConfirmationRequiredError,
     );
+  });
+
+  it('should NOT throw ConfirmationRequiredError if a command is not allowed but approval mode is YOLO', async () => {
+    const processor = new ShellProcessor('test-command');
+    const prompt = 'Do something dangerous: !{rm -rf /}';
+    mockCheckCommandPermissions.mockReturnValue({
+      allAllowed: false,
+      disallowedCommands: ['rm -rf /'],
+    });
+    // Override the approval mode for this test
+    (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.YOLO);
+    mockShellExecute.mockReturnValue({
+      result: Promise.resolve({ ...SUCCESS_RESULT, stdout: 'deleted' }),
+    });
+
+    const result = await processor.process(prompt, context);
+
+    // It should proceed with execution
+    expect(mockShellExecute).toHaveBeenCalledWith(
+      'rm -rf /',
+      expect.any(String),
+      expect.any(Function),
+      expect.any(Object),
+    );
+    expect(result).toBe('Do something dangerous: deleted');
+  });
+
+  it('should still throw an error for a hard-denied command even in YOLO mode', async () => {
+    const processor = new ShellProcessor('test-command');
+    const prompt = 'Do something forbidden: !{reboot}';
+    mockCheckCommandPermissions.mockReturnValue({
+      allAllowed: false,
+      disallowedCommands: ['reboot'],
+      isHardDenial: true, // This is the key difference
+      blockReason: 'System commands are blocked',
+    });
+    // Set approval mode to YOLO
+    (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.YOLO);
+
+    await expect(processor.process(prompt, context)).rejects.toThrow(
+      /Blocked command: "reboot". Reason: System commands are blocked/,
+    );
+
+    // Ensure it never tried to execute
+    expect(mockShellExecute).not.toHaveBeenCalled();
   });
 
   it('should throw ConfirmationRequiredError with the correct command', async () => {
