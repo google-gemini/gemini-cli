@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import { getOauthClient, resetOauthClientForTesting } from './oauth2.js';
+import {
+  getOauthClient,
+  resetOauthClientForTesting,
+  clearCachedCredentialFile,
+  clearOauthClientCache,
+} from './oauth2.js';
 import { getCachedGoogleAccount } from '../utils/user_account.js';
 import { OAuth2Client, Compute } from 'google-auth-library';
 import * as fs from 'fs';
@@ -508,6 +513,43 @@ describe('oauth2', () => {
       // It should be called with the cached credentials, not the GCP access token.
       expect(mockSetCredentials).toHaveBeenCalledTimes(1);
       expect(mockSetCredentials).toHaveBeenCalledWith(cachedCreds);
+    });
+  });
+
+  describe('clearCachedCredentialFile', () => {
+    it('should clear cached credentials and Google account', async () => {
+      const cachedCreds = { refresh_token: 'test-token' };
+      const credsPath = path.join(tempHomeDir, '.gemini', 'oauth_creds.json');
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+      await fs.promises.writeFile(credsPath, JSON.stringify(cachedCreds));
+
+      const googleAccountPath = path.join(
+        tempHomeDir,
+        '.gemini',
+        'google_accounts.json',
+      );
+      const accountData = { active: 'test@example.com', old: [] };
+      await fs.promises.writeFile(
+        googleAccountPath,
+        JSON.stringify(accountData),
+      );
+
+      expect(fs.existsSync(credsPath)).toBe(true);
+      expect(fs.existsSync(googleAccountPath)).toBe(true);
+      expect(getCachedGoogleAccount()).toBe('test@example.com');
+
+      await clearCachedCredentialFile();
+      expect(fs.existsSync(credsPath)).toBe(false);
+      expect(getCachedGoogleAccount()).toBeNull();
+      const updatedAccountData = JSON.parse(
+        fs.readFileSync(googleAccountPath, 'utf-8'),
+      );
+      expect(updatedAccountData.active).toBeNull();
+      expect(updatedAccountData.old).toContain('test@example.com');
+    });
+
+    it('should handle clearOauthClientCache independently', () => {
+      expect(() => clearOauthClientCache()).not.toThrow();
     });
   });
 });
