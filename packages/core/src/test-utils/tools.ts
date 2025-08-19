@@ -13,7 +13,6 @@ import {
   ToolResult,
   Kind,
 } from '../tools/tools.js';
-import { Schema, Type } from '@google/genai';
 import {
   ModifiableDeclarativeTool,
   ModifyContext,
@@ -74,9 +73,9 @@ export class MockTool extends BaseDeclarativeTool<
     name = 'mock-tool',
     displayName?: string,
     description = 'A mock tool for testing.',
-    params: Schema = {
-      type: Type.OBJECT,
-      properties: { param: { type: Type.STRING } },
+    params = {
+      type: 'object',
+      properties: { param: { type: 'string' } },
     },
   ) {
     super(name, displayName ?? name, description, Kind.Other, params);

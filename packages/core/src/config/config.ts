@@ -43,12 +43,15 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
-import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
 import type { Content } from '@google/genai';
-import { logIdeConnection } from '../telemetry/loggers.js';
+import {
+  FileSystemService,
+  StandardFileSystemService,
+} from '../services/fileSystemService.js';
+import { logCliConfiguration, logIdeConnection } from '../telemetry/loggers.js';
 import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 
 // Re-export OAuth config type
@@ -205,7 +208,8 @@ export interface ConfigParameters {
 export class Config {
   private toolRegistry!: ToolRegistry;
   private promptRegistry!: PromptRegistry;
-  private readonly sessionId: string;
+  private sessionId: string;
+  private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
@@ -271,6 +275,7 @@ export class Config {
     this.sessionId = params.sessionId;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
+    this.fileSystemService = new StandardFileSystemService();
     this.sandbox = params.sandbox;
     this.targetDir = path.resolve(params.targetDir);
     this.workspaceContext = new WorkspaceContext(
@@ -341,13 +346,7 @@ export class Config {
       initializeTelemetry(this);
     }
 
-    if (this.getUsageStatisticsEnabled()) {
-      ClearcutLogger.getInstance(this)?.logStartSessionEvent(
-        new StartSessionEvent(this),
-      );
-    } else {
-      console.log('Data collection is disabled.');
-    }
+    logCliConfiguration(this, new StartSessionEvent(this));
   }
 
   /**
@@ -407,6 +406,10 @@ export class Config {
 
   getSessionId(): string {
     return this.sessionId;
+  }
+
+  setSessionId(sessionId: string): void {
+    this.sessionId = sessionId;
   }
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
@@ -704,6 +707,20 @@ export class Config {
 
   getIdeClient(): IdeClient {
     return this.ideClient;
+  }
+
+  /**
+   * Get the current FileSystemService
+   */
+  getFileSystemService(): FileSystemService {
+    return this.fileSystemService;
+  }
+
+  /**
+   * Set a custom FileSystemService
+   */
+  setFileSystemService(fileSystemService: FileSystemService): void {
+    this.fileSystemService = fileSystemService;
   }
 
   getChatCompression(): ChatCompressionSettings | undefined {

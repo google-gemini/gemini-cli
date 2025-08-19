@@ -7,6 +7,7 @@
 import { FunctionDeclaration, PartListUnion } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
 import { DiffUpdateResult } from '../ide/ideContext.js';
+import { SchemaValidator } from '../utils/schemaValidator.js';
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -170,7 +171,7 @@ export abstract class DeclarativeTool<
    * @param params The raw parameters from the model.
    * @returns An error message string if invalid, null otherwise.
    */
-  protected validateToolParams(_params: TParams): string | null {
+  validateToolParams(_params: TParams): string | null {
     // Base implementation can be extended by subclasses.
     return null;
   }
@@ -200,6 +201,64 @@ export abstract class DeclarativeTool<
     const invocation = this.build(params);
     return invocation.execute(signal, updateOutput);
   }
+
+  /**
+   * Similar to `build` but never throws.
+   * @param params The raw, untrusted parameters from the model.
+   * @returns A `ToolInvocation` instance.
+   */
+  private silentBuild(
+    params: TParams,
+  ): ToolInvocation<TParams, TResult> | Error {
+    try {
+      return this.build(params);
+    } catch (e) {
+      if (e instanceof Error) {
+        return e;
+      }
+      return new Error(String(e));
+    }
+  }
+
+  /**
+   * A convenience method that builds and executes the tool in one step.
+   * Never throws.
+   * @param params The raw, untrusted parameters from the model.
+   * @params abortSignal a signal to abort.
+   * @returns The result of the tool execution.
+   */
+  async validateBuildAndExecute(
+    params: TParams,
+    abortSignal: AbortSignal,
+  ): Promise<ToolResult> {
+    const invocationOrError = this.silentBuild(params);
+    if (invocationOrError instanceof Error) {
+      const errorMessage = invocationOrError.message;
+      return {
+        llmContent: `Error: Invalid parameters provided. Reason: ${errorMessage}`,
+        returnDisplay: errorMessage,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
+      };
+    }
+
+    try {
+      return await invocationOrError.execute(abortSignal);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      return {
+        llmContent: `Error: Tool call execution failed. Reason: ${errorMessage}`,
+        returnDisplay: errorMessage,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.EXECUTION_FAILED,
+        },
+      };
+    }
+  }
 }
 
 /**
@@ -218,6 +277,23 @@ export abstract class BaseDeclarativeTool<
       throw new Error(validationError);
     }
     return this.createInvocation(params);
+  }
+
+  override validateToolParams(params: TParams): string | null {
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
+
+    if (errors) {
+      return errors;
+    }
+    return this.validateToolParamValues(params);
+  }
+
+  protected validateToolParamValues(_params: TParams): string | null {
+    // Base implementation can be extended by subclasses.
+    return null;
   }
 
   protected abstract createInvocation(

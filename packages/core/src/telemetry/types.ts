@@ -7,6 +7,7 @@
 import { GenerateContentResponseUsageMetadata } from '@google/genai';
 import { Config } from '../config/config.js';
 import { CompletedToolCall } from '../core/coreToolScheduler.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { FileDiff } from '../tools/tools.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
@@ -14,7 +15,7 @@ import {
   ToolCallDecision,
 } from './tool-call-decision.js';
 
-interface BaseTelemetryEvent {
+export interface BaseTelemetryEvent {
   'event.name': string;
   /** Current timestamp in ISO 8601 format */
   'event.timestamp': string;
@@ -114,6 +115,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   error?: string;
   error_type?: string;
   prompt_id: string;
+  tool_type: 'native' | 'mcp';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
 
@@ -130,6 +132,10 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     this.error = call.response.error?.message;
     this.error_type = call.response.errorType;
     this.prompt_id = call.request.prompt_id;
+    this.tool_type =
+      typeof call.tool !== 'undefined' && call.tool instanceof DiscoveredMCPTool
+        ? 'mcp'
+        : 'native';
 
     if (
       call.status === 'success' &&
@@ -292,7 +298,7 @@ export class NextSpeakerCheckEvent implements BaseTelemetryEvent {
 
 export interface SlashCommandEvent extends BaseTelemetryEvent {
   'event.name': 'slash_command';
-  'event.timestamp': string; // ISO 8106
+  'event.timestamp': string;
   command: string;
   subcommand?: string;
   status?: SlashCommandStatus;
@@ -315,6 +321,25 @@ export function makeSlashCommandEvent({
 export enum SlashCommandStatus {
   SUCCESS = 'success',
   ERROR = 'error',
+}
+
+export interface ChatCompressionEvent extends BaseTelemetryEvent {
+  'event.name': 'chat_compression';
+  'event.timestamp': string;
+  tokens_before: number;
+  tokens_after: number;
+}
+
+export function makeChatCompressionEvent({
+  tokens_before,
+  tokens_after,
+}: Omit<ChatCompressionEvent, CommonFields>): ChatCompressionEvent {
+  return {
+    'event.name': 'chat_compression',
+    'event.timestamp': new Date().toISOString(),
+    tokens_before,
+    tokens_after,
+  };
 }
 
 export class MalformedJsonResponseEvent implements BaseTelemetryEvent {
