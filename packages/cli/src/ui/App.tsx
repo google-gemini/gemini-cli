@@ -143,13 +143,13 @@ export const App = (props: AppProps) => {
   return (
     <StreamingContext.Provider value={uiState.streamingState}>
       <Box flexDirection="column" width="90%">
-        <AppHeader nightly={nightly} />
         <MainContent
           pendingHistoryItems={pendingHistoryItems}
           mainAreaWidth={mainAreaWidth}
           staticAreaMaxItemHeight={Math.max(terminalHeight * 4, 100)}
           availableTerminalHeight={availableTerminalHeight}
           pendingHistoryItemRef={pendingHistoryItemRef}
+          nightly={nightly}
         />
 
                 <Box flexDirection="column" ref={mainControlsRef}>

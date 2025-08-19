@@ -11,6 +11,7 @@ import { ShowMoreLines } from './ShowMoreLines.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { HistoryItemWithoutId } from '../types.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { AppHeader } from './AppHeader.js';
 
 interface MainContentProps {
   pendingHistoryItems: HistoryItemWithoutId[];
@@ -18,6 +19,7 @@ interface MainContentProps {
   staticAreaMaxItemHeight: number;
   availableTerminalHeight: number | undefined;
   pendingHistoryItemRef: React.RefObject<DOMElement | null>;
+  nightly: boolean;
 }
 
 export const MainContent = (props: MainContentProps) => {
@@ -27,6 +29,7 @@ export const MainContent = (props: MainContentProps) => {
     staticAreaMaxItemHeight,
     availableTerminalHeight,
     pendingHistoryItemRef,
+    nightly,
   } = props;
 
   const uiState = useUIState();
@@ -35,16 +38,19 @@ export const MainContent = (props: MainContentProps) => {
     <>
       <Static
         key={uiState.historyRemountKey}
-        items={uiState.history.map((h) => (
-          <HistoryItemDisplay
-            terminalWidth={mainAreaWidth}
-            availableTerminalHeight={staticAreaMaxItemHeight}
-            key={h.id}
-            item={h}
-            isPending={false}
-            commands={uiState.slashCommands}
-          />
-        ))}
+        items={[
+          <AppHeader nightly={nightly} key="app-header" />,
+          ...uiState.history.map((h) => (
+            <HistoryItemDisplay
+              terminalWidth={mainAreaWidth}
+              availableTerminalHeight={staticAreaMaxItemHeight}
+              key={h.id}
+              item={h}
+              isPending={false}
+              commands={uiState.slashCommands}
+            />
+          )),
+        ]}
       >
         {(item) => item}
       </Static>
