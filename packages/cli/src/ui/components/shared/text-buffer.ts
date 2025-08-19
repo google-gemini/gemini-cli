@@ -1833,6 +1833,13 @@ export function useTextBuffer({
     }): void => {
       const { sequence: input } = key;
 
+      if (key.paste) {
+        // Do not do any other processing on pastes so ensure we handle them
+        // before all other cases.
+        insert(input, { paste: key.paste });
+        return;
+      }
+
       if (
         key.name === 'return' ||
         input === '\r' ||

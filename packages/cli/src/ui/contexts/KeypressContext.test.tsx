@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi, Mock } from 'vitest';
 import {
   KeypressProvider,
@@ -28,18 +28,6 @@ vi.mock('ink', async (importOriginal) => {
   };
 });
 
-// Mock the 'readline' module
-vi.mock('readline', () => {
-  const mockedReadline = {
-    createInterface: vi.fn().mockReturnValue({ close: vi.fn() }),
-    emitKeypressEvents: vi.fn(),
-  };
-  return {
-    ...mockedReadline,
-    default: mockedReadline,
-  };
-});
-
 class MockStdin extends EventEmitter {
   isTTY = true;
   setRawMode = vi.fn();
@@ -47,6 +35,7 @@ class MockStdin extends EventEmitter {
   override removeListener = super.removeListener;
   write = vi.fn();
   resume = vi.fn();
+  pause = vi.fn();
 
   // Helper to simulate a keypress event
   pressKey(key: Partial<Key>) {
@@ -55,32 +44,16 @@ class MockStdin extends EventEmitter {
 
   // Helper to simulate a kitty protocol sequence
   sendKittySequence(sequence: string) {
-    // Kitty sequences come in multiple parts
-    // For example, ESC[13u comes as: ESC[ then 1 then 3 then u
-    // ESC[57414;2u comes as: ESC[ then 5 then 7 then 4 then 1 then 4 then ; then 2 then u
-    const escIndex = sequence.indexOf('\x1b[');
-    if (escIndex !== -1) {
-      // Send ESC[
-      this.emit('keypress', null, {
-        name: undefined,
-        sequence: '\x1b[',
-        ctrl: false,
-        meta: false,
-        shift: false,
-      });
+    this.emit('data', Buffer.from(sequence));
+  }
 
-      // Send the rest character by character
-      const rest = sequence.substring(escIndex + 2);
-      for (const char of rest) {
-        this.emit('keypress', null, {
-          name: /[a-zA-Z0-9]/.test(char) ? char : undefined,
-          sequence: char,
-          ctrl: false,
-          meta: false,
-          shift: false,
-        });
-      }
-    }
+  // Helper to simulate a paste event
+  sendPaste(text: string) {
+    const PASTE_MODE_PREFIX = `\x1b[200~`;
+    const PASTE_MODE_SUFFIX = `\x1b[201~`;
+    this.emit('data', Buffer.from(PASTE_MODE_PREFIX));
+    this.emit('data', Buffer.from(text));
+    this.emit('data', Buffer.from(PASTE_MODE_SUFFIX));
   }
 }
 
@@ -300,6 +273,39 @@ describe('KeypressContext - Kitty Protocol', () => {
         expect.objectContaining({
           name: 'escape',
           kittyProtocol: true,
+        }),
+      );
+    });
+  });
+
+  describe('paste mode', () => {
+    it('should handle multiline paste as a single event', async () => {
+      const keyHandler = vi.fn();
+      const pastedText = 'This \nis \na \nmultiline \npaste.';
+
+      const { result } = renderHook(() => useKeypressContext(), {
+        wrapper,
+      });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Simulate a bracketed paste event
+      act(() => {
+        stdin.sendPaste(pastedText);
+      });
+
+      await waitFor(() => {
+        // Expect the handler to be called exactly once for the entire paste
+        expect(keyHandler).toHaveBeenCalledTimes(1);
+      });
+
+      // Verify the single event contains the full pasted text
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paste: true,
+          sequence: pastedText,
         }),
       );
     });
