@@ -325,16 +325,14 @@ export class LoopDetectionService {
       .slice(-LLM_LOOP_CHECK_HISTORY_COUNT);
 
     // Filter out entries with empty parts to prevent API errors
-    const validHistory = recentHistory.filter(entry => {
-      if (!entry.parts || !Array.isArray(entry.parts)) {
-        return false;
-      }
-      return entry.parts.length > 0 && entry.parts.some(part => 
-        (part.text && part.text.trim().length > 0) || 
-        (part.functionCall) || 
-        (part.functionResponse)
-      );
-    });
+    const validHistory = recentHistory.filter(entry =>
+      Array.isArray(entry.parts) &&
+      entry.parts.some(part => 
+        (part.text?.trim().length ?? 0) > 0 || 
+        part.functionCall || 
+        part.functionResponse
+      )
+    );
 
     // If we don't have enough valid history, skip the LLM check
     if (validHistory.length < 3) {
