@@ -9,7 +9,7 @@ import { captureScreenshot } from '../utils/clipboardUtils.js';
 
 export const screenshotCommand: SlashCommand = {
   name: 'screenshot',
-  description: 'capture a screenshot for AI analysis (modes: fullscreen, window, area [default], or "only" to capture without analysis)',
+  description: 'capture a screenshot for AI analysis (modes: fullscreen, window, interactive [default], or "only" to capture without analysis)',
   kind: CommandKind.BUILT_IN,
   action: async (_context, args) => {
     try {
@@ -24,7 +24,7 @@ export const screenshotCommand: SlashCommand = {
         return {
           type: 'message',
           messageType: 'error',
-          content: `Invalid arguments: Please specify at most one capture mode. Valid modes: fullscreen, window, area (or empty for default).`
+          content: `Invalid arguments: Please specify at most one capture mode. Valid modes: fullscreen, window, interactive (or empty for default).`
         };
       }
 
@@ -40,7 +40,7 @@ export const screenshotCommand: SlashCommand = {
         return {
           type: 'message',
           messageType: 'error',
-          content: `Invalid capture mode: "${mode}". Valid modes: fullscreen, window, area.`
+          content: `Invalid capture mode: "${mode}". Valid modes: fullscreen, window, interactive.`
         };
       }
 
