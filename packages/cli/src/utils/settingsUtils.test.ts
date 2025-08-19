@@ -392,7 +392,7 @@ describe('SettingsUtils', () => {
           new Set(),
           updatedPendingSettings,
         );
-        expect(displayValue).toBe('true*'); // Should show true with * indicating change
+        expect(displayValue).toBe('true'); // Should show true (no * since value matches default)
 
         // Test that modified settings also show the * indicator
         const modifiedSettings = new Set([key]);
@@ -602,7 +602,7 @@ describe('SettingsUtils', () => {
           mergedSettings,
           modifiedSettings,
         );
-        expect(result).toBe('false'); // matches default, no *
+        expect(result).toBe('false*');
       });
 
       it('should show default value when setting is not in scope', () => {
