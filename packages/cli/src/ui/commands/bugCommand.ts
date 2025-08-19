@@ -42,7 +42,7 @@ export const bugCommand: SlashCommand = {
         context.services.config?.getIdeClient()?.getDetectedIdeDisplayName()) ||
       '';
 
-    const info = `
+    let info = `
 * **CLI Version:** ${cliVersion}
 * **Git Commit:** ${GIT_COMMIT_INFO}
 * **Session ID:** ${sessionId}
@@ -50,8 +50,10 @@ export const bugCommand: SlashCommand = {
 * **Sandbox Environment:** ${sandboxEnv}
 * **Model Version:** ${modelVersion}
 * **Memory Usage:** ${memoryUsage}
-${ideClient ? `* **IDE Client:** ${ideClient}` : ''}
 `;
+    if (ideClient) {
+      info += `* **IDE Client:** ${ideClient}\n`;
+    }
 
     let bugReportUrl =
       'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}';
