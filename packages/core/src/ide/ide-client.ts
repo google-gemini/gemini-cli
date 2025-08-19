@@ -316,23 +316,20 @@ export class IdeClient {
 
   private createProxyAwareFetch() {
     // ignore proxy for 'localhost' by deafult to allow connecting to the ide mcp server
-    const existingNoProxy = process.env.NO_PROXY || '';
+    const existingNoProxy = process.env['NO_PROXY'] || '';
     const agent = new EnvHttpProxyAgent({
       noProxy: [existingNoProxy, 'localhost'].filter(Boolean).join(','),
     });
-    
     const undiciPromise = import('undici');
-    
     return async (url: string | URL, init?: RequestInit): Promise<Response> => {
       const { fetch: fetchFn } = await undiciPromise;
       const fetchOptions: RequestInit & { dispatcher?: unknown } = {
         ...init,
         dispatcher: agent,
       };
-  
       const options = fetchOptions as unknown as import('undici').RequestInit;
       const response = await fetchFn(url, options);
-      return new Response(response.body as ReadableStream<any> | null, {
+      return new Response(response.body as ReadableStream<unknown> | null, {
         status: response.status,
         statusText: response.statusText,
         headers: response.headers,
@@ -405,19 +402,14 @@ export class IdeClient {
       transport = new StreamableHTTPClientTransport(
         new URL(`http://${getIdeServerHost()}:${port}/mcp`),
         {
-          fetch: this.createProxyAwareFetch()
-        });
+          fetch: this.createProxyAwareFetch(),
+        },
+      );
       await this.client.connect(transport);
       this.registerClientHandlers();
       this.setState(IDEConnectionStatus.Connected);
       return true;
     } catch (_error) {
-      this.setState(
-        IDEConnectionStatus.Disconnected,
-        `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running and try restarting your terminal. To install the extension, run /ide install.`,
-        true,
-      );
-      logger.debug('Failed to connect to IDE companion extension. Error:\n', _error);
       if (transport) {
         try {
           await transport.close();
