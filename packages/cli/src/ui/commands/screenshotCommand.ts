@@ -34,7 +34,7 @@ export const screenshotCommand: SlashCommand = {
         captureMode = 'fullscreen';
       } else if (mode === 'window') {
         captureMode = 'window';
-      } else if (mode === undefined) {
+      } else if (mode === 'interactive' || mode === undefined) {
         captureMode = 'interactive';
       } else {
         return {
