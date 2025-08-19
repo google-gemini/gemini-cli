@@ -73,6 +73,7 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
+  skipNextSpeakerCheck: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -228,6 +229,11 @@ export async function parseArguments(): Promise<CliArgs> {
           coerce: (dirs: string[]) =>
             // Handle comma-separated values
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
+        })
+        .option('skip-next-speaker-check', {
+          type: 'boolean',
+          description: 'Skip the next speaker check.',
+          default: false,
         })
         .check((argv) => {
           if (argv.prompt && argv['promptInteractive']) {
@@ -540,6 +546,7 @@ export async function loadCliConfig(
     interactive,
     trustedFolder,
     shouldUseNodePtyShell: settings.shouldUseNodePtyShell,
+    skipNextSpeakerCheck: argv.skipNextSpeakerCheck,
   });
 }
 
