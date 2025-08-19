@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Checks if the system clipboard contains an image (macOS only for now)
@@ -139,25 +140,29 @@ export async function captureScreenshot(
     const timestamp = new Date().getTime();
     const screenshotPath = path.join(tempDir, `screenshot-${timestamp}.png`);
 
-    // Build screencapture command based on mode
-    let command: string;
+    // Build screencapture arguments based on mode
+    const args: string[] = [];
     switch (mode) {
       case 'fullscreen':
         // Capture entire screen without user interaction
-        command = `screencapture "${screenshotPath}"`;
         break;
       case 'window':
         // Let user select a window to capture
-        command = `screencapture -w "${screenshotPath}"`;
+        args.push('-w');
         break;
       case 'interactive':
       default:
         // Interactive mode for user selection (default)
-        command = `screencapture -i "${screenshotPath}"`;
+        args.push('-i');
         break;
     }
+    args.push(screenshotPath);
 
-    await execAsync(command);
+    try {
+      await execFileAsync('screencapture', args);
+    } catch {
+      return null; // Graceful handling of user cancellation
+    }
     
     // Verify the file was created and has content
     try {
