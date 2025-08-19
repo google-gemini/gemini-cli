@@ -49,12 +49,14 @@ export async function getIdeProcessId(): Promise<number> {
         const ppidMatch = stdout.match(/ParentProcessId=(\d+)/);
         parentPid = ppidMatch ? parseInt(ppidMatch[1], 10) : 0;
       } else {
-        const command = `ps -o ppid=,comm= -p ${currentPid}`;
-        const stdout = (await execAsync(command)).stdout.trim();
-        const ppidString = stdout.substring(0, stdout.indexOf(' '));
+        const command = `ps -o ppid=,command= -p ${currentPid}`;
+        const { stdout } = await execAsync(command);
+        const trimmedStdout = stdout.trim();
+        const ppidString = trimmedStdout.split(/\s+/)[0];
         const ppid = parseInt(ppidString, 10);
         parentPid = isNaN(ppid) ? 1 : ppid;
-        processName = path.basename(stdout.substring(ppidString.length).trim());
+        const fullCommand = trimmedStdout.substring(ppidString.length).trim();
+        processName = path.basename(fullCommand.split(' ')[0]);
       }
     } catch (_) {
       // This can happen if a process in the chain dies during execution.
@@ -69,7 +71,28 @@ export async function getIdeProcessId(): Promise<number> {
     );
 
     if (isShell) {
-      return parentPid;
+      let idePid = parentPid;
+      if (os.platform() === 'linux') {
+        try {
+          const { stdout: cmdOut } = await execAsync(
+            `ps -o command= -p ${idePid}`,
+          );
+          // Check if it's a utility process
+          if (cmdOut.includes('--type=')) {
+            const { stdout: ppidOut } = await execAsync(
+              `ps -o ppid= -p ${idePid}`,
+            );
+            const grandParentPid = parseInt(ppidOut.trim(), 10);
+            if (!isNaN(grandParentPid) && grandParentPid > 1) {
+              idePid = grandParentPid;
+            }
+          }
+        } catch (_) {
+          // Ignore if ps fails, we'll just use the parent pid.
+        }
+      }
+      console.log(idePid)
+      return idePid;
     }
 
     // Define the root PID for the current OS

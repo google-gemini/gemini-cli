@@ -23,7 +23,7 @@ vi.mock('os', async (importOriginal) => {
 });
 
 const mockedExec = vi.mocked(exec);
-const mockedOsPlatform = vi.mocked(os.platform);
+const mockedOs = vi.mocked(os);
 
 describe('getIdeProcessId', () => {
   beforeEach(() => {
@@ -32,7 +32,7 @@ describe('getIdeProcessId', () => {
 
   describe('on darwin/linux', () => {
     beforeEach(() => {
-      mockedOsPlatform.mockReturnValue('darwin');
+      mockedOs.platform.mockReturnValue('darwin');
       Object.defineProperty(process, 'pid', { value: 100 });
     });
 
@@ -107,7 +107,7 @@ describe('getIdeProcessId', () => {
 
   describe('on windows', () => {
     beforeEach(() => {
-      mockedOsPlatform.mockReturnValue('win32');
+      mockedOs.platform.mockReturnValue('win32');
       Object.defineProperty(process, 'pid', { value: 1000 });
     });
 
@@ -182,7 +182,7 @@ describe('getIdeProcessId', () => {
 
   describe('on unsupported os', () => {
     it('should return the current pid', async () => {
-      mockedOsPlatform.mockReturnValue('aix');
+      mockedOs.platform.mockReturnValue('aix');
       Object.defineProperty(process, 'pid', { value: 500 });
       const pid = await getIdeProcessId();
       expect(pid).toBe(500);
