@@ -112,19 +112,34 @@ export const GitHubDark: Theme = new Theme(
       color: githubDarkColors.AccentCyan,
     },
     'hljs-symbol': {
-      color: githubDarkColors.AccentCyan,
+      color: githubDarkColors.AccentPurple,
     },
     'hljs-bullet': {
-      color: githubDarkColors.AccentCyan,
+      color: githubDarkColors.AccentPurple,
     },
     'hljs-built_in': {
-      color: githubDarkColors.AccentCyan,
+      color: githubDarkColors.LightBlue,
     },
-    'hljs-addition': {
-      color: githubDarkColors.AccentGreen,
+    'hljs-builtin-name': {
+      color: githubDarkColors.LightBlue,
+    },
+    'hljs-meta': {
+      color: githubDarkColors.LightBlue,
+      fontWeight: 'bold',
     },
     'hljs-deletion': {
+      background: '#86181D',
       color: githubDarkColors.AccentRed,
+    },
+    'hljs-addition': {
+      background: '#144620',
+      color: githubDarkColors.AccentGreen,
+    },
+    'hljs-emphasis': {
+      fontStyle: 'italic',
+    },
+    'hljs-strong': {
+      fontWeight: 'bold',
     },
   },
   githubDarkColors,
