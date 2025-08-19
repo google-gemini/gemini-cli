@@ -9,11 +9,6 @@ import { promisify } from 'util';
 import os from 'os';
 import path from 'path';
 
-const logger = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: (...args: any[]) => console.error('[ERROR] [ProcessUtils]', ...args),
-};
-
 const execAsync = promisify(exec);
 
 /**
@@ -52,14 +47,14 @@ export async function getIdeProcessId(): Promise<number> {
         const nameMatch = stdout.match(/Name=([^\n]*)/);
         processName = nameMatch ? nameMatch[1].trim() : '';
         const ppidMatch = stdout.match(/ParentProcessId=(\d+)/);
-        parentPid = ppidMatch ? parseInt(ppidMatch[1], 10) : 0;
+        parentPid = ppidMatch ? parseInt(ppidMatch[1], 10) : 0; // Top of the tree is 0
       } else {
         const command = `ps -o ppid=,command= -p ${currentPid}`;
         const { stdout } = await execAsync(command);
         const trimmedStdout = stdout.trim();
         const ppidString = trimmedStdout.split(/\s+/)[0];
         const ppid = parseInt(ppidString, 10);
-        parentPid = isNaN(ppid) ? 1 : ppid;
+        parentPid = isNaN(ppid) ? 1 : ppid; // Top of the tree is 1
         const fullCommand = trimmedStdout.substring(ppidString.length).trim();
         processName = path.basename(fullCommand.split(' ')[0]);
       }
@@ -108,7 +103,7 @@ export async function getIdeProcessId(): Promise<number> {
     // Move one level up the tree for the next iteration.
     currentPid = parentPid;
   }
-  logger.error(
+  console.error(
     'Failed to find shell process in the process tree. Falling back to top-level process, which may be inaccurate. If you see this, please file a bug via /bug.',
   );
   return currentPid;
