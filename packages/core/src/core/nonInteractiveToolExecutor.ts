@@ -110,6 +110,7 @@ export async function executeToolCall(
       metadata,
       decision: ToolCallDecision.AUTO_ACCEPT,
     });
+
     const response = convertToFunctionResponse(
       toolCallRequest.name,
       toolCallRequest.callId,

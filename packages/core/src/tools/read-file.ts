@@ -145,7 +145,9 @@ ${result.llmContent}`;
         ? result.llmContent.split('\n').length
         : undefined;
     const mimetype = getSpecificMimeType(this.params.absolute_path);
-    const programming_language = getProgrammingLanguage({absolute_path: this.params.absolute_path});
+    const programming_language = getProgrammingLanguage({
+      absolute_path: this.params.absolute_path,
+    });
     recordFileOperationMetric(
       this.config,
       FileOperation.READ,

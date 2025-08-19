@@ -332,7 +332,9 @@ export class WriteFileTool
       const lines = fileContent.split('\n').length;
       const mimetype = getSpecificMimeType(params.file_path);
       const extension = path.extname(params.file_path); // Get extension
-      const programming_language = getProgrammingLanguage({ file_path: params.file_path });
+      const programming_language = getProgrammingLanguage({
+        file_path: params.file_path,
+      });
       if (isNewFile) {
         recordFileOperationMetric(
           this.config,

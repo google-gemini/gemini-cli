@@ -11,7 +11,6 @@ import {
   ToolCallRequestInfo,
   ToolResult,
   Config,
-  logToolCall,
 } from '../index.js';
 import { Part } from '@google/genai';
 import { MockTool } from '../test-utils/tools.js';
@@ -232,4 +231,3 @@ describe('executeToolCall', () => {
     ]);
   });
 });
-

@@ -546,7 +546,9 @@ Use this tool when the user's query implies needing the content of several files
               ? fileReadResult.llmContent.split('\n').length
               : undefined;
           const mimetype = getSpecificMimeType(filePath);
-          const programming_language = getProgrammingLanguage({ absolute_path: filePath });
+          const programming_language = getProgrammingLanguage({
+            absolute_path: filePath,
+          });
           recordFileOperationMetric(
             this.config,
             FileOperation.READ,
