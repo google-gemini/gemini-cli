@@ -13,27 +13,35 @@ export const screenshotCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   action: async (_context, args) => {
     try {
-      const argStr = args.trim().toLowerCase();
+      const parts = args.trim().toLowerCase().split(/\s+/).filter(Boolean);
       let captureMode: 'interactive' | 'fullscreen' | 'window' = 'interactive';
-      let shouldAnalyze = true;
+      const shouldAnalyze = !parts.includes('only');
 
-      // Parse arguments to determine capture mode and analysis preference
-      if (argStr === 'only') {
-        shouldAnalyze = false;
-      } else if (argStr === 'fullscreen') {
+      const modes = parts.filter(p => p !== 'only');
+
+      // Validate: at most one capture mode allowed
+      if (modes.length > 1) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `Invalid arguments: Please specify at most one capture mode. Valid modes: fullscreen, window, area (or empty for default).`
+        };
+      }
+
+      // Set capture mode based on valid input
+      const mode = modes[0];
+      if (mode === 'fullscreen') {
         captureMode = 'fullscreen';
-      } else if (argStr === 'window') {
+      } else if (mode === 'window') {
         captureMode = 'window';
-      } else if (argStr === 'area' || argStr === '') {
+      } else if (mode === 'area' || mode === undefined) {
         captureMode = 'interactive';
-      } else if (argStr.includes('only')) {
-        // Handle cases like "fullscreen only", "window only"
-        shouldAnalyze = false;
-        if (argStr.includes('fullscreen')) {
-          captureMode = 'fullscreen';
-        } else if (argStr.includes('window')) {
-          captureMode = 'window';
-        }
+      } else {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `Invalid capture mode: "${mode}". Valid modes: fullscreen, window, area, only.`
+        };
       }
 
       const screenshotPath = await captureScreenshot(captureMode);
