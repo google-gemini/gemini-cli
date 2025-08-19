@@ -115,6 +115,7 @@ If you encounter issues with IDE integration, here are some common error message
   - **Solution:**
     1.  Make sure you have installed the **Gemini CLI Companion** extension in your IDE and that it is enabled.
     2.  Open a new terminal window in your IDE to ensure it picks up the correct environment.
+    3.  In the devcontainer environment, you need to configure port forwarding for the IDE server port.
 
 - **Message:** `🔴 Disconnected: IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable`
   - **Cause:** The connection to the IDE companion was lost.
