@@ -12,7 +12,6 @@ import {
   ToolInvocation,
   ToolResult,
 } from './tools.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 
 import { getErrorMessage } from '../utils/errors.js';
 import { Config } from '../config/config.js';
@@ -192,17 +191,9 @@ export class WebSearchTool extends BaseDeclarativeTool<
    * @param params The parameters to validate
    * @returns An error message string if validation fails, null if valid
    */
-  protected override validateToolParams(
+  protected override validateToolParamValues(
     params: WebSearchToolParams,
   ): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
-    }
-
     if (!params.query || params.query.trim() === '') {
       return "The 'query' parameter cannot be empty.";
     }
