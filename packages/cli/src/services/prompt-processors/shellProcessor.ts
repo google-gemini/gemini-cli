@@ -137,11 +137,12 @@ export class ShellProcessor implements IPromptProcessor {
 
       // Execute the resolved command (which already has ESCAPED input).
       if (injection.resolvedCommand) {
-        const { result } = ShellExecutionService.execute(
+        const { result } = await ShellExecutionService.execute(
           injection.resolvedCommand,
           config.getTargetDir(),
           () => {},
           new AbortController().signal,
+          config.getShouldUseNodePtyShell(),
         );
 
         const executionResult = await result;
@@ -154,15 +155,7 @@ export class ShellProcessor implements IPromptProcessor {
         }
 
         // Append the output, making stderr explicit for the model.
-        if (executionResult.stdout) {
-          processedPrompt += executionResult.stdout;
-        }
-        if (executionResult.stderr) {
-          if (executionResult.stdout) {
-            processedPrompt += '\n';
-          }
-          processedPrompt += `--- STDERR ---\n${executionResult.stderr}`;
-        }
+        processedPrompt += executionResult.output;
 
         // Append a status message if the command did not succeed.
         if (executionResult.aborted) {
