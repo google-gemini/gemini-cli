@@ -127,7 +127,7 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Example:** `"toolCallCommand": "bin/call_tool"`
 
 - **`mcpServers`** (object):
-  - **Description:** Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools. Gemini CLI attempts to connect to each configured MCP server to discover available tools. If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts. Note that the system might strip certain schema properties from MCP tool definitions for compatibility.
+  - **Description:** Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools. Gemini CLI attempts to connect to each configured MCP server to discover available tools. If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts. Note that the system might strip certain schema properties from MCP tool definitions for compatibility. At least one of `command`, `url`, or `httpUrl` must be provided. If multiple are specified, the order of precedence is `httpUrl`, then `url`, then `command`.
   - **Default:** Empty
   - **Properties:**
     - **`<SERVER_NAME>`** (object): The server parameters for the named server.
@@ -140,6 +140,7 @@ In addition to a project settings file, a project's `.gemini` directory can cont
       - `headers` (object, optional): A map of HTTP headers to send with requests to `url` or `httpUrl`.
       - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
       - `trust` (boolean, optional): Trust this server and bypass all tool call confirmations.
+      - `description` (string, optional): A brief description of the server, which may be used for display purposes.
       - `includeTools` (array of strings, optional): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (whitelist behavior). If not specified, all tools from the server are enabled by default.
       - `excludeTools` (array of strings, optional): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
   - **Example:**
