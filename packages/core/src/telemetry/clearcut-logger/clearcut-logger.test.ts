@@ -181,9 +181,22 @@ describe('ClearcutLogger', () => {
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
 
-      expect(event?.event_metadata[0][0]).toEqual({
+      expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
         value: '9001',
+      });
+    });
+
+    it('logs the current surface from a github action', () => {
+      const { logger } = setup({});
+
+      vi.stubEnv('GITHUB_SHA', '8675309');
+
+      const event = logger?.createLogEvent(EventNames.CHAT_COMPRESSION, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: 'GitHub',
       });
     });
 
@@ -195,7 +208,7 @@ describe('ClearcutLogger', () => {
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
 
-      expect(event?.event_metadata[0][1]).toEqual({
+      expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
         value: 'ide-1234',
       });
@@ -238,7 +251,7 @@ describe('ClearcutLogger', () => {
         expectedValue: 'cloudshell',
       },
     ])(
-      'logs the current surface for as $expectedValue, preempting vscode detection',
+      'logs the current surface as $expectedValue, preempting vscode detection',
       ({ env, expectedValue }) => {
         const { logger } = setup({});
         for (const [key, value] of Object.entries(env)) {
@@ -246,7 +259,7 @@ describe('ClearcutLogger', () => {
         }
         vi.stubEnv('TERM_PROGRAM', 'vscode');
         const event = logger?.createLogEvent(EventNames.API_ERROR, []);
-        expect(event?.event_metadata[0][1]).toEqual({
+        expect(event?.event_metadata[0][3]).toEqual({
           gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
           value: expectedValue,
         });

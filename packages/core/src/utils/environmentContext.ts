@@ -62,7 +62,7 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
 
   const context = `
 This is the Gemini CLI. We are setting up the context for our chat.
-Today's date is ${today}.
+Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
 ${directoryContext}
         `.trim();
