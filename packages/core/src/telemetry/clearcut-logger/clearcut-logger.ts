@@ -37,22 +37,6 @@ import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { DetectedIde, detectIde } from '../../ide/detect-ide.js';
 import { truncateFeedbackContent } from '../constants.js';
 
-const start_session_event_name = 'start_session';
-const new_prompt_event_name = 'new_prompt';
-const tool_call_event_name = 'tool_call';
-const api_request_event_name = 'api_request';
-const api_response_event_name = 'api_response';
-const api_error_event_name = 'api_error';
-const end_session_event_name = 'end_session';
-const flash_fallback_event_name = 'flash_fallback';
-const loop_detected_event_name = 'loop_detected';
-const next_speaker_check_event_name = 'next_speaker_check';
-const slash_command_event_name = 'slash_command';
-const malformed_json_response_event_name = 'malformed_json_response';
-const ide_connection_event_name = 'ide_connection';
-const kitty_sequence_overflow_event_name = 'kitty_sequence_overflow';
-const research_opt_in_event_name = 'research_opt_in';
-const research_feedback_event_name = 'research_feedback';
 
 export enum EventNames {
   START_SESSION = 'start_session',
@@ -70,6 +54,8 @@ export enum EventNames {
   IDE_CONNECTION = 'ide_connection',
   KITTY_SEQUENCE_OVERFLOW = 'kitty_sequence_overflow',
   CHAT_COMPRESSION = 'chat_compression',
+  RESEARCH_OPT_IN = 'research_opt_in',
+  RESEARCH_FEEDBACK = 'research_feedback',
 }
 
 export interface LogResponse {
@@ -785,7 +771,7 @@ export class ClearcutLogger {
     }
 
     this.enqueueLogEvent(
-      this.createLogEvent(research_opt_in_event_name, data),
+      this.createLogEvent(EventNames.RESEARCH_OPT_IN, data),
     );
     this.flushIfNeeded();
   }
@@ -831,7 +817,7 @@ export class ClearcutLogger {
     }
 
     this.enqueueLogEvent(
-      this.createLogEvent(research_feedback_event_name, data),
+      this.createLogEvent(EventNames.RESEARCH_FEEDBACK, data),
     );
     this.flushIfNeeded();
   }

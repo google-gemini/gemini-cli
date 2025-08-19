@@ -246,11 +246,10 @@ export enum EventMetadataKey {
   GEMINI_CLI_RESEARCH_FEEDBACK_TYPE = 59,
 
   // Logs the content of research feedback
-  GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT = 60,
+  GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT = 62,
 
   // Logs survey responses for research feedback (JSON stringified)
-  GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 61,
-}
+  GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 63,
 
   // Logs the number of tokens before context window compression.
   GEMINI_CLI_COMPRESSION_TOKENS_BEFORE = 60,
