@@ -111,7 +111,10 @@ export async function executeToolCall(
       prompt_id: toolCallRequest.prompt_id,
       metadata,
       decision: ToolCallDecision.AUTO_ACCEPT,
-      tool_type: tool instanceof DiscoveredMCPTool ? 'mcp' : 'native',
+      tool_type:
+        typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
+          ? 'mcp'
+          : 'native',
     });
 
     const response = convertToFunctionResponse(
@@ -144,7 +147,10 @@ export async function executeToolCall(
       error: error.message,
       error_type: ToolErrorType.UNHANDLED_EXCEPTION,
       prompt_id: toolCallRequest.prompt_id,
-      tool_type: tool instanceof DiscoveredMCPTool ? 'mcp' : 'native',
+      tool_type:
+        typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
+          ? 'mcp'
+          : 'native',
     });
     return {
       callId: toolCallRequest.callId,

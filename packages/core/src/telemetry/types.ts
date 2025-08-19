@@ -132,7 +132,10 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     this.error = call.response.error?.message;
     this.error_type = call.response.errorType;
     this.prompt_id = call.request.prompt_id;
-    this.tool_type = call.tool instanceof DiscoveredMCPTool ? 'mcp' : 'native';
+    this.tool_type =
+      typeof call.tool !== 'undefined' && call.tool instanceof DiscoveredMCPTool
+        ? 'mcp'
+        : 'native';
 
     if (
       call.status === 'success' &&
