@@ -16,20 +16,11 @@ import {
 import { Part } from '@google/genai';
 import { MockTool } from '../test-utils/tools.js';
 
-const mockConfig = {
-  getSessionId: () => 'test-session-id',
-  getUsageStatisticsEnabled: () => true,
-  getDebugMode: () => false,
-  getContentGeneratorConfig: () => ({
-    model: 'test-model',
-    authType: 'oauth-personal',
-  }),
-} as unknown as Config;
-
 describe('executeToolCall', () => {
   let mockToolRegistry: ToolRegistry;
   let mockTool: MockTool;
   let abortController: AbortController;
+  let mockConfig: Config;
 
   beforeEach(() => {
     mockTool = new MockTool();
@@ -38,6 +29,17 @@ describe('executeToolCall', () => {
       getTool: vi.fn(),
       // Add other ToolRegistry methods if needed, or use a more complete mock
     } as unknown as ToolRegistry;
+
+    mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getToolRegistry: () => mockToolRegistry,
+    } as unknown as Config;
 
     abortController = new AbortController();
   });
@@ -60,7 +62,6 @@ describe('executeToolCall', () => {
     const response = await executeToolCall(
       mockConfig,
       request,
-      mockToolRegistry,
       abortController.signal,
     );
 
@@ -94,7 +95,6 @@ describe('executeToolCall', () => {
     const response = await executeToolCall(
       mockConfig,
       request,
-      mockToolRegistry,
       abortController.signal,
     );
 
@@ -141,7 +141,6 @@ describe('executeToolCall', () => {
     const response = await executeToolCall(
       mockConfig,
       request,
-      mockToolRegistry,
       abortController.signal,
     );
     expect(response).toStrictEqual({
@@ -185,7 +184,6 @@ describe('executeToolCall', () => {
     const response = await executeToolCall(
       mockConfig,
       request,
-      mockToolRegistry,
       abortController.signal,
     );
     expect(response).toStrictEqual({
@@ -222,7 +220,6 @@ describe('executeToolCall', () => {
     const response = await executeToolCall(
       mockConfig,
       request,
-      mockToolRegistry,
       abortController.signal,
     );
 
@@ -262,7 +259,6 @@ describe('executeToolCall', () => {
     const response = await executeToolCall(
       mockConfig,
       request,
-      mockToolRegistry,
       abortController.signal,
     );
 

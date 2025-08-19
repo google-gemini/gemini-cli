@@ -10,7 +10,6 @@ import {
   ToolCallRequestInfo,
   ToolCallResponseInfo,
   ToolErrorType,
-  ToolRegistry,
   ToolResult,
 } from '../index.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -25,10 +24,9 @@ import { ToolCallDecision } from '../telemetry/tool-call-decision.js';
 export async function executeToolCall(
   config: Config,
   toolCallRequest: ToolCallRequestInfo,
-  toolRegistry: ToolRegistry,
   abortSignal?: AbortSignal,
 ): Promise<ToolCallResponseInfo> {
-  const tool = toolRegistry.getTool(toolCallRequest.name);
+  const tool = config.getToolRegistry().getTool(toolCallRequest.name);
 
   const startTime = Date.now();
   if (!tool) {
