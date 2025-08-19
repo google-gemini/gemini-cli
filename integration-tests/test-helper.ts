@@ -11,6 +11,12 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { env } from 'process';
 import fs from 'fs';
+import { Polly } from '@pollyjs/core';
+import FSPersister from '@pollyjs/persister-fs';
+import NodeHttpAdapter from '@pollyjs/adapter-node-http';
+
+Polly.register(NodeHttpAdapter);
+Polly.register(FSPersister);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -114,6 +120,7 @@ export class TestRig {
   testDir: string | null;
   testName?: string;
   _lastRunStdout?: string;
+  polly?: Polly;
 
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
@@ -135,6 +142,17 @@ export class TestRig {
     const sanitizedName = sanitizeTestName(testName);
     this.testDir = join(env.INTEGRATION_TEST_FILE_DIR!, sanitizedName);
     mkdirSync(this.testDir, { recursive: true });
+
+    this.polly = new Polly(sanitizedName, {
+      adapters: ['node-http'],
+      persister: 'fs',
+      recordIfMissing: true,
+      matchRequestsBy: {
+        headers: {
+          exclude: ['user-agent', 'accept', 'accept-encoding', 'connection'],
+        },
+      },
+    });
 
     // Create a settings file to point the CLI to the local collector
     const geminiDir = join(this.testDir, '.gemini');
@@ -307,7 +325,14 @@ export class TestRig {
     return content;
   }
 
+  async teardown() {
+    if (this.polly) {
+      await this.polly.stop();
+    }
+  }
+
   async cleanup() {
+    await this.teardown();
     // Clean up test directory
     if (this.testDir && !env.KEEP_OUTPUT) {
       try {

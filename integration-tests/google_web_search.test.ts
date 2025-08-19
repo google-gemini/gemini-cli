@@ -4,53 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
 describe('google_web_search', () => {
-  it('should be able to search the web', async () => {
-    const rig = new TestRig();
-    await rig.setup('should be able to search the web');
+  let rig: TestRig;
 
-    let result;
-    try {
-      result = await rig.run(`what is the weather in London`);
-    } catch (error) {
-      // Network errors can occur in CI environments
-      if (
-        error instanceof Error &&
-        (error.message.includes('network') || error.message.includes('timeout'))
-      ) {
-        console.warn(
-          'Skipping test due to network error:',
-          (error as Error).message,
-        );
-        return; // Skip the test
-      }
-      throw error; // Re-throw if not a network error
-    }
+  beforeEach(async () => {
+    rig = new TestRig();
+    await rig.setup('should be able to search the web');
+  });
+
+  afterEach(async () => {
+    await rig.cleanup();
+  });
+
+  it('should be able to search the web', async () => {
+    const result = await rig.run(`what is the weather in London`);
 
     const foundToolCall = await rig.waitForToolCall('google_web_search');
 
     // Add debugging information
     if (!foundToolCall) {
-      const allTools = printDebugInfo(rig, result);
-
-      // Check if the tool call failed due to network issues
-      const failedSearchCalls = allTools.filter(
-        (t) =>
-          t.toolRequest.name === 'google_web_search' && !t.toolRequest.success,
-      );
-      if (failedSearchCalls.length > 0) {
-        console.warn(
-          'google_web_search tool was called but failed, possibly due to network issues',
-        );
-        console.warn(
-          'Failed calls:',
-          failedSearchCalls.map((t) => t.toolRequest.args),
-        );
-        return; // Skip the test if network issues
-      }
+      printDebugInfo(rig, result);
     }
 
     expect(

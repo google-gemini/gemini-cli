@@ -9,7 +9,7 @@
  * and then detect and warn about the potential tools that caused the error.
  */
 
-import { describe, it, beforeAll, expect } from 'vitest';
+import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { TestRig } from './test-helper.js';
 import { join } from 'path';
 import { writeFileSync } from 'fs';
@@ -180,6 +180,10 @@ describe('mcp server with cyclic tool schema is detected', () => {
     }
   });
 
+  afterAll(async () => {
+    await rig.cleanup();
+  });
+
   it('should error and suggest disabling the cyclic tool', async () => {
     // Just run any command to trigger the schema depth error.
     // If this test starts failing, check `isSchemaDepthError` from
@@ -192,3 +196,4 @@ describe('mcp server with cyclic tool schema is detected', () => {
     );
   });
 });
+

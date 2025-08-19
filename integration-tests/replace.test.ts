@@ -4,14 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
 describe('replace', () => {
-  it('should be able to replace content in a file', async () => {
-    const rig = new TestRig();
-    await rig.setup('should be able to replace content in a file');
+  let rig: TestRig;
 
+  beforeEach(async () => {
+    rig = new TestRig();
+    await rig.setup('should be able to replace content in a file');
+  });
+
+  afterEach(async () => {
+    await rig.cleanup();
+  });
+
+  it('should be able to replace content in a file', async () => {
     const fileName = 'file_to_replace.txt';
     const originalContent = 'original content';
     const expectedContent = 'replaced content';

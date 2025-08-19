@@ -4,12 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
 describe('run_shell_command', () => {
+  let rig: TestRig;
+
+  beforeEach(async () => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => {
+    await rig.cleanup();
+  });
+
   it('should be able to run a shell command', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to run a shell command');
 
     const prompt = `Please run the command "echo hello-world" and show me the output`;
@@ -41,7 +50,6 @@ describe('run_shell_command', () => {
   });
 
   it('should be able to run a shell command via stdin', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to run a shell command via stdin');
 
     const prompt = `Please run the command "echo test-stdin" and show me what it outputs`;

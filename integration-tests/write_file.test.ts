@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   TestRig,
   createToolCallErrorMessage,
@@ -13,9 +13,18 @@ import {
 } from './test-helper.js';
 
 describe('write_file', () => {
-  it('should be able to write a file', async () => {
-    const rig = new TestRig();
+  let rig: TestRig;
+
+  beforeEach(async () => {
+    rig = new TestRig();
     await rig.setup('should be able to write a file');
+  });
+
+  afterEach(async () => {
+    await rig.cleanup();
+  });
+
+  it('should be able to write a file', async () => {
     const prompt = `show me an example of using the write tool. put a dad joke in dad.txt`;
 
     const result = await rig.run(prompt);

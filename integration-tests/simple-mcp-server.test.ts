@@ -10,7 +10,7 @@
  * external dependencies, making it compatible with Docker sandbox mode.
  */
 
-import { describe, it, beforeAll, expect } from 'vitest';
+import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { TestRig, validateModelOutput } from './test-helper.js';
 import { join } from 'path';
 import { writeFileSync } from 'fs';
@@ -191,6 +191,10 @@ describe('simple-mcp-server', () => {
     }
   });
 
+  afterAll(async () => {
+    await rig.cleanup();
+  });
+
   it('should add two numbers', async () => {
     // Test directory is already set up in before hook
     // Just run the command - MCP server config is in settings.json
@@ -208,3 +212,4 @@ describe('simple-mcp-server', () => {
     ).toBeTruthy();
   });
 });
+
