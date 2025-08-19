@@ -33,6 +33,7 @@ import {
   FileOperation,
 } from '../telemetry/metrics.js';
 import { IDEConnectionStatus } from '../ide/ide-client.js';
+import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -331,6 +332,7 @@ export class WriteFileTool
       const lines = fileContent.split('\n').length;
       const mimetype = getSpecificMimeType(params.file_path);
       const extension = path.extname(params.file_path); // Get extension
+      const programming_language = getProgrammingLanguage({ file_path: params.file_path });
       if (isNewFile) {
         recordFileOperationMetric(
           this.config,
@@ -339,6 +341,7 @@ export class WriteFileTool
           mimetype,
           extension,
           diffStat,
+          programming_language,
         );
       } else {
         recordFileOperationMetric(
@@ -348,6 +351,7 @@ export class WriteFileTool
           mimetype,
           extension,
           diffStat,
+          programming_language,
         );
       }
 

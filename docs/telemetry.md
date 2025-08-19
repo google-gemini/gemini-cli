@@ -267,3 +267,4 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `ai_removed_lines` (Int, if applicable): Number of lines removed/changed by AI.
     - `user_added_lines` (Int, if applicable): Number of lines added/changed by user in AI proposed changes.
     - `user_removed_lines` (Int, if applicable): Number of lines removed/changed by user in AI proposed changes.
+    - `programming_language` (string, if applicable): The programming language of the file.

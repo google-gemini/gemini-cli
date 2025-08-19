@@ -7,7 +7,6 @@
 import {
   FileDiff,
   logToolCall,
-  ToolCallEvent,
   ToolCallRequestInfo,
   ToolCallResponseInfo,
   ToolErrorType,
@@ -16,7 +15,6 @@ import {
 } from '../index.js';
 import { Config } from '../config/config.js';
 import { convertToFunctionResponse } from './coreToolScheduler.js';
-import { addProgrammingLanguageToEvent } from '../telemetry/telemetry-utils.js';
 import { ToolCallDecision } from '../telemetry/tool-call-decision.js';
 
 /**
@@ -37,19 +35,16 @@ export async function executeToolCall(
       `Tool "${toolCallRequest.name}" not found in registry.`,
     );
     const durationMs = Date.now() - startTime;
-    logToolCall(
-      config,
-      addProgrammingLanguageToEvent({
-        'event.name': 'tool_call',
-        'event.timestamp': new Date().toISOString(),
-        function_name: toolCallRequest.name,
-        function_args: toolCallRequest.args,
-        duration_ms: durationMs,
-        success: false,
-        error: error.message,
-        prompt_id: toolCallRequest.prompt_id,
-      }),
-    );
+    logToolCall(config, {
+      'event.name': 'tool_call',
+      'event.timestamp': new Date().toISOString(),
+      function_name: toolCallRequest.name,
+      function_args: toolCallRequest.args,
+      duration_ms: durationMs,
+      success: false,
+      error: error.message,
+      prompt_id: toolCallRequest.prompt_id,
+    });
     // Ensure the response structure matches what the API expects for an error
     return {
       callId: toolCallRequest.callId,
@@ -100,7 +95,7 @@ export async function executeToolCall(
       }
     }
     const durationMs = Date.now() - startTime;
-    const event: ToolCallEvent = {
+    logToolCall(config, {
       'event.name': 'tool_call',
       'event.timestamp': new Date().toISOString(),
       function_name: toolCallRequest.name,
@@ -114,10 +109,7 @@ export async function executeToolCall(
       prompt_id: toolCallRequest.prompt_id,
       metadata,
       decision: ToolCallDecision.AUTO_ACCEPT,
-    };
-
-    logToolCall(config, addProgrammingLanguageToEvent(event));
-
+    });
     const response = convertToFunctionResponse(
       toolCallRequest.name,
       toolCallRequest.callId,
@@ -138,7 +130,7 @@ export async function executeToolCall(
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
     const durationMs = Date.now() - startTime;
-    const event: ToolCallEvent = {
+    logToolCall(config, {
       'event.name': 'tool_call',
       'event.timestamp': new Date().toISOString(),
       function_name: toolCallRequest.name,
@@ -148,9 +140,7 @@ export async function executeToolCall(
       error: error.message,
       error_type: ToolErrorType.UNHANDLED_EXCEPTION,
       prompt_id: toolCallRequest.prompt_id,
-    };
-
-    logToolCall(config, addProgrammingLanguageToEvent(event));
+    });
     return {
       callId: toolCallRequest.callId,
       responseParts: [

@@ -22,6 +22,7 @@ import {
   recordFileOperationMetric,
   FileOperation,
 } from '../telemetry/metrics.js';
+import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -545,12 +546,15 @@ Use this tool when the user's query implies needing the content of several files
               ? fileReadResult.llmContent.split('\n').length
               : undefined;
           const mimetype = getSpecificMimeType(filePath);
+          const programming_language = getProgrammingLanguage({ absolute_path: filePath });
           recordFileOperationMetric(
             this.config,
             FileOperation.READ,
             lines,
             mimetype,
             path.extname(filePath),
+            undefined,
+            programming_language,
           );
         }
       } else {

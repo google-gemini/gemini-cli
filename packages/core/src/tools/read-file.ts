@@ -26,6 +26,7 @@ import {
   recordFileOperationMetric,
   FileOperation,
 } from '../telemetry/metrics.js';
+import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -144,12 +145,15 @@ ${result.llmContent}`;
         ? result.llmContent.split('\n').length
         : undefined;
     const mimetype = getSpecificMimeType(this.params.absolute_path);
+    const programming_language = getProgrammingLanguage({absolute_path: this.params.absolute_path});
     recordFileOperationMetric(
       this.config,
       FileOperation.READ,
       lines,
       mimetype,
       path.extname(this.params.absolute_path),
+      undefined,
+      programming_language,
     );
 
     return {

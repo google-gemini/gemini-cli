@@ -13,6 +13,7 @@ import {
   getDecisionFromOutcome,
   ToolCallDecision,
 } from './tool-call-decision.js';
+import { getProgrammingLanguage } from './telemetry-utils.js';
 export { ToolCallDecision };
 
 export class StartSessionEvent {
@@ -124,6 +125,7 @@ export class ToolCallEvent {
     this.error = call.response.error?.message;
     this.error_type = call.response.errorType;
     this.prompt_id = call.request.prompt_id;
+    this.programming_language = getProgrammingLanguage(call.request.args);
 
     if (
       call.status === 'success' &&
