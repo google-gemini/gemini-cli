@@ -161,7 +161,7 @@ export async function captureScreenshot(
     try {
       await execFileAsync('screencapture', args);
     } catch {
-      return null; // Graceful handling of user cancellation
+      return null;
     }
     
     // Verify the file was created and has content
@@ -183,8 +183,8 @@ export async function captureScreenshot(
 
     return null;
   } catch (error) {
-    console.error('Error capturing screenshot:', error);
-    return null;
+    console.error('Error capturing screenshot:', error);  
+    throw error;
   }
 }
 
