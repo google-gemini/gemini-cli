@@ -13,6 +13,7 @@ import {
   ToolRegistry,
   ToolResult,
 } from '../index.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { Config } from '../config/config.js';
 import { convertToFunctionResponse } from './coreToolScheduler.js';
 import { ToolCallDecision } from '../telemetry/tool-call-decision.js';
@@ -44,6 +45,7 @@ export async function executeToolCall(
       success: false,
       error: error.message,
       prompt_id: toolCallRequest.prompt_id,
+      tool_type: 'native',
     });
     // Ensure the response structure matches what the API expects for an error
     return {
@@ -66,7 +68,7 @@ export async function executeToolCall(
   try {
     // Directly execute without confirmation or live output handling
     const effectiveAbortSignal = abortSignal ?? new AbortController().signal;
-    const toolResult: ToolResult = await tool.buildAndExecute(
+    const toolResult: ToolResult = await tool.validateBuildAndExecute(
       toolCallRequest.args,
       effectiveAbortSignal,
       // No live output callback for non-interactive mode
@@ -109,6 +111,10 @@ export async function executeToolCall(
       prompt_id: toolCallRequest.prompt_id,
       metadata,
       decision: ToolCallDecision.AUTO_ACCEPT,
+      tool_type:
+        typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
+          ? 'mcp'
+          : 'native',
     });
 
     const response = convertToFunctionResponse(
@@ -141,6 +147,10 @@ export async function executeToolCall(
       error: error.message,
       error_type: ToolErrorType.UNHANDLED_EXCEPTION,
       prompt_id: toolCallRequest.prompt_id,
+      tool_type:
+        typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
+          ? 'mcp'
+          : 'native',
     });
     return {
       callId: toolCallRequest.callId,
