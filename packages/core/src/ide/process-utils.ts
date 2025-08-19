@@ -49,7 +49,7 @@ export async function getIdeProcessId(): Promise<number> {
       if (platform === 'win32') {
         const command = `wmic process where "ProcessId=${currentPid}" get Name,ParentProcessId /value`;
         const { stdout } = await execAsync(command);
-        const nameMatch = stdout.match(/Name=(.*)/);
+        const nameMatch = stdout.match(/Name=([^\n]*)/);
         processName = nameMatch ? nameMatch[1].trim() : '';
         const ppidMatch = stdout.match(/ParentProcessId=(\d+)/);
         parentPid = ppidMatch ? parseInt(ppidMatch[1], 10) : 0;
