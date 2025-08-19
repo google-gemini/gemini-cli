@@ -68,7 +68,7 @@ ${directoryContext}
         `.trim();
 
   const initialParts: Part[] = [{ text: context }];
-  const toolRegistry = await config.getToolRegistry();
+  const toolRegistry = config.getToolRegistry();
 
   // Add full file context if the flag is set
   if (config.getFullContext()) {

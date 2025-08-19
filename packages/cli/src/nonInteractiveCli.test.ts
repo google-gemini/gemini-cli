@@ -65,7 +65,7 @@ describe('runNonInteractive', () => {
     mockConfig = {
       initialize: vi.fn().mockResolvedValue(undefined),
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
-      getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
+      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getMaxSessionTurns: vi.fn().mockReturnValue(10),
       getIdeMode: vi.fn().mockReturnValue(false),
       getFullContext: vi.fn().mockReturnValue(false),

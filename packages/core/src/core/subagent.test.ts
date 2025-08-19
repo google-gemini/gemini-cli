@@ -59,7 +59,7 @@ async function createMockConfig(
     ...toolRegistryMocks,
   } as unknown as ToolRegistry;
 
-  vi.spyOn(config, 'getToolRegistry').mockResolvedValue(mockToolRegistry);
+  vi.spyOn(config, 'getToolRegistry').mockReturnValue(mockToolRegistry);
   return { config, toolRegistry: mockToolRegistry };
 }
 

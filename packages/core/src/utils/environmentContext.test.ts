@@ -89,7 +89,7 @@ describe('getEnvironmentContext', () => {
       }),
       getFileService: vi.fn(),
       getFullContext: vi.fn().mockReturnValue(false),
-      getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
+      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
     };
 
     vi.mocked(getFolderStructure).mockResolvedValue('Mock Folder Structure');

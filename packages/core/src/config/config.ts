@@ -482,8 +482,8 @@ export class Config {
     return this.workspaceContext;
   }
 
-  getToolRegistry(): Promise<ToolRegistry> {
-    return Promise.resolve(this.toolRegistry);
+  getToolRegistry(): ToolRegistry {
+    return this.toolRegistry;
   }
 
   getPromptRegistry(): PromptRegistry {
