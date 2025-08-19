@@ -86,6 +86,15 @@ export const SETTINGS_SCHEMA = {
     description: 'Hide the application banner',
     showInDialog: true,
   },
+  hideFooter: {
+    type: 'boolean',
+    label: 'Hide Footer',
+    category: 'UI',
+    requiresRestart: false,
+    default: false,
+    description: 'Hide the footer from the UI',
+    showInDialog: true,
+  },
   showMemoryUsage: {
     type: 'boolean',
     label: 'Show Memory Usage',
