@@ -59,7 +59,7 @@ npm install -g @google/gemini-cli@preview
 
 ### Stable
 
-- New stable releases will be published each week at UTC 2000 on Tuesdays, this will be the full promotion of last week's release + any bug fixes and validations. Use `latest` tag.
+- New stable releases will be published each week at UTC 2000 on Tuesdays, this will be the full promotion of last week's `preview` release + any bug fixes and validations. Use `latest` tag.
 
 ```bash
 npm install -g @google/gemini-cli@latest
