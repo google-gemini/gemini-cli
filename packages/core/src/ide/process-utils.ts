@@ -54,7 +54,8 @@ async function getParentProcessInfo(pid: number): Promise<{
  * @param shells A list of known shell process names.
  * @returns A promise that resolves to the numeric PID.
  */
-async function getIdeProcessIdForUnix(shells: string[]): Promise<number> {
+async function getIdeProcessIdForUnix(): Promise<number> {
+  const shells = ['zsh', 'bash', 'sh', 'tcsh', 'csh', 'ksh', 'fish', 'dash'];
   let currentPid = process.pid;
 
   for (let i = 0; i < MAX_TRAVERSAL_DEPTH; i++) {
@@ -153,10 +154,5 @@ export async function getIdeProcessId(): Promise<number> {
     return getIdeProcessIdForWindows();
   }
 
-  const shells: Record<string, string[]> = {
-    darwin: ['zsh', 'bash', 'sh', 'tcsh', 'csh', 'ksh', 'fish'],
-    linux: ['zsh', 'bash', 'sh', 'tcsh', 'csh', 'ksh', 'fish', 'dash'],
-  };
-
-  return getIdeProcessIdForUnix(shells[platform] ?? []);
+  return getIdeProcessIdForUnix();
 }
