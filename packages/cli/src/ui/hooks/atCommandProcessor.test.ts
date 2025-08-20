@@ -1066,4 +1066,37 @@ describe('handleAtCommand', () => {
       });
     });
   });
+
+  it("should not add the user's turn to history, as that is the caller's responsibility", async () => {
+    // Arrange
+    const fileContent = 'This is the file content.';
+    const filePath = await createTestFile(
+      path.join(testRootDir, 'path', 'to', 'another-file.txt'),
+      fileContent,
+    );
+    const query = `A query with @${filePath}`;
+
+    // Act
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 999,
+      signal: abortController.signal,
+    });
+
+    // Assert
+    // It SHOULD be called for the tool_group
+    expect(mockAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'tool_group' }),
+      999,
+    );
+
+    // It should NOT have been called for the user turn
+    const userTurnCalls = mockAddItem.mock.calls.filter(
+      (call) => call[0].type === 'user',
+    );
+    expect(userTurnCalls).toHaveLength(0);
+  });
 });
