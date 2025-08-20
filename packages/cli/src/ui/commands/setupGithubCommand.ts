@@ -44,6 +44,46 @@ function getOpenUrlsCommands(readmeUrl: string): string[] {
   return commands;
 }
 
+// Add Gemini CLI specific entries to .gitignore file
+export async function updateGitignore(gitRepoRoot: string): Promise<void> {
+  const gitignoreEntries = ['.gemini/', 'gha-creds-*.json'];
+
+  const gitignorePath = path.join(gitRepoRoot, '.gitignore');
+  try {
+    // Check if .gitignore exists and read its content
+    let existingContent = '';
+    let fileExists = true;
+    try {
+      existingContent = await fs.promises.readFile(gitignorePath, 'utf8');
+    } catch (_error) {
+      // File doesn't exist
+      fileExists = false;
+    }
+
+    if (!fileExists) {
+      // Create new .gitignore file with the entries
+      const contentToWrite = gitignoreEntries.join('\n') + '\n';
+      await fs.promises.writeFile(gitignorePath, contentToWrite);
+    } else {
+      // Check which entries are missing
+      const missingEntries = gitignoreEntries.filter(
+        (entry) =>
+          !existingContent
+            .split(/\r?\n/)
+            .some((line) => line.split('#')[0].trim() === entry),
+      );
+
+      if (missingEntries.length > 0) {
+        const contentToAdd = '\n' + missingEntries.join('\n') + '\n';
+        await fs.promises.appendFile(gitignorePath, contentToAdd);
+      }
+    }
+  } catch (error) {
+    console.debug('Failed to update .gitignore:', error);
+    // Continue without failing the whole command
+  }
+}
+
 export const setupGithubCommand: SlashCommand = {
   name: 'setup-github',
   description: 'Set up GitHub Actions',
@@ -146,11 +186,14 @@ export const setupGithubCommand: SlashCommand = {
       abortController.abort();
     });
 
+    // Add entries to .gitignore file
+    await updateGitignore(gitRepoRoot);
+
     // Print out a message
     const commands = [];
     commands.push('set -eEuo pipefail');
     commands.push(
-      `echo "Successfully downloaded ${workflows.length} workflows. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
+      `echo "Successfully downloaded ${workflows.length} workflows and updated .gitignore. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
     );
     commands.push(...getOpenUrlsCommands(readmeUrl));
 

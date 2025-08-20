@@ -40,3 +40,6 @@ packages/cli/src/generated/
 packages/core/src/generated/
 .integration-tests/
 packages/vscode-ide-companion/*.vsix
+
+# GHA credentials
+gha-creds-*.json
