@@ -4,7 +4,7 @@ This project follows a structured release process to ensure that all packages ar
 
 ## Release Cadence and Tags
 
-We will follow https://semver.org/ as closely as possible but will call out when if we have to deviate from it. Our weekly releases will be minor version increments and any bug or hotfixes btween releases will go out as patch versions on the most recent release.
+We will follow https://semver.org/ as closely as possible but will call out when or if we have to deviate from it. Our weekly releases will be minor version increments and any bug or hotfixes btween releases will go out as patch versions on the most recent release.
 
 ### Preview
 
@@ -38,11 +38,11 @@ Our release cadence is new releases are sent to a preview channel for a week and
 
 ## Nightly Release
 
-Each night at midnight UTC we will auto deploy a nightly release from `main`. This will be a version of the next production release, x.y.z, with the nightly tag.
+Each night at UTC 0000 we will auto deploy a nightly release from `main`. This will be a version of the next production release, x.y.z, with the nightly tag.
 
 ## Create Preview Release
 
-Each Tuesday at midnight UTC we will auto deploy a preview release of the next production release x.Y.x.
+Each Tuesday at UTC 2359 we will auto deploy a preview release of the next production release x.y.z.
 
 - This will happen as a scheduled instance of the ‘release’ action. It will be cut off of Main.
 - This will create a branch `release/x.y.z-preview.n`
