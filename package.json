@@ -1,5 +1,5 @@
 {
-  "name": "@google/gemini-cli",
+  "name": "@innoverdigital/innqa-cli",
   "version": "0.1.21",
   "engines": {
     "node": ">=20.0.0"
@@ -51,7 +51,7 @@
     "clean": "node scripts/clean.js"
   },
   "bin": {
-    "gemini": "bundle/gemini.js"
+    "innqa": "bundle/gemini.js"
   },
   "files": [
     "bundle/",

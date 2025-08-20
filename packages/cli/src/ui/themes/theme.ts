@@ -92,7 +92,7 @@ export const lightTheme: ColorsTheme = {
   DiffRemoved: '#FFCCCC',
   Comment: '#008000',
   Gray: '#97a0b0',
-  GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
+  GradientColors: ["#FF6B00", "#FFD700", "#FFFFFFFF"],
 };
 
 export const darkTheme: ColorsTheme = {
@@ -110,7 +110,7 @@ export const darkTheme: ColorsTheme = {
   DiffRemoved: '#430000',
   Comment: '#6C7086',
   Gray: '#6C7086',
-  GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
+  GradientColors: ["#FF6B00", "#FFD700", "#FFFFFFFF"],
 };
 
 export const ansiTheme: ColorsTheme = {

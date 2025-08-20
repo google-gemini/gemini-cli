@@ -62,7 +62,7 @@ Add a `customThemes` block to your user, project, or system `settings.json` file
       "DiffAdded": "#A6E3A1",
       "DiffRemoved": "#F38BA8",
       "DiffModified": "#89B4FA",
-      "GradientColors": ["#4796E4", "#847ACE", "#C3677F"]
+      "GradientColors": ["#FF6B00", "#FFD700", "#FFFFFFFF"]
     }
   }
 }
