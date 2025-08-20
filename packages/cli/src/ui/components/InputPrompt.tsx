@@ -239,6 +239,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      if (key.paste) {
+        // Ensure we never accidentally interpret paste as regular input.
+        buffer.handleInput(key);
+        return;
+      }
+
       if (vimHandleInput && vimHandleInput(key)) {
         return;
       }
