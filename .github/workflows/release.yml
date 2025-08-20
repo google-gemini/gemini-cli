@@ -4,6 +4,8 @@ on:
   schedule:
     # Runs every day at midnight UTC for the nightly release.
     - cron: '0 0 * * *'
+    # Runs every Tuesday at 23:59 UTC for the preview release.
+    - cron: '59 23 * * 2'
   workflow_dispatch:
     inputs:
       version:
@@ -22,6 +24,11 @@ on:
         default: true
       create_nightly_release:
         description: 'Auto apply the nightly release tag, input version is ignored.'
+        required: false
+        type: 'boolean'
+        default: false
+      create_preview_release:
+        description: 'Auto apply the preview release tag, input version is ignored.'
         required: false
         type: 'boolean'
         default: false
@@ -57,15 +64,23 @@ jobs:
       - name: 'Set booleans for simplified logic'
         env:
           CREATE_NIGHTLY_RELEASE: '${{ github.event.inputs.create_nightly_release }}'
+          CREATE_PREVIEW_RELEASE: '${{ github.event.inputs.create_preview_release }}'
           EVENT_NAME: '${{ github.event_name }}'
+          CRON: '${{ github.event.schedule }}'
           DRY_RUN_INPUT: '${{ github.event.inputs.dry_run }}'
         id: 'vars'
         run: |-
           is_nightly="false"
-          if [[ "${EVENT_NAME}" == "schedule" || "${CREATE_NIGHTLY_RELEASE}" == "true" ]]; then
+          if [[ "${CRON}" == "0 0 * * *" || "${CREATE_NIGHTLY_RELEASE}" == "true" ]]; then
             is_nightly="true"
           fi
           echo "is_nightly=${is_nightly}" >> "${GITHUB_OUTPUT}"
+
+          is_preview="false"
+          if [[ "${CRON}" == "59 23 * * 2" || "${CREATE_PREVIEW_RELEASE}" == "true" ]]; then
+            is_preview="true"
+          fi
+          echo "is_preview=${is_preview}" >> "${GITHUB_OUTPUT}"
 
           is_dry_run="false"
           if [[ "${DRY_RUN_INPUT}" == "true" ]]; then
@@ -86,13 +101,16 @@ jobs:
       - name: 'Get the version'
         id: 'version'
         env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           IS_NIGHTLY: '${{ steps.vars.outputs.is_nightly }}'
+          IS_PREVIEW: '${{ steps.vars.outputs.is_preview }}'
           MANUAL_VERSION: '${{ inputs.version }}'
         run: |-
           VERSION_JSON="$(node scripts/get-release-version.js)"
           echo "RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)" >> "${GITHUB_OUTPUT}"
           echo "RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
+          echo "PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
 
       - name: 'Run Tests'
         if: |-
@@ -183,23 +201,6 @@ jobs:
             --workspace="@google/gemini-cli" \
             --tag="${NPM_TAG}"
 
-      - name: 'Get previous release tag'
-        id: 'previous_release'
-        if: |-
-          ${{ steps.vars.outputs.is_dry_run == 'false' }}
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          IS_NIGHTLY: '${{ steps.vars.outputs.is_nightly }}'
-        run: |-
-          if [[ "${IS_NIGHTLY}" == "true" ]]; then
-            echo "Finding latest nightly release..."
-            PREVIOUS_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("nightly"))] | .[0].tagName')
-          else
-            echo "Finding latest STABLE release (excluding pre-releases)..."
-            PREVIOUS_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("nightly") | not)] | .[0].tagName')
-          fi
-          echo "PREVIOUS_TAG=${PREVIOUS_TAG}" >> "$GITHUB_OUTPUT"
-
       - name: 'Create GitHub Release and Tag'
         if: |-
           ${{ steps.vars.outputs.is_dry_run == 'false' }}
@@ -207,7 +208,7 @@ jobs:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_BRANCH: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           RELEASE_TAG: '${{ steps.version.outputs.RELEASE_TAG }}'
-          PREVIOUS_TAG: '${{ steps.previous_release.outputs.PREVIOUS_TAG }}'
+          PREVIOUS_TAG: '${{ steps.version.outputs.PREVIOUS_TAG }}'
         run: |-
           gh release create "${RELEASE_TAG}" \
             bundle/gemini.js \
