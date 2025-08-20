@@ -45,9 +45,7 @@ export async function runNonInteractive(
     const { processedQuery, shouldProceed } = await handleAtCommand({
       query: input,
       config,
-      // Pass dummy functions for addItem and onDebugMessage as they are not critical
-      // for the core functionality of resolving the query in non-interactive mode.
-      addItem: () => {},
+      addItem: (_item, _timestamp) => 0,
       onDebugMessage: () => {},
       messageId: Date.now(),
       signal: abortController.signal,
@@ -62,6 +60,7 @@ export async function runNonInteractive(
     let currentMessages: Content[] = [
       { role: 'user', parts: processedQuery as Part[] },
     ];
+
     let turnCount = 0;
     while (true) {
       turnCount++;
