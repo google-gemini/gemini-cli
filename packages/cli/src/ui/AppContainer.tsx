@@ -12,10 +12,7 @@ import {
   useUIState,
   UIState,
 } from './contexts/UIStateContext.js';
-import {
-  UIActionsContext,
-  UIActions,
-} from './contexts/UIActionsContext.js';
+import { UIActionsContext, UIActions } from './contexts/UIActionsContext.js';
 import { ConfigContext } from './contexts/ConfigContext.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
 import { HistoryItem, StreamingState } from './types.js';
@@ -366,10 +363,10 @@ export const AppContainer = (props: AppContainerProps) => {
   const currentIDE = config.getIdeClient().getCurrentIde();
   const shouldShowIdePrompt = Boolean(
     config.getIdeModeFeature() &&
-    currentIDE &&
-    !config.getIdeMode() &&
-    !settings.merged.hasSeenIdeIntegrationNudge &&
-    !idePromptAnswered
+      currentIDE &&
+      !config.getIdeMode() &&
+      !settings.merged.hasSeenIdeIntegrationNudge &&
+      !idePromptAnswered,
   );
 
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);

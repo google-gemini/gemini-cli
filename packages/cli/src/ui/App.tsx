@@ -11,10 +11,7 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { LoadedSettings } from '../config/settings.js';
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
-import {
-  type Config,
-  getAllGeminiMdFilenames,
-} from '@google/gemini-cli-core';
+import { type Config, getAllGeminiMdFilenames } from '@google/gemini-cli-core';
 import { StreamingContext } from './contexts/StreamingContext.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
@@ -152,7 +149,7 @@ export const App = (props: AppProps) => {
           nightly={nightly}
         />
 
-                <Box flexDirection="column" ref={mainControlsRef}>
+        <Box flexDirection="column" ref={mainControlsRef}>
           <Notifications />
 
           {dialogsVisible ? (

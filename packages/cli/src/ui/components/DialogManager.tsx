@@ -6,12 +6,8 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import {
-  IdeIntegrationNudge,
-} from '../IdeIntegrationNudge.js';
-import {
-  FolderTrustDialog,
-} from './FolderTrustDialog.js';
+import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
+import { FolderTrustDialog } from './FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { ThemeDialog } from './ThemeDialog.js';
@@ -36,12 +32,8 @@ interface DialogManagerProps {
 }
 
 export const DialogManager = (props: DialogManagerProps) => {
-  const {
-    constrainHeight,
-    terminalHeight,
-    staticExtraHeight,
-    mainAreaWidth,
-  } = props;
+  const { constrainHeight, terminalHeight, staticExtraHeight, mainAreaWidth } =
+    props;
   const config = useConfig();
   const settings = useSettings();
 
@@ -60,7 +52,9 @@ export const DialogManager = (props: DialogManagerProps) => {
     return <FolderTrustDialog onSelect={uiActions.handleFolderTrustSelect} />;
   }
   if (uiState.shellConfirmationRequest) {
-    return <ShellConfirmationDialog request={uiState.shellConfirmationRequest} />;
+    return (
+      <ShellConfirmationDialog request={uiState.shellConfirmationRequest} />
+    );
   }
   if (uiState.confirmationRequest) {
     return (
@@ -149,7 +143,10 @@ export const DialogManager = (props: DialogManagerProps) => {
   }
   if (uiState.showPrivacyNotice) {
     return (
-      <PrivacyNotice onExit={() => uiActions.exitPrivacyNotice()} config={config} />
+      <PrivacyNotice
+        onExit={() => uiActions.exitPrivacyNotice()}
+        config={config}
+      />
     );
   }
 

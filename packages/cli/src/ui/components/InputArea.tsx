@@ -31,8 +31,7 @@ interface InputAreaProps {
 }
 
 export const InputArea = (props: InputAreaProps) => {
-  const { contextFileNames, showAutoAcceptIndicator, footerProps } =
-    props;
+  const { contextFileNames, showAutoAcceptIndicator, footerProps } = props;
 
   const config = useConfig();
 
@@ -72,13 +71,9 @@ export const InputArea = (props: InputAreaProps) => {
             <Text color={Colors.AccentRed}>|⌐■_■| </Text>
           )}
           {uiState.ctrlCPressedOnce ? (
-            <Text color={Colors.AccentYellow}>
-              Press Ctrl+C again to exit.
-            </Text>
+            <Text color={Colors.AccentYellow}>Press Ctrl+C again to exit.</Text>
           ) : uiState.ctrlDPressedOnce ? (
-            <Text color={Colors.AccentYellow}>
-              Press Ctrl+D again to exit.
-            </Text>
+            <Text color={Colors.AccentYellow}>Press Ctrl+D again to exit.</Text>
           ) : uiState.showEscapePrompt ? (
             <Text color={Colors.Gray}>Press Esc again to clear.</Text>
           ) : (
@@ -95,9 +90,7 @@ export const InputArea = (props: InputAreaProps) => {
         <Box paddingTop={isNarrow ? 1 : 0}>
           {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
             !uiState.shellModeActive && (
-              <AutoAcceptIndicator
-                approvalMode={showAutoAcceptIndicator}
-              />
+              <AutoAcceptIndicator approvalMode={showAutoAcceptIndicator} />
             )}
           {uiState.shellModeActive && <ShellModeIndicator />}
         </Box>

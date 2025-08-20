@@ -12,10 +12,19 @@ import { AuthType, EditorType } from '@google/gemini-cli-core';
 import { SettingScope } from '../../config/settings.js';
 
 export interface UIActions {
-  handleThemeSelect: (themeName: string | undefined, scope: SettingScope) => void;
+  handleThemeSelect: (
+    themeName: string | undefined,
+    scope: SettingScope,
+  ) => void;
   handleThemeHighlight: (themeName: string | undefined) => void;
-  handleAuthSelect: (authType: AuthType | undefined, scope: SettingScope) => void;
-  handleEditorSelect: (editorType: EditorType | undefined, scope: SettingScope) => void;
+  handleAuthSelect: (
+    authType: AuthType | undefined,
+    scope: SettingScope,
+  ) => void;
+  handleEditorSelect: (
+    editorType: EditorType | undefined,
+    scope: SettingScope,
+  ) => void;
   exitEditorDialog: () => void;
   exitPrivacyNotice: () => void;
   closeSettingsDialog: () => void;

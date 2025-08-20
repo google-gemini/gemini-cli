@@ -7,9 +7,7 @@
 import React, { useContext } from 'react';
 import { type Config } from '@google/gemini-cli-core';
 
-export const ConfigContext = React.createContext<Config | undefined>(
-  undefined,
-);
+export const ConfigContext = React.createContext<Config | undefined>(undefined);
 
 export const useConfig = () => {
   const context = useContext(ConfigContext);
