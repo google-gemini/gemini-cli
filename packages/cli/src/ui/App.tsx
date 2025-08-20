@@ -605,6 +605,12 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
 
   // Update the cancel handler with message queue support
   cancelHandlerRef.current = useCallback(() => {
+    // If in shell mode, clear the input on cancel rather than repopulating the previous prompt.
+    if (shellModeActive) {
+      buffer.setText('');
+      return;
+    }
+
     const lastUserMessage = userMessages.at(-1);
     let textToSet = lastUserMessage || '';
 
@@ -618,7 +624,7 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
     if (textToSet) {
       buffer.setText(textToSet);
     }
-  }, [buffer, userMessages, getQueuedMessagesText, clearQueue]);
+  }, [buffer, userMessages, getQueuedMessagesText, clearQueue, shellModeActive]);
 
   // Input handling - queue messages for processing
   const handleFinalSubmit = useCallback(
