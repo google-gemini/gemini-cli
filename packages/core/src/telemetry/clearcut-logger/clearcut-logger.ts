@@ -681,12 +681,7 @@ export class ClearcutLogger {
   }
 
   logResearchOptInEvent(event: ResearchOptInEvent): void {
-    const data: EventValue[] = [
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId() ?? '',
-      },
-    ];
+    const data: EventValue[] = [];
 
     // Add opt_in_status if available
     if (event.opt_in_status !== undefined) {
@@ -719,12 +714,7 @@ export class ClearcutLogger {
   }
 
   logResearchFeedbackEvent(event: ResearchFeedbackEvent): void {
-    const data: EventValue[] = [
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId() ?? '',
-      },
-    ];
+    const data: EventValue[] = [];
 
     // Add feedback_type if available
     if (event.feedback_type) {
