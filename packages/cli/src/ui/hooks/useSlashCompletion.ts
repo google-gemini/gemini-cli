@@ -9,6 +9,9 @@ import { AsyncFzf, FzfResultItem } from 'fzf';
 import { Suggestion } from '../components/SuggestionsDisplay.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 
+// Type alias for improved type safety
+type FzfCommandResult = FzfResultItem<string>;
+
 export interface UseSlashCompletionProps {
   enabled: boolean;
   query: string | null;
@@ -84,6 +87,20 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
     return instance;
   }, [fzfInstanceCache]);
 
+  // Helper function for command matching to reduce code duplication
+  const matchesCommand = useMemo(() => (cmd: SlashCommand, query: string): boolean => 
+    cmd.name.toLowerCase() === query.toLowerCase() ||
+    cmd.altNames?.some(alt => alt.toLowerCase() === query.toLowerCase()) || false, []);
+
+  // Memoized helper function for prefix-based filtering to improve performance
+  const getPrefixSuggestions = useMemo(() => (commands: readonly SlashCommand[], partial: string) => 
+    commands.filter(
+      (cmd) =>
+        cmd.description &&
+        (cmd.name.toLowerCase().startsWith(partial.toLowerCase()) ||
+          cmd.altNames?.some((alt) => alt.toLowerCase().startsWith(partial.toLowerCase()))),
+    ), []);
+
   useEffect(() => {
     if (!enabled || query === null) {
       return;
@@ -110,8 +127,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
         break;
       }
       const found: SlashCommand | undefined = currentLevel.find(
-        (cmd) => cmd.name.toLowerCase() === part.toLowerCase() || 
-                 cmd.altNames?.some(alt => alt.toLowerCase() === part.toLowerCase()),
+        (cmd) => matchesCommand(cmd, part),
       );
       if (found) {
         leafCommand = found;
@@ -126,10 +142,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
     let exactMatchAsParent: SlashCommand | undefined;
     if (!hasTrailingSpace && currentLevel) {
       exactMatchAsParent = currentLevel.find(
-        (cmd) =>
-          (cmd.name.toLowerCase() === partial.toLowerCase() || 
-           cmd.altNames?.some(alt => alt.toLowerCase() === partial.toLowerCase())) &&
-          cmd.subCommands,
+        (cmd) => matchesCommand(cmd, partial) && cmd.subCommands,
       );
 
       if (exactMatchAsParent) {
@@ -145,10 +158,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
         setIsPerfectMatch(true);
       } else if (currentLevel) {
         const perfectMatch = currentLevel.find(
-          (cmd) =>
-            (cmd.name.toLowerCase() === partial.toLowerCase() || 
-             cmd.altNames?.some(alt => alt.toLowerCase() === partial.toLowerCase())) &&
-            cmd.action,
+          (cmd) => matchesCommand(cmd, partial) && cmd.action,
         );
         if (perfectMatch) {
           setIsPerfectMatch(true);
@@ -199,14 +209,6 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       const performFuzzySearch = async () => {
         let potentialSuggestions: SlashCommand[] = [];
         
-        // Helper function for prefix-based filtering
-        const getPrefixSuggestions = () => commandsToSearch.filter(
-          (cmd) =>
-            cmd.description &&
-            (cmd.name.toLowerCase().startsWith(partial.toLowerCase()) ||
-              cmd.altNames?.some((alt) => alt.toLowerCase().startsWith(partial.toLowerCase()))),
-        );
-        
         if (partial === '') {
           // If no partial query, show all available commands
           potentialSuggestions = commandsToSearch.filter((cmd) => cmd.description);
@@ -217,7 +219,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
             try {
               const fzfResults = await fzfInstance.fzf.find(partial);
               const uniqueCommands = new Set<SlashCommand>();
-              fzfResults.forEach((result: FzfResultItem<string>) => {
+              fzfResults.forEach((result: FzfCommandResult) => {
                 const cmd = fzfInstance.commandMap.get(result.item);
                 if (cmd && cmd.description) {
                   uniqueCommands.add(cmd);
@@ -227,23 +229,22 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
               
               // If fuzzy search returns no results, fallback to prefix matching
               if (potentialSuggestions.length === 0) {
-                potentialSuggestions = getPrefixSuggestions();
+                potentialSuggestions = getPrefixSuggestions(commandsToSearch, partial);
               }
             } catch (error) {
               console.warn('Fuzzy search failed, falling back to prefix matching:', error);
               // Fallback to prefix-based filtering
-              potentialSuggestions = getPrefixSuggestions();
+              potentialSuggestions = getPrefixSuggestions(commandsToSearch, partial);
             }
           } else {
             // Fallback to prefix-based filtering when fzf instance creation fails
-            potentialSuggestions = getPrefixSuggestions();
+            potentialSuggestions = getPrefixSuggestions(commandsToSearch, partial);
           }
         }
 
         if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
           const perfectMatch = potentialSuggestions.find(
-            (s) => s.name.toLowerCase() === partial.toLowerCase() || 
-                   s.altNames?.some(alt => alt.toLowerCase() === partial.toLowerCase()),
+            (s) => matchesCommand(s, partial),
           );
           if (perfectMatch && perfectMatch.action) {
             potentialSuggestions = [];
@@ -284,6 +285,8 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
     setIsLoadingSuggestions,
     setIsPerfectMatch,
     getFzfForCommands,
+    getPrefixSuggestions,
+    matchesCommand,
   ]);
 
   return {
