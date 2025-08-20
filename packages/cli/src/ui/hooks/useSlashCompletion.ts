@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { Suggestion } from '../components/SuggestionsDisplay.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
+import { getCommandDescription } from '../utils/getCommandDescription.js';
 
 export interface UseSlashCompletionProps {
   enabled: boolean;
@@ -162,7 +163,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       const finalSuggestions = potentialSuggestions.map((cmd) => ({
         label: cmd.name,
         value: cmd.name,
-        description: cmd.description,
+        description: getCommandDescription(cmd.name, cmd.description || '', leafCommand?.name),
       }));
 
       setSuggestions(finalSuggestions);

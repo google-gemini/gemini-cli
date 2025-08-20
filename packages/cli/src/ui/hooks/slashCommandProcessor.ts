@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useMemo, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -56,6 +57,7 @@ export const useSlashCommandProcessor = (
   setIsProcessing: (isProcessing: boolean) => void,
   setGeminiMdFileCount: (count: number) => void,
 ) => {
+  const { t } = useTranslation('ui');
   const session = useSessionStats();
   const [commands, setCommands] = useState<readonly SlashCommand[]>([]);
   const [reloadTrigger, setReloadTrigger] = useState(0);
@@ -272,6 +274,7 @@ export const useSlashCommandProcessor = (
       const parts = trimmed.substring(1).trim().split(/\s+/);
       const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
 
+      
       let currentCommands = commands;
       let commandToExecute: SlashCommand | undefined;
       let pathIndex = 0;
@@ -279,6 +282,7 @@ export const useSlashCommandProcessor = (
       const canonicalPath: string[] = [];
 
       for (const part of commandPath) {
+        
         // TODO: For better performance and architectural clarity, this two-pass
         // search could be replaced. A more optimal approach would be to
         // pre-compute a single lookup map in `CommandService.ts` that resolves
@@ -314,6 +318,7 @@ export const useSlashCommandProcessor = (
         resolvedCommandPath.length > 1
           ? resolvedCommandPath.slice(1).join(' ')
           : undefined;
+
 
       try {
         if (commandToExecute) {
@@ -510,7 +515,7 @@ export const useSlashCommandProcessor = (
 
         addMessage({
           type: MessageType.ERROR,
-          content: `Unknown command: ${trimmed}`,
+          content: t('errors.unknownCommand', { command: trimmed }),
           timestamp: new Date(),
         });
 
@@ -546,6 +551,7 @@ export const useSlashCommandProcessor = (
       }
     },
     [
+      t,
       config,
       addItem,
       openAuthDialog,

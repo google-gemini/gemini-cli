@@ -18,6 +18,7 @@ import {
   USER_AGREEMENT_RATE_MEDIUM,
 } from '../utils/displayUtils.js';
 import { computeSessionStats } from '../utils/computeStats.js';
+import { useTranslation } from 'react-i18next';
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -69,6 +70,7 @@ const ModelUsageTable: React.FC<{
   totalCachedTokens: number;
   cacheEfficiency: number;
 }> = ({ models, totalCachedTokens, cacheEfficiency }) => {
+  const { t } = useTranslation('ui');
   const nameWidth = 25;
   const requestsWidth = 8;
   const inputTokensWidth = 15;
@@ -79,16 +81,16 @@ const ModelUsageTable: React.FC<{
       {/* Header */}
       <Box>
         <Box width={nameWidth}>
-          <Text bold>Model Usage</Text>
+          <Text bold>{t('sessionSummary.modelUsage')}</Text>
         </Box>
         <Box width={requestsWidth} justifyContent="flex-end">
-          <Text bold>Reqs</Text>
+          <Text bold>{t('sessionSummary.reqs')}</Text>
         </Box>
         <Box width={inputTokensWidth} justifyContent="flex-end">
-          <Text bold>Input Tokens</Text>
+          <Text bold>{t('sessionSummary.inputTokens')}</Text>
         </Box>
         <Box width={outputTokensWidth} justifyContent="flex-end">
-          <Text bold>Output Tokens</Text>
+          <Text bold>{t('sessionSummary.outputTokens')}</Text>
         </Box>
       </Box>
       {/* Divider */}
@@ -148,6 +150,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   duration,
   title,
 }) => {
+  const { t } = useTranslation('ui');
   const { stats } = useSessionStats();
   const { metrics } = stats;
   const { models, tools, files } = metrics;
@@ -197,18 +200,18 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
       {renderTitle()}
       <Box height={1} />
 
-      <Section title="Interaction Summary">
-        <StatRow title="Session ID:">
+      <Section title={t('sessionSummary.interactionSummary')}>
+        <StatRow title={t('sessionSummary.sessionId')}>
           <Text>{stats.sessionId}</Text>
         </StatRow>
-        <StatRow title="Tool Calls:">
+        <StatRow title={t('sessionSummary.toolCalls')}>
           <Text>
             {tools.totalCalls} ({' '}
             <Text color={theme.status.success}>✔ {tools.totalSuccess}</Text>{' '}
             <Text color={theme.status.error}>✖ {tools.totalFail}</Text> )
           </Text>
         </StatRow>
-        <StatRow title="Success Rate:">
+        <StatRow title={t('sessionSummary.successRate')}>
           <Text color={successColor}>{computed.successRate.toFixed(1)}%</Text>
         </StatRow>
         {computed.totalDecisions > 0 && (
@@ -236,14 +239,14 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
           )}
       </Section>
 
-      <Section title="Performance">
-        <StatRow title="Wall Time:">
+      <Section title={t('sessionSummary.performance')}>
+        <StatRow title={t('sessionSummary.wallTime')}>
           <Text>{duration}</Text>
         </StatRow>
-        <StatRow title="Agent Active:">
+        <StatRow title={t('sessionSummary.agentActive')}>
           <Text>{formatDuration(computed.agentActiveTime)}</Text>
         </StatRow>
-        <SubStatRow title="API Time:">
+        <SubStatRow title={t('sessionSummary.apiTime')}>
           <Text>
             {formatDuration(computed.totalApiTime)}{' '}
             <Text color={theme.text.secondary}>
@@ -251,7 +254,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
             </Text>
           </Text>
         </SubStatRow>
-        <SubStatRow title="Tool Time:">
+        <SubStatRow title={t('sessionSummary.toolTime')}>
           <Text>
             {formatDuration(computed.totalToolTime)}{' '}
             <Text color={theme.text.secondary}>

@@ -15,6 +15,7 @@ import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
+import { useTranslation } from 'react-i18next';
 
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
@@ -50,6 +51,7 @@ export const Footer: React.FC<FooterProps> = ({
   vimMode,
   isTrustedFolder,
 }) => {
+  const { t } = useTranslation('ui');
   const { columns: terminalWidth } = useTerminalSize();
 
   const isNarrow = isNarrowWidth(terminalWidth);
@@ -102,7 +104,7 @@ export const Footer: React.FC<FooterProps> = ({
         paddingTop={isNarrow ? 1 : 0}
       >
         {isTrustedFolder === false ? (
-          <Text color={theme.status.warning}>untrusted</Text>
+          <Text color={theme.status.warning}>{t('footer.untrusted')}</Text>
         ) : process.env['SANDBOX'] &&
           process.env['SANDBOX'] !== 'sandbox-exec' ? (
           <Text color="green">
@@ -117,7 +119,7 @@ export const Footer: React.FC<FooterProps> = ({
           </Text>
         ) : (
           <Text color={theme.status.error}>
-            no sandbox <Text color={theme.text.secondary}>(see /docs)</Text>
+            {t('footer.noSandbox')} <Text color={theme.text.secondary}>{t('footer.seeDocsHint')}</Text>
           </Text>
         )}
       </Box>

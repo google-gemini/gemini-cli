@@ -5,6 +5,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Config,
   GeminiClient,
@@ -96,6 +97,7 @@ export const useGeminiStream = (
   onEditorClose: () => void,
   onCancelSubmit: () => void,
 ) => {
+  const { t } = useTranslation('errors');
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
@@ -199,7 +201,7 @@ export const useGeminiStream = (
     addItem(
       {
         type: MessageType.INFO,
-        text: 'Request cancelled.',
+        text: t('api.requestCancelled'),
       },
       Date.now(),
     );
@@ -207,6 +209,7 @@ export const useGeminiStream = (
     onCancelSubmit();
     setIsResponding(false);
   }, [
+    t,
     streamingState,
     addItem,
     setPendingHistoryItem,
