@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -35,8 +35,6 @@ describe.skip('IdeClient', () => {
     fs.unlinkSync(portFile);
     await server.stop();
     delete process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
-    // Reset instance
-    IdeClient.instance = undefined;
   });
 });
 
@@ -155,4 +153,47 @@ describe.skip('getIdeProcessId', () => {
 
     expect(parseInt(output, 10)).toBe(parentPid);
   }, 10000);
+});
+
+describe('IdeClient with proxy', () => {
+  let mcpServer: TestMcpServer;
+  let proxyServer: net.Server;
+  let mcpServerPort: number;
+  let proxyServerPort: number;
+
+  beforeEach(async () => {
+    mcpServer = new TestMcpServer();
+    mcpServerPort = await mcpServer.start();
+
+    proxyServer = net.createServer().listen();
+    proxyServerPort = (proxyServer.address() as net.AddressInfo).port;
+
+    vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', String(mcpServerPort));
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', process.cwd());
+
+    // Reset instance
+    IdeClient.instance = undefined;
+  });
+
+  afterEach(async () => {
+    IdeClient.getInstance().disconnect();
+    await mcpServer.stop();
+    proxyServer.close();
+    vi.unstubAllEnvs();
+  });
+
+  it('should connect to IDE server when HTTP_PROXY, HTTPS_PROXY and NO_PROXY are set', async () => {
+    vi.stubEnv('HTTP_PROXY', `http://localhost:${proxyServerPort}`);
+    vi.stubEnv('HTTPS_PROXY', `http://localhost:${proxyServerPort}`);
+    vi.stubEnv('NO_PROXY', 'example.com,127.0.0.1,::1');
+
+    const ideClient = IdeClient.getInstance();
+    await ideClient.connect();
+
+    expect(ideClient.getConnectionStatus()).toEqual({
+      status: 'connected',
+      details: undefined,
+    });
+  });
 });
