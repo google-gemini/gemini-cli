@@ -382,6 +382,20 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_START_SESSION_TELEMETRY_LOG_USER_PROMPTS_ENABLED,
         value: event.telemetry_log_user_prompts_enabled.toString(),
       },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_START_SESSION_MCP_SERVERS_COUNT,
+        value: event.mcp_servers_count ? event.mcp_servers_count : '',
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_START_SESSION_MCP_TOOLS_COUNT,
+        value: event.mcp_tools_count ? event.mcp_tools_count : '',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MCP_TOOLS,
+        value: event.mcp_tools ? event.mcp_tools : '',
+      },
     ];
     this.sessionData = data;
 
