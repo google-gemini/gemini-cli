@@ -44,7 +44,9 @@ export class McpPromptLoader implements ICommandLoader {
         const commandName = `${prompt.name}`;
         const newPromptCommand: SlashCommand = {
           name: commandName,
-          description: prompt.description || `Invoke prompt ${prompt.name}`,
+          description: `[${serverName}] ${
+            prompt.description || `Invoke prompt ${prompt.name}`
+          }`,
           kind: CommandKind.MCP_PROMPT,
           subCommands: [
             {
