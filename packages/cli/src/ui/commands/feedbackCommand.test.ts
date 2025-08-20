@@ -12,7 +12,8 @@ import { Settings } from '../../config/settings.js';
 
 // Mock the telemetry functions
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const original =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...original,
     logResearchFeedback: vi.fn(),
@@ -63,7 +64,9 @@ describe('feedbackCommand', () => {
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
-      content: expect.stringContaining('first opt-in to research participation'),
+      content: expect.stringContaining(
+        'first opt-in to research participation',
+      ),
     });
   });
 
@@ -80,7 +83,7 @@ describe('feedbackCommand', () => {
 
   it('should accept feedback and log telemetry event when opted in with args', async () => {
     const mockConfig = makeFakeConfig({ telemetry: { enabled: true } });
-    const context = createMockContext({ 
+    const context = createMockContext({
       researchOptIn: true,
       researchContact: 'user@example.com',
     });
@@ -102,13 +105,13 @@ describe('feedbackCommand', () => {
       expect.objectContaining({
         feedback_content: feedbackText,
         feedback_type: 'conversational',
-      })
+      }),
     );
   });
 
   it('should always log research feedback when config exists', async () => {
     const mockConfig = makeFakeConfig({ telemetry: { enabled: false } });
-    const context = createMockContext({ 
+    const context = createMockContext({
       researchOptIn: true,
     });
     context.services.config = mockConfig;
@@ -121,29 +124,35 @@ describe('feedbackCommand', () => {
   });
 
   it('should return error when services.config is missing', async () => {
-    const context = createMockContext({ 
+    const context = createMockContext({
       researchOptIn: true,
     });
     context.services.config = null; // Simulate missing config
 
-    const result = await feedbackCommand.action!(context, 'Test feedback') as MessageActionReturn;
+    const result = (await feedbackCommand.action!(
+      context,
+      'Test feedback',
+    )) as MessageActionReturn;
 
     expect(result).toBeDefined();
     expect(result.type).toBe('message');
     expect(result.messageType).toBe('error');
-    expect(result.content).toBe('Unable to send feedback due to an internal configuration error. Please try again later.');
-    
+    expect(result.content).toBe(
+      'Unable to send feedback due to an internal configuration error. Please try again later.',
+    );
+
     // Verify logging was NOT called when config is missing
     expect(logResearchFeedback).not.toHaveBeenCalled();
   });
 
   it('should handle multi-byte characters (emoji) correctly in feedback', async () => {
     const mockConfig = makeFakeConfig({ telemetry: { enabled: true } });
-    const context = createMockContext({ 
+    const context = createMockContext({
       researchOptIn: true,
     });
     context.services.config = mockConfig;
-    const feedbackWithEmoji = 'This CLI is great! 👍🎉 Love the new features 💯';
+    const feedbackWithEmoji =
+      'This CLI is great! 👍🎉 Love the new features 💯';
 
     await feedbackCommand.action!(context, feedbackWithEmoji);
 
@@ -153,7 +162,7 @@ describe('feedbackCommand', () => {
       expect.objectContaining({
         feedback_content: feedbackWithEmoji,
         feedback_type: 'conversational',
-      })
+      }),
     );
   });
 

@@ -32,11 +32,13 @@ export const FEEDBACK_CONTENT_MAX_LENGTH = 4096;
 /**
  * Truncates feedback content to a safe length for telemetry logging.
  * Uses Unicode-aware truncation to avoid splitting multi-byte characters.
- * 
+ *
  * @param content The feedback content to truncate
  * @returns The truncated content or undefined if input is undefined
  */
-export function truncateFeedbackContent(content: string | undefined): string | undefined {
+export function truncateFeedbackContent(
+  content: string | undefined,
+): string | undefined {
   if (!content) {
     return undefined;
   }

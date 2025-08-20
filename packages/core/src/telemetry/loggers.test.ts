@@ -826,16 +826,16 @@ describe('loggers', () => {
     it('should handle multi-byte character truncation correctly', () => {
       // Clear any previous mock calls
       mockLogger.emit.mockClear();
-      
+
       const mockConfig = makeFakeConfig({
         sessionId: 'test-session-id',
         usageStatisticsEnabled: false, // Disable ClearcutLogger to focus on OpenTelemetry
       });
-      
+
       // Test string with an emoji at the truncation boundary
       const feedbackBase = 'A'.repeat(FEEDBACK_CONTENT_MAX_LENGTH - 1) + '👍'; // This string is exactly FEEDBACK_CONTENT_MAX_LENGTH characters long
       const feedbackToTruncate = feedbackBase + 'extra content'; // This string will be truncated
-      
+
       const event = makeResearchFeedbackEvent({
         feedback_type: 'conversational',
         feedback_content: feedbackToTruncate,
@@ -857,7 +857,7 @@ describe('loggers', () => {
           'event.timestamp': '2025-01-01T00:00:00.000Z',
         },
       });
-      
+
       // Additional verification that Unicode characters are preserved correctly after truncation
       expect(Array.from(feedbackBase).length).toBe(FEEDBACK_CONTENT_MAX_LENGTH);
       expect(feedbackBase.endsWith('👍')).toBe(true);

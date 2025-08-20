@@ -466,7 +466,9 @@ export function logResearchFeedback(
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     feedback_type: event.feedback_type,
-    ...(event.feedback_content && { feedback_content: truncateFeedbackContent(event.feedback_content) }),
+    ...(event.feedback_content && {
+      feedback_content: truncateFeedbackContent(event.feedback_content),
+    }),
     ...(event.user_id && { user_id: event.user_id }),
     'event.name': EVENT_RESEARCH_FEEDBACK,
     'event.timestamp': event['event.timestamp'],

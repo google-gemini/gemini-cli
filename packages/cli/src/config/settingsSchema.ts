@@ -530,7 +530,8 @@ export const SETTINGS_SCHEMA = {
     category: 'General',
     requiresRestart: false,
     default: false,
-    description: 'Opt-in to participate in UX research studies to help improve Gemini CLI',
+    description:
+      'Opt-in to participate in UX research studies to help improve Gemini CLI',
     showInDialog: true,
   },
   researchContact: {

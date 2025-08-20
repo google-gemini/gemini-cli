@@ -32,7 +32,6 @@ import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { DetectedIde, detectIde } from '../../ide/detect-ide.js';
 import { truncateFeedbackContent } from '../constants.js';
 
-
 export enum EventNames {
   START_SESSION = 'start_session',
   NEW_PROMPT = 'new_prompt',
@@ -721,9 +720,7 @@ export class ClearcutLogger {
       });
     }
 
-    this.enqueueLogEvent(
-      this.createLogEvent(EventNames.RESEARCH_OPT_IN, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.RESEARCH_OPT_IN, data));
     this.flushIfNeeded();
   }
 

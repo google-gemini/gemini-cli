@@ -4,11 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandKind, SlashCommand, MessageActionReturn, CommandContext } from './types.js';
-import { 
-  makeResearchFeedbackEvent, 
-  logResearchFeedback, 
-  getInstallationId 
+import {
+  CommandKind,
+  SlashCommand,
+  MessageActionReturn,
+  CommandContext,
+} from './types.js';
+import {
+  makeResearchFeedbackEvent,
+  logResearchFeedback,
+  InstallationManager,
 } from '@google/gemini-cli-core';
 
 export const feedbackCommand: SlashCommand = {
@@ -56,7 +61,8 @@ Your feedback helps make Gemini CLI better for everyone!`,
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Unable to send feedback due to an internal configuration error. Please try again later.',
+        content:
+          'Unable to send feedback due to an internal configuration error. Please try again later.',
       };
     }
 
@@ -97,11 +103,8 @@ function getUserId(services: CommandContext['services']): string | undefined {
   }
 
   // Fall back to installation ID as a stable but privacy-preserving identifier.
-  const installationId = getInstallationId();
+  const installationManager = new InstallationManager();
+  const installationId = installationManager.getInstallationId();
 
-  // getInstallationId() returns undefined on error.
-  if (!installationId) {
-    return undefined;
-  }
   return installationId;
 }
