@@ -51,7 +51,6 @@ async function getParentProcessInfo(pid: number): Promise<{
  * find that shell's parent process (the IDE). To get the true IDE process,
  * we traverse one level higher to get the grandparent.
  *
- * @param shells A list of known shell process names.
  * @returns A promise that resolves to the numeric PID.
  */
 async function getIdeProcessIdForUnix(): Promise<number> {
