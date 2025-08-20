@@ -6,16 +6,14 @@
 
 import fs from 'fs';
 import path from 'path';
-import { glob } from 'glob';
-import { SchemaValidator } from '../utils/schemaValidator.js';
+import { glob, escape } from 'glob';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
-  Icon,
+  Kind,
   ToolInvocation,
   ToolResult,
 } from './tools.js';
-import { Type } from '@google/genai';
 import { shortenPath, makeRelative } from '../utils/paths.js';
 import { Config } from '../config/config.js';
 
@@ -138,7 +136,13 @@ class GlobToolInvocation extends BaseToolInvocation<
       let allEntries: GlobPath[] = [];
 
       for (const searchDir of searchDirectories) {
-        const entries = (await glob(this.params.pattern, {
+        let pattern = this.params.pattern;
+        const fullPath = path.join(searchDir, pattern);
+        if (fs.existsSync(fullPath)) {
+          pattern = escape(pattern);
+        }
+
+        const entries = (await glob(pattern, {
           cwd: searchDir,
           withFileTypes: true,
           nodir: true,
@@ -249,32 +253,32 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
       GlobTool.Name,
       'FindFiles',
       'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
-      Icon.FileSearch,
+      Kind.Search,
       {
         properties: {
           pattern: {
             description:
               "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
-            type: Type.STRING,
+            type: 'string',
           },
           path: {
             description:
               'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
-            type: Type.STRING,
+            type: 'string',
           },
           case_sensitive: {
             description:
               'Optional: Whether the search should be case-sensitive. Defaults to false.',
-            type: Type.BOOLEAN,
+            type: 'boolean',
           },
           respect_git_ignore: {
             description:
               'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
-            type: Type.BOOLEAN,
+            type: 'boolean',
           },
         },
         required: ['pattern'],
-        type: Type.OBJECT,
+        type: 'object',
       },
     );
   }
@@ -282,12 +286,9 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   /**
    * Validates the parameters for the tool.
    */
-  validateToolParams(params: GlobToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
-    if (errors) {
-      return errors;
-    }
-
+  protected override validateToolParamValues(
+    params: GlobToolParams,
+  ): string | null {
     const searchDirAbsolute = path.resolve(
       this.config.getTargetDir(),
       params.path || '.',

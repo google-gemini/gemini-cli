@@ -13,6 +13,7 @@ import fs from 'fs';
 import fsp from 'fs/promises';
 import { Config } from '../config/config.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { ToolInvocation, ToolResult } from './tools.js';
 
@@ -29,6 +30,7 @@ describe('ReadFileTool', () => {
 
     const mockConfigInstance = {
       getFileService: () => new FileDiscoveryService(tempRootDir),
+      getFileSystemService: () => new StandardFileSystemService(),
       getTargetDir: () => tempRootDir,
       getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
     } as unknown as Config;
@@ -66,6 +68,15 @@ describe('ReadFileTool', () => {
       };
       expect(() => tool.build(params)).toThrow(
         /File path must be within one of the workspace directories/,
+      );
+    });
+
+    it('should throw error if path is empty', () => {
+      const params: ReadFileToolParams = {
+        absolute_path: '',
+      };
+      expect(() => tool.build(params)).toThrow(
+        /The 'absolute_path' parameter must be non-empty./,
       );
     });
 

@@ -5,18 +5,17 @@
  */
 
 import path from 'path';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
-  Icon,
+  Kind,
   ToolInvocation,
   ToolLocation,
   ToolResult,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import { PartUnion, Type } from '@google/genai';
+import { PartUnion } from '@google/genai';
 import {
   processSingleFileContent,
   getSpecificMimeType,
@@ -74,6 +73,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     const result = await processSingleFileContent(
       this.params.absolute_path,
       this.config.getTargetDir(),
+      this.config.getFileSystemService(),
       this.params.offset,
       this.params.limit,
     );
@@ -173,38 +173,39 @@ export class ReadFileTool extends BaseDeclarativeTool<
       ReadFileTool.Name,
       'ReadFile',
       `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.`,
-      Icon.FileSearch,
+      Kind.Read,
       {
         properties: {
           absolute_path: {
             description:
               "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
-            type: Type.STRING,
+            type: 'string',
           },
           offset: {
             description:
               "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
-            type: Type.NUMBER,
+            type: 'number',
           },
           limit: {
             description:
               "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
-            type: Type.NUMBER,
+            type: 'number',
           },
         },
         required: ['absolute_path'],
-        type: Type.OBJECT,
+        type: 'object',
       },
     );
   }
 
-  protected validateToolParams(params: ReadFileToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
-    if (errors) {
-      return errors;
+  protected override validateToolParamValues(
+    params: ReadFileToolParams,
+  ): string | null {
+    const filePath = params.absolute_path;
+    if (params.absolute_path.trim() === '') {
+      return "The 'absolute_path' parameter must be non-empty.";
     }
 
-    const filePath = params.absolute_path;
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute, but was relative: ${filePath}. You must provide an absolute path.`;
     }

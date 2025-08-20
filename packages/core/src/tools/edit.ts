@@ -9,7 +9,7 @@ import * as path from 'path';
 import * as Diff from 'diff';
 import {
   BaseDeclarativeTool,
-  Icon,
+  Kind,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolEditConfirmationDetails,
@@ -19,8 +19,6 @@ import {
   ToolResultDisplay,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import { Type } from '@google/genai';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { Config, ApprovalMode } from '../config/config.js';
@@ -126,7 +124,9 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       | undefined = undefined;
 
     try {
-      currentContent = fs.readFileSync(params.file_path, 'utf8');
+      currentContent = await this.config
+        .getFileSystemService()
+        .readTextFile(params.file_path);
       // Normalize line endings to LF for consistent processing.
       currentContent = currentContent.replace(/\r\n/g, '\n');
       fileExists = true;
@@ -251,7 +251,6 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     );
     const ideClient = this.config.getIdeClient();
     const ideConfirmation =
-      this.config.getIdeModeFeature() &&
       this.config.getIdeMode() &&
       ideClient?.getConnectionStatus().status === IDEConnectionStatus.Connected
         ? ideClient.openDiff(this.params.file_path, editData.newContent)
@@ -341,7 +340,9 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
 
     try {
       this.ensureParentDirectoriesExist(this.params.file_path);
-      fs.writeFileSync(this.params.file_path, editData.newContent, 'utf8');
+      await this.config
+        .getFileSystemService()
+        .writeTextFile(this.params.file_path, editData.newContent);
 
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {
@@ -437,33 +438,33 @@ Expectation for required parameters:
 4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
 **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
 **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
-      Icon.Pencil,
+      Kind.Edit,
       {
         properties: {
           file_path: {
             description:
               "The absolute path to the file to modify. Must start with '/'.",
-            type: Type.STRING,
+            type: 'string',
           },
           old_string: {
             description:
               'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. For multiple replacements, specify expected_replacements parameter. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
-            type: Type.STRING,
+            type: 'string',
           },
           new_string: {
             description:
               'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
-            type: Type.STRING,
+            type: 'string',
           },
           expected_replacements: {
-            type: Type.NUMBER,
+            type: 'number',
             description:
               'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
             minimum: 1,
           },
         },
         required: ['file_path', 'old_string', 'new_string'],
-        type: Type.OBJECT,
+        type: 'object',
       },
     );
   }
@@ -473,10 +474,11 @@ Expectation for required parameters:
    * @param params Parameters to validate
    * @returns Error message string or null if valid
    */
-  validateToolParams(params: EditToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
-    if (errors) {
-      return errors;
+  protected override validateToolParamValues(
+    params: EditToolParams,
+  ): string | null {
+    if (!params.file_path) {
+      return "The 'file_path' parameter must be non-empty.";
     }
 
     if (!path.isAbsolute(params.file_path)) {
@@ -503,7 +505,9 @@ Expectation for required parameters:
       getFilePath: (params: EditToolParams) => params.file_path,
       getCurrentContent: async (params: EditToolParams): Promise<string> => {
         try {
-          return fs.readFileSync(params.file_path, 'utf8');
+          return this.config
+            .getFileSystemService()
+            .readTextFile(params.file_path);
         } catch (err) {
           if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
           return '';
@@ -511,7 +515,9 @@ Expectation for required parameters:
       },
       getProposedContent: async (params: EditToolParams): Promise<string> => {
         try {
-          const currentContent = fs.readFileSync(params.file_path, 'utf8');
+          const currentContent = await this.config
+            .getFileSystemService()
+            .readTextFile(params.file_path);
           return applyReplacement(
             currentContent,
             params.old_string,
