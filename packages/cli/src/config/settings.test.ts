@@ -1270,6 +1270,7 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.workspace.settings.contextFileName).toBe(
         'MY_AGENTS.md',
       );
+      // This test assumes a trusted workspace, so the workspace setting should apply.
       expect(loadedSettings.merged.contextFileName).toBe('MY_AGENTS.md');
       expect(loadedSettings.merged.theme).toBe('matrix'); // User setting should still be there
       expect(fs.writeFileSync).toHaveBeenCalledWith(

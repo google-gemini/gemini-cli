@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useContext } from 'react';
 import { Settings, LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import {
@@ -13,6 +13,7 @@ import {
   isWorkspaceTrusted,
 } from '../../config/trustedFolders.js';
 import * as process from 'process';
+import { SettingsContext } from '../contexts/SettingsContext.js';
 
 export const useFolderTrust = (
   settings: LoadedSettings,
@@ -20,6 +21,7 @@ export const useFolderTrust = (
 ) => {
   const [isTrusted, setIsTrusted] = useState<boolean | undefined>(undefined);
   const [isFolderTrustDialogOpen, setIsFolderTrustDialogOpen] = useState(false);
+  const settingsContext = useContext(SettingsContext);
 
   const { folderTrust, folderTrustFeature } = settings.merged;
   useEffect(() => {
@@ -60,8 +62,9 @@ export const useFolderTrust = (
       setIsTrusted(trusted);
       setIsFolderTrustDialogOpen(false);
       onTrustChange(trusted);
+      settingsContext?.recomputeSettings();
     },
-    [onTrustChange, folderTrust, folderTrustFeature],
+    [onTrustChange, folderTrust, folderTrustFeature, settingsContext],
   );
 
   return {

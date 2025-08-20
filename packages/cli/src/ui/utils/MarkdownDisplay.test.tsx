@@ -30,7 +30,9 @@ describe('<MarkdownDisplay />', () => {
 
   it('renders nothing for empty text', () => {
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text="" />
       </SettingsContext.Provider>,
     );
@@ -40,7 +42,9 @@ describe('<MarkdownDisplay />', () => {
   it('renders a simple paragraph', () => {
     const text = 'Hello, world.';
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
@@ -55,7 +59,9 @@ describe('<MarkdownDisplay />', () => {
 #### Header 4
 `;
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
@@ -65,7 +71,9 @@ describe('<MarkdownDisplay />', () => {
   it('renders a fenced code block with a language', () => {
     const text = '```javascript\nconst x = 1;\nconsole.log(x);\n```';
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
@@ -75,7 +83,9 @@ describe('<MarkdownDisplay />', () => {
   it('renders a fenced code block without a language', () => {
     const text = '```\nplain text\n```';
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
@@ -85,7 +95,9 @@ describe('<MarkdownDisplay />', () => {
   it('handles unclosed (pending) code blocks', () => {
     const text = '```typescript\nlet y = 2;';
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} isPending={true} />
       </SettingsContext.Provider>,
     );
@@ -99,7 +111,9 @@ describe('<MarkdownDisplay />', () => {
 + item C
 `;
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
@@ -113,7 +127,9 @@ describe('<MarkdownDisplay />', () => {
     * Level 3
 `;
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
@@ -126,7 +142,9 @@ describe('<MarkdownDisplay />', () => {
 2. Second item
 `;
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
@@ -142,7 +160,9 @@ World
 Test
 `;
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
@@ -157,7 +177,9 @@ Test
 | Cell 3   | Cell 4   |
 `;
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
@@ -168,10 +190,12 @@ Test
     const text = `
 Some text before.
 | A | B |
-|---|
+|---| 
 | 1 | 2 |`;
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
@@ -183,7 +207,9 @@ Some text before.
 
 Paragraph 2.`;
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
@@ -206,7 +232,9 @@ some code
 Another paragraph.
 `;
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
@@ -223,7 +251,9 @@ Another paragraph.
     );
 
     const { lastFrame } = render(
-      <SettingsContext.Provider value={settings}>
+      <SettingsContext.Provider
+        value={{ settings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
@@ -234,7 +264,9 @@ Another paragraph.
   it('shows line numbers in code blocks by default', () => {
     const text = '```javascript\nconst x = 1;\n```';
     const { lastFrame } = render(
-      <SettingsContext.Provider value={mockSettings}>
+      <SettingsContext.Provider
+        value={{ settings: mockSettings, recomputeSettings: () => {} }}
+      >
         <MarkdownDisplay {...baseProps} text={text} />
       </SettingsContext.Provider>,
     );
