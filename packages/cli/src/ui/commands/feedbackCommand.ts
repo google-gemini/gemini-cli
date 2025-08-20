@@ -6,7 +6,7 @@
 
 import { CommandKind, SlashCommand, MessageActionReturn, CommandContext } from './types.js';
 import { 
-  ResearchFeedbackEvent, 
+  makeResearchFeedbackEvent, 
   logResearchFeedback, 
   getInstallationId 
 } from '@google/gemini-cli-core';
@@ -62,12 +62,12 @@ Your feedback helps make Gemini CLI better for everyone!`,
 
     // Log the feedback event
     const userId = getUserId(services);
-    const feedbackEvent = new ResearchFeedbackEvent(
-      'conversational',
-      feedback,
-      undefined,
-      userId,
-    );
+    const feedbackEvent = makeResearchFeedbackEvent({
+      feedback_type: 'conversational',
+      feedback_content: feedback,
+      survey_responses: undefined,
+      user_id: userId,
+    });
 
     // Log the research feedback event
     logResearchFeedback(services.config, feedbackEvent);

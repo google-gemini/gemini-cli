@@ -47,7 +47,9 @@ export {
   makeSlashCommandEvent,
   SlashCommandStatus,
   ResearchOptInEvent,
+  makeResearchOptInEvent,
   ResearchFeedbackEvent,
+  makeResearchFeedbackEvent,
   ChatCompressionEvent,
   makeChatCompressionEvent,
 } from './types.js';

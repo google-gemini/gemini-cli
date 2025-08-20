@@ -46,7 +46,7 @@ import {
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
-  ResearchFeedbackEvent,
+  makeResearchFeedbackEvent,
   makeChatCompressionEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
@@ -832,12 +832,12 @@ describe('loggers', () => {
       const feedbackBase = 'A'.repeat(FEEDBACK_CONTENT_MAX_LENGTH - 1) + '👍'; // This string is exactly FEEDBACK_CONTENT_MAX_LENGTH characters long
       const feedbackToTruncate = feedbackBase + 'extra content'; // This string will be truncated
       
-      const event = new ResearchFeedbackEvent(
-        'conversational',
-        feedbackToTruncate,
-        undefined,
-        'user@example.com',
-      );
+      const event = makeResearchFeedbackEvent({
+        feedback_type: 'conversational',
+        feedback_content: feedbackToTruncate,
+        survey_responses: undefined,
+        user_id: 'user@example.com',
+      });
 
       logResearchFeedback(mockConfig, event);
 
