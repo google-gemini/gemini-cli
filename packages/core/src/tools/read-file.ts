@@ -5,12 +5,11 @@
  */
 
 import path from 'path';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
-  Icon,
+  Kind,
   ToolInvocation,
   ToolLocation,
   ToolResult,
@@ -74,6 +73,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     const result = await processSingleFileContent(
       this.params.absolute_path,
       this.config.getTargetDir(),
+      this.config.getFileSystemService(),
       this.params.offset,
       this.params.limit,
     );
@@ -173,7 +173,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
       ReadFileTool.Name,
       'ReadFile',
       `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.`,
-      Icon.FileSearch,
+      Kind.Read,
       {
         properties: {
           absolute_path: {
@@ -198,16 +198,14 @@ export class ReadFileTool extends BaseDeclarativeTool<
     );
   }
 
-  protected validateToolParams(params: ReadFileToolParams): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
+  protected override validateToolParamValues(
+    params: ReadFileToolParams,
+  ): string | null {
+    const filePath = params.absolute_path;
+    if (params.absolute_path.trim() === '') {
+      return "The 'absolute_path' parameter must be non-empty.";
     }
 
-    const filePath = params.absolute_path;
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute, but was relative: ${filePath}. You must provide an absolute path.`;
     }

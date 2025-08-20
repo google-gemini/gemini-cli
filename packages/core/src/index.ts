@@ -10,6 +10,7 @@ export * from './config/config.js';
 // Export Core Logic
 export * from './core/client.js';
 export * from './core/contentGenerator.js';
+export * from './core/loggingContentGenerator.js';
 export * from './core/geminiChat.js';
 export * from './core/logger.js';
 export * from './core/prompts.js';
@@ -41,16 +42,20 @@ export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
 export * from './utils/formatters.js';
 export * from './utils/filesearch/fileSearch.js';
+export * from './utils/errorParsing.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
+export * from './services/chatRecordingService.js';
+export * from './services/fileSystemService.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';
 export * from './ide/ideContext.js';
 export * from './ide/ide-installer.js';
-export { getIdeDisplayName, DetectedIde } from './ide/detect-ide.js';
+export { getIdeInfo, DetectedIde, IdeInfo } from './ide/detect-ide.js';
+export * from './ide/constants.js';
 
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
@@ -96,3 +101,4 @@ export { OAuthUtils } from './mcp/oauth-utils.js';
 export * from './telemetry/index.js';
 export { sessionId } from './utils/session.js';
 export * from './utils/browser.js';
+export { Storage } from './config/storage.js';

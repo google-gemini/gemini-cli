@@ -5,56 +5,47 @@
  */
 
 import { FunctionDeclaration } from '@google/genai';
-import { AnyDeclarativeTool, Icon, ToolResult, BaseTool } from './tools.js';
+import {
+  AnyDeclarativeTool,
+  Kind,
+  ToolResult,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  ToolInvocation,
+} from './tools.js';
 import { Config } from '../config/config.js';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
-import { discoverMcpTools } from './mcp-client.js';
+import { connectAndDiscover } from './mcp-client.js';
+import { McpClientManager } from './mcp-client-manager.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 
 type ToolParams = Record<string, unknown>;
 
-export class DiscoveredTool extends BaseTool<ToolParams, ToolResult> {
+class DiscoveredToolInvocation extends BaseToolInvocation<
+  ToolParams,
+  ToolResult
+> {
   constructor(
     private readonly config: Config,
-    name: string,
-    readonly description: string,
-    readonly parameterSchema: Record<string, unknown>,
+    private readonly toolName: string,
+    params: ToolParams,
   ) {
-    const discoveryCmd = config.getToolDiscoveryCommand()!;
-    const callCommand = config.getToolCallCommand()!;
-    description += `
-
-This tool was discovered from the project by executing the command \`${discoveryCmd}\` on project root.
-When called, this tool will execute the command \`${callCommand} ${name}\` on project root.
-Tool discovery and call commands can be configured in project or user settings.
-
-When called, the tool call command is executed as a subprocess.
-On success, tool output is returned as a json string.
-Otherwise, the following information is returned:
-
-Stdout: Output on stdout stream. Can be \`(empty)\` or partial.
-Stderr: Output on stderr stream. Can be \`(empty)\` or partial.
-Error: Error or \`(none)\` if no error was reported for the subprocess.
-Exit Code: Exit code or \`(none)\` if terminated by signal.
-Signal: Signal number or \`(none)\` if no signal was received.
-`;
-    super(
-      name,
-      name,
-      description,
-      Icon.Hammer,
-      parameterSchema,
-      false, // isOutputMarkdown
-      false, // canUpdateOutput
-    );
+    super(params);
   }
 
-  async execute(params: ToolParams): Promise<ToolResult> {
+  getDescription(): string {
+    return `Calling discovered tool: ${this.toolName}`;
+  }
+
+  async execute(
+    _signal: AbortSignal,
+    _updateOutput?: (output: string) => void,
+  ): Promise<ToolResult> {
     const callCommand = this.config.getToolCallCommand()!;
-    const child = spawn(callCommand, [this.name]);
-    child.stdin.write(JSON.stringify(params));
+    const child = spawn(callCommand, [this.toolName]);
+    child.stdin.write(JSON.stringify(this.params));
     child.stdin.end();
 
     let stdout = '';
@@ -124,12 +115,67 @@ Signal: Signal number or \`(none)\` if no signal was received.
   }
 }
 
+export class DiscoveredTool extends BaseDeclarativeTool<
+  ToolParams,
+  ToolResult
+> {
+  constructor(
+    private readonly config: Config,
+    name: string,
+    override readonly description: string,
+    override readonly parameterSchema: Record<string, unknown>,
+  ) {
+    const discoveryCmd = config.getToolDiscoveryCommand()!;
+    const callCommand = config.getToolCallCommand()!;
+    description += `
+
+This tool was discovered from the project by executing the command \`${discoveryCmd}\` on project root.
+When called, this tool will execute the command \`${callCommand} ${name}\` on project root.
+Tool discovery and call commands can be configured in project or user settings.
+
+When called, the tool call command is executed as a subprocess.
+On success, tool output is returned as a json string.
+Otherwise, the following information is returned:
+
+Stdout: Output on stdout stream. Can be \`(empty)\` or partial.
+Stderr: Output on stderr stream. Can be \`(empty)\` or partial.
+Error: Error or \`(none)\` if no error was reported for the subprocess.
+Exit Code: Exit code or \`(none)\` if terminated by signal.
+Signal: Signal number or \`(none)\` if no signal was received.
+`;
+    super(
+      name,
+      name,
+      description,
+      Kind.Other,
+      parameterSchema,
+      false, // isOutputMarkdown
+      false, // canUpdateOutput
+    );
+  }
+
+  protected createInvocation(
+    params: ToolParams,
+  ): ToolInvocation<ToolParams, ToolResult> {
+    return new DiscoveredToolInvocation(this.config, this.name, params);
+  }
+}
+
 export class ToolRegistry {
   private tools: Map<string, AnyDeclarativeTool> = new Map();
   private config: Config;
+  private mcpClientManager: McpClientManager;
 
   constructor(config: Config) {
     this.config = config;
+    this.mcpClientManager = new McpClientManager(
+      this.config.getMcpServers() ?? {},
+      this.config.getMcpServerCommand(),
+      this,
+      this.config.getPromptRegistry(),
+      this.config.getDebugMode(),
+      this.config.getWorkspaceContext(),
+    );
   }
 
   /**
@@ -159,6 +205,18 @@ export class ToolRegistry {
   }
 
   /**
+   * Removes all tools from a specific MCP server.
+   * @param serverName The name of the server to remove tools from.
+   */
+  removeMcpToolsByServer(serverName: string): void {
+    for (const [name, tool] of this.tools.entries()) {
+      if (tool instanceof DiscoveredMCPTool && tool.serverName === serverName) {
+        this.tools.delete(name);
+      }
+    }
+  }
+
+  /**
    * Discovers tools from project (if available and configured).
    * Can be called multiple times to update discovered tools.
    * This will discover tools from the command line and from MCP servers.
@@ -172,14 +230,7 @@ export class ToolRegistry {
     await this.discoverAndRegisterToolsFromCommand();
 
     // discover tools using MCP servers, if configured
-    await discoverMcpTools(
-      this.config.getMcpServers() ?? {},
-      this.config.getMcpServerCommand(),
-      this,
-      this.config.getPromptRegistry(),
-      this.config.getDebugMode(),
-      this.config.getWorkspaceContext(),
-    );
+    await this.mcpClientManager.discoverAllMcpTools();
   }
 
   /**
@@ -194,14 +245,14 @@ export class ToolRegistry {
     this.config.getPromptRegistry().clear();
 
     // discover tools using MCP servers, if configured
-    await discoverMcpTools(
-      this.config.getMcpServers() ?? {},
-      this.config.getMcpServerCommand(),
-      this,
-      this.config.getPromptRegistry(),
-      this.config.getDebugMode(),
-      this.config.getWorkspaceContext(),
-    );
+    await this.mcpClientManager.discoverAllMcpTools();
+  }
+
+  /**
+   * Restarts all MCP servers and re-discovers tools.
+   */
+  async restartMcpServers(): Promise<void> {
+    await this.discoverMcpTools();
   }
 
   /**
@@ -221,9 +272,9 @@ export class ToolRegistry {
     const mcpServers = this.config.getMcpServers() ?? {};
     const serverConfig = mcpServers[serverName];
     if (serverConfig) {
-      await discoverMcpTools(
-        { [serverName]: serverConfig },
-        undefined,
+      await connectAndDiscover(
+        serverName,
+        serverConfig,
         this,
         this.config.getPromptRegistry(),
         this.config.getDebugMode(),
