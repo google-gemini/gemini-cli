@@ -252,7 +252,7 @@ export class MCPOAuthProvider {
       server.on('error', reject);
       server.listen(this.REDIRECT_PORT, () => {
         console.log(
-          `OAuth callback server listening on port ${this.REDIRECT_PORT}`,
+          'OAuth callback server listening for authentication response.',
         );
       });
 
