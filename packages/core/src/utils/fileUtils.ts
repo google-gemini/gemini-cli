@@ -60,36 +60,50 @@ export function isWithinRoot(
  * @param buffer The buffer to check for BOM.
  * @returns Object with BOM information: { hasBOM: boolean, encoding?: string, bomLength?: number }
  */
-function detectBOM(buffer: Buffer): { hasBOM: boolean; encoding?: string; bomLength?: number } {
+function detectBOM(buffer: Buffer): {
+  hasBOM: boolean;
+  encoding?: string;
+  bomLength?: number;
+} {
   if (buffer.length >= 4) {
     // UTF-32 LE: FF FE 00 00
-    if (buffer[0] === 0xFF && buffer[1] === 0xFE && buffer[2] === 0x00 && buffer[3] === 0x00) {
+    if (
+      buffer[0] === 0xff &&
+      buffer[1] === 0xfe &&
+      buffer[2] === 0x00 &&
+      buffer[3] === 0x00
+    ) {
       return { hasBOM: true, encoding: 'utf32le', bomLength: 4 };
     }
     // UTF-32 BE: 00 00 FE FF
-    if (buffer[0] === 0x00 && buffer[1] === 0x00 && buffer[2] === 0xFE && buffer[3] === 0xFF) {
+    if (
+      buffer[0] === 0x00 &&
+      buffer[1] === 0x00 &&
+      buffer[2] === 0xfe &&
+      buffer[3] === 0xff
+    ) {
       return { hasBOM: true, encoding: 'utf32be', bomLength: 4 };
     }
   }
-  
+
   if (buffer.length >= 3) {
     // UTF-8: EF BB BF
-    if (buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
+    if (buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
       return { hasBOM: true, encoding: 'utf8', bomLength: 3 };
     }
   }
-  
+
   if (buffer.length >= 2) {
     // UTF-16 LE: FF FE
-    if (buffer[0] === 0xFF && buffer[1] === 0xFE) {
+    if (buffer[0] === 0xff && buffer[1] === 0xfe) {
       return { hasBOM: true, encoding: 'utf16le', bomLength: 2 };
     }
     // UTF-16 BE: FE FF
-    if (buffer[0] === 0xFE && buffer[1] === 0xFF) {
+    if (buffer[0] === 0xfe && buffer[1] === 0xff) {
       return { hasBOM: true, encoding: 'utf16be', bomLength: 2 };
     }
   }
-  
+
   return { hasBOM: false };
 }
 
@@ -102,19 +116,20 @@ function detectBOM(buffer: Buffer): { hasBOM: boolean; encoding?: string; bomLen
 export async function readFileWithEncoding(filePath: string): Promise<string> {
   const buffer = await fs.promises.readFile(filePath);
   const bomInfo = detectBOM(buffer);
-  
+
   if (bomInfo.hasBOM && bomInfo.encoding && bomInfo.bomLength) {
     // Remove BOM and decode with detected encoding
     const contentBuffer = buffer.subarray(bomInfo.bomLength);
-    
+
     // Handle UTF-32 encodings that Node.js doesn't support directly
     if (bomInfo.encoding === 'utf32le' || bomInfo.encoding === 'utf32be') {
       // For UTF-32, we need to manually decode the code points as Node.js Buffer doesn't support it directly.
       let result = '';
-      const readUInt32 = bomInfo.encoding === 'utf32le' ? 
-        (offset: number) => contentBuffer.readUInt32LE(offset) : 
-        (offset: number) => contentBuffer.readUInt32BE(offset);
-      
+      const readUInt32 =
+        bomInfo.encoding === 'utf32le'
+          ? (offset: number) => contentBuffer.readUInt32LE(offset)
+          : (offset: number) => contentBuffer.readUInt32BE(offset);
+
       for (let i = 0; i < contentBuffer.length; i += 4) {
         if (i + 3 < contentBuffer.length) {
           result += String.fromCodePoint(readUInt32(i));
@@ -122,7 +137,7 @@ export async function readFileWithEncoding(filePath: string): Promise<string> {
       }
       return result;
     }
-    
+
     if (bomInfo.encoding === 'utf16be') {
       // For UTF-16 BE, we need to swap bytes to make it LE for Node.js compatibility.
       // A new buffer is created because swap16 modifies the buffer in place.
@@ -130,15 +145,15 @@ export async function readFileWithEncoding(filePath: string): Promise<string> {
       swappedBuffer.swap16();
       return swappedBuffer.toString('utf16le');
     }
-    
+
     if (bomInfo.encoding === 'utf8') {
       // Use strip-bom for UTF-8 BOM handling
       return stripBom(buffer.toString('utf8'));
     }
-    
+
     return contentBuffer.toString(bomInfo.encoding as BufferEncoding);
   }
-  
+
   // No BOM detected, use strip-bom to handle potential UTF-8 BOM and assume UTF-8
   return stripBom(buffer.toString('utf8'));
 }
