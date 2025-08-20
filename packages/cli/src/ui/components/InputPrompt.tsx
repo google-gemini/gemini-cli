@@ -43,6 +43,7 @@ export interface InputPromptProps {
   setShellModeActive: (value: boolean) => void;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
+  isReaderMode?: boolean;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -61,6 +62,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
   onEscapePromptChange,
   vimHandleInput,
+  isReaderMode = false,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [escPressCount, setEscPressCount] = useState(0);
@@ -539,6 +541,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
     buffer.visualCursor;
   const scrollVisualRow = buffer.visualScrollRow;
+
+  // Simplified reader mode input
+  if (isReaderMode) {
+    return (
+      <>
+        <Text>
+          {shellModeActive ? '! ' : '> '}
+          {buffer.text.length === 0 ? placeholder : buffer.text}
+        </Text>
+        {completion.showSuggestions && completion.suggestions.length > 0 && (
+          <Text>
+            Suggestions: {completion.suggestions.slice(0, 3).join(', ')}
+          </Text>
+        )}
+      </>
+    );
+  }
 
   return (
     <>

@@ -57,6 +57,7 @@ export interface SummarizeToolOutputSettings {
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
+  readerMode?: boolean;
 }
 
 export interface SettingsError {

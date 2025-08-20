@@ -151,6 +151,17 @@ export async function main() {
   }
 
   const argv = await parseArguments();
+
+  // Apply reader mode from CLI flag to accessibility settings
+  if (argv.reader) {
+    const currentAccessibility = settings.merged.accessibility || {};
+    settings.setValue(SettingScope.User, 'accessibility', {
+      ...currentAccessibility,
+      readerMode: true,
+      disableLoadingPhrases: true,
+    });
+  }
+
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(
     settings.merged,

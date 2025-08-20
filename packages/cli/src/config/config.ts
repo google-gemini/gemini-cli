@@ -73,6 +73,7 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
+  reader: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -228,6 +229,13 @@ export async function parseArguments(): Promise<CliArgs> {
           coerce: (dirs: string[]) =>
             // Handle comma-separated values
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
+        })
+        .option('reader', {
+          alias: 'r',
+          type: 'boolean',
+          description:
+            'Enable screen reader friendly mode (removes ASCII art and visual formatting)',
+          default: false,
         })
 
         .check((argv) => {

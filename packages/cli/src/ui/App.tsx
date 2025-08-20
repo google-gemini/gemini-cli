@@ -210,6 +210,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
+  // Check if reader mode is enabled for accessibility
+  const isReaderMode = settings?.merged?.accessibility?.readerMode || false;
+
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
     // Set the initial value
@@ -907,6 +910,94 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
     : '  Type your message or @path/to/file';
 
+  // Simplified reader mode rendering
+  if (isReaderMode) {
+    return (
+      <StreamingContext.Provider value={streamingState}>
+        {/* Simplified header */}
+        {!settings.merged.hideBanner && (
+          <Header version={version} nightly={nightly} settings={settings} />
+        )}
+
+        {/* Essential history content only */}
+        {history.map((h) => (
+          <HistoryItemDisplay
+            key={h.id}
+            item={h}
+            isPending={false}
+            config={config}
+            terminalWidth={80} // Fixed width for screen readers
+            availableTerminalHeight={undefined}
+            isReaderMode={isReaderMode}
+          />
+        ))}
+
+        {/* Current pending items */}
+        {pendingHistoryItems.map((item, i) => (
+          <HistoryItemDisplay
+            key={i}
+            item={{ ...item, id: 0 }}
+            isPending={true}
+            config={config}
+            terminalWidth={80}
+            availableTerminalHeight={undefined}
+            isReaderMode={isReaderMode}
+          />
+        ))}
+
+        {/* Simple loading indicator */}
+        <LoadingIndicator
+          thought={
+            streamingState === StreamingState.WaitingForConfirmation ||
+            config.getAccessibility()?.disableLoadingPhrases
+              ? undefined
+              : thought
+          }
+          currentLoadingPhrase={
+            config.getAccessibility()?.disableLoadingPhrases
+              ? undefined
+              : currentLoadingPhrase
+          }
+          elapsedTime={elapsedTime}
+          isReaderMode={isReaderMode}
+        />
+
+        {/* Essential warnings only */}
+        {startupWarnings.length > 0 &&
+          startupWarnings.map((warning, index) => (
+            <Text key={index}>Warning: {warning}</Text>
+          ))}
+
+        {/* Essential error messages only */}
+        {initError && streamingState !== StreamingState.Responding && (
+          <Text>Error: {initError}</Text>
+        )}
+
+        {/* Simple input area */}
+        {isInputActive && (
+          <InputPrompt
+            buffer={buffer}
+            inputWidth={80}
+            suggestionsWidth={80}
+            onSubmit={handleFinalSubmit}
+            userMessages={userMessages}
+            onClearScreen={handleClearScreen}
+            config={config}
+            slashCommands={slashCommands}
+            commandContext={commandContext}
+            shellModeActive={shellModeActive}
+            setShellModeActive={setShellModeActive}
+            onEscapePromptChange={handleEscapePromptChange}
+            focus={isFocused}
+            vimHandleInput={vimHandleInput}
+            placeholder={placeholder}
+            isReaderMode={isReaderMode}
+          />
+        )}
+      </StreamingContext.Provider>
+    );
+  }
+
   return (
     <StreamingContext.Provider value={streamingState}>
       <Box flexDirection="column" width="90%">
@@ -926,7 +1017,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           items={[
             <Box flexDirection="column" key="header">
               {!settings.merged.hideBanner && (
-                <Header version={version} nightly={nightly} />
+                <Header
+                  version={version}
+                  nightly={nightly}
+                  settings={settings}
+                />
               )}
               {!settings.merged.hideTips && <Tips config={config} />}
             </Box>,
@@ -971,8 +1066,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           {updateInfo && <UpdateNotification message={updateInfo.message} />}
           {startupWarnings.length > 0 && (
             <Box
-              borderStyle="round"
-              borderColor={Colors.AccentYellow}
+              borderStyle={isReaderMode ? undefined : 'round'}
+              borderColor={isReaderMode ? undefined : Colors.AccentYellow}
               paddingX={1}
               marginY={1}
               flexDirection="column"
@@ -1102,6 +1197,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     : currentLoadingPhrase
                 }
                 elapsedTime={elapsedTime}
+                isReaderMode={isReaderMode}
               />
 
               {/* Display queued messages below loading indicator */}
@@ -1219,8 +1315,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
           {initError && streamingState !== StreamingState.Responding && (
             <Box
-              borderStyle="round"
-              borderColor={Colors.AccentRed}
+              borderStyle={isReaderMode ? undefined : 'round'}
+              borderColor={isReaderMode ? undefined : Colors.AccentRed}
               paddingX={1}
               marginBottom={1}
             >
