@@ -33,7 +33,7 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 
-vi.mock('vscode', () => ({
+const vscodeMock = vi.hoisted(() => ({
   workspace: {
     workspaceFolders: [
       {
@@ -49,6 +49,8 @@ vi.mock('vscode', () => ({
     ],
   },
 }));
+
+vi.mock('vscode', () => vscodeMock);
 
 vi.mock('./open-files-manager', () => {
   const OpenFilesManager = vi.fn();
@@ -76,9 +78,13 @@ describe('IDEServer', () => {
   afterEach(async () => {
     await ideServer.stop();
     vi.restoreAllMocks();
+    vscodeMock.workspace.workspaceFolders = [
+      { uri: { fsPath: '/test/workspace1' } },
+      { uri: { fsPath: '/test/workspace2' } },
+    ];
   });
 
-  it('should set environment variables and workspace path on start', async () => {
+  it('should set environment variables and workspace path on start with multiple folders', async () => {
     await ideServer.start(mockContext);
 
     const replaceMock = mockContext.environmentVariableCollection.replace;
@@ -86,7 +92,7 @@ describe('IDEServer', () => {
 
     expect(replaceMock).toHaveBeenCalledWith(
       'GEMINI_CLI_IDE_SERVER_PORT',
-      expect.stringMatching(/^\d+$/), // port is a number as a string
+      expect.stringMatching(/^\\d+$/), // port is a number as a string
     );
 
     const expectedWorkspacePaths = [
@@ -119,4 +125,88 @@ describe('IDEServer', () => {
       }),
     );
   });
+
+  it('should set a single folder path', async () => {
+    vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: '/foo/bar' } }];
+
+    await ideServer.start(mockContext);
+
+    expect(
+      mockContext.environmentVariableCollection.replace,
+    ).toHaveBeenCalledWith('GEMINI_CLI_IDE_WORKSPACE_PATH', '/foo/bar');
+  });
+
+  it('should set an empty string if no folders are open', async () => {
+    vscodeMock.workspace.workspaceFolders = [];
+
+    await ideServer.start(mockContext);
+
+    expect(
+      mockContext.environmentVariableCollection.replace,
+    ).toHaveBeenCalledWith('GEMINI_CLI_IDE_WORKSPACE_PATH', '');
+  });
+
+  it('should update the path when workspace folders change', async () => {
+    vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: '/foo/bar' } }];
+    await ideServer.start(mockContext);
+
+    expect(
+      mockContext.environmentVariableCollection.replace,
+    ).toHaveBeenCalledWith('GEMINI_CLI_IDE_WORKSPACE_PATH', '/foo/bar');
+
+    // Simulate adding a folder
+    vscodeMock.workspace.workspaceFolders = [
+      { uri: { fsPath: '/foo/bar' } },
+      { uri: { fsPath: '/baz/qux' } },
+    ];
+    ideServer.updateWorkspacePath();
+
+    expect(
+      mockContext.environmentVariableCollection.replace,
+    ).toHaveBeenCalledWith(
+      'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      ['/foo/bar', '/baz/qux'].join(path.delimiter),
+    );
+
+    // Simulate removing a folder
+    vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: '/baz/qux' } }];
+    ideServer.updateWorkspacePath();
+
+    expect(
+      mockContext.environmentVariableCollection.replace,
+    ).toHaveBeenCalledWith('GEMINI_CLI_IDE_WORKSPACE_PATH', '/baz/qux');
+  });
+
+  it('should clear env vars and delete port file on stop', async () => {
+    await ideServer.start(mockContext);
+    const portFile = path.join(
+      '/tmp',
+      `gemini-ide-server-${process.ppid}.json`,
+    );
+    expect(fs.writeFile).toHaveBeenCalledWith(portFile, expect.any(String));
+
+    await ideServer.stop();
+
+    expect(mockContext.environmentVariableCollection.clear).toHaveBeenCalled();
+    expect(fs.unlink).toHaveBeenCalledWith(portFile);
+  });
+
+  it.skipIf(process.platform !== 'win32')(
+    'should handle windows paths',
+    async () => {
+      vscodeMock.workspace.workspaceFolders = [
+        { uri: { fsPath: 'c:\\foo\\bar' } },
+        { uri: { fsPath: 'd:\\baz\\qux' } },
+      ];
+
+      await ideServer.start(mockContext);
+
+      expect(
+        mockContext.environmentVariableCollection.replace,
+      ).toHaveBeenCalledWith(
+        'GEMINI_CLI_IDE_WORKSPACE_PATH',
+        'c:\\foo\\bar;d:\\baz\\qux',
+      );
+    },
+  );
 });
