@@ -528,7 +528,7 @@ export const SETTINGS_SCHEMA = {
     type: 'boolean',
     label: 'Enable Prompt Completion',
     category: 'General',
-    requiresRestart: false,
+    requiresRestart: true,
     default: false,
     description: 'Enable AI-powered prompt completion suggestions while typing.',
     showInDialog: true,
