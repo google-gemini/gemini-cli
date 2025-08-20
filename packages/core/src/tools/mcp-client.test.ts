@@ -846,10 +846,7 @@ describe('mcp-client', () => {
 
       it('should handle circular references in anyOf', () => {
         const schema = {
-          anyOf: [
-            { $ref: '#/definitions/NodeA' },
-            { type: 'string' },
-          ],
+          anyOf: [{ $ref: '#/definitions/NodeA' }, { type: 'string' }],
           definitions: {
             NodeA: {
               type: 'object',

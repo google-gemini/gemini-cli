@@ -579,10 +579,7 @@ export async function connectAndDiscover(
  * // Returns: { type: "object", properties: { name: { type: "string" } } }
  * ```
  */
-export function getRefDefinition(
-  path: string,
-  rootSchema: unknown,
-): unknown {
+export function getRefDefinition(path: string, rootSchema: unknown): unknown {
   // only support internal references
   if (!path.startsWith('#/')) {
     return null;
