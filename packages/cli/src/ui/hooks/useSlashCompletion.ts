@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { AsyncFzf, FzfResultItem } from 'fzf';
 import { Suggestion } from '../components/SuggestionsDisplay.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 
@@ -33,6 +34,57 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
   } = props;
   const [completionStart, setCompletionStart] = useState(-1);
   const [completionEnd, setCompletionEnd] = useState(-1);
+
+  // Memoized cache for AsyncFzf instances per command level
+  const fzfInstanceCache = useMemo(() => new WeakMap<readonly SlashCommand[], {
+    fzf: AsyncFzf<string[]>;
+    commandMap: Map<string, SlashCommand>;
+  }>(), []);
+
+  // Helper function to create or retrieve cached AsyncFzf instance for a command level
+  const getFzfForCommands = useMemo(() => {
+    return (commands: readonly SlashCommand[]) => {
+      if (!commands || commands.length === 0) {
+        return null;
+      }
+      
+      // Check if we already have a cached instance
+      const cached = fzfInstanceCache.get(commands);
+      if (cached) {
+        return cached;
+      }
+      
+      const commandItems: string[] = [];
+      const commandMap = new Map<string, SlashCommand>();
+      
+      commands.forEach(cmd => {
+        if (cmd.description) {
+          commandItems.push(cmd.name);
+          commandMap.set(cmd.name, cmd);
+          
+          if (cmd.altNames) {
+            cmd.altNames.forEach(alt => {
+              commandItems.push(alt);
+              commandMap.set(alt, cmd);
+            });
+          }
+        }
+      });
+      
+      if (commandItems.length === 0) {
+        return null;
+      }
+      
+      const instance = {
+        fzf: new AsyncFzf(commandItems, { fuzzy: 'v2' }),
+        commandMap
+      };
+      
+      // Cache the instance for future use
+      fzfInstanceCache.set(commands, instance);
+      return instance;
+    };
+  }, [fzfInstanceCache]);
 
   useEffect(() => {
     if (!enabled || query === null) {
@@ -143,29 +195,72 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
 
     const commandsToSearch = currentLevel || [];
     if (commandsToSearch.length > 0) {
-      let potentialSuggestions = commandsToSearch.filter(
-        (cmd) =>
-          cmd.description &&
-          (cmd.name.startsWith(partial) ||
-            cmd.altNames?.some((alt) => alt.startsWith(partial))),
-      );
-
-      if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
-        const perfectMatch = potentialSuggestions.find(
-          (s) => s.name === partial || s.altNames?.includes(partial),
-        );
-        if (perfectMatch && perfectMatch.action) {
-          potentialSuggestions = [];
+      const performFuzzySearch = async () => {
+        let potentialSuggestions: SlashCommand[] = [];
+        
+        if (partial === '') {
+          // If no partial query, show all available commands
+          potentialSuggestions = commandsToSearch.filter((cmd) => cmd.description);
+        } else {
+          // Use fuzzy search for non-empty partial queries with fallback
+          const fzfInstance = getFzfForCommands(commandsToSearch);
+          if (fzfInstance) {
+            try {
+              const fzfResults = await fzfInstance.fzf.find(partial);
+              potentialSuggestions = fzfResults
+                .map((result: FzfResultItem<string>) => fzfInstance.commandMap.get(result.item))
+                .filter((cmd: SlashCommand | undefined): cmd is SlashCommand => cmd !== undefined && !!cmd.description);
+            } catch (error) {
+              console.warn('Fuzzy search failed, falling back to prefix matching:', error);
+              // Fallback to original prefix-based filtering
+              potentialSuggestions = commandsToSearch.filter(
+                (cmd) =>
+                  cmd.description &&
+                  (cmd.name.startsWith(partial) ||
+                    cmd.altNames?.some((alt) => alt.startsWith(partial))),
+              );
+            }
+          } else {
+            // Fallback to original prefix-based filtering when fzf instance creation fails
+            potentialSuggestions = commandsToSearch.filter(
+              (cmd) =>
+                cmd.description &&
+                (cmd.name.startsWith(partial) ||
+                  cmd.altNames?.some((alt) => alt.startsWith(partial))),
+            );
+          }
         }
-      }
 
-      const finalSuggestions = potentialSuggestions.map((cmd) => ({
-        label: cmd.name,
-        value: cmd.name,
-        description: cmd.description,
-      }));
+        if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
+          const perfectMatch = potentialSuggestions.find(
+            (s) => s.name === partial || s.altNames?.includes(partial),
+          );
+          if (perfectMatch && perfectMatch.action) {
+            potentialSuggestions = [];
+          }
+        }
 
-      setSuggestions(finalSuggestions);
+        const finalSuggestions = potentialSuggestions.map((cmd) => ({
+          label: cmd.name,
+          value: cmd.name,
+          description: cmd.description,
+        }));
+
+        setSuggestions(finalSuggestions);
+      };
+      
+      performFuzzySearch().catch((error) => {
+        console.error('Unexpected error in fuzzy search:', error);
+        // Ultimate fallback: show all commands with descriptions
+        const fallbackSuggestions = commandsToSearch
+          .filter((cmd) => cmd.description)
+          .map((cmd) => ({
+            label: cmd.name,
+            value: cmd.name,
+            description: cmd.description,
+          }));
+        setSuggestions(fallbackSuggestions);
+      });
       return;
     }
 
@@ -178,6 +273,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
     setSuggestions,
     setIsLoadingSuggestions,
     setIsPerfectMatch,
+    getFzfForCommands,
   ]);
 
   return {
