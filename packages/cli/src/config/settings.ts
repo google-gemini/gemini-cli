@@ -16,6 +16,7 @@ import {
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
+import { isWorkspaceTrusted } from './trustedFolders.js';
 import { Settings, MemoryImportFormat } from './settingsSchema.js';
 
 export type { Settings, MemoryImportFormat };
@@ -73,7 +74,30 @@ function mergeSettings(
   system: Settings,
   user: Settings,
   workspace: Settings,
+  isTrusted?: boolean,
 ): Settings {
+  if (!isTrusted) {
+    return {
+      ...user,
+      ...system,
+      customThemes: {
+        ...(user.customThemes || {}),
+        ...(system.customThemes || {}),
+      },
+      mcpServers: {
+        ...(user.mcpServers || {}),
+        ...(system.mcpServers || {}),
+      },
+      includeDirectories: [
+        ...(system.includeDirectories || []),
+        ...(user.includeDirectories || []),
+      ],
+      chatCompression: {
+        ...(system.chatCompression || {}),
+        ...(user.chatCompression || {}),
+      },
+    };
+  }
   // folderTrust is not supported at workspace level.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { folderTrust, ...workspaceWithoutFolderTrust } = workspace;
@@ -111,11 +135,13 @@ export class LoadedSettings {
     user: SettingsFile,
     workspace: SettingsFile,
     errors: SettingsError[],
+    isTrusted?: boolean,
   ) {
     this.system = system;
     this.user = user;
     this.workspace = workspace;
     this.errors = errors;
+    this.isTrusted = isTrusted;
     this._merged = this.computeMergedSettings();
   }
 
@@ -123,6 +149,7 @@ export class LoadedSettings {
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
   readonly errors: SettingsError[];
+  private isTrusted: boolean | undefined;
 
   private _merged: Settings;
 
@@ -130,11 +157,17 @@ export class LoadedSettings {
     return this._merged;
   }
 
+  recomputeMergedSettings(isTrusted?: boolean): void {
+    this.isTrusted = isTrusted;
+    this._merged = this.computeMergedSettings();
+  }
+
   private computeMergedSettings(): Settings {
     return mergeSettings(
       this.system.settings,
       this.user.settings,
       this.workspace.settings,
+      this.isTrusted,
     );
   }
 
@@ -403,11 +436,16 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     }
   }
 
+  // For the initial trust check, we can only use user and system settings.
+  const initialTrustCheckSettings = { ...systemSettings, ...userSettings };
+  const isTrusted = isWorkspaceTrusted(initialTrustCheckSettings);
+
   // Create a temporary merged settings object to pass to loadEnvironment.
   const tempMergedSettings = mergeSettings(
     systemSettings,
     userSettings,
     workspaceSettings,
+    isTrusted,
   );
 
   // loadEnviroment depends on settings so we have to create a temp version of
@@ -434,6 +472,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
       settings: workspaceSettings,
     },
     settingsErrors,
+    isTrusted,
   );
 
   // Validate chatCompression settings

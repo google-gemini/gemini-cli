@@ -12,6 +12,7 @@ import {
   useState,
 } from 'react';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import { SettingsContext } from './SettingsContext.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -26,11 +27,13 @@ const VimModeContext = createContext<VimModeContextType | undefined>(undefined);
 
 export const VimModeProvider = ({
   children,
-  settings,
+  settings: initialSettings,
 }: {
   children: React.ReactNode;
   settings: LoadedSettings;
 }) => {
+  const settingsContext = useContext(SettingsContext);
+  const settings = settingsContext?.settings || initialSettings;
   const initialVimEnabled = settings.merged.vimMode ?? false;
   const [vimEnabled, setVimEnabled] = useState(initialVimEnabled);
   const [vimMode, setVimMode] = useState<VimMode>(
