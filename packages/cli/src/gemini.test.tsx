@@ -35,6 +35,10 @@ vi.mock('./config/settings.js', async (importOriginal) => {
   };
 });
 
+vi.mock('./config/trustedFolders.js', () => ({
+  isWorkspaceTrusted: vi.fn(),
+}));
+
 vi.mock('./config/config.js', () => ({
   loadCliConfig: vi.fn().mockResolvedValue({
     config: {
@@ -93,10 +97,10 @@ describe('gemini.tsx main function', () => {
     loadSettingsMock = vi.mocked(loadSettings);
 
     // Store and clear sandbox-related env variables to ensure a consistent test environment
-    originalEnvGeminiSandbox = process.env.GEMINI_SANDBOX;
-    originalEnvSandbox = process.env.SANDBOX;
-    delete process.env.GEMINI_SANDBOX;
-    delete process.env.SANDBOX;
+    originalEnvGeminiSandbox = process.env['GEMINI_SANDBOX'];
+    originalEnvSandbox = process.env['SANDBOX'];
+    delete process.env['GEMINI_SANDBOX'];
+    delete process.env['SANDBOX'];
 
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     initialUnhandledRejectionListeners =
@@ -106,14 +110,14 @@ describe('gemini.tsx main function', () => {
   afterEach(() => {
     // Restore original env variables
     if (originalEnvGeminiSandbox !== undefined) {
-      process.env.GEMINI_SANDBOX = originalEnvGeminiSandbox;
+      process.env['GEMINI_SANDBOX'] = originalEnvGeminiSandbox;
     } else {
-      delete process.env.GEMINI_SANDBOX;
+      delete process.env['GEMINI_SANDBOX'];
     }
     if (originalEnvSandbox !== undefined) {
-      process.env.SANDBOX = originalEnvSandbox;
+      process.env['SANDBOX'] = originalEnvSandbox;
     } else {
-      delete process.env.SANDBOX;
+      delete process.env['SANDBOX'];
     }
 
     const currentListeners = process.listeners('unhandledRejection');
@@ -149,6 +153,7 @@ describe('gemini.tsx main function', () => {
       userSettingsFile,
       workspaceSettingsFile,
       [settingsError],
+      true,
     );
 
     loadSettingsMock.mockReturnValue(mockLoadedSettings);

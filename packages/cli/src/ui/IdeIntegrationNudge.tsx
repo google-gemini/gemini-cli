@@ -41,8 +41,8 @@ export function IdeIntegrationNudge({
   const { displayName: ideName } = getIdeInfo(ide);
   // Assume extension is already installed if the env variables are set.
   const isExtensionPreInstalled =
-    !!process.env.GEMINI_CLI_IDE_SERVER_PORT &&
-    !!process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
+    !!process.env['GEMINI_CLI_IDE_SERVER_PORT'] &&
+    !!process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
 
   const OPTIONS: Array<RadioSelectItem<IdeIntegrationNudgeResult>> = [
     {
@@ -92,11 +92,7 @@ export function IdeIntegrationNudge({
         </Text>
         <Text dimColor>{installText}</Text>
       </Box>
-      <RadioButtonSelect
-        items={OPTIONS}
-        onSelect={onComplete}
-        isFocused={true}
-      />
+      <RadioButtonSelect items={OPTIONS} onSelect={onComplete} />
     </Box>
   );
 }

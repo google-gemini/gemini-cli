@@ -8,11 +8,9 @@ import {
   Config,
   ToolCallRequestInfo,
   executeToolCall,
-  ToolRegistry,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   GeminiEventType,
-  ToolErrorType,
   parseAndFormatApiError,
 } from '@google/gemini-cli-core';
 import { Content, Part, FunctionCall } from '@google/genai';
@@ -40,7 +38,6 @@ export async function runNonInteractive(
     });
 
     const geminiClient = config.getGeminiClient();
-    const toolRegistry: ToolRegistry = await config.getToolRegistry();
 
     const abortController = new AbortController();
     let currentMessages: Content[] = [
@@ -101,7 +98,6 @@ export async function runNonInteractive(
           const toolResponse = await executeToolCall(
             config,
             requestInfo,
-            toolRegistry,
             abortController.signal,
           );
 
@@ -109,8 +105,6 @@ export async function runNonInteractive(
             console.error(
               `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
             );
-            if (toolResponse.errorType === ToolErrorType.UNHANDLED_EXCEPTION)
-              process.exit(1);
           }
 
           if (toolResponse.responseParts) {
