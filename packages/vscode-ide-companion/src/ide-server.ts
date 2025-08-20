@@ -12,6 +12,9 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express, { type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { type Server as HTTPServer } from 'node:http';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import { z } from 'zod';
 import { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
@@ -46,11 +49,16 @@ export class IDEServer {
   private server: HTTPServer | undefined;
   private context: vscode.ExtensionContext | undefined;
   private log: (message: string) => void;
+  private portFile: string;
   diffManager: DiffManager;
 
   constructor(log: (message: string) => void, diffManager: DiffManager) {
     this.log = log;
     this.diffManager = diffManager;
+    this.portFile = path.join(
+      os.tmpdir(),
+      `gemini-ide-server-${process.ppid}.json`,
+    );
   }
 
   async start(context: vscode.ExtensionContext) {
@@ -197,6 +205,10 @@ export class IDEServer {
           port.toString(),
         );
         this.log(`IDE server listening on port ${port}`);
+        fs.writeFile(this.portFile, JSON.stringify({ port })).catch((err) => {
+          this.log(`Failed to write port to file: ${err}`);
+        });
+        this.log(this.portFile);
       }
     });
   }
@@ -218,6 +230,11 @@ export class IDEServer {
 
     if (this.context) {
       this.context.environmentVariableCollection.clear();
+    }
+    try {
+      await fs.unlink(this.portFile);
+    } catch (_err) {
+      // Ignore errors if the file doesn't exist.
     }
   }
 }

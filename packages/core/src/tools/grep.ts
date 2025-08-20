@@ -13,11 +13,10 @@ import { globStream } from 'glob';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
-  Icon,
+  Kind,
   ToolInvocation,
   ToolResult,
 } from './tools.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
@@ -543,7 +542,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
       GrepTool.Name,
       'SearchText',
       'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.',
-      Icon.Regex,
+      Kind.Search,
       {
         properties: {
           pattern: {
@@ -614,15 +613,9 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
    */
-  validateToolParams(params: GrepToolParams): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
-    }
-
+  protected override validateToolParamValues(
+    params: GrepToolParams,
+  ): string | null {
     try {
       new RegExp(params.pattern);
     } catch (error) {
