@@ -105,12 +105,9 @@ export class IdeClient {
     this.setState(IDEConnectionStatus.Connecting);
 
     const ideInfoFromFile = await this.getIdeInfoFromFile();
-    console.log("port file: ", ideInfoFromFile.workspacePath);
     const workspacePath =
       ideInfoFromFile.workspacePath ??
       process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
-    console.log("env var: ", process.env['GEMINI_CLI_IDE_WORKSPACE_PATH']);
-    console.log("final: ", workspacePath)
 
     const { isValid, error } = IdeClient.validateWorkspacePath(
       workspacePath,
@@ -124,7 +121,6 @@ export class IdeClient {
     }
 
     const portFromFile = ideInfoFromFile.port;
-    console.log("port from file: ", ideInfoFromFile.port)
     if (portFromFile) {
       const connected = await this.establishConnection(portFromFile);
       if (connected) {
@@ -133,7 +129,6 @@ export class IdeClient {
     }
 
     const portFromEnv = this.getPortFromEnv();
-     console.log("port from env: ", this.getPortFromEnv())
     if (portFromEnv) {
       const connected = await this.establishConnection(portFromEnv);
       if (connected) {
