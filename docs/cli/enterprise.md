@@ -6,7 +6,86 @@ This document outlines configuration patterns and best practices for deploying a
 
 ## Centralized Configuration: The System Settings File
 
-The most powerful tool for enterprise administration is the system-wide `settings.json` file. This file allows you to define a baseline configuration that applies to all users on a machine, overriding any user or project-level settings.
+The most powerful tool for enterprise administration is the system-wide `settings.json` file. This file allows you to define a baseline configuration that applies to all users on a machine. Settings from system, user, and project-level `settings.json` files are merged together. For most settings, the system-wide configuration takes precedence, overriding any conflicting user or project-level settings. However, some settings, like `customThemes`, `mcpServers`, and `includeDirectories`, are merged from all configuration files, and if there are conflicting values (e.g., both workspace and system settings have a 'github' MCP server defined), the workspace value will take precedence.
+
+**Example of Merging and Precedence:**
+
+Here is how settings from different levels are combined.
+
+- **System `settings.json`:**
+
+  ```json
+  {
+    "theme": "system-enforced-theme",
+    "mcpServers": {
+      "corp-server": {
+        "command": "/usr/local/bin/corp-server-prod"
+      }
+    },
+    "includeDirectories": ["/etc/gemini-cli/global-context"]
+  }
+  ```
+
+- **User `settings.json` (`~/.gemini/settings.json`):**
+
+  ```json
+  {
+    "theme": "user-preferred-dark-theme",
+    "mcpServers": {
+      "corp-server": {
+        "command": "/usr/local/bin/corp-server-dev"
+      },
+      "user-tool": {
+        "command": "npm start --prefix ~/tools/my-tool"
+      }
+    },
+    "includeDirectories": ["~/gemini-context"]
+  }
+  ```
+
+- **Workspace `settings.json` (`<project>/.gemini/settings.json`):**
+  ```json
+  {
+    "theme": "project-specific-light-theme",
+    "mcpServers": {
+      "project-tool": {
+        "command": "npm start"
+      }
+    },
+    "includeDirectories": ["./project-context"]
+  }
+  ```
+
+This results in the following merged configuration:
+
+- **Final Merged Configuration:**
+  ```json
+  {
+    "theme": "system-enforced-theme",
+    "mcpServers": {
+      "corp-server": {
+        "command": "/usr/local/bin/corp-server-prod"
+      },
+      "user-tool": {
+        "command": "npm start --prefix ~/tools/my-tool"
+      },
+      "project-tool": {
+        "command": "npm start"
+      }
+    },
+    "includeDirectories": [
+      "/etc/gemini-cli/global-context",
+      "~/gemini-context",
+      "./project-context"
+    ]
+  }
+  ```
+
+**Why:**
+
+- **`theme`**: The value from the system settings is used, overriding both user and workspace settings.
+- **`mcpServers`**: The objects are merged. The `corp-server` definition from the system settings takes precedence over the user's definition. The unique `user-tool` and `project-tool` are included.
+- **`includeDirectories`**: The arrays are concatenated in the order of System, User, and then Workspace.
 
 - **Location**:
   - **Linux**: `/etc/gemini-cli/settings.json`
@@ -63,6 +142,26 @@ This means a user **cannot** override the definition of a server that is already
 ### Enforcing a Catalog of Tools
 
 The security of your MCP tool ecosystem depends on a combination of defining the canonical servers and adding their names to an allowlist.
+
+### Restricting Tools Within an MCP Server
+
+For even greater security, especially when dealing with third-party MCP servers, you can restrict which specific tools from a server are exposed to the model. This is done using the `includeTools` and `excludeTools` properties within a server's definition. This allows you to use a subset of tools from a server without allowing potentially dangerous ones.
+
+Following the principle of least privilege, it is highly recommended to use `includeTools` to create an allowlist of only the necessary tools.
+
+**Example:** Only allow the `code-search` and `get-ticket-details` tools from a third-party MCP server, even if the server offers other tools like `delete-ticket`.
+
+```json
+{
+  "allowMCPServers": ["third-party-analyzer"],
+  "mcpServers": {
+    "third-party-analyzer": {
+      "command": "/usr/local/bin/start-3p-analyzer.sh",
+      "includeTools": ["code-search", "get-ticket-details"]
+    }
+  }
+}
+```
 
 #### More Secure Pattern: Define and Add to Allowlist in System Settings
 
@@ -155,14 +254,13 @@ In corporate environments with strict network policies, you can configure Gemini
 
 For auditing and monitoring purposes, you can configure Gemini CLI to send telemetry data to a central location. This allows you to track tool usage and other events.
 
-**Example:** Enable telemetry and send it to a local OTLP collector.
+**Example:** Enable telemetry and send it to a local OTLP collector. If `otlpEndpoint` is not specified, it defaults to `http://localhost:4317`.
 
 ```json
 {
   "telemetry": {
     "enabled": true,
-    "target": "local",
-    "otlpEndpoint": "http://telemetry-collector.internal:4317",
+    "target": "gcp",
     "logPrompts": false
   }
 }
