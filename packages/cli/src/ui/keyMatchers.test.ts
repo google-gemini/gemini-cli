@@ -27,6 +27,8 @@ describe('keyMatchers', () => {
     [Command.END]: (key: Key) => key.ctrl && key.name === 'e',
     [Command.KILL_LINE_RIGHT]: (key: Key) => key.ctrl && key.name === 'k',
     [Command.KILL_LINE_LEFT]: (key: Key) => key.ctrl && key.name === 'u',
+    [Command.KILL_WORD_LEFT]: (key: Key) =>
+      key.ctrl && key.name === 'backspace',
     [Command.CLEAR_INPUT]: (key: Key) => key.ctrl && key.name === 'c',
     [Command.CLEAR_SCREEN]: (key: Key) => key.ctrl && key.name === 'l',
     [Command.HISTORY_UP]: (key: Key) => key.ctrl && key.name === 'p',
@@ -106,6 +108,11 @@ describe('keyMatchers', () => {
       command: Command.KILL_LINE_LEFT,
       positive: [createKey('u', { ctrl: true })],
       negative: [createKey('u'), createKey('k', { ctrl: true })],
+    },
+    {
+      command: Command.KILL_WORD_LEFT,
+      positive: [createKey('backspace', { ctrl: true })],
+      negative: [createKey('backspace'), createKey('w', { ctrl: true })],
     },
     {
       command: Command.CLEAR_INPUT,

@@ -492,6 +492,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.killLineLeft();
         return;
       }
+      if (keyMatchers[Command.KILL_WORD_LEFT](key)) {
+        buffer.deleteWordLeft();
+        return;
+      }
 
       // External editor
       if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
