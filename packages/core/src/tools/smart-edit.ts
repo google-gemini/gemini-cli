@@ -4,36 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import * as fs from 'fs';
+import * as path from 'path';
 import * as Diff from 'diff';
-import type {
+import {
+  BaseDeclarativeTool,
+  Kind,
   ToolCallConfirmationDetails,
+  ToolConfirmationOutcome,
   ToolEditConfirmationDetails,
   ToolInvocation,
   ToolLocation,
   ToolResult,
   ToolResultDisplay,
 } from './tools.js';
-import { BaseDeclarativeTool, Kind, ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
-import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../config/config.js';
-import { ensureCorrectEdit } from '../utils/editCorrector.js';
+import { Config, ApprovalMode } from '../config/config.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
-import type {
-  ModifiableDeclarativeTool,
-  ModifyContext,
-} from './modifiable-tool.js';
+import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
 import { IDEConnectionStatus } from '../ide/ide-client.js';
-import { FileOperation } from '../telemetry/metrics.js';
-import { logFileOperation } from '../telemetry/loggers.js';
-import { FileOperationEvent } from '../telemetry/types.js';
-import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
-import { getSpecificMimeType } from '../utils/fileUtils.js';
+import { FixLLMEditWithInstruction } from '../utils/editCorrector.js';
 
 export function applyReplacement(
   currentContent: string | null,
@@ -55,6 +48,111 @@ export function applyReplacement(
   return currentContent.replaceAll(oldString, newString);
 }
 
+interface ReplacementContext {
+  params: EditToolParams;
+  currentContent: string;
+  abortSignal: AbortSignal;
+}
+
+interface ReplacementResult {
+  newContent: string;
+  occurrences: number;
+  finalOldString: string;
+  finalNewString: string;
+}
+
+export async function performFuzzyReplacement(
+  context: ReplacementContext,
+): Promise<ReplacementResult> {
+  const { currentContent, params } = context;
+  const { old_string, new_string } = params;
+  const hadTrailingNewline = currentContent.endsWith('\n');
+
+  const normalizedCode = currentContent;
+  const normalizedSearch = old_string.replace(/\r\n/g, '\n');
+  const normalizedReplace = new_string.replace(/\r\n/g, '\n');
+
+  if (normalizedSearch === '') {
+    return {
+      newContent: currentContent,
+      occurrences: 0,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+    };
+  }
+
+  const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
+  if (exactOccurrences > 0) {
+    let modifiedCode = normalizedCode.replaceAll(
+      normalizedSearch,
+      normalizedReplace,
+    );
+    if (hadTrailingNewline && !modifiedCode.endsWith('\n')) {
+      modifiedCode += '\n';
+    } else if (!hadTrailingNewline && modifiedCode.endsWith('\n')) {
+      modifiedCode = modifiedCode.replace(/\n$/, '');
+    }
+    return {
+      newContent: modifiedCode,
+      occurrences: exactOccurrences,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+    };
+  }
+
+  const sourceLines = normalizedCode.match(/.*(?:\n|$)/g)?.slice(0, -1) ?? [];
+  const searchLinesStripped = normalizedSearch
+    .split('\n')
+    .map((line: string) => line.trim());
+  const replaceLines = normalizedReplace.split('\n');
+
+  let flexibleOccurrences = 0;
+  let i = 0;
+  while (i <= sourceLines.length - searchLinesStripped.length) {
+    const window = sourceLines.slice(i, i + searchLinesStripped.length);
+    const windowStripped = window.map((line: string) => line.trim());
+    const isMatch = windowStripped.every(
+      (line: string, index: number) => line === searchLinesStripped[index],
+    );
+
+    if (isMatch) {
+      flexibleOccurrences++;
+      const firstLineInMatch = window[0];
+      const indentationMatch = firstLineInMatch.match(/^(\s*)/);
+      const indentation = indentationMatch ? indentationMatch[1] : '';
+      const newBlockWithIndent = replaceLines.map(
+        (line: string) => `${indentation}${line}`,
+      );
+      sourceLines.splice(i, searchLinesStripped.length, ...newBlockWithIndent);
+      i += replaceLines.length;
+    } else {
+      i++;
+    }
+  }
+
+  if (flexibleOccurrences > 0) {
+    let modifiedCode = sourceLines.join('');
+    if (hadTrailingNewline && !modifiedCode.endsWith('\n')) {
+      modifiedCode += '\n';
+    } else if (!hadTrailingNewline && modifiedCode.endsWith('\n')) {
+      modifiedCode = modifiedCode.replace(/\n$/, '');
+    }
+    return {
+      newContent: modifiedCode,
+      occurrences: flexibleOccurrences,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+    };
+  }
+
+  return {
+    newContent: currentContent,
+    occurrences: 0,
+    finalOldString: normalizedSearch,
+    finalNewString: normalizedReplace,
+  };
+}
+
 export function getErrorReplaceResult(
   params: EditToolParams,
   occurrences: number,
@@ -67,7 +165,7 @@ export function getErrorReplaceResult(
   if (occurrences === 0) {
     error = {
       display: `Failed to edit, could not find the string to replace.`,
-      raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
+      raw: `Failed to edit, 0 occurrences found for old_string (${finalOldString}). Original old_string was (${params.old_string}) in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
       type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
     };
   } else if (occurrences !== expectedReplacements) {
@@ -109,10 +207,9 @@ export interface EditToolParams {
   new_string: string;
 
   /**
-   * Number of replacements expected. Defaults to 1 if not specified.
-   * Use when you want to replace multiple occurrences.
+   * The instruction for what needs to be done.
    */
-  expected_replacements?: number;
+  instruction: string;
 
   /**
    * Whether the edit was modified manually by the user.
@@ -153,7 +250,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     params: EditToolParams,
     abortSignal: AbortSignal,
   ): Promise<CalculatedEdit> {
-    const expectedReplacements = params.expected_replacements ?? 1;
+    const expectedReplacements = 1;
     let currentContent: string | null = null;
     let fileExists = false;
     let isNewFile = false;
@@ -197,17 +294,15 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         type: ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
       };
     } else if (currentContent !== null) {
-      // Editing an existing file
-      const correctedEdit = await ensureCorrectEdit(
-        params.file_path,
-        currentContent,
+      const replacementResult = await performFuzzyReplacement({
         params,
-        this.config.getGeminiClient(),
+        currentContent,
         abortSignal,
-      );
-      finalOldString = correctedEdit.params.old_string;
-      finalNewString = correctedEdit.params.new_string;
-      occurrences = correctedEdit.occurrences;
+      });
+
+      finalOldString = replacementResult.finalOldString;
+      finalNewString = replacementResult.finalNewString;
+      occurrences = replacementResult.occurrences;
 
       error = getErrorReplaceResult(
         params,
@@ -216,6 +311,48 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         finalOldString,
         finalNewString,
       );
+
+      if (error !== undefined) {
+        const fixedEdit = await FixLLMEditWithInstruction(
+          params.instruction,
+          finalOldString,
+          finalNewString,
+          error.raw,
+          currentContent,
+          this.config.getGeminiClient(),
+          abortSignal,
+        );
+        if (fixedEdit.noChangesRequired) {
+          error = {
+            display: `No changes required. The file already meets the specified conditions.`,
+            raw: `A secondary check determined that no changes were necessary to fulfill the instruction. Explanation: ${fixedEdit.explanation}. Original error with the parameters given: ${error.raw}`,
+            type: ToolErrorType.EDIT_NO_CHANGE,
+          };
+        } else {
+          const replacementResult = await performFuzzyReplacement({
+            params: {
+              ...params,
+              old_string: fixedEdit.search,
+              new_string: fixedEdit.replace,
+            },
+            currentContent,
+            abortSignal,
+          });
+          const errorFixed = getErrorReplaceResult(
+            params,
+            replacementResult.occurrences,
+            expectedReplacements,
+            replacementResult.finalOldString,
+            replacementResult.finalNewString,
+          );
+          if (errorFixed === undefined) {
+            finalOldString = replacementResult.finalOldString;
+            finalNewString = replacementResult.finalNewString;
+            occurrences = replacementResult.occurrences;
+            error = undefined;
+          }
+        }
+      }
     } else {
       // Should not happen if fileExists and no exception was thrown, but defensively:
       error = {
@@ -225,23 +362,12 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       };
     }
 
-    const newContent = !error
-      ? applyReplacement(
-          currentContent,
-          finalOldString,
-          finalNewString,
-          isNewFile,
-        )
-      : (currentContent ?? '');
-
-    if (!error && fileExists && currentContent === newContent) {
-      error = {
-        display:
-          'No changes to apply. The new content is identical to the current content.',
-        raw: `No changes to apply. The new content is identical to the current content in file: ${params.file_path}`,
-        type: ToolErrorType.EDIT_NO_CHANGE,
-      };
-    }
+    const newContent = applyReplacement(
+      currentContent,
+      finalOldString,
+      finalNewString,
+      isNewFile,
+    );
 
     return {
       currentContent,
@@ -382,21 +508,12 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         .writeTextFile(this.params.file_path, editData.newContent);
 
       let displayResult: ToolResultDisplay;
-      const fileName = path.basename(this.params.file_path);
-      const originallyProposedContent =
-        this.params.ai_proposed_string || this.params.new_string;
-      const diffStat = getDiffStat(
-        fileName,
-        editData.currentContent ?? '',
-        originallyProposedContent,
-        this.params.new_string,
-      );
-
       if (editData.isNewFile) {
         displayResult = `Created ${shortenPath(makeRelative(this.params.file_path, this.config.getTargetDir()))}`;
       } else {
         // Generate diff for display, even though core logic doesn't technically need it
         // The CLI wrapper will use this part of the ToolResult
+        const fileName = path.basename(this.params.file_path);
         const fileDiff = Diff.createPatch(
           fileName,
           editData.currentContent ?? '', // Should not be null here if not isNewFile
@@ -404,6 +521,14 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           'Current',
           'Proposed',
           DEFAULT_DIFF_OPTIONS,
+        );
+        const originallyProposedContent =
+          this.params.ai_proposed_string || this.params.new_string;
+        const diffStat = getDiffStat(
+          fileName,
+          editData.currentContent ?? '',
+          originallyProposedContent,
+          this.params.new_string,
         );
         displayResult = {
           fileDiff,
@@ -424,26 +549,6 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           `User modified the \`new_string\` content to be: ${this.params.new_string}.`,
         );
       }
-
-      const lines = editData.newContent.split('\n').length;
-      const mimetype = getSpecificMimeType(this.params.file_path);
-      const extension = path.extname(this.params.file_path);
-      const programming_language = getProgrammingLanguage({
-        file_path: this.params.file_path,
-      });
-
-      logFileOperation(
-        this.config,
-        new FileOperationEvent(
-          EditTool.Name,
-          editData.isNewFile ? FileOperation.CREATE : FileOperation.UPDATE,
-          lines,
-          mimetype,
-          extension,
-          diffStat,
-          programming_language,
-        ),
-      );
 
       return {
         llmContent: llmSuccessMessageParts.join(' '),
@@ -476,26 +581,29 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
 /**
  * Implementation of the Edit tool logic
  */
-export class EditTool
+export class SmartEditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
   implements ModifiableDeclarativeTool<EditToolParams>
 {
-  static readonly Name = 'replace';
+  static readonly Name = 'smart_edit';
+
   constructor(private readonly config: Config) {
     super(
-      EditTool.Name,
-      'Edit',
-      `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${ReadFileTool.Name} tool to examine the file's current content before attempting a text replacement.
-
+      SmartEditTool.Name,
+      'Smart Edit',
+      `Replaces text within a file. Replaces a single occurrence. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${ReadFileTool.Name} tool to examine the file's current content before attempting a text replacement.
+      
       The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
-
-Expectation for required parameters:
-1. \`file_path\` MUST be an absolute path; otherwise an error will be thrown.
-2. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
-3. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic.
-4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
-**Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
-**Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
+      
+      Expectation for required parameters:
+      1. \`file_path\` MUST be an absolute path; otherwise an error will be thrown.
+      2. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
+      3. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
+      4.  \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
+      5. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
+      **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
+      6. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
+      **Multiple replacements:** If there are multiple and ambiguous occurences of the \`old_string\` in the file, the tool will also fail.`,
       Kind.Edit,
       {
         properties: {
@@ -504,9 +612,27 @@ Expectation for required parameters:
               "The absolute path to the file to modify. Must start with '/'.",
             type: 'string',
           },
+          instruction: {
+            description: `A clear, semantic instruction for the code change, acting as a high-quality prompt for an expert LLM assistant. It must be self-contained and explain the goal of the change.
+
+A good instruction should concisely answer:
+1.  WHY is the change needed? (e.g., "To fix a bug where users can be null...")
+2.  WHERE should the change happen? (e.g., "...in the 'renderUserProfile' function...")
+3.  WHAT is the high-level change? (e.g., "...add a null check for the 'user' object...")
+4.  WHAT is the desired outcome? (e.g., "...so that it displays a loading spinner instead of crashing.")
+
+**GOOD Example:** "In the 'calculateTotal' function, correct the sales tax calculation by updating the 'taxRate' constant from 0.05 to 0.075 to reflect the new regional tax laws."
+
+**BAD Examples:**
+- "Change the text." (Too vague)
+- "Fix the bug." (Doesn't explain the bug or the fix)
+- "Replace the line with this new line." (Brittle, just repeats the other parameters)
+`,
+            type: 'string',
+          },
           old_string: {
             description:
-              'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. For multiple replacements, specify expected_replacements parameter. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
+              'The exact literal text to replace, preferably unescaped. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
             type: 'string',
           },
           new_string: {
@@ -514,14 +640,8 @@ Expectation for required parameters:
               'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
             type: 'string',
           },
-          expected_replacements: {
-            type: 'number',
-            description:
-              'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
-            minimum: 1,
-          },
         },
-        required: ['file_path', 'old_string', 'new_string'],
+        required: ['file_path', 'instruction', 'old_string', 'new_string'],
         type: 'object',
       },
     );
