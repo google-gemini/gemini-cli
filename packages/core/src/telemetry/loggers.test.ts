@@ -823,10 +823,10 @@ describe('loggers', () => {
       // Clear any previous mock calls
       mockLogger.emit.mockClear();
       
-      const mockConfig = {
-        getSessionId: () => 'test-session-id',
-        getUsageStatisticsEnabled: () => false, // Disable ClearcutLogger to focus on OpenTelemetry
-      } as Config;
+      const mockConfig = makeFakeConfig({
+        sessionId: 'test-session-id',
+        usageStatisticsEnabled: false, // Disable ClearcutLogger to focus on OpenTelemetry
+      });
       
       // Test string with an emoji at the truncation boundary
       const feedbackBase = 'A'.repeat(FEEDBACK_CONTENT_MAX_LENGTH - 1) + '👍'; // This string is exactly FEEDBACK_CONTENT_MAX_LENGTH characters long

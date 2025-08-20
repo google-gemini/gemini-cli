@@ -20,7 +20,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-import { logResearchFeedback, ResearchFeedbackEvent, Config } from '@google/gemini-cli-core';
+import { logResearchFeedback, makeFakeConfig } from '@google/gemini-cli-core';
 
 // Create a mock context for testing
 function createMockContext(settings: Partial<Settings>): CommandContext {
@@ -79,12 +79,12 @@ describe('feedbackCommand', () => {
   });
 
   it('should accept feedback and log telemetry event when opted in with args', async () => {
-    const mockConfig: Partial<Config> = { getTelemetryEnabled: () => true };
+    const mockConfig = makeFakeConfig({ telemetry: { enabled: true } });
     const context = createMockContext({ 
       researchOptIn: true,
       researchContact: 'user@example.com',
     });
-    context.services.config = mockConfig as Config;
+    context.services.config = mockConfig;
 
     const feedbackText = 'This is great feedback';
     const result = await feedbackCommand.action!(context, feedbackText);
@@ -95,27 +95,29 @@ describe('feedbackCommand', () => {
       content: expect.stringContaining('Thank you for your feedback'),
     });
 
-    // Verify telemetry logging was called
-    expect(vi.mocked(logResearchFeedback)).toHaveBeenCalledOnce();
-    const [configArg, eventArg] = vi.mocked(logResearchFeedback).mock.calls[0];
-    expect(configArg).toBe(mockConfig);
-    expect(eventArg).toBeInstanceOf(ResearchFeedbackEvent);
-    expect(eventArg.feedback_content).toBe(feedbackText);
-    expect(eventArg.feedback_type).toBe('conversational');
+    // Verify telemetry logging was called with expected parameters
+    expect(logResearchFeedback).toHaveBeenCalledOnce();
+    expect(logResearchFeedback).toHaveBeenCalledWith(
+      mockConfig,
+      expect.objectContaining({
+        feedback_content: feedbackText,
+        feedback_type: 'conversational',
+      })
+    );
   });
 
   it('should always log research feedback when config exists', async () => {
-    const mockConfig: Partial<Config> = { getTelemetryEnabled: () => false };
+    const mockConfig = makeFakeConfig({ telemetry: { enabled: false } });
     const context = createMockContext({ 
       researchOptIn: true,
     });
-    context.services.config = mockConfig as Config;
+    context.services.config = mockConfig;
 
     await feedbackCommand.action!(context, 'Test feedback');
 
     // Verify research feedback logging was called regardless of telemetry setting
     // The logResearchFeedback function handles internal routing based on different settings
-    expect(vi.mocked(logResearchFeedback)).toHaveBeenCalled();
+    expect(logResearchFeedback).toHaveBeenCalled();
   });
 
   it('should return error when services.config is missing', async () => {
@@ -132,24 +134,27 @@ describe('feedbackCommand', () => {
     expect(result.content).toBe('Unable to send feedback due to an internal configuration error. Please try again later.');
     
     // Verify logging was NOT called when config is missing
-    expect(vi.mocked(logResearchFeedback)).not.toHaveBeenCalled();
+    expect(logResearchFeedback).not.toHaveBeenCalled();
   });
 
   it('should handle multi-byte characters (emoji) correctly in feedback', async () => {
-    const mockConfig: Partial<Config> = { getTelemetryEnabled: () => true };
+    const mockConfig = makeFakeConfig({ telemetry: { enabled: true } });
     const context = createMockContext({ 
       researchOptIn: true,
     });
-    context.services.config = mockConfig as Config;
+    context.services.config = mockConfig;
     const feedbackWithEmoji = 'This CLI is great! 👍🎉 Love the new features 💯';
 
     await feedbackCommand.action!(context, feedbackWithEmoji);
 
     // Verify the feedback event was created with the original multi-byte content
-    expect(vi.mocked(logResearchFeedback)).toHaveBeenCalled();
-    const eventArg = vi.mocked(logResearchFeedback).mock.calls[0][1];
-    expect(eventArg.feedback_content).toBe(feedbackWithEmoji);
-    expect(eventArg.feedback_type).toBe('conversational');
+    expect(logResearchFeedback).toHaveBeenCalledWith(
+      mockConfig,
+      expect.objectContaining({
+        feedback_content: feedbackWithEmoji,
+        feedback_type: 'conversational',
+      })
+    );
   });
 
   it('should have correct command metadata', () => {
