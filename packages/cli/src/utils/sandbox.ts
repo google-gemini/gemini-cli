@@ -24,6 +24,7 @@ function getContainerPath(hostPath: string): string {
   if (os.platform() !== 'win32') {
     return hostPath;
   }
+
   const withForwardSlashes = hostPath.replace(/\\/g, '/');
   const match = withForwardSlashes.match(/^([A-Z]):\/(.*)/i);
   if (match) {
@@ -114,7 +115,7 @@ function ports(): string[] {
     .map((p) => p.trim());
 }
 
-function entrypoint(workdir: string, stdinData?: string): string[] {
+function entrypoint(workdir: string, cliArgs: string[]): string[] {
   const isWindows = os.platform() === 'win32';
   const containerWorkdir = getContainerPath(workdir);
   const shellCmds = [];
@@ -166,20 +167,7 @@ function entrypoint(workdir: string, stdinData?: string): string[] {
     ),
   );
 
-  const cliArgs = process.argv.slice(2);
-  if (stdinData) {
-    const promptIndex = cliArgs.findIndex(
-      (arg) => arg === '--prompt' || arg === '-p',
-    );
-    if (promptIndex > -1 && cliArgs.length > promptIndex + 1) {
-      // If there's a prompt argument, prepend stdin to it
-      cliArgs[promptIndex + 1] = `${stdinData}\n\n${cliArgs[promptIndex + 1]}`;
-    } else {
-      // If there's no prompt argument, add stdin as the prompt
-      cliArgs.push('--prompt', stdinData);
-    }
-  }
-  const quotedCliArgs = cliArgs.map((arg) => quote([arg]));
+  const quotedCliArgs = cliArgs.slice(2).map((arg) => quote([arg]));
   const cliCmd =
     process.env['NODE_ENV'] === 'development'
       ? process.env['DEBUG']
@@ -197,7 +185,7 @@ export async function start_sandbox(
   config: SandboxConfig,
   nodeArgs: string[] = [],
   cliConfig?: Config,
-  stdinData?: string,
+  cliArgs: string[] = [],
 ) {
   const patcher = new ConsolePatcher({
     debugMode: cliConfig?.getDebugMode() || !!process.env['DEBUG'],
@@ -276,20 +264,7 @@ export async function start_sandbox(
         args.push('-D', `INCLUDE_DIR_${i}=${dirPath}`);
       }
 
-      const finalArgv = [...process.argv];
-      if (stdinData) {
-        const promptIndex = finalArgv.findIndex(
-          (arg) => arg === '--prompt' || arg === '-p',
-        );
-        if (promptIndex > -1 && finalArgv.length > promptIndex + 1) {
-          // If there's a prompt argument, prepend stdin to it
-          finalArgv[promptIndex + 1] =
-            `${stdinData}\n\n${finalArgv[promptIndex + 1]}`;
-        } else {
-          // If there's no prompt argument, add stdin as the prompt
-          finalArgv.push('--prompt', stdinData);
-        }
-      }
+      const finalArgv = cliArgs;
 
       args.push(
         '-f',
@@ -720,7 +695,7 @@ export async function start_sandbox(
     // Determine if the current user's UID/GID should be passed to the sandbox.
     // See shouldUseCurrentUserInSandbox for more details.
     let userFlag = '';
-    const finalEntrypoint = entrypoint(workdir, stdinData);
+    const finalEntrypoint = entrypoint(workdir, cliArgs);
 
     if (process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true') {
       args.push('--user', 'root');
