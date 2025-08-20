@@ -210,7 +210,7 @@ git clone https://github.com/google-gemini/gemini-cli
 cd gemini-cli
 gemini
 > Give me a summary of all of the changes that went in yesterday
-````
+```
 
 ## 📚 Documentation
 
