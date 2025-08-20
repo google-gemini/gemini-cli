@@ -196,6 +196,14 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       const performFuzzySearch = async () => {
         let potentialSuggestions: SlashCommand[] = [];
         
+        // Helper function for prefix-based filtering
+        const getPrefixSuggestions = () => commandsToSearch.filter(
+          (cmd) =>
+            cmd.description &&
+            (cmd.name.toLowerCase().startsWith(partial.toLowerCase()) ||
+              cmd.altNames?.some((alt) => alt.toLowerCase().startsWith(partial.toLowerCase()))),
+        );
+        
         if (partial === '') {
           // If no partial query, show all available commands
           potentialSuggestions = commandsToSearch.filter((cmd) => cmd.description);
@@ -213,24 +221,19 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
                 }
               });
               potentialSuggestions = Array.from(uniqueCommands);
+              
+              // If fuzzy search returns no results, fallback to prefix matching
+              if (potentialSuggestions.length === 0) {
+                potentialSuggestions = getPrefixSuggestions();
+              }
             } catch (error) {
               console.warn('Fuzzy search failed, falling back to prefix matching:', error);
-              // Fallback to original prefix-based filtering
-              potentialSuggestions = commandsToSearch.filter(
-                (cmd) =>
-                  cmd.description &&
-                  (cmd.name.startsWith(partial) ||
-                    cmd.altNames?.some((alt) => alt.startsWith(partial))),
-              );
+              // Fallback to prefix-based filtering
+              potentialSuggestions = getPrefixSuggestions();
             }
           } else {
-            // Fallback to original prefix-based filtering when fzf instance creation fails
-            potentialSuggestions = commandsToSearch.filter(
-              (cmd) =>
-                cmd.description &&
-                (cmd.name.startsWith(partial) ||
-                  cmd.altNames?.some((alt) => alt.startsWith(partial))),
-            );
+            // Fallback to prefix-based filtering when fzf instance creation fails
+            potentialSuggestions = getPrefixSuggestions();
           }
         }
 
