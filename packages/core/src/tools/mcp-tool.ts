@@ -152,7 +152,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return this.displayName;
+    return JSON.stringify(this.params);
   }
 }
 

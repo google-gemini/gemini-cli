@@ -36,7 +36,7 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return `Calling discovered tool: ${this.toolName}`;
+    return JSON.stringify(this.params);
   }
 
   async execute(
