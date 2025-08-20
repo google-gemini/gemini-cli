@@ -30,6 +30,10 @@ jobs:
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
+          permission-pull-requests: 'read'
+          permission-discussions: 'read'
+          permission-contents: 'read'
 
       - name: 'Generate Report 📜'
         id: 'report'
