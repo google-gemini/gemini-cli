@@ -104,7 +104,7 @@ export class WebSearchTool extends BaseTool<
    * Converts a UTF-8 byte index to a character index.
    * This is needed because the Grounding API returns byte positions,
    * but JavaScript string operations work with character positions.
-   * 
+   *
    * @param text The text string
    * @param byteIndex The byte index to convert
    * @returns The corresponding character index
@@ -117,7 +117,7 @@ export class WebSearchTool extends BaseTool<
     if (byteIndex <= 0) {
       return 0;
     }
-    
+
     const truncatedBytes = bytes.subarray(0, byteIndex);
     return truncatedBytes.toString('utf8').length;
   }
