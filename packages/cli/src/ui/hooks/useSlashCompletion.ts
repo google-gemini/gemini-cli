@@ -110,7 +110,8 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
         break;
       }
       const found: SlashCommand | undefined = currentLevel.find(
-        (cmd) => cmd.name === part || cmd.altNames?.includes(part),
+        (cmd) => cmd.name.toLowerCase() === part.toLowerCase() || 
+                 cmd.altNames?.some(alt => alt.toLowerCase() === part.toLowerCase()),
       );
       if (found) {
         leafCommand = found;
@@ -126,7 +127,8 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
     if (!hasTrailingSpace && currentLevel) {
       exactMatchAsParent = currentLevel.find(
         (cmd) =>
-          (cmd.name === partial || cmd.altNames?.includes(partial)) &&
+          (cmd.name.toLowerCase() === partial.toLowerCase() || 
+           cmd.altNames?.some(alt => alt.toLowerCase() === partial.toLowerCase())) &&
           cmd.subCommands,
       );
 
@@ -144,7 +146,8 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       } else if (currentLevel) {
         const perfectMatch = currentLevel.find(
           (cmd) =>
-            (cmd.name === partial || cmd.altNames?.includes(partial)) &&
+            (cmd.name.toLowerCase() === partial.toLowerCase() || 
+             cmd.altNames?.some(alt => alt.toLowerCase() === partial.toLowerCase())) &&
             cmd.action,
         );
         if (perfectMatch) {
@@ -239,7 +242,8 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
 
         if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
           const perfectMatch = potentialSuggestions.find(
-            (s) => s.name === partial || s.altNames?.includes(partial),
+            (s) => s.name.toLowerCase() === partial.toLowerCase() || 
+                   s.altNames?.some(alt => alt.toLowerCase() === partial.toLowerCase()),
           );
           if (perfectMatch && perfectMatch.action) {
             potentialSuggestions = [];
