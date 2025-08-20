@@ -137,7 +137,6 @@ export async function handleAtCommand({
   );
 
   if (atPathCommandParts.length === 0) {
-    addItem({ type: 'user', text: query }, userMessageTimestamp);
     return { processedQuery: [{ text: query }], shouldProceed: true };
   }
 
