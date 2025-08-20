@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
 import { render } from 'ink';
-import { AppWrapper } from './ui/App.js';
+import { MainComponent } from './ui/MainComponent.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
@@ -46,7 +45,6 @@ import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.j
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import { SettingsContext } from './ui/contexts/SettingsContext.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -275,18 +273,20 @@ export async function main() {
     // Detect and enable Kitty keyboard protocol once at startup
     await detectAndEnableKittyProtocol();
     setWindowTitle(basename(workspaceRoot), settings);
+
     const instance = render(
-      <React.StrictMode>
-        <SettingsContext.Provider value={settings}>
-          <AppWrapper
-            config={config}
-            settings={settings}
-            startupWarnings={startupWarnings}
-            version={version}
-          />
-        </SettingsContext.Provider>
-      </React.StrictMode>,
-      { exitOnCtrlC: false },
+      <MainComponent
+        initialConfig={config}
+        settings={settings}
+        startupWarnings={startupWarnings}
+        version={version}
+        workspaceRoot={workspaceRoot}
+        extensions={extensions}
+        argv={argv}
+      />,
+      {
+        exitOnCtrlC: false,
+      },
     );
 
     checkForUpdates()

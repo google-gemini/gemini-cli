@@ -45,6 +45,34 @@ brew install gemini-cli
 - Node.js version 20 or higher
 - macOS, Linux, or Windows
 
+## Release Cadence and Tags
+
+See [Releases](./docs/releases.md) for more details.
+
+### Preview
+
+New preview releases will be published each week at UTC 2359 on Tuesdays. These releases will not have been fully vetted and may contain regressions or other outstanding issues. Please help us test and install with `preview` tag.
+
+```bash
+npm install -g @google/gemini-cli@preview
+```
+
+### Stable
+
+- New stable releases will be published each week at UTC 2000 on Tuesdays, this will be the full promotion of last week's `preview` release + any bug fixes and validations. Use `latest` tag.
+
+```bash
+npm install -g @google/gemini-cli@latest
+```
+
+### Nightly
+
+- New releases will be published each week at UTC 0000 each day, This will be all changes from the main branch as represted at time of release. It should be assumed there are pending validations and issues. Use `nightly` tag.
+
+```bash
+npm install -g @google/gemini-cli@nightly
+```
+
 ## 📋 Key Features
 
 ### Code Understanding & Generation
@@ -170,18 +198,20 @@ gemini -p "Explain the architecture of this codebase"
 
 #### Start a new project
 
-````bash
+```bash
 cd new-project/
 gemini
 > Write me a Discord bot that answers questions using a FAQ.md file I will provide
+```
 
 #### Analyze existing code
+
 ```bash
 git clone https://github.com/google-gemini/gemini-cli
 cd gemini-cli
 gemini
 > Give me a summary of all of the changes that went in yesterday
-````
+```
 
 ## 📚 Documentation
 
