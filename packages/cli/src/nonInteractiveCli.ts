@@ -16,6 +16,7 @@ import {
 import { Content, Part, FunctionCall } from '@google/genai';
 
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
+import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
 
 export async function runNonInteractive(
   config: Config,
@@ -40,8 +41,26 @@ export async function runNonInteractive(
     const geminiClient = config.getGeminiClient();
 
     const abortController = new AbortController();
+
+    const { processedQuery, shouldProceed } = await handleAtCommand({
+      query: input,
+      config,
+      // Pass dummy functions for addItem and onDebugMessage as they are not critical
+      // for the core functionality of resolving the query in non-interactive mode.
+      addItem: () => {},
+      onDebugMessage: () => {},
+      messageId: Date.now(),
+      signal: abortController.signal,
+    });
+
+    if (!shouldProceed || !processedQuery) {
+      // An error occurred during @include processing (e.g., file not found).
+      // The error message is already logged by handleAtCommand.
+      return;
+    }
+
     let currentMessages: Content[] = [
-      { role: 'user', parts: [{ text: input }] },
+      { role: 'user', parts: processedQuery as Part[] },
     ];
     let turnCount = 0;
     while (true) {
@@ -97,7 +116,7 @@ export async function runNonInteractive(
 
           const toolResponse = await executeToolCall(
             config,
-            requestInfo,
+            requestInfo,         
             abortController.signal,
           );
 
