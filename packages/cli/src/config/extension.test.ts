@@ -10,7 +10,6 @@ import * as os from 'os';
 import * as path from 'path';
 import {
   EXTENSIONS_CONFIG_FILENAME,
-  EXTENSIONS_DIRECTORY_NAME,
   annotateActiveExtensions,
   loadExtensions,
 } from './extension.js';
@@ -22,6 +21,8 @@ vi.mock('os', async (importOriginal) => {
     homedir: vi.fn(),
   };
 });
+
+const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
 
 describe('loadExtensions', () => {
   let tempWorkspaceDir: string;

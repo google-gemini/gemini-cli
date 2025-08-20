@@ -22,13 +22,13 @@ import {
   TEST_ONLY,
 } from './clearcut-logger.js';
 import { ConfigParameters } from '../../config/config.js';
-import * as userAccount from '../../utils/user_account.js';
-import * as userId from '../../utils/user_id.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../mocks/msw.js';
 import { makeChatCompressionEvent } from '../types.js';
+import { UserAccountManager } from '../../utils/userAccountManager.js';
+import { InstallationManager } from '../../utils/installationManager.js';
 
 interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
@@ -71,11 +71,11 @@ expect.extend({
   },
 });
 
-vi.mock('../../utils/user_account');
-vi.mock('../../utils/user_id');
+vi.mock('../../utils/userAccountManager.js');
+vi.mock('../../utils/installationManager.js');
 
-const mockUserAccount = vi.mocked(userAccount);
-const mockUserId = vi.mocked(userId);
+const mockUserAccount = vi.mocked(UserAccountManager.prototype);
+const mockInstallMgr = vi.mocked(InstallationManager.prototype);
 
 // TODO(richieforeman): Consider moving this to test setup globally.
 beforeAll(() => {
@@ -113,7 +113,6 @@ describe('ClearcutLogger', () => {
     config = {} as Partial<ConfigParameters>,
     lifetimeGoogleAccounts = 1,
     cachedGoogleAccount = 'test@google.com',
-    installationId = 'test-installation-id',
   } = {}) {
     server.resetHandlers(
       http.post(CLEARCUT_URL, () => HttpResponse.text(EXAMPLE_RESPONSE)),
@@ -131,7 +130,9 @@ describe('ClearcutLogger', () => {
     mockUserAccount.getLifetimeGoogleAccounts.mockReturnValue(
       lifetimeGoogleAccounts,
     );
-    mockUserId.getInstallationId.mockReturnValue(installationId);
+    mockInstallMgr.getInstallationId = vi
+      .fn()
+      .mockReturnValue('test-installation-id');
 
     const logger = ClearcutLogger.getInstance(loggerConfig);
 

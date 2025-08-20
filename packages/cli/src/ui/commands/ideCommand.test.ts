@@ -20,7 +20,14 @@ import * as core from '@google/gemini-cli-core';
 
 vi.mock('child_process');
 vi.mock('glob');
-vi.mock('@google/gemini-cli-core');
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original = await importOriginal<typeof core>();
+  return {
+    ...original,
+    getOauthClient: vi.fn(original.getOauthClient),
+    getIdeInstaller: vi.fn(original.getIdeInstaller),
+  };
+});
 
 describe('ideCommand', () => {
   let mockContext: CommandContext;

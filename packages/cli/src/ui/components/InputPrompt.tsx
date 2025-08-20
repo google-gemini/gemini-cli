@@ -81,7 +81,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [cursorPosition, setCursorPosition] = useState<[number, number]>([
     0, 0,
   ]);
-  const shellHistory = useShellHistory(config.getProjectRoot());
+  const shellHistory = useShellHistory(config.getProjectRoot(), config.storage);
   const historyData = shellHistory.history;
 
   const completion = useCommandCompletion(

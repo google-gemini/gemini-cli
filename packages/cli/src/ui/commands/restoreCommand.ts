@@ -22,9 +22,7 @@ async function restoreAction(
   const { config, git: gitService } = services;
   const { addItem, loadHistory } = ui;
 
-  const checkpointDir = config?.getProjectTempDir()
-    ? path.join(config.getProjectTempDir(), 'checkpoints')
-    : undefined;
+  const checkpointDir = config?.storage.getProjectTempCheckpointsDir();
 
   if (!checkpointDir) {
     return {
@@ -125,9 +123,7 @@ async function completion(
 ): Promise<string[]> {
   const { services } = context;
   const { config } = services;
-  const checkpointDir = config?.getProjectTempDir()
-    ? path.join(config.getProjectTempDir(), 'checkpoints')
-    : undefined;
+  const checkpointDir = config?.storage.getProjectTempCheckpointsDir();
   if (!checkpointDir) {
     return [];
   }
