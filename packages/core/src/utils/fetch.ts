@@ -5,16 +5,16 @@
  */
 
 import { getErrorMessage, isNodeError } from './errors.js';
-import { URL } from 'url';
 
-const PRIVATE_IP_RANGES = [
+const PRIVATE_HOSTNAME_PATTERNS = [
   /^10\./,
   /^127\./,
   /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
   /^192\.168\./,
-  /^::1$/,
-  /^fc00:/,
-  /^fe80:/,
+  /^localhost$/,
+  /^\[::1\]$/,
+  /^\[fc00:/,
+  /^\[fe80:/,
 ];
 
 export class FetchError extends Error {
@@ -30,7 +30,7 @@ export class FetchError extends Error {
 export function isPrivateIp(url: string): boolean {
   try {
     const hostname = new URL(url).hostname;
-    return PRIVATE_IP_RANGES.some((range) => range.test(hostname));
+    return PRIVATE_HOSTNAME_PATTERNS.some((pattern) => pattern.test(hostname));
   } catch (_e) {
     return false;
   }
