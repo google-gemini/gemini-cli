@@ -134,6 +134,18 @@ export function KeypressProvider({
         };
       }
 
+      if (keyCode === 127) {
+        return {
+          name: 'backspace',
+          ctrl,
+          meta: alt,
+          shift,
+          paste: false,
+          sequence,
+          kittyProtocol: true,
+        };
+      }
+
       if (
         keyCode === KITTY_KEYCODE_ENTER ||
         keyCode === KITTY_KEYCODE_NUMPAD_ENTER

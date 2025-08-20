@@ -278,6 +278,34 @@ describe('KeypressContext - Kitty Protocol', () => {
     });
   });
 
+  describe('Backspace key handling', () => {
+    it('should recognize ctrl+backspace in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+
+      const { result } = renderHook(() => useKeypressContext(), {
+        wrapper: ({ children }) =>
+          wrapper({ children, kittyProtocolEnabled: true }),
+      });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Send kitty protocol sequence for ctrl+backspace: ESC[127;5u
+      act(() => {
+        stdin.sendKittySequence(`\x1b[127;5u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          kittyProtocol: true,
+          ctrl: true,
+        }),
+      );
+    });
+  });
+
   describe('paste mode', () => {
     it('should handle multiline paste as a single event', async () => {
       const keyHandler = vi.fn();
