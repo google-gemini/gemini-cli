@@ -187,10 +187,6 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
       );
 
       const result = await installer.install();
-      if (result.success) {
-        config.setIdeMode(true);
-        context.services.settings.setValue(SettingScope.User, 'ideMode', true);
-      }
       context.ui.addItem(
         {
           type: result.success ? 'info' : 'error',
@@ -198,6 +194,30 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         },
         Date.now(),
       );
+      if (result.success) {
+        // Wait for 2 seconds to give the extension time to activate.
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        context.services.settings.setValue(SettingScope.User, 'ideMode', true);
+        await config.setIdeModeAndSyncConnection(true);
+        const { messageType, content } = getIdeStatusMessage(ideClient);
+        if (messageType === 'error') {
+          context.ui.addItem(
+            {
+              type: messageType,
+              text: `Failed to automatically enable IDE integration. To fix this, open a new terminal, run the CLI and enter the command /ide enable.`,
+            },
+            Date.now(),
+          );
+        } else {
+          context.ui.addItem(
+            {
+              type: messageType,
+              text: content,
+            },
+            Date.now(),
+          );
+        }
+      }
     },
   };
 

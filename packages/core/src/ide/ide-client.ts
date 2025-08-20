@@ -104,8 +104,16 @@ export class IdeClient {
 
     this.setState(IDEConnectionStatus.Connecting);
 
+    const ideInfoFromFile = await this.getIdeInfoFromFile();
+    console.log("port file: ", ideInfoFromFile.workspacePath);
+    const workspacePath =
+      ideInfoFromFile.workspacePath ??
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+    console.log("env var: ", process.env['GEMINI_CLI_IDE_WORKSPACE_PATH']);
+    console.log("final: ", workspacePath)
+
     const { isValid, error } = IdeClient.validateWorkspacePath(
-      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'],
+      workspacePath,
       this.currentIdeDisplayName,
       process.cwd(),
     );
@@ -115,7 +123,8 @@ export class IdeClient {
       return;
     }
 
-    const portFromFile = await this.getPortFromFile();
+    const portFromFile = ideInfoFromFile.port;
+    console.log("port from file: ", ideInfoFromFile.port)
     if (portFromFile) {
       const connected = await this.establishConnection(portFromFile);
       if (connected) {
@@ -124,6 +133,7 @@ export class IdeClient {
     }
 
     const portFromEnv = this.getPortFromEnv();
+     console.log("port from env: ", this.getPortFromEnv())
     if (portFromEnv) {
       const connected = await this.establishConnection(portFromEnv);
       if (connected) {
@@ -311,7 +321,10 @@ export class IdeClient {
     return port;
   }
 
-  private async getPortFromFile(): Promise<string | undefined> {
+  private async getIdeInfoFromFile(): Promise<{
+    port?: string;
+    workspacePath?: string;
+  }> {
     try {
       const ideProcessId = await getIdeProcessId();
       const portFile = path.join(
@@ -319,10 +332,13 @@ export class IdeClient {
         `gemini-ide-server-${ideProcessId}.json`,
       );
       const portFileContents = await fs.promises.readFile(portFile, 'utf8');
-      const port = JSON.parse(portFileContents).port;
-      return port.toString();
+      const ideInfo = JSON.parse(portFileContents);
+      return {
+        port: ideInfo.port?.toString(),
+        workspacePath: ideInfo.workspacePath,
+      };
     } catch (_) {
-      return undefined;
+      return {};
     }
   }
 
