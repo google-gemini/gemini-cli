@@ -7,22 +7,10 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getReleaseVersion } from '../get-release-version';
 import { execSync } from 'child_process';
-import * as fs from 'fs';
 
 vi.mock('child_process', () => ({
   execSync: vi.fn(),
 }));
-
-vi.mock('fs', async (importOriginal) => {
-  const mod = await importOriginal();
-  return {
-    ...mod,
-    default: {
-      ...mod.default,
-      readFileSync: vi.fn(),
-    },
-  };
-});
 
 describe('getReleaseVersion', () => {
   const originalEnv = { ...process.env };
@@ -31,6 +19,16 @@ describe('getReleaseVersion', () => {
     vi.resetModules();
     process.env = { ...originalEnv };
     vi.useFakeTimers();
+    // Mock git commands
+    vi.mocked(execSync).mockImplementation((command) => {
+      if (command.startsWith('git tag')) {
+        return 'v1.1.0\nv1.0.0';
+      }
+      if (command.startsWith('git rev-parse')) {
+        return 'abcdef';
+      }
+      return '';
+    });
   });
 
   afterEach(() => {
@@ -43,14 +41,19 @@ describe('getReleaseVersion', () => {
     process.env.IS_NIGHTLY = 'true';
     const knownDate = new Date('2025-07-20T10:00:00.000Z');
     vi.setSystemTime(knownDate);
-    vi.mocked(fs.default.readFileSync).mockReturnValue(
-      JSON.stringify({ version: '0.1.0' }),
-    );
-    vi.mocked(execSync).mockReturnValue('abcdef');
+
     const { releaseTag, releaseVersion, npmTag } = getReleaseVersion();
-    expect(releaseTag).toBe('v0.1.0-nightly.250720.abcdef');
-    expect(releaseVersion).toBe('0.1.0-nightly.250720.abcdef');
+    expect(releaseTag).toBe('v1.3.0-nightly.20250720.abcdef');
+    expect(releaseVersion).toBe('1.3.0-nightly.20250720.abcdef');
     expect(npmTag).toBe('nightly');
+  });
+
+  it('should calculate preview version when IS_PREVIEW is true', () => {
+    process.env.IS_PREVIEW = 'true';
+    const { releaseTag, releaseVersion, npmTag } = getReleaseVersion();
+    expect(releaseTag).toBe('v1.2.0-preview');
+    expect(releaseVersion).toBe('1.2.0-preview');
+    expect(npmTag).toBe('preview');
   });
 
   it('should use manual version when provided', () => {
@@ -84,7 +87,7 @@ describe('getReleaseVersion', () => {
 
   it('should throw an error if no version is provided for non-nightly release', () => {
     expect(() => getReleaseVersion()).toThrow(
-      'Error: No version specified and this is not a nightly release.',
+      'Error: No version specified and this is not a nightly or preview release.',
     );
   });
 
@@ -93,19 +96,5 @@ describe('getReleaseVersion', () => {
     expect(() => getReleaseVersion()).toThrow(
       'Error: Versions with build metadata (+) are not supported for releases.',
     );
-  });
-});
-
-describe('get-release-version script', () => {
-  it('should print version JSON to stdout when executed directly', () => {
-    const expectedJson = {
-      releaseTag: 'v0.1.0-nightly.20250705',
-      releaseVersion: '0.1.0-nightly.20250705',
-      npmTag: 'nightly',
-    };
-    execSync.mockReturnValue(JSON.stringify(expectedJson));
-
-    const result = execSync('node scripts/get-release-version.js').toString();
-    expect(JSON.parse(result)).toEqual(expectedJson);
   });
 });
