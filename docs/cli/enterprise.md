@@ -6,7 +6,7 @@ This document outlines configuration patterns and best practices for deploying a
 
 ## Centralized Configuration: The System Settings File
 
-The most powerful tool for enterprise administration is the system-wide `settings.json` file. This file allows you to define a baseline configuration that applies to all users on a machine. Settings from system, user, and project-level `settings.json` files are merged together. For most settings, the system-wide configuration takes precedence, overriding any conflicting user or project-level settings. However, some settings, like `customThemes`, `mcpServers`, and `includeDirectories`, are merged from all configuration files, and if there are conflicting values (e.g., both workspace and system settings have a 'github' MCP server defined), the workspace value will take precedence.
+The most powerful tool for enterprise administration is the system-wide `settings.json` file. This file allows you to define a baseline configuration that applies to all users on a machine. For a complete overview of configuration options, see the [Configuration documentation](./configuration.md). Settings from system, user, and project-level `settings.json` files are merged together. For most settings, the system-wide configuration takes precedence, overriding any conflicting user or project-level settings. However, some settings, like `customThemes`, `mcpServers`, and `includeDirectories`, are merged from all configuration files, and if there are conflicting values (e.g., both workspace and system settings have a 'github' MCP server defined), the workspace value will take precedence.
 
 **Example of Merging and Precedence:**
 
@@ -98,7 +98,7 @@ By using the system settings file, you can enforce the security and configuratio
 
 ## Restricting Tool Access
 
-You can significantly enhance security by controlling which tools the Gemini model can use. This is achieved through the `coreTools` and `excludeTools` settings.
+You can significantly enhance security by controlling which tools the Gemini model can use. This is achieved through the `coreTools` and `excludeTools` settings. For a list of available tools, see the [Tools documentation](../tools/index.md).
 
 ### Allowlisting with `coreTools`
 
@@ -252,7 +252,7 @@ In corporate environments with strict network policies, you can configure Gemini
 
 ## Telemetry and Auditing
 
-For auditing and monitoring purposes, you can configure Gemini CLI to send telemetry data to a central location. This allows you to track tool usage and other events.
+For auditing and monitoring purposes, you can configure Gemini CLI to send telemetry data to a central location. This allows you to track tool usage and other events. For more information, see the [telemetry documentation](../telemetry.md).
 
 **Example:** Enable telemetry and send it to a local OTLP collector. If `otlpEndpoint` is not specified, it defaults to `http://localhost:4317`.
 
