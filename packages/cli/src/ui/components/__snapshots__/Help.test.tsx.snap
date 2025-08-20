@@ -1,0 +1,69 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<Help /> > renders with custom commands section when custom commands are provided 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ Basics:                                                                                          │
+│ Add context: Use @ to specify files for context (e.g., @src/myFile.ts) to target specific files  │
+│ or folders.                                                                                      │
+│ Shell mode: Execute shell commands via ! (e.g., !npm run start) or use natural language (e.g.    │
+│ start server).                                                                                   │
+│                                                                                                  │
+│ Commands:                                                                                        │
+│  /help - Show this help message.                                                                 │
+│  /exit - Exit the application.                                                                   │
+│  ! - shell command                                                                               │
+│                                                                                                  │
+│ Custom Commands:                                                                                 │
+│  /custom1 - [extension-foo] This is a custom command from an extension.                          │
+│  /custom2 - [fooMcpServer] This is a custom command from an MCP server.                          │
+│                                                                                                  │
+│ Keyboard Shortcuts:                                                                              │
+│ Alt+Left/Right - Jump through words in the input                                                 │
+│ Ctrl+C - Quit application                                                                        │
+│ Ctrl+J - New line (Alt+Enter works for certain linux distros)                                    │
+│ Ctrl+L - Clear the screen                                                                        │
+│ Ctrl+X - Open input in external editor                                                           │
+│ Ctrl+Y - Toggle YOLO mode                                                                        │
+│ Enter - Send message                                                                             │
+│ Esc - Cancel operation / Clear input (double press)                                              │
+│ Shift+Tab - Toggle auto-accepting edits                                                          │
+│ Up/Down - Cycle through your prompt history                                                      │
+│                                                                                                  │
+│ For a full list of shortcuts, see docs/keyboard-shortcuts.md                                     │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`<Help /> > renders without custom commands section when none are provided 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ Basics:                                                                                          │
+│ Add context: Use @ to specify files for context (e.g., @src/myFile.ts) to target specific files  │
+│ or folders.                                                                                      │
+│ Shell mode: Execute shell commands via ! (e.g., !npm run start) or use natural language (e.g.    │
+│ start server).                                                                                   │
+│                                                                                                  │
+│ Commands:                                                                                        │
+│  /help - Show this help message.                                                                 │
+│  /exit - Exit the application.                                                                   │
+│  ! - shell command                                                                               │
+│                                                                                                  │
+│ Keyboard Shortcuts:                                                                              │
+│ Alt+Left/Right - Jump through words in the input                                                 │
+│ Ctrl+C - Quit application                                                                        │
+│ Ctrl+J - New line (Alt+Enter works for certain linux distros)                                    │
+│ Ctrl+L - Clear the screen                                                                        │
+│ Ctrl+X - Open input in external editor                                                           │
+│ Ctrl+Y - Toggle YOLO mode                                                                        │
+│ Enter - Send message                                                                             │
+│ Esc - Cancel operation / Clear input (double press)                                              │
+│ Shift+Tab - Toggle auto-accepting edits                                                          │
+│ Up/Down - Cycle through your prompt history                                                      │
+│                                                                                                  │
+│ For a full list of shortcuts, see docs/keyboard-shortcuts.md                                     │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
