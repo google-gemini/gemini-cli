@@ -42,7 +42,8 @@ describe('runNonInteractive', () => {
     sendMessageStream: vi.Mock;
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // <-- Made beforeEach async
     mockCoreExecuteToolCall = vi.mocked(executeToolCall);
     mockShutdownTelemetry = vi.mocked(shutdownTelemetry);
 
@@ -57,6 +58,7 @@ describe('runNonInteractive', () => {
     mockToolRegistry = {
       getTool: vi.fn(),
       getFunctionDeclarations: vi.fn().mockReturnValue([]),
+      discoverTools: vi.fn(),
     } as unknown as ToolRegistry;
 
     mockGeminiClient = {
@@ -66,13 +68,21 @@ describe('runNonInteractive', () => {
     mockConfig = {
       initialize: vi.fn().mockResolvedValue(undefined),
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
       getMaxSessionTurns: vi.fn().mockReturnValue(10),
       getIdeMode: vi.fn().mockReturnValue(false),
       getFullContext: vi.fn().mockReturnValue(false),
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
       getDebugMode: vi.fn().mockReturnValue(false),
     } as unknown as Config;
+
+    const { handleAtCommand } = await import(
+      './ui/hooks/atCommandProcessor.js'
+    );
+    vi.mocked(handleAtCommand).mockImplementation(async ({ query }) => ({
+      processedQuery: [{ text: query }],
+      shouldProceed: true,
+    }));
   });
 
   afterEach(() => {
@@ -138,6 +148,7 @@ describe('runNonInteractive', () => {
     expect(mockCoreExecuteToolCall).toHaveBeenCalledWith(
       mockConfig,
       expect.objectContaining({ name: 'testTool' }),
+      mockToolRegistry,
       expect.any(AbortSignal),
     );
     expect(mockGeminiClient.sendMessageStream).toHaveBeenNthCalledWith(
@@ -164,14 +175,16 @@ describe('runNonInteractive', () => {
     mockCoreExecuteToolCall.mockResolvedValue({
       error: new Error('Execution failed'),
       errorType: ToolErrorType.EXECUTION_FAILED,
-      responseParts: {
-        functionResponse: {
-          name: 'errorTool',
-          response: {
-            output: 'Error: Execution failed',
+      responseParts: [
+        {
+          functionResponse: {
+            name: 'errorTool',
+            response: {
+              output: 'Error: Execution failed',
+            },
           },
         },
-      },
+      ],
       resultDisplay: 'Execution failed',
     });
     const finalResponse: ServerGeminiStreamEvent[] = [
