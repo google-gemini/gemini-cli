@@ -116,7 +116,7 @@ export async function runNonInteractive(
 
           const toolResponse = await executeToolCall(
             config,
-            requestInfo,         
+            requestInfo,
             abortController.signal,
           );
 
