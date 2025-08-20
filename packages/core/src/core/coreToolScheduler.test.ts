@@ -856,6 +856,14 @@ describe('CoreToolScheduler request queueing', () => {
       removeMcpToolsByServer: () => {},
       getAllTools: () => [],
       getToolsByServer: () => [],
+      tools: new Map(),
+      config: mockConfig,
+      mcpClientManager: undefined,
+      getToolByName: () => testTool,
+      getToolByDisplayName: () => testTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      discovery: {},
     };
 
     const onAllToolCallsComplete = vi.fn();
