@@ -746,10 +746,10 @@ describe('DiscoveredMCPTool', () => {
 
   describe('DiscoveredMCPToolInvocation', () => {
     it('should return the stringified params from getDescription', () => {
-      const params = { param: 'testValue' };
+      const params = { param: 'testValue', param2: 'anotherOne' };
       const invocation = tool.build(params);
       const description = invocation.getDescription();
-      expect(description).toBe('{"param":"testValue"}');
+      expect(description).toBe('{"param":"testValue","param2":"anotherOne"}');
     });
   });
 });
