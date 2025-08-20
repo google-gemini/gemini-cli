@@ -115,15 +115,15 @@ export class McpPromptLoader implements ICommandLoader {
               }
               const result = await prompt.invoke(promptInputs);
 
-              if (result.error) {
+              if (result['error']) {
                 return {
                   type: 'message',
                   messageType: 'error',
-                  content: `Error invoking prompt: ${result.error}`,
+                  content: `Error invoking prompt: ${result['error']}`,
                 };
               }
 
-              if (!result.messages?.[0]?.content?.text) {
+              if (!result.messages?.[0]?.content?.['text']) {
                 return {
                   type: 'message',
                   messageType: 'error',

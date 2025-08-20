@@ -11,6 +11,7 @@ import {
   FileDiscoveryService,
   GlobTool,
   ReadManyFilesTool,
+  StandardFileSystemService,
   ToolRegistry,
 } from '@google/gemini-cli-core';
 import * as os from 'os';
@@ -56,11 +57,18 @@ describe('handleAtCommand', () => {
         respectGitIgnore: true,
         respectGeminiIgnore: true,
       }),
+      getFileSystemService: () => new StandardFileSystemService(),
       getEnableRecursiveFileSearch: vi.fn(() => true),
       getWorkspaceContext: () => ({
         isPathWithinWorkspace: () => true,
         getDirectories: () => [testRootDir],
       }),
+      getMcpServers: () => ({}),
+      getMcpServerCommand: () => undefined,
+      getPromptRegistry: () => ({
+        getPromptsByServer: () => [],
+      }),
+      getDebugMode: () => false,
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig);
