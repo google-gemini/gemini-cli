@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -152,7 +153,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return this.displayName;
+    return safeJsonStringify(this.params);
   }
 }
 
