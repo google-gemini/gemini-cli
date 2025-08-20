@@ -31,7 +31,7 @@ import {
   AuthType,
   GeminiClient,
   GeminiEventType as ServerGeminiEventType,
-  AnyToolInvocation,  
+  AnyToolInvocation,
   ToolErrorType, // <-- Import ToolErrorType
 } from '@google/gemini-cli-core';
 import { Part, PartListUnion } from '@google/genai';
