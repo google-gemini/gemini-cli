@@ -219,7 +219,7 @@ describe('ReadFileTool', () => {
         returnDisplay: 'Path is a directory.',
         error: {
           message: `Path is a directory, not a file: ${dirPath}`,
-          type: ToolErrorType.INVALID_TOOL_PARAMS,
+          type: ToolErrorType.TARGET_IS_DIRECTORY,
         },
       });
     });
