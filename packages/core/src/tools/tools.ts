@@ -309,11 +309,6 @@ export type AnyDeclarativeTool = DeclarativeTool<object, ToolResult>;
 
 export interface ToolResult {
   /**
-   * A short, one-line summary of the tool's action and result.
-   * e.g., "Read 5 files", "Wrote 256 bytes to foo.txt"
-   */
-  summary?: string;
-  /**
    * Content meant to be included in LLM history.
    * This should represent the factual outcome of the tool execution.
    */
