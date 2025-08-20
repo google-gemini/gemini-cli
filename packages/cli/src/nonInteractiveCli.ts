@@ -54,6 +54,8 @@ export async function runNonInteractive(
     if (!shouldProceed || !processedQuery) {
       // An error occurred during @include processing (e.g., file not found).
       // The error message is already logged by handleAtCommand.
+      console.error('Exiting due to an error processing the @ command.');
+      process.exit(1);
       return;
     }
 
