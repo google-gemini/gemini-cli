@@ -1019,7 +1019,7 @@ describe('CoreToolScheduler programming_language logging', () => {
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as unknown as ToolRegistry),
+      toolRegistry: toolRegistry as unknown as ToolRegistry,
       onAllToolCallsComplete,
       onToolCallsUpdate: () => {},
       getPreferredEditor: () => 'vscode',

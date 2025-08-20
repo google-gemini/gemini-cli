@@ -22,8 +22,6 @@ import {
   TEST_ONLY,
 } from './clearcut-logger.js';
 import { ConfigParameters } from '../../config/config.js';
-import * as userAccount from '../../utils/user_account.js';
-import * as userId from '../../utils/user_id.js';
 import { ToolCallEvent, ToolCallDecision } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
