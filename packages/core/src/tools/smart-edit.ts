@@ -26,7 +26,7 @@ import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
 import { IDEConnectionStatus } from '../ide/ide-client.js';
-import { FixLLMEditWithInstruction } from '../utils/editCorrector.js';
+import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
 
 export function applyReplacement(
   currentContent: string | null,
@@ -123,7 +123,7 @@ export async function performFuzzyReplacement(
       const newBlockWithIndent = replaceLines.map(
         (line: string) => `${indentation}${line}`,
       );
-      sourceLines.splice(i, searchLinesStripped.length, ...newBlockWithIndent);
+      sourceLines.splice(i, searchLinesStripped.length, newBlockWithIndent.join('\n'));
       i += replaceLines.length;
     } else {
       i++;
