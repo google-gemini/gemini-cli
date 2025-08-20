@@ -103,6 +103,10 @@ describe('IDEServer', () => {
       .mocked(replaceMock)
       .mock.calls.find((call) => call[0] === 'GEMINI_CLI_IDE_SERVER_PORT')?.[1];
 
+    if (port === undefined) {
+      expect.fail('Port was not set');
+    }
+
     const expectedPortFile = path.join(
       '/tmp',
       `gemini-ide-server-${process.ppid}.json`,
