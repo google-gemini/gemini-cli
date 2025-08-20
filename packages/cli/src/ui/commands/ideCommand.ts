@@ -66,7 +66,7 @@ function formatFileList(openFiles: File[]): string {
       const isDuplicate = (basenameCounts.get(basename) || 0) > 1;
       const parentDir = path.basename(path.dirname(file.path));
       const displayName = isDuplicate
-        ? `${basename} (/${parentDir})` 
+        ? `${basename} (/${parentDir})`
         : basename;
 
       return `  - ${displayName}${file.isActive ? ' (active)' : ''}`;
@@ -199,7 +199,10 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         // Poll for up to 5 seconds for the extension to activate.
         for (let i = 0; i < 10; i++) {
           await config.setIdeModeAndSyncConnection(true);
-          if (ideClient.getConnectionStatus().status === IDEConnectionStatus.Connected) {
+          if (
+            ideClient.getConnectionStatus().status ===
+            IDEConnectionStatus.Connected
+          ) {
             break;
           }
           await new Promise((resolve) => setTimeout(resolve, 500));
